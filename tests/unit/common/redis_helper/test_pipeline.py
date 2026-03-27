@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -12,7 +13,6 @@ from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 
 @pytest.mark.redis
-@pytest.mark.asyncio
 async def test_pipeline_single_instance(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     rconn = RedisConnectionInfo(
@@ -23,7 +23,7 @@ async def test_pipeline_single_instance(redis_container: tuple[str, HostPortPair
         service_name=None,
     )
 
-    async def _build_pipeline_async(r: Redis) -> Pipeline:
+    async def _build_pipeline_async(r: Redis[Any]) -> Pipeline[Any]:
         pipe = r.pipeline(transaction=False)
         await pipe.set("abc", "123")
         await pipe.incr("abc")
@@ -38,7 +38,6 @@ async def test_pipeline_single_instance(redis_container: tuple[str, HostPortPair
 
 
 @pytest.mark.redis
-@pytest.mark.asyncio
 async def test_pipeline_single_instance_retries(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     rconn = RedisConnectionInfo(
@@ -57,7 +56,7 @@ async def test_pipeline_single_instance_retries(redis_container: tuple[str, Host
     )
     patcher.start()
 
-    async def _build_pipeline_async(r: Redis) -> Pipeline:
+    async def _build_pipeline_async(r: Redis[Any]) -> Pipeline[Any]:
         nonlocal build_count, patcher
         build_count += 1
         if build_count == 3:

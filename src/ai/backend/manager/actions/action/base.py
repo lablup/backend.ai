@@ -2,14 +2,16 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, TypeVar
+from typing import TypeVar
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import ErrorCode
-from ai.backend.manager.actions.types import ActionSpec, OperationStatus
+from ai.backend.manager.actions.types import ActionOperationType, ActionSpec, OperationStatus
+from ai.backend.manager.data.common.types import SearchResult
 
 
 class BaseAction(ABC):
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         """
         Return the ID of the entity this action operates on.
         This returns `None` by default because subclasses may not always need to specify an entity ID.
@@ -18,12 +20,12 @@ class BaseAction(ABC):
 
     @classmethod
     @abstractmethod
-    def entity_type(cls) -> str:
+    def entity_type(cls) -> EntityType:
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
-    def operation_type(cls) -> str:
+    def operation_type(cls) -> ActionOperationType:
         raise NotImplementedError
 
     @classmethod
@@ -42,20 +44,28 @@ class BaseActionTriggerMeta:
 
 class BaseActionResult(ABC):
     @abstractmethod
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         raise NotImplementedError
+
+
+@dataclass
+class SearchActionResult[T](BaseActionResult):
+    result: SearchResult[T]
+
+    def entity_id(self) -> str | None:
+        return None
 
 
 @dataclass
 class BaseActionResultMeta:
     action_id: uuid.UUID
-    entity_id: Optional[str]
+    entity_id: str | None
     status: OperationStatus
     description: str
     started_at: datetime
     ended_at: datetime
     duration: timedelta
-    error_code: Optional[ErrorCode]
+    error_code: ErrorCode | None
 
 
 TAction = TypeVar("TAction", bound=BaseAction)

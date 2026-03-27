@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.errors.repository import UpsertEmptyResultError
 from ai.backend.manager.models.base import Base
@@ -17,7 +19,7 @@ if TYPE_CHECKING:
 TRow = TypeVar("TRow", bound=Base)
 
 
-class UpserterSpec(ABC, Generic[TRow]):
+class UpserterSpec[TRow: Base](ABC):
     """Abstract base class for upsert operations.
 
     Implementations specify what to upsert by providing:
@@ -53,7 +55,7 @@ class UpserterSpec(ABC, Generic[TRow]):
 
 
 @dataclass
-class Upserter(Generic[TRow]):
+class Upserter[TRow: Base]:
     """Bundles upserter spec for upsert operations.
 
     Attributes:
@@ -64,13 +66,13 @@ class Upserter(Generic[TRow]):
 
 
 @dataclass
-class UpserterResult(Generic[TRow]):
+class UpserterResult[TRow: Base]:
     """Result of executing an upsert operation."""
 
     row: TRow
 
 
-async def execute_upserter(
+async def execute_upserter[TRow: Base](
     db_sess: SASession,
     upserter: Upserter[TRow],
     *,
@@ -107,7 +109,7 @@ async def execute_upserter(
     """
     spec = upserter.spec
     row_class = spec.row_class
-    table = row_class.__table__  # type: ignore[attr-defined]
+    table = row_class.__table__
     insert_values = spec.build_insert_values()
     update_values = spec.build_update_values()
 
@@ -129,3 +131,64 @@ async def execute_upserter(
 
     created_row: TRow = row_class(**dict(row_data._mapping))
     return UpserterResult(row=created_row)
+
+
+@dataclass
+class BulkUpserter[TRow: Base]:
+    """Bundles multiple upserter specs for bulk upsert operations.
+
+    Attributes:
+        specs: Sequence of UpserterSpec implementations defining what to upsert.
+    """
+
+    specs: Sequence[UpserterSpec[TRow]]
+
+
+@dataclass
+class BulkUpserterResult:
+    """Result of executing a bulk upsert operation."""
+
+    upserted_count: int
+
+
+async def execute_bulk_upserter[TRow: Base](
+    db_sess: SASession,
+    bulk_upserter: BulkUpserter[TRow],
+    *,
+    index_elements: list[str],
+) -> BulkUpserterResult:
+    """Execute bulk INSERT ON CONFLICT UPDATE with multiple specs.
+
+    Args:
+        db_sess: Database session (must be writable)
+        bulk_upserter: BulkUpserter containing specs for rows to insert/update
+        index_elements: Column names to use for conflict detection
+
+    Returns:
+        BulkUpserterResult containing count of affected rows
+    """
+    specs = bulk_upserter.specs
+
+    if not specs:
+        return BulkUpserterResult(upserted_count=0)
+
+    # All specs must have the same row_class
+    first_spec = specs[0]
+    row_class = first_spec.row_class
+    table = row_class.__table__
+
+    # Build values list from all specs
+    items = [spec.build_insert_values() for spec in specs]
+
+    # Get columns to update from first spec (structure is same for all specs)
+    # Use EXCLUDED pseudo-table to reference incoming values
+    update_columns = list(first_spec.build_update_values().keys())
+
+    insert_stmt = pg_insert(table).values(items)
+    stmt = insert_stmt.on_conflict_do_update(
+        index_elements=index_elements,
+        set_={col: insert_stmt.excluded[col] for col in update_columns},
+    )
+
+    result = await db_sess.execute(stmt)
+    return BulkUpserterResult(upserted_count=cast(CursorResult[Any], result).rowcount)

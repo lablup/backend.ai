@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, TypeAlias, TypeVar
+from typing import Any, TypeVar, cast
 from uuid import UUID
 
 import aiohttp
@@ -46,7 +46,7 @@ _default_list_fields = (
 )
 
 T = TypeVar("T")
-list_: TypeAlias = list[T]
+type list_[T] = list[T]
 
 
 class ResponseFailed(Exception):
@@ -55,9 +55,9 @@ class ResponseFailed(Exception):
 
 class VFolderByName(BaseFunction):
     name: str
-    id: Optional[UUID] = None
+    id: UUID | None = None
 
-    def __init__(self, name: str, id: Optional[UUID] = None) -> None:
+    def __init__(self, name: str, id: UUID | None = None) -> None:
         self.name = name
         self.id = id
 
@@ -66,13 +66,13 @@ class VFolderByName(BaseFunction):
     async def create(
         cls,
         name: str,
-        host: Optional[str] = None,
-        unmanaged_path: Optional[str] = None,
-        group: Optional[str] = None,
+        host: str | None = None,
+        unmanaged_path: str | None = None,
+        group: str | None = None,
         usage_mode: str = "general",
         permission: str = "rw",
         cloneable: bool = False,
-    ):
+    ) -> dict[str, Any]:
         rqst = Request("POST", "/folders")
         rqst.set_json({
             "name": name,
@@ -84,11 +84,12 @@ class VFolderByName(BaseFunction):
             "cloneable": cloneable,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def delete_by_id(cls, oid):
+    async def delete_by_id(cls, oid: str) -> dict[str, Any]:
         rqst = Request("DELETE", "/folders")
         rqst.set_json({"id": oid})
         async with rqst.fetch():
@@ -96,24 +97,25 @@ class VFolderByName(BaseFunction):
 
     @api_function
     @classmethod
-    async def list(cls, list_all=False):
+    async def list(cls, list_all: bool = False) -> dict[str, Any]:
         rqst = Request("GET", "/folders")
         rqst.set_json({"all": list_all})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
     async def paginated_list(
         cls,
-        group: Optional[str] = None,
+        group: str | None = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> PaginatedResult[dict]:
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of vfolders. Domain admins can only get domain vfolders.
 
@@ -140,9 +142,9 @@ class VFolderByName(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> PaginatedResult[dict]:
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of own vfolders.
 
@@ -167,9 +169,9 @@ class VFolderByName(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> PaginatedResult[dict]:
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of invited vfolders.
 
@@ -194,9 +196,9 @@ class VFolderByName(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> PaginatedResult[dict]:
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of invited vfolders.
 
@@ -228,34 +230,38 @@ class VFolderByName(BaseFunction):
 
     @api_function
     @classmethod
-    async def list_hosts(cls):
+    async def list_hosts(cls) -> dict[str, Any]:
         rqst = Request("GET", "/folders/_/hosts")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def list_all_hosts(cls):
+    async def list_all_hosts(cls) -> dict[str, Any]:
         rqst = Request("GET", "/folders/_/all_hosts")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def list_allowed_types(cls):
+    async def list_allowed_types(cls) -> dict[str, Any]:
         rqst = Request("GET", "/folders/_/allowed_types")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
-    async def info(self):
+    async def info(self) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("GET", f"/folders/{self.request_key}")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
-    async def delete(self):
+    async def delete(self) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("DELETE", "/folders")
         rqst.set_json({
@@ -284,11 +290,11 @@ class VFolderByName(BaseFunction):
             return {}
 
     @api_function
-    async def recover(self):
+    async def recover(self) -> Mapping[str, Any]:
         return await self._restore()
 
     @api_function
-    async def restore(self):
+    async def restore(self) -> Mapping[str, Any]:
         return await self._restore()
 
     @api_function
@@ -309,7 +315,7 @@ class VFolderByName(BaseFunction):
             return {}
 
     @api_function
-    async def rename(self, new_name):
+    async def rename(self, new_name: str) -> str:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/rename")
         rqst.set_json({
@@ -319,8 +325,8 @@ class VFolderByName(BaseFunction):
             self.name = new_name
             return await resp.text()
 
-    def _write_file(self, file_path: Path, mode: str, q: janus._SyncQueueProxy[bytes]):
-        with open(file_path, mode) as f:
+    def _write_file(self, file_path: Path, mode: str, q: janus._SyncQueueProxy[bytes]) -> None:
+        with file_path.open(mode) as f:
             while True:
                 chunk = q.get()
                 if not chunk:
@@ -389,6 +395,7 @@ class VFolderByName(BaseFunction):
                                         )
                                         await asyncio.sleep(0)
                                         max_attempts = 10
+                                        chunk: bytes = b""
                                         while True:
                                             try:
                                                 async for attempt in AsyncRetrying(
@@ -405,10 +412,10 @@ class VFolderByName(BaseFunction):
                                                             chunk = await raw_resp.content.read(
                                                                 chunk_size
                                                             )
-                                                        except TimeoutError:
-                                                            raise TryAgain
-                                            except RetryError:
-                                                raise ResponseFailed
+                                                        except TimeoutError as e:
+                                                            raise TryAgain from e
+                                            except RetryError as e:
+                                                raise ResponseFailed from e
                                             range_start += len(chunk)
                                             pbar.update(len(chunk))
                                             if not chunk:
@@ -423,21 +430,23 @@ class VFolderByName(BaseFunction):
                         ResponseFailed,
                         aiohttp.ClientPayloadError,
                         aiohttp.ClientConnectorError,
-                    ):
-                        raise TryAgain
-        except RetryError:
-            raise RuntimeError(f"Downloading {file_path.name} failed after {max_retries} retries")
+                    ) as e:
+                        raise TryAgain from e
+        except RetryError as e:
+            raise RuntimeError(
+                f"Downloading {file_path.name} failed after {max_retries} retries"
+            ) from e
 
     @api_function
     async def download(
         self,
         relative_paths: Sequence[str | Path],
         *,
-        basedir: Optional[str | Path] = None,
-        dst_dir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
+        dst_dir: str | Path | None = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         show_progress: bool = False,
-        address_map: Optional[Mapping[str, str]] = None,
+        address_map: Mapping[str, str] | None = None,
         max_retries: int = 20,
     ) -> None:
         base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
@@ -474,10 +483,10 @@ class VFolderByName(BaseFunction):
     async def _upload_files(
         self,
         file_paths: Sequence[Path],
-        basedir: Optional[str | Path] = None,
-        dst_dir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
+        dst_dir: str | Path | None = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
-        address_map: Optional[Mapping[str, str]] = None,
+        address_map: Mapping[str, str] | None = None,
     ) -> None:
         base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
         await self.update_id_by_name()
@@ -509,9 +518,9 @@ class VFolderByName(BaseFunction):
                 upload_url = URL(overriden_url).with_query(params)
             tus_client = client.TusClient()
             if basedir:
-                input_file = open(base_path / file_path, "rb")
+                input_file = (base_path / file_path).open("rb")
             else:
-                input_file = open(str(Path(file_path).relative_to(base_path)), "rb")
+                input_file = Path(file_path).relative_to(base_path).open("rb")
             print(f"Uploading {base_path / file_path} via {upload_info['url']} ...")
             # TODO: refactor out the progress bar
             uploader = tus_client.async_uploader(
@@ -526,10 +535,10 @@ class VFolderByName(BaseFunction):
     async def _upload_recursively(
         self,
         source: Sequence[Path],
-        basedir: Optional[str | Path] = None,
-        dst_dir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
+        dst_dir: str | Path | None = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
-        address_map: Optional[Mapping[str, str]] = None,
+        address_map: Mapping[str, str] | None = None,
     ) -> None:
         dir_list: list[Path] = []
         file_list: list[Path] = []
@@ -551,11 +560,11 @@ class VFolderByName(BaseFunction):
         self,
         sources: Sequence[str | Path],
         *,
-        basedir: Optional[str | Path] = None,
+        basedir: str | Path | None = None,
         recursive: bool = False,
-        dst_dir: Optional[str | Path] = None,
+        dst_dir: str | Path | None = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
-        address_map: Optional[Mapping[str, str]] = None,
+        address_map: Mapping[str, str] | None = None,
         show_progress: bool = False,
     ) -> None:
         if basedir:
@@ -570,8 +579,8 @@ class VFolderByName(BaseFunction):
     async def _mkdir(
         self,
         path: str | Path | list_[str | Path],
-        parents: Optional[bool] = False,
-        exist_ok: Optional[bool] = False,
+        parents: bool | None = False,
+        exist_ok: bool | None = False,
     ) -> ResultSet:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/mkdir")
@@ -582,19 +591,19 @@ class VFolderByName(BaseFunction):
         })
         async with rqst.fetch() as resp:
             reply = await resp.json()
-            return reply["results"]
+            return cast(ResultSet, reply["results"])
 
     @api_function
     async def mkdir(
         self,
         path: str | Path | list_[str | Path],
-        parents: Optional[bool] = False,
-        exist_ok: Optional[bool] = False,
+        parents: bool | None = False,
+        exist_ok: bool | None = False,
     ) -> ResultSet:
         return await self._mkdir(path, parents, exist_ok)
 
     @api_function
-    async def rename_file(self, target_path: str, new_name: str):
+    async def rename_file(self, target_path: str, new_name: str) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/rename-file")
         rqst.set_json({
@@ -602,10 +611,11 @@ class VFolderByName(BaseFunction):
             "new_name": new_name,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
-    async def move_file(self, src_path: str, dst_path: str):
+    async def move_file(self, src_path: str, dst_path: str) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/move-file")
         rqst.set_json({
@@ -613,10 +623,11 @@ class VFolderByName(BaseFunction):
             "dst": dst_path,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
-    async def delete_files(self, files: Sequence[str | Path], recursive: bool = False):
+    async def delete_files(self, files: Sequence[str | Path], recursive: bool = False) -> str:
         await self.update_id_by_name()
         rqst = Request("DELETE", f"/folders/{self.request_key}/delete-files")
         rqst.set_json({
@@ -627,14 +638,15 @@ class VFolderByName(BaseFunction):
             return await resp.text()
 
     @api_function
-    async def list_files(self, path: str | Path = "."):
+    async def list_files(self, path: str | Path = ".") -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("GET", f"/folders/{self.request_key}/files", params={"path": str(path)})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
-    async def invite(self, perm: str, emails: Sequence[str]):
+    async def invite(self, perm: str, emails: Sequence[str]) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/invite")
         rqst.set_json({
@@ -642,61 +654,75 @@ class VFolderByName(BaseFunction):
             "user_ids": emails,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def invitations(cls):
+    async def invitations(cls) -> dict[str, Any]:
         rqst = Request("GET", "/folders/invitations/list")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def accept_invitation(cls, inv_id: str):
+    async def accept_invitation(cls, inv_id: str) -> dict[str, Any]:
         rqst = Request("POST", "/folders/invitations/accept")
         rqst.set_json({"inv_id": inv_id})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def delete_invitation(cls, inv_id: str):
+    async def delete_invitation(cls, inv_id: str) -> dict[str, Any]:
         rqst = Request("DELETE", "/folders/invitations/delete")
         rqst.set_json({"inv_id": inv_id})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def get_fstab_contents(cls, agent_id=None):
+    async def get_fstab_contents(cls, agent_id: str | None = None) -> dict[str, Any]:
+        params: dict[str, str | int] = {}
+        if agent_id is not None:
+            params["agent_id"] = agent_id
         rqst = Request(
             "GET",
             "/folders/_/fstab",
-            params={
-                "agent_id": agent_id,
-            },
+            params=params,
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def get_performance_metric(cls, folder_host: str):
+    async def get_performance_metric(cls, folder_host: str) -> dict[str, Any]:
         rqst = Request("GET", "/folders/_/perf-metric", params={"folder_host": folder_host})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def list_mounts(cls):
+    async def list_mounts(cls) -> dict[str, Any]:
         rqst = Request("GET", "/folders/_/mounts")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def mount_host(cls, name: str, fs_location: str, options=None, edit_fstab: bool = False):
+    async def mount_host(
+        cls,
+        name: str,
+        fs_location: str,
+        options: dict[str, Any] | None = None,
+        edit_fstab: bool = False,
+    ) -> dict[str, Any]:
         rqst = Request("POST", "/folders/_/mounts")
         rqst.set_json({
             "name": name,
@@ -705,21 +731,23 @@ class VFolderByName(BaseFunction):
             "edit_fstab": edit_fstab,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def umount_host(cls, name: str, edit_fstab: bool = False):
+    async def umount_host(cls, name: str, edit_fstab: bool = False) -> dict[str, Any]:
         rqst = Request("DELETE", "/folders/_/mounts")
         rqst.set_json({
             "name": name,
             "edit_fstab": edit_fstab,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
-    async def share(self, perm: str, emails: Sequence[str]):
+    async def share(self, perm: str, emails: Sequence[str]) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/share")
         rqst.set_json({
@@ -727,34 +755,37 @@ class VFolderByName(BaseFunction):
             "emails": emails,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
-    async def unshare(self, emails: Sequence[str]):
+    async def unshare(self, emails: Sequence[str]) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("DELETE", f"/folders/{self.request_key}/unshare")
         rqst.set_json({
             "emails": emails,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
-    async def leave(self, shared_user_uuid=None):
+    async def leave(self, shared_user_uuid: str | None = None) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/leave")
         rqst.set_json({"shared_user_uuid": shared_user_uuid})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     async def clone(
         self,
         target_name: str,
-        target_host: Optional[str] = None,
+        target_host: str | None = None,
         usage_mode: str = "general",
         permission: str = "rw",
-    ):
+    ) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/clone")
         rqst.set_json({
@@ -764,12 +795,13 @@ class VFolderByName(BaseFunction):
             "permission": permission,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     async def update_options(
-        self, name: str, permission: Optional[str] = None, cloneable: Optional[bool] = None
-    ):
+        self, name: str, permission: str | None = None, cloneable: bool | None = None
+    ) -> str:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/update-options")
         rqst.set_json({
@@ -781,21 +813,25 @@ class VFolderByName(BaseFunction):
 
     @api_function
     @classmethod
-    async def list_shared_vfolders(cls):
+    async def list_shared_vfolders(cls) -> dict[str, Any]:
         rqst = Request("GET", "folders/_/shared")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def shared_vfolder_info(cls, vfolder_id: str):
+    async def shared_vfolder_info(cls, vfolder_id: str) -> dict[str, Any]:
         rqst = Request("GET", "folders/_/shared", params={"vfolder_id": vfolder_id})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
-    async def update_shared_vfolder(cls, vfolder: str, user: str, perm: Optional[str] = None):
+    async def update_shared_vfolder(
+        cls, vfolder: str, user: str, perm: str | None = None
+    ) -> dict[str, Any]:
         rqst = Request("POST", "/folders/_/shared")
         rqst.set_json({
             "vfolder": vfolder,
@@ -803,18 +839,22 @@ class VFolderByName(BaseFunction):
             "perm": perm,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def change_vfolder_ownership(cls, vfolder: str, user_email: str):
+    async def change_vfolder_ownership(cls, vfolder: str, user_email: str) -> dict[str, Any]:
         rqst = Request("POST", "/folders/_/change-ownership")
         rqst.set_json({
             "vfolder": vfolder,
             "user_email": user_email,
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     async def update_id_by_name(self) -> None:
         if self.id is None:

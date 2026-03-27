@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import click
 
@@ -41,7 +41,7 @@ def main(
     ctx: click.Context,
     debug: bool,
     log_level: str,
-    config_path: Optional[Path] = None,
+    config_path: Path | None = None,
 ) -> None:
     """
     Proxy Worker Administration CLI
@@ -60,11 +60,11 @@ def main(
 @click.option(
     "--output",
     "-o",
-    default="-",
+    default=None,
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def generate_example_configuration(output: Path) -> None:
+def generate_example_configuration(output: Path | None) -> None:
     """
     Generates example TOML configuration file for Backend.AI Proxy Worker.
     """
@@ -75,10 +75,10 @@ def generate_example_configuration(output: Path) -> None:
     from ai.backend.appproxy.worker.config import ServerConfig
 
     generated_example = generate_example_json(ServerConfig)
-    if output == "-" or output is None:
+    if output is None:
         print(tomli_w.dumps(ensure_json_serializable(generated_example)))
     else:
-        with open(output, mode="w") as fw:
+        with output.open(mode="w") as fw:
             fw.write(tomli_w.dumps(ensure_json_serializable(generated_example)))
 
 
@@ -92,7 +92,7 @@ async def _generate() -> dict[str, Any]:
     from ai.backend.appproxy.worker.server import global_subapp_pkgs
 
     cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
     }
@@ -109,11 +109,11 @@ async def _generate() -> dict[str, Any]:
 @click.option(
     "--output",
     "-o",
-    default="-",
+    default=None,
     type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
-def generate_openapi_spec(output: Path) -> None:
+def generate_openapi_spec(output: Path | None) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
@@ -121,26 +121,29 @@ def generate_openapi_spec(output: Path) -> None:
     import json
 
     openapi = asyncio.run(_generate())
-    if output == "-" or output is None:
+    if output is None:
         print(json.dumps(openapi, ensure_ascii=False, indent=2))
     else:
-        with open(output, mode="w") as fw:
+        with output.open(mode="w") as fw:
             fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.dependencies:cli")
-def dependencies():
+def dependencies() -> click.Group:  # type: ignore[empty-body]
     """Command set for dependency verification and validation."""
+    ...
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.health:cli")
-def health():
+def health() -> click.Group:  # type: ignore[empty-body]
     """Command set for health checking."""
+    ...
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.config:cli")
-def config():
+def config() -> click.Group:  # type: ignore[empty-body]
     """Configuration management commands."""
+    ...
 
 
 if __name__ == "__main__":

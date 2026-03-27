@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any
 
 import aiofiles
 import aiotools
@@ -20,8 +20,8 @@ class Tester:
     _spec_manager: TestSpecManager
     _exporter_type: type[TestExporter]
     _config_file_path: Path
-    _config: Optional[TesterConfig]
-    _semaphore_instance: Optional[asyncio.Semaphore]
+    _config: TesterConfig | None
+    _semaphore_instance: asyncio.Semaphore | None
 
     def __init__(
         self,
@@ -51,14 +51,16 @@ class Tester:
             content = tomli.loads(raw_content)
             return TesterConfig.model_validate(content, by_alias=True, by_name=True)
 
-    async def _run_single_spec(self, spec: TestSpec, sub_name: Optional[str] = None) -> None:
+    async def _run_single_spec(self, spec: TestSpec, sub_name: str | None = None) -> None:
         async with self._semaphore:
             exporter = await self._exporter_type.create(sub_name)
             runner = TestRunner(spec, exporter)
             await runner.run()
 
     async def _run_param_spec(self, spec: TestSpec, param: Mapping[ContextName, Any]) -> None:
-        registered_contexts = BaseTestContext.used_contexts()
+        registered_contexts: dict[ContextName, BaseTestContext[Any]] = (
+            BaseTestContext.used_contexts()
+        )
         with ExitStack() as local_stack:
             for ctx_name, value in param.items():
                 if ctx := registered_contexts.get(ctx_name):
@@ -67,7 +69,7 @@ class Tester:
                     local_stack.enter_context(ctx_mgr)
             await self._run_single_spec(spec, self._param_to_name(param))
 
-    def _param_to_name(self, param: Mapping[ContextName, Any]) -> Optional[str]:
+    def _param_to_name(self, param: Mapping[ContextName, Any]) -> str | None:
         if not param:
             return None
         param_str = "_".join(f"{key}={value}" for key, value in sorted(param.items()))
@@ -80,7 +82,9 @@ class Tester:
         if not self._config:
             raise RuntimeError("Tester configuration is not loaded")
 
-        registered_contexts = BaseTestContext.used_contexts()
+        registered_contexts: dict[ContextName, BaseTestContext[Any]] = (
+            BaseTestContext.used_contexts()
+        )
         with ExitStack() as global_stack:
             # global context manager for the tester
             for key, ctx in registered_contexts.items():
@@ -99,7 +103,7 @@ class Tester:
         Run all test specifications.
         """
         self._config = await self._load_tester_config(self._config_file_path)
-        exclude_tags = cast(TesterConfig, self._config).runner.exclude_tags
+        exclude_tags = self._config.runner.exclude_tags
 
         tasks = []
         for spec in self._spec_manager.all_specs():

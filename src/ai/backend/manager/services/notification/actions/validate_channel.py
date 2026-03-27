@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 
-from .base import NotificationAction
+from .base import NotificationChannelSingleEntityAction, NotificationChannelSingleEntityActionResult
 
 
 @dataclass
-class ValidateChannelAction(NotificationAction):
+class ValidateChannelAction(NotificationChannelSingleEntityAction):
     """Action to validate a notification channel (webhook sending test)."""
 
     channel_id: UUID
@@ -18,18 +20,22 @@ class ValidateChannelAction(NotificationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "validate_channel"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def target_entity_id(self) -> str:
         return str(self.channel_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, str(self.channel_id))
 
 
 @dataclass
-class ValidateChannelActionResult(BaseActionResult):
+class ValidateChannelActionResult(NotificationChannelSingleEntityActionResult):
     """Result of validating a notification channel."""
 
     @override
-    def entity_id(self) -> Optional[str]:
-        return None
+    def target_entity_id(self) -> str:
+        return ""

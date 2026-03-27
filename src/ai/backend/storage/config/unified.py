@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import os
 from pathlib import Path, PurePath
-from typing import Annotated, Any, Literal, Optional, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
     AliasChoices,
@@ -79,8 +79,8 @@ class VolumeInfoConfig(BaseConfigSchema):
         ),
     ]
     fsprefix: Annotated[
-        Optional[PurePath],
-        Field(default=PurePath(".")),
+        PurePath | None,
+        Field(default=PurePath()),
         BackendAIConfigMeta(
             description=(
                 "An optional subdirectory prefix within the volume path. All storage operations "
@@ -92,7 +92,7 @@ class VolumeInfoConfig(BaseConfigSchema):
         ),
     ]
     options: Annotated[
-        Optional[dict[str, Any]],
+        dict[str, Any] | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -148,7 +148,7 @@ class ClientAPIConfig(BaseConfigSchema):
         ),
     ]
     ssl_cert: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl-cert", "ssl_cert"),
@@ -165,7 +165,7 @@ class ClientAPIConfig(BaseConfigSchema):
         ),
     ]
     ssl_privkey: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl-privkey", "ssl_privkey"),
@@ -270,7 +270,7 @@ class ManagerAPIConfig(BaseConfigSchema):
         ),
     ]
     ssl_cert: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl-cert", "ssl_cert"),
@@ -287,7 +287,7 @@ class ManagerAPIConfig(BaseConfigSchema):
         ),
     ]
     ssl_privkey: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl-privkey", "ssl_privkey"),
@@ -410,6 +410,65 @@ class DebugConfig(BaseConfigSchema):
             ),
             added_version="24.09.0",
             example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
+
+
+class VolumeStatsConfig(BaseConfigSchema):
+    """Configuration for volume performance metrics observation and caching."""
+
+    observe_interval: Annotated[
+        float,
+        Field(
+            default=10.0,
+            ge=1.0,
+            validation_alias=AliasChoices("observe-interval", "observe_interval"),
+            serialization_alias="observe-interval",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Interval in seconds between volume stats observations. The background observer "
+                "collects performance metrics from all volumes at this interval and caches them "
+                "in Redis for quick API responses."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="10.0", prod="10.0"),
+        ),
+    ]
+    observe_timeout: Annotated[
+        float,
+        Field(
+            default=5.0,
+            ge=1.0,
+            validation_alias=AliasChoices("observe-timeout", "observe_timeout"),
+            serialization_alias="observe-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for each volume's performance metric API call. If a volume's "
+                "external API does not respond within this time, the observation is marked as "
+                "failed and the observer moves on to the next volume."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="5.0", prod="5.0"),
+        ),
+    ]
+    cache_ttl: Annotated[
+        float,
+        Field(
+            default=30.0,
+            ge=1.0,
+            validation_alias=AliasChoices("cache-ttl", "cache_ttl"),
+            serialization_alias="cache-ttl",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Time-to-live in seconds for cached volume stats in Redis. Cached metrics "
+                "expire after this duration, ensuring stale data is not served. Should be "
+                "longer than the observe interval to provide cache coverage between observations."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(local="30.0", prod="30.0"),
         ),
     ]
 
@@ -567,7 +626,7 @@ class StorageProxyConfig(BaseConfigSchema):
         ),
     ]
     user: Annotated[
-        Optional[UserID],
+        UserID | None,
         Field(default=UserID(_default_uid)),
         BackendAIConfigMeta(
             description=(
@@ -580,7 +639,7 @@ class StorageProxyConfig(BaseConfigSchema):
         ),
     ]
     group: Annotated[
-        Optional[GroupID],
+        GroupID | None,
         Field(default=GroupID(_default_gid)),
         BackendAIConfigMeta(
             description=(
@@ -633,7 +692,7 @@ class StorageProxyConfig(BaseConfigSchema):
         ),
     ]
     watcher_insock_path_prefix: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices(
@@ -652,7 +711,7 @@ class StorageProxyConfig(BaseConfigSchema):
         ),
     ]
     watcher_outsock_path_prefix: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices(
@@ -725,11 +784,27 @@ class StorageProxyConfig(BaseConfigSchema):
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
+    volume_stats: Annotated[
+        VolumeStatsConfig,
+        Field(
+            default_factory=lambda: VolumeStatsConfig(),
+            validation_alias=AliasChoices("volume-stats", "volume_stats"),
+            serialization_alias="volume-stats",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Configuration for volume performance metrics observation and caching. "
+                "Controls the background observer that periodically collects metrics from "
+                "storage volumes and caches them in Redis."
+            ),
+            added_version="25.12.0",
+        ),
+    ]
 
 
 class PresignedUploadConfig(BaseConfigSchema):
     min_size: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             validation_alias=AliasChoices("min-size", "min_size"),
@@ -746,7 +821,7 @@ class PresignedUploadConfig(BaseConfigSchema):
         ),
     ]
     max_size: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             validation_alias=AliasChoices("max-size", "max_size"),
@@ -811,7 +886,7 @@ class VFSStorageConfig(BaseConfigSchema):
         ),
     ]
     subpath: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -873,7 +948,7 @@ class VFSStorageConfig(BaseConfigSchema):
         ),
     ]
     max_file_size: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             validation_alias=AliasChoices("max-file-size", "max_file_size"),
@@ -1091,7 +1166,7 @@ class HuggingfaceConfig(BaseConfigSchema):
         ),
     ]
     token: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1157,7 +1232,7 @@ class ReservoirConfig(BaseConfigSchema):
         ),
     ]
     object_storage_access_key: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("object-storage-access-key", "object_storage_access_key"),
@@ -1175,7 +1250,7 @@ class ReservoirConfig(BaseConfigSchema):
         ),
     ]
     object_storage_secret_key: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("object-storage-secret-key", "object_storage_secret_key"),
@@ -1193,7 +1268,7 @@ class ReservoirConfig(BaseConfigSchema):
         ),
     ]
     object_storage_region: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("object-storage-region", "object_storage_region"),
@@ -1211,7 +1286,7 @@ class ReservoirConfig(BaseConfigSchema):
     ]
 
     manager_endpoint: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("manager-endpoint", "manager_endpoint"),
@@ -1228,7 +1303,7 @@ class ReservoirConfig(BaseConfigSchema):
         ),
     ]
     manager_access_key: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("manager-access-key", "manager_access_key"),
@@ -1246,7 +1321,7 @@ class ReservoirConfig(BaseConfigSchema):
         ),
     ]
     manager_secret_key: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("manager-secret-key", "manager_secret_key"),
@@ -1264,7 +1339,7 @@ class ReservoirConfig(BaseConfigSchema):
         ),
     ]
     manager_api_version: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("manager-api-version", "manager_api_version"),
@@ -1281,7 +1356,7 @@ class ReservoirConfig(BaseConfigSchema):
         ),
     ]
     storage_name: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("storage-name", "storage_name"),
@@ -1317,7 +1392,7 @@ class LegacyReservoirConfig(ReservoirConfig):
 
 class ReservoirClientConfig(BaseConfigSchema):
     timeout_total: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=300.0,
             validation_alias=AliasChoices("timeout-total", "timeout_total"),
@@ -1334,7 +1409,7 @@ class ReservoirClientConfig(BaseConfigSchema):
         ),
     ]
     timeout_connect: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             validation_alias=AliasChoices("timeout-connect", "timeout_connect"),
@@ -1351,7 +1426,7 @@ class ReservoirClientConfig(BaseConfigSchema):
         ),
     ]
     timeout_sock_connect: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=30.0,
             validation_alias=AliasChoices("timeout-sock-connect", "timeout_sock_connect"),
@@ -1368,7 +1443,7 @@ class ReservoirClientConfig(BaseConfigSchema):
         ),
     ]
     timeout_sock_read: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             validation_alias=AliasChoices("timeout-sock-read", "timeout_sock_read"),
@@ -1401,7 +1476,7 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
         ),
     ]
     object_storage: Annotated[
-        Optional[ObjectStorageConfig],
+        ObjectStorageConfig | None,
         Field(
             default=None,
             validation_alias=AliasChoices("object-storage", "object_storage"),
@@ -1418,7 +1493,7 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
         ),
     ]
     vfs_storage: Annotated[
-        Optional[VFSStorageConfig],
+        VFSStorageConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1495,7 +1570,7 @@ class ArtifactRegistryConfig(BaseConfigSchema):
         ),
     ]
     huggingface: Annotated[
-        Optional[HuggingfaceConfig],
+        HuggingfaceConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1508,7 +1583,7 @@ class ArtifactRegistryConfig(BaseConfigSchema):
         ),
     ]
     reservoir: Annotated[
-        Optional[ReservoirConfig],
+        ReservoirConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1557,7 +1632,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
     ]
     pyroscope: Annotated[
         PyroscopeConfig,
-        Field(default_factory=PyroscopeConfig),  # type: ignore[arg-type]
+        Field(default_factory=PyroscopeConfig),
         BackendAIConfigMeta(
             description=(
                 "Pyroscope continuous profiling configuration. Pyroscope provides real-time "
@@ -1623,7 +1698,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
     service_discovery: Annotated[
         ServiceDiscoveryConfig,
         Field(
-            default_factory=ServiceDiscoveryConfig,  # type: ignore[arg-type]
+            default_factory=ServiceDiscoveryConfig,
             validation_alias=AliasChoices("service-discovery", "service_discovery"),
             serialization_alias="service-discovery",
         ),
@@ -1639,7 +1714,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
     ]
     otel: Annotated[
         OTELConfig,
-        Field(default_factory=OTELConfig),  # type: ignore[arg-type]
+        Field(default_factory=OTELConfig),
         BackendAIConfigMeta(
             description=(
                 "OpenTelemetry (OTEL) configuration for distributed tracing and metrics. "
@@ -1652,7 +1727,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
     ]
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=EtcdConfig),  # type: ignore[arg-type]
+        Field(default_factory=EtcdConfig),
         BackendAIConfigMeta(
             description=(
                 "etcd configuration for distributed key-value storage. etcd is used for "

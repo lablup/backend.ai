@@ -5,7 +5,6 @@ from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
 )
 
@@ -22,7 +21,7 @@ from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
 )
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.models.group import (
     AssocGroupUserRow,
@@ -32,8 +31,9 @@ from ai.backend.manager.models.group import (
     get_permission_ctx,
     groups,
 )
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ProjectPermission
@@ -91,7 +91,7 @@ __all__ = (
 
 
 @graphene_federation.key("id")
-class GroupNode(graphene.ObjectType):
+class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -154,7 +154,7 @@ class GroupNode(graphene.ObjectType):
             modified_at=row.modified_at,
             domain_name=row.domain_name,
             total_resource_slots=row.total_resource_slots.to_json() or {},
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json() or {},
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
             integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             type=row.type.name,
@@ -223,7 +223,7 @@ class GroupNode(graphene.ObjectType):
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(user_query)).all()
             result = [type(self).from_row(graph_ctx, row) for row in user_rows]
-            total_cnt = await db_session.scalar(cnt_query)
+            total_cnt = await db_session.scalar(cnt_query) or 0
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     async def resolve_registry_quota(self, info: graphene.ResolveInfo) -> int:
@@ -235,7 +235,7 @@ class GroupNode(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
         _, group_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(GroupRow).where(GroupRow.id == group_id)
@@ -250,15 +250,15 @@ class GroupNode(graphene.ObjectType):
         cls,
         info: graphene.ResolveInfo,
         scope: ScopeType,
-        container_registry_scope: Optional[ContainerRegistryScope] = None,
+        container_registry_scope: ContainerRegistryScope | None = None,
         permission: ProjectPermission = ProjectPermission.READ_ATTRIBUTE,
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
@@ -311,7 +311,7 @@ class GroupNode(graphene.ObjectType):
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> GroupNode:
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> GroupNode:
         return await GroupNode.get_node(info, self.id)
 
 
@@ -321,7 +321,7 @@ class GroupConnection(Connection):
         description = "Added in 24.03.0"
 
 
-class GroupPermissionField(graphene.Scalar):
+class GroupPermissionField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 25.3.0. One of {[val.value for val in ProjectPermission]}."
 
@@ -330,7 +330,9 @@ class GroupPermissionField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None):
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> ProjectPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ProjectPermission(node.value)
         return None
@@ -340,7 +342,7 @@ class GroupPermissionField(graphene.Scalar):
         return ProjectPermission(value)
 
 
-class Group(graphene.ObjectType):
+class Group(graphene.ObjectType):  # type: ignore[misc]
     id = graphene.UUID()
     name = graphene.String()
     description = graphene.String()
@@ -358,7 +360,7 @@ class Group(graphene.ObjectType):
     scaling_groups = graphene.List(lambda: graphene.String)
 
     @classmethod
-    def from_row(cls, graph_ctx: GraphQueryContext, row: Row) -> Optional[Group]:
+    def from_row(cls, graph_ctx: GraphQueryContext, row: Row[Any] | None) -> Group | None:
         if row is None:
             return None
         return cls(
@@ -380,7 +382,7 @@ class Group(graphene.ObjectType):
         )
 
     @classmethod
-    def from_dto(cls, dto: Optional[GroupData]) -> Optional[Self]:
+    def from_dto(cls, dto: GroupData | None) -> Self | None:
         if dto is None:
             return None
         return cls(
@@ -415,8 +417,8 @@ class Group(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
+        domain_name: str | None = None,
+        is_active: bool | None = None,
         type: list[ProjectType] | None = None,
     ) -> Sequence[Group]:
         if type is None:
@@ -439,8 +441,8 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         group_ids: Sequence[uuid.UUID],
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
+        domain_name: str | None = None,
+        is_active: bool | None = None,
     ) -> Sequence[Group | None]:
         query = sa.select(groups).select_from(groups).where(groups.c.id.in_(group_ids))
         if domain_name is not None:
@@ -463,8 +465,8 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         group_names: Sequence[str],
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
+        domain_name: str | None = None,
+        is_active: bool | None = None,
     ) -> Sequence[Sequence[Group | None]]:
         query = sa.select(groups).select_from(groups).where(groups.c.name.in_(group_names))
         if domain_name is not None:
@@ -488,7 +490,7 @@ class Group(graphene.ObjectType):
         user_ids: Sequence[uuid.UUID],
         *,
         type: list[ProjectType] | None = None,
-        is_active: Optional[bool] = None,
+        is_active: bool | None = None,
     ) -> Sequence[Sequence[Group | None]]:
         if type is None:
             _type = [ProjectType.GENERAL]
@@ -538,7 +540,7 @@ class Group(graphene.ObjectType):
             ]
 
 
-class GroupInput(graphene.InputObjectType):
+class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
     type = graphene.String(
         required=False,
         default_value="GENERAL",
@@ -558,7 +560,7 @@ class GroupInput(graphene.InputObjectType):
     )
 
     def to_action(self, name: str) -> CreateGroupAction:
-        def value_or_none(value):
+        def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
         type_val = None if self.type is Undefined else ProjectType[self.type]
@@ -569,7 +571,11 @@ class GroupInput(graphene.InputObjectType):
             if self.total_resource_slots is Undefined
             else ResourceSlot.from_user_input(self.total_resource_slots, None)
         )
-        allowed_vfolder_hosts_val = value_or_none(self.allowed_vfolder_hosts)
+        allowed_vfolder_hosts_val = (
+            VFolderHostPermissionMap.from_json(self.allowed_vfolder_hosts)
+            if self.allowed_vfolder_hosts is not Undefined
+            else None
+        )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
         container_registry_val = value_or_none(self.container_registry)
@@ -589,10 +595,11 @@ class GroupInput(graphene.InputObjectType):
                     container_registry=container_registry_val,
                 )
             ),
+            _domain_name=self.domain_name,
         )
 
 
-class ModifyGroupInput(graphene.InputObjectType):
+class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     name = graphene.String(required=False)
     description = graphene.String(required=False)
     is_active = graphene.Boolean(required=False)
@@ -650,7 +657,7 @@ class ModifyGroupInput(graphene.InputObjectType):
         )
 
 
-class CreateGroup(graphene.Mutation):
+class CreateGroup(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -668,7 +675,7 @@ class CreateGroup(graphene.Mutation):
     )
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: GroupInput,
@@ -688,7 +695,7 @@ class CreateGroup(graphene.Mutation):
         )
 
 
-class ModifyGroup(graphene.Mutation):
+class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -706,7 +713,7 @@ class ModifyGroup(graphene.Mutation):
     )
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         gid: uuid.UUID,
         props: ModifyGroupInput,
@@ -722,7 +729,7 @@ class ModifyGroup(graphene.Mutation):
         )
 
 
-class DeleteGroup(graphene.Mutation):
+class DeleteGroup(graphene.Mutation):  # type: ignore[misc]
     """
     Instead of deleting the group, just mark it as inactive.
     """
@@ -740,13 +747,13 @@ class DeleteGroup(graphene.Mutation):
         UserRole.ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
-    async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
+    async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
         ctx: GraphQueryContext = info.context
         await ctx.processors.group.delete_group.wait_for_complete(DeleteGroupAction(gid))
         return cls(ok=True, msg="success")
 
 
-class PurgeGroup(graphene.Mutation):
+class PurgeGroup(graphene.Mutation):  # type: ignore[misc]
     """
     Completely deletes a group from DB.
 
@@ -768,7 +775,7 @@ class PurgeGroup(graphene.Mutation):
         UserRole.ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
-    async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
+    async def mutate(cls, root: Any, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:
         graph_ctx: GraphQueryContext = info.context
 
         await graph_ctx.processors.group.purge_group.wait_for_complete(PurgeGroupAction(gid))

@@ -7,7 +7,7 @@ from typing import Any
 import aiohttp
 import sqlalchemy as sa
 import yarl
-from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import NoResultFound
 
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
@@ -19,8 +19,6 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionCheckingPrecondAnycastEvent,
     SessionEnqueuedAnycastEvent,
     SessionFailureAnycastEvent,
-    SessionPreparingAnycastEvent,
-    SessionScheduledAnycastEvent,
     SessionStartedAnycastEvent,
     SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
@@ -70,7 +68,7 @@ class SessionEventHandler:
 
     async def _handle_started_or_cancelled(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: SessionStartedAnycastEvent | SessionCancelledAnycastEvent,
     ) -> None:
@@ -102,7 +100,7 @@ class SessionEventHandler:
 
     async def handle_session_cancelled(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: SessionCancelledAnycastEvent,
     ) -> None:
@@ -115,7 +113,7 @@ class SessionEventHandler:
 
     async def handle_session_terminating(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: SessionTerminatingAnycastEvent,
     ) -> None:
@@ -127,7 +125,7 @@ class SessionEventHandler:
 
     async def handle_session_terminated(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: SessionTerminatedAnycastEvent,
     ) -> None:
@@ -136,8 +134,8 @@ class SessionEventHandler:
 
     async def handle_destroy_session(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: DoTerminateSessionEvent,
     ) -> None:
         async with self._registry.db.begin_session() as db_sess:
@@ -152,26 +150,21 @@ class SessionEventHandler:
 
     async def handle_batch_result(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: SessionSuccessAnycastEvent | SessionFailureAnycastEvent,
     ) -> None:
         """
         Update the database according to the batch-job completion results
         """
+        reason: KernelLifecycleEventReason
         match event:
-            case SessionSuccessAnycastEvent(
-                session_id=session_id, reason=reason, exit_code=exit_code
-            ):
-                await SessionRow.set_session_result(
-                    self._db, session_id, success=True, exit_code=exit_code
-                )
-            case SessionFailureAnycastEvent(
-                session_id=session_id, reason=reason, exit_code=exit_code
-            ):
-                await SessionRow.set_session_result(
-                    self._db, session_id, success=False, exit_code=exit_code
-                )
+            case SessionSuccessAnycastEvent(session_id=session_id, reason=_reason, exit_code=_):
+                await SessionRow.set_session_result(self._db, session_id, success=True)
+                reason = _reason
+            case SessionFailureAnycastEvent(session_id=session_id, reason=_reason, exit_code=_):
+                await SessionRow.set_session_result(self._db, session_id, success=False)
+                reason = _reason
         async with self._db.begin_session() as db_sess:
             try:
                 session = await SessionRow.get_session(
@@ -190,13 +183,11 @@ class SessionEventHandler:
 
     async def invoke_session_callback(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: (
             SessionEnqueuedAnycastEvent
-            | SessionScheduledAnycastEvent
             | SessionCheckingPrecondAnycastEvent
-            | SessionPreparingAnycastEvent
             | SessionStartedAnycastEvent
             | SessionCancelledAnycastEvent
             | SessionTerminatingAnycastEvent
@@ -310,8 +301,8 @@ class SessionEventHandler:
 
     async def handle_execution_started(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ExecutionStartedAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(
@@ -320,8 +311,8 @@ class SessionEventHandler:
 
     async def handle_execution_finished(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ExecutionFinishedAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(
@@ -330,8 +321,8 @@ class SessionEventHandler:
 
     async def handle_execution_timeout(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ExecutionTimeoutAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(
@@ -340,8 +331,8 @@ class SessionEventHandler:
 
     async def handle_execution_cancelled(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ExecutionCancelledAnycastEvent,
     ) -> None:
         await self._idle_checker_host.dispatch_session_execution_status_event(

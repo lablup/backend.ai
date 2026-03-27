@@ -11,24 +11,28 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 @pytest.fixture
-def mock_auth_repository():
+def mock_auth_repository() -> AsyncMock:
     return AsyncMock(spec=AuthRepository)
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
+def auth_service(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mock_config_provider: AsyncMock,
+) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
+        valkey_session_client=AsyncMock(),
     )
 
 
-@pytest.mark.asyncio
 async def test_update_full_name_successful(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test successfully updating full name for existing user"""
     action = UpdateFullNameAction(
         user_id="12345678-1234-5678-1234-567812345678",
@@ -48,11 +52,10 @@ async def test_update_full_name_successful(
     assert result.success is True
 
 
-@pytest.mark.asyncio
 async def test_update_full_name_fails_for_nonexistent_user(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test updating full name fails for non-existent user"""
     action = UpdateFullNameAction(
         user_id="12345678-1234-5678-1234-567812345678",
@@ -75,11 +78,10 @@ async def test_update_full_name_fails_for_nonexistent_user(
     )
 
 
-@pytest.mark.asyncio
 async def test_update_full_name_repository_call(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test that update full name calls repository with correct parameters"""
     action = UpdateFullNameAction(
         user_id="12345678-1234-5678-1234-567812345678",

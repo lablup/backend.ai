@@ -1,7 +1,13 @@
-from http import HTTPStatus
+from __future__ import annotations
 
+from collections.abc import Callable
+from http import HTTPStatus
+from typing import Any
+
+import click
 import pytest
 from aioresponses import aioresponses
+from click.testing import CliRunner
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.config import set_config
@@ -24,8 +30,13 @@ from ai.backend.client.config import set_config
     ids=["Use session command by uuid", "Use session command by session name"],
 )
 def test_session_command(
-    test_case, runner, cli_entrypoint, monkeypatch, example_keypair, unused_tcp_port_factory
-):
+    test_case: dict[str, Any],
+    runner: CliRunner,
+    cli_entrypoint: Callable[[], click.Group],
+    monkeypatch: pytest.MonkeyPatch,
+    example_keypair: tuple[str, str],
+    unused_tcp_port_factory: Callable[[], int],
+) -> None:
     """
     Test whether the Session CLI commands work correctly when either session_id or session_name is provided as argument.
     """

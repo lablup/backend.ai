@@ -16,12 +16,12 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column(
         "kernels",
         sa.Column("local_rank", sa.Integer, nullable=False, server_default=sa.text("0")),
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("kernels", "local_rank")

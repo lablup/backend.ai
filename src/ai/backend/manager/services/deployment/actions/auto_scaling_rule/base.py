@@ -1,10 +1,11 @@
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction
 
 
 class AutoScalingRuleBaseAction(BaseAction):
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "auto_scaling_rule"
+    def entity_type(cls) -> EntityType:
+        return EntityType.DEPLOYMENT_AUTO_SCALING_RULE

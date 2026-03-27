@@ -7,7 +7,6 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Optional,
 )
 
 import aiodocker
@@ -98,7 +97,7 @@ class CUDAPlugin(AbstractComputePlugin):
     device_mask: Sequence[str] = []
     enabled: bool = True
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
 
         # Basic docker version & nvidia container runtime check
@@ -159,7 +158,7 @@ class CUDAPlugin(AbstractComputePlugin):
         for dev_id in map(lambda idx: DeviceId(str(idx)), range(num_devices)):
             raw_info = libcudart.get_device_props(int(dev_id))
             sysfs_node_path = f"/sys/bus/pci/devices/{raw_info['pciBusID_str'].lower()}/numa_node"
-            node: Optional[int]
+            node: int | None
             try:
                 node = int(Path(sysfs_node_path).read_text().strip())
             except OSError:

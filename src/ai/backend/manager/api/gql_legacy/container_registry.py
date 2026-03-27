@@ -3,14 +3,14 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import graphene
 import graphql
 import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
 
-from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
@@ -19,18 +19,24 @@ from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import (
     ContainerRegistryScope,
     ProjectScope,
     ScopeType,
     SystemScope,
 )
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
+)
+from ai.backend.manager.services.container_registry.actions.create_container_registry import (
+    CreateContainerRegistryAction,
 )
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
@@ -56,7 +62,7 @@ if TYPE_CHECKING:
     from .schema import GraphQueryContext
 from ai.backend.manager.models.user import UserRole
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "AllowedGroups",
@@ -78,7 +84,7 @@ __all__: Sequence[str] = (
 )
 
 
-class ContainerRegistryTypeField(graphene.Scalar):
+class ContainerRegistryTypeField(graphene.Scalar):  # type: ignore[misc]
     """Added in 24.09.0."""
 
     allowed_values = tuple(t.value for t in ContainerRegistryType)
@@ -88,7 +94,9 @@ class ContainerRegistryTypeField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node, _variables=None):
+    def parse_literal(
+        node: graphql.language.ast.Node, _variables: dict[str, Any] | None = None
+    ) -> ContainerRegistryType | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ContainerRegistryType(node.value)
         return None
@@ -98,7 +106,7 @@ class ContainerRegistryTypeField(graphene.Scalar):
         return ContainerRegistryType(value)
 
 
-class ContainerRegistryNode(graphene.ObjectType):
+class ContainerRegistryNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.09.0."
@@ -165,7 +173,7 @@ class ContainerRegistryNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[ContainerRegistryNode]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
@@ -221,13 +229,13 @@ class ContainerRegistryNode(graphene.ObjectType):
     async def resolve_allowed_groups(
         self,
         info: graphene.ResolveInfo,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[GroupNode]:
         scope = SystemScope()
 
@@ -258,7 +266,7 @@ class ContainerRegistryConnection(Connection):
         description = "Added in 24.09.0."
 
 
-class ContainerRegistryScopeField(graphene.Scalar):
+class ContainerRegistryScopeField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.3.0."
 
@@ -269,25 +277,25 @@ class ContainerRegistryScopeField(graphene.Scalar):
         raise ValueError("Invalid ContainerRegistryScope")
 
     @staticmethod
-    def parse_value(value):
+    def parse_value(value: str) -> ContainerRegistryScope:
         if isinstance(value, str):
             try:
                 return ContainerRegistryScope.parse(value)
             except Exception as e:
-                raise ValueError(f"Invalid ContainerRegistryScope: {e}")
+                raise ValueError(f"Invalid ContainerRegistryScope: {e}") from e
         raise ValueError("Invalid ContainerRegistryScope")
 
     @staticmethod
-    def parse_literal(node):
+    def parse_literal(node: graphql.language.ast.Node) -> ContainerRegistryScope | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             try:
                 return ContainerRegistryScope.parse(node.value)
             except Exception as e:
-                raise ValueError(f"Invalid ContainerRegistryScope: {e}")
+                raise ValueError(f"Invalid ContainerRegistryScope: {e}") from e
         return None
 
 
-class AllowedGroups(graphene.InputObjectType):
+class AllowedGroups(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.3.0.
     """
@@ -303,8 +311,14 @@ class AllowedGroups(graphene.InputObjectType):
         description="List of group_ids to remove associations. Added in 25.3.0.",
     )
 
+    def to_model(self) -> AllowedGroupsModel:
+        return AllowedGroupsModel(
+            add=[] if (self.add is Undefined or self.add is None) else self.add,
+            remove=[] if (self.remove is Undefined or self.remove is None) else self.remove,
+        )
 
-class CreateContainerRegistryNode(graphene.Mutation):
+
+class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 25.3.0. use `CreateContainerRegistryNodeV2` instead
     """
@@ -332,7 +346,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         url: str,
         type: ContainerRegistryType,
@@ -342,48 +356,51 @@ class CreateContainerRegistryNode(graphene.Mutation):
         username: str | UndefinedType = Undefined,
         password: str | UndefinedType = Undefined,
         ssl_verify: bool | UndefinedType = Undefined,
-        extra: dict | UndefinedType = Undefined,
+        extra: dict[str, Any] | UndefinedType = Undefined,
     ) -> CreateContainerRegistryNode:
         ctx: GraphQueryContext = info.context
         validator = ContainerRegistryValidator(
             ContainerRegistryValidatorArgs(
                 url=url,
                 type=type,
-                project=cast(Optional[str], project if project is not Undefined else None),
+                project=cast(str | None, project if project is not Undefined else None),
             )
         )
 
         validator.validate()
 
-        input_config: dict[str, Any] = {
-            "registry_name": registry_name,
-            "url": url,
-            "type": type,
-        }
+        def value_or_none(val: Any) -> Any | None:
+            return None if val is Undefined else val
 
-        def _set_if_set(name: str, val: Any) -> None:
-            if val is not Undefined:
-                input_config[name] = val
-
-        _set_if_set("project", project)
-        _set_if_set("username", username)
-        _set_if_set("password", password)
-        _set_if_set("ssl_verify", ssl_verify)
-        _set_if_set("is_global", is_global)
-        _set_if_set("extra", extra)
-
-        async with ctx.db.begin_session() as db_session:
-            reg_row = ContainerRegistryRow(id=uuid.uuid4(), **input_config)
-            db_session.add(reg_row)
-            await db_session.flush()
-            await db_session.refresh(reg_row)
-
-            return cls(
-                container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
+        action = CreateContainerRegistryAction(
+            creator=Creator(
+                spec=ContainerRegistryCreatorSpec(
+                    url=url,
+                    type=type,
+                    registry_name=registry_name,
+                    is_global=value_or_none(is_global),
+                    project=value_or_none(project),
+                    username=value_or_none(username),
+                    password=value_or_none(password),
+                    ssl_verify=value_or_none(ssl_verify),
+                    extra=value_or_none(extra),
+                    allowed_groups=None,  # allowed groups are not supported in v1 mutation
+                )
             )
+        )
+
+        result = (
+            await ctx.processors.container_registry.create_container_registry.wait_for_complete(
+                action
+            )
+        )
+
+        return cls(
+            container_registry=ContainerRegistryNode.from_dataclass(result.data),
+        )
 
 
-class ModifyContainerRegistryNode(graphene.Mutation):
+class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 25.3.0. use `ModifyContainerRegistryNodeV2` instead
     """
@@ -414,7 +431,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
         url: str | UndefinedType = Undefined,
@@ -425,7 +442,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         username: str | UndefinedType = Undefined,
         password: str | UndefinedType = Undefined,
         ssl_verify: bool | UndefinedType = Undefined,
-        extra: dict | UndefinedType = Undefined,
+        extra: dict[str, Any] | UndefinedType = Undefined,
     ) -> ModifyContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
@@ -460,7 +477,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
-class DeleteContainerRegistryNode(graphene.Mutation):
+class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 25.3.0. use `DeleteContainerRegistryNodeV2` instead
     """
@@ -480,7 +497,7 @@ class DeleteContainerRegistryNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
     ) -> DeleteContainerRegistryNode:
@@ -499,7 +516,7 @@ class DeleteContainerRegistryNode(graphene.Mutation):
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
-class CreateContainerRegistryQuota(graphene.Mutation):
+class CreateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
     allowed_roles = (
@@ -517,7 +534,7 @@ class CreateContainerRegistryQuota(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         quota: int | float,
@@ -539,7 +556,7 @@ class CreateContainerRegistryQuota(graphene.Mutation):
             return cls(ok=False, msg=str(e))
 
 
-class UpdateContainerRegistryQuota(graphene.Mutation):
+class UpdateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
     allowed_roles = (
@@ -557,7 +574,7 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         quota: int | float,
@@ -579,7 +596,7 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
             return cls(ok=False, msg=str(e))
 
 
-class DeleteContainerRegistryQuota(graphene.Mutation):
+class DeleteContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.3.0."""
 
     allowed_roles = (
@@ -596,7 +613,7 @@ class DeleteContainerRegistryQuota(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
     ) -> Self:
@@ -623,7 +640,7 @@ class DeleteContainerRegistryQuota(graphene.Mutation):
 # ================================================================================
 
 
-class CreateContainerRegistryInput(graphene.InputObjectType):
+class CreateContainerRegistryInput(graphene.InputObjectType):  # type: ignore[misc]
     """
     Deprecated since 24.09.0.
     """
@@ -637,7 +654,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
     is_global = graphene.Boolean(description="Added in 24.09.0.")
 
 
-class ModifyContainerRegistryInput(graphene.InputObjectType):
+class ModifyContainerRegistryInput(graphene.InputObjectType):  # type: ignore[misc]
     """
     Deprecated since 24.09.0.
     """
@@ -651,7 +668,7 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
     is_global = graphene.Boolean(description="Added in 24.09.0.")
 
 
-class ContainerRegistryConfig(graphene.ObjectType):
+class ContainerRegistryConfig(graphene.ObjectType):  # type: ignore[misc]
     """
     Deprecated since 24.09.0.
     """
@@ -665,7 +682,7 @@ class ContainerRegistryConfig(graphene.ObjectType):
     is_global = graphene.Boolean(description="Added in 24.09.0.")
 
 
-class ContainerRegistry(graphene.ObjectType):
+class ContainerRegistry(graphene.ObjectType):  # type: ignore[misc]
     """
     Deprecated since 24.09.0. use `ContainerRegistryNode` instead
     """
@@ -715,7 +732,7 @@ class ContainerRegistry(graphene.ObjectType):
             return [cls.from_row(ctx, row) for row in rows]
 
 
-class CreateContainerRegistry(graphene.Mutation):
+class CreateContainerRegistry(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead
     """
@@ -729,7 +746,11 @@ class CreateContainerRegistry(graphene.Mutation):
 
     @classmethod
     async def mutate(
-        cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
+        cls,
+        root: Any,
+        info: graphene.ResolveInfo,
+        hostname: str,
+        props: CreateContainerRegistryInput,
     ) -> CreateContainerRegistry:
         ctx: GraphQueryContext = info.context
 
@@ -758,7 +779,7 @@ class CreateContainerRegistry(graphene.Mutation):
             )
 
 
-class ModifyContainerRegistry(graphene.Mutation):
+class ModifyContainerRegistry(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead
     """
@@ -773,7 +794,7 @@ class ModifyContainerRegistry(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         hostname: str,
         props: ModifyContainerRegistryInput,
@@ -810,7 +831,7 @@ class ModifyContainerRegistry(graphene.Mutation):
             return cls(container_registry=ContainerRegistry.from_row(ctx, reg_row))
 
 
-class DeleteContainerRegistry(graphene.Mutation):
+class DeleteContainerRegistry(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead
     """
@@ -824,7 +845,7 @@ class DeleteContainerRegistry(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         hostname: str,
     ) -> DeleteContainerRegistry:

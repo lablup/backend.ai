@@ -2,7 +2,7 @@ from ai.backend.cli.main import main
 
 
 @main.group()
-def admin():
+def admin() -> None:
     """
     Administrative command set
     """
@@ -19,6 +19,7 @@ from . import (  # noqa
     keypair,
     license,  # noqa: A004
     manager,
+    prometheus_query_definition,
     resource,
     resource_policy,
     scaling_group,

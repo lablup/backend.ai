@@ -11,9 +11,11 @@ import pytest
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    DeploymentLifecycleStatus,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
+    DeploymentStatusTransitions,
     ReplicaSpec,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -23,6 +25,7 @@ from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionError,
     DeploymentExecutionResult,
     DeploymentLifecycleType,
+    DeploymentWithHistory,
 )
 
 if TYPE_CHECKING:
@@ -65,12 +68,20 @@ def sample_deployment_info() -> DeploymentInfo:
 
 
 @pytest.fixture
-def sample_deployment_execution_error(
+def sample_deployment_with_history(
     sample_deployment_info: DeploymentInfo,
+) -> DeploymentWithHistory:
+    """Sample DeploymentWithHistory for testing."""
+    return DeploymentWithHistory(deployment_info=sample_deployment_info)
+
+
+@pytest.fixture
+def sample_deployment_execution_error(
+    sample_deployment_with_history: DeploymentWithHistory,
 ) -> DeploymentExecutionError:
     """Sample DeploymentExecutionError for testing."""
     return DeploymentExecutionError(
-        deployment_info=sample_deployment_info,
+        deployment_info=sample_deployment_with_history,
         reason="Test failure",
         error_detail="Detailed error message",
     )
@@ -85,8 +96,9 @@ def sample_deployment_execution_error(
 def mock_deployment_repository() -> AsyncMock:
     """Mock DeploymentRepository with minimal implementation."""
     mock = AsyncMock(spec=DeploymentRepository)
-    mock.get_endpoints_by_statuses = AsyncMock(return_value=[])
+    mock.get_deployments_for_handler = AsyncMock(return_value=[])
     mock.update_endpoint_lifecycle_bulk_with_history = AsyncMock(return_value=0)
+    mock.get_db_now = AsyncMock(return_value=None)
     return mock
 
 
@@ -156,19 +168,23 @@ def mock_route_controller() -> MagicMock:
 
 @pytest.fixture
 def mock_handler_with_success(
-    sample_deployment_info: DeploymentInfo,
+    sample_deployment_with_history: DeploymentWithHistory,
 ) -> MagicMock:
     """Handler that returns success result."""
     mock = MagicMock(spec=DeploymentHandler)
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
-    mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
-    mock.next_status = MagicMock(return_value=EndpointLifecycle.CREATED)
-    mock.failure_status = MagicMock(return_value=None)
+    mock.target_statuses = MagicMock(
+        return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.PENDING)]
+    )
+    mock.status_transitions = MagicMock(
+        return_value=DeploymentStatusTransitions(
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
+        )
+    )
     mock.execute = AsyncMock(
         return_value=DeploymentExecutionResult(
-            successes=[sample_deployment_info],
-            errors=[],
+            successes=[sample_deployment_with_history],
         )
     )
     mock.post_process = AsyncMock()
@@ -180,16 +196,25 @@ def mock_handler_with_failure(
     sample_deployment_execution_error: DeploymentExecutionError,
 ) -> MagicMock:
     """Handler that returns failure result."""
+    destroyed = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED)
     mock = MagicMock(spec=DeploymentHandler)
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
-    mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
-    mock.next_status = MagicMock(return_value=EndpointLifecycle.CREATED)
-    mock.failure_status = MagicMock(return_value=EndpointLifecycle.DESTROYED)
+    mock.target_statuses = MagicMock(
+        return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.PENDING)]
+    )
+    mock.status_transitions = MagicMock(
+        return_value=DeploymentStatusTransitions(
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
+            need_retry=destroyed,
+            expired=destroyed,
+            give_up=destroyed,
+        )
+    )
     mock.execute = AsyncMock(
         return_value=DeploymentExecutionResult(
             successes=[],
-            errors=[sample_deployment_execution_error],
+            failures=[sample_deployment_execution_error],
         )
     )
     mock.post_process = AsyncMock()
@@ -202,9 +227,14 @@ def mock_handler_with_empty_result() -> MagicMock:
     mock = MagicMock(spec=DeploymentHandler)
     mock.name = MagicMock(return_value="check_pending")
     mock.lock_id = None
-    mock.target_statuses = MagicMock(return_value=[EndpointLifecycle.PENDING])
-    mock.next_status = MagicMock(return_value=EndpointLifecycle.CREATED)
-    mock.failure_status = MagicMock(return_value=None)
+    mock.target_statuses = MagicMock(
+        return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.PENDING)]
+    )
+    mock.status_transitions = MagicMock(
+        return_value=DeploymentStatusTransitions(
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
+        )
+    )
     mock.execute = AsyncMock(return_value=DeploymentExecutionResult())
     mock.post_process = AsyncMock()
     return mock
@@ -227,11 +257,11 @@ def coordinator_with_pending_deployments(
     mock_client_pool: MagicMock,
     mock_valkey_stat: AsyncMock,
     mock_route_controller: MagicMock,
-    sample_deployment_info: DeploymentInfo,
+    sample_deployment_with_history: DeploymentWithHistory,
 ) -> Generator[DeploymentCoordinator, None, None]:
     """Coordinator with PENDING deployments available."""
-    mock_deployment_repository.get_endpoints_by_statuses = AsyncMock(
-        return_value=[sample_deployment_info]
+    mock_deployment_repository.get_deployments_for_handler = AsyncMock(
+        return_value=[sample_deployment_with_history]
     )
 
     coordinator = DeploymentCoordinator(
@@ -263,7 +293,7 @@ def coordinator_without_deployments(
     mock_route_controller: MagicMock,
 ) -> Generator[DeploymentCoordinator, None, None]:
     """Coordinator with no deployments available."""
-    mock_deployment_repository.get_endpoints_by_statuses = AsyncMock(return_value=[])
+    mock_deployment_repository.get_deployments_for_handler = AsyncMock(return_value=[])
 
     coordinator = DeploymentCoordinator(
         valkey_schedule=mock_valkey_schedule,
@@ -288,7 +318,6 @@ def coordinator_without_deployments(
 class TestProcessDeploymentLifecycle:
     """Tests for process_deployment_lifecycle public method."""
 
-    @pytest.mark.asyncio
     async def test_records_history_on_success(
         self,
         coordinator_with_pending_deployments: DeploymentCoordinator,
@@ -296,8 +325,8 @@ class TestProcessDeploymentLifecycle:
         mock_handler_with_success: MagicMock,
     ) -> None:
         """History is recorded when handler returns success."""
-        coordinator_with_pending_deployments._deployment_handlers = {
-            DeploymentLifecycleType.CHECK_PENDING: mock_handler_with_success
+        coordinator_with_pending_deployments._registry.handlers = {
+            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler_with_success
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(
@@ -306,7 +335,6 @@ class TestProcessDeploymentLifecycle:
 
         mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_records_history_on_failure(
         self,
         coordinator_with_pending_deployments: DeploymentCoordinator,
@@ -314,8 +342,8 @@ class TestProcessDeploymentLifecycle:
         mock_handler_with_failure: MagicMock,
     ) -> None:
         """History is recorded when handler returns failure."""
-        coordinator_with_pending_deployments._deployment_handlers = {
-            DeploymentLifecycleType.CHECK_PENDING: mock_handler_with_failure
+        coordinator_with_pending_deployments._registry.handlers = {
+            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler_with_failure
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(
@@ -324,7 +352,6 @@ class TestProcessDeploymentLifecycle:
 
         mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_skips_history_when_no_deployments(
         self,
         coordinator_without_deployments: DeploymentCoordinator,
@@ -337,7 +364,6 @@ class TestProcessDeploymentLifecycle:
 
         mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_skips_history_when_handler_returns_empty(
         self,
         coordinator_with_pending_deployments: DeploymentCoordinator,
@@ -345,8 +371,81 @@ class TestProcessDeploymentLifecycle:
         mock_handler_with_empty_result: MagicMock,
     ) -> None:
         """History is not recorded when handler returns empty result."""
-        coordinator_with_pending_deployments._deployment_handlers = {
-            DeploymentLifecycleType.CHECK_PENDING: mock_handler_with_empty_result
+        coordinator_with_pending_deployments._registry.handlers = {
+            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler_with_empty_result
+        }
+
+        await coordinator_with_pending_deployments.process_deployment_lifecycle(
+            DeploymentLifecycleType.CHECK_PENDING
+        )
+
+        mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_not_called()
+
+    async def test_records_history_on_failure_classified_as_need_retry(
+        self,
+        coordinator_with_pending_deployments: DeploymentCoordinator,
+        mock_deployment_repository: AsyncMock,
+        sample_deployment_execution_error: DeploymentExecutionError,
+    ) -> None:
+        """History is recorded when handler returns failures classified as need_retry."""
+        need_retry_status = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)
+        mock_handler = MagicMock(spec=DeploymentHandler)
+        mock_handler.name = MagicMock(return_value="deploying_progressing")
+        mock_handler.lock_id = None
+        mock_handler.target_statuses = MagicMock(
+            return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)]
+        )
+        mock_handler.status_transitions = MagicMock(
+            return_value=DeploymentStatusTransitions(
+                success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+                need_retry=need_retry_status,
+            )
+        )
+        mock_handler.execute = AsyncMock(
+            return_value=DeploymentExecutionResult(
+                failures=[sample_deployment_execution_error],
+            )
+        )
+        mock_handler.post_process = AsyncMock()
+
+        coordinator_with_pending_deployments._registry.handlers = {
+            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler
+        }
+
+        await coordinator_with_pending_deployments.process_deployment_lifecycle(
+            DeploymentLifecycleType.CHECK_PENDING
+        )
+
+        mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_called_once()
+
+    async def test_failure_without_need_retry_transition_does_not_record_history(
+        self,
+        coordinator_with_pending_deployments: DeploymentCoordinator,
+        mock_deployment_repository: AsyncMock,
+        sample_deployment_execution_error: DeploymentExecutionError,
+    ) -> None:
+        """No history recorded when failures exist but transitions.need_retry is None."""
+        mock_handler = MagicMock(spec=DeploymentHandler)
+        mock_handler.name = MagicMock(return_value="deploying_progressing")
+        mock_handler.lock_id = None
+        mock_handler.target_statuses = MagicMock(
+            return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)]
+        )
+        mock_handler.status_transitions = MagicMock(
+            return_value=DeploymentStatusTransitions(
+                success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+                need_retry=None,
+            )
+        )
+        mock_handler.execute = AsyncMock(
+            return_value=DeploymentExecutionResult(
+                failures=[sample_deployment_execution_error],
+            )
+        )
+        mock_handler.post_process = AsyncMock()
+
+        coordinator_with_pending_deployments._registry.handlers = {
+            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(

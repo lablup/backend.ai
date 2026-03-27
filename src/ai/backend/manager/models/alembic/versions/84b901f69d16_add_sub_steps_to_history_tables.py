@@ -39,7 +39,9 @@ def upgrade() -> None:
     )
 
     # Migrate existing session_scheduling_history: NULL -> []
-    op.execute("UPDATE session_scheduling_history SET sub_steps = '[]'::jsonb WHERE sub_steps IS NULL")
+    op.execute(
+        "UPDATE session_scheduling_history SET sub_steps = '[]'::jsonb WHERE sub_steps IS NULL"
+    )
     op.alter_column(
         "session_scheduling_history",
         "sub_steps",

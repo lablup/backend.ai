@@ -12,13 +12,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
-    WebhookConfig,
+    WebhookSpec,
 )
-from ai.backend.common.types import BinarySize
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -33,7 +33,15 @@ from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.notification.conditions import (
+    NotificationChannelConditions,
+    NotificationRuleConditions,
+)
+from ai.backend.manager.models.notification.orders import (
+    NotificationChannelOrders,
+    NotificationRuleOrders,
+)
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -59,12 +67,6 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
 )
 from ai.backend.manager.repositories.notification import NotificationRepository
-from ai.backend.manager.repositories.notification.options import (
-    NotificationChannelConditions,
-    NotificationChannelOrders,
-    NotificationRuleConditions,
-    NotificationRuleOrders,
-)
 from ai.backend.testutils.db import with_tables
 
 
@@ -88,6 +90,7 @@ class TestNotificationOptions:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -123,7 +126,7 @@ class TestNotificationOptions:
                 name=domain_name,
                 description="Test domain for notification",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -215,7 +218,7 @@ class TestNotificationOptions:
 
             for name, channel_type, enabled in channels_data:
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example.com/webhook/{channel_id}")
+                config = WebhookSpec(url=f"https://example.com/webhook/{channel_id}")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=name,
@@ -252,7 +255,7 @@ class TestNotificationOptions:
 
             for name, created_at, updated_at in channels_data:
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example.com/webhook/{channel_id}")
+                config = WebhookSpec(url=f"https://example.com/webhook/{channel_id}")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=name,
@@ -279,7 +282,7 @@ class TestNotificationOptions:
         """Create a single channel for rule testing"""
         channel_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
-            config = WebhookConfig(url="https://example.com/webhook")
+            config = WebhookSpec(url="https://example.com/webhook")
             channel = NotificationChannelRow(
                 id=channel_id,
                 name="Test Channel",
@@ -374,7 +377,6 @@ class TestNotificationOptions:
 
     # NotificationChannelConditions Tests
 
-    @pytest.mark.asyncio
     async def test_channel_by_name_contains_case_sensitive(
         self,
         notification_repository: NotificationRepository,
@@ -397,7 +399,6 @@ class TestNotificationOptions:
         assert len(channels.items) == 1
         assert channels.items[0].name == "Test Channel"
 
-    @pytest.mark.asyncio
     async def test_channel_by_name_contains_case_insensitive(
         self,
         notification_repository: NotificationRepository,
@@ -421,7 +422,6 @@ class TestNotificationOptions:
         names = {ch.name for ch in channels.items}
         assert names == {"Test Channel", "test channel"}
 
-    @pytest.mark.asyncio
     async def test_channel_by_name_equals_case_sensitive(
         self,
         notification_repository: NotificationRepository,
@@ -444,7 +444,6 @@ class TestNotificationOptions:
         assert len(channels.items) == 1
         assert channels.items[0].name == "Test Channel"
 
-    @pytest.mark.asyncio
     async def test_channel_by_name_equals_case_insensitive(
         self,
         notification_repository: NotificationRepository,
@@ -468,7 +467,6 @@ class TestNotificationOptions:
         names = {ch.name for ch in channels.items}
         assert names == {"Test Channel", "test channel"}
 
-    @pytest.mark.asyncio
     async def test_channel_by_channel_types(
         self,
         notification_repository: NotificationRepository,
@@ -489,7 +487,6 @@ class TestNotificationOptions:
         assert len(channels.items) == 5
         assert all(ch.channel_type == NotificationChannelType.WEBHOOK for ch in channels.items)
 
-    @pytest.mark.asyncio
     async def test_channel_by_enabled_true(
         self,
         notification_repository: NotificationRepository,
@@ -507,7 +504,6 @@ class TestNotificationOptions:
         assert len(channels.items) == 4
         assert all(ch.enabled for ch in channels.items)
 
-    @pytest.mark.asyncio
     async def test_channel_by_enabled_false(
         self,
         notification_repository: NotificationRepository,
@@ -528,7 +524,6 @@ class TestNotificationOptions:
 
     # NotificationChannelOrders Tests
 
-    @pytest.mark.asyncio
     async def test_channel_order_by_name_ascending(
         self,
         notification_repository: NotificationRepository,
@@ -548,7 +543,6 @@ class TestNotificationOptions:
         assert channels.items[1].name == "Beta Channel"
         assert channels.items[2].name == "Zebra Channel"
 
-    @pytest.mark.asyncio
     async def test_channel_order_by_name_descending(
         self,
         notification_repository: NotificationRepository,
@@ -568,7 +562,6 @@ class TestNotificationOptions:
         assert channels.items[1].name == "Beta Channel"
         assert channels.items[2].name == "Alpha Channel"
 
-    @pytest.mark.asyncio
     async def test_channel_order_by_created_at_ascending(
         self,
         notification_repository: NotificationRepository,
@@ -589,7 +582,6 @@ class TestNotificationOptions:
         assert channels.items[1].name == "Alpha Channel"
         assert channels.items[2].name == "Beta Channel"
 
-    @pytest.mark.asyncio
     async def test_channel_order_by_created_at_descending(
         self,
         notification_repository: NotificationRepository,
@@ -610,7 +602,6 @@ class TestNotificationOptions:
         assert channels.items[1].name == "Alpha Channel"
         assert channels.items[2].name == "Zebra Channel"
 
-    @pytest.mark.asyncio
     async def test_channel_order_by_updated_at_ascending(
         self,
         notification_repository: NotificationRepository,
@@ -631,7 +622,6 @@ class TestNotificationOptions:
         assert channels.items[1].name == "Alpha Channel"
         assert channels.items[2].name == "Zebra Channel"
 
-    @pytest.mark.asyncio
     async def test_channel_order_by_updated_at_descending(
         self,
         notification_repository: NotificationRepository,
@@ -654,7 +644,6 @@ class TestNotificationOptions:
 
     # NotificationRuleConditions Tests
 
-    @pytest.mark.asyncio
     async def test_rule_by_name_contains_case_sensitive(
         self,
         notification_repository: NotificationRepository,
@@ -677,7 +666,6 @@ class TestNotificationOptions:
         assert len(rules.items) == 1
         assert rules.items[0].name == "Test Rule"
 
-    @pytest.mark.asyncio
     async def test_rule_by_name_contains_case_insensitive(
         self,
         notification_repository: NotificationRepository,
@@ -701,7 +689,6 @@ class TestNotificationOptions:
         names = {rule.name for rule in rules.items}
         assert names == {"Test Rule", "test rule"}
 
-    @pytest.mark.asyncio
     async def test_rule_by_name_equals_case_sensitive(
         self,
         notification_repository: NotificationRepository,
@@ -724,7 +711,6 @@ class TestNotificationOptions:
         assert len(rules.items) == 1
         assert rules.items[0].name == "Test Rule"
 
-    @pytest.mark.asyncio
     async def test_rule_by_name_equals_case_insensitive(
         self,
         notification_repository: NotificationRepository,
@@ -748,7 +734,6 @@ class TestNotificationOptions:
         names = {rule.name for rule in rules.items}
         assert names == {"Test Rule", "test rule"}
 
-    @pytest.mark.asyncio
     async def test_rule_by_rule_types(
         self,
         notification_repository: NotificationRepository,
@@ -769,7 +754,6 @@ class TestNotificationOptions:
         assert len(rules.items) == 3
         assert all(rule.rule_type == NotificationRuleType.SESSION_STARTED for rule in rules.items)
 
-    @pytest.mark.asyncio
     async def test_rule_by_enabled_true(
         self,
         notification_repository: NotificationRepository,
@@ -787,7 +771,6 @@ class TestNotificationOptions:
         assert len(rules.items) == 4
         assert all(rule.enabled for rule in rules.items)
 
-    @pytest.mark.asyncio
     async def test_rule_by_enabled_false(
         self,
         notification_repository: NotificationRepository,
@@ -808,7 +791,6 @@ class TestNotificationOptions:
 
     # NotificationRuleOrders Tests
 
-    @pytest.mark.asyncio
     async def test_rule_order_by_name_ascending(
         self,
         notification_repository: NotificationRepository,
@@ -828,7 +810,6 @@ class TestNotificationOptions:
         assert rules.items[1].name == "Beta Rule"
         assert rules.items[2].name == "Zebra Rule"
 
-    @pytest.mark.asyncio
     async def test_rule_order_by_name_descending(
         self,
         notification_repository: NotificationRepository,
@@ -848,7 +829,6 @@ class TestNotificationOptions:
         assert rules.items[1].name == "Beta Rule"
         assert rules.items[2].name == "Alpha Rule"
 
-    @pytest.mark.asyncio
     async def test_rule_order_by_created_at_ascending(
         self,
         notification_repository: NotificationRepository,
@@ -869,7 +849,6 @@ class TestNotificationOptions:
         assert rules.items[1].name == "Alpha Rule"
         assert rules.items[2].name == "Beta Rule"
 
-    @pytest.mark.asyncio
     async def test_rule_order_by_created_at_descending(
         self,
         notification_repository: NotificationRepository,
@@ -890,7 +869,6 @@ class TestNotificationOptions:
         assert rules.items[1].name == "Alpha Rule"
         assert rules.items[2].name == "Zebra Rule"
 
-    @pytest.mark.asyncio
     async def test_rule_order_by_updated_at_ascending(
         self,
         notification_repository: NotificationRepository,
@@ -911,7 +889,6 @@ class TestNotificationOptions:
         assert rules.items[1].name == "Alpha Rule"
         assert rules.items[2].name == "Zebra Rule"
 
-    @pytest.mark.asyncio
     async def test_rule_order_by_updated_at_descending(
         self,
         notification_repository: NotificationRepository,
@@ -932,7 +909,6 @@ class TestNotificationOptions:
         assert rules.items[1].name == "Alpha Rule"
         assert rules.items[2].name == "Beta Rule"
 
-    @pytest.mark.asyncio
     async def test_channel_no_match_returns_empty(
         self,
         notification_repository: NotificationRepository,
@@ -954,7 +930,6 @@ class TestNotificationOptions:
         assert len(channels.items) == 0
         assert channels.total_count == 0
 
-    @pytest.mark.asyncio
     async def test_rule_no_match_returns_empty(
         self,
         notification_repository: NotificationRepository,
@@ -1000,6 +975,7 @@ class TestNotificationCursorPagination:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -1035,7 +1011,7 @@ class TestNotificationCursorPagination:
                 name=domain_name,
                 description="Test domain for cursor pagination",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -1124,7 +1100,7 @@ class TestNotificationCursorPagination:
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(1, 6):
                 channel_id = uuid.uuid4()
-                config = WebhookConfig(url=f"https://example.com/webhook/{i}")
+                config = WebhookSpec(url=f"https://example.com/webhook/{i}")
                 channel = NotificationChannelRow(
                     id=channel_id,
                     name=f"Channel-{i}",
@@ -1143,7 +1119,6 @@ class TestNotificationCursorPagination:
 
         return channel_ids
 
-    @pytest.mark.asyncio
     async def test_forward_pagination_first_page_shows_newest_first(
         self,
         notification_repository: NotificationRepository,
@@ -1171,7 +1146,6 @@ class TestNotificationCursorPagination:
         assert result.has_previous_page is False  # First page
         assert result.has_next_page is True  # More items exist
 
-    @pytest.mark.asyncio
     async def test_forward_pagination_with_cursor_shows_older_items(
         self,
         notification_repository: NotificationRepository,
@@ -1211,7 +1185,6 @@ class TestNotificationCursorPagination:
         assert search_result.has_previous_page is True  # Has items before (cursor was provided)
         assert search_result.has_next_page is False  # No more items
 
-    @pytest.mark.asyncio
     async def test_backward_pagination_last_page_fetches_oldest_first(
         self,
         notification_repository: NotificationRepository,
@@ -1240,7 +1213,6 @@ class TestNotificationCursorPagination:
         assert result.has_previous_page is True  # More items exist before
         assert result.has_next_page is False  # No cursor = last page
 
-    @pytest.mark.asyncio
     async def test_backward_pagination_with_cursor_shows_newer_items(
         self,
         notification_repository: NotificationRepository,

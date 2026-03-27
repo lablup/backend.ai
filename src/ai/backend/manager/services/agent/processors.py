@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -14,6 +15,10 @@ from ai.backend.manager.services.agent.actions.get_watcher_status import (
 from ai.backend.manager.services.agent.actions.handle_heartbeat import (
     HandleHeartbeatAction,
     HandleHeartbeatActionResult,
+)
+from ai.backend.manager.services.agent.actions.load_container_counts import (
+    LoadContainerCountsAction,
+    LoadContainerCountsActionResult,
 )
 from ai.backend.manager.services.agent.actions.mark_agent_exit import (
     MarkAgentExitAction,
@@ -34,6 +39,10 @@ from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
 from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canonicals import (
     RemoveAgentFromImagesByCanonicalsAction,
     RemoveAgentFromImagesByCanonicalsActionResult,
+)
+from ai.backend.manager.services.agent.actions.search_agents import (
+    SearchAgentsAction,
+    SearchAgentsActionResult,
 )
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
@@ -73,8 +82,17 @@ class AgentProcessors(AbstractProcessorPackage):
     remove_agent_from_images: ActionProcessor[
         RemoveAgentFromImagesAction, RemoveAgentFromImagesActionResult
     ]
+    search_agents: ActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
+    load_container_counts: ActionProcessor[
+        LoadContainerCountsAction, LoadContainerCountsActionResult
+    ]
 
-    def __init__(self, service: AgentService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: AgentService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
         self.get_watcher_status = ActionProcessor(service.get_watcher_status, action_monitors)
         self.watcher_agent_start = ActionProcessor(service.watcher_agent_start, action_monitors)
@@ -91,6 +109,8 @@ class AgentProcessors(AbstractProcessorPackage):
         self.remove_agent_from_images = ActionProcessor(
             service.remove_agent_from_images, action_monitors
         )
+        self.search_agents = ActionProcessor(service.search_agents, action_monitors)
+        self.load_container_counts = ActionProcessor(service.load_container_counts, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -105,4 +125,6 @@ class AgentProcessors(AbstractProcessorPackage):
             HandleHeartbeatAction.spec(),
             RemoveAgentFromImagesAction.spec(),
             RemoveAgentFromImagesByCanonicalsAction.spec(),
+            SearchAgentsAction.spec(),
+            LoadContainerCountsAction.spec(),
         ]

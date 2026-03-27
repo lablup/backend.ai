@@ -93,7 +93,7 @@ class HostPortPair(BaseSchema):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def __getitem__(self, *args) -> int | str:
+    def __getitem__(self, *args: object) -> int | str:
         if args[0] == 0:
             return self.host
         if args[0] == 1:
@@ -208,8 +208,8 @@ class UserIDValidator:
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_uid
-                    except KeyError:
-                        raise UserNotFoundError(f"No such user {value} in system")
+                    except KeyError as e:
+                        raise UserNotFoundError(f"No such user {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -240,7 +240,7 @@ class UserIDValidator:
 
     @classmethod
     def __get_pydantic_json_schema__(
-        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+        cls, _: core_schema.CoreSchema, handler: GetJsonSchemaHandler
     ) -> JsonSchemaValue:
         # Use the same schema that would be used for `int`
         return handler(
@@ -268,8 +268,8 @@ class GroupIDValidator:
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_gid
-                    except KeyError:
-                        raise GroupNotFoundError(f"No such group {value} in system")
+                    except KeyError as e:
+                        raise GroupNotFoundError(f"No such group {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -300,7 +300,7 @@ class GroupIDValidator:
 
     @classmethod
     def __get_pydantic_json_schema__(
-        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+        cls, _: core_schema.CoreSchema, handler: GetJsonSchemaHandler
     ) -> JsonSchemaValue:
         # Use the same schema that would be used for `int`
         return handler(
@@ -723,9 +723,9 @@ class UnsupportedTypeError(RuntimeError):
 
 
 def generate_example_json(
-    schema: type[BaseModel] | types.GenericAlias,
+    schema: type[BaseModel] | types.GenericAlias | types.UnionType,
     parent: list[str] | None = None,
-) -> dict | list:
+) -> dict[str, Any] | list[Any]:
     if parent is None:
         parent = []
     if isinstance(schema, types.UnionType):

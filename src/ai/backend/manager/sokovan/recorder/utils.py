@@ -19,7 +19,7 @@ def step_record_to_sub_step_result(step: StepRecord) -> SubStepResult:
     return SubStepResult(
         step=step.name,
         result=result,
-        error_code=None,  # StepRecord doesn't have error_code
+        error_code=step.error_code,
         message=step.detail,
         started_at=step.started_at,
         ended_at=step.ended_at,

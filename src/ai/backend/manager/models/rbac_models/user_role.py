@@ -29,27 +29,37 @@ if TYPE_CHECKING:
     from .role import RoleRow
 
 
-def _get_role_row_join_condition():
+def _get_role_row_join_condition() -> sa.ColumnElement[bool]:
     from .role import RoleRow
 
     return RoleRow.id == foreign(UserRoleRow.role_id)
 
 
-def _get_user_row_join_condition():
+def _get_user_row_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(UserRoleRow.user_id)
 
 
-class UserRoleRow(Base):
+class UserRoleRow(Base):  # type: ignore[misc]
     __tablename__ = "user_roles"
     __table_args__ = (sa.UniqueConstraint("user_id", "role_id", name="uq_user_id_role_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    user_id: Mapped[uuid.UUID] = mapped_column("user_id", GUID, nullable=False)
-    role_id: Mapped[uuid.UUID] = mapped_column("role_id", GUID, nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        "user_id",
+        GUID,
+        sa.ForeignKey("users.uuid", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role_id: Mapped[uuid.UUID] = mapped_column(
+        "role_id",
+        GUID,
+        sa.ForeignKey("roles.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     granted_by: Mapped[uuid.UUID | None] = mapped_column(
         "granted_by", GUID, nullable=True
     )  # Null if granted by system
@@ -70,6 +80,7 @@ class UserRoleRow(Base):
 
     def to_data(self) -> UserRoleAssignmentData:
         return UserRoleAssignmentData(
+            id=self.id,
             user_id=self.user_id,
             role_id=self.role_id,
             granted_by=self.granted_by,

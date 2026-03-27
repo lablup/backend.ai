@@ -1,30 +1,39 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
-from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.services.artifact_registry.actions.base import (
+    ArtifactRegistrySingleEntityAction,
+    ArtifactRegistrySingleEntityActionResult,
+)
 
 
 @dataclass
-class GetHuggingFaceRegistryAction(ArtifactRegistryAction):
+class GetHuggingFaceRegistryAction(ArtifactRegistrySingleEntityAction):
     registry_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+    @override
+    def target_entity_id(self) -> str:
         return str(self.registry_id)
 
     @override
-    @classmethod
-    def operation_type(cls) -> str:
-        return "get_huggingface_registry"
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.ARTIFACT_REGISTRY, str(self.registry_id))
 
 
 @dataclass
-class GetHuggingFaceRegistryActionResult(BaseActionResult):
+class GetHuggingFaceRegistryActionResult(ArtifactRegistrySingleEntityActionResult):
     result: HuggingFaceRegistryData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def target_entity_id(self) -> str:
         return str(self.result.id)

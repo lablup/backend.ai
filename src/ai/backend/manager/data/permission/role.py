@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+
+from ai.backend.manager.data.common.types import SearchResult
 
 from .id import ObjectId, ScopeId
 from .object_permission import (
@@ -11,11 +12,8 @@ from .object_permission import (
     ObjectPermissionData,
 )
 from .permission import ScopedPermissionCreateInput
-from .permission_group import (
-    PermissionGroupExtendedData,
-)
 from .status import RoleStatus
-from .types import EntityType, OperationType, RoleSource
+from .types import EntityType, OperationType, RBACElementRef, RoleSource
 
 
 @dataclass(frozen=True)
@@ -31,16 +29,18 @@ class RoleData:
     status: RoleStatus
     created_at: datetime
     updated_at: datetime
-    deleted_at: Optional[datetime]
-    description: Optional[str] = None
+    deleted_at: datetime | None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
 class AssignedUserData:
     """Information about a user assigned to a role."""
 
+    id: uuid.UUID
     user_id: uuid.UUID
-    granted_by: Optional[uuid.UUID]
+    role_id: uuid.UUID
+    granted_by: uuid.UUID | None
     granted_at: datetime
 
 
@@ -56,13 +56,12 @@ class RoleDetailData:
     source: RoleSource
     status: RoleStatus
 
-    permission_groups: list[PermissionGroupExtendedData]
     object_permissions: list[ObjectPermissionData]
 
     created_at: datetime
     updated_at: datetime
-    deleted_at: Optional[datetime]
-    description: Optional[str] = None
+    deleted_at: datetime | None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -88,6 +87,14 @@ class BatchEntityPermissionCheckInput:
 
 
 @dataclass(frozen=True)
+class ScopeChainPermissionCheckInput:
+    user_id: uuid.UUID
+    target_element_ref: RBACElementRef
+    operation: OperationType
+    permission_entity_type: EntityType | None
+
+
+@dataclass(frozen=True)
 class UserRoleAssignmentInput:
     """
     Input to create a new user-role association.
@@ -95,14 +102,15 @@ class UserRoleAssignmentInput:
 
     user_id: uuid.UUID
     role_id: uuid.UUID
-    granted_by: Optional[uuid.UUID] = None
+    granted_by: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
 class UserRoleAssignmentData:
+    id: uuid.UUID
     user_id: uuid.UUID
     role_id: uuid.UUID
-    granted_by: Optional[uuid.UUID] = None
+    granted_by: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -149,20 +157,63 @@ class UserRoleRevocationData:
 
 
 @dataclass(frozen=True)
-class RoleListResult:
-    """Result of role search with pagination info."""
+class BulkUserRoleAssignmentInput:
+    """Input for bulk assigning a role to multiple users."""
 
-    items: list[RoleData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+    granted_by: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
-class AssignedUserListResult:
+class BulkRoleAssignmentFailure:
+    """Failure information for a single user in bulk role assignment."""
+
+    user_id: uuid.UUID
+    message: str
+
+
+@dataclass(frozen=True)
+class BulkRoleAssignmentResultData:
+    """Result of bulk role assignment."""
+
+    successes: list[UserRoleAssignmentData] = field(default_factory=list)
+    failures: list[BulkRoleAssignmentFailure] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class BulkUserRoleRevocationInput:
+    """Input for bulk revoking a role from multiple users."""
+
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+
+
+@dataclass(frozen=True)
+class BulkRoleRevocationFailure:
+    """Failure information for a single user in bulk role revocation."""
+
+    user_id: uuid.UUID
+    message: str
+
+
+@dataclass(frozen=True)
+class BulkRoleRevocationResultData:
+    """Result of bulk role revocation."""
+
+    successes: list[UserRoleRevocationData] = field(default_factory=list)
+    failures: list[BulkRoleRevocationFailure] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RoleListResult(SearchResult[RoleData]):
+    """Result of role search with pagination info."""
+
+    pass
+
+
+@dataclass(frozen=True)
+class AssignedUserListResult(SearchResult[AssignedUserData]):
     """Result of assigned user search with pagination info."""
 
-    items: list[AssignedUserData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    pass

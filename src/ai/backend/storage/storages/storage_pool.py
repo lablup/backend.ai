@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Self, override
+from typing import Self, override
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.data.storage.types import ArtifactStorageType
@@ -22,7 +22,7 @@ class StoragePool(AbstractStoragePool):
 
     _storages: dict[str, AbstractStorage]
 
-    def __init__(self, storages: Optional[dict[str, AbstractStorage]] = None) -> None:
+    def __init__(self, storages: dict[str, AbstractStorage] | None = None) -> None:
         self._storages = storages or {}
 
     @classmethod

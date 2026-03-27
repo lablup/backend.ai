@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import click
 
@@ -15,7 +15,7 @@ class CLIContext:
     _local_config: ServerConfig | None
     _logger: AbstractLogger
 
-    def __init__(self, config_path: Optional[Path], log_level: LogLevel) -> None:
+    def __init__(self, config_path: Path | None, log_level: LogLevel) -> None:
         self.config_path = config_path
         self.log_level = log_level
         self._local_config = None

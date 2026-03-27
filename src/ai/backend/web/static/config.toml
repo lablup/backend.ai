@@ -3,6 +3,13 @@ apiEndpoint = "[Default API Endpoint. If blank, user input field will be shown.]
 apiEndpointText = "[Placeholder text instead of API endpoint input field.]"
 defaultSessionEnvironment = "[Default session kernel. If blank, alphabetically first kernel will be default.]"
 defaultImportEnvironment = "[Default kernel to use import features. If blank, cr.backend.ai/multiarch/python:3.9-ubuntu20.04 will be used.]"
+# Supported formats:
+#   - Full path with architecture: "registry/namespace:tag@arch" (e.g., "cr.backend.ai/multiarch/python:3.9-ubuntu20.04@x86_64")
+#     → Selects the exact image matching all components
+#   - Without architecture: "registry/namespace:tag" (e.g., "cr.backend.ai/multiarch/python:3.9-ubuntu20.04")
+#     → Selects the first available architecture for the specified tag
+#   - Without tag (registry/namespace only): "registry/namespace" (e.g., "cr.backend.ai/multiarch/python")
+#     → Selects the latest version with the first available architecture
 connectionMode = "[Connection mode. Default is API. Currenly supports API and SESSION]"
 allowChangeSigninMode = false           # Allows user to change signin mode between `API` and `SESSION`
 signupSupport = false                   # Enable/disable signup feature support. Manager plugin is required.

@@ -4,7 +4,7 @@ import logging
 import sys
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Optional, override
+from typing import override
 
 import trafaret as t
 
@@ -21,17 +21,17 @@ from ai.backend.manager.models.session import SessionRow
 
 from .types import (
     AbstractAgentSelector,
+    AbstractResourceGroupState,
     NullAgentSelectorState,
     RoundRobinState,
     RRAgentSelectorState,
-    T_ResourceGroupState,
 )
 from .utils import (
     get_requested_architecture,
     sort_requested_slots_by_priority,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
@@ -55,7 +55,9 @@ def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
     return num_extras
 
 
-class BaseAgentSelector(AbstractAgentSelector[T_ResourceGroupState]):
+class BaseAgentSelector[T_ResourceGroupState: AbstractResourceGroupState](
+    AbstractAgentSelector[T_ResourceGroupState]
+):
     @property
     @override
     def config_iv(self) -> t.Dict:
@@ -95,7 +97,7 @@ class LegacyAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         agents = self.filter_agents(agents, pending_session_or_kernel)
         if not agents:
             return None
@@ -124,7 +126,7 @@ class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         if isinstance(pending_session_or_kernel, KernelRow):
             sgroup_name = pending_session_or_kernel.scaling_group
             arch_str = pending_session_or_kernel.architecture
@@ -190,7 +192,7 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         agents = self.filter_agents(agents, pending_session_or_kernel)
         if not agents:
             return None
@@ -232,7 +234,7 @@ class DispersedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         agents = self.filter_agents(agents, pending_session_or_kernel)
         if not agents:
             return None

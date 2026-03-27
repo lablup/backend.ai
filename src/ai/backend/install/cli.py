@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 
 from . import __version__
-from .types import Accelerator, CliArgs, InstallModes
+from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, InstallModes
 
 
 @click.command(
@@ -64,16 +64,58 @@ from .types import Accelerator, CliArgs, InstallModes
     default=None,
     help="Install webui as editable repository. [default: auto (True on main branch)]",
 )
+@click.option(
+    "--fqdn-prefix",
+    type=str,
+    default=None,
+    help="FQDN prefix for generating domain names (e.g., '786cdf' generates 786cdf.app.backend.ai, 786cdf.apphub.backend.ai, etc.).",
+)
+@click.option(
+    "--tls-advertised",
+    is_flag=True,
+    default=False,
+    help="Advertise TLS endpoints to external clients.",
+)
+@click.option(
+    "--advertised-port",
+    type=int,
+    default=443,
+    help="Advertised port for public endpoints (default: 443).",
+)
+@click.option(
+    "--endpoint-protocol",
+    type=click.Choice([p.value for p in EndpointProtocol], case_sensitive=False),
+    default=None,
+    help="Force endpoint protocol in webserver (http or https). If not set, auto-detected.",
+)
+@click.option(
+    "--frontend-mode",
+    type=click.Choice([m.value for m in FrontendMode], case_sensitive=False),
+    default=FrontendMode.PORT.value,
+    help="App-proxy frontend mode: 'port' (default) or 'wildcard'.",
+)
+@click.option(
+    "--use-wildcard-binding",
+    is_flag=True,
+    default=False,
+    help="Use wildcard domain binding for app-proxy worker.",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
-    cli_ctx: click.Context,
+    _cli_ctx: click.Context,
     mode: InstallModes | None,
     target_path: str,
     show_guide: bool,
     non_interactive: bool,
     headless: bool,
     public_facing_address: str,
+    fqdn_prefix: str | None,
+    tls_advertised: bool,
+    advertised_port: int,
+    endpoint_protocol: str | None,
+    frontend_mode: str,
+    use_wildcard_binding: bool,
     accelerator: str,
     editable_webui: bool | None,
 ) -> None:
@@ -99,6 +141,12 @@ def main(
         public_facing_address=public_facing_address,
         accelerator=accelerator,
         editable_webui=editable_webui,
+        fqdn_prefix=fqdn_prefix,
+        tls_advertised=tls_advertised,
+        advertised_port=advertised_port,
+        endpoint_protocol=EndpointProtocol(endpoint_protocol) if endpoint_protocol else None,
+        frontend_mode=FrontendMode(frontend_mode),
+        use_wildcard_binding=use_wildcard_binding,
     )
     app = InstallerApp(args)
     app.run(headless=headless)

@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import Any, Optional, override
+from dataclasses import dataclass, replace
+from typing import Any, override
 
 from ai.backend.common.types import (
     ResourceSlot,
     RuntimeVariant,
     VFolderMount,
 )
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
@@ -20,31 +21,38 @@ from ai.backend.manager.repositories.base import CreatorSpec
 class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     """CreatorSpec for deployment revision creation.
 
-    Note: revision_number must be provided by the service layer after
-    calculating from get_latest_revision_number().
+    When using create_revision(), revision_number must be set explicitly.
+    When using create_revision_with_next_number(), revision_number can be
+    left as None — the repository will assign it atomically.
     """
 
     endpoint_id: uuid.UUID
-    revision_number: int
     image_id: uuid.UUID
     resource_group: str
     resource_slots: ResourceSlot
     resource_opts: Mapping[str, Any]
     cluster_mode: str
     cluster_size: int
-    model_id: Optional[uuid.UUID]
+    model_id: uuid.UUID | None
     model_mount_destination: str
-    model_definition_path: Optional[str]
-    model_definition: Optional[Mapping[str, Any]]
-    startup_command: Optional[str]
-    bootstrap_script: Optional[str]
+    model_definition_path: str | None
+    model_definition: Mapping[str, Any] | None
+    startup_command: str | None
+    bootstrap_script: str | None
     environ: Mapping[str, Any]
-    callback_url: Optional[str]
+    callback_url: str | None
     runtime_variant: RuntimeVariant
     extra_mounts: Sequence[VFolderMount]
+    revision_number: int | None = None
+
+    def with_revision_number(self, revision_number: int) -> DeploymentRevisionCreatorSpec:
+        """Return a copy with the given revision_number."""
+        return replace(self, revision_number=revision_number)
 
     @override
     def build_row(self) -> DeploymentRevisionRow:
+        if self.revision_number is None:
+            raise InternalServerError("revision_number must be set before building a row")
         return DeploymentRevisionRow(
             endpoint=self.endpoint_id,
             revision_number=self.revision_number,

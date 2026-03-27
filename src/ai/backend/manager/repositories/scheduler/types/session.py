@@ -1,9 +1,8 @@
 """Session related types."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -17,7 +16,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.sokovan.scheduler.types import KernelWorkload, SessionWorkload
+from ai.backend.manager.sokovan.data import KernelWorkload, SessionWorkload
 
 
 @dataclass
@@ -28,7 +27,7 @@ class KernelData:
     image: str
     architecture: str
     requested_slots: ResourceSlot
-    agent: Optional[AgentId]
+    agent: AgentId | None
 
     def to_kernel_workload(self) -> KernelWorkload:
         """Convert to KernelWorkload entity."""
@@ -52,11 +51,12 @@ class PendingSessionData:
     domain_name: str
     scaling_group_name: str
     priority: int
+    is_preemptible: bool
     session_type: SessionTypes
     cluster_mode: ClusterMode
-    starts_at: Optional[datetime]
+    starts_at: datetime | None
     is_private: bool
-    designated_agent_ids: Optional[list[AgentId]]
+    designated_agent_ids: list[AgentId] | None
     kernels: list[KernelData]
 
     def to_session_workload(self) -> SessionWorkload:
@@ -75,6 +75,7 @@ class PendingSessionData:
             cluster_mode=self.cluster_mode,
             starts_at=self.starts_at,
             is_private=self.is_private,
+            is_preemptible=self.is_preemptible,
             kernels=kernel_workloads,
             designated_agent_ids=self.designated_agent_ids,
         )
@@ -113,9 +114,9 @@ class TerminatingKernelData:
 
     kernel_id: KernelId
     status: KernelStatus
-    container_id: Optional[str]
-    agent_id: Optional[AgentId]
-    agent_addr: Optional[str]
+    container_id: str | None
+    agent_id: AgentId | None
+    agent_addr: str | None
     occupied_slots: ResourceSlot
 
 
@@ -139,8 +140,8 @@ class TerminatingKernelWithAgentData:
     kernel_id: KernelId
     session_id: SessionId
     status: KernelStatus
-    agent_id: Optional[AgentId]
-    agent_status: Optional[str]  # Agent status from AgentRow
+    agent_id: AgentId | None
+    agent_status: str | None  # Agent status from AgentRow
 
 
 @dataclass
@@ -148,29 +149,10 @@ class KernelTerminationResult:
     """Result of termination for a single kernel."""
 
     kernel_id: KernelId
-    agent_id: Optional[AgentId]
+    agent_id: AgentId | None
     occupied_slots: ResourceSlot
     success: bool
-    error: Optional[str] = None
-
-
-@dataclass
-class SessionTerminationResult:
-    """Result of termination for a session and its kernels."""
-
-    session_id: SessionId
-    access_key: AccessKey
-    creation_id: str
-    session_type: SessionTypes
-    reason: str  # Termination reason (e.g., "USER_REQUESTED", "FORCE_TERMINATED")
-    kernel_results: list[KernelTerminationResult] = field(default_factory=list)
-
-    @property
-    def should_terminate_session(self) -> bool:
-        """Check if all kernels in the session were successfully terminated."""
-        if not self.kernel_results:
-            return False
-        return all(kernel.success for kernel in self.kernel_results)
+    error: str | None = None
 
 
 @dataclass
@@ -188,14 +170,21 @@ class MarkTerminatingResult:
 
     cancelled_sessions: list[SessionId]  # Sessions that were cancelled (PENDING)
     terminating_sessions: list[SessionId]  # Sessions marked as TERMINATING
+    force_terminated_sessions: list[SessionId]  # Sessions directly set to TERMINATED (forced)
     skipped_sessions: list[
         SessionId
     ]  # Sessions not processed (already terminated, not found, etc.)
 
     def has_processed(self) -> bool:
         """Check if any sessions were actually processed (state changed)."""
-        return bool(self.cancelled_sessions or self.terminating_sessions)
+        return bool(
+            self.cancelled_sessions or self.terminating_sessions or self.force_terminated_sessions
+        )
 
     def processed_count(self) -> int:
         """Get count of sessions that were actually processed."""
-        return len(self.cancelled_sessions) + len(self.terminating_sessions)
+        return (
+            len(self.cancelled_sessions)
+            + len(self.terminating_sessions)
+            + len(self.force_terminated_sessions)
+        )

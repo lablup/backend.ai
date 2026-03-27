@@ -3,22 +3,22 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Optional
 
 from ai.backend.client.request import Request
-from ai.backend.common.dto.manager.export import (
-    AuditLogExportCSVRequest,
+from ai.backend.common.dto.manager.v2.export import (
+    AuditLogExportCSVInput,
     AuditLogExportFilter,
     AuditLogExportOrder,
-    GetExportReportResponse,
-    ListExportReportsResponse,
-    ProjectExportCSVRequest,
+    GetExportReportPayload,
+    KeypairExportCSVInput,
+    ListExportReportsPayload,
+    ProjectExportCSVInput,
     ProjectExportFilter,
     ProjectExportOrder,
-    SessionExportCSVRequest,
+    SessionExportCSVInput,
     SessionExportFilter,
     SessionExportOrder,
-    UserExportCSVRequest,
+    UserExportCSVInput,
     UserExportFilter,
     UserExportOrder,
 )
@@ -36,7 +36,7 @@ class Export(BaseFunction):
 
     @api_function
     @classmethod
-    async def list_reports(cls) -> ListExportReportsResponse:
+    async def list_reports(cls) -> ListExportReportsPayload:
         """
         List all available export reports.
 
@@ -45,11 +45,11 @@ class Export(BaseFunction):
         rqst = Request("GET", "/export/reports")
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return ListExportReportsResponse.model_validate(data)
+            return ListExportReportsPayload.model_validate(data)
 
     @api_function
     @classmethod
-    async def get_report(cls, report_key: str) -> GetExportReportResponse:
+    async def get_report(cls, report_key: str) -> GetExportReportPayload:
         """
         Get a specific export report by key.
 
@@ -59,7 +59,7 @@ class Export(BaseFunction):
         rqst = Request("GET", f"/export/reports/{report_key}")
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return GetExportReportResponse.model_validate(data)
+            return GetExportReportPayload.model_validate(data)
 
     # =========================================================================
     # User Export
@@ -70,11 +70,11 @@ class Export(BaseFunction):
     async def stream_users_csv(
         cls,
         *,
-        fields: Optional[list[str]] = None,
-        filter: Optional[UserExportFilter] = None,
-        order: Optional[list[UserExportOrder]] = None,
+        fields: list[str] | None = None,
+        filter: UserExportFilter | None = None,
+        order: list[UserExportOrder] | None = None,
         encoding: str = "utf-8",
-        filename: Optional[str] = None,
+        filename: str | None = None,
         chunk_size: int = 8192,
     ) -> AsyncIterator[bytes]:
         """
@@ -88,7 +88,7 @@ class Export(BaseFunction):
         :param chunk_size: Size of chunks to yield (default: 8192 bytes)
         :yields: Chunks of CSV data as bytes
         """
-        request = UserExportCSVRequest(
+        request = UserExportCSVInput(
             fields=fields,
             filter=filter,
             order=order,
@@ -113,11 +113,11 @@ class Export(BaseFunction):
     async def stream_sessions_csv(
         cls,
         *,
-        fields: Optional[list[str]] = None,
-        filter: Optional[SessionExportFilter] = None,
-        order: Optional[list[SessionExportOrder]] = None,
+        fields: list[str] | None = None,
+        filter: SessionExportFilter | None = None,
+        order: list[SessionExportOrder] | None = None,
         encoding: str = "utf-8",
-        filename: Optional[str] = None,
+        filename: str | None = None,
         chunk_size: int = 8192,
     ) -> AsyncIterator[bytes]:
         """
@@ -131,7 +131,7 @@ class Export(BaseFunction):
         :param chunk_size: Size of chunks to yield (default: 8192 bytes)
         :yields: Chunks of CSV data as bytes
         """
-        request = SessionExportCSVRequest(
+        request = SessionExportCSVInput(
             fields=fields,
             filter=filter,
             order=order,
@@ -156,11 +156,11 @@ class Export(BaseFunction):
     async def stream_projects_csv(
         cls,
         *,
-        fields: Optional[list[str]] = None,
-        filter: Optional[ProjectExportFilter] = None,
-        order: Optional[list[ProjectExportOrder]] = None,
+        fields: list[str] | None = None,
+        filter: ProjectExportFilter | None = None,
+        order: list[ProjectExportOrder] | None = None,
         encoding: str = "utf-8",
-        filename: Optional[str] = None,
+        filename: str | None = None,
         chunk_size: int = 8192,
     ) -> AsyncIterator[bytes]:
         """
@@ -174,7 +174,7 @@ class Export(BaseFunction):
         :param chunk_size: Size of chunks to yield (default: 8192 bytes)
         :yields: Chunks of CSV data as bytes
         """
-        request = ProjectExportCSVRequest(
+        request = ProjectExportCSVInput(
             fields=fields,
             filter=filter,
             order=order,
@@ -182,6 +182,45 @@ class Export(BaseFunction):
         )
 
         rqst = Request("POST", "/export/projects/csv")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        if filename:
+            rqst.headers["X-Export-Filename"] = filename
+
+        async with rqst.fetch() as resp:
+            async for chunk in resp.content.iter_chunked(chunk_size):
+                yield chunk
+
+    # =========================================================================
+    # Keypair Export
+    # =========================================================================
+
+    @api_function
+    @classmethod
+    async def stream_keypairs_csv(
+        cls,
+        *,
+        fields: list[str] | None = None,
+        encoding: str = "utf-8",
+        filename: str | None = None,
+        chunk_size: int = 8192,
+    ) -> AsyncIterator[bytes]:
+        """
+        Stream keypair export as an async iterator of chunks.
+
+        Note: Keypair export does not currently support filtering or ordering.
+
+        :param fields: Optional list of field keys to include (default: all fields)
+        :param encoding: CSV encoding (default: utf-8, also supports euc-kr)
+        :param filename: Optional filename for the export
+        :param chunk_size: Size of chunks to yield (default: 8192 bytes)
+        :yields: Chunks of CSV data as bytes
+        """
+        request = KeypairExportCSVInput(
+            fields=fields,
+            encoding=encoding,
+        )
+
+        rqst = Request("POST", "/export/keypairs/csv")
         rqst.set_json(request.model_dump(mode="json", exclude_none=True))
         if filename:
             rqst.headers["X-Export-Filename"] = filename
@@ -199,11 +238,11 @@ class Export(BaseFunction):
     async def stream_audit_logs_csv(
         cls,
         *,
-        fields: Optional[list[str]] = None,
-        filter: Optional[AuditLogExportFilter] = None,
-        order: Optional[list[AuditLogExportOrder]] = None,
+        fields: list[str] | None = None,
+        filter: AuditLogExportFilter | None = None,
+        order: list[AuditLogExportOrder] | None = None,
         encoding: str = "utf-8",
-        filename: Optional[str] = None,
+        filename: str | None = None,
         chunk_size: int = 8192,
     ) -> AsyncIterator[bytes]:
         """
@@ -217,7 +256,7 @@ class Export(BaseFunction):
         :param chunk_size: Size of chunks to yield (default: 8192 bytes)
         :yields: Chunks of CSV data as bytes
         """
-        request = AuditLogExportCSVRequest(
+        request = AuditLogExportCSVInput(
             fields=fields,
             filter=filter,
             order=order,

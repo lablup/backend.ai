@@ -26,7 +26,7 @@ from .types import (
     RootContext,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 CACHE_LIFESPAN: Final[int] = 120
 
@@ -49,7 +49,7 @@ async def gather_prometheus_inference_measures(
     client_pool: ClientPool,
     routes: list[RouteInfo],
     request_path: str = "/metrics",
-) -> list[InferenceMeasurement]:
+) -> list[InferenceMeasurement[Measurement | HistogramMeasurement]]:
     histogram_metrics_labels: dict[str, tuple[str, ...]] = {}  # [metric name: (bucket label, ...)]
 
     histogram_bucket_metrics: defaultdict[str, dict[UUID, tuple[Decimal, ...]]] = defaultdict(
@@ -85,9 +85,21 @@ async def gather_prometheus_inference_measures(
         )
         client_session = client_pool.load_client_session(client_key)
 
-        async with client_session.get(request_path) as resp:
-            resp.raise_for_status()
-            metrics_text = await resp.text()
+        try:
+            async with client_session.get(request_path) as resp:
+                resp.raise_for_status()
+                metrics_text = await resp.text()
+        except Exception:
+            log.warning(
+                "Failed to collect metrics from route {} ({}:{}), skipping",
+                route.route_id,
+                route.current_kernel_host,
+                route.kernel_port,
+                exc_info=True,
+            )
+            continue
+
+        try:
             metric_families = text_string_to_metric_families(metrics_text)
             for metric_family in metric_families:
                 metric_name = metric_family.name
@@ -121,8 +133,17 @@ async def gather_prometheus_inference_measures(
                         except IndexError:
                             continue
                         counter_metrics[metric_name][route.route_id] = Decimal(value)
+        except Exception:
+            log.warning(
+                "Failed to parse metrics from route {} ({}:{}), skipping",
+                route.route_id,
+                route.current_kernel_host,
+                route.kernel_port,
+                exc_info=True,
+            )
+            continue
 
-    measures: list[InferenceMeasurement] = []
+    measures: list[InferenceMeasurement[Measurement | HistogramMeasurement]] = []
     for metric_name, per_route_histogram_metrics in histogram_bucket_metrics.items():
         aggregated_buckets = add_matrices(*per_route_histogram_metrics.values())
         aggregated_count = sum([
@@ -206,12 +227,12 @@ async def gather_prometheus_inference_measures(
 
 async def gather_inference_measures(
     client_pool: ClientPool, circuit: Circuit
-) -> list[InferenceMeasurement] | None:
+) -> list[InferenceMeasurement[Measurement | HistogramMeasurement]] | None:
     if not isinstance(circuit.app_info, InferenceAppInfo):
         raise InvalidAppInfoTypeError(
             f"Expected InferenceAppInfo, got {type(circuit.app_info).__name__}"
         )
-    measures: list[InferenceMeasurement] = []
+    measures: list[InferenceMeasurement[Measurement | HistogramMeasurement]] = []
 
     match circuit.app_info.runtime_variant:
         case RuntimeVariant.VLLM:
@@ -267,11 +288,13 @@ async def gather_inference_measures(
                     )
                 )
             return measures
+        case RuntimeVariant.CUSTOM:
+            return await gather_prometheus_inference_measures(client_pool, circuit.route_info)
         case _:
             return None
 
 
-async def collect_inference_metric(root_ctx: RootContext, interval: float) -> None:
+async def collect_inference_metric(root_ctx: RootContext, _interval: float) -> None:
     try:
         inference_circuits = [
             circuit
@@ -282,7 +305,9 @@ async def collect_inference_metric(root_ctx: RootContext, interval: float) -> No
         # Here we use asyncio.gather() instead of aiotools.TaskGroup
         # to keep methods of other plugins running when a plugin raises an error
         # instead of cancelling them.
-        _tasks: list[asyncio.Task[list[InferenceMeasurement] | None]] = [
+        _tasks: list[
+            asyncio.Task[list[InferenceMeasurement[Measurement | HistogramMeasurement]] | None]
+        ] = [
             asyncio.create_task(gather_inference_measures(root_ctx.http_client_pool, c))
             for c in inference_circuits
         ]

@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Optional
 from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
@@ -38,6 +37,15 @@ from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
 )
+from ai.backend.manager.services.group.actions.search_projects import (
+    GetProjectAction,
+    GetProjectActionResult,
+    ScopedSearchProjectsActionResult,
+    SearchProjectsAction,
+    SearchProjectsActionResult,
+    SearchProjectsByDomainAction,
+    SearchProjectsByUserAction,
+)
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
@@ -70,11 +78,9 @@ class GroupService:
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
         group_data = await self._group_repository.create(action.creator)
-        return CreateGroupActionResult(data=group_data)
+        return CreateGroupActionResult(data=group_data, _domain_name=action._domain_name)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
-        from ai.backend.manager.models.user import UserRole
-
         # Convert user_uuids from list[str] to list[UUID] if provided
         user_uuids_converted = None
         user_uuids_list = action.user_uuids.optional_value()
@@ -83,7 +89,6 @@ class GroupService:
 
         group_data = await self._group_repository.modify_validated(
             action.updater,
-            UserRole.USER,  # Default role since group operations don't require role-based logic
             action.user_update_mode.optional_value(),
             user_uuids_converted,
         )
@@ -102,7 +107,7 @@ class GroupService:
         self,
         start_date: datetime,
         end_date: datetime,
-        project_ids: Optional[Sequence[UUID]] = None,
+        project_ids: Sequence[UUID] | None = None,
     ) -> dict[UUID, ProjectResourceUsage]:
         kernels = await self._group_repository.fetch_project_resource_usage(
             start_date, end_date, project_ids=project_ids
@@ -122,8 +127,8 @@ class GroupService:
         try:
             start_date = datetime.strptime(month, "%Y%m").replace(tzinfo=local_tz)
             end_date = start_date + relativedelta(months=+1)
-        except ValueError:
-            raise InvalidAPIParameters(extra_msg="Invalid date values")
+        except ValueError as e:
+            raise InvalidAPIParameters(extra_msg="Invalid date values") from e
         result = await self._group_repository.get_container_stats_for_period(
             start_date, end_date, action.group_ids
         )
@@ -141,8 +146,8 @@ class GroupService:
             end_date = end_date + timedelta(days=1)  # include sessions in end_date
             if end_date - start_date > timedelta(days=100):
                 raise InvalidAPIParameters("Cannot query more than 100 days")
-        except ValueError:
-            raise InvalidAPIParameters(extra_msg="Invalid date values")
+        except ValueError as e:
+            raise InvalidAPIParameters(extra_msg="Invalid date values") from e
         if end_date <= start_date:
             raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
         log.info(
@@ -155,3 +160,83 @@ class GroupService:
         result = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
         log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
         return UsagePerPeriodActionResult(result=result)
+
+    async def search_projects(self, action: SearchProjectsAction) -> SearchProjectsActionResult:
+        """Search all projects (admin only - no scope filter).
+
+        Args:
+            action: SearchProjectsAction with querier.
+
+        Returns:
+            SearchProjectsActionResult with items and pagination info.
+        """
+        result = await self._group_repository.search_projects(querier=action.querier)
+        return SearchProjectsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_projects_by_domain(
+        self, action: SearchProjectsByDomainAction
+    ) -> ScopedSearchProjectsActionResult:
+        """Search projects within a domain.
+
+        Scope validation (domain existence) is done in repository layer.
+
+        Args:
+            action: SearchProjectsByDomainAction with scope and querier.
+
+        Returns:
+            ScopedSearchProjectsActionResult with domain-scoped items.
+        """
+        result = await self._group_repository.search_projects_by_domain(
+            action.scope, action.querier
+        )
+        return ScopedSearchProjectsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            _scope_type=action.scope_type(),
+            _scope_id=action.scope_id(),
+        )
+
+    async def search_projects_by_user(
+        self, action: SearchProjectsByUserAction
+    ) -> ScopedSearchProjectsActionResult:
+        """Search projects a user is member of.
+
+        Filters by association_groups_users table.
+
+        Args:
+            action: SearchProjectsByUserAction with scope and querier.
+
+        Returns:
+            ScopedSearchProjectsActionResult with user's projects.
+        """
+        result = await self._group_repository.search_projects_by_user(action.scope, action.querier)
+        return ScopedSearchProjectsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            _scope_type=action.scope_type(),
+            _scope_id=action.scope_id(),
+        )
+
+    async def get_project(self, action: GetProjectAction) -> GetProjectActionResult:
+        """Get a single project by UUID.
+
+        Args:
+            action: GetProjectAction with project_id.
+
+        Returns:
+            GetProjectActionResult with project data.
+
+        Raises:
+            ProjectNotFound: If project does not exist.
+        """
+        data = await self._group_repository.get_project(action.project_id)
+        return GetProjectActionResult(data=data)

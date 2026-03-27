@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Generic, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -34,11 +33,10 @@ class BaseBackgroundTaskResult(BaseModel):
     )
 
 
-TManifest = TypeVar("TManifest", bound=BaseBackgroundTaskManifest)
-TResult = TypeVar("TResult", bound=Optional[BaseBackgroundTaskResult])
-
-
-class BaseBackgroundTaskHandler(Generic[TManifest, TResult], ABC):
+class BaseBackgroundTaskHandler[
+    TManifest: BaseBackgroundTaskManifest,
+    TResult: BaseBackgroundTaskResult | None,
+](ABC):
     @classmethod
     @abstractmethod
     def name(cls) -> BgtaskNameBase:

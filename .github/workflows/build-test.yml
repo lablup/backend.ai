@@ -14,10 +14,10 @@ jobs:
       fail-fast: false
       matrix:
         # ubuntu-22.04: x86-64
-        # ubuntu-22.04-arm64: aarch64
-        # macos-14-large: intel
-        # self-hosted-macos-14: apple silicon
-        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-large, self-hosted-macos-14]
+        # ubuntu-22.04-arm: aarch64
+        # macos-15-intel: intel
+        # macos-15: apple silicon
+        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15-intel, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Check out the revision

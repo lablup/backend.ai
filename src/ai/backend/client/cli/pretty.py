@@ -7,9 +7,9 @@ import json
 import sys
 import textwrap
 import traceback
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from types import TracebackType
-from typing import Optional, Self
+from typing import Any, Self, TextIO
 
 from click import echo, style
 from tqdm import tqdm
@@ -56,7 +56,7 @@ def italic(text: str) -> str:
     return "\x1b[3m" + text + "\x1b[23m"
 
 
-def format_pretty(msg, status=PrintStatus.NONE, colored=True):
+def format_pretty(msg: str, status: PrintStatus = PrintStatus.NONE, _colored: bool = True) -> str:
     if status == PrintStatus.NONE:
         indicator = style("\u2219", fg="bright_cyan", reset=False)
     elif status == PrintStatus.WAITING:
@@ -79,13 +79,16 @@ format_fail = functools.partial(format_pretty, status=PrintStatus.FAILED)
 format_warn = functools.partial(format_pretty, status=PrintStatus.WARNING)
 
 
-def print_pretty(msg, *, status=PrintStatus.NONE, file=None):
+def print_pretty(
+    msg: str, *, status: PrintStatus = PrintStatus.NONE, file: TextIO | None = None
+) -> None:
     if file is None:
         file = sys.stderr
     if status == PrintStatus.NONE:
         indicator = style("\u2219", fg="bright_cyan", reset=False)
     elif status == PrintStatus.WAITING:
-        assert "\n" not in msg, "Waiting message must be a single line."
+        if "\n" in msg:
+            raise ValueError("Waiting message must be a single line")
         indicator = style("\u22ef", fg="bright_yellow", reset=False)
     elif status == PrintStatus.DONE:
         indicator = style("\u2713", fg="bright_green", reset=False)
@@ -122,7 +125,7 @@ def _format_gql_path(items: Sequence[str | int]) -> str:
     return "".join(pieces)[1:]  # strip first dot
 
 
-def format_error(exc: Exception):
+def format_error(exc: Exception) -> Iterator[str]:
     if isinstance(exc, BackendAPIError):
         yield f"{exc.__class__.__name__}: {exc.status} {exc.reason}\n"
         yield f"{exc.data['title']}"
@@ -181,7 +184,7 @@ def format_error(exc: Exception):
         yield ("*** Traceback ***\n" + "".join(traceback.format_tb(exc.__traceback__)).strip())
 
 
-def print_error(exc: Exception, *, file=None):
+def print_error(exc: Exception, *, file: TextIO | None = None) -> None:
     if file is None:
         file = sys.stderr
     indicator = style("\u2718", fg="bright_red", reset=False)
@@ -195,9 +198,16 @@ def print_error(exc: Exception, *, file=None):
     file.flush()
 
 
-def show_warning(message, category, filename, lineno, file=None, line=None):
+def show_warning(
+    message: str,
+    category: type[Warning],
+    _filename: str,
+    _lineno: int,
+    file: TextIO | None = None,
+    _line: str | None = None,
+) -> None:
     echo(
-        "{0}: {1}".format(
+        "{}: {}".format(
             style(str(category.__name__), fg="yellow", bold=True),
             style(str(message), fg="yellow"),
         ),
@@ -205,7 +215,7 @@ def show_warning(message, category, filename, lineno, file=None, line=None):
     )
 
 
-class ProgressBarWithSpinner(tqdm):
+class ProgressBarWithSpinner(tqdm):  # type: ignore[type-arg]
     """
     A simple extension to tqdm adding a spinner.
 
@@ -223,21 +233,23 @@ class ProgressBarWithSpinner(tqdm):
 
     @staticmethod
     def alt_format_meter(
-        n,
-        total,
-        elapsed,
-        ncols=None,
-        prefix="",
-        ascii=False,
-        unit="it",
-        unit_scale=False,
-        rate=None,
-        bar_format=None,
-        postfix=None,
-        *args,
-        **kwargs,
+        n: int | float,
+        total: int | float | None,
+        elapsed: float,
+        ncols: int | None = None,
+        prefix: str = "",
+        ascii: bool = False,
+        unit: str = "it",
+        unit_scale: bool = False,
+        rate: float | None = None,
+        bar_format: str | None = None,
+        postfix: str | None = None,
+        *args: Any,
+        **kwargs: Any,
     ) -> str:
         # Return the prefix string only.
+        # Suppress unused variable warnings (params required for tqdm compatibility)
+        _ = n, total, elapsed, ncols, ascii, unit, unit_scale, rate, bar_format, args, kwargs
         return str(prefix) + str(postfix)
 
     def __init__(
@@ -259,7 +271,7 @@ class ProgressBarWithSpinner(tqdm):
             unit=unit,
         )
         # Deactivate the progress bar display by default
-        self.format_meter = self.alt_format_meter  # type: ignore
+        self.format_meter = self.alt_format_meter
         self.set_description_str(initial_desc)
         self.set_postfix_str(style("", reset=True))
 
@@ -284,7 +296,7 @@ class ProgressBarWithSpinner(tqdm):
     def total(self, value: int | float) -> None:
         self._total = value
         # Reactivate the progress bar display when total is first set
-        self.format_meter = self._orig_format_meter  # type: ignore
+        self.format_meter = self._orig_format_meter
 
     async def __aenter__(self) -> Self:
         self.spinner_task = asyncio.create_task(self.spin())
@@ -292,10 +304,10 @@ class ProgressBarWithSpinner(tqdm):
 
     async def __aexit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> Optional[bool]:
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
         if self.spinner_task is not None and not self.spinner_task.done():
             self.spinner_task.cancel()
             await self.spinner_task

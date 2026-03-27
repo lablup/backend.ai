@@ -3,7 +3,7 @@ Tests for BaseRevisionGenerator implementation.
 """
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -33,10 +33,10 @@ from ai.backend.manager.sokovan.deployment.revision_generator.custom import Cust
 class _RequestSpec:
     """API request specification."""
 
-    image: Optional[str]
-    architecture: Optional[str]
-    resource_slots: Optional[dict[str, Any]]
-    environ: Optional[dict[str, str]]
+    image: str | None
+    architecture: str | None
+    resource_slots: dict[str, Any] | None
+    environ: dict[str, str] | None
 
 
 @dataclass
@@ -46,7 +46,7 @@ class _ExpectedResult:
     image: str
     architecture: str
     resource_slots: dict[str, Any]
-    environ: Optional[dict[str, str]]
+    environ: dict[str, str] | None
 
 
 @dataclass
@@ -203,7 +203,6 @@ class TestLoadServiceDefinition:
         ],
         ids=lambda tc: tc.id,
     )
-    @pytest.mark.asyncio
     async def test_load_service_definition(
         self,
         test_case: _LoadServiceDefinitionTestCase,
@@ -220,7 +219,6 @@ class TestLoadServiceDefinition:
         # When: Loading service definition
         result = await base_generator.load_service_definition(
             vfolder_id=vfolder_id,
-            model_definition_path=None,
             runtime_variant=test_case.runtime_variant,
         )
 
@@ -232,7 +230,6 @@ class TestLoadServiceDefinition:
         assert result.resource_slots == test_case.expected.resource_slots
         assert result.environ == test_case.expected.environ
 
-    @pytest.mark.asyncio
     async def test_no_service_definition(
         self,
         base_generator: BaseRevisionGenerator,
@@ -246,7 +243,6 @@ class TestLoadServiceDefinition:
         # When: Loading service definition
         result = await base_generator.load_service_definition(
             vfolder_id=vfolder_id,
-            model_definition_path=None,
             runtime_variant="vllm",
         )
 
@@ -259,10 +255,10 @@ class _MergeRevisionTestCase:
     """Test case for merge_revision."""
 
     id: str
-    service_definition: Optional[ModelServiceDefinition]
+    service_definition: ModelServiceDefinition | None
     request: _RequestSpec
     expected: _ExpectedResult
-    default_architecture: Optional[str] = None
+    default_architecture: str | None = None
 
 
 class TestMergeRevision:
@@ -530,7 +526,7 @@ class _CompletePipelineTestCase:
     runtime_variant: str
     request: _RequestSpec
     expected: _ExpectedResult
-    default_architecture: Optional[str] = None
+    default_architecture: str | None = None
 
 
 class TestCompleteOverridePipeline:
@@ -748,7 +744,6 @@ class TestCompleteOverridePipeline:
         ],
         ids=lambda tc: tc.id,
     )
-    @pytest.mark.asyncio
     async def test_complete_pipeline(
         self,
         test_case: _CompletePipelineTestCase,
@@ -788,7 +783,6 @@ class TestCompleteOverridePipeline:
         result = await base_generator.generate_revision(
             draft_revision=requested_revision,
             vfolder_id=vfolder_id,
-            model_definition_path="service-definition.toml",
             default_architecture=test_case.default_architecture,
         )
 
@@ -817,10 +811,9 @@ class TestDefinitionFileRequirement:
         return uuid4()
 
     @pytest.fixture
-    def custom_generator(self, mock_deployment_repository: MagicMock):
+    def custom_generator(self, mock_deployment_repository: MagicMock) -> CustomRevisionGenerator:
         return CustomRevisionGenerator(mock_deployment_repository)
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "runtime_variant",
         [
@@ -884,7 +877,6 @@ class TestDefinitionFileRequirement:
                 ),
             ),
             vfolder_id=vfolder_id,
-            model_definition_path=None,
         )
 
         # Then: Should succeed without requiring model definition
@@ -892,7 +884,6 @@ class TestDefinitionFileRequirement:
         # Then: Should have called fetch_service_definition (not fetch_model_definition)
         mock_deployment_repository.fetch_service_definition.assert_called_once_with(vfolder_id)
 
-    @pytest.mark.asyncio
     async def test_non_custom_variants_work_without_service_definition(
         self,
         base_generator: BaseRevisionGenerator,
@@ -936,13 +927,11 @@ class TestDefinitionFileRequirement:
         result = await base_generator.generate_revision(
             draft_revision=draft_revision,
             vfolder_id=vfolder_id,
-            model_definition_path=None,
         )
 
         # Then: Should succeed using only API request values
         assert result is not None
 
-    @pytest.mark.asyncio
     async def test_custom_variant_requires_model_definition_success(
         self,
         custom_generator: CustomRevisionGenerator,
@@ -1000,7 +989,6 @@ class TestDefinitionFileRequirement:
             model_definition_path=None,
         )
 
-    @pytest.mark.asyncio
     async def test_custom_variant_requires_model_definition_failure_not_found(
         self,
         custom_generator: CustomRevisionGenerator,
@@ -1054,7 +1042,6 @@ class TestDefinitionFileRequirement:
             model_definition_path=None,
         )
 
-    @pytest.mark.asyncio
     async def test_custom_variant_requires_valid_model_definition_schema(
         self,
         custom_generator: CustomRevisionGenerator,

@@ -16,9 +16,9 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column("kernels", sa.Column("service_ports", sa.JSON(), nullable=True))
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("kernels", "service_ports")

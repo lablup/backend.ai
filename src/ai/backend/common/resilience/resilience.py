@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 from collections.abc import Callable, Coroutine, Iterable
 from contextvars import ContextVar
-from typing import Any, Optional, ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 from .policy import Policy
 
@@ -11,10 +11,10 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 # Context variable to store the current operation name
-_current_operation: ContextVar[Optional[str]] = ContextVar("resilience_operation", default=None)
+_current_operation: ContextVar[str | None] = ContextVar("resilience_operation", default=None)
 
 
-def get_current_operation() -> Optional[str]:
+def get_current_operation() -> str | None:
     """
     Get the current operation name from context.
 

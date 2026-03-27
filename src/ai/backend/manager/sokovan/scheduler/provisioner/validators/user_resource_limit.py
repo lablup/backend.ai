@@ -1,7 +1,7 @@
 """Validator for user resource limits."""
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
+from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
 
 from .exceptions import UserResourceQuotaExceeded
 from .validator import ValidatorRule
@@ -28,8 +28,9 @@ class UserResourceLimitValidator(ValidatorRule):
             # If no user-specific policy, skip validation (no limits apply)
             return
 
-        # Get current user occupancy
-        user_occupied = snapshot.resource_occupancy.by_user.get(workload.user_uuid, ResourceSlot())
+        # Get current user occupancy (list[SlotQuantity]) and convert to ResourceSlot
+        user_occupied_quantities = snapshot.resource_occupancy.by_user.get(workload.user_uuid, [])
+        user_occupied = ResourceSlot({sq.slot_name: sq.quantity for sq in user_occupied_quantities})
 
         # Check if adding this workload would exceed the limit
         total_after = user_occupied + workload.requested_slots

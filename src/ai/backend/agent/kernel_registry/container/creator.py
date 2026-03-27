@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ai.backend.agent.kernel_registry.loader.container import ContainerBasedKernelRegistryLoader
 from ai.backend.agent.kernel_registry.writer.container import ContainerBasedKernelRegistryWriter
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 @dataclass
 class ContainerBasedKernelRegistryCreatorArgs:
     scratch_root: Path
-    agent: AbstractAgent
+    agent: AbstractAgent[Any, Any]
 
 
 class ContainerBasedLoaderWriterCreator:

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Generic, Optional
+from uuid import UUID
 
 from .recorder import TransitionRecorder
 from .types import (
-    EntityIdT,
     ExecutionRecord,
     PhaseRecord,
     RecordBuildData,
@@ -17,26 +16,26 @@ from .types import (
 
 
 @dataclass
-class _SharedPhaseContext(Generic[EntityIdT]):
+class _SharedPhaseContext[EntityIdT: UUID]:
     """Internal context for tracking an in-progress shared phase."""
 
     name: str
     started_at: datetime
-    success_detail: Optional[str]
-    entity_ids: Optional[set[EntityIdT]] = None  # None means all entities
+    success_detail: str | None
+    entity_ids: set[EntityIdT] | None = None  # None means all entities
     steps: list[StepRecord] = field(default_factory=list)
     failed: bool = False
 
 
 @dataclass
-class _SharedPhaseRecord(Generic[EntityIdT]):
+class _SharedPhaseRecord[EntityIdT: UUID]:
     """Internal record for a shared phase with entity filtering info."""
 
     phase: PhaseRecord
-    entity_ids: Optional[set[EntityIdT]]  # None means all entities
+    entity_ids: set[EntityIdT] | None  # None means all entities
 
 
-class RecordPool(Generic[EntityIdT]):
+class RecordPool[EntityIdT: UUID]:
     """Storage for all entity execution records within a scope.
 
     This class holds the operation metadata, recorders for each entity,
@@ -57,7 +56,8 @@ class RecordPool(Generic[EntityIdT]):
         self.records: dict[EntityIdT, ExecutionRecord] = {}
         self._recorders: dict[EntityIdT, TransitionRecorder[EntityIdT]] = {}
         self._shared_phases: list[_SharedPhaseRecord[EntityIdT]] = []
-        self._current_shared_phase: Optional[_SharedPhaseContext[EntityIdT]] = None
+        self._current_shared_phase: _SharedPhaseContext[EntityIdT] | None = None
+        self._built = False
 
         # Create recorders for all entity IDs upfront
         for entity_id in entity_ids:
@@ -111,20 +111,26 @@ class RecordPool(Generic[EntityIdT]):
             if sp.entity_ids is None or entity_id in sp.entity_ids
         ]
 
-    def _build_all_records(self) -> None:
-        """Build ExecutionRecords for all entities."""
-        ended_at = datetime.now(UTC)
-        for entity_id, recorder in self._recorders.items():
-            # Filter shared phases for this specific entity
-            entity_shared_phases = self._get_shared_phases_for_entity(entity_id)
-            build_data = RecordBuildData(
-                started_at=self.started_at,
-                ended_at=ended_at,
-                shared_phases=entity_shared_phases,
-            )
-            self.records[entity_id] = recorder.build_execution_record(build_data)
+    def build_all_records(self) -> Mapping[EntityIdT, ExecutionRecord]:
+        """Build and return all execution records.
 
-    def get_record(self, entity_id: EntityIdT) -> Optional[ExecutionRecord]:
+        Call this explicitly when you need records within a scope.
+        Subsequent calls return cached results.
+        """
+        if not self._built:
+            self._built = True
+            ended_at = datetime.now(UTC)
+            for entity_id, recorder in self._recorders.items():
+                entity_shared_phases = self._get_shared_phases_for_entity(entity_id)
+                build_data = RecordBuildData(
+                    started_at=self.started_at,
+                    ended_at=ended_at,
+                    shared_phases=entity_shared_phases,
+                )
+                self.records[entity_id] = recorder.build_execution_record(build_data)
+        return dict(self.records)
+
+    def get_record(self, entity_id: EntityIdT) -> ExecutionRecord | None:
         """Get the execution record for an entity."""
         return self.records.get(entity_id)
 

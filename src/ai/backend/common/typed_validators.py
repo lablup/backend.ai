@@ -5,8 +5,9 @@ import pwd
 from collections.abc import Mapping, Sequence
 from datetime import tzinfo
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Final, Optional, TypeAlias, TypeVar
+from typing import Annotated, Any, ClassVar, Final, TypeVar
 
+import jwt
 from dateutil import tz
 from dateutil.relativedelta import relativedelta
 from pydantic import (
@@ -26,6 +27,12 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 
+from ai.backend.common.exception import (
+    JWTDecodeError,
+    JWTExpiredError,
+    JWTInvalidSignatureError,
+    JWTPayloadValidationError,
+)
 from ai.backend.common.types import HostPortPair as LegacyHostPortPair
 
 from .defs import (
@@ -35,7 +42,7 @@ from .defs import (
 )
 from .meta import BackendAIConfigMeta, ConfigExample
 
-TVariousDelta: TypeAlias = datetime.timedelta | relativedelta
+type TVariousDelta = datetime.timedelta | relativedelta
 
 
 class _TimeDurationPydanticAnnotation:
@@ -46,30 +53,35 @@ class _TimeDurationPydanticAnnotation:
         cls,
         value: int | float | str,
     ) -> TVariousDelta:
-        assert isinstance(value, (int, float, str)), "value must be a number or string"
+        if not isinstance(value, (int, float, str)):
+            raise ValueError("value must be a number or string")
         if isinstance(value, (int, float)):
             return datetime.timedelta(seconds=value)
-        assert len(value) > 0, "value must not be empty"
+        if len(value) == 0:
+            raise ValueError("value must not be empty")
 
         try:
             unit = value[-1]
             if unit.isdigit():
                 t = float(value)
-                assert cls.allow_negative or t >= 0, "value must be positive"
+                if not cls.allow_negative and t < 0:
+                    raise ValueError("value must be positive")
                 return datetime.timedelta(seconds=t)
             if value[-2:].isalpha():
                 t = int(value[:-2])
-                assert cls.allow_negative or t >= 0, "value must be positive"
+                if not cls.allow_negative and t < 0:
+                    raise ValueError("value must be positive")
                 match value[-2:]:
                     case "yr":
                         return relativedelta(years=t)
                     case "mo":
                         return relativedelta(months=t)
                     case _:
-                        raise AssertionError("value is not a known time duration")
+                        raise ValueError("value is not a known time duration")
             else:
                 t = float(value[:-1])
-                assert cls.allow_negative or t >= 0, "value must be positive"
+                if not cls.allow_negative and t < 0:
+                    raise ValueError("value must be positive")
                 match value[-1]:
                     case "w":
                         return datetime.timedelta(weeks=t)
@@ -82,9 +94,9 @@ class _TimeDurationPydanticAnnotation:
                     case "s":
                         return datetime.timedelta(seconds=t)
                     case _:
-                        raise AssertionError("value is not a known time duration")
-        except ValueError:
-            raise AssertionError(f"invalid numeric literal: {value[:-1]}")
+                        raise ValueError("value is not a known time duration")
+        except ValueError as e:
+            raise ValueError(f"invalid numeric literal: {value[:-1]}") from e
 
     @classmethod
     def time_duration_serializer(cls, value: TVariousDelta) -> float | str:
@@ -94,19 +106,19 @@ class _TimeDurationPydanticAnnotation:
             case relativedelta():
                 # just like the deserializer, serializing relativedelta is only supported when year or month (not both) is supplied
                 # years or months being normalized is not considered as a valid case since relativedelta does not allow fraction of years or months as an input
-                assert not (value.years and value.months), (
-                    "Serializing relativedelta with both years and months contained is not supported"
-                )
-                assert value.years or value.months, (
-                    "Serialization is supported only for months or years field"
-                )
+                if value.years and value.months:
+                    raise ValueError(
+                        "Serializing relativedelta with both years and months contained is not supported"
+                    )
+                if not (value.years or value.months):
+                    raise ValueError("Serialization is supported only for months or years field")
                 if value.years:
                     return f"{value.years}yr"
                 if value.months:
                     return f"{value.months}mo"
-                raise AssertionError("Should not reach here")
+                raise RuntimeError("Should not reach here")
             case _:
-                raise AssertionError("Not a valid type")
+                raise ValueError("Not a valid type")
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -252,8 +264,8 @@ class HostPortPair(BaseModel):
         elif isinstance(value, Mapping):
             try:
                 host, port = value["host"], value["port"]
-            except KeyError:
-                raise ValueError('value as map must contain "host" and "port" keys')
+            except KeyError as e:
+                raise ValueError('value as map must contain "host" and "port" keys') from e
 
         else:
             raise TypeError("unrecognized value type")
@@ -269,14 +281,14 @@ class HostPortPair(BaseModel):
 
         try:
             port = int(port)
-        except (TypeError, ValueError):
-            raise ValueError("port number must be an integer")
+        except (TypeError, ValueError) as e:
+            raise ValueError("port number must be an integer") from e
         if not (1 <= port <= 65535):
             raise ValueError("port number must be between 1 and 65535")
 
         return {"host": str(host), "port": port}
 
-    def __getitem__(self, *args) -> int | str:
+    def __getitem__(self, *args: Any) -> int | str:
         if args[0] == 0:
             return self.host
         if args[0] == 1:
@@ -351,7 +363,7 @@ class AutoDirectoryPath(DirectoryPath):
 
 
 class UserID(int):
-    _default_uid: Optional[int] = None
+    _default_uid: int | None = None
 
     @classmethod
     def check_and_return(cls, value: Any) -> int:
@@ -372,8 +384,8 @@ class UserID(int):
             except ValueError:
                 try:
                     return pwd.getpwnam(value).pw_uid
-                except KeyError:
-                    raise ValueError(f"no such user {value} in system")
+                except KeyError as e:
+                    raise ValueError(f"no such user {value} in system") from e
             else:
                 return cls.check_and_return(value)
         else:
@@ -402,7 +414,7 @@ class UserID(int):
 
 
 class GroupID(int):
-    _default_gid: Optional[int] = None
+    _default_gid: int | None = None
 
     @classmethod
     def check_and_return(cls, value: Any) -> int:
@@ -423,8 +435,8 @@ class GroupID(int):
             except ValueError:
                 try:
                     return pwd.getpwnam(value).pw_gid
-                except KeyError:
-                    raise ValueError(f"no such group {value!r} in system")
+                except KeyError as e:
+                    raise ValueError(f"no such group {value!r} in system") from e
             else:
                 return cls.check_and_return(value)
         else:
@@ -457,7 +469,7 @@ TItem = TypeVar("TItem")
 
 class DelimiterSeparatedList(list[TItem]):
     delimiter: str = ","
-    min_length: Optional[int] = None
+    min_length: int | None = None
     empty_str_as_empty_list: bool = False
 
     @classmethod
@@ -482,9 +494,9 @@ class DelimiterSeparatedList(list[TItem]):
             try:
                 return cls([item_adapter.validate_python(x) for x in items])
             except ValidationError as e:
-                raise ValueError(str(e))
+                raise ValueError(str(e)) from e
 
-        def _serialize(val: Sequence[Any]):
+        def _serialize(val: Sequence[Any]) -> str:
             return cls.delimiter.join(str(x) for x in val)
 
         return core_schema.with_info_plain_validator_function(
@@ -504,3 +516,68 @@ class DelimiterSeparatedList(list[TItem]):
 class CommaSeparatedStrList(DelimiterSeparatedList[str]):
     delimiter = ","
     min_length = None
+
+
+class PydanticJWTValidator:
+    """
+    Generic JWT validator with pydantic model-based payload validation.
+
+    This validator decodes JWT tokens and validates their payload against
+    a specified pydantic model, providing type-safe access to token claims.
+
+    Usage:
+        class MyTokenData(BaseModel):
+            user_id: str
+            role: str
+
+        validator = PydanticJWTValidator(secret="my-secret-key")
+        token_data = validator.validate("eyJ...", MyTokenData)  # Returns MyTokenData instance
+
+    Args:
+        secret: Secret key for JWT signature verification
+        algorithms: List of allowed JWT algorithms (default: ["HS256"])
+    """
+
+    def __init__(
+        self,
+        *,
+        secret: str,
+        algorithms: list[str] | None = None,
+    ) -> None:
+        self._secret = secret
+        self._algorithms = algorithms or ["HS256"]
+
+    def validate[TModel: BaseModel](self, token: str, model: type[TModel]) -> TModel:
+        """
+        Validate JWT token and return parsed payload as pydantic model instance.
+
+        Args:
+            token: Encoded JWT token string
+            model: Pydantic model class to validate and parse the JWT payload
+
+        Returns:
+            Pydantic model instance containing validated token claims
+
+        Raises:
+            JWTExpiredError: If the token has expired
+            JWTInvalidSignatureError: If signature verification fails
+            JWTDecodeError: If the token cannot be decoded
+            JWTPayloadValidationError: If payload fails pydantic model validation
+        """
+        try:
+            payload = jwt.decode(
+                token,
+                self._secret,
+                algorithms=self._algorithms,
+            )
+        except jwt.ExpiredSignatureError as e:
+            raise JWTExpiredError() from e
+        except jwt.InvalidSignatureError as e:
+            raise JWTInvalidSignatureError() from e
+        except jwt.DecodeError as e:
+            raise JWTDecodeError(extra_msg=str(e)) from e
+
+        try:
+            return model.model_validate(payload)
+        except ValidationError as e:
+            raise JWTPayloadValidationError(extra_msg=str(e)) from e

@@ -43,7 +43,9 @@ def test_time_duration() -> None:
         (HostPortPair(host="example.com", port=1234), HostPortPair(host="example.com", port=1234)),
     ],
 )
-def test_hostport_pair_valid(input, expected) -> None:
+def test_hostport_pair_valid(
+    input: str | list[str | int] | dict[str, str | int] | HostPortPair, expected: HostPortPair
+) -> None:
     result = HostPortPair.model_validate(input)
     assert result == expected
     assert result.address == f"{expected.host}:{expected.port}"
@@ -60,6 +62,6 @@ def test_hostport_pair_valid(input, expected) -> None:
         1234,
     ],
 )
-def test_hostport_pair_invalid(input) -> None:
+def test_hostport_pair_invalid(input: str | list[str] | dict[str, str] | int) -> None:
     with pytest.raises((ValidationError, TypeError)):
         HostPortPair.model_validate(input)

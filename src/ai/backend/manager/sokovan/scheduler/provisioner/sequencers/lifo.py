@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import override
 
-from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
+from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
 
 from .sequencer import WorkloadSequencer
 
@@ -28,11 +28,16 @@ class LIFOSequencer(WorkloadSequencer):
         return "Sessions sequenced in last-in-first-out order"
 
     @override
-    def sequence(
-        self, system_snapshot: SystemSnapshot, workloads: Sequence[SessionWorkload]
+    async def sequence(
+        self,
+        resource_group: str,
+        system_snapshot: SystemSnapshot,
+        workloads: Sequence[SessionWorkload],
     ) -> Sequence[SessionWorkload]:
         """
         Sequence the workloads in LIFO order.
+
+        :param resource_group: The resource group (scaling group) name.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to sequence.
         :return: A sequence of SessionWorkload objects in LIFO order.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.manager.data.deployment.types import RouteStatus, RouteTrafficStatus
 from ai.backend.manager.models.routing import RoutingRow
@@ -25,7 +25,7 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
     domain: str
     project_id: uuid.UUID
     traffic_ratio: float = 1.0
-    revision_id: Optional[uuid.UUID] = None
+    revision_id: uuid.UUID | None = None
     traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE
 
     @override
@@ -52,9 +52,9 @@ class RouteBatchUpdaterSpec(BatchUpdaterSpec[RoutingRow]):
     This allows flexible partial updates for various route operations.
     """
 
-    status: Optional[RouteStatus] = None
-    traffic_ratio: Optional[float] = None
-    traffic_status: Optional[RouteTrafficStatus] = None
+    status: RouteStatus | None = None
+    traffic_ratio: float | None = None
+    traffic_status: RouteTrafficStatus | None = None
 
     @property
     @override

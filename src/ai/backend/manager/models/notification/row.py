@@ -8,9 +8,10 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.notification import (
+    EmailSpec,
     NotificationChannelType,
     NotificationRuleType,
-    WebhookConfig,
+    WebhookSpec,
 )
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
@@ -27,28 +28,26 @@ if TYPE_CHECKING:
 
 __all__ = (
     "NotificationChannelRow",
-    "NotificationChannelType",
     "NotificationRuleRow",
-    "WebhookConfig",
 )
 
 
 # ========== ORM Models ==========
 
 
-def _get_notification_channel_rules_join_condition():
+def _get_notification_channel_rules_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.notification import NotificationRuleRow
 
     return NotificationChannelRow.id == foreign(NotificationRuleRow.channel_id)
 
 
-def _get_notification_channel_creator_join_condition():
+def _get_notification_channel_creator_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.user import UserRow
 
     return foreign(NotificationChannelRow.created_by) == UserRow.uuid
 
 
-class NotificationChannelRow(Base):
+class NotificationChannelRow(Base):  # type: ignore[misc]
     __tablename__ = "notification_channels"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -104,18 +103,19 @@ class NotificationChannelRow(Base):
         channel_type_enum = NotificationChannelType(self.channel_type)
 
         # Parse config based on channel_type
+        parsed_config: WebhookSpec | EmailSpec
         match channel_type_enum:
             case NotificationChannelType.WEBHOOK:
-                parsed_config = WebhookConfig(**self.config)
-            case _:
-                raise ValueError(f"Unknown channel type: {self.channel_type}")
+                parsed_config = WebhookSpec.model_validate(self.config)
+            case NotificationChannelType.EMAIL:
+                parsed_config = EmailSpec.model_validate(self.config)
 
         return NotificationChannelData(
             id=self.id,
             name=self.name,
             description=self.description,
             channel_type=channel_type_enum,
-            config=parsed_config,
+            spec=parsed_config,
             enabled=self.enabled,
             created_by=self.created_by,
             created_at=self.created_at,
@@ -123,19 +123,19 @@ class NotificationChannelRow(Base):
         )
 
 
-def _get_notification_rule_channel_join_condition():
+def _get_notification_rule_channel_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.notification import NotificationChannelRow
 
     return foreign(NotificationRuleRow.channel_id) == NotificationChannelRow.id
 
 
-def _get_notification_rule_creator_join_condition():
+def _get_notification_rule_creator_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.user import UserRow
 
     return foreign(NotificationRuleRow.created_by) == UserRow.uuid
 
 
-class NotificationRuleRow(Base):
+class NotificationRuleRow(Base):  # type: ignore[misc]
     __tablename__ = "notification_rules"
 
     id: Mapped[uuid.UUID] = mapped_column(

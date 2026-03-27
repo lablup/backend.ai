@@ -21,7 +21,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
     op.create_table(
         "images",
@@ -55,7 +55,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_table("image_aliases")
     op.drop_table("images")
     op.execute(text("DROP TYPE image_type"))

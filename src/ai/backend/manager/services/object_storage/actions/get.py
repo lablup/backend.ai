@@ -1,8 +1,9 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
 
@@ -12,13 +13,13 @@ class GetObjectStorageAction(ObjectStorageAction):
     storage_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.storage_id)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass
@@ -26,5 +27,5 @@ class GetObjectStorageActionResult(BaseActionResult):
     result: ObjectStorageData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.result.id)

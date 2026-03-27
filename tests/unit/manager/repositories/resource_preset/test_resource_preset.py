@@ -60,7 +60,7 @@ class TestResourcePresetRepository:
 
     @pytest.fixture
     def resource_preset_repository(
-        self, mock_db_engine, mock_db_source, mock_cache_source
+        self, mock_db_engine: MagicMock, mock_db_source: MagicMock, mock_cache_source: MagicMock
     ) -> ResourcePresetRepository:
         """Create ResourcePresetRepository instance with mocked database"""
         mock_config_provider = MagicMock()
@@ -97,7 +97,7 @@ class TestResourcePresetRepository:
         return mock_row
 
     @pytest.fixture
-    def sample_preset_creator(self) -> Creator:
+    def sample_preset_creator(self) -> Creator[ResourcePresetRow]:
         """Create sample resource preset creator for testing"""
         return Creator(
             spec=ResourcePresetCreatorSpec(
@@ -108,13 +108,12 @@ class TestResourcePresetRepository:
             )
         )
 
-    @pytest.mark.asyncio
     async def test_create_preset_validated_success(
         self,
-        resource_preset_repository,
-        mock_db_source,
-        sample_preset_creator: Creator,
-        sample_preset_row,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        sample_preset_creator: Creator[ResourcePresetRow],
+        sample_preset_row: MagicMock,
     ) -> None:
         """Test successful preset creation"""
         preset_data = sample_preset_row.to_dataclass()
@@ -128,9 +127,11 @@ class TestResourcePresetRepository:
         assert result.id == preset_data.id
         mock_db_source.create_preset.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_create_preset_validated_duplicate(
-        self, resource_preset_repository, mock_db_source, sample_preset_creator: Creator
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        sample_preset_creator: Creator[ResourcePresetRow],
     ) -> None:
         """Test preset creation with duplicate name"""
         mock_db_source.create_preset = AsyncMock(
@@ -140,9 +141,12 @@ class TestResourcePresetRepository:
         with pytest.raises(ResourcePresetConflict):
             await resource_preset_repository.create_preset_validated(sample_preset_creator)
 
-    @pytest.mark.asyncio
     async def test_get_preset_by_id_success(
-        self, resource_preset_repository, mock_db_source, mock_cache_source, sample_preset_row
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
+        sample_preset_row: MagicMock,
     ) -> None:
         """Test successful preset retrieval by ID"""
         preset_id = sample_preset_row.id
@@ -161,9 +165,11 @@ class TestResourcePresetRepository:
         mock_db_source.get_preset_by_id.assert_called_once_with(preset_id)
         mock_cache_source.set_preset.assert_called_once_with(preset_data)
 
-    @pytest.mark.asyncio
     async def test_get_preset_by_id_not_found(
-        self, resource_preset_repository, mock_db_source, mock_cache_source
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
     ) -> None:
         """Test preset retrieval by ID when not found"""
         preset_id = uuid.uuid4()
@@ -175,9 +181,12 @@ class TestResourcePresetRepository:
         with pytest.raises(ResourcePresetNotFound):
             await resource_preset_repository.get_preset_by_id(preset_id)
 
-    @pytest.mark.asyncio
     async def test_get_preset_by_name_success(
-        self, resource_preset_repository, mock_db_source, mock_cache_source, sample_preset_row
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
+        sample_preset_row: MagicMock,
     ) -> None:
         """Test successful preset retrieval by name"""
         preset_name = "test-preset"
@@ -196,9 +205,11 @@ class TestResourcePresetRepository:
         mock_db_source.get_preset_by_name.assert_called_once_with(preset_name)
         mock_cache_source.set_preset.assert_called_once_with(preset_data)
 
-    @pytest.mark.asyncio
     async def test_get_preset_by_name_not_found(
-        self, resource_preset_repository, mock_db_source, mock_cache_source
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
     ) -> None:
         """Test preset retrieval by name when not found"""
         preset_name = "non-existent"
@@ -210,9 +221,12 @@ class TestResourcePresetRepository:
         with pytest.raises(ResourcePresetNotFound):
             await resource_preset_repository.get_preset_by_name(preset_name)
 
-    @pytest.mark.asyncio
     async def test_get_preset_by_id_or_name_with_id(
-        self, resource_preset_repository, mock_db_source, mock_cache_source, sample_preset_row
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
+        sample_preset_row: MagicMock,
     ) -> None:
         """Test preset retrieval by ID when both ID and name provided"""
         preset_id = sample_preset_row.id
@@ -227,9 +241,12 @@ class TestResourcePresetRepository:
 
         assert result.id == preset_id
 
-    @pytest.mark.asyncio
     async def test_get_preset_by_id_or_name_with_name_only(
-        self, resource_preset_repository, mock_db_source, mock_cache_source, sample_preset_row
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
+        sample_preset_row: MagicMock,
     ) -> None:
         """Test preset retrieval by name only"""
         preset_data = sample_preset_row.to_dataclass()
@@ -243,9 +260,10 @@ class TestResourcePresetRepository:
 
         assert result.name == "test-preset"
 
-    @pytest.mark.asyncio
     async def test_get_preset_by_id_or_name_no_params(
-        self, resource_preset_repository, mock_db_source
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
     ) -> None:
         """Test preset retrieval with neither ID nor name"""
         # Mock db_source to raise ValueError
@@ -256,9 +274,12 @@ class TestResourcePresetRepository:
         with pytest.raises(ValueError, match="Either preset_id or name must be provided"):
             await resource_preset_repository.get_preset_by_id_or_name(preset_id=None, name=None)
 
-    @pytest.mark.asyncio
     async def test_modify_preset_validated_success(
-        self, resource_preset_repository, mock_db_source, mock_cache_source, sample_preset_row
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
+        sample_preset_row: MagicMock,
     ) -> None:
         """Test successful preset modification"""
         preset_id = sample_preset_row.id
@@ -283,9 +304,11 @@ class TestResourcePresetRepository:
         mock_db_source.modify_preset.assert_called_once_with(updater)
         mock_cache_source.invalidate_preset.assert_called_once_with(preset_id, None)
 
-    @pytest.mark.asyncio
     async def test_modify_preset_validated_not_found(
-        self, resource_preset_repository, mock_db_source, mock_cache_source
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
     ) -> None:
         """Test preset modification when preset not found"""
         preset_id = uuid.uuid4()
@@ -302,9 +325,10 @@ class TestResourcePresetRepository:
         with pytest.raises(ResourcePresetNotFound):
             await resource_preset_repository.modify_preset_validated(updater)
 
-    @pytest.mark.asyncio
     async def test_modify_preset_validated_no_params(
-        self, resource_preset_repository, mock_db_source
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
     ) -> None:
         """Test preset modification with no preset ID"""
         updater = Updater(
@@ -320,9 +344,12 @@ class TestResourcePresetRepository:
         with pytest.raises(ValueError):
             await resource_preset_repository.modify_preset_validated(updater)
 
-    @pytest.mark.asyncio
     async def test_delete_preset_validated_success(
-        self, resource_preset_repository, mock_db_source, mock_cache_source, sample_preset_row
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
+        sample_preset_row: MagicMock,
     ) -> None:
         """Test successful preset deletion by ID"""
         preset_id = sample_preset_row.id
@@ -341,9 +368,12 @@ class TestResourcePresetRepository:
         mock_db_source.delete_preset.assert_called_once_with(preset_id, None)
         mock_cache_source.invalidate_preset.assert_called_once_with(preset_id, None)
 
-    @pytest.mark.asyncio
     async def test_delete_preset_validated_by_name(
-        self, resource_preset_repository, mock_db_source, mock_cache_source, sample_preset_row
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
+        sample_preset_row: MagicMock,
     ) -> None:
         """Test successful preset deletion by name"""
         preset_name = sample_preset_row.name
@@ -362,9 +392,11 @@ class TestResourcePresetRepository:
         mock_db_source.delete_preset.assert_called_once_with(None, preset_name)
         mock_cache_source.invalidate_preset.assert_called_once_with(None, preset_name)
 
-    @pytest.mark.asyncio
     async def test_delete_preset_validated_not_found(
-        self, resource_preset_repository, mock_db_source, mock_cache_source
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
     ) -> None:
         """Test preset deletion when preset not found"""
         preset_id = uuid.uuid4()
@@ -375,9 +407,10 @@ class TestResourcePresetRepository:
         with pytest.raises(ResourcePresetNotFound):
             await resource_preset_repository.delete_preset_validated(preset_id=preset_id, name=None)
 
-    @pytest.mark.asyncio
     async def test_delete_preset_validated_no_params(
-        self, resource_preset_repository, mock_db_source
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
     ) -> None:
         """Test preset deletion with neither ID nor name"""
         # Mock db_source to raise ValueError
@@ -388,9 +421,11 @@ class TestResourcePresetRepository:
         with pytest.raises(ValueError, match="Either preset_id or name must be provided"):
             await resource_preset_repository.delete_preset_validated(preset_id=None, name=None)
 
-    @pytest.mark.asyncio
     async def test_list_presets_all(
-        self, resource_preset_repository, mock_db_source, mock_cache_source
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
     ) -> None:
         """Test listing all presets"""
         preset_list = [
@@ -417,9 +452,11 @@ class TestResourcePresetRepository:
         mock_db_source.list_presets.assert_called_once_with(None)
         mock_cache_source.set_preset_list.assert_called_once_with(preset_list, None)
 
-    @pytest.mark.asyncio
     async def test_list_presets_by_scaling_group(
-        self, resource_preset_repository, mock_db_source, mock_cache_source
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
     ) -> None:
         """Test listing presets filtered by scaling group"""
         scaling_group = "gpu-cluster"
@@ -446,9 +483,11 @@ class TestResourcePresetRepository:
         mock_db_source.list_presets.assert_called_once_with(scaling_group)
         mock_cache_source.set_preset_list.assert_called_once_with(preset_list, scaling_group)
 
-    @pytest.mark.asyncio
     async def test_list_presets_empty(
-        self, resource_preset_repository, mock_db_source, mock_cache_source
+        self,
+        resource_preset_repository: ResourcePresetRepository,
+        mock_db_source: MagicMock,
+        mock_cache_source: MagicMock,
     ) -> None:
         """Test listing presets when none exist"""
         # Mock cache miss, then DB returns empty list
@@ -463,8 +502,9 @@ class TestResourcePresetRepository:
         mock_db_source.list_presets.assert_called_once_with(None)
         mock_cache_source.set_preset_list.assert_called_once_with([], None)
 
-    @pytest.mark.asyncio
-    async def test_repository_decorator_applied(self, resource_preset_repository) -> None:
+    async def test_repository_decorator_applied(
+        self, resource_preset_repository: ResourcePresetRepository
+    ) -> None:
         """Test that repository decorator is applied to methods"""
         # These methods should have the repository decorator
         methods_with_decorator = [

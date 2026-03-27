@@ -6,7 +6,6 @@ import logging
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -22,12 +21,10 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.repositories.deployment import (
-    DeploymentRepository,
-    RouteConditions,
-)
+from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
 from ai.backend.manager.repositories.scheduling_history.creators import RouteHistoryCreatorSpec
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -60,7 +57,7 @@ class RouteTaskSpec:
     """Specification for a route lifecycle periodic task."""
 
     lifecycle_type: RouteLifecycleType
-    short_interval: Optional[float] = None  # None means no short-cycle task
+    short_interval: float | None = None  # None means no short-cycle task
     long_interval: float = 60.0
     initial_delay: float = 30.0
 
@@ -184,7 +181,7 @@ class RouteCoordinator:
             route_ids = [r.route_id for r in routes]
             with RouteRecorderContext.scope(lifecycle_type.value, entity_ids=route_ids) as pool:
                 result = await handler.execute(routes)
-                all_records = pool.get_all_records()
+                all_records = pool.build_all_records()
 
                 # Handle status transitions with history recording
                 await self._handle_status_transitions(handler, result, all_records)
@@ -259,7 +256,7 @@ class RouteCoordinator:
                     message=e.reason,
                     from_status=from_status,
                     to_status=failure_status,
-                    error_code=None,  # RouteExecutionError doesn't have error_code
+                    error_code=e.error_code,
                     sub_steps=extract_sub_steps_for_entity(e.route_info.route_id, records),
                 )
                 for e in result.errors

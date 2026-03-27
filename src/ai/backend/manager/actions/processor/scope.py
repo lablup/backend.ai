@@ -2,13 +2,15 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
-from typing import Generic, Optional
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import (
     BaseActionTriggerMeta,
 )
-from ai.backend.manager.actions.action.scope import TScopeAction, TScopeActionResult
+from ai.backend.manager.actions.action.scope import (
+    BaseScopeAction,
+    BaseScopeActionResult,
+)
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validator.scope import ScopeActionValidator
 
@@ -17,15 +19,18 @@ from .base import ActionRunner
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ScopeActionProcessor(Generic[TScopeAction, TScopeActionResult]):
+class ScopeActionProcessor[
+    TScopeAction: BaseScopeAction,
+    TScopeActionResult: BaseScopeActionResult,
+]:
     _validators: Sequence[ScopeActionValidator]
     _runner: ActionRunner[TScopeAction, TScopeActionResult]
 
     def __init__(
         self,
         func: Callable[[TScopeAction], Awaitable[TScopeActionResult]],
-        monitors: Optional[Sequence[ActionMonitor]] = None,
-        validators: Optional[Sequence[ScopeActionValidator]] = None,
+        monitors: Sequence[ActionMonitor] | None = None,
+        validators: Sequence[ScopeActionValidator] | None = None,
     ) -> None:
         self._runner = ActionRunner(func, monitors)
         self._validators = validators or []

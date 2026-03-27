@@ -4,7 +4,6 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
@@ -24,9 +23,9 @@ class AutoScalingRuleData:
     comparator: AutoScalingMetricComparator
     step_size: int
     cooldown_seconds: int
-    min_replicas: Optional[int] = None
-    max_replicas: Optional[int] = None
+    min_replicas: int | None = None
+    max_replicas: int | None = None
     enabled: bool = True
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    last_triggered_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    last_triggered_at: datetime | None = None

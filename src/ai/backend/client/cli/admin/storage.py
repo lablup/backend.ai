@@ -55,7 +55,9 @@ def info(ctx: CLIContext, vfolder_host: str) -> None:
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
+def list(
+    ctx: CLIContext, filter_: str | None, order: str | None, offset: int, limit: int | None
+) -> None:
     """
     List storage volumes.
     (super-admin privilege required)

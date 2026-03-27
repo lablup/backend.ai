@@ -8,7 +8,6 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Optional,
 )
 
 import aiodocker
@@ -20,7 +19,6 @@ from ai.backend.agent.resources import (
     AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
-    StatContext,
 )
 from ai.backend.agent.stats import (
     ContainerMeasurement,
@@ -28,6 +26,7 @@ from ai.backend.agent.stats import (
     MetricTypes,
     NodeMeasurement,
     ProcessMeasurement,
+    StatContext,
 )
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common import config
@@ -79,7 +78,7 @@ class IPUPlugin(AbstractComputePlugin):
 
     ipu_config: dict[str, Any]
 
-    _all_devices: Optional[list[IPUDevice]]
+    _all_devices: list[IPUDevice] | None
     ipuof_devices: Mapping[str, Any]
     ipuof_attributes: Mapping[str, Any]
     subnet_network_map: Mapping[ipaddress.IPv4Network, str]
@@ -96,8 +95,9 @@ class IPUPlugin(AbstractComputePlugin):
         self.ipu_config = _config_iv.check(raw_cfg)
         log.info("Read IPU device configs from {}", cfg_src_path)
 
-        def _read_json():
-            with open(self.ipu_config["ipuof-config-path"]) as fr:
+        def _read_json() -> dict[str, Any]:
+            ipuof_config_path = Path(self.ipu_config["ipuof-config-path"])
+            with ipuof_config_path.open() as fr:
                 return json.loads(fr.read())
 
         try:
@@ -173,7 +173,8 @@ class IPUPlugin(AbstractComputePlugin):
             if len(ipv4_subnet) > 1:
                 raise DockerNetworkError(f"Multiple IPv4 configs on network {network_identifier}")
             ip_network = ipaddress.ip_network(ipv4_subnet[0])
-            assert isinstance(ip_network, ipaddress.IPv4Network)
+            if not isinstance(ip_network, ipaddress.IPv4Network):
+                raise RuntimeError(f"Expected IPv4Network but got {type(ip_network).__name__}")
             self.subnet_network_map[ip_network] = network_identifier
 
     def get_docker_network(self, device: IPUDevice) -> str:
@@ -355,9 +356,9 @@ class IPUPlugin(AbstractComputePlugin):
             source_path / "ipuof.conf.d" / Path(self.ipu_config["ipuof-config-path"]).name
         )
 
-        def _write():
+        def _write() -> None:
             generated_ipuof_config_path.parent.mkdir(parents=True)
-            with open(generated_ipuof_config_path, "w") as fw:
+            with generated_ipuof_config_path.open("w") as fw:
                 fw.write(json.dumps(generated_ipuof_config))
 
         await asyncio.get_running_loop().run_in_executor(None, _write)

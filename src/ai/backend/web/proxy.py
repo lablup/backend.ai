@@ -5,11 +5,11 @@ import base64
 import json
 import logging
 import random
-from collections.abc import Iterable
-from typing import Final, Optional, cast
+from collections.abc import Awaitable, Callable, Iterable
+from typing import Any, Final, cast
 
 import aiohttp
-from aiohttp import web
+from aiohttp import ClientConnectionError, web
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 from multidict import CIMultiDict
@@ -62,7 +62,7 @@ class WebSocketProxy:
     up_conn: aiohttp.ClientWebSocketResponse
     down_conn: web.WebSocketResponse
     upstream_buffer: asyncio.Queue[tuple[str | bytes, aiohttp.WSMsgType]]
-    upstream_buffer_task: Optional[asyncio.Task]
+    upstream_buffer_task: asyncio.Task[Any] | None
 
     def __init__(
         self, up_conn: aiohttp.ClientWebSocketResponse, down_conn: web.WebSocketResponse
@@ -150,7 +150,10 @@ def _decrypt_payload(endpoint: str, payload: bytes) -> bytes:
 
 
 @web.middleware
-async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
+async def decrypt_payload(
+    request: web.Request,
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+) -> web.StreamResponse:
     config: WebServerUnifiedConfig = request.app["config"]
     try:
         request_headers = extra_config_headers.check(request.headers)
@@ -182,7 +185,7 @@ async def web_handler(
     frontend_rqst: web.Request,
     *,
     is_anonymous: bool = False,
-    api_endpoint: Optional[str] = None,
+    api_endpoint: str | None = None,
     http_headers_to_forward_extra: Iterable[str] | None = None,
 ) -> web.StreamResponse:
     # Check if this is a WebSocket upgrade request (for GraphQL subscriptions)
@@ -291,6 +294,13 @@ async def web_handler(
             }),
             content_type="application/problem+json",
         )
+    except ClientConnectionError:
+        log.warning(
+            "web_handler: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
+            frontend_rqst.method,
+            path,
+        )
+        raise
     except Exception:
         log.exception("web_handler: unexpected error")
         return web.HTTPInternalServerError(
@@ -327,7 +337,7 @@ async def web_handler_with_jwt(
         Streamed response from the backend API
     """
     # Select random endpoint if multiple endpoints are provided
-    api_endpoint: Optional[str] = None
+    api_endpoint: str | None = None
     if api_endpoints:
         api_endpoint = random.choice(api_endpoints)
 
@@ -457,6 +467,13 @@ async def web_handler_with_jwt(
             }),
             content_type="application/problem+json",
         )
+    except ClientConnectionError:
+        log.warning(
+            "web_handler_with_jwt: ClientConnectionError - Client disconnected during proxying: method: {}, path: {}",
+            frontend_rqst.method,
+            path,
+        )
+        raise
     except Exception:
         log.exception("web_handler_with_jwt: unexpected error")
         return web.HTTPInternalServerError(
@@ -566,9 +583,9 @@ async def web_plugin_handler(
 async def websocket_handler(
     request: web.Request,
     *,
-    is_anonymous=False,
-    api_endpoint: Optional[str] = None,
-    jwt_token: Optional[str] = None,
+    is_anonymous: bool = False,
+    api_endpoint: str | None = None,
+    jwt_token: str | None = None,
 ) -> web.StreamResponse:
     if api_endpoint:
         if api_endpoint.startswith("http://"):

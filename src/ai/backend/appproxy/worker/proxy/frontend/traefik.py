@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import time
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Generic, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 import aiotools
 from aiohttp import web
@@ -22,7 +21,6 @@ from ai.backend.appproxy.worker.types import (
     PortFrontendInfo,
     RootContext,
     SubdomainFrontendInfo,
-    TCircuitKey,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -31,14 +29,16 @@ from .base import BaseFrontend
 if TYPE_CHECKING:
     pass
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-MSetType: TypeAlias = Mapping[str | bytes, bytes | float | int | str]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+type MSetType = Mapping[str | bytes, bytes | float | int | str]
 
 
-class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend, TCircuitKey]):
+class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
+    BaseFrontend[TraefikBackend, TCircuitKeyType]
+):
     runner: web.AppRunner
-    last_used_time_marker_writer_task: asyncio.Task
-    active_circuit_writer_task: asyncio.Task
+    last_used_time_marker_writer_task: asyncio.Task[Any]
+    active_circuit_writer_task: asyncio.Task[Any]
     redis_keys: dict[str, float]
     redis_keys_lock: asyncio.Lock
     active_circuits: set[uuid.UUID]
@@ -67,7 +67,7 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
             / LAST_USED_MARKER_SOCKET_NAME
         )
         if path.exists():
-            os.remove(path)
+            path.unlink()
 
         await self.runner.setup()
         site = web.UnixSite(self.runner, path)
@@ -93,7 +93,7 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
         await self.last_used_time_marker_writer_task
         await self.active_circuit_writer_task
 
-    async def _last_used_time_marker_writer(self, interval: float) -> None:
+    async def _last_used_time_marker_writer(self, _interval: float) -> None:
         try:
             async with self.redis_keys_lock:
                 if len(self.redis_keys) == 0:
@@ -130,7 +130,7 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
 
         return web.StreamResponse(status=204)
 
-    async def _active_circuit_writer(self, interval: float) -> None:
+    async def _active_circuit_writer(self, _interval: float) -> None:
         try:
             if len(self.active_circuits) > 0:
                 now = time.time()

@@ -2,9 +2,10 @@ import asyncio
 import logging
 import time
 import uuid
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Any, Final, Optional, Self
+from typing import Any, Final, Self
 
 from pydantic import BaseModel, Field
 
@@ -215,9 +216,14 @@ class ServiceDiscovery(ABC):
 
 
 class ServiceDiscoveryLoop:
-    """
-    Service discovery loop.
+    """Service discovery loop.
+
     This class is used to discover services in a distributed system.
+
+    .. deprecated:: 26.3.0
+        Use event-based service discovery
+        (:class:`~ai.backend.common.service_discovery.event_publisher.ServiceDiscoveryEventPublisher`)
+        instead. This class will be removed in a future release.
     """
 
     _type: ServiceDiscoveryType
@@ -226,7 +232,7 @@ class ServiceDiscoveryLoop:
     _interval_seconds: int
     _closed: bool = False
     _run_service_task: asyncio.Task[None]
-    _sweep_unhealthy_services_task: Optional[asyncio.Task[None]]
+    _sweep_unhealthy_services_task: asyncio.Task[None] | None
 
     def __init__(
         self,
@@ -235,6 +241,12 @@ class ServiceDiscoveryLoop:
         metadata: ServiceMetadata,
         interval_seconds: int = 60,
     ) -> None:
+        warnings.warn(
+            "ServiceDiscoveryLoop is deprecated. Use event-based service discovery"
+            " (ServiceDiscoveryEventPublisher) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._type = sd_type
         self._service_discovery = service_discovery
         self._metadata = metadata

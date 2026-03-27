@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
-from typing import Optional
+from typing import Any, cast
 from uuid import UUID
 
 from ai.backend.client.output.fields import vfolder_fields
@@ -27,7 +29,7 @@ class Model(BaseFunction):
 
     @api_function
     @classmethod
-    async def list(cls):
+    async def list(cls) -> None:
         """ """
 
     @api_function
@@ -38,9 +40,9 @@ class Model(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> PaginatedResult:
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> PaginatedResult[Any]:
         if filter:
             composed_filter = f'({filter}) & (usage_mode == "MODEL")'
         else:
@@ -57,7 +59,7 @@ class Model(BaseFunction):
         )
 
     @api_function
-    async def info(self):
+    async def info(self) -> dict[str, Any]:
         rqst = Request("GET", f"/folders/{self.model_name}")
         async with rqst.fetch() as resp:
             info = await resp.json()
@@ -71,20 +73,20 @@ class Model(BaseFunction):
             item["name"] for item in versions["items"] if item["type"] == "DIRECTORY"
         ]
         info["versions"].sort(reverse=True)
-        return info
+        return cast(dict[str, Any], info)
 
     @api_function
     @classmethod
     async def create(
         cls,
         name: str,
-        host: Optional[str] = None,
-        unmanaged_path: Optional[str] = None,
-        group: Optional[str] = None,
+        host: str | None = None,
+        unmanaged_path: str | None = None,
+        group: str | None = None,
         permission: str = "rw",
         quota: str = "0",
         cloneable: bool = False,
-    ):
+    ) -> dict[str, Any]:
         rqst = Request("POST", "/folders")
         rqst.set_json({
             "name": name,
@@ -106,10 +108,10 @@ class Model(BaseFunction):
         })
         async with rqst.fetch() as resp:
             await resp.text()
-        return result
+        return cast(dict[str, Any], result)
 
     @api_function
-    async def delete(self):
+    async def delete(self) -> dict[str, Any]:
         rqst = Request("DELETE", f"/folders/{self.model_name}")
         rqst.set_json({"id": self.model_name})
         async with rqst.fetch():

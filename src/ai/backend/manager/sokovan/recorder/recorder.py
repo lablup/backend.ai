@@ -4,14 +4,15 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Generic, Optional
+from uuid import UUID
+
+from ai.backend.common.exception import BackendAIError
 
 from .exceptions import (
     NestedPhaseError,
     StepWithoutPhaseError,
 )
 from .types import (
-    EntityIdT,
     ExecutionRecord,
     PhaseRecord,
     RecordBuildData,
@@ -26,12 +27,12 @@ class _PhaseContext:
 
     name: str
     started_at: datetime
-    success_detail: Optional[str]
+    success_detail: str | None
     steps: list[StepRecord] = field(default_factory=list)
     failed: bool = False
 
 
-class TransitionRecorder(Generic[EntityIdT]):
+class TransitionRecorder[EntityIdT: UUID]:
     """
     Records execution steps during lifecycle operations.
 
@@ -53,7 +54,7 @@ class TransitionRecorder(Generic[EntityIdT]):
     _entity_id: EntityIdT
     _started_at: datetime
     _phases: list[PhaseRecord]
-    _current_phase: Optional[_PhaseContext]
+    _current_phase: _PhaseContext | None
 
     def __init__(
         self,
@@ -114,7 +115,7 @@ class TransitionRecorder(Generic[EntityIdT]):
     def phase(
         self,
         name: str,
-        success_detail: Optional[str] = None,
+        success_detail: str | None = None,
     ) -> Generator[None, None, None]:
         """
         Enter a phase.
@@ -155,7 +156,7 @@ class TransitionRecorder(Generic[EntityIdT]):
     def step(
         self,
         name: str,
-        success_detail: Optional[str] = None,
+        success_detail: str | None = None,
     ) -> Generator[None, None, None]:
         """
         Execute a step with automatic success/failure recording.
@@ -189,15 +190,18 @@ class TransitionRecorder(Generic[EntityIdT]):
                 started_at=started_at,
                 ended_at=datetime.now(UTC),
                 detail=success_detail,
+                error_code=None,
             )
             self._current_phase.steps.append(step_record)
         except Exception as e:
+            error_code = str(e.error_code()) if isinstance(e, BackendAIError) else None
             step_record = StepRecord(
                 name=name,
                 status=StepStatus.FAILED,
                 started_at=started_at,
                 ended_at=datetime.now(UTC),
                 detail=str(e),
+                error_code=error_code,
             )
             self._current_phase.steps.append(step_record)
             raise

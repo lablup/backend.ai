@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import Mapping
 from datetime import datetime
+from typing import Any, cast
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload
 
-from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionResult, SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.domain import DomainRow
@@ -27,7 +31,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 async def check_reserved_batch_session(
     db_sess: SASession,
-    sched_ctx: SchedulingContext,
+    _sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     """
@@ -88,7 +92,7 @@ async def check_concurrency(
 
 async def check_dependencies(
     db_sess: SASession,
-    sched_ctx: SchedulingContext,
+    _sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     j = sa.join(
@@ -149,10 +153,13 @@ async def check_keypair_resource_limit(
         "default_for_unspecified": resource_policy.default_for_unspecified,
     }
     total_keypair_allowed = ResourceSlot.from_policy(
-        resource_policy_map, sched_ctx.known_slot_types
+        resource_policy_map, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
+
+    if sess_ctx.access_key is None:
+        return PredicateResult(False, "Session has no access key")
     key_occupied = await sched_ctx.registry.get_keypair_occupancy(
-        sess_ctx.access_key, db_sess=db_sess
+        AccessKey(sess_ctx.access_key), db_sess=db_sess
     )
     log.debug("keypair:{} current-occupancy: {}", sess_ctx.access_key, key_occupied)
     log.debug("keypair:{} total-allowed: {}", sess_ctx.access_key, total_keypair_allowed)
@@ -163,7 +170,7 @@ async def check_keypair_resource_limit(
                 " ".join(
                     f"{k}={v}"
                     for k, v in total_keypair_allowed.to_humanized(
-                        sched_ctx.known_slot_types
+                        cast(Mapping[str, Any], sched_ctx.known_slot_types)
                     ).items()
                 )
             ),
@@ -197,7 +204,7 @@ async def check_user_resource_limit(
         "default_for_unspecified": resource_policy.default_for_unspecified,
     }
     total_main_keypair_allowed = ResourceSlot.from_policy(
-        resource_policy_map, sched_ctx.known_slot_types
+        resource_policy_map, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
     user_occupied = await sched_ctx.registry.get_user_occupancy(sess_ctx.user_uuid, db_sess=db_sess)
     log.debug("user:{} current-occupancy: {}", sess_ctx.user_uuid, user_occupied)
@@ -209,7 +216,7 @@ async def check_user_resource_limit(
                 " ".join(
                     f"{k}={v}"
                     for k, v in total_main_keypair_allowed.to_humanized(
-                        sched_ctx.known_slot_types
+                        cast(Mapping[str, Any], sched_ctx.known_slot_types)
                     ).items()
                 )
             ),
@@ -229,7 +236,7 @@ async def check_group_resource_limit(
         "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
     }
     total_group_allowed = ResourceSlot.from_policy(
-        group_resource_policy, sched_ctx.known_slot_types
+        group_resource_policy, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
     group_occupied = await sched_ctx.registry.get_group_occupancy(
         sess_ctx.group_id, db_sess=db_sess
@@ -242,7 +249,9 @@ async def check_group_resource_limit(
             "Your group resource quota is exceeded. ({})".format(
                 " ".join(
                     f"{k}={v}"
-                    for k, v in total_group_allowed.to_humanized(sched_ctx.known_slot_types).items()
+                    for k, v in total_group_allowed.to_humanized(
+                        cast(Mapping[str, Any], sched_ctx.known_slot_types)
+                    ).items()
                 )
             ),
         )
@@ -261,7 +270,7 @@ async def check_domain_resource_limit(
         "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
     }
     total_domain_allowed = ResourceSlot.from_policy(
-        domain_resource_policy, sched_ctx.known_slot_types
+        domain_resource_policy, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
     domain_occupied = await sched_ctx.registry.get_domain_occupancy(
         sess_ctx.domain_name, db_sess=db_sess
@@ -275,7 +284,7 @@ async def check_domain_resource_limit(
                 " ".join(
                     f"{k}={v}"
                     for k, v in total_domain_allowed.to_humanized(
-                        sched_ctx.known_slot_types
+                        cast(Mapping[str, Any], sched_ctx.known_slot_types)
                     ).items()
                 )
             ),
@@ -285,7 +294,7 @@ async def check_domain_resource_limit(
 
 async def check_pending_session_count_limit(
     db_sess: SASession,
-    sched_ctx: SchedulingContext,
+    _sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     result = True
@@ -397,7 +406,7 @@ async def check_pending_session_resource_limit(
                 " ".join(
                     f"{k}={v}"
                     for k, v in current_pending_session_slots.to_humanized(
-                        sched_ctx.known_slot_types
+                        cast(Mapping[str, Any], sched_ctx.known_slot_types)
                     ).items()
                 )
             )

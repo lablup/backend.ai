@@ -4,12 +4,8 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.scheduler.provisioner.validators import (
-    UserResourceLimitValidator,
-    UserResourceQuotaExceeded,
-)
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.common.types import ResourceSlot, SlotQuantity
+from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,
@@ -18,6 +14,10 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionWorkload,
     SystemSnapshot,
     UserResourcePolicy,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators import (
+    UserResourceLimitValidator,
+    UserResourceQuotaExceeded,
 )
 
 
@@ -36,7 +36,12 @@ class TestUserResourceLimitValidator:
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
-                by_user={workload.user_uuid: ResourceSlot(cpu=Decimal("3"), mem=Decimal("3"))},
+                by_user={
+                    workload.user_uuid: [
+                        SlotQuantity("cpu", Decimal("3")),
+                        SlotQuantity("mem", Decimal("3")),
+                    ]
+                },
                 by_group={},
                 by_domain={},
                 by_agent={},
@@ -71,7 +76,12 @@ class TestUserResourceLimitValidator:
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
-                by_user={workload.user_uuid: ResourceSlot(cpu=Decimal("8"), mem=Decimal("8"))},
+                by_user={
+                    workload.user_uuid: [
+                        SlotQuantity("cpu", Decimal("8")),
+                        SlotQuantity("mem", Decimal("8")),
+                    ]
+                },
                 by_group={},
                 by_domain={},
                 by_agent={},

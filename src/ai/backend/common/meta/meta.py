@@ -4,16 +4,28 @@ import enum
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel as PydanticBaseModel
+
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
+NEXT_RELEASE_VERSION = "UNRELEASED"
+"""Placeholder for the next release version.
+
+Used in GQL type decorators for newly added types/fields that have not yet
+been included in a release.  At release time, ``scripts/release.sh`` replaces
+every occurrence of ``NEXT_RELEASE_VERSION`` with the actual version string.
+"""
+
 __all__ = (
+    "NEXT_RELEASE_VERSION",
     "ConfigEnvironment",
     "CompositeType",
     "ConfigExample",
     "BackendAIFieldMeta",
     "BackendAIConfigMeta",
     "BackendAIAPIMeta",
+    "BackendAIGQLMeta",
     "get_field_meta",
     "get_field_type",
     "generate_example",
@@ -140,6 +152,17 @@ class BackendAIAPIMeta(BackendAIFieldMeta):
     """Whether this field is a composite type with nested fields.
     When True, example values are auto-generated from child field metadata
     rather than specified directly."""
+
+
+@dataclass(frozen=True)
+class BackendAIGQLMeta(BackendAIFieldMeta):
+    """GraphQL type metadata for Strawberry type decorators.
+
+    Extends BackendAIFieldMeta for GraphQL type-level version tracking
+    and documentation. Used with gql_node_type, gql_connection_type,
+    and gql_pydantic_type decorators in place of @strawberry.type and
+    @strawberry.experimental.pydantic.type.
+    """
 
 
 def get_field_meta(
@@ -273,8 +296,6 @@ def generate_composite_example(
         >>> generate_composite_example(SessionConfig, ConfigEnvironment.PROD)
         {'cpu': '8'}
     """
-    from pydantic import BaseModel as PydanticBaseModel
-
     result: dict[str, Any] = {}
 
     for name in model.model_fields:

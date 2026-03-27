@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import urllib
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncGenerator, Mapping, Sequence
 from contextvars import ContextVar
-from typing import Any, Optional, override
+from typing import Any, override
 
 import aiotools
 import yarl
 
-from ai.backend.common.etcd import AsyncEtcd, GetPrefixValue
+from ai.backend.common.configs.loader.types import AbstractConfigLoader
+from ai.backend.common.etcd import AsyncEtcd, Event, GetPrefixValue
 from ai.backend.common.identity import get_instance_id
-from ai.backend.common.types import SlotName, SlotTypes, current_resource_slots
+from ai.backend.common.types import QueueSentinel, SlotName, SlotTypes, current_resource_slots
 from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.defs import INTRINSIC_SLOTS
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 
@@ -32,7 +32,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
     _etcd: AsyncEtcd
     _config_prefix: str = "config"
 
-    def __init__(self, etcd: AsyncEtcd, config_prefix: Optional[str] = None) -> None:
+    def __init__(self, etcd: AsyncEtcd, config_prefix: str | None = None) -> None:
         super().__init__()
         self._etcd = etcd
         if config_prefix:
@@ -68,7 +68,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
                     )
         return flattened_dict
 
-    async def get_raw(self, key: str, allow_null: bool = True) -> Optional[str]:
+    async def get_raw(self, key: str, allow_null: bool = True) -> str | None:
         value = await self._etcd.get(key)
         if not allow_null and value is None:
             raise ServerMisconfiguredError("A required etcd config is missing.", key)
@@ -97,7 +97,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
         if updates:
             await self._etcd.put_dict(updates)
 
-    async def update_manager_status(self, status) -> None:
+    async def update_manager_status(self, status: ManagerStatus) -> None:
         await self._etcd.put("manager/status", status.value)
         self.get_manager_status.cache_clear()
 
@@ -146,7 +146,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
             return ManagerStatus.TERMINATED
         return ManagerStatus(status)
 
-    async def watch_manager_status(self):
+    async def watch_manager_status(self) -> AsyncGenerator[QueueSentinel | Event, None]:
         async with aiotools.aclosing(self._etcd.watch("manager/status")) as agen:
             async for ev in agen:
                 yield ev
@@ -154,7 +154,7 @@ class LegacyEtcdLoader(AbstractConfigLoader):
     # TODO: refactor using contextvars in Python 3.7 so that the result is cached
     #       in a per-request basis.
     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
-    async def get_allowed_origins(self):
+    async def get_allowed_origins(self) -> str | None:
         return await self._etcd.get("config/api/allow-origins")
 
 

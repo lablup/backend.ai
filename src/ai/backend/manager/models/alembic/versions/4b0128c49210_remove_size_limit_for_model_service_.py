@@ -18,13 +18,13 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.drop_constraint("pk_endpoint_tokens", "endpoint_tokens")
     op.add_column("endpoint_tokens", IDColumn())
     op.alter_column("endpoint_tokens", "token", type_=sa.String())
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("pk_endpoint_tokens", "endpoint_tokens")
     op.drop_column("endpoint_tokens", "id")
     op.alter_column("endpoint_tokens", "token", type_=sa.VARCHAR(1024))

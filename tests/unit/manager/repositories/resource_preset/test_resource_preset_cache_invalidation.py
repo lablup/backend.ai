@@ -13,7 +13,7 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
+from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot, ValkeyTarget
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -25,7 +25,7 @@ from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -68,6 +68,7 @@ class TestResourcePresetCacheInvalidation:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -117,7 +118,7 @@ class TestResourcePresetCacheInvalidation:
     async def sample_preset_creator(
         self,
         test_scaling_group_name: str,
-    ) -> AsyncGenerator[Creator, None]:
+    ) -> AsyncGenerator[Creator[ResourcePresetRow], None]:
         """Create sample resource preset creator for testing"""
         creator = Creator(
             spec=ResourcePresetCreatorSpec(
@@ -135,8 +136,6 @@ class TestResourcePresetCacheInvalidation:
         redis_container: tuple[str, HostPortPairModel],
     ) -> AsyncGenerator[ValkeyStatClient, None]:
         """Create ValkeyStatClient instance with real Redis"""
-        from ai.backend.common.types import ValkeyTarget
-
         redis_addr = redis_container[1]
         valkey_target = ValkeyTarget(
             addr=f"{redis_addr.host}:{redis_addr.port}",
@@ -175,11 +174,10 @@ class TestResourcePresetCacheInvalidation:
         )
         yield repo
 
-    @pytest.mark.asyncio
     async def test_create_preset_invalidates_cache(
         self,
         resource_preset_repository: ResourcePresetRepository,
-        sample_preset_creator: Creator,
+        sample_preset_creator: Creator[ResourcePresetRow],
     ) -> None:
         """Test that creating a preset invalidates all preset caches"""
         # Get reference to cache source and valkey stat
@@ -214,7 +212,6 @@ class TestResourcePresetCacheInvalidation:
         cached_list_after = await cache_source.get_preset_list(scaling_group=None)
         assert cached_list_after is None
 
-    @pytest.mark.asyncio
     async def test_invalidate_all_presets_deletes_all_keys(
         self,
         resource_preset_repository: ResourcePresetRepository,
@@ -290,7 +287,6 @@ class TestResourcePresetCacheInvalidation:
             is None
         )
 
-    @pytest.mark.asyncio
     async def test_invalidate_all_presets_handles_no_keys(
         self,
         resource_preset_repository: ResourcePresetRepository,
@@ -304,7 +300,6 @@ class TestResourcePresetCacheInvalidation:
         # Should not raise any errors when no keys exist
         await cache_source.invalidate_all_presets()
 
-    @pytest.mark.asyncio
     async def test_valkey_stat_invalidate_all_resource_presets(
         self,
         resource_preset_repository: ResourcePresetRepository,

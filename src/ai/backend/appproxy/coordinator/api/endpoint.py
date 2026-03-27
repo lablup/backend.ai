@@ -20,6 +20,7 @@ from ai.backend.appproxy.common.types import (
     FrontendMode,
     ProxyProtocol,
     PydanticResponse,
+    SessionConfig,
     WebMiddleware,
 )
 from ai.backend.appproxy.common.utils import (
@@ -33,7 +34,7 @@ from ai.backend.appproxy.coordinator.models.worker import add_circuit
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.config import ModelHealthCheck
 
-from .types import SessionConfig, StubResponseModel
+from .types import StubResponseModel
 from .utils import auth_required
 
 if TYPE_CHECKING:
@@ -302,11 +303,11 @@ async def generate_endpoint_api_token(
     return PydanticResponse(EndpointAPITokenResponseModel(token=encoded_jwt))
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

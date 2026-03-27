@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -14,16 +15,16 @@ import tomlkit
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import (
-    AgentBackend,
     AgentConfig,
     AgentUnifiedConfig,
     ContainerConfig,
-    EtcdConfig,
     ResourceConfig,
     ScratchType,
 )
 from ai.backend.agent.dummy.agent import DummyAgent
 from ai.backend.agent.server import AgentRPCServer
+from ai.backend.agent.types import AgentBackend
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import AgentId
 
@@ -84,7 +85,7 @@ def mock_agent_factory() -> Callable[[str, str], Mock]:
                 user=None,
                 password=None,
             ),
-        )  # type: ignore[call-arg]
+        )
 
         # Use the real update_scaling_group method - capture agent in closure properly
         def update_sg(sg: str) -> None:
@@ -112,12 +113,11 @@ class TestAgentConfigReading:
         ],
         ids=["invalid_keys", "empty", "only_gid", "both_valid"],
     )
-    @pytest.mark.asyncio
     async def test_read_agent_config_container(
         self,
         agent_rpc_server: AgentRPCServer,
-        mocker,
-        etcd_response: dict,
+        mocker: Any,
+        etcd_response: dict[str, Any],
         expected_gid: int,
         expected_uid: int,
     ) -> None:
@@ -147,13 +147,12 @@ class TestScalingGroupUpdates:
                 user=None,
                 password=None,
             ),
-        )  # type: ignore[call-arg]
+        )
 
         AbstractAgent.update_scaling_group(mock_agent, "gpu")
 
         assert mock_agent.local_config.agent.scaling_group == "gpu"
 
-    @pytest.mark.asyncio
     async def test_update_scaling_group_persists_single_agent(
         self, tmp_path: Path, mock_agent_factory: Callable[[str, str], Mock]
     ) -> None:
@@ -181,10 +180,10 @@ addr = { host = "127.0.0.1", port = 2379 }
         runtime = Mock()
         runtime._default_agent_id = AgentId("test-agent")
 
-        def get_agent_impl(agent_id=None):
+        def get_agent_impl(agent_id: AgentId | None = None) -> Mock:
             if agent_id is None:
                 agent_id = runtime._default_agent_id
-            return runtime.agents[agent_id]
+            return cast(Mock, runtime.agents[agent_id])
 
         runtime.get_agent = get_agent_impl
 
@@ -202,7 +201,6 @@ addr = { host = "127.0.0.1", port = 2379 }
         assert updated_config["agent"]["scaling-group"] == "gpu"  # type: ignore[index]
         assert mock_agent.local_config.agent.scaling_group == "gpu"
 
-    @pytest.mark.asyncio
     async def test_update_scaling_group_persists_multi_agent(
         self, tmp_path: Path, mock_agent_factory: Callable[[str, str], Mock]
     ) -> None:
@@ -239,10 +237,10 @@ scaling-group = "default"
         runtime = Mock()
         runtime._default_agent_id = AgentId("agent-1")
 
-        def get_agent_impl(agent_id=None):
+        def get_agent_impl(agent_id: AgentId | None = None) -> Mock:
             if agent_id is None:
                 agent_id = runtime._default_agent_id
-            return runtime.agents[agent_id]
+            return cast(Mock, runtime.agents[agent_id])
 
         runtime.get_agent = get_agent_impl
 
@@ -258,7 +256,7 @@ scaling-group = "default"
         with patch("ai.backend.common.config.find_config_file", return_value=config_file):
             await server.update_scaling_group.__wrapped__.__wrapped__(  # type: ignore[attr-defined]
                 server, "gpu", AgentId("agent-2")
-            )  # type: ignore[attr-defined]
+            )
 
         # Verify file was updated
         with open(config_file) as f:

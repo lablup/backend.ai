@@ -35,7 +35,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -84,6 +84,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -114,7 +115,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -207,7 +208,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 is_active=True,
                 domain_name=test_domain.name,
                 resource_policy=test_project_resource_policy.name,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
             )
             db_sess.add(group)
@@ -287,6 +288,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 url=f"https://test-{uuid.uuid4().hex[:8]}.example.com",
                 lifecycle_stage=EndpointLifecycle.CREATED,
+                current_revision=uuid.uuid4(),
                 model_mount_destination="/models",
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
@@ -300,7 +302,6 @@ class TestDeploymentAutoScalingPolicyRow:
 
         yield endpoint
 
-    @pytest.mark.asyncio
     async def test_create_auto_scaling_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -332,7 +333,6 @@ class TestDeploymentAutoScalingPolicyRow:
             assert policy.scale_up_threshold == Decimal("80")
             assert policy.scale_down_threshold == Decimal("30")
 
-    @pytest.mark.asyncio
     async def test_create_policy_with_defaults(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -357,7 +357,6 @@ class TestDeploymentAutoScalingPolicyRow:
             assert policy.scale_up_threshold is None
             assert policy.scale_down_threshold is None
 
-    @pytest.mark.asyncio
     async def test_to_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -399,7 +398,6 @@ class TestDeploymentAutoScalingPolicyRow:
             assert data.cooldown_seconds == 600
             assert data.created_at is not None
 
-    @pytest.mark.asyncio
     async def test_unique_constraint_endpoint(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -429,7 +427,6 @@ class TestDeploymentAutoScalingPolicyRow:
             # Rollback to clean up the session state after the expected error
             await db_sess.rollback()
 
-    @pytest.mark.asyncio
     async def test_nullable_thresholds(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

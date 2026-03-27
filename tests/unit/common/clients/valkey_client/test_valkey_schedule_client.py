@@ -5,6 +5,7 @@ Tests the client with real Redis operations for route health monitoring.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from time import time
@@ -66,7 +67,6 @@ class TestValkeyScheduleClient:
             },
         )
 
-    @pytest.mark.asyncio
     async def test_initialize_routes_health_status_batch(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -82,7 +82,6 @@ class TestValkeyScheduleClient:
             assert status.readiness is None, "Initialized route should have None readiness"
             assert status.liveness is None, "Initialized route should have None liveness"
 
-    @pytest.mark.asyncio
     async def test_update_route_readiness_healthy(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -97,7 +96,6 @@ class TestValkeyScheduleClient:
             "Route should be ready after healthy update"
         )
 
-    @pytest.mark.asyncio
     async def test_update_route_readiness_unhealthy(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -112,7 +110,6 @@ class TestValkeyScheduleClient:
             "Route should not be ready after unhealthy update"
         )
 
-    @pytest.mark.asyncio
     async def test_update_route_liveness_healthy(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -127,7 +124,6 @@ class TestValkeyScheduleClient:
             "Route should be alive after healthy update"
         )
 
-    @pytest.mark.asyncio
     async def test_update_route_liveness_unhealthy(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -142,7 +138,6 @@ class TestValkeyScheduleClient:
             "Route should not be alive after unhealthy update"
         )
 
-    @pytest.mark.asyncio
     async def test_update_routes_readiness_batch(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -166,7 +161,6 @@ class TestValkeyScheduleClient:
                 f"Route {route_id} should have readiness={expected_status}"
             )
 
-    @pytest.mark.asyncio
     async def test_get_route_health_status_healthy_and_fresh(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -182,7 +176,6 @@ class TestValkeyScheduleClient:
         assert status.readiness == HealthCheckStatus.HEALTHY
         assert status.liveness == HealthCheckStatus.HEALTHY
 
-    @pytest.mark.asyncio
     async def test_get_route_health_status_healthy_but_stale(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -202,7 +195,6 @@ class TestValkeyScheduleClient:
             "Stale health data should be marked as stale"
         )
 
-    @pytest.mark.asyncio
     async def test_get_route_health_status_unhealthy(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -217,7 +209,6 @@ class TestValkeyScheduleClient:
         assert status.readiness == HealthCheckStatus.UNHEALTHY
         assert status.liveness == HealthCheckStatus.UNHEALTHY
 
-    @pytest.mark.asyncio
     async def test_get_route_health_status_missing_fields(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -233,7 +224,6 @@ class TestValkeyScheduleClient:
         assert status.readiness is None
         assert status.liveness is None
 
-    @pytest.mark.asyncio
     async def test_get_route_health_status_not_found(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -241,7 +231,6 @@ class TestValkeyScheduleClient:
         status = await valkey_schedule_client.get_route_health_status("nonexistent-route")
         assert status is None
 
-    @pytest.mark.asyncio
     async def test_check_route_health_status_multiple_routes(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -287,7 +276,6 @@ class TestValkeyScheduleClient:
             "Stale route should be marked as stale"
         )
 
-    @pytest.mark.asyncio
     async def test_check_route_health_status_updates_last_check(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -448,7 +436,6 @@ class TestKernelPresenceStatus:
 
     # ===== Tests =====
 
-    @pytest.mark.asyncio
     async def test_initialize_kernel_presence_batch(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -468,14 +455,12 @@ class TestKernelPresenceStatus:
             assert status.last_check is not None and status.last_check > 0
             assert status.created_at > 0
 
-    @pytest.mark.asyncio
     async def test_initialize_kernel_presence_batch_empty(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
         """Test that empty batch initialization does nothing."""
         await valkey_schedule_client.initialize_kernel_presence_batch([])
 
-    @pytest.mark.asyncio
     async def test_update_kernel_presence_batch_healthy(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -488,7 +473,6 @@ class TestKernelPresenceStatus:
         assert status is not None
         assert status.presence == HealthCheckStatus.HEALTHY
 
-    @pytest.mark.asyncio
     async def test_update_kernel_presence_batch_unhealthy(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -503,7 +487,6 @@ class TestKernelPresenceStatus:
         assert status is not None
         assert status.presence == HealthCheckStatus.UNHEALTHY
 
-    @pytest.mark.asyncio
     async def test_update_kernel_presence_batch_mixed(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -524,7 +507,6 @@ class TestKernelPresenceStatus:
         assert unhealthy_status is not None
         assert unhealthy_status.presence == HealthCheckStatus.UNHEALTHY
 
-    @pytest.mark.asyncio
     async def test_delete_kernel_presence_batch(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -548,14 +530,12 @@ class TestKernelPresenceStatus:
         for kernel_id in initialized_kernels:
             assert statuses_after[kernel_id] is None
 
-    @pytest.mark.asyncio
     async def test_delete_kernel_presence_batch_empty(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
         """Test that empty batch deletion does nothing."""
         await valkey_schedule_client.delete_kernel_presence_batch([])
 
-    @pytest.mark.asyncio
     async def test_check_kernel_presence_status_batch_not_found(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -568,7 +548,6 @@ class TestKernelPresenceStatus:
         for kernel_id in kernel_ids:
             assert statuses[kernel_id] is None
 
-    @pytest.mark.asyncio
     async def test_check_kernel_presence_status_batch_empty(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
@@ -576,7 +555,6 @@ class TestKernelPresenceStatus:
         statuses = await valkey_schedule_client.check_kernel_presence_status_batch([])
         assert statuses == {}
 
-    @pytest.mark.asyncio
     async def test_check_kernel_presence_status_batch_updates_last_check(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -603,7 +581,6 @@ class TestKernelPresenceStatus:
         assert status.last_check is not None
         assert status.last_check > int(old_timestamp)
 
-    @pytest.mark.asyncio
     async def test_check_kernel_presence_status_batch_stale_detection(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -616,7 +593,6 @@ class TestKernelPresenceStatus:
         assert status is not None
         assert status.presence == HealthCheckStatus.STALE
 
-    @pytest.mark.asyncio
     async def test_check_kernel_presence_status_batch_mixed_states(
         self,
         mixed_state_kernels: KernelPresenceFixture,
@@ -687,7 +663,6 @@ class TestAgentLastCheck:
         """Generate multiple kernel IDs."""
         return [KernelId(uuid4()) for _ in range(3)]
 
-    @pytest.mark.asyncio
     async def test_get_agent_last_check_not_exists(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -697,7 +672,6 @@ class TestAgentLastCheck:
         result = await valkey_schedule_client.get_agent_last_check(agent_id)
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_agent_last_check_exists(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -716,7 +690,6 @@ class TestAgentLastCheck:
         result = await valkey_schedule_client.get_agent_last_check(agent_id)
         assert result == expected_timestamp
 
-    @pytest.mark.asyncio
     async def test_check_kernel_presence_updates_agent_last_check(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -740,7 +713,6 @@ class TestAgentLastCheck:
         assert result is not None
         assert result > 0
 
-    @pytest.mark.asyncio
     async def test_check_kernel_presence_updates_multiple_agents_last_check(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -762,7 +734,6 @@ class TestAgentLastCheck:
             assert result is not None
             assert result > 0
 
-    @pytest.mark.asyncio
     async def test_check_kernel_presence_without_agent_ids_does_not_update(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -780,7 +751,6 @@ class TestAgentLastCheck:
         result = await valkey_schedule_client.get_agent_last_check(agent_id)
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_kernel_presence_batch_does_not_update_last_check(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -800,8 +770,6 @@ class TestAgentLastCheck:
                 initial_last_checks[kid] = status.last_check
 
         # Wait a bit
-        import asyncio
-
         await asyncio.sleep(0.1)
 
         # Call get_kernel_presence_batch (read-only)
@@ -818,7 +786,6 @@ class TestAgentLastCheck:
                 initial_value = initial_last_checks.get(kernel_id, 0)
                 assert status.last_check >= initial_value
 
-    @pytest.mark.asyncio
     async def test_get_kernel_presence_batch_returns_status(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -847,7 +814,6 @@ class TestAgentLastCheck:
         assert status1 is not None
         assert status1.presence == HealthCheckStatus.UNHEALTHY
 
-    @pytest.mark.asyncio
     async def test_get_kernel_presence_batch_missing_kernel(
         self,
         valkey_schedule_client: ValkeyScheduleClient,
@@ -859,7 +825,6 @@ class TestAgentLastCheck:
 
         assert statuses[missing_kernel_id] is None
 
-    @pytest.mark.asyncio
     async def test_get_kernel_presence_batch_empty(
         self,
         valkey_schedule_client: ValkeyScheduleClient,

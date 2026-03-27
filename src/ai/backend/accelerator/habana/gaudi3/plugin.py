@@ -1,8 +1,5 @@
 from collections.abc import Collection, Sequence
 from pathlib import Path
-from typing import (
-    Optional,
-)
 
 import pyhlml
 
@@ -48,7 +45,7 @@ class Gaudi3Plugin(AbstractGaudiPlugin):
             pci_bus_id = pci_info.bus_id.decode()
 
             sysfs_node_path = f"/sys/bus/pci/devices/{pci_bus_id}/numa_node"
-            node: Optional[int]
+            node: int | None
             try:
                 node = int(Path(sysfs_node_path).read_text().strip())
             except OSError:

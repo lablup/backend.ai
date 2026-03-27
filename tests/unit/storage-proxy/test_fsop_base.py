@@ -1,4 +1,5 @@
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -7,7 +8,7 @@ from ai.backend.storage.volumes.vfs import BaseFSOpModel
 
 
 @pytest.fixture
-def dummy_path():
+def dummy_path() -> Iterator[Path]:
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
 
@@ -25,8 +26,7 @@ def dummy_path():
         yield tmpdir_path
 
 
-@pytest.mark.asyncio
-async def test_scan_tree(dummy_path) -> None:
+async def test_scan_tree(dummy_path: Path) -> None:
     fsop_model = BaseFSOpModel(dummy_path, 10)
 
     result = []
@@ -58,8 +58,7 @@ async def test_scan_tree(dummy_path) -> None:
     assert "x.txt" in names
 
 
-@pytest.mark.asyncio
-async def test_scan_tree_with_limit(dummy_path) -> None:
+async def test_scan_tree_with_limit(dummy_path: Path) -> None:
     fsop_model = BaseFSOpModel(dummy_path, 5)
 
     result = []

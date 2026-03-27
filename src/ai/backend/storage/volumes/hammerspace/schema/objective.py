@@ -1,5 +1,4 @@
 import enum
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -41,4 +40,4 @@ class Objective(BaseModel):
     basic: bool
     internalId: int
     hidden: bool
-    placementObjective: Optional[PlacementObjective] = None
+    placementObjective: PlacementObjective | None = None

@@ -7,6 +7,7 @@ Create Date: 2024-08-10 07:29:39.492116
 """
 
 import enum
+from typing import Any
 
 import sqlalchemy as sa
 import trafaret as t
@@ -21,20 +22,20 @@ branch_labels = None
 depends_on = None
 
 
-def get_container_registry_row_schema():
+def get_container_registry_row_schema() -> type[Base]:
     class ContainerRegistryType(enum.StrEnum):
         DOCKER = "docker"
         HARBOR = "harbor"
         HARBOR2 = "harbor2"
         LOCAL = "local"
 
-    class ContainerRegistryRow(Base):
+    class ContainerRegistryRow(Base):  # type: ignore[misc]
         __tablename__ = "container_registries"
         __table_args__ = {"extend_existing": True}
         id = IDColumn()
         url = sa.Column("url", sa.String(length=512), index=True)
         registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
-        type = sa.Column(
+        type: sa.Column[Any] = sa.Column(
             "type",
             StrEnumType(ContainerRegistryType),
             default=ContainerRegistryType.DOCKER,
@@ -51,13 +52,13 @@ def get_container_registry_row_schema():
     return ContainerRegistryRow
 
 
-def get_image_row_schema():
+def get_image_row_schema() -> type[Base]:
     class ImageType(enum.Enum):
         COMPUTE = "compute"
         SYSTEM = "system"
         SERVICE = "service"
 
-    class ImageRow(Base):
+    class ImageRow(Base):  # type: ignore[misc]
         __tablename__ = "images"
         __table_args__ = {"extend_existing": True}
         id = IDColumn("id")
@@ -84,10 +85,10 @@ def get_image_row_schema():
             nullable=False,
             server_default=sa.sql.expression.false(),
         )
-        type = sa.Column("type", sa.Enum(ImageType), nullable=False)
+        type: sa.Column[Any] = sa.Column("type", sa.Enum(ImageType), nullable=False)
         accelerators = sa.Column("accelerators", sa.String)
         labels = sa.Column("labels", sa.JSON, nullable=False, default=dict)
-        resources = sa.Column(
+        resources: sa.Column[Any] = sa.Column(
             "resources",
             StructuredJSONColumn(
                 t.Mapping(
@@ -104,7 +105,7 @@ def get_image_row_schema():
     return ImageRow
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column("images", sa.Column("project", sa.String, nullable=True))
 
     ImageRow = get_image_row_schema()
@@ -119,5 +120,5 @@ def upgrade():
     op.get_bind().execute(update_stmt)
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("images", "project")

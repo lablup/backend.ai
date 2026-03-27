@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base import Updater
@@ -15,13 +16,13 @@ class UpdateDeploymentAction(DeploymentBaseAction):
     updater: Updater[EndpointRow]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.updater.pk_value)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -29,5 +30,5 @@ class UpdateDeploymentActionResult(BaseActionResult):
     data: ModelDeploymentData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.data.id)

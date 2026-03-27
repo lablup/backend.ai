@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ai.backend.manager.repositories.base.export import ReportDef
 from ai.backend.manager.repositories.export.reports.audit_log import AUDIT_LOG_REPORT
+from ai.backend.manager.repositories.export.reports.keypair import KEYPAIR_REPORT
 from ai.backend.manager.repositories.export.reports.project import PROJECT_REPORT
 from ai.backend.manager.repositories.export.reports.session import SESSION_REPORT
 from ai.backend.manager.repositories.export.reports.user import USER_REPORT
@@ -56,6 +57,7 @@ class ExportReportRegistry:
         """
         registry = cls()
         registry.register(AUDIT_LOG_REPORT)
+        registry.register(KEYPAIR_REPORT)
         registry.register(PROJECT_REPORT)
         registry.register(SESSION_REPORT)
         registry.register(USER_REPORT)

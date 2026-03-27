@@ -38,7 +38,7 @@ kernelstatus_choices = (
 kernelstatus = postgresql.ENUM(*kernelstatus_choices, name="kernelstatus")
 
 
-def upgrade():
+def upgrade() -> None:
     agentstatus.create(op.get_bind())
     kernelstatus.create(op.get_bind())
     op.add_column("agents", sa.Column("lost_at", sa.DateTime(timezone=True), nullable=True))
@@ -70,7 +70,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("kernels", "stdout_port")
     op.drop_column("kernels", "stdin_port")
     op.drop_column("kernels", "repl_out_port")

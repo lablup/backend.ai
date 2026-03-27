@@ -6,6 +6,7 @@ from ai.backend.common.clients.valkey_client.valkey_container_log.client import 
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     CoalescingOptions,
     EventDispatcher,
@@ -17,7 +18,6 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentImagesRemoveEvent,
     AgentInstalledImagesRemoveEvent,
     AgentStartedEvent,
-    AgentStatusHeartbeat,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
@@ -46,13 +46,22 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
     KernelCancelledAnycastEvent,
     KernelCreatingAnycastEvent,
-    KernelHeartbeatEvent,
     KernelPreparingAnycastEvent,
     KernelPullingAnycastEvent,
     KernelStartedAnycastEvent,
     KernelTerminatedAnycastEvent,
     KernelTerminatingAnycastEvent,
 )
+from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelCancelledBroadcastEvent,
+    KernelCreatingBroadcastEvent,
+    KernelPreparingBroadcastEvent,
+    KernelPullingBroadcastEvent,
+    KernelStartedBroadcastEvent,
+    KernelTerminatedBroadcastEvent,
+    KernelTerminatingBroadcastEvent,
+)
+from ai.backend.common.events.event_types.log.anycast import DoLogCleanupEvent
 from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
     RouteCreatedAnycastEvent,
@@ -61,20 +70,20 @@ from ai.backend.common.events.event_types.notification.anycast import (
     NotificationTriggeredEvent,
 )
 from ai.backend.common.events.event_types.schedule.anycast import (
-    DoCheckPrecondEvent,
     DoDeploymentLifecycleEvent,
     DoDeploymentLifecycleIfNeededEvent,
     DoRouteLifecycleEvent,
     DoRouteLifecycleIfNeededEvent,
-    DoScaleEvent,
-    DoScheduleEvent,
     DoSokovanProcessIfNeededEvent,
     DoSokovanProcessScheduleEvent,
-    DoStartSessionEvent,
+)
+from ai.backend.common.events.event_types.service_discovery.anycast import (
+    DoSweepStaleServicesEvent,
+    ServiceDeregisteredEvent,
+    ServiceRegisteredEvent,
 )
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
-    DoUpdateSessionStatusEvent,
     ExecutionCancelledAnycastEvent,
     ExecutionFinishedAnycastEvent,
     ExecutionStartedAnycastEvent,
@@ -83,8 +92,6 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionCheckingPrecondAnycastEvent,
     SessionEnqueuedAnycastEvent,
     SessionFailureAnycastEvent,
-    SessionPreparingAnycastEvent,
-    SessionScheduledAnycastEvent,
     SessionStartedAnycastEvent,
     SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
@@ -92,6 +99,12 @@ from ai.backend.common.events.event_types.session.anycast import (
 )
 from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
+    SessionCancelledBroadcastEvent,
+    SessionEnqueuedBroadcastEvent,
+    SessionFailureBroadcastEvent,
+    SessionSuccessBroadcastEvent,
+    SessionTerminatedBroadcastEvent,
+    SessionTerminatingBroadcastEvent,
 )
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderCloneFailureEvent,
@@ -114,7 +127,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
@@ -125,9 +137,12 @@ from .handlers.agent import AgentEventHandler
 from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
+from .handlers.log_cleanup import LogCleanupEventHandler
 from .handlers.model_serving import ModelServingEventHandler
 from .handlers.notification import NotificationEventHandler
+from .handlers.service_catalog import ServiceCatalogEventHandler
 from .handlers.session import SessionEventHandler
+from .handlers.stream_cleanup import StreamCleanupEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
 
@@ -137,7 +152,6 @@ class DispatcherArgs:
     valkey_container_log: ValkeyContainerLogClient
     valkey_stat: ValkeyStatClient
     valkey_stream: ValkeyStreamClient
-    scheduler_dispatcher: SchedulerDispatcher
     schedule_coordinator: ScheduleCoordinator
     scheduling_controller: SchedulingController
     deployment_coordinator: DeploymentCoordinator
@@ -146,6 +160,7 @@ class DispatcherArgs:
     event_hub: EventHub
     agent_registry: AgentRegistry
     db: ExtendedAsyncSAEngine
+    etcd: AsyncEtcd
     idle_checker_host: IdleCheckerHost
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     repositories: Repositories
@@ -153,7 +168,6 @@ class DispatcherArgs:
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
     event_producer: EventProducer
-    use_sokovan: bool = True
 
 
 class Dispatchers:
@@ -170,6 +184,9 @@ class Dispatchers:
     _notification_event_handler: NotificationEventHandler
     _artifact_event_handler: ArtifactEventHandler
     _artifact_registry_event_handler: ArtifactRegistryEventHandler
+    _service_catalog_event_handler: ServiceCatalogEventHandler
+    _log_cleanup_event_handler: LogCleanupEventHandler
+    stream_cleanup_handler: StreamCleanupEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
         """
@@ -183,7 +200,6 @@ class Dispatchers:
         self._image_event_handler = ImageEventHandler(
             args.agent_registry,
             args.db,
-            args.use_sokovan,
             args.schedule_coordinator,
         )
 
@@ -194,16 +210,13 @@ class Dispatchers:
             args.agent_registry,
             args.db,
             args.schedule_coordinator,
-            args.use_sokovan,
         )
         self._schedule_event_handler = ScheduleEventHandler(
-            args.scheduler_dispatcher,
             args.schedule_coordinator,
             args.scheduling_controller,
             args.deployment_coordinator,
             args.route_coordinator,
             args.event_hub,
-            args.use_sokovan,
         )
         self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
         self._session_event_handler = SessionEventHandler(
@@ -232,6 +245,9 @@ class Dispatchers:
             args.storage_manager,
             args.config_provider,
         )
+        self._service_catalog_event_handler = ServiceCatalogEventHandler(args.db)
+        self._log_cleanup_event_handler = LogCleanupEventHandler(args.etcd, args.db)
+        self.stream_cleanup_handler = StreamCleanupEventHandler(args.db)
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
         """
@@ -249,6 +265,10 @@ class Dispatchers:
         self._dispatch_notification_events(event_dispatcher)
         self._dispatch_artifact_events(event_dispatcher)
         self._dispatch_artifact_registry_events(event_dispatcher)
+        self._dispatch_service_catalog_events(event_dispatcher)
+        self._dispatch_log_cleanup_events(event_dispatcher)
+        self._dispatch_session_broadcast_propagation(event_dispatcher)
+        self._dispatch_stream_cleanup_events(event_dispatcher)
 
     def _dispatch_bgtask_events(
         self,
@@ -285,13 +305,6 @@ class Dispatchers:
         event_dispatcher.consume(
             AgentHeartbeatEvent, None, self._agent_event_handler.handle_agent_heartbeat
         )
-        event_dispatcher.consume(
-            AgentStatusHeartbeat,
-            None,
-            self._agent_event_handler.handle_agent_container_heartbeat,
-            name="agent.status_heartbeat",
-        )
-
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(AgentStartedEvent, None, self._agent_event_handler.handle_agent_started)
         evd.consume(AgentTerminatedEvent, None, self._agent_event_handler.handle_agent_terminated)
@@ -383,12 +396,6 @@ class Dispatchers:
             self._kernel_event_handler.handle_kernel_terminated,
             name="api.session.kterm",
         )
-        evd.consume(
-            KernelHeartbeatEvent,
-            None,
-            self._kernel_event_handler.handle_kernel_heartbeat,
-            name="api.session.kheartbeat",
-        )
 
     def _dispatch_model_serving_events(self, event_dispatcher: EventDispatcher) -> None:
         event_dispatcher.consume(
@@ -424,21 +431,6 @@ class Dispatchers:
             None,
             self._schedule_event_handler.handle_agent_started,
             name="dispatcher.schedule",
-        )
-        event_dispatcher.consume(
-            DoScheduleEvent, None, self._schedule_event_handler.handle_do_schedule, coalescing_opts
-        )
-        event_dispatcher.consume(
-            DoStartSessionEvent, None, self._schedule_event_handler.handle_do_start_session
-        )
-        event_dispatcher.consume(
-            DoCheckPrecondEvent, None, self._schedule_event_handler.handle_do_check_precond
-        )
-        event_dispatcher.consume(DoScaleEvent, None, self._schedule_event_handler.handle_do_scale)
-        event_dispatcher.consume(
-            DoUpdateSessionStatusEvent,
-            None,
-            self._schedule_event_handler.handle_do_update_session_status,
         )
         # Sokovan scheduler events
         event_dispatcher.consume(
@@ -524,15 +516,9 @@ class Dispatchers:
             SessionEnqueuedAnycastEvent, None, self._session_event_handler.invoke_session_callback
         )
         evd.consume(
-            SessionScheduledAnycastEvent, None, self._session_event_handler.invoke_session_callback
-        )
-        evd.consume(
             SessionCheckingPrecondAnycastEvent,
             None,
             self._session_event_handler.invoke_session_callback,
-        )
-        evd.consume(
-            SessionPreparingAnycastEvent, None, self._session_event_handler.invoke_session_callback
         )
         evd.consume(
             SessionSuccessAnycastEvent, None, self._session_event_handler.handle_batch_result
@@ -634,4 +620,79 @@ class Dispatchers:
             None,
             self._notification_event_handler.handle_notification_triggered,
             name="notification.triggered",
+        )
+
+    def _dispatch_service_catalog_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        event_dispatcher.consume(
+            ServiceRegisteredEvent,
+            None,
+            self._service_catalog_event_handler.handle_registered,
+            name="service-catalog.registered",
+        )
+        event_dispatcher.consume(
+            ServiceDeregisteredEvent,
+            None,
+            self._service_catalog_event_handler.handle_deregistered,
+            name="service-catalog.deregistered",
+        )
+        event_dispatcher.consume(
+            DoSweepStaleServicesEvent,
+            None,
+            self._service_catalog_event_handler.handle_sweep_stale_services,
+            name="service-catalog.sweep",
+        )
+
+    def _dispatch_log_cleanup_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        event_dispatcher.consume(
+            DoLogCleanupEvent,
+            None,
+            self._log_cleanup_event_handler.handle_log_cleanup,
+            name="log_cleanup",
+        )
+
+    def _dispatch_session_broadcast_propagation(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        """Subscribe to session/kernel broadcast events and propagate them via EventHub.
+
+        Previously these subscriptions lived in the events API module
+        (``events_app_ctx``).  Moving them here keeps ``event_dispatcher``
+        usage inside the ``event_dispatcher`` package.
+        """
+        handler = self._propagator_handler.propagate_event
+        event_dispatcher.subscribe(SessionEnqueuedBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelPreparingBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelPullingBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelCreatingBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelStartedBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelTerminatingBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelTerminatedBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(KernelCancelledBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(SessionTerminatingBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(SessionTerminatedBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(SessionCancelledBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(SessionSuccessBroadcastEvent, None, handler)
+        event_dispatcher.subscribe(SessionFailureBroadcastEvent, None, handler)
+
+    def _dispatch_stream_cleanup_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        """Subscribe to KernelTerminatingBroadcastEvent for stream cleanup.
+
+        Previously this subscription lived in the stream API module
+        (``stream_app_ctx``).  Moving it here keeps ``event_dispatcher``
+        usage inside the ``event_dispatcher`` package.
+        """
+        event_dispatcher.subscribe(
+            KernelTerminatingBroadcastEvent,
+            None,
+            self.stream_cleanup_handler.handle_kernel_terminating_broadcast,
         )

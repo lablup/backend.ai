@@ -3,6 +3,7 @@
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta
+from typing import Any
 
 import pytest
 import yarl
@@ -40,9 +41,9 @@ def session_spec_factory() -> Callable[..., SessionCreationSpec]:
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
         priority: int = 10,
-        resource_policy: dict | None = None,
+        resource_policy: dict[str, Any] | None = None,
         kernel_specs: list[KernelEnqueueingConfig] | None = None,
-        creation_spec: dict | None = None,
+        creation_spec: dict[str, Any] | None = None,
         scaling_group: str | None = None,
         session_tag: str | None = None,
         starts_at: datetime | None = None,
@@ -53,7 +54,7 @@ def session_spec_factory() -> Callable[..., SessionCreationSpec]:
         sudo_session_enabled: bool = False,
         network: NetworkRow | None = None,
         designated_agent_list: list[str] | None = None,
-        internal_data: dict | None = None,
+        internal_data: dict[str, Any] | None = None,
         public_sgroup_only: bool = True,
     ) -> SessionCreationSpec:
         return SessionCreationSpec(

@@ -1,0 +1,47 @@
+"""User GraphQL enum types."""
+
+from __future__ import annotations
+
+from enum import StrEnum
+
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_enum
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "User account status. "
+            "ACTIVE: User can log in and use the system. "
+            "INACTIVE: User account is disabled but preserved. "
+            "DELETED: User has been soft-deleted. "
+            "BEFORE_VERIFICATION: User account is pending email verification."
+        ),
+    ),
+    name="UserStatusV2",
+)
+class UserStatusEnumGQL(StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    DELETED = "deleted"
+    BEFORE_VERIFICATION = "before-verification"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "User role determining access permissions. "
+            "USER: Standard user with basic permissions. "
+            "ADMIN: Domain administrator with elevated permissions. "
+            "SUPERADMIN: System-wide administrator with full access. "
+            "MONITOR: Read-only access for monitoring purposes."
+        ),
+    ),
+    name="UserRoleV2",
+)
+class UserRoleEnumGQL(StrEnum):
+    USER = "user"
+    ADMIN = "admin"
+    SUPERADMIN = "superadmin"
+    MONITOR = "monitor"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable
 from decimal import Decimal
 
@@ -709,8 +710,6 @@ def agents_cpu_only_vs_gpu() -> list[AgentInfo]:
 @pytest.fixture
 def agents_normal_vs_huge() -> list[AgentInfo]:
     """Normal and huge capacity agents for testing large resource values."""
-    import sys
-
     return [
         _create_agent_info(
             agent_id="normal",

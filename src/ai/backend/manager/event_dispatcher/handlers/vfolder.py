@@ -24,8 +24,8 @@ class VFolderEventHandler:
 
     async def handle_vfolder_deletion_success(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: VFolderDeletionSuccessEvent,
     ) -> None:
         await update_vfolder_status(
@@ -34,8 +34,8 @@ class VFolderEventHandler:
 
     async def handle_vfolder_deletion_failure(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: VFolderDeletionFailureEvent,
     ) -> None:
         log.exception(f"Failed to delete vfolder (vfid:{event.vfid}, msg:{event.message})")
@@ -45,8 +45,8 @@ class VFolderEventHandler:
 
     async def handle_vfolder_clone_success(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: VFolderCloneSuccessEvent,
     ) -> None:
         await update_vfolder_status(
@@ -58,8 +58,8 @@ class VFolderEventHandler:
 
     async def handle_vfolder_clone_failure(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: VFolderCloneFailureEvent,
     ) -> None:
         log.exception(

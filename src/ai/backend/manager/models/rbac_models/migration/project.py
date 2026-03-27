@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Self
+from typing import Any, Self
 
 from sqlalchemy.engine.row import Row
 
@@ -37,7 +37,7 @@ class ProjectData:
         return f"{ROLE_NAME_PREFIX}project_{str(self.id)[:8]}{role_type}"
 
     @classmethod
-    def from_row(cls, group_row: Row) -> Self:
+    def from_row(cls, group_row: Row[Any]) -> Self:
         return cls(id=group_row.id)
 
 

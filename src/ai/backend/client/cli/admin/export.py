@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
 
 import click
 
@@ -20,7 +20,7 @@ def export() -> None:
     """
     CSV export administration commands.
 
-    Supports report-specific exports: users, sessions, projects, audit-logs.
+    Supports report-specific exports: users, sessions, projects, keypairs, audit-logs.
     """
 
 
@@ -96,15 +96,15 @@ def list_reports(ctx: CLIContext) -> None:
 @click.option("--encoding", type=str, default="utf-8", help="CSV encoding (default: utf-8).")
 def export_users(
     ctx: CLIContext,
-    output: Optional[str],
-    fields: Optional[str],
-    filter_username: Optional[str],
-    filter_email: Optional[str],
-    filter_domain: Optional[str],
-    filter_role: Optional[str],
-    filter_status: Optional[str],
-    filter_after: Optional[datetime],
-    filter_before: Optional[datetime],
+    output: str | None,
+    fields: str | None,
+    filter_username: str | None,
+    filter_email: str | None,
+    filter_domain: str | None,
+    filter_role: str | None,
+    filter_status: str | None,
+    filter_after: datetime | None,
+    filter_before: datetime | None,
     orders: tuple[str, ...],
     encoding: str,
 ) -> None:
@@ -112,18 +112,18 @@ def export_users(
     Export users as CSV.
     """
     from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.export import (
+    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+    from ai.backend.common.dto.manager.v2.export import (
         OrderDirection,
         UserExportFilter,
         UserExportOrder,
         UserExportOrderField,
     )
-    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
 
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
     # Build filter
-    user_filter: Optional[UserExportFilter] = None
+    user_filter: UserExportFilter | None = None
     if any([
         filter_username,
         filter_email,
@@ -145,7 +145,7 @@ def export_users(
         )
 
     # Build orders
-    user_orders: Optional[list[UserExportOrder]] = None
+    user_orders: list[UserExportOrder] | None = None
     if orders:
         user_orders = []
         for order_spec in orders:
@@ -167,7 +167,8 @@ def export_users(
     with Session() as session:
         try:
             if output:
-                with open(output, "wb") as f:
+                output_path = Path(output)
+                with output_path.open("wb") as f:
                     f.writelines(
                         session.Export.stream_users_csv(
                             fields=field_list,
@@ -230,18 +231,18 @@ def export_users(
 @click.option("--encoding", type=str, default="utf-8", help="CSV encoding.")
 def export_sessions(
     ctx: CLIContext,
-    output: Optional[str],
-    fields: Optional[str],
-    filter_name: Optional[str],
-    filter_type: Optional[str],
-    filter_domain: Optional[str],
-    filter_access_key: Optional[str],
-    filter_status: Optional[str],
-    filter_scaling_group: Optional[str],
-    filter_created_after: Optional[datetime],
-    filter_created_before: Optional[datetime],
-    filter_terminated_after: Optional[datetime],
-    filter_terminated_before: Optional[datetime],
+    output: str | None,
+    fields: str | None,
+    filter_name: str | None,
+    filter_type: str | None,
+    filter_domain: str | None,
+    filter_access_key: str | None,
+    filter_status: str | None,
+    filter_scaling_group: str | None,
+    filter_created_after: datetime | None,
+    filter_created_before: datetime | None,
+    filter_terminated_after: datetime | None,
+    filter_terminated_before: datetime | None,
     orders: tuple[str, ...],
     encoding: str,
 ) -> None:
@@ -249,18 +250,18 @@ def export_sessions(
     Export sessions as CSV.
     """
     from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.export import (
+    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+    from ai.backend.common.dto.manager.v2.export import (
         OrderDirection,
         SessionExportFilter,
         SessionExportOrder,
         SessionExportOrderField,
     )
-    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
 
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
     # Build filter
-    session_filter: Optional[SessionExportFilter] = None
+    session_filter: SessionExportFilter | None = None
     if any([
         filter_name,
         filter_type,
@@ -293,7 +294,7 @@ def export_sessions(
         )
 
     # Build orders
-    session_orders: Optional[list[SessionExportOrder]] = None
+    session_orders: list[SessionExportOrder] | None = None
     if orders:
         session_orders = []
         for order_spec in orders:
@@ -315,7 +316,8 @@ def export_sessions(
     with Session() as session:
         try:
             if output:
-                with open(output, "wb") as f:
+                output_path = Path(output)
+                with output_path.open("wb") as f:
                     f.writelines(
                         session.Export.stream_sessions_csv(
                             fields=field_list,
@@ -330,6 +332,95 @@ def export_sessions(
                     fields=field_list,
                     filter=session_filter,
                     order=session_orders,
+                    encoding=encoding,
+                ):
+                    sys.stdout.buffer.write(chunk)
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# Keypairs Export
+# =============================================================================
+
+
+@export.command(name="keypairs")
+@pass_ctx_obj
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output file path.")
+@click.option("--fields", type=str, default=None, help="Comma-separated field keys.")
+@click.option(
+    "--filter-access-key", type=str, default=None, help="Filter by access key (contains)."
+)
+@click.option(
+    "--filter-user-id", type=str, default=None, help="Filter by user ID/email (contains)."
+)
+@click.option(
+    "--filter-active/--filter-inactive",
+    default=None,
+    help="Filter by active status (--filter-active or --filter-inactive).",
+)
+@click.option(
+    "--filter-admin/--filter-non-admin",
+    default=None,
+    help="Filter by admin status (--filter-admin or --filter-non-admin).",
+)
+@click.option(
+    "--filter-after", type=click.DateTime(), default=None, help="Filter created_at after."
+)
+@click.option(
+    "--filter-before", type=click.DateTime(), default=None, help="Filter created_at before."
+)
+@click.option("--encoding", type=str, default="utf-8", help="CSV encoding.")
+def export_keypairs(
+    ctx: CLIContext,
+    output: str | None,
+    fields: str | None,
+    filter_access_key: str | None,
+    filter_user_id: str | None,
+    filter_active: bool | None,
+    filter_admin: bool | None,
+    filter_after: datetime | None,
+    filter_before: datetime | None,
+    encoding: str,
+) -> None:
+    """
+    Export keypairs as CSV.
+    """
+    from ai.backend.client.session import Session
+
+    field_list = [f.strip() for f in fields.split(",")] if fields else None
+
+    # Note: Keypair export currently doesn't support filtering/ordering
+    # This is consistent with the backend implementation (BA-4062)
+    if any([
+        filter_access_key,
+        filter_user_id,
+        filter_active is not None,
+        filter_admin is not None,
+        filter_after,
+        filter_before,
+    ]):
+        click.echo(
+            "Warning: Keypair export does not support filtering yet. All filters will be ignored.",
+            err=True,
+        )
+
+    with Session() as session:
+        try:
+            if output:
+                output_path = Path(output)
+                with output_path.open("wb") as f:
+                    f.writelines(
+                        session.Export.stream_keypairs_csv(
+                            fields=field_list,
+                            encoding=encoding,
+                        )
+                    )
+                click.echo(f"Exported to {output}")
+            else:
+                for chunk in session.Export.stream_keypairs_csv(
+                    fields=field_list,
                     encoding=encoding,
                 ):
                     sys.stdout.buffer.write(chunk)
@@ -366,13 +457,13 @@ def export_sessions(
 @click.option("--encoding", type=str, default="utf-8", help="CSV encoding.")
 def export_projects(
     ctx: CLIContext,
-    output: Optional[str],
-    fields: Optional[str],
-    filter_name: Optional[str],
-    filter_domain: Optional[str],
-    filter_active: Optional[bool],
-    filter_after: Optional[datetime],
-    filter_before: Optional[datetime],
+    output: str | None,
+    fields: str | None,
+    filter_name: str | None,
+    filter_domain: str | None,
+    filter_active: bool | None,
+    filter_after: datetime | None,
+    filter_before: datetime | None,
     orders: tuple[str, ...],
     encoding: str,
 ) -> None:
@@ -380,20 +471,26 @@ def export_projects(
     Export projects as CSV.
     """
     from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.export import (
+    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+    from ai.backend.common.dto.manager.v2.export import (
         BooleanFilter,
         OrderDirection,
         ProjectExportFilter,
         ProjectExportOrder,
         ProjectExportOrderField,
     )
-    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
 
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
     # Build filter
-    project_filter: Optional[ProjectExportFilter] = None
-    if any([filter_name, filter_domain, filter_active is not None, filter_after, filter_before]):
+    project_filter: ProjectExportFilter | None = None
+    if any([
+        filter_name,
+        filter_domain,
+        filter_active is not None,
+        filter_after,
+        filter_before,
+    ]):
         project_filter = ProjectExportFilter(
             name=StringFilter(contains=filter_name) if filter_name else None,
             domain_name=StringFilter(contains=filter_domain) if filter_domain else None,
@@ -404,7 +501,7 @@ def export_projects(
         )
 
     # Build orders
-    project_orders: Optional[list[ProjectExportOrder]] = None
+    project_orders: list[ProjectExportOrder] | None = None
     if orders:
         project_orders = []
         for order_spec in orders:
@@ -426,7 +523,8 @@ def export_projects(
     with Session() as session:
         try:
             if output:
-                with open(output, "wb") as f:
+                output_path = Path(output)
+                with output_path.open("wb") as f:
                     f.writelines(
                         session.Export.stream_projects_csv(
                             fields=field_list,
@@ -482,16 +580,16 @@ def export_projects(
 @click.option("--encoding", type=str, default="utf-8", help="CSV encoding.")
 def export_audit_logs(
     ctx: CLIContext,
-    output: Optional[str],
-    fields: Optional[str],
-    filter_entity_type: Optional[str],
-    filter_entity_id: Optional[str],
-    filter_operation: Optional[str],
-    filter_status: Optional[str],
-    filter_triggered_by: Optional[str],
-    filter_request_id: Optional[str],
-    filter_after: Optional[datetime],
-    filter_before: Optional[datetime],
+    output: str | None,
+    fields: str | None,
+    filter_entity_type: str | None,
+    filter_entity_id: str | None,
+    filter_operation: str | None,
+    filter_status: str | None,
+    filter_triggered_by: str | None,
+    filter_request_id: str | None,
+    filter_after: datetime | None,
+    filter_before: datetime | None,
     orders: tuple[str, ...],
     encoding: str,
 ) -> None:
@@ -499,18 +597,18 @@ def export_audit_logs(
     Export audit logs as CSV.
     """
     from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.export import (
+    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+    from ai.backend.common.dto.manager.v2.export import (
         AuditLogExportFilter,
         AuditLogExportOrder,
         AuditLogExportOrderField,
         OrderDirection,
     )
-    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
 
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
     # Build filter
-    audit_log_filter: Optional[AuditLogExportFilter] = None
+    audit_log_filter: AuditLogExportFilter | None = None
     if any([
         filter_entity_type,
         filter_entity_id,
@@ -536,7 +634,7 @@ def export_audit_logs(
         )
 
     # Build orders
-    audit_log_orders: Optional[list[AuditLogExportOrder]] = None
+    audit_log_orders: list[AuditLogExportOrder] | None = None
     if orders:
         audit_log_orders = []
         for order_spec in orders:
@@ -558,7 +656,8 @@ def export_audit_logs(
     with Session() as session:
         try:
             if output:
-                with open(output, "wb") as f:
+                output_path = Path(output)
+                with output_path.open("wb") as f:
                     f.writelines(
                         session.Export.stream_audit_logs_csv(
                             fields=field_list,

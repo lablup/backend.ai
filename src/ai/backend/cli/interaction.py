@@ -6,7 +6,7 @@ from urllib.request import urlopen
 Numeric = int | float
 
 
-def ask_host(prompt: str, default: str = "127.0.0.1", allow_hostname=False) -> str:
+def ask_host(prompt: str, default: str = "127.0.0.1", allow_hostname: bool = False) -> str:
     while True:
         user_reply = input(f"{prompt} (default: {default}): ")
         if user_reply == "":
@@ -35,6 +35,7 @@ def convert_str_into_numeric(user_reply: str) -> Numeric:
 
 
 def ask_number(prompt: str, default: Numeric, min_value: Numeric, max_value: Numeric) -> Numeric:
+    user_reply_numeric: Numeric = default
     while True:
         user_reply = input(f"{prompt} (default: {default}): ")
         try:
@@ -61,7 +62,7 @@ def ask_string(prompt: str, default: str = "", use_default: bool = True) -> str:
         return input(f"{prompt} (if you don't want, just leave empty): ")
 
 
-def ask_string_in_array(prompt: str, choices: list, default: str) -> str | None:
+def ask_string_in_array(prompt: str, choices: list[str], default: str) -> str | None:
     if default and default not in choices:
         print("Default value should be in choices args.")
         return None
@@ -86,14 +87,13 @@ def ask_string_in_array(prompt: str, choices: list, default: str) -> str | None:
             else:
                 return None
             break
-        elif user_reply.lower() in choices:
+        if user_reply.lower() in choices:
             break
-        else:
-            print(f"Please answer in {'/'.join(choices)}.")
+        print(f"Please answer in {'/'.join(choices)}.")
     return user_reply
 
 
-def ask_path(prompt: str, is_file=True, is_directory=True) -> Path:
+def ask_path(prompt: str, is_file: bool = True, is_directory: bool = True) -> Path:
     if not (is_file or is_directory):
         print("One of args(is_file/is_directory) has True value.")
     while True:
@@ -126,8 +126,7 @@ def ask_yn(prompt: str = "Are you sure?", default: str = "y") -> bool:
             user_reply = default
         if user_reply in ("y", "yes", "n", "no"):
             break
-        else:
-            print("Please answer in y/yes/n/no.")
+        print("Please answer in y/yes/n/no.")
     return user_reply[:1].lower() == "y"
 
 
@@ -144,6 +143,5 @@ def ask_tf(prompt: str = "Are you sure?", default: str = "true") -> bool:
             user_reply = default
         if user_reply in ("t", "true", "f", "false"):
             break
-        else:
-            print("Please answer in t/true/f/false.")
+        print("Please answer in t/true/f/false.")
     return user_reply[:1].lower() == "t"

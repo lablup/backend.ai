@@ -10,10 +10,12 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
-from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.common import (
     GenericForbidden,
     ObjectNotFound,
@@ -25,6 +27,11 @@ from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
+from ai.backend.manager.repositories.network.creators import NetworkCreatorSpec
 
 from .base import (
     FilterExprArg,
@@ -47,10 +54,10 @@ __all__ = (
     "NetworkNode",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class NetworkNode(graphene.ObjectType):
+class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
     """Added in 24.12.0."""
 
     class Meta:
@@ -127,8 +134,8 @@ class NetworkNode(graphene.ObjectType):
                 return cls.from_row(
                     await NetworkRow.get(db_session, uuid.UUID(raw_network_id), load_project=True)
                 )
-            except NoResultFound:
-                raise ValueError(f"Network not found (id: {raw_network_id})")
+            except NoResultFound as e:
+                raise ValueError(f"Network not found (id: {raw_network_id})") from e
 
     @classmethod
     async def get_connection(
@@ -141,7 +148,7 @@ class NetworkNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[NetworkNode]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
@@ -205,7 +212,7 @@ class NetworkNode(graphene.ObjectType):
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
-class CreateNetwork(graphene.Mutation):
+class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.12.0."""
 
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -242,8 +249,8 @@ class CreateNetwork(graphene.Mutation):
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
                 project = await GroupRow.get(db_session, project_id, load_resource_policy=True)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="project")
+            except NoResultFound as e:
+                raise ObjectNotFound(object_name="project") from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -251,10 +258,12 @@ class CreateNetwork(graphene.Mutation):
             ):
                 raise GenericForbidden
             query = sa.select(sa.func.count("*")).where(NetworkRow.project == project.id)
-            project_network_count = await db_session.scalar(query)
+            project_network_count = await db_session.scalar(query) or 0
+            max_network_count = project.resource_policy_row.max_network_count
             if (
-                project_network_count >= 0
-                and project_network_count >= project.resource_policy_row.max_network_count
+                max_network_count is not None
+                and project_network_count >= 0
+                and project_network_count >= max_network_count
             ):
                 raise GenericForbidden(
                     "Cannot create more networks on this project (restricted by project resource policy)"
@@ -270,31 +279,38 @@ class CreateNetwork(graphene.Mutation):
 
         async def _do_mutate() -> CreateNetwork:
             async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
-                row = NetworkRow(
-                    name,
-                    network_name,
-                    _driver,
-                    project.domain_name,
-                    project.id,
-                    options=network_info.options,
+                rbac_creator = RBACEntityCreator(
+                    spec=NetworkCreatorSpec(
+                        name=name,
+                        ref_name=network_name,
+                        driver=_driver,
+                        domain_name=project.domain_name,
+                        project_id=project.id,
+                        options=network_info.options,
+                    ),
+                    element_type=RBACElementType.NETWORK,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.PROJECT,
+                        element_id=str(project.id),
+                    ),
                 )
-                db_session.add(row)
+                result = await execute_rbac_entity_creator(db_session, rbac_creator)
                 return CreateNetwork(
                     ok=True,
                     msg="Network created",
-                    network=NetworkNode.from_row(row),
+                    network=NetworkNode.from_row(result.row),
                 )
 
         return await gql_mutation_wrapper(CreateNetwork, _do_mutate)
 
 
-class ModifyNetworkInput(graphene.InputObjectType):
+class ModifyNetworkInput(graphene.InputObjectType):  # type: ignore[misc]
     """Added in 24.12.0."""
 
     name = graphene.String(required=True)
 
 
-class ModifyNetwork(graphene.Mutation):
+class ModifyNetwork(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.12.0."""
 
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -320,15 +336,15 @@ class ModifyNetwork(graphene.Mutation):
 
         try:
             _network_id = uuid.UUID(raw_network_id)
-        except ValueError:
-            raise ObjectNotFound("network")
+        except ValueError as e:
+            raise ObjectNotFound("network") from e
 
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await NetworkRow.get(db_session, _network_id, load_project=True)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="network")
+            except NoResultFound as e:
+                raise ObjectNotFound(object_name="network") from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -348,7 +364,7 @@ class ModifyNetwork(graphene.Mutation):
             return await gql_mutation_wrapper(ModifyNetwork, _do_mutate)
 
 
-class DeleteNetwork(graphene.Mutation):
+class DeleteNetwork(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.12.0."""
 
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -369,14 +385,14 @@ class DeleteNetwork(graphene.Mutation):
 
         try:
             _network_id = uuid.UUID(raw_network_id)
-        except ValueError:
-            raise ObjectNotFound("network")
+        except ValueError as e:
+            raise ObjectNotFound("network") from e
 
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await NetworkRow.get(db_session, _network_id, load_project=True)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="network")
+            except NoResultFound as e:
+                raise ObjectNotFound(object_name="network") from e
 
             if (
                 graph_ctx.user["role"] != UserRole.SUPERADMIN
@@ -386,8 +402,8 @@ class DeleteNetwork(graphene.Mutation):
 
             try:
                 network_plugin = graph_ctx.network_plugin_ctx.plugins[row.driver]
-            except KeyError:
-                raise ServerMisconfiguredError(f"Network plugin {row.driver} not configured")
+            except KeyError as e:
+                raise ServerMisconfiguredError(f"Network plugin {row.driver} not configured") from e
             await network_plugin.destroy_network(row.ref_name)
 
             async def _do_mutate() -> DeleteNetwork:

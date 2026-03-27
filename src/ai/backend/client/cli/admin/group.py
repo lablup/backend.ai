@@ -69,7 +69,7 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
 @click.option(
     "-d", "--domain-name", type=str, default=None, help="Domain name to list groups belongs to it."
 )
-def list(ctx: CLIContext, domain_name) -> None:
+def list(ctx: CLIContext, domain_name: str | None) -> None:
     """
     List groups in the given domain.
     (admin privilege required)

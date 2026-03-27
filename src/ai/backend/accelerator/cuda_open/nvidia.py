@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import ctypes
 import platform
 from abc import ABCMeta, abstractmethod
 from collections.abc import MutableMapping, Sequence
 from itertools import groupby
 from operator import itemgetter
-from typing import Any, NamedTuple, TypeAlias, cast
+from typing import Any, NamedTuple, cast
 
 # ref: https://developer.nvidia.com/cuda-toolkit-archive
 TARGET_CUDA_VERSIONS = (
@@ -509,7 +511,7 @@ class cudaDeviceProp(ctypes.Structure):
     ]
 
 
-cudaDeviceProp_t: TypeAlias = (
+type cudaDeviceProp_t = (
     cudaDeviceProp_v13
     | cudaDeviceProp_v12
     | cudaDeviceProp_v11
@@ -518,10 +520,10 @@ cudaDeviceProp_t: TypeAlias = (
 )
 
 
-def _load_library(name):
+def _load_library(name: str) -> ctypes.CDLL | None:
     try:
         if platform.system() == "Windows":
-            return ctypes.windll.LoadLibrary(name)
+            return ctypes.windll.LoadLibrary(name)  # type: ignore[attr-defined]
         return ctypes.cdll.LoadLibrary(name)
     except OSError:
         pass
@@ -535,18 +537,18 @@ class LibraryBase(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def load_library(cls) -> ctypes.CDLL:
+    def load_library(cls) -> ctypes.CDLL | None:
         pass
 
     @classmethod
-    def _ensure_lib(cls):
+    def _ensure_lib(cls) -> None:
         if cls._lib is None:
             cls._lib = cls.load_library()
         if cls._lib is None:
             raise ImportError(f"Could not load the {cls.name} library!")
 
     @classmethod
-    def invoke(cls, func_name, *args, check_rc=True):
+    def invoke(cls, func_name: str, *args: Any, check_rc: bool = True) -> int:
         try:
             cls._ensure_lib()
         except ImportError:
@@ -564,33 +566,33 @@ class libcudart(LibraryBase):
     _version = (0, 0)
 
     @classmethod
-    def load_library(cls):
+    def load_library(cls) -> ctypes.CDLL | None:
         system_type = platform.system()
         match system_type:
             case "Windows":
                 arch = platform.architecture()[0]
                 for major, minor in TARGET_CUDA_VERSIONS:
                     ver = f"{major}{minor}"
-                    cudart = _load_library("cudart%s_%d.dll" % (arch[:2], ver))
+                    cudart = _load_library(f"cudart{arch[:2]}_{ver}.dll")
                     if cudart is not None:
                         return cudart
             case "Darwin":
                 for major, _ in groupby(TARGET_CUDA_VERSIONS, key=itemgetter(0)):
-                    cudart = _load_library("libcudart.%d.dylib" % major)
+                    cudart = _load_library(f"libcudart.{major}.dylib")
                     if cudart is not None:
                         return cudart
                 for major, minor in TARGET_CUDA_VERSIONS:
-                    cudart = _load_library("libcudart.%d.%d.dylib" % (major, minor))
+                    cudart = _load_library(f"libcudart.{major}.{minor}.dylib")
                     if cudart is not None:
                         return cudart
                 return _load_library("libcudart.dylib")
             case _:
                 for major, _ in groupby(TARGET_CUDA_VERSIONS, key=itemgetter(0)):
-                    cudart = _load_library("libcudart.so.%d" % major)
+                    cudart = _load_library(f"libcudart.so.{major}")
                     if cudart is not None:
                         return cudart
                 for major, minor in TARGET_CUDA_VERSIONS:
-                    cudart = _load_library("libcudart.so.%d.%d" % (major, minor))
+                    cudart = _load_library(f"libcudart.so.{major}.{minor}")
                     if cudart is not None:
                         return cudart
                 return _load_library("libcudart.so")
@@ -611,7 +613,7 @@ class libcudart(LibraryBase):
         return count.value
 
     @classmethod
-    def get_device_props(cls, device_idx: int):
+    def get_device_props(cls, device_idx: int) -> MutableMapping[str, Any]:
         props_struct: cudaDeviceProp_t
         if cls.get_version() >= (13, 0):
             props_struct = cudaDeviceProp_v13()
@@ -640,7 +642,7 @@ class libcudart(LibraryBase):
         return props
 
     @classmethod
-    def reset(cls):
+    def reset(cls) -> None:
         """
         Releases the underlying CUDA driver context and resources occupied by it.
         """
@@ -688,7 +690,7 @@ class libnvml(LibraryBase):
     _initialized = False
 
     @classmethod
-    def load_library(cls):
+    def load_library(cls) -> ctypes.CDLL | None:
         system_type = platform.system()
         if system_type == "Windows":
             return _load_library("libnvidia-ml.dll")
@@ -701,13 +703,13 @@ class libnvml(LibraryBase):
         return None
 
     @classmethod
-    def ensure_init(cls):
+    def ensure_init(cls) -> None:
         if not cls._initialized:
             cls.invoke("nvmlInit", NVML_INIT_FLAG_NO_GPUS)
             cls._initialized = True
 
     @classmethod
-    def shutdown(cls):
+    def shutdown(cls) -> None:
         if cls._initialized:
             cls.invoke("nvmlShutdown")
 

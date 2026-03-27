@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from typing import cast
 
@@ -136,8 +137,6 @@ class TestMonitoringValkeyClient:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Test that CancelledError during shutdown does not produce error logs (BA-3593)"""
-        import logging
-
         hostport_pair: HostPortPairModel = redis_container[1]
         valkey_target = ValkeyTarget(addr=hostport_pair.address)
         client = cast(
@@ -183,8 +182,6 @@ class TestMonitoringValkeyClient:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Test that external task cancellation (simulating shutdown) does not produce error logs (BA-3593)"""
-        import logging
-
         hostport_pair: HostPortPairModel = redis_container[1]
         valkey_target = ValkeyTarget(addr=hostport_pair.address)
         client = cast(

@@ -134,3 +134,50 @@ class InvalidClientIPConfig(BackendAIError, web.HTTPForbidden):
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.FORBIDDEN,
         )
+
+
+class LoginSessionNotFoundError(ObjectNotFound):
+    object_name = "login_session"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class LoginSessionExpiredError(BackendAIError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/login-session-expired"
+    error_title = "Login session has expired."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.DATA_EXPIRED,
+        )
+
+
+class LoginBlockedError(BackendAIError, web.HTTPTooManyRequests):
+    error_type = "https://api.backend.ai/probs/login-blocked"
+    error_title = "Too many failed login attempts."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class ActiveLoginSessionExistsError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/active-login-session-exists"
+    error_title = "An active login session already exists."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.CONFLICT,
+        )

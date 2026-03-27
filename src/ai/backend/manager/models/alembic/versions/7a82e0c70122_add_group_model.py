@@ -18,7 +18,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.create_table(
         "groups",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
@@ -68,7 +68,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_table("association_groups_users")
     op.drop_index(op.f("ix_groups_domain_name"), table_name="groups")
     op.drop_table("groups")

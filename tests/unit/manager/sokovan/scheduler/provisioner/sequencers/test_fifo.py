@@ -3,9 +3,8 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
-from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
+from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     KeypairOccupancy,
     PendingSessionSnapshot,
@@ -15,9 +14,14 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionWorkload,
     SystemSnapshot,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
 
 
 class TestFIFOSequencer:
+    @pytest.fixture
+    def scaling_group(self) -> str:
+        return "default"
+
     @pytest.fixture
     def sequencer(self) -> FIFOSequencer:
         return FIFOSequencer()
@@ -52,20 +56,17 @@ class TestFIFOSequencer:
             known_slot_types={},
         )
 
-    @pytest.mark.asyncio
     async def test_name(self, sequencer: FIFOSequencer) -> None:
         assert sequencer.name == "FIFOSequencer"
 
-    @pytest.mark.asyncio
     async def test_empty_workload(
-        self, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
+        self, scaling_group: str, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
-        result = sequencer.sequence(system_snapshot, [])
+        result = await sequencer.sequence(scaling_group, system_snapshot, [])
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_preserves_order(
-        self, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
+        self, scaling_group: str, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
         workloads = [
             SessionWorkload(
@@ -100,7 +101,7 @@ class TestFIFOSequencer:
             ),
         ]
 
-        result = sequencer.sequence(system_snapshot, workloads)
+        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
 
         # FIFO should preserve the original order
         assert len(result) == 3
@@ -108,20 +109,27 @@ class TestFIFOSequencer:
         assert result[1] == workloads[1]
         assert result[2] == workloads[2]
 
-    @pytest.mark.asyncio
-    async def test_ignores_system_snapshot(self, sequencer: FIFOSequencer) -> None:
+    async def test_ignores_system_snapshot(
+        self, scaling_group: str, sequencer: FIFOSequencer
+    ) -> None:
         # FIFO should work the same regardless of system state
         snapshot_with_allocations = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("50"), mem=Decimal("50")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("50")),
+                            SlotQuantity("mem", Decimal("50")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),
                     AccessKey("user2"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("30"), mem=Decimal("30")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("30")),
+                            SlotQuantity("mem", Decimal("30")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),
@@ -173,7 +181,7 @@ class TestFIFOSequencer:
             ),
         ]
 
-        result = sequencer.sequence(snapshot_with_allocations, workloads)
+        result = await sequencer.sequence(scaling_group, snapshot_with_allocations, workloads)
 
         # Should still preserve original order despite different allocations
         assert len(result) == 2

@@ -20,6 +20,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.auth import ManagerAuthHandler
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.agent_cache import PeerInvoker
 from ai.backend.manager.errors.agent import AgentConnectionUnavailable
 
 from .client import AgentClient
@@ -186,8 +187,6 @@ class AgentClientPool:
         keepalive_retry_count: int,
     ) -> PeerInvoker:
         """Create a new PeerInvoker instance."""
-        from ai.backend.manager.agent_cache import PeerInvoker
-
         return PeerInvoker(
             connect=ZeroMQAddress(agent_addr),
             transport=ZeroMQRPCTransport,

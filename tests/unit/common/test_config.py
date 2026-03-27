@@ -1,12 +1,13 @@
 import pickle
+from typing import Any
 
 import tomli
 
 from ai.backend.common.config import merge, override_key
 
 
-def test_override_key():
-    sample = {
+def test_override_key() -> None:
+    sample: dict[str, Any] = {
         "a": {
             "b": 0,
         },
@@ -27,7 +28,7 @@ def test_override_key():
     assert sample["c"] == -1
 
 
-def test_merge():
+def test_merge() -> None:
     left = {
         "a": {
             "a": 5,
@@ -54,7 +55,7 @@ def test_merge():
     }
 
 
-def test_sanitize_inline_dicts():
+def test_sanitize_inline_dicts() -> None:
     sample = """
     [section]
     a = { x = 1, y = 1 }

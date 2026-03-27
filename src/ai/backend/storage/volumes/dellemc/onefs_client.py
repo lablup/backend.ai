@@ -4,7 +4,7 @@ import enum
 import os
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
-from typing import Any, NotRequired, Optional, TypedDict, cast
+from typing import Any, NotRequired, TypedDict, cast
 
 import aiohttp
 
@@ -27,7 +27,7 @@ class OneFSClient:
     user: str
     password: str
     api_version: str
-    system_name: Optional[str]
+    system_name: str | None
     _session: aiohttp.ClientSession
 
     def __init__(
@@ -37,7 +37,7 @@ class OneFSClient:
         password: str,
         *,
         api_version: str = "12",
-        system_name: Optional[str] = "nfs",
+        system_name: str | None = "nfs",
     ) -> None:
         self.endpoint = endpoint
         self.user = user
@@ -62,7 +62,7 @@ class OneFSClient:
         self,
         method: str,
         path: str,
-        **kwargs,
+        **kwargs: Any,
     ) -> AsyncIterator[aiohttp.ClientResponse]:
         async with self._session.request(
             method,
@@ -85,9 +85,9 @@ class OneFSClient:
     async def get_list_lnn(self) -> list[int]:
         async with self._request("GET", "storagepool/storagepools") as resp:
             data = await resp.json()
-        return data["storagepools"][0]["lnns"]
+        return cast(list[int], data["storagepools"][0]["lnns"])
 
-    async def get_node_hardware_info_by_lnn(self, lnn) -> Mapping[str, Any]:
+    async def get_node_hardware_info_by_lnn(self, lnn: int) -> Mapping[str, Any]:
         async with self._request("GET", f"cluster/nodes/{lnn}/hardware") as resp:
             data = await resp.json()
             node = data["nodes"][0]
@@ -98,7 +98,7 @@ class OneFSClient:
             "serial_number": node["serial_number"],
         }
 
-    async def get_node_status_by_lnn(self, lnn) -> Mapping[str, Any]:
+    async def get_node_status_by_lnn(self, lnn: int) -> Mapping[str, Any]:
         async with self._request("GET", f"cluster/nodes/{lnn}/status/nvram") as resp:
             data = await resp.json()
             node = data["nodes"][0]
@@ -131,7 +131,7 @@ class OneFSClient:
     async def get_cluster_interface(self) -> list[Mapping[str, Any]]:
         async with self._request("GET", "network/interfaces") as resp:
             data = await resp.json()
-        return data["interfaces"]
+        return cast(list[Mapping[str, Any]], data["interfaces"])
 
     async def get_node_metadata(self) -> list[dict[str, Mapping[str, Any]]]:
         try:
@@ -149,12 +149,12 @@ class OneFSClient:
     async def get_drive_stats(self) -> Mapping[str, Any]:
         async with self._request("GET", "statistics/summary/drive") as resp:
             data = await resp.json()
-        return data["drive"]
+        return cast(Mapping[str, Any], data["drive"])
 
     async def get_protocol_stats(self) -> Mapping[str, Any]:
         async with self._request("GET", "statistics/summary/protocol-stats") as resp:
             data = await resp.json()
-        return data["protocol-stats"]
+        return cast(Mapping[str, Any], data["protocol-stats"])
 
     async def get_workload_stats(self) -> Mapping[str, Any]:
         params = {}
@@ -178,16 +178,16 @@ class OneFSClient:
     async def list_all_quota(self) -> Mapping[str, Any]:
         async with self._request("GET", "quota/quotas") as resp:
             data = await resp.json()
-        return data["quotas"]
+        return cast(Mapping[str, Any], data["quotas"])
 
     async def get_quota(self, quota_id: str) -> Mapping[str, Any]:
         async with self._request("GET", f"quota/quotas/{quota_id}") as resp:
             data = await resp.json()
-        return data["quotas"][0]
+        return cast(Mapping[str, Any], data["quotas"][0])
 
     async def create_quota(
         self,
-        path: os.PathLike,
+        path: os.PathLike[str],
         type_: QuotaTypes,
         thresholds: QuotaThresholds,
     ) -> Mapping[str, Any]:
@@ -204,9 +204,9 @@ class OneFSClient:
             "quota/quotas",
             json=data,
         ) as resp:
-            return await resp.json()
+            return cast(Mapping[str, Any], await resp.json())
 
-    async def delete_quota(self, quota_id) -> None:
+    async def delete_quota(self, quota_id: str) -> None:
         async with self._request(
             "DELETE",
             f"quota/quotas/{quota_id}",

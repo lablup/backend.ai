@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import aiofiles.os
 
@@ -48,14 +47,14 @@ class WekaQuotaModel(BaseQuotaModel):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None,
-            lambda: os.stat(path).st_ino,
+            lambda: path.stat().st_ino,
         )
 
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await aiofiles.os.makedirs(qspath)
@@ -74,7 +73,7 @@ class WekaQuotaModel(BaseQuotaModel):
             qs_relpath, inode_id, soft_limit=config.limit_bytes, hard_limit=config.limit_bytes
         )
 
-    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
             return None
@@ -129,8 +128,8 @@ class WekaVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        watcher: Optional[WatcherClient] = None,
-        options: Optional[Mapping[str, Any]] = None,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             local_config,
@@ -216,10 +215,10 @@ class WekaVolume(BaseVolume):
                 start_time,
             )
             latest_metric = metrics["ops"][-1]["stats"]
-        except KeyError:
-            raise WekaNoMetricError
-        except IndexError:
-            raise WekaNoMetricError
+        except KeyError as e:
+            raise WekaNoMetricError from e
+        except IndexError as e:
+            raise WekaNoMetricError from e
         return FSPerfMetric(
             iops_read=latest_metric["READS"],
             iops_write=latest_metric["WRITES"],

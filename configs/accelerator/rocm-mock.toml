@@ -8,6 +8,7 @@ devices = [
   { mother_uuid = "c59395cd-ac91-4cd3-a1b0-3d2568aa2d04", model_name = "AMD MI250", numa_node = 1, subproc_count = 108, memory_size = "40G", is_mig_device = false },
 ]
 
+[attributes]
 
 [formats.device]
 display_unit = "GPU"

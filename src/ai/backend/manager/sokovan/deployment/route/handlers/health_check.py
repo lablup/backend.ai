@@ -2,11 +2,10 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -34,7 +33,7 @@ class HealthCheckRouteHandler(RouteHandler):
         return "health-check-routes"
 
     @property
-    def lock_id(self) -> Optional[LockID]:
+    def lock_id(self) -> LockID | None:
         """Lock for health check routes."""
         return LockID.LOCKID_DEPLOYMENT_HEALTH_CHECK_ROUTES
 
@@ -44,19 +43,33 @@ class HealthCheckRouteHandler(RouteHandler):
         return [RouteStatus.HEALTHY, RouteStatus.UNHEALTHY, RouteStatus.DEGRADED]
 
     @classmethod
-    def next_status(cls) -> Optional[RouteStatus]:
+    def next_status(cls) -> RouteStatus | None:
         """Routes that pass health check become HEALTHY."""
         return RouteStatus.HEALTHY
 
     @classmethod
-    def failure_status(cls) -> Optional[RouteStatus]:
+    def failure_status(cls) -> RouteStatus | None:
         """Routes that fail health check become UNHEALTHY."""
         return RouteStatus.UNHEALTHY
 
     @classmethod
-    def stale_status(cls) -> Optional[RouteStatus]:
+    def stale_status(cls) -> RouteStatus | None:
         """Routes with stale health data become DEGRADED."""
         return RouteStatus.DEGRADED
+
+    @classmethod
+    def status_transitions(cls) -> RouteStatusTransitions:
+        """Define state transitions for health check route handler (BEP-1030).
+
+        - success: Route → HEALTHY
+        - failure: Route → UNHEALTHY
+        - stale: Route → DEGRADED (stale health data)
+        """
+        return RouteStatusTransitions(
+            success=RouteStatus.HEALTHY,
+            failure=RouteStatus.UNHEALTHY,
+            stale=RouteStatus.DEGRADED,
+        )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute health check for routes."""

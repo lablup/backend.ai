@@ -7,11 +7,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
-from ai.backend.manager.sokovan.scheduler.provisioner.validators import (
-    PendingSessionCountLimitExceeded,
-    PendingSessionCountLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     KeyPairResourcePolicy,
     PendingSessionInfo,
@@ -21,6 +17,10 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionDependencySnapshot,
     SessionWorkload,
     SystemSnapshot,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators import (
+    PendingSessionCountLimitExceeded,
+    PendingSessionCountLimitValidator,
 )
 
 

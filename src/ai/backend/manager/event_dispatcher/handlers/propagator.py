@@ -12,8 +12,8 @@ class PropagatorEventHandler:
 
     async def propagate_event(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: AbstractBroadcastEvent,
     ) -> None:
         # Generate events to propagate (default implementation returns [self])
@@ -23,8 +23,8 @@ class PropagatorEventHandler:
 
     async def propagate_event_with_close(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: AbstractBroadcastEvent,
     ) -> None:
         # Generate events to propagate (default implementation returns [self])

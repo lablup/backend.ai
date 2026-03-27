@@ -6,12 +6,11 @@ All database operations go through the repository pattern.
 """
 
 import logging
-from typing import Optional
 
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.sokovan.scheduler.types import KernelCreationInfo
+from ai.backend.manager.sokovan.data import KernelCreationInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -136,7 +135,7 @@ class KernelStateEngine:
         self,
         kernel_id: KernelId,
         reason: str,
-        exit_code: Optional[int] = None,
+        exit_code: int | None = None,
     ) -> bool:
         """
         Mark a kernel as TERMINATED when it's terminated.
@@ -150,25 +149,11 @@ class KernelStateEngine:
 
         return await self._repository.update_kernel_status_terminated(kernel_id, reason, exit_code)
 
-    async def update_kernel_heartbeat(
-        self,
-        kernel_id: KernelId,
-    ) -> bool:
-        """
-        Update the heartbeat timestamp for a running kernel.
-
-        :param kernel_id: The kernel ID
-        :return: True if the update was successful
-        """
-        log.trace("Updating heartbeat for kernel {}", kernel_id)
-
-        return await self._repository.update_kernel_heartbeat(kernel_id)
-
     async def update_kernels_to_pulling_for_image(
         self,
         agent_id: AgentId,
         image: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> None:
         """
         Update kernel status from PREPARING to PULLING for the specified image on an agent.
@@ -189,7 +174,7 @@ class KernelStateEngine:
         self,
         agent_id: AgentId,
         image: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> int:
         """
         Update kernel status to PREPARED for the specified image on an agent.
@@ -209,7 +194,7 @@ class KernelStateEngine:
         agent_id: AgentId,
         image: str,
         error_msg: str,
-        image_ref: Optional[str] = None,
+        image_ref: str | None = None,
     ) -> None:
         """
         Cancel kernels for an image that failed to be available on an agent.

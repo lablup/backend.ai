@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @admin.group()
-def quota_scope():
+def quota_scope() -> None:
     """Quota scope administration commands."""
 
 
@@ -54,7 +54,7 @@ def _get_qsid_from_identifier(
                     fields=_user_query_fields,
                 )
                 if user_info is None:
-                    return None
+                    return None  # type: ignore[unreachable]
                 user_id = uuid.UUID(user_info["uuid"])
             else:
                 # Use the user_id as-is if it's already a valid uuid.
@@ -71,7 +71,7 @@ def _get_qsid_from_identifier(
                     fields=_project_query_fields,
                 )
                 if project_info is None:
-                    return None
+                    return None  # type: ignore[unreachable]
                 project_id = uuid.UUID(project_info["id"])
             else:
                 # Use the project_id as-is if it's already a valid uuid.
@@ -194,7 +194,7 @@ def set_(
             if qsid is None:
                 ctx.output.print_fail("Identifier is not valid")
                 sys.exit(ExitCode.INVALID_ARGUMENT)
-            session.QuotaScope.set_quota_scope(
+            _ = session.QuotaScope.set_quota_scope(
                 host=host,
                 qsid=qsid,
                 config=QuotaConfig(limit_bytes=limit_bytes),
@@ -251,7 +251,7 @@ def unset(
             if qsid is None:
                 ctx.output.print_fail("Identifier is not valid")
                 sys.exit(ExitCode.INVALID_ARGUMENT)
-            session.QuotaScope.unset_quota_scope(
+            _ = session.QuotaScope.unset_quota_scope(
                 host=host,
                 qsid=qsid,
             )

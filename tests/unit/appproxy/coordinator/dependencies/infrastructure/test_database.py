@@ -5,14 +5,16 @@ from unittest.mock import Mock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.appproxy.common.config import HostPortPair
 from ai.backend.appproxy.coordinator.config import (
     DBConfig,
+    DBType,
     ServerConfig,
 )
 from ai.backend.appproxy.coordinator.dependencies.infrastructure.database import (
     DatabaseProvider,
 )
-from ai.backend.testutils.bootstrap import HostPortPairModel
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 
 
 class TestDatabaseProvider:
@@ -24,9 +26,6 @@ class TestDatabaseProvider:
         postgres_container: tuple[str, HostPortPairModel],
     ) -> ServerConfig:
         """Create a coordinator config pointing to the test database."""
-        from ai.backend.appproxy.common.config import HostPortPair
-        from ai.backend.appproxy.coordinator.config import DBType
-
         container_id, db_addr = postgres_container
 
         # Create DB config for testing
@@ -44,7 +43,6 @@ class TestDatabaseProvider:
         config.db = db_config
         return config
 
-    @pytest.mark.asyncio
     async def test_provide_database_engine(
         self,
         coordinator_db_config: ServerConfig,
@@ -59,7 +57,6 @@ class TestDatabaseProvider:
                 result = await conn.scalar(sa.text("SELECT 1"))
                 assert result == 1
 
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         coordinator_db_config: ServerConfig,

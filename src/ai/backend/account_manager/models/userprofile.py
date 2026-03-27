@@ -12,7 +12,7 @@ from .base import GUID, Base, PasswordColumn, StrEnumType
 __all__: tuple[str, ...] = ("UserProfileRow",)
 
 
-class UserProfileRow(Base):
+class UserProfileRow(Base):  # type: ignore[misc]
     __tablename__ = "user_profiles"
     id: Mapped[UUID] = mapped_column(
         GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")

@@ -1,32 +1,33 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.types import (
     AgentSelectionStrategy,
-    ResourceSlot,
     SessionId,
+    SlotQuantity,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.resource_slot.types import (
+    add_quantities,
+    resource_slot_to_quantities,
+)
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
 )
-from ai.backend.manager.sokovan.recorder import (
-    ExecutionRecord,
-    RecorderContext,
-    StepStatus,
-)
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.manager.sokovan.data import (
     AllocationBatch,
     KeypairOccupancy,
     SchedulingFailure,
@@ -35,6 +36,12 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionWorkload,
     SystemSnapshot,
 )
+from ai.backend.manager.sokovan.recorder import (
+    ExecutionRecord,
+    RecorderContext,
+    StepStatus,
+)
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
 from .allocators.allocator import SchedulingAllocator
 from .selectors.concentrated import ConcentratedAgentSelector
@@ -44,9 +51,13 @@ from .selectors.roundrobin import RoundRobinAgentSelector
 from .selectors.selector import (
     AgentInfo,
     AgentSelectionConfig,
+    AgentSelectionCriteria,
     AgentSelector,
+    KernelResourceSpec,
+    SessionMetadata,
 )
 from .sequencers.drf import DRFSequencer
+from .sequencers.fair_share import FairShareSequencer
 from .sequencers.fifo import FIFOSequencer
 from .sequencers.lifo import LIFOSequencer
 from .sequencers.sequencer import SchedulingSequencer, WorkloadSequencer
@@ -62,6 +73,7 @@ class SessionProvisionerArgs:
     default_agent_selector: AgentSelector
     allocator: SchedulingAllocator
     repository: SchedulerRepository
+    fair_share_repository: FairShareRepository
     config_provider: ManagerConfigProvider
     valkey_schedule: ValkeyScheduleClient
 
@@ -82,6 +94,7 @@ class SessionProvisioner:
     _default_agent_selector: AgentSelector
     _allocator: SchedulingAllocator
     _repository: SchedulerRepository
+    _fair_share_repository: FairShareRepository
     _config_provider: ManagerConfigProvider
     _sequencer_pool: Mapping[str, WorkloadSequencer]
     _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
@@ -94,6 +107,7 @@ class SessionProvisioner:
         self._default_agent_selector = args.default_agent_selector
         self._allocator = args.allocator
         self._repository = args.repository
+        self._fair_share_repository = args.fair_share_repository
         self._config_provider = args.config_provider
         self._valkey_schedule = args.valkey_schedule
         self._sequencer_pool = self._make_sequencer_pool()
@@ -102,13 +116,13 @@ class SessionProvisioner:
         )
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
 
-    @classmethod
-    def _make_sequencer_pool(cls) -> Mapping[str, WorkloadSequencer]:
+    def _make_sequencer_pool(self) -> Mapping[str, WorkloadSequencer]:
         """Initialize the sequencer pool with default sequencers."""
         pool: dict[str, WorkloadSequencer] = defaultdict(DRFSequencer)
         pool["fifo"] = FIFOSequencer()
         pool["lifo"] = LIFOSequencer()
         pool["drf"] = DRFSequencer()
+        pool["fair-share"] = FairShareSequencer(self._fair_share_repository)
         return pool
 
     @classmethod
@@ -139,6 +153,7 @@ class SessionProvisioner:
         self,
         scaling_group: str,
         scheduling_data: SchedulingData,
+        provision_time: datetime,
     ) -> ScheduleResult:
         """
         Schedule sessions for a specific scaling group.
@@ -158,7 +173,7 @@ class SessionProvisioner:
         """
         # Use data from scheduling_data instead of making DB calls
         # Convert PendingSessionData to SessionWorkload
-        workloads = [
+        base_workloads = [
             session.to_session_workload() for session in scheduling_data.pending_sessions.sessions
         ]
         sg_info = scheduling_data.scaling_group
@@ -166,6 +181,18 @@ class SessionProvisioner:
         if not scheduling_data.snapshot_data:
             log.warning("Missing snapshot data for scaling group {}", scaling_group)
             return ScheduleResult()
+
+        # Load per-session failed agents from Valkey for retry deprioritization.
+        # Uses a single pipelined Batch request instead of N parallel round-trips.
+        failed_agents_list = await self._valkey_schedule.get_multiple_session_failed_agents([
+            workload.session_id for workload in base_workloads
+        ])
+        workloads = [
+            dataclasses.replace(workload, failed_agent_ids=failed_agents)
+            if failed_agents
+            else workload
+            for workload, failed_agents in zip(base_workloads, failed_agents_list, strict=True)
+        ]
 
         # Convert snapshot data to SystemSnapshot
         system_snapshot = scheduling_data.snapshot_data.to_system_snapshot(
@@ -191,7 +218,9 @@ class SessionProvisioner:
                 sequencer.name, success_detail=sequencer.success_message()
             ),
         ):
-            sequenced_workloads = sequencer.sequence(system_snapshot, workloads)
+            sequenced_workloads = await sequencer.sequence(
+                scaling_group, system_snapshot, workloads
+            )
 
         # Build mutable agents with occupancy data from snapshot
         agent_occupancy = (
@@ -237,6 +266,7 @@ class SessionProvisioner:
                     session_id=session_workload.session_id,
                     passed_phases=passed,
                     failed_phases=failed,
+                    last_try=provision_time,
                     msg=str(e),
                 )
                 scheduling_failures.append(failure)
@@ -334,21 +364,26 @@ class SessionProvisioner:
         :param allocation: The session allocation result containing agent allocations
         """
         # Calculate total allocated resources from allocation
-        total_allocated_slots = ResourceSlot()
+        # allocated_slots are list[ResourceSlot]; convert to list[SlotQuantity] for occupancy
+        total_quantities: list[SlotQuantity] = []
         for agent_alloc in allocation.agent_allocations:
             for slot in agent_alloc.allocated_slots:
-                total_allocated_slots += slot
+                total_quantities = add_quantities(
+                    total_quantities, resource_slot_to_quantities(slot)
+                )
 
         # 1. Update resource occupancy - add the session's allocated slots
         # Update keypair occupancy
         current_keypair = snapshot.resource_occupancy.by_keypair.get(workload.access_key)
         if current_keypair is None:
             current_keypair = KeypairOccupancy(
-                occupied_slots=ResourceSlot(), session_count=0, sftp_session_count=0
+                occupied_slots=[], session_count=0, sftp_session_count=0
             )
 
         # Update occupied slots and session counts
-        current_keypair.occupied_slots += total_allocated_slots
+        current_keypair.occupied_slots = add_quantities(
+            current_keypair.occupied_slots, total_quantities
+        )
         if workload.is_private:
             current_keypair.sftp_session_count += 1
         else:
@@ -357,23 +392,21 @@ class SessionProvisioner:
         snapshot.resource_occupancy.by_keypair[workload.access_key] = current_keypair
 
         # Update user occupancy
-        current_user = snapshot.resource_occupancy.by_user.get(workload.user_uuid, ResourceSlot())
-        snapshot.resource_occupancy.by_user[workload.user_uuid] = (
-            current_user + total_allocated_slots
+        current_user = snapshot.resource_occupancy.by_user.get(workload.user_uuid, [])
+        snapshot.resource_occupancy.by_user[workload.user_uuid] = add_quantities(
+            current_user, total_quantities
         )
 
         # Update group occupancy
-        current_group = snapshot.resource_occupancy.by_group.get(workload.group_id, ResourceSlot())
-        snapshot.resource_occupancy.by_group[workload.group_id] = (
-            current_group + total_allocated_slots
+        current_group = snapshot.resource_occupancy.by_group.get(workload.group_id, [])
+        snapshot.resource_occupancy.by_group[workload.group_id] = add_quantities(
+            current_group, total_quantities
         )
 
         # Update domain occupancy
-        current_domain = snapshot.resource_occupancy.by_domain.get(
-            workload.domain_name, ResourceSlot()
-        )
-        snapshot.resource_occupancy.by_domain[workload.domain_name] = (
-            current_domain + total_allocated_slots
+        current_domain = snapshot.resource_occupancy.by_domain.get(workload.domain_name, [])
+        snapshot.resource_occupancy.by_domain[workload.domain_name] = add_quantities(
+            current_domain, total_quantities
         )
 
         # 2. Update concurrency counts
@@ -404,8 +437,28 @@ class SessionProvisioner:
         :return: SessionAllocation
         :raises AgentSelectionError: If agent selection fails
         """
-        # Convert to new criteria format
-        criteria = session_workload.to_agent_selection_criteria()
+        # Convert session workload to agent selection criteria
+        session_metadata = SessionMetadata(
+            session_id=session_workload.session_id,
+            session_type=session_workload.session_type,
+            scaling_group=session_workload.scaling_group,
+            cluster_mode=session_workload.cluster_mode,
+        )
+
+        kernel_requirements = {
+            kernel.kernel_id: KernelResourceSpec(
+                requested_slots=kernel.requested_slots,
+                required_architecture=kernel.architecture,
+            )
+            for kernel in session_workload.kernels
+        }
+
+        criteria = AgentSelectionCriteria(
+            session_metadata=session_metadata,
+            kernel_requirements=kernel_requirements,
+            kernel_counts_at_endpoint=session_workload.kernel_counts_at_endpoint,
+            failed_agent_ids=session_workload.failed_agent_ids,
+        )
 
         # Use batch selection method - it will get resource requirements internally
         # and apply state changes to agents_info

@@ -48,7 +48,7 @@ from ai.backend.manager.services.object_storage.actions.update import (
     UpdateObjectStorageActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ObjectStorageService:
@@ -105,7 +105,7 @@ class ObjectStorageService:
         return GetObjectStorageActionResult(result=storage_data)
 
     # TODO: Add filtering logic
-    async def list(self, action: ListObjectStorageAction) -> ListObjectStorageActionResult:
+    async def list(self, _action: ListObjectStorageAction) -> ListObjectStorageActionResult:
         """
         List all object storages.
         """

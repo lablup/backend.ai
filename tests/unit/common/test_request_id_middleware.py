@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 import uuid
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER, request_id_middleware
 
+if TYPE_CHECKING:
+    pass
 
-async def test_request_id_middleware_with_custom_request_id(aiohttp_client):
-    async def test_handler(request):
+
+async def test_request_id_middleware_with_custom_request_id(aiohttp_client: Any) -> None:
+    async def test_handler(request: web.Request) -> web.Response:
         assert current_request_id() == request.headers.get(REQUEST_ID_HEADER)
         return web.Response(text="ok")
 
@@ -23,8 +29,8 @@ async def test_request_id_middleware_with_custom_request_id(aiohttp_client):
     assert resp.status == 200
 
 
-async def test_request_id_middleware_without_request_id(aiohttp_client):
-    async def test_handler(request):
+async def test_request_id_middleware_without_request_id(aiohttp_client: Any) -> None:
+    async def test_handler(request: web.Request) -> web.Response:
         assert current_request_id() is not None
         return web.Response(text="ok")
 

@@ -8,6 +8,7 @@ Create Date: 2025-09-22 19:44:13.067238
 
 import enum
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 import sqlalchemy as sa
@@ -104,7 +105,7 @@ class RoleCreator:
     @classmethod
     def _query_user_row_by_role(
         cls, db_conn: Connection, role: UserRole, offset: int, page_size: int
-    ) -> list[Row]:
+    ) -> Sequence[Row[Any]]:
         """
         Query all user rows with pagination.
         """

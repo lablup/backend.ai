@@ -3,16 +3,15 @@ from collections.abc import Iterable
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.appproxy.common.types import CORSOptions, FrontendMode, WebMiddleware
+from ai.backend.appproxy.common.types import CORSOptions, FrontendServerMode, WebMiddleware
 from ai.backend.appproxy.worker import __version__
 from ai.backend.appproxy.worker.errors import MissingPortProxyConfigError
 from ai.backend.appproxy.worker.types import RootContext
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 
 
 async def hello(request: web.Request) -> web.Response:
     """Health check endpoint with dependency connectivity status"""
-    from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
-
     request["do_not_print_access_log"] = True
 
     root_ctx: RootContext = request.app["_root.context"]
@@ -34,7 +33,7 @@ async def status(request: web.Request) -> web.Response:
 
     root_ctx: RootContext = request.app["_root.context"]
     worker_config = root_ctx.local_config.proxy_worker
-    if worker_config.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
+    if worker_config.frontend_mode == FrontendServerMode.WILDCARD_DOMAIN:
         available_slots = 0
     else:
         if worker_config.port_proxy is None:
@@ -54,11 +53,11 @@ async def status(request: web.Request) -> web.Response:
     })
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

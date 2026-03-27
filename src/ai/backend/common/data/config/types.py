@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 from ai.backend.common.typed_validators import HostPortPair
 
@@ -8,5 +7,5 @@ from ai.backend.common.typed_validators import HostPortPair
 class EtcdConfigData:
     namespace: str
     addrs: list[HostPortPair]
-    user: Optional[str]
-    password: Optional[str]
+    user: str | None
+    password: str | None

@@ -3,13 +3,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, tzinfo
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     TypedDict,
     cast,
@@ -98,9 +97,6 @@ from ai.backend.manager.models.utils import (
     sql_json_merge,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.gql import GraphQueryContext
-
 __all__ = (
     "AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES",
     "DEAD_KERNEL_STATUSES",
@@ -109,7 +105,6 @@ __all__ = (
     "RESOURCE_USAGE_KERNEL_STATUSES",
     "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
     "KernelRow",
-    "KernelStatistics",
     "get_user_email",
     "handle_kernel_exception",
     "kernels",
@@ -183,7 +178,7 @@ async def get_user_email(
     return user_email.replace("@", "_")
 
 
-def default_hostname(context) -> str:
+def default_hostname(context: Any) -> str:
     params = context.get_current_parameters()
     return f"{params['cluster_role']}{params['cluster_idx']}"
 
@@ -287,8 +282,8 @@ async def handle_kernel_exception(
     db: ExtendedAsyncSAEngine,
     op: str,
     kernel_id: KernelId,
-    error_callback=None,
-    cancellation_callback=None,
+    error_callback: Callable[[], Any] | None = None,
+    cancellation_callback: Callable[[], Any] | None = None,
     set_error: bool = False,
 ) -> AsyncIterator[None]:
     exc_class = OP_EXC[op]
@@ -353,13 +348,13 @@ async def handle_kernel_exception(
 
 
 # Defined for avoiding circular import
-def _get_user_row_join_condition():
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
-def _get_image_row_join_condition():
+def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.image import ImageRow
 
     return sa.and_(
@@ -368,7 +363,7 @@ def _get_image_row_join_condition():
     )
 
 
-class KernelRow(Base):
+class KernelRow(Base):  # type: ignore[misc]
     __tablename__ = "kernels"
 
     # The Backend.AI-side UUID for each kernel
@@ -459,9 +454,13 @@ class KernelRow(Base):
     container_id: Mapped[str | None] = mapped_column(
         "container_id", sa.String(length=64), nullable=True
     )
+    # DEPRECATED (Phase 3, BA-4308): No longer the source of truth.
+    # Kernel resource allocations are now tracked by the normalized
+    # resource_allocations table.  Retained for historical audit.
     occupied_slots: Mapped[ResourceSlot] = mapped_column(
         "occupied_slots", ResourceSlotColumn(), nullable=False
     )
+    # DEPRECATED (Phase 3, BA-4308): See resource_allocations table.
     requested_slots: Mapped[ResourceSlot] = mapped_column(
         "requested_slots", ResourceSlotColumn(), nullable=False
     )
@@ -500,7 +499,7 @@ class KernelRow(Base):
     stdout_port: Mapped[int] = mapped_column(
         "stdout_port", sa.Integer(), nullable=False
     )  # legacy for stream_pty
-    service_ports: Mapped[dict[str, Any] | None] = mapped_column(
+    service_ports: Mapped[list[dict[str, Any]] | None] = mapped_column(
         "service_ports", pgsql.JSONB(), nullable=True
     )
     preopen_ports: Mapped[list[int] | None] = mapped_column(
@@ -612,6 +611,13 @@ class KernelRow(Base):
         default=sa.null(),
         server_default=sa.null(),
     )
+    last_observed_at: Mapped[datetime | None] = mapped_column(
+        "last_observed_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
+        default=sa.null(),
+        server_default=sa.null(),
+    )
 
     __table_args__ = (
         # indexing
@@ -621,6 +627,19 @@ class KernelRow(Base):
             "ix_kernels_updated_order",
             sa.func.greatest("created_at", "terminated_at", "status_changed"),
             unique=False,
+        ),
+        # Partial index for running kernels (fair share observation)
+        sa.Index(
+            "ix_kernels_fair_share_running",
+            "scaling_group",
+            postgresql_where=sa.text("terminated_at IS NULL AND starts_at IS NOT NULL"),
+        ),
+        # Partial index for terminated kernels (fair share observation)
+        sa.Index(
+            "ix_kernels_fair_share_terminated",
+            "scaling_group",
+            "terminated_at",
+            postgresql_where=sa.text("terminated_at IS NOT NULL AND starts_at IS NOT NULL"),
         ),
     )
 
@@ -650,12 +669,12 @@ class KernelRow(Base):
         return self.cluster_role + str(self.cluster_idx)
 
     @property
-    def used_time(self) -> Optional[str]:
+    def used_time(self) -> str | None:
         if self.terminated_at is not None and self.created_at is not None:
             return str(self.terminated_at - self.created_at)
         return None
 
-    def get_used_days(self, local_tz: tzinfo) -> Optional[int]:
+    def get_used_days(self, local_tz: tzinfo) -> int | None:
         if self.terminated_at is not None and self.created_at is not None:
             return (
                 self.terminated_at.astimezone(local_tz).toordinal()
@@ -705,7 +724,7 @@ class KernelRow(Base):
     ) -> KernelRow:
         from ai.backend.manager.models.agent import AgentStatus
 
-        async def _query():
+        async def _query() -> KernelRow:
             async with db.begin_readonly_session() as db_sess:
                 query = (
                     sa.select(KernelRow)
@@ -723,7 +742,7 @@ class KernelRow(Base):
                         k
                         for k in result
                         if (k.status not in DEAD_KERNEL_STATUSES)
-                        and (k.agent_row.status == AgentStatus.ALIVE)
+                        and (k.agent_row is not None and k.agent_row.status == AgentStatus.ALIVE)
                     ]
                 if not cand:
                     raise SessionNotFound
@@ -812,9 +831,9 @@ class KernelRow(Base):
         kernel_id: KernelId,
         status: KernelStatus,
         *,
-        status_data: Optional[Mapping[str, Any]] = None,
-        reason: Optional[str] = None,
-        status_changed_at: Optional[datetime] = None,
+        status_data: Mapping[str, Any] | None = None,
+        reason: str | None = None,
+        status_changed_at: datetime | None = None,
     ) -> None:
         from ai.backend.manager.errors.kernel import InvalidKernelStatus
 
@@ -852,7 +871,7 @@ class KernelRow(Base):
         db: ExtendedAsyncSAEngine,
         kernel_id: KernelId,
         new_status: KernelStatus,
-        update_data: Optional[Mapping[str, Any]] = None,
+        update_data: Mapping[str, Any] | None = None,
     ) -> bool:
         """
         Update kernel by given id and data.
@@ -1052,6 +1071,7 @@ class KernelRow(Base):
                 status_data=self.status_data,
                 status_history=self.status_history,
                 last_seen=self.last_seen,
+                last_observed_at=self.last_observed_at,
             ),
             metrics=Metrics(
                 num_queries=self.num_queries or 0,
@@ -1084,36 +1104,6 @@ class SessionInfo(TypedDict):
     session_name: str
     status: KernelStatus
     created_at: datetime
-
-
-class KernelStatistics:
-    @classmethod
-    async def batch_load_by_kernel_impl(
-        cls,
-        valkey_stat_client: ValkeyStatClient,
-        session_ids: Sequence[SessionId],
-    ) -> Sequence[Optional[Mapping[str, Any]]]:
-        """For cases where required to collect kernel metrics in bulk internally"""
-        session_ids_str = [str(sess_id) for sess_id in session_ids]
-        return await valkey_stat_client.get_session_statistics_batch(session_ids_str)
-
-    @classmethod
-    async def batch_load_by_kernel(
-        cls,
-        ctx: GraphQueryContext,
-        session_ids: Sequence[SessionId],
-    ) -> Sequence[Optional[Mapping[str, Any]]]:
-        """wrapper of `KernelStatistics.batch_load_by_kernel_impl()` for aiodataloader"""
-        return await cls.batch_load_by_kernel_impl(ctx.valkey_stat, session_ids)
-
-    @classmethod
-    async def batch_load_inference_metrics_by_kernel(
-        cls,
-        ctx: GraphQueryContext,
-        session_ids: Sequence[SessionId],
-    ) -> Sequence[Optional[Mapping[str, Any]]]:
-        session_ids_str = [str(sess_id) for sess_id in session_ids]
-        return await ctx.valkey_live.get_session_statistics_batch(session_ids_str)
 
 
 async def recalc_concurrency_used(
@@ -1171,8 +1161,8 @@ def by_status(
     status: Iterable[KernelStatus],
 ) -> QueryCondition:
     def _by_status(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(KernelRow.status.in_(status))
 
     return _by_status
@@ -1182,8 +1172,8 @@ def by_agent_id(
     agent_id: str,
 ) -> QueryCondition:
     def _by_agent_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(KernelRow.agent == agent_id)
 
     return _by_agent_id
@@ -1193,8 +1183,8 @@ def by_kernel_ids(
     kernel_ids: Iterable[KernelId],
 ) -> QueryCondition:
     def _by_kernel_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(KernelRow.id.in_(kernel_ids))
 
     return _by_kernel_id

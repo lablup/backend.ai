@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from ai.backend.common.container_registry import ContainerRegistryType
 
@@ -11,10 +11,40 @@ class ContainerRegistryData:
     url: str
     registry_name: str
     type: ContainerRegistryType
-    project: Optional[str]
-    username: Optional[str]
-    password: Optional[str]
-    ssl_verify: Optional[bool]
-    is_global: Optional[bool]
+    project: str | None
+    username: str | None
+    password: str | None
+    ssl_verify: bool | None
+    is_global: bool | None
     # TODO: Add proper type
-    extra: Optional[dict[str, Any]]
+    extra: dict[str, Any] | None
+
+
+@dataclass
+class ContainerRegistrySearchResult:
+    """Search result with pagination for container registries."""
+
+    items: list[ContainerRegistryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class PerProjectContainerRegistryInfo:
+    """Container registry info resolved from a project's container_registry config.
+
+    Unlike ContainerRegistryData, all fields are non-nullable because
+    the data is validated during the lookup process (GroupRow → ContainerRegistryRow).
+    """
+
+    id: uuid.UUID
+    url: str
+    registry_name: str
+    type: ContainerRegistryType
+    project: str
+    username: str
+    password: str
+    ssl_verify: bool
+    is_global: bool
+    extra: dict[str, Any]

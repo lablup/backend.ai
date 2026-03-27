@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from unittest.mock import MagicMock, patch
 
@@ -25,7 +26,6 @@ class TestDatabaseDependency:
         mock.db = MagicMock()
         return mock
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.infrastructure.database.connect_database")
     async def test_provide_database_engine(
         self, mock_connect_db: MagicMock, mock_config: ManagerUnifiedConfig
@@ -37,7 +37,7 @@ class TestDatabaseDependency:
         mock_engine = MagicMock()
 
         @asynccontextmanager
-        async def mock_context(config: ManagerUnifiedConfig):
+        async def mock_context(config: ManagerUnifiedConfig) -> AsyncGenerator[MagicMock, None]:
             yield mock_engine
 
         mock_connect_db.return_value = mock_context(mock_config)
@@ -48,7 +48,6 @@ class TestDatabaseDependency:
             assert db is mock_engine
             mock_connect_db.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.infrastructure.database.connect_database")
     async def test_cleanup_on_exception(
         self, mock_connect_db: MagicMock, mock_config: ManagerUnifiedConfig
@@ -61,7 +60,7 @@ class TestDatabaseDependency:
         cleanup_called = False
 
         @asynccontextmanager
-        async def mock_context(config: ManagerUnifiedConfig):
+        async def mock_context(config: ManagerUnifiedConfig) -> AsyncGenerator[MagicMock, None]:
             nonlocal cleanup_called
             try:
                 yield mock_engine

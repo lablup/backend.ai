@@ -1,5 +1,5 @@
 import enum
-from typing import Optional, Self
+from typing import Self
 
 
 class KernelLifecycleEventReason(enum.StrEnum):
@@ -35,7 +35,7 @@ class KernelLifecycleEventReason(enum.StrEnum):
     CONTAINER_NOT_FOUND = "container-not-found"
 
     @classmethod
-    def from_value(cls, value: Optional[str]) -> Optional[Self]:
+    def from_value(cls, value: str | None) -> Self | None:
         if value is None:
             return None
         try:

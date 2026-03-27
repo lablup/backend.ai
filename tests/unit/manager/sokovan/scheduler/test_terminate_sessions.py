@@ -6,7 +6,9 @@ Tests the batch termination of sessions marked with TERMINATING status.
 from __future__ import annotations
 
 import asyncio
+import time
 from decimal import Decimal
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -36,7 +38,7 @@ from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
 
 
 @pytest.fixture
-def mock_agent_client_pool():
+def mock_agent_client_pool() -> MagicMock:
     """Mock AgentClientPool for testing."""
     mock_pool = MagicMock(spec=AgentClientPool)
 
@@ -69,7 +71,7 @@ def mock_agent_client_pool():
 
 
 @pytest.fixture
-def mock_repository():
+def mock_repository() -> MagicMock:
     """Mock ScheduleRepository for testing."""
     mock_repo = MagicMock()
     mock_repo.get_terminating_sessions = AsyncMock()
@@ -320,7 +322,7 @@ class TestTerminateSessions:
         mock_repository.get_terminating_sessions.return_value = sessions
 
         # Add delay to agent calls to verify concurrency
-        async def delayed_destroy(*args, **kwargs):
+        async def delayed_destroy(*args: Any, **kwargs: Any) -> None:
             await asyncio.sleep(0.1)
             return
 
@@ -332,8 +334,6 @@ class TestTerminateSessions:
         session_ids = [s.session_id for s in sessions]
 
         # Execute - wrap in RecorderContext scope with entity_ids
-        import time
-
         start_time = time.time()
         with RecorderContext[SessionId].scope("terminate", session_ids):
             result = await terminator._terminate_sessions_internal(sessions)

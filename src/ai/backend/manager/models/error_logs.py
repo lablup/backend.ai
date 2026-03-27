@@ -42,7 +42,7 @@ error_logs = sa.Table(
 )
 
 
-class ErrorLogRow(Base):
+class ErrorLogRow(Base):  # type: ignore[misc]
     __table__ = error_logs
 
     def __init__(

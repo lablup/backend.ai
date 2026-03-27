@@ -1,14 +1,17 @@
 import logging
-from datetime import UTC
+from datetime import UTC, datetime
 from uuid import UUID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
+from ai.backend.common.data.notification import NotificationRuleType
+from ai.backend.common.data.notification.messages import ArtifactDownloadCompletedMessage
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import (
     ModelImportDoneEvent,
     ModelMetadataFetchDoneEvent,
     ModelVerifyingEvent,
 )
+from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.common.types import (
     AgentId,
 )
@@ -49,16 +52,16 @@ class ArtifactEventHandler:
 
     async def handle_model_verifying(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ModelVerifyingEvent,
     ) -> None:
         try:
             registry_type = ArtifactRegistryType(event.registry_type)
-        except Exception:
+        except Exception as e:
             raise InvalidArtifactRegistryTypeError(
                 f"Unsupported artifact registry type: {event.registry_type}"
-            )
+            ) from e
         registry_id: UUID
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
@@ -102,12 +105,6 @@ class ArtifactEventHandler:
         verification_result: VerificationStepResult | None,
     ) -> None:
         """Produce notification event for artifact download completion."""
-        from datetime import datetime
-
-        from ai.backend.common.data.notification import NotificationRuleType
-        from ai.backend.common.data.notification.messages import ArtifactDownloadCompletedMessage
-        from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
-
         try:
             message = ArtifactDownloadCompletedMessage(
                 artifact_id=str(artifact_id),
@@ -144,16 +141,16 @@ class ArtifactEventHandler:
 
     async def handle_model_import_done(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ModelImportDoneEvent,
     ) -> None:
         try:
             registry_type = ArtifactRegistryType(event.registry_type)
-        except Exception:
+        except Exception as e:
             raise InvalidArtifactRegistryTypeError(
                 f"Unsupported artifact registry type: {event.registry_type}"
-            )
+            ) from e
         registry_id: UUID
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
@@ -248,17 +245,17 @@ class ArtifactEventHandler:
 
     async def handle_model_metadata_fetch_done(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: ModelMetadataFetchDoneEvent,
     ) -> None:
         model_info = event.model
         try:
             registry_type = ArtifactRegistryType(model_info.registry_type)
-        except Exception:
+        except Exception as e:
             raise InvalidArtifactRegistryTypeError(
                 f"Unsupported artifact registry type: {model_info.registry_type}"
-            )
+            ) from e
 
         registry_id: UUID
         match registry_type:

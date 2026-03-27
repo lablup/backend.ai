@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import enum
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
@@ -23,23 +21,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("AuditLogRow",)
 
 
-class AuditLogEntityType(enum.StrEnum):
-    IMAGE = "image"
-    CONTAINER_REGISTRY = "container_registry"
-    DOMAIN = "domain"
-    GROUP = "group"
-    AGENT = "agent"
-    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
-    PROJECT_RESOURCE_POLICY = "project_resource_policy"
-    USER_RESOURCE_POLICY = "user_resource_policy"
-    RESOURCE_PRESET = "resource_preset"
-    SESSION = "session"
-    USER = "user"
-    VFOLDER = "vfolder"
-    VFOLDER_INVITATION = "vfolder_invitation"
-
-
-class AuditLogRow(Base):
+class AuditLogRow(Base):  # type: ignore[misc]
     __tablename__ = "audit_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -84,10 +66,10 @@ class AuditLogRow(Base):
         description: str,
         created_at: datetime,
         status: OperationStatus,
-        entity_id: Optional[str | uuid.UUID] = None,
-        request_id: Optional[str] = None,
-        triggered_by: Optional[str] = None,
-        duration: Optional[timedelta] = None,
+        entity_id: str | uuid.UUID | None = None,
+        request_id: str | None = None,
+        triggered_by: str | None = None,
+        duration: timedelta | None = None,
     ) -> None:
         self.entity_type = entity_type
         self.operation = operation

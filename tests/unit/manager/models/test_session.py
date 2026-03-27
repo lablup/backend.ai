@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -19,7 +19,7 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -71,6 +71,7 @@ class TestSessionUniqueNamePerUser:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -220,8 +221,8 @@ class TestSessionUniqueNamePerUser:
             group_id=group.id,
             domain_name=domain.name,
             status=status,
-            occupying_slots={},
-            requested_slots={},
+            occupying_slots=ResourceSlot(),
+            requested_slots=ResourceSlot(),
             vfolder_mounts=[],
         )
 
@@ -264,8 +265,8 @@ class TestSessionUniqueNamePerUser:
                 group_id=prepared_first_session.group_id,
                 domain_name=prepared_first_session.domain_name,
                 status=test_config.second_session_status,
-                occupying_slots={},
-                requested_slots={},
+                occupying_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
                 vfolder_mounts=[],
             )
 
@@ -294,8 +295,8 @@ class TestSessionUniqueNamePerUser:
             group_id=prepared_first_session.group_id,
             domain_name=prepared_first_session.domain_name,
             status=test_config.second_session_status,
-            occupying_slots={},
-            requested_slots={},
+            occupying_slots=ResourceSlot(),
+            requested_slots=ResourceSlot(),
             vfolder_mounts=[],
         )
 
@@ -335,8 +336,8 @@ class TestSessionUniqueNamePerUser:
                 group_id=prepared_first_session.group_id,
                 domain_name=prepared_first_session.domain_name,
                 status=test_config.second_session_status,
-                occupying_slots={},
-                requested_slots={},
+                occupying_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
                 vfolder_mounts=[],
             )
 

@@ -4,9 +4,7 @@ import logging
 import uuid
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Optional
-
-from dateutil.tz import tzutc
+from typing import Any
 
 from ai.backend.common.types import (
     KernelEnqueueingConfig,
@@ -55,6 +53,7 @@ class SessionPreparer:
         validated_scaling_group: AllowedScalingGroup,
         context: SessionCreationContext,
         calculated_resources: CalculatedResources,
+        enqueue_time: datetime,
     ) -> SessionEnqueueData:
         """
         Convert creation spec to enqueue data.
@@ -112,6 +111,7 @@ class SessionPreparer:
             context.vfolder_mounts,
             context,
             calculated_resources,
+            enqueue_time,
         )
 
         # Collect images from kernels
@@ -134,9 +134,10 @@ class SessionPreparer:
             cluster_mode=spec.cluster_mode,
             cluster_size=spec.cluster_size,
             priority=spec.priority,
+            is_preemptible=spec.is_preemptible,
             status=SessionStatus.PENDING.name,
             status_history={
-                SessionStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+                SessionStatus.PENDING.name: enqueue_time.isoformat(),
             },
             requested_slots=total_requested,
             occupying_slots=ResourceSlot(),
@@ -183,6 +184,7 @@ class SessionPreparer:
         vfolder_mounts: list[VFolderMount],
         context: SessionCreationContext,
         calculated_resources: CalculatedResources,
+        enqueue_time: datetime,
     ) -> list[KernelEnqueueData]:
         """Prepare kernel enqueue data."""
         kernel_data_list = []
@@ -261,7 +263,7 @@ class SessionPreparer:
                 starts_at=spec.starts_at,
                 status=KernelStatus.PENDING.name,
                 status_history={
-                    KernelStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+                    KernelStatus.PENDING.name: enqueue_time.isoformat(),
                 },
                 occupied_slots=ResourceSlot(),
                 requested_slots=requested_slots,
@@ -292,7 +294,7 @@ class SessionPreparer:
         self,
         spec: SessionCreationSpec,
         kernel_config: list[KernelEnqueueingConfig],
-    ) -> Optional[list[str]]:
+    ) -> list[str] | None:
         """Get pre-assigned agent for a kernel."""
         # Check if agent is specified in kernel config
         designated_agents = set()

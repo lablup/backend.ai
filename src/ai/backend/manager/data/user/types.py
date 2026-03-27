@@ -4,12 +4,14 @@ import enum
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self, override
+from typing import TYPE_CHECKING, Any, Self, override
 from uuid import UUID
 
 from sqlalchemy.engine import Row
 
-from ai.backend.common.types import AccessKey, CIStrEnum
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import (
@@ -18,6 +20,11 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.repositories.base.creator import BulkCreatorError
+    from ai.backend.manager.repositories.base.updater import BulkUpdaterError
 
 
 class UserStatus(enum.StrEnum):
@@ -32,7 +39,7 @@ class UserStatus(enum.StrEnum):
 
     @override
     @classmethod
-    def _missing_(cls, value: Any) -> Optional[UserStatus]:
+    def _missing_(cls, value: Any) -> UserStatus | None:
         if not isinstance(value, str):
             raise DataTransformationFailed(
                 f"UserStatus value must be a string, got {type(value).__name__}"
@@ -49,17 +56,6 @@ class UserStatus(enum.StrEnum):
         return None
 
 
-class UserRole(CIStrEnum):
-    """
-    User's role.
-    """
-
-    SUPERADMIN = "superadmin"
-    ADMIN = "admin"
-    USER = "user"
-    MONITOR = "monitor"
-
-
 @dataclass
 class UserInfoContext:
     uuid: UUID
@@ -71,27 +67,27 @@ class UserInfoContext:
 class UserData:
     id: UUID = field(compare=False)
     uuid: UUID = field(compare=False)  # legacy
-    username: Optional[str]
+    username: str | None
     email: str
-    need_password_change: Optional[bool]
-    full_name: Optional[str]
-    description: Optional[str]
+    need_password_change: bool | None
+    full_name: str | None
+    description: str | None
     is_active: bool  # legacy
     status: str
-    status_info: Optional[str]
-    created_at: Optional[datetime] = field(compare=False)
-    modified_at: Optional[datetime] = field(compare=False)
-    domain_name: Optional[str]
-    role: Optional[UserRole]
+    status_info: str | None
+    created_at: datetime | None = field(compare=False)
+    modified_at: datetime | None = field(compare=False)
+    domain_name: str | None
+    role: UserRole | None
     resource_policy: str
-    allowed_client_ip: Optional[list[str]]
-    totp_activated: Optional[bool]
-    totp_activated_at: Optional[datetime] = field(compare=False)
+    allowed_client_ip: list[str] | None
+    totp_activated: bool | None
+    totp_activated_at: datetime | None = field(compare=False)
     sudo_session_enabled: bool
-    main_access_key: Optional[str] = field(compare=False)
-    container_uid: Optional[int] = field(compare=False)
-    container_main_gid: Optional[int] = field(compare=False)
-    container_gids: Optional[list[int]] = field(compare=False)
+    main_access_key: str | None = field(compare=False)
+    container_uid: int | None = field(compare=False)
+    container_main_gid: int | None = field(compare=False)
+    container_gids: list[int] | None = field(compare=False)
 
     def scope_id(self) -> ScopeId:
         return ScopeId(
@@ -102,16 +98,16 @@ class UserData:
     def role_name(self) -> str:
         return f"user-{str(self.id)[:8]}"
 
-    def entity_operations(self) -> Mapping[EntityType, Iterable[OperationType]]:
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
         resource_entity_permissions = {
-            entity: OperationType.owner_operations()
+            entity.to_element(): OperationType.owner_operations()
             for entity in EntityType.owner_accessible_entity_types_in_user()
         }
         user_permissions = OperationType.owner_operations() - {OperationType.CREATE}
-        return {EntityType.USER: user_permissions, **resource_entity_permissions}
+        return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
     @classmethod
-    def from_row(cls, row: Row) -> Self:
+    def from_row(cls, row: Row[Any]) -> Self:
         """
         Deprecated: Use `UserRow.to_data()` method instead.
         """
@@ -131,7 +127,9 @@ class UserData:
             domain_name=row.domain_name,
             role=row.role,
             resource_policy=row.resource_policy,
-            allowed_client_ip=row.allowed_client_ip,
+            allowed_client_ip=[str(ip) for ip in row.allowed_client_ip]
+            if row.allowed_client_ip
+            else None,
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
@@ -146,3 +144,96 @@ class UserData:
 class UserCreateResultData:
     user: UserData
     keypair: KeyPairData
+
+
+@dataclass
+class UserSearchResult:
+    """Result of user search operations."""
+
+    items: list[UserData]
+    """List of user data items."""
+
+    total_count: int
+    """Total number of items matching the query (before pagination)."""
+
+    has_next_page: bool
+    """Whether there are more items after the current page."""
+
+    has_previous_page: bool
+    """Whether there are items before the current page."""
+
+
+@dataclass
+class BulkUserCreateResultData:
+    """Result of bulk user creation operation.
+
+    Attributes:
+        successes: Successfully created users
+        failures: Failed user creation attempts with error info
+    """
+
+    successes: list[UserData] = field(default_factory=list)
+    failures: list[BulkCreatorError[UserRow]] = field(default_factory=list)
+
+    def success_count(self) -> int:
+        """Get count of successfully created users."""
+        return len(self.successes)
+
+    def failure_count(self) -> int:
+        """Get count of failed user creations."""
+        return len(self.failures)
+
+
+@dataclass
+class BulkUserUpdateResultData:
+    """Result of bulk user update operation.
+
+    Attributes:
+        successes: Successfully updated users
+        failures: Failed user update attempts with error info
+    """
+
+    successes: list[UserData] = field(default_factory=list)
+    failures: list[BulkUpdaterError[UserRow]] = field(default_factory=list)
+
+    def success_count(self) -> int:
+        """Get count of successfully updated users."""
+        return len(self.successes)
+
+    def failure_count(self) -> int:
+        """Get count of failed user updates."""
+        return len(self.failures)
+
+
+@dataclass
+class BulkPurgeError:
+    """Error information for a failed bulk purge operation.
+
+    Attributes:
+        user_id: UUID of the user that failed to purge
+        exception: The exception that occurred
+    """
+
+    user_id: UUID
+    exception: Exception
+
+
+@dataclass
+class BulkUserPurgeResultData:
+    """Result of bulk user purge operation.
+
+    Attributes:
+        purged_user_ids: UUIDs of successfully purged users
+        failures: Failed user purge attempts with error info
+    """
+
+    purged_user_ids: list[UUID] = field(default_factory=list)
+    failures: list[BulkPurgeError] = field(default_factory=list)
+
+    def purged_count(self) -> int:
+        """Get count of successfully purged users."""
+        return len(self.purged_user_ids)
+
+    def failure_count(self) -> int:
+        """Get count of failed user purges."""
+        return len(self.failures)

@@ -9,6 +9,7 @@ Create Date: 2019-05-30 18:40:17.669756
 import math
 from datetime import timedelta
 from decimal import Decimal
+from typing import Any, cast
 
 import sqlalchemy as sa
 from alembic import op
@@ -24,7 +25,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
 
     # previous table def used for migration
@@ -63,7 +64,7 @@ def upgrade():
 
     connection = op.get_bind()
     query = (
-        sa.select([
+        sa.select(
             kernels.c.id,
             kernels.c.created_at,
             kernels.c.terminated_at,
@@ -76,7 +77,7 @@ def upgrade():
             kernels.c.io_read_bytes,
             kernels.c.io_write_bytes,
             kernels.c.io_max_scratch_size,
-        ])
+        )
         .select_from(kernels)
         .order_by(kernels.c.created_at)
     )
@@ -85,37 +86,38 @@ def upgrade():
     updates = []
     q_pct = Decimal("0.00")
     for row in results:
-        if row["terminated_at"] is None:
-            cpu_avg_pct = 0
+        row_dict = cast(dict[str, Any], row._mapping)
+        if row_dict["terminated_at"] is None:
+            cpu_avg_pct: Decimal | int = 0
         else:
             cpu_avg_pct = (
                 (
                     Decimal(100)
                     * Decimal(
-                        timedelta(microseconds=1e3 * row["cpu_used"])
-                        / (row["terminated_at"] - row["created_at"])
+                        timedelta(microseconds=1e3 * row_dict["cpu_used"])
+                        / (row_dict["terminated_at"] - row_dict["created_at"])
                     )
                 )
                 .quantize(q_pct)
                 .normalize()
             )
         mem_capacity = 0
-        _oslots = row["occupied_slots"]
+        _oslots = row_dict["occupied_slots"]
         if _oslots:
             mem_capacity = _oslots.get("mem")
         if mem_capacity is None or mem_capacity == 0:
             # fallback: try legacy field
-            _oshares = row["occupied_shares"]
+            _oshares = row_dict["occupied_shares"]
             mem_capacity = _oshares.get("mem")
         if mem_capacity is None or mem_capacity == 0:
             # fallback: round-up to nearest GiB
-            mem_capacity = math.ceil(row["mem_max_bytes"] / (2**30)) * (2**30)
+            mem_capacity = math.ceil(row_dict["mem_max_bytes"] / (2**30)) * (2**30)
         if mem_capacity is None or mem_capacity == 0:
             # fallback: assume 1 GiB
             mem_capacity = 2**30
         last_stat = {
             "cpu_used": {
-                "current": str(row["cpu_used"]),
+                "current": str(row_dict["cpu_used"]),
                 "capacity": None,
             },
             "cpu_util": {
@@ -124,35 +126,35 @@ def upgrade():
                 "stats.avg": str(cpu_avg_pct),
             },
             "mem": {
-                "current": str(row["mem_max_bytes"]),
+                "current": str(row_dict["mem_max_bytes"]),
                 "capacity": str(mem_capacity),
-                "stats.max": str(row["mem_max_bytes"]),
+                "stats.max": str(row_dict["mem_max_bytes"]),
             },
             "io_read": {
-                "current": str(row["io_read_bytes"]),
+                "current": str(row_dict["io_read_bytes"]),
                 "capacity": None,
                 "stats.rate": "0",
             },
             "io_write": {
-                "current": str(row["io_write_bytes"]),
+                "current": str(row_dict["io_write_bytes"]),
                 "capacity": None,
                 "stats.rate": "0",
             },
             "io_scratch_size": {
-                "current": str(row["io_max_scratch_size"]),
+                "current": str(row_dict["io_max_scratch_size"]),
                 "capacity": str(10 * (2**30)),  # 10 GiB
-                "stats.max": str(row["io_max_scratch_size"]),
+                "stats.max": str(row_dict["io_max_scratch_size"]),
             },
         }
-        updates.append({"row_id": row["id"], "last_stat": last_stat})
+        updates.append({"row_id": row_dict["id"], "last_stat": last_stat})
 
     if updates:
-        query = (
+        update_query = (
             sa.update(kernels)
             .values(last_stat=bindparam("last_stat"))
             .where(kernels.c.id == bindparam("row_id"))
         )
-        connection.execute(query, updates)
+        connection.execute(update_query, updates)
 
     op.drop_column("kernels", "io_max_scratch_size")
     op.drop_column("kernels", "net_rx_bytes")
@@ -163,7 +165,7 @@ def upgrade():
     op.drop_column("kernels", "cpu_used")
 
 
-def downgrade():
+def downgrade() -> None:
     metadata = sa.MetaData(naming_convention=convention)
 
     kernels = sa.Table(
@@ -217,13 +219,14 @@ def downgrade():
 
     # Restore old stats
     connection = op.get_bind()
-    query = sa.select([kernels.c.id, kernels.c.last_stat]).select_from(kernels)
+    query = sa.select(kernels.c.id, kernels.c.last_stat).select_from(kernels)
     results = connection.execute(query).fetchall()
     updates = []
     for row in results:
-        last_stat = row["last_stat"]
+        row_dict = cast(dict[str, Any], row._mapping)
+        last_stat = row_dict["last_stat"]
         updates.append({
-            "row_id": row["id"],
+            "row_id": row_dict["id"],
             "cpu_used": Decimal(last_stat["cpu_used"]["current"]),
             "io_read_bytes": int(last_stat["io_read"]["current"]),
             "io_write_bytes": int(last_stat["io_write"]["current"]),
@@ -231,7 +234,7 @@ def downgrade():
             "io_max_scratch_size": int(last_stat["io_scratch_size"]["stats.max"]),
         })
     if updates:
-        query = (
+        update_query = (
             sa.update(kernels)
             .values({
                 "cpu_used": bindparam("cpu_used"),
@@ -244,6 +247,6 @@ def downgrade():
             })
             .where(kernels.c.id == bindparam("row_id"))
         )
-        connection.execute(query, updates)
+        connection.execute(update_query, updates)
 
     op.drop_column("kernels", "last_stat")

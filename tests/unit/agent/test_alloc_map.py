@@ -179,7 +179,7 @@ def test_discrete_alloc_map_cpu_even() -> None:
         allocation_strategy=AllocationStrategy.EVENLY,
     )
 
-    def check_clean():
+    def check_clean() -> None:
         assert alloc_map.allocations[SlotName("cpu")][DeviceId("cpu0")] == 0
         assert alloc_map.allocations[SlotName("cpu")][DeviceId("cpu1")] == 0
         assert alloc_map.allocations[SlotName("cpu")][DeviceId("cpu2")] == 0
@@ -727,7 +727,7 @@ def test_exclusive_resource_slots() -> None:
         exclusive_slot_types={"cuda.device:*-mig", "cuda.device", "cuda.shares"},
     )
 
-    def check_clean():
+    def check_clean() -> None:
         assert alloc_map.allocations[SlotName("cuda.device:1g.5gb-mig")][DeviceId("a0")] == Decimal(
             "0"
         )
@@ -766,7 +766,7 @@ def test_heterogeneous_resource_slots_with_discrete_alloc_map() -> None:
         exclusive_slot_types={"cuda.device:*-mig", "cuda.device", "cuda.shares"},
     )
 
-    def check_clean():
+    def check_clean() -> None:
         assert alloc_map.allocations[SlotName("cuda.device:1g.5gb-mig")][DeviceId("a0")] == Decimal(
             "0"
         )
@@ -861,7 +861,7 @@ def test_heterogeneous_resource_slots_with_fractional_alloc_map() -> None:
         allocation_strategy=AllocationStrategy.FILL,
     )
 
-    def check_clean():
+    def check_clean() -> None:
         assert alloc_map.allocations[SlotName("cuda.device:1g.5gb-mig")][DeviceId("a0")] == Decimal(
             "0"
         )

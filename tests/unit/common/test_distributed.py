@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import aiotools
 import pytest
@@ -62,7 +62,7 @@ def drange(start: Decimal, stop: Decimal, step: Decimal) -> Iterable[Decimal]:
         start += step
 
 
-def dslice(start: Decimal, stop: Decimal, num: int):
+def dslice(start: Decimal, stop: Decimal, num: int) -> Iterable[Decimal]:
     """
     A simplified version of numpy.linspace with default options
     """
@@ -75,21 +75,21 @@ def dslice(start: Decimal, stop: Decimal, num: int):
 class NoopAnycastEvent(AbstractAnycastEvent):
     test_case_ns: str
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (self.test_case_ns,)
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> NoopAnycastEvent:
         return cls(value[0])
 
     @classmethod
     def event_domain(cls) -> EventDomain:
         return EventDomain.AGENT
 
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod
@@ -159,8 +159,8 @@ async def run_timer(
 
 
 def etcd_timer_node_process(
-    queue,
-    stop_event,
+    queue: Any,
+    stop_event: Any,
     etcd_ctx: EtcdLockContext,
     timer_ctx: TimerNodeContext,
     etcd_client: Literal["etcd-client-py"],
@@ -321,12 +321,11 @@ class TimerNode(threading.Thread):
         asyncio.run(self.timer_node_async())
 
 
-@pytest.mark.asyncio
 async def test_global_timer_filelock(
-    request,
-    test_case_ns,
-    redis_container,
-    test_node_id,
+    request: pytest.FixtureRequest,
+    test_case_ns: str,
+    redis_container: tuple[Any, HostPortPair],
+    test_node_id: str,
 ) -> None:
     lock_path = Path(tempfile.gettempdir()) / f"{test_case_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
@@ -374,10 +373,9 @@ async def test_global_timer_filelock(
     assert target_count - 2 <= num_records <= target_count + 2
 
 
-@pytest.mark.asyncio
 async def test_global_timer_redlock(
-    test_case_ns,
-    redis_container,
+    test_case_ns: str,
+    redis_container: tuple[Any, HostPortPair],
 ) -> None:
     redis_addr = redis_container[1]
     r = RedisConnectionInfo(
@@ -395,7 +393,7 @@ async def test_global_timer_redlock(
     delay = 3.0
     interval = 0.5
     target_count = delay / interval
-    tasks: list[tuple[asyncio.Task, asyncio.Event]] = []
+    tasks: list[tuple[asyncio.Task[Any], asyncio.Event]] = []
     for thread_idx in range(num_threads):
         stop_event = asyncio.Event()
         task = asyncio.create_task(
@@ -427,7 +425,6 @@ async def test_global_timer_redlock(
 
 
 # Tests using Process are failing due to a compatibility issue with valkey-glide.
-# @pytest.mark.asyncio
 # @pytest.mark.parametrize("etcd_client", ["etcd-client-py"])
 # async def test_global_timer_etcdlock(
 #     test_case_ns,
@@ -491,12 +488,11 @@ async def test_global_timer_redlock(
 #     assert target_count - 2 <= num_records <= target_count + 2
 
 
-@pytest.mark.asyncio
 async def test_global_timer_join_leave(
-    request,
-    test_case_ns,
-    test_valkey_stream_mq,
-    test_node_id,
+    request: pytest.FixtureRequest,
+    test_case_ns: str,
+    test_valkey_stream_mq: RedisQueue,
+    test_node_id: str,
 ) -> None:
     event_records = []
 
@@ -530,8 +526,7 @@ async def test_global_timer_join_leave(
     await event_dispatcher.close()
 
 
-@pytest.mark.asyncio
-async def test_filelock_watchdog(request, test_case_ns) -> None:
+async def test_filelock_watchdog(request: pytest.FixtureRequest, test_case_ns: str) -> None:
     """
     This test case is for verifying
     if watchdog releases the lock after the timeout(ttl)
@@ -546,7 +541,7 @@ async def test_filelock_watchdog(request, test_case_ns) -> None:
     vclock = aiotools.VirtualClock()
     with vclock.patch_loop():
 
-        async def _main(ttl: float, delay: float = 5.0, interval: float = 0.03):
+        async def _main(ttl: float, delay: float = 5.0, interval: float = 0.03) -> None:
             async with FileLock(lock_path, timeout=0, lifetime=ttl, debug=True) as lock:
                 t = 0.0
                 while lock.is_locked and t < delay:

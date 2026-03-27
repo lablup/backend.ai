@@ -1,4 +1,4 @@
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.config import (
     ModelConfig,
@@ -20,7 +20,7 @@ class ModularMAXModelDefinitionGenerator(ModelDefinitionGenerator):
     async def generate_model_definition(self, model_revision: ModelRevisionSpec) -> ModelDefinition:
         runtime_profile = MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.MODULAR_MAX]
 
-        health_check: Optional[ModelHealthCheck] = None
+        health_check: ModelHealthCheck | None = None
         if runtime_profile.health_check_endpoint:
             health_check = ModelHealthCheck(
                 path=runtime_profile.health_check_endpoint,

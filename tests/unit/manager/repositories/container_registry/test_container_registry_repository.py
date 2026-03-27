@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from typing import cast
 from uuid import UUID
 
 import pytest
@@ -10,6 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.errors.image import (
@@ -32,7 +34,10 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -45,8 +50,13 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.container_registry.creators import (
+    ContainerRegistryCreatorSpec,
+)
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -108,6 +118,7 @@ class TestContainerRegistryRepository:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
@@ -125,6 +136,7 @@ class TestContainerRegistryRepository:
                 ResourcePresetRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -139,7 +151,7 @@ class TestContainerRegistryRepository:
         """Pre-created domain for group tests. Returns domain name."""
         domain_name = "test-domain-" + str(uuid.uuid4())[:8]
         async with db_with_cleanup.begin_session() as session:
-            domain = DomainRow(name=domain_name, total_resource_slots={})
+            domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
             session.add(domain)
             await session.commit()
         return domain_name
@@ -176,7 +188,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain}",
                     domain_name=sample_domain,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
                 session.add(group)
@@ -251,7 +263,6 @@ class TestContainerRegistryRepository:
             await session.refresh(registry)
             return registry.to_dataclass()
 
-    @pytest.mark.asyncio
     async def test_get_by_registry_and_project_success(
         self, repository: ContainerRegistryRepository, sample_registry: ContainerRegistryData
     ) -> None:
@@ -268,7 +279,6 @@ class TestContainerRegistryRepository:
         assert result.project == sample_registry.project
         assert result.id == sample_registry.id
 
-    @pytest.mark.asyncio
     async def test_get_by_registry_and_project_not_found(
         self, repository: ContainerRegistryRepository
     ) -> None:
@@ -307,7 +317,6 @@ class TestContainerRegistryRepository:
                 registry2=registry2.to_dataclass(),
             )
 
-    @pytest.mark.asyncio
     async def test_get_by_registry_name(
         self,
         repository: ContainerRegistryRepository,
@@ -356,7 +365,6 @@ class TestContainerRegistryRepository:
                 registry2=registry2.to_dataclass(),
             )
 
-    @pytest.mark.asyncio
     async def test_get_all(
         self,
         repository: ContainerRegistryRepository,
@@ -368,6 +376,119 @@ class TestContainerRegistryRepository:
 
         # Then
         assert len(result) == 2
+
+    @pytest.fixture
+    async def creator(self) -> Creator[ContainerRegistryRow]:
+        """Fixture that provides a minimal creator spec for creating registries."""
+        return Creator(
+            spec=ContainerRegistryCreatorSpec(
+                url="https://minimal.example.com",
+                type=ContainerRegistryType.HARBOR2,
+                registry_name="minimal-registry",
+                project="minimal-project",
+            )
+        )
+
+    async def test_create_registry_minimal(
+        self,
+        repository: ContainerRegistryRepository,
+        creator: Creator[ContainerRegistryRow],
+    ) -> None:
+        """Test creating registry with minimal required fields"""
+        # When
+        result = await repository.create_registry(creator)
+
+        # Then - Verify result
+        spec: ContainerRegistryCreatorSpec = cast(ContainerRegistryCreatorSpec, creator.spec)
+        assert result is not None
+        assert result.registry_name == spec.registry_name
+        assert result.url == spec.url
+        assert result.type == spec.type
+        assert result.project == spec.project
+        assert result.id is not None
+
+    @pytest.fixture
+    async def creator_spec_with_allowed_groups(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> tuple[ContainerRegistryCreatorSpec, list[str]]:
+        """Fixture that provides a creator spec with allowed_groups for creating registries."""
+        registry_name = "registry-with-groups-" + str(uuid.uuid4())[:8]
+        project = "project-with-groups-" + str(uuid.uuid4())[:8]
+        domain_name = f"test-domain-{registry_name}"
+        resource_policy_name = f"test-policy-{registry_name}"
+
+        # Pre-create domain, resource policy, and 2 groups to associate
+        group_ids: list[str] = []
+        async with db_with_cleanup.begin_session() as session:
+            # Create domain
+            domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
+            session.add(domain)
+
+            # Create project resource policy
+            project_policy = ProjectResourcePolicyRow(
+                name=resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            session.add(project_policy)
+
+            await session.flush()
+
+            # Create 2 groups
+            for i in range(2):
+                group = GroupRow(
+                    name=f"test-group-for-registry-{i}-{registry_name}",
+                    domain_name=domain_name,
+                    total_resource_slots=ResourceSlot(),
+                    resource_policy=resource_policy_name,
+                )
+                session.add(group)
+                await session.flush()
+                group_ids.append(str(group.id))
+            await session.commit()
+
+        spec = ContainerRegistryCreatorSpec(
+            url=f"https://{registry_name}",
+            type=ContainerRegistryType.HARBOR2,
+            registry_name=registry_name,
+            project=project,
+            allowed_groups=AllowedGroupsModel(add=group_ids, remove=[]),
+        )
+        return spec, group_ids
+
+    async def test_create_registry_with_allowed_groups(
+        self,
+        repository: ContainerRegistryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        creator_spec_with_allowed_groups: tuple[ContainerRegistryCreatorSpec, list[str]],
+    ) -> None:
+        """Test creating registry with allowed_groups"""
+        # Given - Registry and groups
+        spec, group_ids = creator_spec_with_allowed_groups
+        # When
+        result = await repository.create_registry(Creator(spec=spec))
+
+        # Then - Verify registry created
+        assert result is not None
+        assert result.registry_name == spec.registry_name
+
+        # Then - Verify allowed_groups associations created
+        async with db_with_cleanup.begin_readonly_session() as session:
+            associations = (
+                (
+                    await session.execute(
+                        sa.select(AssociationContainerRegistriesGroupsRow).where(
+                            AssociationContainerRegistriesGroupsRow.registry_id == result.id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            assert len(associations) == 2
+            assert {str(a.group_id) for a in associations} == set(group_ids)
 
     @pytest.fixture
     async def sample_registry_with_images(
@@ -429,7 +550,6 @@ class TestContainerRegistryRepository:
                 image_ids=[image1.id, image2.id],
             )
 
-    @pytest.mark.asyncio
     async def test_clear_images(
         self,
         repository: ContainerRegistryRepository,
@@ -456,7 +576,6 @@ class TestContainerRegistryRepository:
             )
             assert all(img.status == ImageStatus.DELETED for img in images)
 
-    @pytest.mark.asyncio
     async def test_clear_images_not_found(self, repository: ContainerRegistryRepository) -> None:
         """Test clearing images when registry not found"""
         with pytest.raises(ContainerRegistryNotFound):
@@ -534,7 +653,6 @@ class TestContainerRegistryRepository:
                 image2_id=image2.id,
             )
 
-    @pytest.mark.asyncio
     async def test_clear_images_with_project_filter(
         self,
         repository: ContainerRegistryRepository,
@@ -559,7 +677,6 @@ class TestContainerRegistryRepository:
             assert img_p1.status == ImageStatus.DELETED
             assert img_p2.status == ImageStatus.ALIVE
 
-    @pytest.mark.asyncio
     async def test_get_registry_row_for_scanner_success(
         self, repository: ContainerRegistryRepository, sample_registry: ContainerRegistryData
     ) -> None:
@@ -576,7 +693,6 @@ class TestContainerRegistryRepository:
         assert result.project == sample_registry.project
         assert result.id == sample_registry.id
 
-    @pytest.mark.asyncio
     async def test_get_registry_row_for_scanner_not_found(
         self, repository: ContainerRegistryRepository
     ) -> None:
@@ -609,7 +725,6 @@ class TestContainerRegistryRepository:
             await session.refresh(registry)
             return registry.to_dataclass()
 
-    @pytest.mark.asyncio
     async def test_modify_registry_success(
         self,
         repository: ContainerRegistryRepository,
@@ -652,7 +767,6 @@ class TestContainerRegistryRepository:
         assert result.password == changed_password
         assert result.extra == changed_extra
 
-    @pytest.mark.asyncio
     async def test_modify_registry_not_found(self, repository: ContainerRegistryRepository) -> None:
         """Test modifying a non-existent registry"""
         non_existent_id = UUID("00000000-0000-0000-0000-000000000000")
@@ -708,7 +822,6 @@ class TestContainerRegistryRepository:
                 group_ids=sample_groups,
             )
 
-    @pytest.mark.asyncio
     async def test_modify_registry_add_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
@@ -807,7 +920,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain}-assoc",
                     domain_name=sample_domain,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
                 session.add(group)
@@ -824,7 +937,6 @@ class TestContainerRegistryRepository:
             await session.refresh(registry)
             return _RegistryWithGroups(registry=registry.to_dataclass(), group_ids=group_ids)
 
-    @pytest.mark.asyncio
     async def test_modify_registry_remove_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
@@ -935,7 +1047,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain}-partial",
                     domain_name=sample_domain,
-                    total_resource_slots={},
+                    total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
                 session.add(group)
@@ -958,7 +1070,6 @@ class TestContainerRegistryRepository:
                 available_group_ids=group_ids[2:],
             )
 
-    @pytest.mark.asyncio
     async def test_modify_registry_add_and_remove_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
@@ -1018,7 +1129,6 @@ class TestContainerRegistryRepository:
                 group_ids[3],
             }
 
-    @pytest.mark.asyncio
     async def test_modify_registry_remove_nonexistent_allowed_groups(
         self, repository: ContainerRegistryRepository, sample_registry: ContainerRegistryData
     ) -> None:
@@ -1075,7 +1185,6 @@ class TestContainerRegistryRepository:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_modify_registry_add_duplicate_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
@@ -1093,7 +1202,46 @@ class TestContainerRegistryRepository:
                 )
             )
 
-    @pytest.mark.asyncio
+    async def test_modify_registry_set_is_global_clears_allowed_groups(
+        self,
+        repository: ContainerRegistryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_with_associated_groups: _RegistryWithGroups,
+    ) -> None:
+        """Test that setting is_global=True clears all group associations."""
+        # Given - Registry already has 3 groups associated
+        registry_id = registry_with_associated_groups.registry.id
+
+        # When - Set is_global to True
+        result = await repository.modify_registry(
+            Updater(
+                spec=ContainerRegistryUpdaterSpec(
+                    is_global=TriState.update(True),
+                ),
+                pk_value=registry_id,
+            )
+        )
+
+        # Then - Registry is updated
+        assert result is not None
+        assert result.is_global is True
+
+        # Then - All group associations are cleared
+        async with db_with_cleanup.begin_readonly_session() as session:
+            associations = (
+                (
+                    await session.execute(
+                        sa.select(AssociationContainerRegistriesGroupsRow).where(
+                            AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            assert len(associations) == 0
+
     async def test_delete_registry_success(
         self,
         repository: ContainerRegistryRepository,
@@ -1117,7 +1265,6 @@ class TestContainerRegistryRepository:
             purger = Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
             await repository.delete_registry(purger)
 
-    @pytest.mark.asyncio
     async def test_delete_registry_not_found(
         self,
         repository: ContainerRegistryRepository,
@@ -1131,7 +1278,6 @@ class TestContainerRegistryRepository:
             purger = Purger(row_class=ContainerRegistryRow, pk_value=non_existent_id)
             await repository.delete_registry(purger)
 
-    @pytest.mark.asyncio
     async def test_delete_registry_returns_data_before_deletion(
         self,
         repository: ContainerRegistryRepository,
@@ -1153,3 +1299,210 @@ class TestContainerRegistryRepository:
         assert result.password == "test-pass"
         assert result.ssl_verify is False
         assert result.is_global is False
+
+
+class TestSearchContainerRegistries:
+    """Integration tests for search_container_registries repository method."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                ContainerRegistryRow,
+                AssociationContainerRegistriesGroupsRow,
+                AssociationScopesEntitiesRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
+        return ContainerRegistryRepository(db=db_with_cleanup)
+
+    @pytest.fixture
+    async def sample_registries(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> list[ContainerRegistryData]:
+        """Create 4 container registries with different types for testing."""
+        registries: list[ContainerRegistryData] = []
+        configs = [
+            (ContainerRegistryType.DOCKER, "docker-reg", "project-a"),
+            (ContainerRegistryType.DOCKER, "docker-reg-2", "project-b"),
+            (ContainerRegistryType.HARBOR2, "harbor-reg", "harbor-project"),
+            (ContainerRegistryType.GITHUB, "ghcr-reg", "ghcr-project"),
+        ]
+        async with db_with_cleanup.begin_session() as session:
+            for reg_type, reg_name, project in configs:
+                row = ContainerRegistryRow(
+                    id=uuid.uuid4(),
+                    url=f"https://{reg_name}.example.com",
+                    registry_name=reg_name,
+                    type=reg_type,
+                    project=project,
+                )
+                session.add(row)
+                await session.flush()
+                registries.append(row.to_dataclass())
+            await session.commit()
+        return registries
+
+    # =========================================================================
+    # Tests - Search with pagination
+    # =========================================================================
+
+    async def test_search_first_page(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test first page of search results."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        result = await repository.search_container_registries(querier)
+
+        assert len(result.items) == 2
+        assert result.total_count == 4
+
+    async def test_search_second_page(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test second page of search results."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=2),
+            conditions=[],
+            orders=[],
+        )
+        result = await repository.search_container_registries(querier)
+
+        assert len(result.items) == 2
+        assert result.total_count == 4
+
+    # =========================================================================
+    # Tests - Search with filtering
+    # =========================================================================
+
+    async def test_search_filter_by_type(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test filtering container registries by type."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: ContainerRegistryRow.type == ContainerRegistryType.DOCKER,
+            ],
+            orders=[],
+        )
+        result = await repository.search_container_registries(querier)
+
+        assert len(result.items) == 2
+        assert all(item.type == ContainerRegistryType.DOCKER for item in result.items)
+
+    async def test_search_filter_by_registry_name(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test filtering container registries by registry name."""
+        target_name = sample_registries[0].registry_name
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: ContainerRegistryRow.registry_name == target_name,
+            ],
+            orders=[],
+        )
+        result = await repository.search_container_registries(querier)
+
+        assert len(result.items) == 1
+        assert result.items[0].registry_name == target_name
+
+    # =========================================================================
+    # Tests - Search with ordering
+    # =========================================================================
+
+    async def test_search_order_by_registry_name_ascending(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test ordering container registries by registry_name ascending."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[ContainerRegistryRow.registry_name.asc()],
+        )
+        result = await repository.search_container_registries(querier)
+
+        names = [item.registry_name for item in result.items]
+        assert names == sorted(names)
+
+    async def test_search_order_by_registry_name_descending(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test ordering container registries by registry_name descending."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[ContainerRegistryRow.registry_name.desc()],
+        )
+        result = await repository.search_container_registries(querier)
+
+        names = [item.registry_name for item in result.items]
+        assert names == sorted(names, reverse=True)
+
+    # =========================================================================
+    # Tests - Empty results
+    # =========================================================================
+
+    async def test_search_no_results(
+        self,
+        repository: ContainerRegistryRepository,
+        sample_registries: list[ContainerRegistryData],
+    ) -> None:
+        """Test search with no matching results."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: ContainerRegistryRow.registry_name == "non-existent-registry",
+            ],
+            orders=[],
+        )
+        result = await repository.search_container_registries(querier)
+
+        assert len(result.items) == 0
+        assert result.total_count == 0

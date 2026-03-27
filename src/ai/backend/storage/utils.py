@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import enum
 import logging
+import urllib.parse
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from datetime import UTC, datetime
 from pathlib import PurePath
-from typing import Any, Optional
+from typing import Any
 
 import trafaret as t
-from aiohttp import web
+from aiohttp import hdrs, web
 
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
@@ -18,6 +19,7 @@ from .errors import (
     InvalidConfigurationSourceError,
     InvalidPathError,
 )
+from .volumes.types import LoggingInternalMeta
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -34,11 +36,12 @@ def fstime2datetime(t: float | int) -> datetime:
 @actxmgr
 async def check_params(
     request: web.Request,
-    checker: Optional[t.Trafaret],
+    checker: t.Trafaret | None,
     *,
     read_from: CheckParamSource = CheckParamSource.BODY,
-    auth_required: bool = True,
+    _auth_required: bool = True,
 ) -> AsyncIterator[Any]:
+    raw_params: Any = None
     if checker is None:
         if request.can_read_body:
             raise web.HTTPBadRequest(
@@ -73,8 +76,8 @@ async def check_params(
                 },
             ),
             content_type="application/problem+json",
-        )
-    except NotImplementedError:
+        ) from e
+    except NotImplementedError as e:
         raise web.HTTPBadRequest(
             text=dump_json_str(
                 {
@@ -83,7 +86,7 @@ async def check_params(
                 },
             ),
             content_type="application/problem+json",
-        )
+        ) from e
 
 
 async def log_manager_api_entry(
@@ -144,8 +147,6 @@ async def log_manager_api_entry_new(
     name: str,
     params: Any,
 ) -> None:
-    from .volumes.types import LoggingInternalMeta
-
     if params is None:
         log.info(
             "ManagerAPI::{}()",
@@ -170,8 +171,6 @@ async def log_client_api_entry(
     name: str,
     params: Any,
 ) -> None:
-    from .volumes.types import LoggingInternalMeta
-
     if params is None:
         log.info(
             "ClientFacingAPI::{}()",
@@ -222,3 +221,32 @@ def normalize_filepath(filepath: str) -> str:
 
     # Remove leading slash if present (we want relative paths)
     return normalized.removeprefix("/")
+
+
+def build_attachment_headers(
+    filename: str,
+    content_type: str | None = None,
+) -> dict[str, str]:
+    """Build RFC-compliant attachment headers with UTF-8 filename support.
+
+    Args:
+        filename: The filename to include in Content-Disposition header.
+        content_type: MIME type for Content-Type header. Defaults to application/octet-stream.
+
+    Returns:
+        Dictionary containing Content-Type and Content-Disposition headers.
+
+    Note:
+        This function generates headers compliant with:
+        - RFC-2616 sec2.2: Basic filename in ASCII
+        - RFC-5987: Extended filename with UTF-8 encoding for international characters
+    """
+    ascii_filename = filename.encode("ascii", errors="ignore").decode("ascii").replace('"', r"\"")
+    encoded_filename = urllib.parse.quote(filename, encoding="utf-8")
+    return {
+        hdrs.CONTENT_TYPE: content_type or "application/octet-stream",
+        hdrs.CONTENT_DISPOSITION: " ".join([
+            f'attachment;filename="{ascii_filename}";',
+            f"filename*=UTF-8''{encoded_filename}",
+        ]),
+    }

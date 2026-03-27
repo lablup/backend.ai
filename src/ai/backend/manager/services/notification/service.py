@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.notification import NotificationCenter
     from ai.backend.manager.repositories.notification import NotificationRepository
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("NotificationService",)
 
@@ -206,8 +206,6 @@ class NotificationService:
             NotificationTemplateRenderingFailure: If template rendering fails
             ValidationError: If notification_data doesn't match the rule type's schema
         """
-        from ai.backend.common.data.notification import NotifiableMessage
-
         # Fetch the rule to know its rule_type
         rule = await self._repository.get_rule_by_id(action.rule_id)
 

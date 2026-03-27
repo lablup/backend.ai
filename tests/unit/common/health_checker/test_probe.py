@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -10,15 +11,17 @@ from ai.backend.common.health_checker import (
     DATABASE,
     MANAGER,
     AllServicesHealth,
+    ComponentHealthStatus,
+    ComponentId,
     HealthCheckerAlreadyRegistered,
     HealthCheckerNotFound,
     HealthProbe,
     ServiceGroup,
+    ServiceHealth,
     ServiceHealthChecker,
 )
 
 
-@pytest.mark.asyncio
 async def test_probe_register_checker(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
@@ -34,7 +37,6 @@ async def test_probe_register_checker(
     assert registered[sample_service_group].result is None  # Not checked yet
 
 
-@pytest.mark.asyncio
 async def test_probe_register_duplicate_checker_raises_error(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
@@ -51,7 +53,6 @@ async def test_probe_register_duplicate_checker_raises_error(
     assert str(sample_service_group) in str(exc_info.value)
 
 
-@pytest.mark.asyncio
 async def test_probe_unregister_checker(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
@@ -66,7 +67,6 @@ async def test_probe_unregister_checker(
     assert sample_service_group not in registered
 
 
-@pytest.mark.asyncio
 async def test_probe_unregister_nonexistent_checker_raises_error(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
@@ -79,17 +79,11 @@ async def test_probe_unregister_nonexistent_checker_raises_error(
     assert str(sample_service_group) in str(exc_info.value)
 
 
-@pytest.mark.asyncio
 async def test_probe_register_multiple_checkers(
     health_probe: HealthProbe,
     mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test registering multiple health checkers."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate mock checkers with different service groups
     check_time = datetime.now(UTC)
     healthy_result = ServiceHealth(
@@ -128,7 +122,6 @@ async def test_probe_register_multiple_checkers(
     assert AGENT in registered
 
 
-@pytest.mark.asyncio
 async def test_probe_check_healthy_checker(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
@@ -150,7 +143,6 @@ async def test_probe_check_healthy_checker(
         assert isinstance(component_status.last_checked_at, datetime)
 
 
-@pytest.mark.asyncio
 async def test_probe_check_unhealthy_checker(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
@@ -171,7 +163,6 @@ async def test_probe_check_unhealthy_checker(
         assert isinstance(component_status.last_checked_at, datetime)
 
 
-@pytest.mark.asyncio
 async def test_probe_check_timeout_checker(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
@@ -189,7 +180,6 @@ async def test_probe_check_timeout_checker(
     assert len(result.results) == 0
 
 
-@pytest.mark.asyncio
 async def test_probe_check_all_updates_internal_status(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
@@ -209,18 +199,12 @@ async def test_probe_check_all_updates_internal_status(
     assert registered[sample_service_group].result is not None
 
 
-@pytest.mark.asyncio
 async def test_probe_check_all_mixed_results(
     health_probe: HealthProbe,
     mock_healthy_checker: ServiceHealthChecker,
     mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test check_all() with a mix of healthy and unhealthy checkers."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate checkers with different service groups
     check_time = datetime.now(UTC)
 
@@ -269,18 +253,12 @@ async def test_probe_check_all_mixed_results(
     assert all(not s.is_healthy for s in database_result.results.values())
 
 
-@pytest.mark.asyncio
 async def test_probe_check_all_continues_on_exception(
     health_probe: HealthProbe,
     mock_healthy_checker: ServiceHealthChecker,
     mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test that check_all() continues checking even if some checkers fail."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate checkers with different service groups
     check_time = datetime.now(UTC)
 
@@ -335,7 +313,6 @@ async def test_probe_check_all_continues_on_exception(
     assert AGENT in all_results.results
 
 
-@pytest.mark.asyncio
 async def test_probe_check_all_empty_registry(
     health_probe: HealthProbe,
 ) -> None:
@@ -345,7 +322,6 @@ async def test_probe_check_all_empty_registry(
     assert all_results.results == {}
 
 
-@pytest.mark.asyncio
 async def test_probe_start_and_stop(
     health_probe: HealthProbe,
 ) -> None:
@@ -355,14 +331,13 @@ async def test_probe_start_and_stop(
 
     await health_probe.start()
     assert health_probe._running is True
-    assert health_probe._loop_task is not None
+    assert health_probe._loop_task is not None  # type: ignore[unreachable]
 
     await health_probe.stop()
     assert health_probe._running is False
     assert health_probe._loop_task is None
 
 
-@pytest.mark.asyncio
 async def test_probe_start_already_running(
     health_probe: HealthProbe,
 ) -> None:
@@ -378,7 +353,6 @@ async def test_probe_start_already_running(
     await health_probe.stop()
 
 
-@pytest.mark.asyncio
 async def test_probe_stop_not_running(
     health_probe: HealthProbe,
 ) -> None:
@@ -392,7 +366,6 @@ async def test_probe_stop_not_running(
     assert health_probe._running is False
 
 
-@pytest.mark.asyncio
 async def test_probe_periodic_check(
     health_probe: HealthProbe,
     mock_healthy_checker: ServiceHealthChecker,
@@ -408,24 +381,16 @@ async def test_probe_periodic_check(
     await health_probe.stop()
 
     # Verify that check_service was called multiple times
-    from unittest.mock import AsyncMock
-
-    mock = mock_healthy_checker.check_service  # type: ignore[attr-defined]
+    mock = mock_healthy_checker.check_service
     assert isinstance(mock, AsyncMock)
     assert mock.call_count >= 2
 
 
-@pytest.mark.asyncio
 async def test_probe_dynamic_registration_during_loop(
     health_probe: HealthProbe,
     mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test that checkers can be registered/unregistered while the loop is running."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate checkers with different service groups
     check_time = datetime.now(UTC)
     healthy_result = ServiceHealth(
@@ -475,17 +440,11 @@ async def test_probe_dynamic_registration_during_loop(
     assert DATABASE in registered
 
 
-@pytest.mark.asyncio
 async def test_probe_get_connectivity_status_all_healthy(
     health_probe: HealthProbe,
     mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test get_connectivity_status() when all components are healthy."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate checkers with different service groups
     check_time = datetime.now(UTC)
     healthy_result = ServiceHealth(
@@ -522,18 +481,12 @@ async def test_probe_get_connectivity_status_all_healthy(
     assert isinstance(response.timestamp, datetime)
 
 
-@pytest.mark.asyncio
 async def test_probe_get_connectivity_status_some_unhealthy(
     health_probe: HealthProbe,
     mock_healthy_checker: ServiceHealthChecker,
     mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test get_connectivity_status() when some components are unhealthy."""
-    from datetime import datetime
-    from unittest.mock import AsyncMock
-
-    from ai.backend.common.health_checker import ComponentHealthStatus, ComponentId, ServiceHealth
-
     # Create separate checkers with different service groups
     check_time = datetime.now(UTC)
 
@@ -581,7 +534,6 @@ async def test_probe_get_connectivity_status_some_unhealthy(
     assert len(response.connectivity_checks) == 2
 
 
-@pytest.mark.asyncio
 async def test_probe_get_connectivity_status_empty_registry(
     health_probe: HealthProbe,
 ) -> None:
@@ -593,7 +545,6 @@ async def test_probe_get_connectivity_status_empty_registry(
     assert isinstance(response.timestamp, datetime)
 
 
-@pytest.mark.asyncio
 async def test_probe_get_connectivity_status_excludes_unchecked(
     health_probe: HealthProbe,
     mock_healthy_checker: ServiceHealthChecker,
@@ -610,7 +561,6 @@ async def test_probe_get_connectivity_status_excludes_unchecked(
     assert response.overall_healthy is True  # Default when no checked components
 
 
-@pytest.mark.asyncio
 async def test_probe_get_connectivity_status_component_fields(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,

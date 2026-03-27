@@ -1,4 +1,4 @@
-def visibility_private_component(**kwargs):
+def visibility_private_component(**kwargs: object) -> None:
     """Private package not expected to be imported by anything else than itself."""
     allowed_dependencies = kwargs.get("allowed_dependencies", [])
     allowed_dependents = kwargs.get("allowed_dependents", [])
@@ -25,7 +25,9 @@ def visibility_private_component(**kwargs):
     )
 
 
-def common_scie_config(build_style, *, entry_point="ai.backend.cli.__main__"):
+def common_scie_config(
+    build_style: str, *, entry_point: str = "ai.backend.cli.__main__"
+) -> dict[str, object]:
     build_style_to_tag = {
         "lazy": "lazy",
         "eager": "fat",

@@ -1,28 +1,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
-from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.rbac.scope_binder import RBACScopeBinder
 
-from .base import ScalingGroupAction
+from .user_group_base import ScalingGroupUserGroupAction
 
 
 @dataclass
-class AssociateScalingGroupWithUserGroupsAction(ScalingGroupAction):
+class AssociateScalingGroupWithUserGroupsAction(ScalingGroupUserGroupAction):
     """Action to associate a scaling group with multiple user groups (projects)."""
 
-    bulk_creator: BulkCreator[ScalingGroupForProjectRow]
+    binder: RBACScopeBinder[ScalingGroupForProjectRow]
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "associate_with_user_groups"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -31,5 +32,5 @@ class AssociateScalingGroupWithUserGroupsActionResult(BaseActionResult):
     """Result of associating a scaling group with user groups."""
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

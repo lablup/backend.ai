@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 from pydantic import Field
 
@@ -41,10 +41,10 @@ class RescanImagesManifest(BaseBackgroundTaskManifest):
     Manifest for rescanning container images from registries.
     """
 
-    registry: Optional[str] = Field(
+    registry: str | None = Field(
         default=None, description="Registry name to rescan (if None, rescans all registries)"
     )
-    project: Optional[str] = Field(
+    project: str | None = Field(
         default=None,
         description="Project name within the registry to rescan (if None, rescans all projects)",
     )

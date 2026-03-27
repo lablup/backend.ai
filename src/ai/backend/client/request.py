@@ -15,8 +15,6 @@ from enum import StrEnum
 from pathlib import Path
 from typing import (
     Any,
-    Optional,
-    TypeVar,
     cast,
 )
 
@@ -72,10 +70,7 @@ A struct that represents an attached file to the API request.
 """
 
 
-_T = TypeVar("_T")
-
-
-async def _coro_return(val: _T) -> _T:
+async def _coro_return[T](val: T) -> T:
     return val
 
 
@@ -117,9 +112,9 @@ class Request:
     )
 
     _content: RequestContent
-    _attached_files: Optional[Sequence[AttachedFile]]
+    _attached_files: Sequence[AttachedFile] | None
 
-    date: Optional[datetime]
+    date: datetime | None
     api_version: str
 
     _allowed_methods = frozenset(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
@@ -127,13 +122,13 @@ class Request:
     def __init__(
         self,
         method: str = "GET",
-        path: Optional[str] = None,
-        content: Optional[RequestContent] = None,
+        path: str | None = None,
+        content: RequestContent | None = None,
         *,
-        content_type: Optional[str] = None,
-        params: Optional[Mapping[str, str | int]] = None,
-        reporthook: Optional[Callable] = None,
-        override_api_version: Optional[str] = None,
+        content_type: str | None = None,
+        params: Mapping[str, str | int] | None = None,
+        reporthook: Callable[..., Any] | None = None,
+        override_api_version: str | None = None,
         session_mode: SessionMode = SessionMode.CLIENT,
     ) -> None:
         """
@@ -189,14 +184,13 @@ class Request:
         self,
         value: RequestContent,
         *,
-        content_type: Optional[str] = None,
+        content_type: str | None = None,
     ) -> None:
         """
         Sets the content of the request.
         """
-        assert self._attached_files is None, (
-            "cannot set content because you already attached files."
-        )
+        if self._attached_files is not None:
+            raise ValueError("Cannot set content because files are already attached")
         guessed_content_type = "application/octet-stream"
         if value is None:
             guessed_content_type = "text/plain"
@@ -221,16 +215,17 @@ class Request:
         """
         Attach a list of files represented as AttachedFile.
         """
-        assert not self._content, "content must be empty to attach files."
+        if self._content:
+            raise ValueError("Content must be empty to attach files")
         self.content_type = "multipart/form-data"
         self._attached_files = files
 
     def _sign(
         self,
         rel_url: URL,
-        access_key: Optional[str] = None,
-        secret_key: Optional[str] = None,
-        hash_type: Optional[str] = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
+        hash_type: str | None = None,
     ) -> None:
         """
         Calculates the signature of the given request and adds the
@@ -244,7 +239,8 @@ class Request:
             secret_key = self.config.secret_key
         if hash_type is None:
             hash_type = self.config.hash_type
-        assert self.date is not None
+        if self.date is None:
+            raise RuntimeError("Request date is not set")
         if self.config.endpoint_type == "api":
             hdrs, _ = generate_signature(
                 method=self.method,
@@ -273,7 +269,8 @@ class Request:
             data = aiohttp.FormData()
             for f in self._attached_files:
                 data.add_field("src", f.stream, filename=f.filename, content_type=f.content_type)
-            assert data.is_multipart, "Failed to pack files as multipart."
+            if not data.is_multipart:
+                raise RuntimeError("Failed to pack files as multipart")
             # Let aiohttp fill up the content-type header including
             # multipart boundaries.
             self.headers.pop("Content-Type", None)
@@ -294,7 +291,7 @@ class Request:
 
     # TODO: attach rate-limit information
 
-    def fetch(self, **kwargs) -> FetchContextManager:
+    def fetch(self, **kwargs: Any) -> FetchContextManager:
         """
         Sends the request to the server and reads the response.
 
@@ -311,15 +308,17 @@ class Request:
             async with rqst.fetch() as resp:
               print(await resp.text())
         """
-        assert self.method in self._allowed_methods, f"Disallowed HTTP method: {self.method}"
+        if self.method not in self._allowed_methods:
+            raise ValueError(f"Disallowed HTTP method: {self.method}")
         self.date = datetime.now(tzutc())
-        assert self.date is not None
+        if self.date is None:
+            raise RuntimeError("Failed to set request date")
         self.headers["Date"] = self.date.isoformat()
         if self.content_type is not None and "Content-Type" not in self.headers:
             self.headers["Content-Type"] = self.content_type
         force_anonymous = kwargs.pop("anonymous", False)
 
-        def _rqst_ctx_builder():
+        def _rqst_ctx_builder() -> _RequestContextManager:
             timeout_config = aiohttp.ClientTimeout(
                 total=None,
                 connect=None,
@@ -346,7 +345,7 @@ class Request:
         return FetchContextManager(self.session, _rqst_ctx_builder, self._session_mode, **kwargs)
 
     def connect_websocket(
-        self, protocols: Iterable[str] = tuple(), **kwargs
+        self, protocols: Iterable[str] = tuple(), **kwargs: Any
     ) -> WebSocketContextManager:
         """
         Creates a WebSocket connection.
@@ -356,17 +355,18 @@ class Request:
           This method only works with
           :class:`~ai.backend.client.session.AsyncSession`.
         """
-        assert isinstance(self.session, AsyncSession), (
-            "Cannot use websockets with sessions in the synchronous mode"
-        )
-        assert self.method == "GET", "Invalid websocket method"
+        if not isinstance(self.session, AsyncSession):
+            raise RuntimeError("Cannot use websockets with sessions in the synchronous mode")
+        if self.method != "GET":
+            raise ValueError("Invalid websocket method")
         self.date = datetime.now(tzutc())
-        assert self.date is not None
+        if self.date is None:
+            raise RuntimeError("Failed to set request date")
         self.headers["Date"] = self.date.isoformat()
         # websocket is always a "binary" stream.
         self.content_type = "application/octet-stream"
 
-        def _ws_ctx_builder():
+        def _ws_ctx_builder() -> _WSRequestContextManager:
             full_url = self._build_url()
             if not self.config.is_anonymous:
                 self._sign(full_url.relative())
@@ -385,7 +385,7 @@ class Request:
 
         return WebSocketContextManager(self.session, _ws_ctx_builder, **kwargs)
 
-    def connect_events(self, **kwargs) -> SSEContextManager:
+    def connect_events(self, **kwargs: Any) -> SSEContextManager:
         """
         Creates a Server-Sent Events connection.
 
@@ -394,16 +394,17 @@ class Request:
           This method only works with
           :class:`~ai.backend.client.session.AsyncSession`.
         """
-        assert isinstance(self.session, AsyncSession), (
-            "Cannot use event streams with sessions in the synchronous mode"
-        )
-        assert self.method == "GET", "Invalid event stream method"
+        if not isinstance(self.session, AsyncSession):
+            raise RuntimeError("Cannot use event streams with sessions in the synchronous mode")
+        if self.method != "GET":
+            raise ValueError("Invalid event stream method")
         self.date = datetime.now(tzutc())
-        assert self.date is not None
+        if self.date is None:
+            raise RuntimeError("Failed to set request date")
         self.headers["Date"] = self.date.isoformat()
         self.content_type = "application/octet-stream"
 
-        def _rqst_ctx_builder():
+        def _rqst_ctx_builder() -> _RequestContextManager:
             timeout_config = aiohttp.ClientTimeout(
                 total=None,
                 connect=None,
@@ -432,7 +433,7 @@ class AsyncResponseMixin:
     async def text(self) -> str:
         return await self._raw_response.text()
 
-    async def json(self, *, loads=modjson.loads) -> Any:
+    async def json(self, *, loads: Callable[[str], Any] = modjson.loads) -> Any:
         loads = functools.partial(loads)
         return await self._raw_response.json(loads=loads)
 
@@ -449,11 +450,14 @@ class SyncResponseMixin:
 
     def text(self) -> str:
         sync_session = cast(SyncSession, self._session)
-        return sync_session.worker_thread.execute(
-            self._raw_response.text(),
+        return cast(
+            str,
+            sync_session.worker_thread.execute(
+                self._raw_response.text(),
+            ),
         )
 
-    def json(self, *, loads=modjson.loads) -> Any:
+    def json(self, *, loads: Callable[[str], Any] = modjson.loads) -> Any:
         loads = functools.partial(loads)
         sync_session = cast(SyncSession, self._session)
         return sync_session.worker_thread.execute(
@@ -462,14 +466,20 @@ class SyncResponseMixin:
 
     def read(self, n: int = -1) -> bytes:
         sync_session = cast(SyncSession, self._session)
-        return sync_session.worker_thread.execute(
-            self._raw_response.content.read(n),
+        return cast(
+            bytes,
+            sync_session.worker_thread.execute(
+                self._raw_response.content.read(n),
+            ),
         )
 
     def readall(self) -> bytes:
         sync_session = cast(SyncSession, self._session)
-        return sync_session.worker_thread.execute(
-            self._raw_response.content.read(-1),
+        return cast(
+            bytes,
+            sync_session.worker_thread.execute(
+                self._raw_response.content.read(-1),
+            ),
         )
 
 
@@ -500,7 +510,7 @@ class BaseResponse:
         underlying_response: aiohttp.ClientResponse,
         *,
         async_mode: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         self._session = session
         self._raw_response = underlying_response
@@ -533,7 +543,7 @@ class BaseResponse:
         return self._raw_response.content_type
 
     @property
-    def content_length(self) -> Optional[int]:
+    def content_length(self) -> int | None:
         return self._raw_response.content_length
 
     @property
@@ -562,7 +572,7 @@ class FetchContextManager:
         "session",
     )
 
-    _rqst_ctx: Optional[_RequestContextManager]
+    _rqst_ctx: _RequestContextManager | None
 
     def __init__(
         self,
@@ -584,12 +594,13 @@ class FetchContextManager:
     async def __aenter__(self) -> Response:
         max_retries = len(self.session.config.endpoints)
         retry_count = 0
-        raw_resp: Optional[aiohttp.ClientResponse] = None
+        raw_resp: aiohttp.ClientResponse | None = None
         while True:
             try:
                 retry_count += 1
                 self._rqst_ctx = self.rqst_ctx_builder()
-                assert self._rqst_ctx is not None
+                if self._rqst_ctx is None:
+                    raise RuntimeError("Failed to build request context")
                 raw_resp = await self._rqst_ctx.__aenter__()
                 if self.check_status and raw_resp.status // 100 not in [2, 3]:
                     match self._session_mode:
@@ -619,8 +630,9 @@ class FetchContextManager:
             finally:
                 self.session.config.load_balance_endpoints()
 
-    async def __aexit__(self, *exc_info) -> Optional[bool]:
-        assert self._rqst_ctx is not None
+    async def __aexit__(self, *exc_info: Any) -> bool | None:
+        if self._rqst_ctx is None:
+            raise RuntimeError("Request context is not initialized")
         await self._rqst_ctx.__aexit__(*exc_info)
         self._rqst_ctx = None
         return None
@@ -637,7 +649,7 @@ class WebSocketResponse(BaseResponse):
         self,
         session: BaseSession,
         underlying_response: aiohttp.ClientResponse,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         # Unfortunately, aiohttp.ClientWebSocketResponse is not a subclass of aiohttp.ClientResponse.
         # Since we block methods that require ClientResponse-specific methods, we just force-typecast.
@@ -649,7 +661,7 @@ class WebSocketResponse(BaseResponse):
         raise AttributeError("WebSocketResponse does not have an explicit content type.")
 
     @property
-    def content_length(self) -> Optional[int]:
+    def content_length(self) -> int | None:
         raise AttributeError("WebSocketResponse does not have a fixed content length.")
 
     @property
@@ -670,7 +682,7 @@ class WebSocketResponse(BaseResponse):
     def __aiter__(self) -> AsyncIterator[aiohttp.WSMessage]:
         return self._raw_ws.__aiter__()
 
-    def exception(self) -> Optional[BaseException]:
+    def exception(self) -> BaseException | None:
         return self._raw_ws.exception()
 
     async def send_str(self, raw_str: str) -> None:
@@ -717,14 +729,14 @@ class WebSocketContextManager:
         "ws_ctx_builder",
     )
 
-    _ws_ctx: Optional[_WSRequestContextManager]
+    _ws_ctx: _WSRequestContextManager | None
 
     def __init__(
         self,
         session: BaseSession,
         ws_ctx_builder: Callable[[], _WSRequestContextManager],
         *,
-        on_enter: Optional[Callable] = None,
+        on_enter: Callable[..., Any] | None = None,
         response_cls: type[WebSocketResponse] = WebSocketResponse,
     ) -> None:
         self.session = session
@@ -740,7 +752,8 @@ class WebSocketContextManager:
             try:
                 retry_count += 1
                 self._ws_ctx = self.ws_ctx_builder()
-                assert self._ws_ctx is not None
+                if self._ws_ctx is None:
+                    raise RuntimeError("Failed to build WebSocket context")
                 raw_ws = await self._ws_ctx.__aenter__()
             except aiohttp.ClientConnectionError as e:
                 if retry_count == max_retries:
@@ -765,8 +778,9 @@ class WebSocketContextManager:
             await self.on_enter(wrapped_ws)
         return wrapped_ws
 
-    async def __aexit__(self, *args) -> Optional[bool]:
-        assert self._ws_ctx is not None
+    async def __aexit__(self, *args: Any) -> bool | None:
+        if self._ws_ctx is None:
+            raise RuntimeError("WebSocket context is not initialized")
         await self._ws_ctx.__aexit__(*args)
         self._ws_ctx = None
         return None
@@ -776,8 +790,8 @@ class WebSocketContextManager:
 class SSEMessage:
     event: str
     data: str
-    id: Optional[str] = None
-    retry: Optional[int] = None
+    id: str | None = None
+    retry: int | None = None
 
 
 class SSEResponse(BaseResponse):
@@ -795,7 +809,7 @@ class SSEResponse(BaseResponse):
         connector: Callable[[], Awaitable[aiohttp.ClientResponse]],
         auto_reconnect: bool = True,
         default_retry: int = 5,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(session, underlying_response, async_mode=True, **kwargs)
         self._auto_reconnect = auto_reconnect
@@ -870,7 +884,7 @@ class SSEContextManager:
         "session",
     )
 
-    _rqst_ctx: Optional[_RequestContextManager]
+    _rqst_ctx: _RequestContextManager | None
 
     def __init__(
         self,
@@ -888,7 +902,8 @@ class SSEContextManager:
         if self._rqst_ctx is not None:
             await self._rqst_ctx.__aexit__(None, None, None)
         self._rqst_ctx = self.rqst_ctx_builder()
-        assert self._rqst_ctx is not None
+        if self._rqst_ctx is None:
+            raise RuntimeError("Failed to build request context for SSE")
         raw_resp = await self._rqst_ctx.__aenter__()
         if raw_resp.status // 100 != 2:
             msg = await raw_resp.text()
@@ -919,8 +934,9 @@ class SSEContextManager:
             finally:
                 self.session.config.load_balance_endpoints()
 
-    async def __aexit__(self, *args) -> Optional[bool]:
-        assert self._rqst_ctx is not None
+    async def __aexit__(self, *args: Any) -> bool | None:
+        if self._rqst_ctx is None:
+            raise RuntimeError("SSE request context is not initialized")
         await self._rqst_ctx.__aexit__(*args)
         self._rqst_ctx = None
         return None

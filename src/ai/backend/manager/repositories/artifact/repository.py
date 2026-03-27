@@ -1,5 +1,4 @@
 import uuid
-from typing import Optional
 
 from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
@@ -12,9 +11,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
-    ArtifactFilterOptions,
     ArtifactListResult,
-    ArtifactOrderingOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionListResult,
@@ -27,7 +24,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.db_source.db_source import ArtifactDBSource
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.types import PaginationOptions
 
 artifact_repository_resilience = Resilience(
     policies=[
@@ -182,19 +178,6 @@ class ArtifactRepository:
     @artifact_repository_resilience.apply()
     async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str | None:
         return await self._db_source.get_artifact_revision_readme(artifact_revision_id)
-
-    @artifact_repository_resilience.apply()
-    async def list_artifacts_with_revisions_paginated(
-        self,
-        *,
-        pagination: Optional[PaginationOptions] = None,
-        ordering: Optional[ArtifactOrderingOptions] = None,
-        filters: Optional[ArtifactFilterOptions] = None,
-    ) -> tuple[list[ArtifactDataWithRevisions], int | None]:
-        # Legacy
-        return await self._db_source.list_artifacts_with_revisions_paginated(
-            pagination=pagination, ordering=ordering, filters=filters
-        )
 
     @artifact_repository_resilience.apply()
     async def search_artifacts(

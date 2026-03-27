@@ -5,7 +5,6 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
 )
@@ -27,9 +26,14 @@ from ai.backend.manager.data.user.types import (
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, groups
 from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.minilang import ExternalTableFilterSpec, ORMFieldItem
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import (
+    ExternalTableFilterSpec,
+    FieldSpecItem,
+    OrderSpecItem,
+    ORMFieldItem,
+)
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,
@@ -91,7 +95,7 @@ __all__ = (
 
 
 @graphene_federation.key("id")
-class UserNode(graphene.ObjectType):
+class UserNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -187,7 +191,7 @@ class UserNode(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
 
         _, user_id = AsyncNode.resolve_global_id(info, id)
@@ -406,13 +410,13 @@ class UserNode(graphene.ObjectType):
     async def resolve_project_nodes(
         self,
         info: graphene.ResolveInfo,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[GroupNode]:
         from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 
@@ -459,7 +463,7 @@ class UserNode(graphene.ObjectType):
                 result.append(GroupNode.from_row(graph_ctx, prj_row))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> UserNode:
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> UserNode:
         return await UserNode.get_node(info, self.id)
 
 
@@ -469,12 +473,12 @@ class UserConnection(Connection):
         description = "Added in 24.03.0"
 
 
-class UserGroup(graphene.ObjectType):
+class UserGroup(graphene.ObjectType):  # type: ignore[misc]
     id = graphene.UUID()
     name = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[UserGroup]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any] | None) -> Self | None:
         if row is None:
             return None
         return cls(
@@ -483,7 +487,9 @@ class UserGroup(graphene.ObjectType):
         )
 
     @classmethod
-    async def batch_load_by_user_id(cls, ctx: GraphQueryContext, user_ids: Sequence[UUID]):
+    async def batch_load_by_user_id(
+        cls, ctx: GraphQueryContext, user_ids: Sequence[UUID]
+    ) -> Sequence[Sequence[UserGroup]]:
         async with ctx.db.begin() as conn:
             j = agus.join(groups, agus.c.group_id == groups.c.id)
             query = (
@@ -501,7 +507,7 @@ class UserGroup(graphene.ObjectType):
             )
 
 
-class User(graphene.ObjectType):
+class User(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -550,7 +556,7 @@ class User(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         manager = ctx.dataloader_manager
         loader = manager.get_loader(ctx, "UserGroup.by_user_id")
-        return await loader.load(self.id)
+        return cast(Iterable[UserGroup], await loader.load(self.id))
 
     @classmethod
     def from_dto(cls, dto: UserData) -> Self:
@@ -584,7 +590,7 @@ class User(graphene.ObjectType):
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row,
+        row: Row[Any],
     ) -> User:
         return cls(
             id=row.uuid,
@@ -617,11 +623,11 @@ class User(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[UUID] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[str] = None,
-        limit: Optional[int] = None,
+        domain_name: str | None = None,
+        group_id: UUID | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+        limit: int | None = None,
     ) -> Sequence[User]:
         """
         Load user's information. Group names associated with the user are also returned.
@@ -692,11 +698,11 @@ class User(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[UUID] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[str] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: UUID | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+        filter: str | None = None,
     ) -> int:
         if group_id is not None:
             j = users.join(agus, agus.c.user_id == users.c.uuid)
@@ -722,7 +728,7 @@ class User(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-        return result.scalar()
+        return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -731,12 +737,12 @@ class User(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[UUID] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[str] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: UUID | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[User]:
         if group_id is not None:
             j = users.join(agus, agus.c.user_id == users.c.uuid)
@@ -787,12 +793,12 @@ class User(graphene.ObjectType):
     async def batch_load_by_email(
         cls,
         ctx: GraphQueryContext,
-        emails: Optional[Sequence[str]] = None,
+        emails: Sequence[str] | None = None,
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[str] = None,
-    ) -> Sequence[Optional[User]]:
+        domain_name: str | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+    ) -> Sequence[User | None]:
         if not emails:
             return []
         query = sa.select(users).select_from(users).where(users.c.email.in_(emails))
@@ -817,12 +823,12 @@ class User(graphene.ObjectType):
     async def batch_load_by_uuid(
         cls,
         ctx: GraphQueryContext,
-        user_ids: Optional[Sequence[UUID]] = None,
+        user_ids: Sequence[UUID] | None = None,
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
-        status: Optional[str] = None,
-    ) -> Sequence[Optional[User]]:
+        domain_name: str | None = None,
+        is_active: bool | None = None,
+        status: str | None = None,
+    ) -> Sequence[User | None]:
         if not user_ids:
             return []
         query = sa.select(users).select_from(users).where(users.c.uuid.in_(user_ids))
@@ -844,14 +850,14 @@ class User(graphene.ObjectType):
             )
 
 
-class UserList(graphene.ObjectType):
+class UserList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(User, required=True)
 
 
-class UserInput(graphene.InputObjectType):
+class UserInput(graphene.InputObjectType):  # type: ignore[misc]
     username = graphene.String(required=True)
     password = graphene.String(required=True)
     need_password_change = graphene.Boolean(required=True)
@@ -883,7 +889,7 @@ class UserInput(graphene.InputObjectType):
     # When modifying, set the field to "None" to skip setting the value.
 
     def to_action(self, email: str, graph_ctx: GraphQueryContext) -> CreateUserAction:
-        def value_or_none(value: Any) -> Optional[Any]:
+        def value_or_none(value: Any) -> Any | None:
             return value if value is not Undefined else None
 
         auth_config = graph_ctx.config_provider.config.auth
@@ -920,7 +926,7 @@ class UserInput(graphene.InputObjectType):
         )
 
 
-class ModifyUserInput(graphene.InputObjectType):
+class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
     username = graphene.String(required=False)
     password = graphene.String(required=False)
     need_password_change = graphene.Boolean(required=False)
@@ -971,10 +977,10 @@ class ModifyUserInput(graphene.InputObjectType):
             need_password_change=OptionalState[bool].from_graphql(
                 self.need_password_change,
             ),
-            full_name=OptionalState[str].from_graphql(
+            full_name=TriState[str].from_graphql(
                 self.full_name,
             ),
-            description=OptionalState[str].from_graphql(
+            description=TriState[str].from_graphql(
                 self.description,
             ),
             is_active=OptionalState[bool].from_graphql(
@@ -1026,7 +1032,7 @@ class ModifyUserInput(graphene.InputObjectType):
         )
 
 
-class PurgeUserInput(graphene.InputObjectType):
+class PurgeUserInput(graphene.InputObjectType):  # type: ignore[misc]
     purge_shared_vfolders = graphene.Boolean(required=False, default=False)
     delegate_endpoint_ownership = graphene.Boolean(
         required=False,
@@ -1050,7 +1056,7 @@ class PurgeUserInput(graphene.InputObjectType):
         )
 
 
-class CreateUser(graphene.Mutation):
+class CreateUser(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1067,12 +1073,14 @@ class CreateUser(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         email: str,
         props: UserInput,
     ) -> CreateUser:
         from .keypair import KeyPair
+
+        validate_user_mutation_props(props)
 
         graph_ctx: GraphQueryContext = info.context
         action: CreateUserAction = props.to_action(email, graph_ctx)
@@ -1088,7 +1096,7 @@ class CreateUser(graphene.Mutation):
         )
 
 
-class ModifyUser(graphene.Mutation):
+class ModifyUser(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1102,14 +1110,18 @@ class ModifyUser(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         email: str,
         props: ModifyUserInput,
     ) -> ModifyUser:
         graph_ctx: GraphQueryContext = info.context
 
+        validate_user_mutation_props(props)
+
         action: ModifyUserAction = props.to_action(email, graph_ctx)
+        user_data = await graph_ctx.user_repository.get_by_email_validated(email)
+        action.user_uuid = user_data.id
         res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
             action
         )
@@ -1121,7 +1133,7 @@ class ModifyUser(graphene.Mutation):
         )
 
 
-class DeleteUser(graphene.Mutation):
+class DeleteUser(graphene.Mutation):  # type: ignore[misc]
     """
     Instead of really deleting user, just mark the account as deleted status.
 
@@ -1139,7 +1151,7 @@ class DeleteUser(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         email: str,
     ) -> DeleteUser:
@@ -1152,7 +1164,7 @@ class DeleteUser(graphene.Mutation):
         )
 
 
-class PurgeUser(graphene.Mutation):
+class PurgeUser(graphene.Mutation):  # type: ignore[misc]
     """
     Delete user as well as all user-related DB informations such as keypairs, kernels, etc.
 
@@ -1180,7 +1192,7 @@ class PurgeUser(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         email: str,
         props: PurgeUserInput,
@@ -1199,3 +1211,16 @@ class PurgeUser(graphene.Mutation):
             ok=True,
             msg="success",
         )
+
+
+def _validate_container_uid_gid(value: Any) -> None:
+    if value is not Undefined and value is not None and value < 0:
+        raise ValueError("UID and GID must be non-negative integers.")
+
+
+def validate_user_mutation_props(props: UserInput | ModifyUserInput) -> None:
+    for value in [props.container_uid, props.container_main_gid]:
+        _validate_container_uid_gid(value)
+    if props.container_gids is not Undefined and props.container_gids is not None:
+        for value in props.container_gids:
+            _validate_container_uid_gid(value)

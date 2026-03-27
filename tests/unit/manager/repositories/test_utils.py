@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.engine import Row
 
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent import AgentRow
@@ -23,7 +24,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, kernels
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -68,6 +69,7 @@ async def db_with_cleanup(
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
+            RoleRow,
             UserRoleRow,
             UserRow,
             KeyPairRow,
@@ -112,7 +114,7 @@ async def session_info(
         )
         db_sess.add(scaling_group)
 
-        domain = DomainRow(name=domain_name, total_resource_slots={})
+        domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
         db_sess.add(domain)
 
         user_resource_policy = UserResourcePolicyRow(
@@ -136,7 +138,7 @@ async def session_info(
             id=group_id,
             name=group_name,
             domain_name=domain_name,
-            total_resource_slots={},
+            total_resource_slots=ResourceSlot(),
             resource_policy=resource_policy_name,
         )
         db_sess.add(group)
@@ -159,6 +161,8 @@ async def session_info(
             scaling_group_name=sgroup_name,
             group_id=group_id,
             user_uuid=user_uuid,
+            occupying_slots=ResourceSlot(),
+            requested_slots=ResourceSlot(),
             vfolder_mounts={},
         )
         db_sess.add(sess)
@@ -169,7 +173,8 @@ async def session_info(
             group_id=group_id,
             user_uuid=user_uuid,
             cluster_role=DEFAULT_ROLE,
-            occupied_slots={},
+            occupied_slots=ResourceSlot(),
+            requested_slots=ResourceSlot(),
             repl_in_port=0,
             repl_out_port=0,
             stdin_port=0,
@@ -185,13 +190,12 @@ async def session_info(
 async def _select_kernel_row(
     conn: Any,
     session_id: str | uuid.UUID,
-) -> Row:
+) -> Row[Any]:
     query = kernels.select().select_from(kernels).where(kernels.c.session_id == session_id)
-    kernel, *_ = await conn.execute(query)
-    return kernel
+    result = await conn.execute(query)
+    return result.first()  # type: ignore[no-any-return]
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__default(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     expected: dict[str, Any] | None = None
@@ -200,7 +204,6 @@ async def test_sql_json_merge__default(session_info: tuple[str, Any]) -> None:
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__deeper_object(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
@@ -232,7 +235,6 @@ async def test_sql_json_merge__deeper_object(session_info: tuple[str, Any]) -> N
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__append_values(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
@@ -281,7 +283,6 @@ async def test_sql_json_merge__append_values(session_info: tuple[str, Any]) -> N
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__kernel_status_history(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
@@ -326,7 +327,6 @@ async def test_sql_json_merge__kernel_status_history(session_info: tuple[str, An
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__mixed_formats(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
@@ -370,7 +370,6 @@ async def test_sql_json_merge__mixed_formats(session_info: tuple[str, Any]) -> N
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__json_serializable_types(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     expected = {
@@ -403,7 +402,6 @@ async def test_sql_json_merge__json_serializable_types(session_info: tuple[str, 
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     test_data1, test_data2 = "hello", "world"
@@ -420,13 +418,13 @@ async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
         "group_id": orig_mapping["group_id"],
         "user_uuid": orig_mapping["user_uuid"],
         "cluster_role": "sub",
-        "occupied_slots": {},
-        "requested_slots": {},
+        "occupied_slots": ResourceSlot(),
+        "requested_slots": ResourceSlot(),
         "repl_in_port": 0,
         "repl_out_port": 0,
         "stdin_port": 0,
         "stdout_port": 0,
-        "vfolder_mounts": {},
+        "vfolder_mounts": [],
     }
     await conn.execute(
         sa.insert(kernels).values({
@@ -466,7 +464,6 @@ async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
     )
 
 
-@pytest.mark.asyncio
 async def test_agg_to_array(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     test_data1, test_data2 = "a", "b"
@@ -483,13 +480,13 @@ async def test_agg_to_array(session_info: tuple[str, Any]) -> None:
         "group_id": orig_mapping["group_id"],
         "user_uuid": orig_mapping["user_uuid"],
         "cluster_role": "sub",
-        "occupied_slots": {},
-        "requested_slots": {},
+        "occupied_slots": ResourceSlot(),
+        "requested_slots": ResourceSlot(),
         "repl_in_port": 0,
         "repl_out_port": 0,
         "stdin_port": 0,
         "stdout_port": 0,
-        "vfolder_mounts": {},
+        "vfolder_mounts": [],
     }
     await conn.execute(
         sa.insert(kernels).values({

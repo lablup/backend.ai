@@ -27,7 +27,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .utils import auth_required
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RouteHealthStatusModel(BaseModel):
@@ -243,16 +243,16 @@ async def get_circuit_health(
     circuit_id_str = request.match_info["circuit_id"]
     try:
         circuit_id = UUID(circuit_id_str)
-    except ValueError:
-        raise web.HTTPBadRequest(reason="Invalid circuit ID format")
+    except ValueError as e:
+        raise web.HTTPBadRequest(reason="Invalid circuit ID format") from e
 
     root_ctx: RootContext = request.app["ctx"]
 
     async with root_ctx.db.begin_readonly_session() as sess:
         try:
             circuit = await Circuit.get(sess, circuit_id)
-        except Exception:
-            raise web.HTTPNotFound(reason="Circuit not found")
+        except Exception as e:
+            raise web.HTTPNotFound(reason="Circuit not found") from e
 
         if not circuit.endpoint_id:
             # Circuit without endpoint health checking
@@ -342,11 +342,11 @@ async def status(request: web.Request) -> PydanticResponse[StatusResponseModel]:
     )
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

@@ -3,7 +3,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 import sqlalchemy as sa
-from sqlalchemy.orm import contains_eager
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -20,12 +19,11 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
+    AgentListResult,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
-from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
@@ -33,10 +31,13 @@ from ai.backend.manager.repositories.agent.stateful_source.stateful_source impor
     AgentStatefulSource,
 )
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base import BulkUpserter
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
-
-from .query import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
+from ai.backend.manager.repositories.resource_slot.upserters import AgentResourceUpserterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -72,8 +73,16 @@ class AgentRepository:
     ) -> None:
         self._db_source = AgentDBSource(db)
         self._cache_source = AgentCacheSource(valkey_image, valkey_live, valkey_stat)
-        self._stateful_source = AgentStatefulSource(valkey_image)
+        self._stateful_source = AgentStatefulSource(valkey_image, valkey_stat)
         self._config_provider = config_provider
+
+    @agent_repository_resilience.apply()
+    async def load_agent_container_counts(self, agent_ids: Sequence[AgentId]) -> Sequence[int]:
+        """Load container counts for the given agent IDs.
+
+        Returns counts in the same order as the input agent_ids.
+        """
+        return await self._stateful_source.read_agent_container_counts(agent_ids)
 
     @agent_repository_resilience.apply()
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
@@ -111,6 +120,21 @@ class AgentRepository:
             await self._config_provider.legacy_etcd_config_loader.update_resource_slots(
                 upsert_data.resource_info.slot_key_and_units
             )
+
+        # Sync agent capacity to normalized agent_resources table
+        quantities = resource_slot_to_quantities(upsert_data.resource_info.available_slots)
+        if quantities:
+            bulk_upserter = BulkUpserter(
+                specs=[
+                    AgentResourceUpserterSpec(
+                        agent_id=str(agent_id),
+                        slot_name=q.slot_name,
+                        capacity=q.quantity,
+                    )
+                    for q in quantities
+                ]
+            )
+            await self._db_source.upsert_agent_resource_capacity(bulk_upserter)
 
         return upsert_result
 
@@ -168,22 +192,8 @@ class AgentRepository:
         conditions: Sequence[QueryCondition],
         order_by: Sequence[QueryOrder] = tuple(),
     ) -> list[AgentData]:
-        stmt: sa.sql.Select = (
-            sa.select(AgentRow)
-            .select_from(
-                sa.join(
-                    AgentRow,
-                    KernelRow,
-                    sa.and_(
-                        AgentRow.id == KernelRow.agent,
-                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
-                    ),
-                    isouter=True,
-                )
-            )
-            .options(
-                contains_eager(AgentRow.kernels),
-            )
+        stmt: sa.sql.Select[Any] = sa.select(AgentRow).options(
+            sa.orm.selectinload(AgentRow.agent_resource_rows),
         )
         for cond in conditions:
             stmt = stmt.where(cond())
@@ -203,3 +213,11 @@ class AgentRepository:
             [Exception], message=f"Failed to update GPU alloc map for agent: {agent_id}"
         ):
             await self._cache_source.update_gpu_alloc_map(agent_id, alloc_map)
+
+    @agent_repository_resilience.apply()
+    async def search_agents(
+        self,
+        querier: BatchQuerier,
+    ) -> AgentListResult:
+        """Searches agents with total count."""
+        return await self._db_source.search_agents(querier=querier)

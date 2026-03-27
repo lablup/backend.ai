@@ -1,10 +1,13 @@
 import json
 from contextlib import closing
+from typing import Any
 
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
-def test_add_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resource_policy: str):
+def test_add_keypair_resource_policy(
+    run_admin: ClientRunnerFunc, keypair_resource_policy: str
+) -> None:
     print("[ Add keypair resource policy ]")
 
     vfolder_volume_name = "local:volume1"
@@ -81,7 +84,9 @@ def test_add_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resour
     ), "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
-def test_update_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resource_policy: str):
+def test_update_keypair_resource_policy(
+    run_admin: ClientRunnerFunc, keypair_resource_policy: str
+) -> None:
     print("[ Update keypair resource policy ]")
 
     vfolder_volume_name = "local:volume2"
@@ -157,7 +162,9 @@ def test_update_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_res
     ), "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
-def test_delete_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resource_policy: str):
+def test_delete_keypair_resource_policy(
+    run_admin: ClientRunnerFunc, keypair_resource_policy: str
+) -> None:
     print("[ Delete keypair resource policy ]")
 
     # Delete keypair resource policy
@@ -177,7 +184,7 @@ def test_delete_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_res
         assert response.get("ok") is True, "Keypair resource policy deletion failed"
 
 
-def test_list_keypair_resource_policy(run_admin: ClientRunnerFunc):
+def test_list_keypair_resource_policy(run_admin: ClientRunnerFunc) -> None:
     print("[ List keypair resource policy ]")
     with closing(run_admin(["--output=json", "admin", "keypair-resource-policy", "list"])) as p:
         p.expect(EOF)
@@ -187,7 +194,7 @@ def test_list_keypair_resource_policy(run_admin: ClientRunnerFunc):
         assert isinstance(krp_list, list), "Keypair resource policy list not printed properly"
 
 
-def get_keypair_resource_policy_from_list(krps: list, name: str) -> dict:
+def get_keypair_resource_policy_from_list(krps: list[dict[str, Any]], name: str) -> dict[str, Any]:
     for krp in krps:
         if krp.get("name") == name:
             return krp

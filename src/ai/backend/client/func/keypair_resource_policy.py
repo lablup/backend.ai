@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.output.fields import keypair_resource_policy_fields
@@ -66,7 +66,7 @@ class KeypairResourcePolicy(BaseFunction):
         max_pending_session_count: int | Undefined = undefined,
         max_pending_session_resource_slots: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new keypair resource policy with the given options.
         You need an admin privilege for this operation.
@@ -100,7 +100,7 @@ class KeypairResourcePolicy(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["create_keypair_resource_policy"]
+        return cast(dict[str, Any], data["create_keypair_resource_policy"])
 
     @api_function
     @classmethod
@@ -118,7 +118,7 @@ class KeypairResourcePolicy(BaseFunction):
         vfolder_host_perms: str | Undefined = undefined,
         max_pending_session_count: int | Undefined = undefined,
         max_pending_session_resource_slots: str | Undefined = undefined,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Updates an existing keypair resource policy with the given options.
         You need an admin privilege for this operation.
@@ -146,11 +146,11 @@ class KeypairResourcePolicy(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["modify_keypair_resource_policy"]
+        return cast(dict[str, Any], data["modify_keypair_resource_policy"])
 
     @api_function
     @classmethod
-    async def delete(cls, name: str) -> dict:
+    async def delete(cls, name: str) -> dict[str, Any]:
         """
         Deletes an existing keypair resource policy with given name.
         You need an admin privilege for this operation.
@@ -166,14 +166,14 @@ class KeypairResourcePolicy(BaseFunction):
             "name": name,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["delete_keypair_resource_policy"]
+        return cast(dict[str, Any], data["delete_keypair_resource_policy"])
 
     @api_function
     @classmethod
     async def list(
         cls,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Lists the keypair resource policies.
         You need an admin privilege for this operation.
@@ -181,14 +181,14 @@ class KeypairResourcePolicy(BaseFunction):
         q = "query { keypair_resource_policies { $fields } }"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q)
-        return data["keypair_resource_policies"]
+        return cast(Sequence[dict[str, Any]], data["keypair_resource_policies"])
 
     @api_function
     async def info(
         self,
         name: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Returns the resource policy's information.
 
@@ -206,4 +206,4 @@ class KeypairResourcePolicy(BaseFunction):
             "name": name,
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["keypair_resource_policy"]
+        return cast(dict[str, Any], data["keypair_resource_policy"])

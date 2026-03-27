@@ -2,6 +2,9 @@
 Author: HyeokJin Kim (hyeokjin@lablup.com)
 Status: Draft
 Created: 2025-06-30
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # Model Serving Registry

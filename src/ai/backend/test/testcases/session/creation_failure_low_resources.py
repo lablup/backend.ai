@@ -19,7 +19,7 @@ class SessionCreationFailureLowResources(TestCode):
         result = await client_session.Image.get(
             image_dep.name, image_dep.architecture, fields=[image_fields["labels"]]
         )
-        labels = result["labels"]
+        labels = result["labels"]  # type: ignore[call-overload]
         min_mem_label = next(
             filter(lambda label: label["key"] == "ai.backend.resource.min.mem", labels), None
         )

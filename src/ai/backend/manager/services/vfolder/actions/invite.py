@@ -3,11 +3,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import (
     Any,
-    Optional,
     override,
 )
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.vfolder import VFolderPermission as VFolderMountPermission
 from ai.backend.manager.services.vfolder.types import VFolderInvitationInfo
 
@@ -16,8 +17,8 @@ from ai.backend.manager.services.vfolder.types import VFolderInvitationInfo
 class VFolderInvitationAction(BaseAction):
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "vfolder_invitation"
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER_INVITATION
 
 
 @dataclass
@@ -27,16 +28,16 @@ class InviteVFolderAction(VFolderInvitationAction):
 
     vfolder_uuid: uuid.UUID
     mount_permission: VFolderMountPermission
-    invitee_user_uuids: list[uuid.UUID]
+    invitee_emails: list[str]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "invite"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass
@@ -45,7 +46,7 @@ class InviteVFolderActionResult(BaseActionResult):
     invitation_ids: list[str]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
 
@@ -54,13 +55,13 @@ class AcceptInvitationAction(VFolderInvitationAction):
     invitation_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.invitation_id)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "accept"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -68,7 +69,7 @@ class AcceptInvitationActionResult(BaseActionResult):
     invitation_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.invitation_id)
 
 
@@ -78,13 +79,13 @@ class RejectInvitationAction(VFolderInvitationAction):
     requester_user_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.invitation_id)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "reject"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -92,7 +93,7 @@ class RejectInvitationActionResult(BaseActionResult):
     invitation_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.invitation_id)
 
 
@@ -104,13 +105,13 @@ class UpdateInvitationAction(VFolderInvitationAction):
     mount_permission: VFolderMountPermission
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.invitation_id)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -118,7 +119,7 @@ class UpdateInvitationActionResult(BaseActionResult):
     invitation_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.invitation_id)
 
 
@@ -127,13 +128,13 @@ class ListInvitationAction(VFolderInvitationAction):
     requester_user_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.requester_user_uuid)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "list"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass
@@ -142,7 +143,7 @@ class ListInvitationActionResult(BaseActionResult):
     info: list[VFolderInvitationInfo]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.requester_user_uuid)
 
 
@@ -150,16 +151,16 @@ class ListInvitationActionResult(BaseActionResult):
 class LeaveInvitedVFolderAction(VFolderInvitationAction):
     vfolder_uuid: uuid.UUID
     requester_user_uuid: uuid.UUID
-    shared_user_uuid: Optional[uuid.UUID] = None
+    shared_user_uuid: uuid.UUID | None = None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "leave"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass
@@ -167,7 +168,7 @@ class LeaveInvitedVFolderActionResult(BaseActionResult):
     vfolder_uuid: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)
 
 
@@ -177,13 +178,13 @@ class RevokeInvitedVFolderAction(VFolderInvitationAction):
     shared_user_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_id)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "revoke"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass
@@ -192,7 +193,7 @@ class RevokeInvitedVFolderActionResult(BaseActionResult):
     shared_user_id: uuid.UUID
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_id)
 
 
@@ -203,13 +204,13 @@ class UpdateInvitedVFolderMountPermissionAction(VFolderInvitationAction):
     permission: VFolderMountPermission
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_id)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update_permission"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -219,5 +220,30 @@ class UpdateInvitedVFolderMountPermissionActionResult(BaseActionResult):
     permission: VFolderMountPermission
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.vfolder_id)
+
+
+@dataclass
+class ListSentInvitationsAction(VFolderInvitationAction):
+    """List invitations sent by the requester."""
+
+    requester_user_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.requester_user_uuid)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+@dataclass
+class ListSentInvitationsActionResult(BaseActionResult):
+    invitations: list[VFolderInvitationInfo]
+
+    @override
+    def entity_id(self) -> str | None:
+        return None

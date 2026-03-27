@@ -97,6 +97,7 @@ image_fields = FieldSet([
     FieldSpec("digest"),
     FieldSpec("size_bytes", formatter=sizebytes_output_formatter),
     FieldSpec("aliases"),
+    FieldSpec("last_used_at"),
     FieldSpec("labels { key value }", "labels"),
     FieldSpec(
         "labels { key value }",

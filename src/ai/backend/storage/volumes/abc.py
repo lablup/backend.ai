@@ -8,7 +8,6 @@ from typing import (
     Any,
     ClassVar,
     Final,
-    Optional,
     final,
 )
 
@@ -55,8 +54,8 @@ class AbstractQuotaModel(metaclass=ABCMeta):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         """
         Creates a new quota scope.
@@ -79,7 +78,7 @@ class AbstractQuotaModel(metaclass=ABCMeta):
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         """
         Get the information about the given quota scope.
         Returns None if target quota scope does not exist.
@@ -204,8 +203,8 @@ class AbstractVolume(metaclass=ABCMeta):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        watcher: Optional[WatcherClient] = None,
-        options: Optional[Mapping[str, Any]] = None,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         self.local_config = local_config
         self.mount_path = mount_path

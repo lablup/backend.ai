@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -10,6 +10,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     HealthCheckStatus,
     ValkeyScheduleClient,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId
@@ -17,6 +18,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
 from ai.backend.manager.errors.deployment import (
+    DeploymentHasNoTargetRevision,
     EndpointNotFound,
     RouteSessionNotFound,
     RouteSessionTerminated,
@@ -35,6 +37,20 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+
+def _extract_error_code(exception: BaseException) -> str | None:
+    """Extract error code from exception if available.
+
+    Args:
+        exception: The exception to extract error code from.
+
+    Returns:
+        Error code string if exception is BackendAIError, None otherwise.
+    """
+    if isinstance(exception, BackendAIError):
+        return str(exception.error_code())
+    return None
 
 
 class RouteExecutor:
@@ -84,12 +100,13 @@ class RouteExecutor:
                     route_session_ids[route.route_id] = session_id
                 successes.append(route)
             except Exception as e:
-                log.exception("Failed to provision route {}: {}", route.route_id, e)
+                log.warning("Failed to provision route {}: {}", route.route_id, e)
                 errors.append(
                     RouteExecutionError(
                         route_info=route,
                         reason="Failed to provision",
                         error_detail=str(e),
+                        error_code=_extract_error_code(e),
                     )
                 )
 
@@ -126,7 +143,9 @@ class RouteExecutor:
         # Phase 1: Terminate sessions
         with RouteRecorderContext.shared_phase("terminate_sessions"):
             with RouteRecorderContext.shared_step("mark_sessions_terminating"):
-                await self._scheduling_controller.mark_sessions_for_termination(target_session_ids)
+                await self._scheduling_controller.mark_sessions_for_termination(
+                    target_session_ids, reason="ROUTE_TERMINATION"
+                )
 
         return RouteExecutionResult(
             successes=list(routes),
@@ -165,6 +184,7 @@ class RouteExecutor:
                         route_info=route,
                         reason=e.error_title,
                         error_detail=str(e),
+                        error_code=_extract_error_code(e),
                     )
                 )
 
@@ -216,6 +236,7 @@ class RouteExecutor:
                         route_info=route,
                         reason=e.error_title,
                         error_detail=str(e),
+                        error_code=_extract_error_code(e),
                     )
                 )
 
@@ -269,6 +290,8 @@ class RouteExecutor:
                 labels={
                     "runtime_variant": data.runtime_variant,
                     "endpoint_id": str(data.endpoint_id),
+                    "session_owner": str(data.session_owner),
+                    "project": str(data.project),
                 },
             )
             metadata_list.append(metadata)
@@ -355,12 +378,12 @@ class RouteExecutor:
         self,
         route: RouteData,
         deployment_map: Mapping[UUID, DeploymentInfo],
-    ) -> Optional[SessionId]:
+    ) -> SessionId | None:
         """Provision a single route by creating a session.
 
         Returns:
             SessionId: newly created session ID
-            None: route already has a session (skipped)
+            None: route already has a session, skipped
         """
         pool = RouteRecorderContext.current_pool()
         recorder = pool.recorder(route.route_id)
@@ -376,10 +399,22 @@ class RouteExecutor:
                 if deployment is None:
                     raise EndpointNotFound(f"Deployment not found for endpoint {route.endpoint_id}")
 
-                # Fetch deployment context with all necessary data
-                deployment_context = await self._deployment_repo.fetch_deployment_context(
-                    deployment
+                target_revision_id = (
+                    route.revision_id
+                    or deployment.deploying_revision_id
+                    or deployment.current_revision_id
                 )
+                if target_revision_id is None:
+                    raise DeploymentHasNoTargetRevision(
+                        f"No target revision found for route {route.route_id} "
+                        f"(endpoint {route.endpoint_id})"
+                    )
+
+                deployment_context = await self._deployment_repo.fetch_deployment_context(
+                    deployment,
+                    revision_id=target_revision_id,
+                )
+                target_revision = deployment.resolve_revision_spec(target_revision_id)
 
                 # Create session with full context
                 return await self._scheduling_controller.enqueue_session(
@@ -387,6 +422,7 @@ class RouteExecutor:
                         deployment_info=deployment,
                         context=deployment_context,
                         route_id=route.route_id,
+                        target_revision=target_revision,
                     )
                 )
 

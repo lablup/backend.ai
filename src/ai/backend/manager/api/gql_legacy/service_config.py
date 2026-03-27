@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Final, Optional, Self
+from typing import TYPE_CHECKING, Any, Final, Self
 
 import graphene
 
@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 _PREFIX: Final[str] = "ai/backend/config"
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class AvailableServiceNode(graphene.ObjectType):
+class AvailableServiceNode(graphene.ObjectType):  # type: ignore[misc]
     """
     Available services for configuration.
     Added in 25.8.0.
@@ -49,7 +49,7 @@ class AvailableServiceConnection(Connection):
         description = "Added in 25.8.0."
 
 
-class ServiceConfigNode(graphene.ObjectType):
+class ServiceConfigNode(graphene.ObjectType):  # type: ignore[misc]
     """
     Configuration data for a specific service.
     Added in 25.8.0.
@@ -76,7 +76,7 @@ class ServiceConfigNode(graphene.ObjectType):
     async def load(cls, info: graphene.ResolveInfo, service: str) -> Self:
         ctx: GraphQueryContext = info.context
 
-        def _fallback(x):
+        def _fallback(x: Any) -> str:
             return str(x)
 
         unified_config = ctx.config_provider.config.model_dump(
@@ -96,13 +96,13 @@ class ServiceConfigNode(graphene.ObjectType):
         cls,
         info: graphene.ResolveInfo,
         services: list[str],
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         tasks = [asyncio.create_task(ServiceConfigNode.load(info, svc)) for svc in services]
 
@@ -134,7 +134,7 @@ class ServiceConfigConnection(Connection):
         description = "Added in 25.8.0."
 
 
-class ModifyServiceConfigNodeInput(graphene.InputObjectType):
+class ModifyServiceConfigNodeInput(graphene.InputObjectType):  # type: ignore[misc]
     """
     Input data for modifying configuration.
     Added in 25.8.0.
@@ -150,7 +150,7 @@ class ModifyServiceConfigNodeInput(graphene.InputObjectType):
     )
 
 
-class ModifyServiceConfigNodePayload(graphene.ObjectType):
+class ModifyServiceConfigNodePayload(graphene.ObjectType):  # type: ignore[misc]
     """
     Payload for the ModifyServiceConfigNode mutation.
     Added in 25.8.0.
@@ -164,7 +164,7 @@ class ModifyServiceConfigNodePayload(graphene.ObjectType):
     allowed_roles = (UserRole.SUPERADMIN,)
 
 
-class ModifyServiceConfigNode(graphene.Mutation):
+class ModifyServiceConfigNode(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     Output = ModifyServiceConfigNodePayload
@@ -182,7 +182,7 @@ class ModifyServiceConfigNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         input: ModifyServiceConfigNodeInput,
     ) -> ModifyServiceConfigNodePayload:

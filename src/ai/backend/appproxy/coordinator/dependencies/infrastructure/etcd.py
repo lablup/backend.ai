@@ -6,8 +6,8 @@ from contextlib import asynccontextmanager
 from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.appproxy.coordinator.config import ServerConfig
 from ai.backend.appproxy.coordinator.errors import MissingTraefikConfigError
-from ai.backend.common.config import ConfigScopes
 from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.health_checker import ServiceHealthChecker
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.common.types import HostPortPair

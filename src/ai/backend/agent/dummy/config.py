@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import trafaret as t
 
@@ -74,4 +74,4 @@ dummy_local_config = t.Dict({
 @cache
 def read_dummy_config() -> Mapping[str, Any]:
     raw_config, _ = read_from_file(DEFAULT_CONFIG_PATH, "dummy")
-    return dummy_local_config.check(raw_config)
+    return cast(Mapping[str, Any], dummy_local_config.check(raw_config))

@@ -1,7 +1,7 @@
 from collections.abc import Iterator, Mapping
 from http import HTTPStatus
-from typing import Optional
 from unittest import mock
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
@@ -10,12 +10,9 @@ from yarl import URL
 
 from ai.backend.client.config import API_VERSION, APIConfig
 from ai.backend.client.session import Session
-from ai.backend.testutils.mock import AsyncMock
 
 
-def build_url(
-    config: APIConfig, path: str, params: Optional[Mapping[str, str | int]] = None
-) -> URL:
+def build_url(config: APIConfig, path: str, params: Mapping[str, str | int] | None = None) -> URL:
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
     path = f"{base_url}/{query_path}"
@@ -42,7 +39,7 @@ def test_create_vfolder() -> None:
         }
         m.post(build_url(session.config, "/folders"), status=HTTPStatus.CREATED, payload=payload)
         resp = session.VFolder.create("fake-vfolder-name")
-        assert resp == payload
+        assert resp == payload  # type: ignore[comparison-overlap]
 
 
 def test_create_vfolder_in_other_host() -> None:
@@ -54,7 +51,7 @@ def test_create_vfolder_in_other_host() -> None:
         }
         m.post(build_url(session.config, "/folders"), status=HTTPStatus.CREATED, payload=payload)
         resp = session.VFolder.create("fake-vfolder-name", "fake-vfolder-host")
-        assert resp == payload
+        assert resp == payload  # type: ignore[comparison-overlap]
 
 
 def test_list_vfolders() -> None:
@@ -77,7 +74,7 @@ def test_list_vfolders() -> None:
         ]
         m.get(build_url(session.config, "/folders"), status=HTTPStatus.OK, payload=payload)
         resp = session.VFolder.list()
-        assert resp == payload
+        assert resp == payload  # type: ignore[comparison-overlap]
 
 
 def test_delete_vfolder() -> None:
@@ -91,7 +88,7 @@ def test_delete_vfolder() -> None:
         )
         m.delete(build_url(session.config, "/folders"), status=HTTPStatus.NO_CONTENT)
         resp = session.VFolder(vfolder_name).delete()
-        assert resp == {}
+        assert resp == {}  # type: ignore[comparison-overlap]
 
 
 def test_vfolder_get_info() -> None:
@@ -118,7 +115,7 @@ def test_vfolder_get_info() -> None:
             payload=payload,
         )
         resp = session.VFolder(vfolder_name).info()
-        assert resp == payload
+        assert resp == payload  # type: ignore[comparison-overlap]
 
 
 def test_vfolder_delete_files() -> None:
@@ -137,7 +134,7 @@ def test_vfolder_delete_files() -> None:
             payload={},
         )
         resp = session.VFolder(vfolder_name).delete_files(files)
-        assert resp == "{}"
+        assert resp == "{}"  # type: ignore[comparison-overlap]
 
 
 def test_vfolder_list_files() -> None:
@@ -180,7 +177,7 @@ def test_vfolder_list_files() -> None:
             payload=payload,
         )
         resp = session.VFolder(vfolder_name).list_files(".")
-        assert resp == payload
+        assert resp == payload  # type: ignore[comparison-overlap]
 
 
 def test_vfolder_invite() -> None:
@@ -200,7 +197,7 @@ def test_vfolder_invite() -> None:
             payload=payload,
         )
         resp = session.VFolder(vfolder_name).invite("rw", user_ids)
-        assert resp == payload
+        assert resp == payload  # type: ignore[comparison-overlap]
 
 
 def test_vfolder_invitations() -> None:
@@ -221,7 +218,7 @@ def test_vfolder_invitations() -> None:
             payload=payload,
         )
         resp = session.VFolder.invitations()
-        assert resp == payload
+        assert resp == payload  # type: ignore[comparison-overlap]
 
 
 def test_vfolder_accept_invitation() -> None:
@@ -235,7 +232,7 @@ def test_vfolder_accept_invitation() -> None:
             payload=payload,
         )
         resp = session.VFolder.accept_invitation("inv-id")
-        assert resp == payload
+        assert resp == payload  # type: ignore[comparison-overlap]
 
 
 def test_vfolder_delete_invitation() -> None:
@@ -247,7 +244,7 @@ def test_vfolder_delete_invitation() -> None:
             payload=payload,
         )
         resp = session.VFolder.delete_invitation("inv-id")
-        assert resp == payload
+        assert resp == payload  # type: ignore[comparison-overlap]
 
 
 def test_vfolder_clone() -> None:
@@ -272,7 +269,7 @@ def test_vfolder_clone() -> None:
             payload=payload,
         )
         resp = session.VFolder(source_vfolder_name).clone(target_vfolder_name)
-        assert resp == payload
+        assert resp == payload  # type: ignore[comparison-overlap]
 
 
 def test_vfolder_force_delete() -> None:
@@ -289,4 +286,4 @@ def test_vfolder_force_delete() -> None:
             payload={},
         )
         resp = session.VFolder("", id=vfolder_uuid).force_delete()
-    assert resp == {}
+    assert resp == {}  # type: ignore[comparison-overlap]

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 import graphene
 import sqlalchemy as sa
-from graphql import GraphQLError, Undefined
+from graphql import Undefined
 
 from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.logging import BraceStyleAdapter
@@ -16,11 +16,15 @@ from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidatorArgs,
 )
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
-    handle_allowed_groups_update,
+)
+from ai.backend.manager.services.container_registry.actions.create_container_registry import (
+    CreateContainerRegistryAction,
 )
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
@@ -40,15 +44,13 @@ from .gql_relay import AsyncNode
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 
 
-class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
+class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.3.0.
     """
@@ -64,8 +66,33 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
     extra = graphene.JSONString(description="Added in 25.3.0.")
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
 
+    def to_action(self) -> CreateContainerRegistryAction:
+        def value_or_none(val: Any) -> None | Any:
+            return None if val is Undefined else val
 
-class CreateContainerRegistryNodeV2(graphene.Mutation):
+        sanitized_allowed_groups: AllowedGroups | None = value_or_none(self.allowed_groups)
+
+        return CreateContainerRegistryAction(
+            creator=Creator(
+                spec=ContainerRegistryCreatorSpec(
+                    url=self.url,
+                    type=self.type,
+                    registry_name=self.registry_name,
+                    is_global=value_or_none(self.is_global),
+                    project=value_or_none(self.project),
+                    username=value_or_none(self.username),
+                    password=value_or_none(self.password),
+                    ssl_verify=value_or_none(self.ssl_verify),
+                    extra=value_or_none(self.extra),
+                    allowed_groups=sanitized_allowed_groups.to_model()
+                    if sanitized_allowed_groups is not None
+                    else None,
+                )
+            )
+        )
+
+
+class CreateContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.3.0."
 
@@ -79,7 +106,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         props: CreateContainerRegistryNodeInputV2,
     ) -> CreateContainerRegistryNodeV2:
@@ -94,45 +121,18 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
 
         validator.validate()
 
-        input_config: dict[str, Any] = {
-            "registry_name": props.registry_name,
-            "url": props.url,
-            "type": props.type,
-        }
-
-        def _set_if_set(name: str, val: Any) -> None:
-            if val is not Undefined:
-                input_config[name] = val
-
-        _set_if_set("project", props.project)
-        _set_if_set("username", props.username)
-        _set_if_set("password", props.password)
-        _set_if_set("ssl_verify", props.ssl_verify)
-        _set_if_set("is_global", props.is_global)
-        _set_if_set("extra", props.extra)
-
-        try:
-            async with ctx.db.begin_session() as db_session:
-                reg_row = ContainerRegistryRow(id=uuid.uuid4(), **input_config)
-                db_session.add(reg_row)
-                await db_session.flush()
-                await db_session.refresh(reg_row)
-
-                if props.allowed_groups:
-                    allowed_groups_model = AllowedGroupsModel(
-                        add=props.allowed_groups.add or [],
-                        remove=props.allowed_groups.remove or [],
-                    )
-                    await handle_allowed_groups_update(db_session, reg_row.id, allowed_groups_model)
-
-            return cls(
-                container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
+        result = (
+            await ctx.processors.container_registry.create_container_registry.wait_for_complete(
+                props.to_action()
             )
-        except Exception as e:
-            raise GraphQLError(str(e))
+        )
+
+        return cls(
+            container_registry=ContainerRegistryNode.from_dataclass(result.data),
+        )
 
 
-class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):
+class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.3.0.
     """
@@ -177,7 +177,7 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):
         )
 
 
-class ModifyContainerRegistryNodeV2(graphene.Mutation):
+class ModifyContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Meta:
@@ -195,7 +195,7 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
         props: ModifyContainerRegistryNodeInputV2,
@@ -213,7 +213,7 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
-class DeleteContainerRegistryNodeV2(graphene.Mutation):
+class DeleteContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Meta:
@@ -230,7 +230,7 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
     ) -> DeleteContainerRegistryNodeV2:

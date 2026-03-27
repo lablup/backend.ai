@@ -2,7 +2,7 @@
 
 import uuid
 from decimal import Decimal
-from typing import Optional, cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
@@ -15,13 +15,18 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
+from ai.backend.manager.sokovan.data import (
+    KernelWorkload,
+    SchedulingConfig,
+    SessionWorkload,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
     SessionProvisionerArgs,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     AgentSelectionError,
+    NoCompatibleAgentError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentInfo,
@@ -31,19 +36,14 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
     AgentSelector,
     ResourceRequirements,
 )
-from ai.backend.manager.sokovan.scheduler.types import (
-    KernelWorkload,
-    SchedulingConfig,
-    SessionWorkload,
-)
 
 
 def create_session_workload(
-    session_id: Optional[SessionId] = None,
+    session_id: SessionId | None = None,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-    kernels: Optional[list[KernelWorkload]] = None,
-    designated_agent_ids: Optional[list[AgentId]] = None,
-    **kwargs,
+    kernels: list[KernelWorkload] | None = None,
+    designated_agent_ids: list[AgentId] | None = None,
+    **kwargs: Any,
 ) -> SessionWorkload:
     """Create a SessionWorkload for testing."""
     # Set defaults for required fields
@@ -83,7 +83,7 @@ def create_session_workload(
 
 
 def create_kernel_workload(
-    kernel_id: Optional[uuid.UUID] = None,
+    kernel_id: uuid.UUID | None = None,
     cpu: Decimal = Decimal("1"),
     mem: Decimal = Decimal("1024"),
     architecture: str = "x86_64",
@@ -123,7 +123,7 @@ class TestProvisionerAllocation:
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
         """Create a mock repository."""
-        repo = MagicMock(spec=ScheduleRepository)
+        repo = MagicMock()
         repo.get_scheduling_config = AsyncMock(
             return_value=SchedulingConfig(
                 max_container_count_per_agent=100,
@@ -131,6 +131,11 @@ class TestProvisionerAllocation:
             )
         )
         return repo
+
+    @pytest.fixture
+    def mock_fair_share_repository(self) -> MagicMock:
+        """Create a mock fair share repository."""
+        return MagicMock()
 
     @pytest.fixture
     def mock_agent_selector_with_verification(self) -> Mock:
@@ -143,7 +148,7 @@ class TestProvisionerAllocation:
             resource_req: ResourceRequirements,
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
-            designated_agent: Optional[AgentId],
+            designated_agent: AgentId | None,
         ) -> AgentInfo:
             try:
                 # Capture the state of agents at each call
@@ -189,10 +194,6 @@ class TestProvisionerAllocation:
                     max_available = available_cpu
 
             if not best_agent:
-                from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-                    NoCompatibleAgentError,
-                )
-
                 raise NoCompatibleAgentError("No suitable agent found")
 
             return best_agent
@@ -202,14 +203,10 @@ class TestProvisionerAllocation:
             agents: list[AgentInfo],
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
-            designated_agent: Optional[AgentId] = None,
+            designated_agent: AgentId | None = None,
         ) -> list[AgentSelection]:
             # Extract resource requirements from criteria
             resource_requirements = criteria.get_resource_requirements()
-            from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-                AgentSelection,
-            )
-
             selections = []
             for resource_req in resource_requirements:
                 # Use the single selection logic
@@ -238,7 +235,10 @@ class TestProvisionerAllocation:
 
     @pytest.fixture
     def provisioner(
-        self, mock_repository: MagicMock, mock_agent_selector_with_verification: Mock
+        self,
+        mock_repository: MagicMock,
+        mock_fair_share_repository: MagicMock,
+        mock_agent_selector_with_verification: Mock,
     ) -> SessionProvisioner:
         """Create a provisioner instance with mocked dependencies."""
         mock_config_provider = MagicMock()
@@ -250,6 +250,7 @@ class TestProvisionerAllocation:
                 default_agent_selector=mock_agent_selector_with_verification,
                 allocator=MagicMock(),
                 repository=mock_repository,
+                fair_share_repository=mock_fair_share_repository,
                 config_provider=mock_config_provider,
                 valkey_schedule=mock_valkey_schedule,
             )
@@ -428,10 +429,6 @@ class TestProvisionerAllocation:
         )
 
         # Execute allocation - should raise NoCompatibleAgentError
-        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-            NoCompatibleAgentError,
-        )
-
         with pytest.raises(NoCompatibleAgentError):
             await provisioner._allocate_workload(
                 workload,
@@ -491,12 +488,8 @@ class TestProvisionerAllocation:
             agents: list[AgentInfo],
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
-            designated_agent_ids: Optional[list[AgentId]],
+            designated_agent_ids: list[AgentId] | None,
         ) -> list[AgentSelection]:
-            from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-                AgentSelection,
-            )
-
             resource_requirements = criteria.get_resource_requirements()
             selections = []
             if not designated_agent_ids:
@@ -539,7 +532,7 @@ class TestProvisionerAllocation:
             designated_agent
         ]  # 4th argument (agents, criteria, config, designated_agent)
 
-    async def test_no_resource_requirements(self, provisioner: SessionProvisioner):
+    async def test_no_resource_requirements(self, provisioner: SessionProvisioner) -> None:
         """Test handling of session with no kernels."""
         workload = create_session_workload(
             cluster_mode=ClusterMode.SINGLE_NODE,
@@ -570,7 +563,7 @@ class TestProvisionerAllocation:
         mock_selector = cast(Mock, provisioner._default_agent_selector)
         assert mock_selector.select_agents_for_batch_requirements.call_count == 1
 
-    async def test_agent_selection_error(self, provisioner: SessionProvisioner):
+    async def test_agent_selection_error(self, provisioner: SessionProvisioner) -> None:
         """Test handling of agent selection errors."""
         kernels = [create_kernel_workload(cpu=Decimal("100"))]  # Impossible requirement
         workload = create_session_workload(
@@ -585,10 +578,6 @@ class TestProvisionerAllocation:
         )
 
         # Execute allocation - should raise NoCompatibleAgentError
-        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-            NoCompatibleAgentError,
-        )
-
         with pytest.raises(NoCompatibleAgentError):
             await provisioner._allocate_workload(
                 workload,

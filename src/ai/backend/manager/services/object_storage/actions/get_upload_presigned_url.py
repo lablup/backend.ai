@@ -1,8 +1,9 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
 
 
@@ -12,13 +13,13 @@ class GetUploadPresignedURLAction(ObjectStorageAction):
     key: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_upload_presigned_url"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass
@@ -28,5 +29,5 @@ class GetUploadPresignedURLActionResult(BaseActionResult):
     fields: dict[str, str]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.storage_id)

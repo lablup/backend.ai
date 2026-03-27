@@ -26,7 +26,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -73,6 +73,7 @@ class TestDeploymentRevisionRow:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -105,7 +106,7 @@ class TestDeploymentRevisionRow:
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 allowed_docker_registries=[],
             )
@@ -198,7 +199,7 @@ class TestDeploymentRevisionRow:
                 is_active=True,
                 domain_name=test_domain.name,
                 resource_policy=test_project_resource_policy.name,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
             )
             db_sess.add(group)
@@ -264,7 +265,7 @@ class TestDeploymentRevisionRow:
         test_image: ImageRow,
         test_scaling_group: ScalingGroupRow,
     ) -> AsyncGenerator[EndpointRow, None]:
-        """Create test endpoint."""
+        """Create test endpoint without an initial revision."""
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
@@ -291,7 +292,6 @@ class TestDeploymentRevisionRow:
 
         yield endpoint
 
-    @pytest.mark.asyncio
     async def test_create_revision(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -322,7 +322,6 @@ class TestDeploymentRevisionRow:
             assert revision.endpoint == test_endpoint.id
             assert revision.revision_number == 1
 
-    @pytest.mark.asyncio
     async def test_to_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -370,7 +369,6 @@ class TestDeploymentRevisionRow:
             assert data.model_runtime_config.environ == {"DEBUG": "true"}
             assert data.image_id == test_image.id
 
-    @pytest.mark.asyncio
     async def test_unique_constraint_endpoint_revision_number(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

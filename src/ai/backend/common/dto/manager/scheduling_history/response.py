@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
     "PaginationInfo",
@@ -20,21 +20,13 @@ __all__ = (
 )
 
 
-class PaginationInfo(BaseModel):
-    """Pagination information."""
-
-    total: int = Field(description="Total number of items")
-    offset: int = Field(description="Number of items skipped")
-    limit: Optional[int] = Field(default=None, description="Maximum items returned")
-
-
 class SubStepResultDTO(BaseResponseModel):
     """Sub-step result DTO."""
 
     step: str
     result: str
-    error_code: Optional[str] = None
-    message: Optional[str] = None
+    error_code: str | None = None
+    message: str | None = None
     started_at: datetime
     ended_at: datetime
 
@@ -45,11 +37,11 @@ class SessionHistoryDTO(BaseResponseModel):
     id: UUID
     session_id: UUID
     phase: str
-    from_status: Optional[str] = None
-    to_status: Optional[str] = None
+    from_status: str | None = None
+    to_status: str | None = None
     result: str
-    error_code: Optional[str] = None
-    message: Optional[str] = None
+    error_code: str | None = None
+    message: str | None = None
     sub_steps: list[SubStepResultDTO] = Field(default_factory=list)
     attempts: int
     created_at: datetime
@@ -62,11 +54,11 @@ class DeploymentHistoryDTO(BaseResponseModel):
     id: UUID
     deployment_id: UUID
     phase: str
-    from_status: Optional[str] = None
-    to_status: Optional[str] = None
+    from_status: str | None = None
+    to_status: str | None = None
     result: str
-    error_code: Optional[str] = None
-    message: Optional[str] = None
+    error_code: str | None = None
+    message: str | None = None
     sub_steps: list[SubStepResultDTO] = Field(default_factory=list)
     attempts: int
     created_at: datetime
@@ -80,11 +72,11 @@ class RouteHistoryDTO(BaseResponseModel):
     route_id: UUID
     deployment_id: UUID
     phase: str
-    from_status: Optional[str] = None
-    to_status: Optional[str] = None
+    from_status: str | None = None
+    to_status: str | None = None
     result: str
-    error_code: Optional[str] = None
-    message: Optional[str] = None
+    error_code: str | None = None
+    message: str | None = None
     sub_steps: list[SubStepResultDTO] = Field(default_factory=list)
     attempts: int
     created_at: datetime

@@ -19,6 +19,7 @@ from .common import (
     StorageStepRequiredStepNotProvided,
     StorageTransferError,
     StorageTypeInvalidError,
+    UploadOffsetMismatchError,
 )
 from .object import (
     ArtifactImportError,
@@ -39,6 +40,7 @@ from .object import (
     RegistryNotFoundError,
     ReservoirStorageConfigInvalidError,
     StorageBucketFileNotFoundError,
+    UnsupportedFileTypeError,
 )
 from .process import (
     CephNotInstalledError,
@@ -86,6 +88,7 @@ __all__ = [
     "InvalidConfigurationSourceError",
     "InvalidDataLengthError",
     "ServiceNotInitializedError",
+    "UploadOffsetMismatchError",
     # vfolder
     "VFolderNotFoundError",
     "InvalidSubpathError",
@@ -129,4 +132,5 @@ __all__ = [
     "ArtifactImportError",
     "ArtifactVerifyStorageTypeInvalid",
     "ArtifactVerificationFailedError",
+    "UnsupportedFileTypeError",
 ]

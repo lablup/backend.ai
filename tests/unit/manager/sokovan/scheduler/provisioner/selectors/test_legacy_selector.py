@@ -8,6 +8,12 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
+    ConcentratedAgentSelector,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
+    DispersedAgentSelector,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.legacy import LegacyAgentSelector
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentInfo,
@@ -180,13 +186,6 @@ class TestLegacyAgentSelector:
         agents_specialized_vs_general: list[AgentInfo],
     ) -> None:
         """Test that legacy selector has distinct behavior from other strategies."""
-        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-            ConcentratedAgentSelector,
-        )
-        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
-            DispersedAgentSelector,
-        )
-
         legacy = LegacyAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         concentrated = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         dispersed = DispersedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])

@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import asyncio
+from collections.abc import Generator
 from http import HTTPStatus
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -123,7 +127,6 @@ def sample_agent_info() -> AgentInfo:
 
 
 class TestAgentService:
-    @pytest.mark.asyncio
     async def test_handle_heartbeat_normal_update(
         self,
         agent_service: AgentService,
@@ -185,7 +188,6 @@ class TestAgentService:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_handle_heartbeat_agent_revival(
         self,
         agent_service: AgentService,
@@ -240,7 +242,6 @@ class TestAgentService:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_handle_heartbeat_new_agent(
         self,
         agent_service: AgentService,
@@ -279,7 +280,6 @@ class TestAgentService:
         mock_agent_repository.sync_installed_images.assert_called_once()
         mock_hook_plugin_ctx.notify.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_handle_heartbeat_with_resource_update(
         self,
         agent_service: AgentService,
@@ -344,7 +344,6 @@ class TestAgentService:
         assert hook_args[0] == "POST_AGENT_HEARTBEAT"
         assert hook_args[1][2] == agent_info.available_resource_slots
 
-    @pytest.mark.asyncio
     async def test_handle_heartbeat_concurrent_heartbeats(
         self,
         agent_service: AgentService,
@@ -391,8 +390,10 @@ class TestWatcher:
         return AgentId("test-agent-watcher")
 
     @pytest.fixture
-    def _setup_http_mock(self, mock_etcd: AsyncMock):
-        def _setup(agent_id: AgentId, status: int, data: dict | str):
+    def _setup_http_mock(self, mock_etcd: AsyncMock) -> Any:
+        def _setup(
+            agent_id: AgentId, status: int, data: dict[str, Any] | str
+        ) -> tuple[AsyncMock, AsyncMock]:
             # Setup etcd
             mock_etcd.get.side_effect = lambda key: {
                 f"nodes/agents/{agent_id}/ip": "192.168.1.100",
@@ -421,7 +422,9 @@ class TestWatcher:
         return _setup
 
     @pytest.fixture
-    def watcher_service_ok(self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock):
+    def watcher_service_ok(
+        self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock: Any
+    ) -> Generator[AgentService, None, None]:
         mock_session, _ = _setup_http_mock(agent_id, HTTPStatus.OK, {"result": "ok"})
 
         with patch(
@@ -432,8 +435,11 @@ class TestWatcher:
 
     @pytest.fixture
     def watcher_service_ok_get(
-        self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock
-    ):
+        self,
+        agent_service: AgentService,
+        agent_id: AgentId,
+        _setup_http_mock: Any,
+    ) -> Generator[AgentService, None, None]:
         mock_session, _ = _setup_http_mock(
             agent_id,
             HTTPStatus.OK,
@@ -448,8 +454,11 @@ class TestWatcher:
 
     @pytest.fixture
     def watcher_service_forbidden(
-        self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock
-    ):
+        self,
+        agent_service: AgentService,
+        agent_id: AgentId,
+        _setup_http_mock: Any,
+    ) -> Generator[AgentService, None, None]:
         mock_session, _ = _setup_http_mock(agent_id, HTTPStatus.FORBIDDEN, "Invalid token")
 
         with patch(
@@ -460,8 +469,11 @@ class TestWatcher:
 
     @pytest.fixture
     def watcher_service_error(
-        self, agent_service: AgentService, agent_id: AgentId, _setup_http_mock
-    ):
+        self,
+        agent_service: AgentService,
+        agent_id: AgentId,
+        _setup_http_mock: Any,
+    ) -> Generator[AgentService, None, None]:
         mock_session, _ = _setup_http_mock(
             agent_id, HTTPStatus.INTERNAL_SERVER_ERROR, "Systemctl command failed"
         )
@@ -472,7 +484,6 @@ class TestWatcher:
         ):
             yield agent_service
 
-    @pytest.mark.asyncio
     async def test_agent_start_success(
         self, watcher_service_ok: AgentService, agent_id: AgentId
     ) -> None:
@@ -484,7 +495,6 @@ class TestWatcher:
         # Then
         assert result.data == {"result": "ok"}
 
-    @pytest.mark.asyncio
     async def test_agent_stop_success(
         self, watcher_service_ok: AgentService, agent_id: AgentId
     ) -> None:
@@ -496,7 +506,6 @@ class TestWatcher:
         # Then
         assert result.data == {"result": "ok"}
 
-    @pytest.mark.asyncio
     async def test_agent_restart_success(
         self, watcher_service_ok: AgentService, agent_id: AgentId
     ) -> None:
@@ -508,7 +517,6 @@ class TestWatcher:
         # Then
         assert result.data == {"result": "ok"}
 
-    @pytest.mark.asyncio
     async def test_get_status_success(
         self, watcher_service_ok_get: AgentService, agent_id: AgentId
     ) -> None:
@@ -523,7 +531,6 @@ class TestWatcher:
 
     # ==================== Error Tests ====================
 
-    @pytest.mark.asyncio
     async def test_agent_start_forbidden(
         self, watcher_service_forbidden: AgentService, agent_id: AgentId
     ) -> None:
@@ -536,7 +543,6 @@ class TestWatcher:
         assert exc_info.value.status_code == HTTPStatus.FORBIDDEN
         assert "Agent watcher error" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_agent_stop_internal_error(
         self, watcher_service_error: AgentService, agent_id: AgentId
     ) -> None:

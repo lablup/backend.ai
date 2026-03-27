@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.data.deployment.types import EndpointLifecycle, RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
@@ -38,9 +39,9 @@ class SessionSchedulingHistoryCreatorSpec(CreatorSpec[SessionSchedulingHistoryRo
     phase: str  # ScheduleType value
     result: SchedulingResult
     message: str
-    from_status: Optional[SessionStatus] = None
-    to_status: Optional[SessionStatus] = None
-    error_code: Optional[str] = None
+    from_status: SessionStatus | None = None
+    to_status: SessionStatus | None = None
+    error_code: str | None = None
     sub_steps: list[SubStepResult] = field(default_factory=list)
 
     @override
@@ -67,9 +68,9 @@ class KernelSchedulingHistoryCreatorSpec(CreatorSpec[KernelSchedulingHistoryRow]
     phase: str  # ScheduleType value
     result: SchedulingResult
     message: str
-    from_status: Optional[KernelSchedulingPhase] = None
-    to_status: Optional[KernelSchedulingPhase] = None
-    error_code: Optional[str] = None
+    from_status: KernelSchedulingPhase | None = None
+    to_status: KernelSchedulingPhase | None = None
+    error_code: str | None = None
 
     @override
     def build_row(self) -> KernelSchedulingHistoryRow:
@@ -94,9 +95,9 @@ class DeploymentHistoryCreatorSpec(CreatorSpec[DeploymentHistoryRow]):
     phase: str  # DeploymentLifecycleType value
     result: SchedulingResult
     message: str
-    from_status: Optional[EndpointLifecycle] = None
-    to_status: Optional[EndpointLifecycle] = None
-    error_code: Optional[str] = None
+    from_status: EndpointLifecycle | None = None
+    to_status: EndpointLifecycle | None = None
+    error_code: str | None = None
     sub_steps: list[SubStepResult] = field(default_factory=list)
 
     @override
@@ -123,9 +124,9 @@ class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
     phase: str  # RouteLifecycleType value
     result: SchedulingResult
     message: str
-    from_status: Optional[RouteStatus] = None
-    to_status: Optional[RouteStatus] = None
-    error_code: Optional[str] = None
+    from_status: RouteStatus | None = None
+    to_status: RouteStatus | None = None
+    error_code: str | None = None
     sub_steps: list[SubStepResult] = field(default_factory=list)
 
     @override

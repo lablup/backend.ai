@@ -3,24 +3,21 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Generic, TypeVar
 
 from ai.backend.appproxy.common.types import (
     RouteInfo,
 )
 from ai.backend.appproxy.worker.proxy.backend.base import BaseBackend
-from ai.backend.appproxy.worker.types import Circuit, RootContext, TCircuitKey
+from ai.backend.appproxy.worker.types import Circuit, RootContext
 from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
-TBackend = TypeVar("TBackend", bound=BaseBackend)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class BaseFrontend(Generic[TBackend, TCircuitKey], metaclass=ABCMeta):
+class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass=ABCMeta):
     root_context: RootContext
-    circuits: dict[TCircuitKey, Circuit]
-    backends: dict[TCircuitKey, TBackend]
+    circuits: dict[TCircuitKeyType, Circuit]
+    backends: dict[TCircuitKeyType, TBackend]
 
     def __init__(self, root_context: RootContext) -> None:
         self.root_context = root_context
@@ -46,6 +43,7 @@ class BaseFrontend(Generic[TBackend, TCircuitKey], metaclass=ABCMeta):
             log.warning("Tried to update an inactive slot: {}", key)
             return
         await self.update_backend(self.backends[key], new_routes)
+        self.circuits[key].route_info = new_routes
 
     async def break_circuit(self, circuit: Circuit) -> None:
         metrics = self.root_context.metrics
@@ -92,5 +90,5 @@ class BaseFrontend(Generic[TBackend, TCircuitKey], metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def get_circuit_key(self, circuit: Circuit) -> TCircuitKey:
+    def get_circuit_key(self, circuit: Circuit) -> TCircuitKeyType:
         raise NotImplementedError

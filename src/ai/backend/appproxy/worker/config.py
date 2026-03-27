@@ -39,6 +39,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.typed_validators import AutoDirectoryPath
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
 from ai.backend.logging.config import LoggingConfig
@@ -341,7 +342,7 @@ class TraefikConfig(BaseSchema):
         ),
     ]
     last_used_time_marker_directory: Annotated[
-        Path,
+        AutoDirectoryPath,
         Field(),
         BackendAIConfigMeta(
             description=(
@@ -808,10 +809,10 @@ class ProxyWorkerConfig(BaseSchema):
     def validate_metric_access_allowed_hosts(self) -> Self:
         try:
             ipaddress.IPv4Network(self.metric_access_allowed_hosts)
-        except ValueError:
+        except ValueError as e:
             raise ValueError(
                 "metric_access_allowed_hosts should be either a valid IPv4 Address or Network"
-            ) from None
+            ) from e
         return self
 
     @model_validator(mode="after")
@@ -959,7 +960,7 @@ class ServerConfig(BaseSchema):
     ]
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=EtcdConfig),  # type: ignore[arg-type]
+        Field(default_factory=EtcdConfig),
         BackendAIConfigMeta(
             description=(
                 "etcd connection configuration for distributed coordination. "
@@ -971,7 +972,7 @@ class ServerConfig(BaseSchema):
     ]
     pyroscope: Annotated[
         PyroscopeConfig,
-        Field(default_factory=PyroscopeConfig),  # type: ignore[arg-type]
+        Field(default_factory=PyroscopeConfig),
         BackendAIConfigMeta(
             description=(
                 "Pyroscope continuous profiling configuration for production performance analysis. "
@@ -1011,7 +1012,7 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
         else:
             detail = pformat(e)
         print(textwrap.indent(detail, prefix="  "), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
         if server_config.debug.enabled:
             print("== Proxy Worker configuration ==", file=sys.stderr)

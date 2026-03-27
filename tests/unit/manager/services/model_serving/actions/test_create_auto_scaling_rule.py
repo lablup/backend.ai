@@ -1,17 +1,24 @@
+from __future__ import annotations
+
 import uuid
+from collections.abc import Iterator
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.endpoint.types import EndpointStatus
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     EndpointId,
 )
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
-from ai.backend.manager.data.model_serving.types import RequesterCtx
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
+from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
@@ -22,60 +29,102 @@ from ai.backend.manager.services.model_serving.exceptions import (
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
 )
+from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.testutils.scenario import ScenarioBase
 
 
-@pytest.fixture
-def mock_check_requester_access_create(mocker, auto_scaling_service):
-    mock = mocker.patch.object(
-        auto_scaling_service,
-        "check_requester_access",
-        new_callable=AsyncMock,
-    )
-    mock.return_value = None
-    return mock
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_validated_create(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.repository,
-        "get_endpoint_by_id_validated",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_create_auto_scaling_rule(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.repository,
-        "create_auto_scaling_rule_validated",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_create_auto_scaling_rule_force(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "create_auto_scaling_rule_force",
-        new_callable=AsyncMock,
-    )
-
-
 class TestCreateEndpointAutoScalingRule:
+    @pytest.fixture
+    def user_data(self) -> UserData:
+        return UserData(
+            user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+
+    @pytest.fixture(autouse=True)
+    def set_user_context(self, user_data: UserData) -> Iterator[None]:
+        with with_user(user_data):
+            yield
+
+    @pytest.fixture
+    def mock_action_monitor(self) -> MagicMock:
+        return MagicMock(spec=ActionMonitor)
+
+    @pytest.fixture
+    def mock_repositories(self) -> MagicMock:
+        mock = MagicMock(spec=ModelServingRepositories)
+        mock.repository = MagicMock(spec=ModelServingRepository)
+        return mock
+
+    @pytest.fixture
+    def auto_scaling_service(
+        self,
+        mock_repositories: MagicMock,
+    ) -> AutoScalingService:
+        return AutoScalingService(
+            repository=mock_repositories.repository,
+        )
+
+    @pytest.fixture
+    def auto_scaling_processors(
+        self,
+        mock_action_monitor: MagicMock,
+        auto_scaling_service: AutoScalingService,
+        mock_action_validators: ActionValidators,
+    ) -> ModelServingAutoScalingProcessors:
+        return ModelServingAutoScalingProcessors(
+            service=auto_scaling_service,
+            action_monitors=[mock_action_monitor],
+            validators=mock_action_validators,
+        )
+
+    @pytest.fixture
+    def mock_check_user_access_create(self, mocker: Any, auto_scaling_service: Any) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                auto_scaling_service,
+                "check_user_access",
+                new_callable=AsyncMock,
+            ),
+        )
+        mock.return_value = None
+        return mock
+
+    @pytest.fixture
+    def mock_get_endpoint_access_validation_data_create(
+        self, mocker: Any, mock_repositories: Any
+    ) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_access_validation_data",
+                new_callable=AsyncMock,
+            ),
+        )
+
+    @pytest.fixture
+    def mock_create_auto_scaling_rule(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "create_auto_scaling_rule",
+                new_callable=AsyncMock,
+            ),
+        )
+
     @pytest.mark.parametrize(
         "scenario",
         [
             ScenarioBase.success(
                 "CPU based scaling",
                 CreateEndpointAutoScalingRuleAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     endpoint_id=EndpointId(uuid.UUID("11111111-1111-1111-1111-111111111111")),
                     creator=EndpointAutoScalingRuleCreator(
                         metric_source=AutoScalingMetricSource.KERNEL,
@@ -96,12 +145,6 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.success(
                 "Request count based scaling",
                 CreateEndpointAutoScalingRuleAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     endpoint_id=EndpointId(uuid.UUID("33333333-3333-3333-3333-333333333333")),
                     creator=EndpointAutoScalingRuleCreator(
                         metric_source=AutoScalingMetricSource.KERNEL,
@@ -122,12 +165,6 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.success(
                 "Custom metric",
                 CreateEndpointAutoScalingRuleAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000003"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     endpoint_id=EndpointId(uuid.UUID("55555555-5555-5555-5555-555555555555")),
                     creator=EndpointAutoScalingRuleCreator(
                         metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK,
@@ -148,12 +185,6 @@ class TestCreateEndpointAutoScalingRule:
             ScenarioBase.failure(
                 "Endpoint not found",
                 CreateEndpointAutoScalingRuleAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000004"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     endpoint_id=EndpointId(uuid.UUID("77777777-7777-7777-7777-777777777777")),
                     creator=EndpointAutoScalingRuleCreator(
                         metric_source=AutoScalingMetricSource.KERNEL,
@@ -169,14 +200,8 @@ class TestCreateEndpointAutoScalingRule:
                 EndpointNotFound,
             ),
             ScenarioBase.success(
-                "SUPERADMIN CPU based scaling",
+                "Memory utilization based scaling",
                 CreateEndpointAutoScalingRuleAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000011"),
-                        user_role=UserRole.SUPERADMIN,
-                        domain_name="default",
-                    ),
                     endpoint_id=EndpointId(uuid.UUID("88888888-8888-8888-8888-888888888888")),
                     creator=EndpointAutoScalingRuleCreator(
                         metric_source=AutoScalingMetricSource.KERNEL,
@@ -196,54 +221,57 @@ class TestCreateEndpointAutoScalingRule:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_create_auto_scaling_rule(
         self,
         scenario: ScenarioBase[
             CreateEndpointAutoScalingRuleAction, CreateEndpointAutoScalingRuleActionResult
         ],
+        user_data: UserData,
         auto_scaling_processors: ModelServingAutoScalingProcessors,
-        mock_check_requester_access_create,
-        mock_get_endpoint_by_id_validated_create,
-        mock_create_auto_scaling_rule,
-        mock_create_auto_scaling_rule_force,
-    ):
+        mock_check_user_access_create: AsyncMock,
+        mock_get_endpoint_access_validation_data_create: AsyncMock,
+        mock_create_auto_scaling_rule: AsyncMock,
+    ) -> None:
+        action = scenario.input
+
         # Mock repository responses based on scenario
         if scenario.description in [
             "CPU based scaling",
             "Request count based scaling",
             "Custom metric",
-            "SUPERADMIN CPU based scaling",
+            "Memory utilization based scaling",
         ]:
-            mock_endpoint = MagicMock(
-                id=scenario.input.endpoint_id,
-                status=EndpointStatus.READY,
+            mock_validation_data = MagicMock(
+                session_owner_id=user_data.user_id,
+                session_owner_role=UserRole(user_data.role),
+                domain=user_data.domain_name,
             )
-            mock_get_endpoint_by_id_validated_create.return_value = mock_endpoint
+            mock_get_endpoint_access_validation_data_create.return_value = mock_validation_data
 
             expected_result = scenario.expected
             assert expected_result is not None
             mock_rule = MagicMock(
                 id=expected_result.data.id if expected_result.data else None,
-                endpoint_id=scenario.input.endpoint_id,
-                metric_source=scenario.input.creator.metric_source,
-                metric_name=scenario.input.creator.metric_name,
-                threshold=scenario.input.creator.threshold,
-                comparator=scenario.input.creator.comparator,
-                step_size=scenario.input.creator.step_size,
-                cooldown_seconds=scenario.input.creator.cooldown_seconds,
-                min_replicas=scenario.input.creator.min_replicas,
-                max_replicas=scenario.input.creator.max_replicas,
+                endpoint_id=action.endpoint_id,
+                metric_source=action.creator.metric_source,
+                metric_name=action.creator.metric_name,
+                threshold=action.creator.threshold,
+                comparator=action.creator.comparator,
+                step_size=action.creator.step_size,
+                cooldown_seconds=action.creator.cooldown_seconds,
+                min_replicas=action.creator.min_replicas,
+                max_replicas=action.creator.max_replicas,
                 enabled=True,
             )
             mock_create_auto_scaling_rule.return_value = mock_rule
-            mock_create_auto_scaling_rule_force.return_value = mock_rule
 
         elif scenario.description == "Endpoint not found":
-            mock_get_endpoint_by_id_validated_create.return_value = None
+            mock_get_endpoint_access_validation_data_create.return_value = None
             mock_create_auto_scaling_rule.return_value = None
 
-        async def create_auto_scaling_rule(action: CreateEndpointAutoScalingRuleAction):
+        async def create_auto_scaling_rule(
+            action: CreateEndpointAutoScalingRuleAction,
+        ) -> CreateEndpointAutoScalingRuleActionResult:
             return (
                 await auto_scaling_processors.create_endpoint_auto_scaling_rule.wait_for_complete(
                     action
@@ -256,7 +284,7 @@ class TestCreateEndpointAutoScalingRule:
             return
 
         # For success scenarios, verify success and id
-        result = await create_auto_scaling_rule(scenario.input)
+        result = await create_auto_scaling_rule(action)
         assert result.success is True
         expected = scenario.expected
         if expected and expected.data:

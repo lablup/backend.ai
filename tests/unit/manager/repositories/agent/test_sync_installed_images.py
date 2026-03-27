@@ -28,7 +28,7 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -161,6 +161,7 @@ class TestSyncInstalledImagesIntegration:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -261,7 +262,6 @@ class TestSyncInstalledImagesIntegration:
 
         yield test_images
 
-    @pytest.mark.asyncio
     async def test_sync_installed_images_with_digest_mismatch(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -324,7 +324,6 @@ class TestSyncInstalledImagesIntegration:
             assert agent_id in cached_agents_001, "First image should be cached"
             assert agent_id in cached_agents_002, "Second image should be cached"
 
-    @pytest.mark.asyncio
     async def test_sync_installed_images_empty_redis(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -356,7 +355,6 @@ class TestSyncInstalledImagesIntegration:
                 )
                 assert agent_id not in cached_agents
 
-    @pytest.mark.asyncio
     async def test_sync_installed_images_multiple_architectures(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -418,7 +416,6 @@ class TestSyncInstalledImagesIntegration:
             assert agent_id in cached_x86, "x86_64 image should be cached"
             assert agent_id in cached_arm, "aarch64 image should be cached"
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "architecture",
         ["x86_64", "aarch64"],
@@ -468,7 +465,6 @@ class TestSyncInstalledImagesIntegration:
             )
             assert agent_id in cached_agents, f"{architecture} image should be cached"
 
-    @pytest.mark.asyncio
     async def test_sync_installed_images_partial_match(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

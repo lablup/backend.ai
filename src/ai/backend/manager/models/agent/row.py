@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional, TypeAlias, cast, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -16,7 +16,6 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
     selectinload,
-    with_loader_criteria,
 )
 from sqlalchemy.sql.expression import false, true
 
@@ -27,14 +26,13 @@ from ai.backend.manager.data.agent.types import (
     AgentDataForHeartbeatUpdate,
     AgentStatus,
 )
-from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.base import (
     Base,
     CurvePublicKeyColumn,
     EnumType,
     ResourceSlotColumn,
 )
-from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
@@ -47,6 +45,7 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission, ScalingGroupPermission
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
@@ -57,11 +56,10 @@ __all__: Sequence[str] = (
     "AgentRow",
     "agents",
     "list_schedulable_agents_by_sgroup",
-    "recalc_agent_resource_occupancy",
 )
 
 
-class AgentRow(Base):
+class AgentRow(Base):  # type: ignore[misc]
     __tablename__ = "agents"
 
     id: Mapped[str] = mapped_column("id", sa.String(length=64), primary_key=True)
@@ -86,6 +84,9 @@ class AgentRow(Base):
     available_slots: Mapped[ResourceSlot] = mapped_column(
         "available_slots", ResourceSlotColumn(), nullable=False
     )
+    # DEPRECATED (Phase 3, BA-4308): No longer written to.
+    # Agent occupied slots are now tracked by the normalized agent_resources table.
+    # Retained for historical audit; will be dropped in a future major version.
     occupied_slots: Mapped[ResourceSlot] = mapped_column(
         "occupied_slots", ResourceSlotColumn(), nullable=False
     )
@@ -116,22 +117,16 @@ class AgentRow(Base):
     )
 
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="agent_row")
+    agent_resource_rows: Mapped[list[AgentResourceRow]] = relationship("AgentResourceRow")
     scaling_group_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow", back_populates="agents"
     )
 
     def actual_occupied_slots(self) -> ResourceSlot:
-        resource_occupied_kernel_rows = cast(
-            list[KernelRow],
-            [
-                kernel
-                for kernel in self.kernels
-                if kernel.status in KernelStatus.resource_occupied_statuses()
-            ],
-        )
-        return sum(
-            (kernel.occupied_slots for kernel in resource_occupied_kernel_rows), ResourceSlot()
-        )
+        occupied = ResourceSlot()
+        for resource_row in self.agent_resource_rows:
+            occupied[resource_row.slot_name] = resource_row.used
+        return occupied
 
     def to_data(self) -> AgentData:
         return AgentData(
@@ -205,16 +200,13 @@ class AgentRow(Base):
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceSlot:
         async with db.begin_readonly_session() as db_session:
-            query = sa.select(KernelRow.occupied_slots).where(
-                sa.and_(
-                    KernelRow.agent == agent_id,
-                    KernelRow.status == KernelStatus.RUNNING,
-                )
+            query = sa.select(AgentResourceRow.slot_name, AgentResourceRow.used).where(
+                AgentResourceRow.agent_id == agent_id,
             )
-            kernel_slots = (await db_session.scalars(query)).all()
+            result = await db_session.execute(query)
             occupied_slots = ResourceSlot.from_known_slots(known_slot_types)
-            for slots in kernel_slots:
-                occupied_slots += slots
+            for row in result:
+                occupied_slots[row.slot_name] = row.used
             return occupied_slots
 
 
@@ -270,51 +262,7 @@ async def list_schedulable_agents_by_sgroup(
     return result.scalars().all()
 
 
-async def recalc_agent_resource_occupancy(db_session: SASession, agent_id: AgentId) -> None:
-    _stmt = (
-        sa.select(KernelRow)
-        .where(
-            (KernelRow.agent == agent_id)
-            & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-        )
-        .options(load_only(KernelRow.occupied_slots))
-    )
-    kernel_rows = cast(list[KernelRow], (await db_session.scalars(_stmt)).all())
-    occupied_slots = ResourceSlot()
-    for row in kernel_rows:
-        occupied_slots += row.occupied_slots
-
-    _update_stmt = (
-        sa.update(AgentRow).values(occupied_slots=occupied_slots).where(AgentRow.id == agent_id)
-    )
-    await db_session.execute(_update_stmt)
-
-
-async def recalc_agent_resource_occupancy_using_orm(
-    db_session: SASession, agent_id: AgentId
-) -> None:
-    agent_query = (
-        sa.select(AgentRow)
-        .where(AgentRow.id == agent_id)
-        .options(
-            selectinload(AgentRow.kernels),
-            with_loader_criteria(
-                KernelRow, KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)
-            ),
-        )
-    )
-    occupied_slots = ResourceSlot()
-    agent_row = cast(AgentRow, await db_session.scalar(agent_query))
-    kernel_rows = cast(list[KernelRow], agent_row.kernels)
-    for kernel in kernel_rows:
-        if kernel.status in AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES:
-            occupied_slots += kernel.occupied_slots
-    agent_row.occupied_slots = occupied_slots
-
-
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
 OWNER_PERMISSIONS: frozenset[AgentPermission] = frozenset([perm for perm in AgentPermission])
@@ -337,15 +285,15 @@ MEMBER_PERMISSIONS: frozenset[AgentPermission] = frozenset([
 class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow, AgentId]):
     from ai.backend.manager.models.scaling_group import ScalingGroupPermissionContext
 
-    sgroup_permission_ctx: Optional[ScalingGroupPermissionContext] = None
+    sgroup_permission_ctx: ScalingGroupPermissionContext | None = None
 
     @property
-    def query_condition(self) -> Optional[WhereClauseType]:
+    def query_condition(self) -> WhereClauseType | None:
         cond: WhereClauseType | None = None
 
         def _OR_coalesce(
-            base_cond: Optional[WhereClauseType],
-            _cond: sa.sql.expression.BinaryExpression,
+            base_cond: WhereClauseType | None,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -369,7 +317,7 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
     ) -> None:
         self.sgroup_permission_ctx = sgroup_permission_ctx
 
-    async def build_query(self) -> Optional[sa.sql.Select]:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -451,7 +399,7 @@ class AgentPermissionContextBuilder(
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.sgroup_row)
+            sg_row = row.sgroup_row
             for ag in sg_row.agents:
                 aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
@@ -480,7 +428,7 @@ class AgentPermissionContextBuilder(
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.sgroup_row)
+            sg_row = row.sgroup_row
             for ag in sg_row.agents:
                 aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
@@ -517,7 +465,7 @@ class AgentPermissionContextBuilder(
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.sgroup_row)
+            sg_row = row.sgroup_row
             for ag in sg_row.agents:
                 aid_permission_map[AgentId(ag.id)] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -25,13 +25,13 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.rbac_models.role import RoleRow
 
 
-def _get_role_join_condition():
+def _get_role_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.rbac_models.role import RoleRow
 
     return RoleRow.id == foreign(ObjectPermissionRow.role_id)
 
 
-def _get_scope_association_join_condition():
+def _get_scope_association_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.rbac_models.association_scopes_entities import (
         AssociationScopesEntitiesRow,
     )
@@ -42,7 +42,7 @@ def _get_scope_association_join_condition():
     )
 
 
-class ObjectPermissionRow(Base):
+class ObjectPermissionRow(Base):  # type: ignore[misc]
     __tablename__ = "object_permissions"
     __table_args__ = (
         sa.Index("ix_id_role_id_entity_id", "id", "role_id", "entity_id"),
@@ -73,6 +73,7 @@ class ObjectPermissionRow(Base):
         "RoleRow",
         back_populates="object_permission_rows",
         primaryjoin=_get_role_join_condition,
+        viewonly=True,
     )
     scope_association_rows: Mapped[list[AssociationScopesEntitiesRow]] = relationship(
         "AssociationScopesEntitiesRow",
@@ -85,7 +86,7 @@ class ObjectPermissionRow(Base):
         return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)
 
     @classmethod
-    def from_sa_row(cls, row: sa.engine.Row) -> Self:
+    def from_sa_row(cls, row: sa.engine.Row[Any]) -> Self:
         return cls(
             id=row.id,
             role_id=row.role_id,

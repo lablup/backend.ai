@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import sqlalchemy as sa
@@ -60,7 +60,7 @@ async def pagination_test_db(
             await conn.run_sync(lambda c: metadata.drop_all(c, [test_items]))
 
 
-def _make_base_query(table: sa.Table) -> sa.sql.Select:
+def _make_base_query(table: sa.Table) -> sa.sql.Select[Any]:
     """Create base query without window function (added by execute_batch_querier)."""
     return sa.select(
         table.c.id,

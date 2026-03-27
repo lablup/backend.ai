@@ -15,7 +15,7 @@ from ai.backend.appproxy.coordinator.models import Token
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class TokenResponseModel(BaseModel):
@@ -59,11 +59,11 @@ async def conf_v2(
         return PydanticResponse(TokenResponseModel(token=str(token_id)))
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

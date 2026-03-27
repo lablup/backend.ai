@@ -1,4 +1,6 @@
-from typing import Any, Optional
+from __future__ import annotations
+
+from typing import Any
 
 from ai.backend.client.request import Request
 
@@ -14,7 +16,7 @@ class Manager(BaseFunction):
 
     @api_function
     @classmethod
-    async def status(cls):
+    async def status(cls) -> dict[str, Any]:
         """
         Returns the current status of the configured API server.
         """
@@ -23,11 +25,13 @@ class Manager(BaseFunction):
             "status": "running",
         })
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def freeze(cls, force_kill: bool = False):
+    async def freeze(cls, force_kill: bool = False) -> None:
         """
         Freezes the configured API server.
         Any API clients will no longer be able to create new compute sessions nor
@@ -50,7 +54,7 @@ class Manager(BaseFunction):
 
     @api_function
     @classmethod
-    async def unfreeze(cls):
+    async def unfreeze(cls) -> None:
         """
         Unfreezes the configured API server so that it resumes to normal operation.
         """
@@ -63,17 +67,19 @@ class Manager(BaseFunction):
 
     @api_function
     @classmethod
-    async def get_announcement(cls):
+    async def get_announcement(cls) -> dict[str, Any]:
         """
         Get current announcement.
         """
         rqst = Request("GET", "/manager/announcement")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def update_announcement(cls, enabled: bool = True, message: Optional[str] = None):
+    async def update_announcement(cls, enabled: bool = True, message: str | None = None) -> None:
         """
         Update (create / delete) announcement.
 
@@ -90,7 +96,7 @@ class Manager(BaseFunction):
 
     @api_function
     @classmethod
-    async def scheduler_op(cls, op: str, args: Any):
+    async def scheduler_op(cls, op: str, args: Any) -> None:
         """
         Perform a scheduler operation.
 

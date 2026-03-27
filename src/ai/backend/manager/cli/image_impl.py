@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from pprint import pformat, pprint
-from typing import Any, Optional
+from typing import Any
 
 import click
 import sqlalchemy as sa
@@ -23,7 +24,7 @@ from .context import CLIContext, redis_ctx
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-async def list_images(cli_ctx: CLIContext, short, installed_only):
+async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) -> None:
     # Connect to postgreSQL DB
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
@@ -75,7 +76,7 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def inspect_image(cli_ctx: CLIContext, canonical_or_alias, architecture):
+async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -96,9 +97,10 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias, architecture):
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def forget_image(cli_ctx, canonical_or_alias, architecture):
+async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(cli_ctx.bootstrap_config.db) as db,
+        connect_database(bootstrap_config.db) as db,
         db.begin_session() as session,
     ):
         try:
@@ -118,7 +120,7 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
 
 async def purge_image(
     cli_ctx: CLIContext, canonical_or_alias: str, architecture: str, remove_from_registry: bool
-):
+) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -146,11 +148,11 @@ async def purge_image(
 
 async def set_image_resource_limit(
     cli_ctx: CLIContext,
-    canonical_or_alias,
-    slot_type,
-    range_value,
-    architecture,
-):
+    canonical_or_alias: str,
+    slot_type: str,
+    range_value: tuple[Decimal | None, Decimal | None],
+    architecture: str,
+) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -164,7 +166,7 @@ async def set_image_resource_limit(
                     ImageAlias(canonical_or_alias),
                 ],
             )
-            await image_row.set_resource_limit(slot_type, range_value)
+            image_row.set_resource_limit(slot_type, range_value)
         except UnknownImageReference:
             log.exception("Image not found.")
         except Exception as e:
@@ -172,10 +174,18 @@ async def set_image_resource_limit(
 
 
 async def rescan_images(
-    cli_ctx: CLIContext, registry_or_image: str, project: Optional[str] = None
+    cli_ctx: CLIContext, registry_or_image: str, project: str | None = None
 ) -> None:
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
+    # Import AssociationScopesEntitiesRow to register it with the ORM metadata.
+    # Without this, the CLI rescan path doesn't load this table via the normal
+    # server bootstrap, causing SA to skip it during ORM queries.
+    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+        AssociationScopesEntitiesRow,
+    )
+
+    _ = AssociationScopesEntitiesRow
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -188,7 +198,7 @@ async def rescan_images(
             log.exception(f"Unknown error occurred. Error: {e}")
 
 
-async def alias(cli_ctx: CLIContext, alias, target, architecture):
+async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -208,7 +218,7 @@ async def alias(cli_ctx: CLIContext, alias, target, architecture):
             log.exception(f"An error occurred. Error: {e}")
 
 
-async def dealias(cli_ctx: CLIContext, alias):
+async def dealias(cli_ctx: CLIContext, alias: str) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -232,10 +242,7 @@ async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
         try:
             image_row = await ImageRow.from_alias(session, alias)
             for key, value in validate_image_labels(image_row.labels).items():
-                print(f"{key:<40}: ", end="")
-                if isinstance(value, list):
-                    value = f"[{', '.join(value)}]"
-                print(value)
+                print(f"{key:<40}: {value}")
 
         except UnknownImageReference:
             log.error(f"No images were found with alias: {alias}")
@@ -243,7 +250,7 @@ async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
             log.exception(f"An error occurred. Error: {e}")
 
 
-def _resolve_architecture(current: bool, architecture: Optional[str]) -> str:
+def _resolve_architecture(current: bool, architecture: str | None) -> str:
     if architecture is not None:
         return architecture
     if current:
@@ -253,7 +260,7 @@ def _resolve_architecture(current: bool, architecture: Optional[str]) -> str:
 
 
 async def validate_image_canonical(
-    cli_ctx: CLIContext, canonical: str, current: bool, architecture: Optional[str] = None
+    cli_ctx: CLIContext, canonical: str, current: bool, architecture: str | None = None
 ) -> None:
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
@@ -269,10 +276,7 @@ async def validate_image_canonical(
 
                 print(f"{'architecture':<40}: {resolved_arch}")
                 for key, value in validate_image_labels(image_row.labels).items():
-                    print(f"{key:<40}: ", end="")
-                    if isinstance(value, list):
-                        value = f"{', '.join(value)}"
-                    print(value)
+                    print(f"{key:<40}: {value}")
             else:
                 rows = await session.scalars(
                     sa.select(ImageRow).where(
@@ -287,10 +291,7 @@ async def validate_image_canonical(
                         print("-" * 50)
                     print(f"{'architecture':<40}: {image_row.architecture}")
                     for key, value in validate_image_labels(image_row.labels).items():
-                        print(f"{key:<40}: ", end="")
-                        if isinstance(value, list):
-                            value = f"{', '.join(value)}"
-                        print(value)
+                        print(f"{key:<40}: {value}")
 
         except UnknownImageReference as e:
             log.error(f"{e}")

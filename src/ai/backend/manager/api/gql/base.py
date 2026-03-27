@@ -1,52 +1,42 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 import graphene
 import strawberry
 from graphql import StringValueNode
+from graphql.language.ast import ValueNode
 from graphql_relay.utils import base64, unbase64
+from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
-from ai.backend.common.json import dump_json_str, load_json
-from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.common.types import IntFilterData, StringFilterData
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.dto.manager.query import DateFilter as DateFilterDTO
+from ai.backend.common.dto.manager.query import DateTimeFilter as DateTimeFilterDTO
+from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
+from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
+from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
+from ai.backend.manager.api.adapters.cursor import decode_cursor as decode_cursor
+from ai.backend.manager.api.adapters.cursor import encode_cursor as encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_enum,
+    gql_field,
+    gql_pydantic_input,
+)
+from ai.backend.manager.data.common.types import SearchResult
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.base import QueryCondition
     from ai.backend.manager.types import (
         PaginationOptions,
     )
-
-
-@dataclass(frozen=True)
-class StringMatchSpec:
-    """Specification for string matching operations in query conditions."""
-
-    value: str
-    case_insensitive: bool
-    negated: bool
-
-
-@dataclass(frozen=True)
-class UUIDEqualMatchSpec:
-    """Specification for UUID equality operations (=, !=)."""
-
-    value: uuid.UUID
-    negated: bool
-
-
-@dataclass(frozen=True)
-class UUIDInMatchSpec:
-    """Specification for UUID IN operations (IN, NOT IN)."""
-
-    values: list[uuid.UUID]
-    negated: bool
 
 
 @strawberry.scalar
@@ -60,51 +50,59 @@ class ByteSize(str):
         return value
 
     @staticmethod
-    def parse_literal(ast) -> str:
+    def parse_literal(ast: ValueNode) -> str:
         if not isinstance(ast, StringValueNode):
             raise ValueError("ByteSize must be provided as a string literal")
         return ast.value
 
 
-@strawberry.input
-class StringFilter:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for string fields supporting equality, containment, prefix/suffix, and case-insensitive variants.",
+        added_version="24.09.0",
+    ),
+    name="StringFilter",
+)
+class StringFilter(PydanticInputMixin[StringFilterDTO]):
     # Basic operations
-    contains: Optional[str] = None
-    starts_with: Optional[str] = None
-    ends_with: Optional[str] = None
-    equals: Optional[str] = None
+    contains: str | None = None
+    starts_with: str | None = None
+    ends_with: str | None = None
+    equals: str | None = None
 
     # NOT operations
-    not_contains: Optional[str] = None
-    not_starts_with: Optional[str] = None
-    not_ends_with: Optional[str] = None
-    not_equals: Optional[str] = None
+    not_contains: str | None = None
+    not_starts_with: str | None = None
+    not_ends_with: str | None = None
+    not_equals: str | None = None
 
     # Case-insensitive operations
-    i_contains: Optional[str] = strawberry.field(name="iContains", default=None)
-    i_starts_with: Optional[str] = strawberry.field(name="iStartsWith", default=None)
-    i_ends_with: Optional[str] = strawberry.field(name="iEndsWith", default=None)
-    i_equals: Optional[str] = strawberry.field(name="iEquals", default=None)
+    i_contains: str | None = gql_field(
+        description="The i contains field.", name="iContains", default=None
+    )
+    i_starts_with: str | None = gql_field(
+        description="The i starts with field.", name="iStartsWith", default=None
+    )
+    i_ends_with: str | None = gql_field(
+        description="The i ends with field.", name="iEndsWith", default=None
+    )
+    i_equals: str | None = gql_field(
+        description="The i equals field.", name="iEquals", default=None
+    )
 
     # Case-insensitive NOT operations
-    i_not_contains: Optional[str] = strawberry.field(name="iNotContains", default=None)
-    i_not_starts_with: Optional[str] = strawberry.field(name="iNotStartsWith", default=None)
-    i_not_ends_with: Optional[str] = strawberry.field(name="iNotEndsWith", default=None)
-    i_not_equals: Optional[str] = strawberry.field(name="iNotEquals", default=None)
-
-    def to_dataclass(self) -> StringFilterData:
-        return StringFilterData(
-            contains=self.contains,
-            starts_with=self.starts_with,
-            ends_with=self.ends_with,
-            equals=self.equals,
-            not_equals=self.not_equals,
-            i_contains=self.i_contains,
-            i_starts_with=self.i_starts_with,
-            i_ends_with=self.i_ends_with,
-            i_equals=self.i_equals,
-            i_not_equals=self.i_not_equals,
-        )
+    i_not_contains: str | None = gql_field(
+        description="The i not contains field.", name="iNotContains", default=None
+    )
+    i_not_starts_with: str | None = gql_field(
+        description="The i not starts with field.", name="iNotStartsWith", default=None
+    )
+    i_not_ends_with: str | None = gql_field(
+        description="The i not ends with field.", name="iNotEndsWith", default=None
+    )
+    i_not_equals: str | None = gql_field(
+        description="The i not equals field.", name="iNotEquals", default=None
+    )
 
     def build_query_condition(
         self,
@@ -112,7 +110,7 @@ class StringFilter:
         equals_factory: Callable[[StringMatchSpec], QueryCondition],
         starts_with_factory: Callable[[StringMatchSpec], QueryCondition],
         ends_with_factory: Callable[[StringMatchSpec], QueryCondition],
-    ) -> Optional[QueryCondition]:
+    ) -> QueryCondition | None:
         """Build a query condition from this filter using the provided factory callables.
 
         Args:
@@ -199,31 +197,30 @@ class StringFilter:
         return None
 
 
-@strawberry.input
-class IntFilter:
-    equals: Optional[int] = None
-    not_equals: Optional[int] = None
-    greater_than: Optional[int] = None
-    greater_than_or_equal: Optional[int] = None
-    less_than: Optional[int] = None
-    less_than_or_equal: Optional[int] = None
-
-    def to_dataclass(self) -> IntFilterData:
-        return IntFilterData(
-            equals=self.equals,
-            not_equals=self.not_equals,
-            greater_than=self.greater_than,
-            greater_than_or_equal=self.greater_than_or_equal,
-            less_than=self.less_than,
-            less_than_or_equal=self.less_than_or_equal,
-        )
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for integer fields supporting equality and comparison operations.",
+        added_version="24.09.0",
+    ),
+    name="IntFilter",
+)
+class IntFilter(PydanticInputMixin[IntFilterDTO]):
+    equals: int | None = None
+    not_equals: int | None = None
+    greater_than: int | None = None
+    greater_than_or_equal: int | None = None
+    less_than: int | None = None
+    less_than_or_equal: int | None = None
 
 
-@strawberry.input(description="Added in 26.1.0. Filter for UUID fields.")
-class UUIDFilter:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for UUID fields.", added_version="26.1.0"),
+    name="UUIDFilter",
+)
+class UUIDFilter(PydanticInputMixin[UUIDFilterDTO]):
     # Basic operations
     equals: uuid.UUID | None = None
-    in_: list[uuid.UUID] | None = strawberry.field(name="in", default=None)
+    in_: list[uuid.UUID] | None = gql_field(description="The in  field.", name="in", default=None)
 
     # NOT operations
     not_equals: uuid.UUID | None = None
@@ -278,32 +275,54 @@ class UUIDFilter:
         return None
 
 
-@strawberry.input
-class DateTimeFilter:
-    """Filter for datetime fields."""
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for datetime fields supporting range and equality operations.",
+        added_version="24.09.0",
+    ),
+    name="DateTimeFilter",
+)
+class DateTimeFilter(PydanticInputMixin[DateTimeFilterDTO]):
+    before: datetime | None = None
+    after: datetime | None = None
+    equals: datetime | None = None
+    not_equals: datetime | None = None
 
-    before: Optional[datetime] = None
-    after: Optional[datetime] = None
-    equals: Optional[datetime] = None
-    not_equals: Optional[datetime] = None
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for date fields (not datetime) supporting range and equality operations.",
+        added_version="24.09.0",
+    ),
+    name="DateFilter",
+)
+class DateFilter(PydanticInputMixin[DateFilterDTO]):
+    before: date | None = None
+    after: date | None = None
+    equals: date | None = None
+    not_equals: date | None = None
 
     def build_query_condition(
         self,
-        before_factory: Callable[[datetime], QueryCondition],
-        after_factory: Callable[[datetime], QueryCondition],
-        equals_factory: Optional[Callable[[datetime], QueryCondition]] = None,
-    ) -> Optional[QueryCondition]:
-        """Build a query condition from this filter using the provided factory callables.
+        before_factory: Callable[[date], QueryCondition],
+        after_factory: Callable[[date], QueryCondition],
+        equals_factory: Callable[[date], QueryCondition],
+        not_equals_factory: Callable[[date], QueryCondition],
+    ) -> QueryCondition | None:
+        """Build query condition using factory callables.
 
         Args:
-            before_factory: Factory function that takes datetime and returns QueryCondition for < comparison
-            after_factory: Factory function that takes datetime and returns QueryCondition for > comparison
-            equals_factory: Optional factory function for = comparison
+            before_factory: Factory function for < comparison
+            after_factory: Factory function for > comparison
+            equals_factory: Factory function for = comparison
+            not_equals_factory: Factory function for != comparison
 
         Returns:
             QueryCondition if any filter field is set, None otherwise
         """
-        if self.equals and equals_factory:
+        if self.not_equals:
+            return not_equals_factory(self.not_equals)
+        if self.equals:
             return equals_factory(self.equals)
         if self.before:
             return before_factory(self.before)
@@ -312,13 +331,18 @@ class DateTimeFilter:
         return None
 
 
-@strawberry.enum
+@gql_enum(BackendAIGQLMeta(added_version="24.09.0", description="Sort direction for ordering"))
 class OrderDirection(StrEnum):
     ASC = "ASC"
     DESC = "DESC"
 
 
-@strawberry.enum
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="24.09.0",
+        description="Sort direction for ordering with null placement control",
+    )
+)
 class Ordering(StrEnum):
     ASC = "ASC"
     ASC_NULLS_FIRST = "ASC_NULLS_FIRST"
@@ -326,29 +350,6 @@ class Ordering(StrEnum):
     DESC = "DESC"
     DESC_NULLS_FIRST = "DESC_NULLS_FIRST"
     DESC_NULLS_LAST = "DESC_NULLS_LAST"
-
-
-@strawberry.scalar(description="Added in 25.15.0")
-class JSONString:
-    @staticmethod
-    def parse_value(value: str | bytes) -> Mapping[str, Any]:
-        if isinstance(value, str):
-            return load_json(value)
-        if isinstance(value, bytes):
-            return load_json(value)
-        return value
-
-    @staticmethod
-    def serialize(value: Any) -> JSONString:
-        if isinstance(value, (dict, list)):
-            return cast(JSONString, dump_json_str(value))
-        if isinstance(value, str):
-            return cast(JSONString, value)
-        return cast(JSONString, dump_json_str(value))
-
-    @staticmethod
-    def from_resource_slot(resource_slot: ResourceSlot) -> JSONString:
-        return JSONString.serialize(resource_slot.to_json())
 
 
 def to_global_id(
@@ -374,37 +375,13 @@ def resolve_global_id(global_id: str) -> tuple[str, str]:
     return type_, id_
 
 
-CURSOR_VERSION = "v1"
-
-
-def encode_cursor(row_id: str | uuid.UUID) -> str:
-    """Encode row ID to cursor format: base64(cursor:v1:{row_id})"""
-    raw = f"cursor:{CURSOR_VERSION}:{row_id}"
-    return base64(raw)
-
-
-def decode_cursor(cursor: str) -> str:
-    """Decode cursor and return row_id. Raises InvalidCursor on failure."""
-    from ai.backend.manager.errors.api import InvalidCursor
-
-    try:
-        raw = unbase64(cursor)
-    except Exception as e:
-        raise InvalidCursor(f"Invalid cursor encoding: {cursor}") from e
-
-    parts = raw.split(":", 2)
-    if len(parts) != 3 or parts[0] != "cursor" or parts[1] != CURSOR_VERSION:
-        raise InvalidCursor(f"Invalid cursor format: {cursor}")
-    return parts[2]  # row_id
-
-
 def build_pagination_options(
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> PaginationOptions:
     from ai.backend.manager.types import (
         BackwardPaginationOptions,
@@ -434,8 +411,8 @@ def build_pagination_options(
 class PageInfo:
     has_next_page: bool
     has_previous_page: bool
-    start_cursor: Optional[str] = None
-    end_cursor: Optional[str] = None
+    start_cursor: str | None = None
+    end_cursor: str | None = None
 
     def to_strawberry_page_info(self) -> strawberry.relay.PageInfo:
         return strawberry.relay.PageInfo(
@@ -453,7 +430,7 @@ class HasCursor(Protocol):
 TEdge = TypeVar("TEdge", bound=HasCursor)
 
 
-def build_page_info(
+def build_page_info[TEdge: HasCursor](
     edges: list[TEdge], total_count: int, pagination_options: PaginationOptions
 ) -> PageInfo:
     """Build PageInfo from edges and pagination options"""
@@ -499,4 +476,27 @@ def build_page_info(
         has_previous_page=has_previous_page,
         start_cursor=edges[0].cursor if edges else None,
         end_cursor=edges[-1].cursor if edges else None,
+    )
+
+
+def build_connection[TData, TNode: Node, TConn](
+    *,
+    result: SearchResult[TData],
+    to_node: Callable[[TData], TNode],
+    id_getter: Callable[[TNode], str],
+    edge_type: type[Edge[TNode]],
+    connection_type: Callable[..., TConn],
+) -> TConn:
+    """Build a relay Connection from a SearchResult."""
+    nodes = [to_node(item) for item in result.items]
+    edges = [edge_type(node=node, cursor=encode_cursor(id_getter(node))) for node in nodes]
+    return connection_type(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )

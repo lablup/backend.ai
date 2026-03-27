@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.message_queue.abc import (
     AbstractAnycaster,
@@ -32,14 +32,14 @@ class RedisMQArgs:
     # Required arguments
     anycast_stream_key: str
     broadcast_channel: str
-    consume_stream_keys: Optional[set[str]]
-    subscribe_channels: Optional[set[str]]
+    consume_stream_keys: set[str] | None
+    subscribe_channels: set[str] | None
     group_name: str
     node_id: str
     db: int
     # Optional arguments
     autoclaim_idle_timeout: int = _DEFAULT_AUTOCLAIM_IDLE_TIMEOUT
-    autoclaim_start_id: Optional[str] = None
+    autoclaim_start_id: str | None = None
 
 
 class RedisQueue(AbstractMessageQueue):
@@ -131,7 +131,7 @@ class RedisQueue(AbstractMessageQueue):
         await self._broadcaster.broadcast_with_cache(cache_id, payload)
 
     @override
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[Mapping[str, str]]:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> Mapping[str, str] | None:
         """
         Fetch a cached broadcast message by cache_id.
         This method retrieves the cached message from the broadcast channel.

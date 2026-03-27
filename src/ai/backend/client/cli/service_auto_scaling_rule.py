@@ -1,7 +1,7 @@
 import decimal
 import sys
 from collections.abc import Iterable
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 import click
@@ -63,8 +63,8 @@ def create(
     comparator: AutoScalingMetricComparator,
     step_size: int,
     cooldown_seconds: int,
-    min_replicas: Optional[int] = None,
-    max_replicas: Optional[int] = None,
+    min_replicas: int | None = None,
+    max_replicas: int | None = None,
 ) -> None:
     """Create a new auto-scaling rule."""
 
@@ -110,11 +110,11 @@ def create(
 def list(
     ctx: CLIContext,
     service: str,
-    format: Optional[str],
-    filter_: Optional[str],
-    order: Optional[str],
+    format: str | None,
+    filter_: str | None,
+    order: str | None,
     offset: int,
-    limit: Optional[int],
+    limit: int | None,
 ) -> None:
     """List all set auto-scaling rules for given model service."""
 
@@ -218,8 +218,8 @@ def update(
     comparator: str | Undefined,
     step_size: int | Undefined,
     cooldown_seconds: int | Undefined,
-    min_replicas: Optional[int] | Undefined,
-    max_replicas: Optional[int] | Undefined,
+    min_replicas: int | None | Undefined,
+    max_replicas: int | None | Undefined,
 ) -> None:
     """Update attributes of the given auto-scaling rule."""
     with Session() as session:
@@ -236,8 +236,8 @@ def update(
 
         try:
             rule_instance = session.ServiceAutoScalingRule(rule)
-            rule_instance.get()
-            rule_instance.update(
+            _ = rule_instance.get()
+            _ = rule_instance.update(
                 metric_source=metric_source,
                 metric_name=metric_name,
                 threshold=_threshold,
@@ -261,8 +261,8 @@ def delete(ctx: CLIContext, rule: UUID) -> None:
     with Session() as session:
         rule_instance = session.ServiceAutoScalingRule(rule)
         try:
-            rule_instance.get(fields=[service_auto_scaling_rule_fields["id"]])
-            rule_instance.delete()
+            _ = rule_instance.get(fields=[service_auto_scaling_rule_fields["id"]])
+            _ = rule_instance.delete()
             print_done(f"Autosscaling rule {rule_instance.rule_id} has been deleted.")
         except BackendAPIError as e:
             ctx.output.print_fail(f"Failed to delete rule {rule_instance.rule_id}:")

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Final, Optional
+from typing import Any, Final
 
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
@@ -24,7 +24,7 @@ class HashInfo:
 
     algorithm: PasswordHashAlgorithm
     rounds: int
-    salt: Optional[str]  # bcrypt includes salt in hash_value
+    salt: str | None  # bcrypt includes salt in hash_value
     hash_value: str
 
     @classmethod
@@ -124,7 +124,7 @@ class PasswordInfo:
         return self.rounds != hash_info.rounds
 
 
-class PasswordColumn(TypeDecorator):
+class PasswordColumn(TypeDecorator[str]):
     """Custom column type that prevents direct password assignment.
 
     Passwords should be set using proper functions that have access to config:
@@ -138,7 +138,7 @@ class PasswordColumn(TypeDecorator):
     impl = VARCHAR
     cache_ok = True
 
-    def process_bind_param(self, value: Any, dialect: Any) -> Optional[str]:
+    def process_bind_param(self, value: Any, _dialect: Any) -> str | None:
         if value is None:
             return None
 

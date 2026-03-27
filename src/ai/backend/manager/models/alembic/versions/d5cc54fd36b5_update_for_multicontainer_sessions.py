@@ -19,7 +19,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     # In this mgiration, we finally clear up the column namings:
     #   sess_id -> session_name
     #     => client-provided alias
@@ -88,7 +88,7 @@ def upgrade():
     op.create_index(op.f("ix_kernels_session_type"), "kernels", ["session_type"], unique=False)
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_index(op.f("ix_kernels_session_type"), table_name="kernels")
     op.drop_index(op.f("ix_kernels_session_name"), table_name="kernels")
     op.drop_index(op.f("ix_kernels_session_id"), table_name="kernels")

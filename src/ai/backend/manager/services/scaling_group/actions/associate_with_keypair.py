@@ -1,28 +1,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 
-from .base import ScalingGroupAction
+from .keypair_base import ScalingGroupKeypairAction
 
 
 @dataclass
-class AssociateScalingGroupWithKeypairsAction(ScalingGroupAction):
+class AssociateScalingGroupWithKeypairsAction(ScalingGroupKeypairAction):
     """Action to associate a scaling group with multiple keypairs."""
 
     bulk_creator: BulkCreator[ScalingGroupForKeypairsRow]
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "associate_with_keypairs"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -31,5 +32,5 @@ class AssociateScalingGroupWithKeypairsActionResult(BaseActionResult):
     """Result of associating a scaling group with keypairs."""
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

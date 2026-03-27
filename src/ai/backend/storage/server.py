@@ -11,8 +11,9 @@ import signal
 import ssl
 import sys
 import traceback
-from collections.abc import AsyncGenerator, AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import TYPE_CHECKING, Any
@@ -30,6 +31,7 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
+from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
 from ai.backend.common.config import (
     ConfigurationError,
 )
@@ -52,13 +54,16 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.plugin import BasePluginContext
+from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
+from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
 )
+from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
     RedisServiceDiscoveryArgs,
@@ -81,7 +86,15 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
 from ai.backend.storage.context_types import ArtifactVerifierContext
 
+try:
+    import uvloop
+except ImportError:
+    uvloop = None  # type: ignore[assignment]
+
 from . import __version__ as VERSION
+from .api.client import init_client_app
+from .api.manager import init_internal_app, init_manager_app
+from .bgtask.registry import BgtaskHandlerRegistryCreator
 from .client.manager import ManagerHTTPClientPool
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import (
@@ -90,12 +103,22 @@ from .config.unified import (
     ReservoirConfig,
     StorageProxyUnifiedConfig,
 )
+from .context import DEFAULT_BACKENDS, EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .errors import InvalidConfigurationSourceError, InvalidSocketPathError
-from .watcher import WatcherClient
+from .migration import check_latest
+from .plugin import (
+    StorageClientWebappPluginContext,
+    StorageManagerWebappPluginContext,
+    StoragePluginContext,
+)
+from .storages.storage_pool import StoragePool
+from .volumes.noop import init_noop_volume
+from .volumes.pool import VolumePool
+from .volumes.stats import VolumeState, VolumeStatsObserver, VolumeStatsObserverOptions
+from .watcher import WatcherClient, main_job
 
 if TYPE_CHECKING:
-    from .context import RootContext
-    from .volumes.pool import VolumePool
+    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -194,8 +217,6 @@ async def bgtask_ctx(
     event_producer: EventProducer,
     volume_pool: VolumePool,
 ) -> AsyncGenerator[BackgroundTaskManager]:
-    from .bgtask.registry import BgtaskHandlerRegistryCreator
-
     redis_profile_target = redis_config.to_redis_profile_target()
     valkey_client = await ValkeyBgtaskClient.create(
         redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target(),
@@ -221,8 +242,6 @@ async def _make_message_queue(
     local_config: StorageProxyUnifiedConfig,
     redis_profile_target: RedisProfileTarget,
 ) -> AbstractMessageQueue:
-    from .context import EVENT_DISPATCHER_CONSUMER_GROUP
-
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     node_id = local_config.storage_proxy.node_id
     args = RedisMQArgs(
@@ -324,8 +343,6 @@ async def volume_ctx(
     event_dispatcher: EventDispatcher,
     event_producer: EventProducer,
 ) -> AsyncGenerator[VolumePool]:
-    from .volumes.pool import VolumePool
-
     volume_pool = await VolumePool.create(
         local_config=local_config,
         etcd=etcd,
@@ -344,14 +361,6 @@ async def api_ctx(
     etcd: AsyncEtcd,
     root_ctx: RootContext,
 ) -> AsyncGenerator[tuple[web.Application, web.Application, web.Application]]:
-    from .api.client import init_client_app
-    from .api.manager import init_internal_app, init_manager_app
-    from .plugin import (
-        StorageClientWebappPluginContext,
-        StorageManagerWebappPluginContext,
-        StoragePluginContext,
-    )
-
     @asynccontextmanager
     async def _init_storage_plugin() -> AsyncGenerator[StoragePluginContext]:
         plugin_ctx = StoragePluginContext(etcd, local_config.model_dump())
@@ -367,14 +376,14 @@ async def api_ctx(
 
     @asynccontextmanager
     async def _init_storage_webapp_plugin(
-        plugin_ctx: BasePluginContext, root_app: web.Application
-    ) -> AsyncGenerator[BasePluginContext]:
+        plugin_ctx: BasePluginContext[AbstractPlugin], root_app: web.Application
+    ) -> AsyncGenerator[BasePluginContext[AbstractPlugin], None]:
         pid = os.getpid()
         await plugin_ctx.init()
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
             if pid == 0:
                 log.info("Loading storage webapp plugin: {0}", plugin_name)
-            subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)
+            subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)  # type: ignore[attr-defined]
             _init_subapp(plugin_name, root_app, subapp, global_middlewares)
         try:
             yield plugin_ctx
@@ -465,13 +474,13 @@ async def api_ctx(
         internal_api_app = await api_init_stack.enter_async_context(internal_api_ctx())
         await api_init_stack.enter_async_context(
             _init_storage_webapp_plugin(
-                StorageClientWebappPluginContext(etcd, local_config.model_dump()),
+                StorageClientWebappPluginContext(etcd, local_config.model_dump()),  # type: ignore[arg-type]
                 client_api_app,
             )
         )
         await api_init_stack.enter_async_context(
             _init_storage_webapp_plugin(
-                StorageManagerWebappPluginContext(etcd, local_config.model_dump()),
+                StorageManagerWebappPluginContext(etcd, local_config.model_dump()),  # type: ignore[arg-type]
                 manager_api_app,
             )
         )
@@ -488,6 +497,7 @@ async def service_discovery_ctx(
     local_config: StorageProxyUnifiedConfig,
     etcd: AsyncEtcd,
     redis_config: RedisConfig,
+    event_producer: EventProducer | None = None,
 ) -> AsyncGenerator[None]:
     announce_addr_config = local_config.api.manager.announce_addr
     announce_addr = CommonHostPortPair(
@@ -531,20 +541,38 @@ async def service_discovery_ctx(
     if local_config.otel.enabled:
         meta = sd_loop.metadata
         otel_spec = OpenTelemetrySpec(
-            service_id=meta.id,
             service_name=meta.service_group,
             service_version=meta.version,
             log_level=local_config.otel.log_level,
             endpoint=local_config.otel.endpoint,
+            service_instance_id=meta.id,
+            service_instance_name=meta.display_name,
+            max_queue_size=local_config.otel.max_queue_size,
+            max_export_batch_size=local_config.otel.max_export_batch_size,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+
+    # Start event-based SD publishing if config has service_group set
+    sd_config = local_config.service_discovery
+    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
+    if sd_config.service_group and event_producer is not None:
+        sd_event_publisher = ServiceDiscoveryEventPublisher(
+            event_producer=event_producer,
+            config=sd_config,
+            component_version=VERSION,
+            startup_time=datetime.now(tz=UTC),
+        )
+        await sd_event_publisher.start()
+
     try:
         yield
     finally:
+        if sd_event_publisher is not None:
+            await sd_event_publisher.stop()
         sd_loop.close()
 
 
-async def _on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def _on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
@@ -556,7 +584,7 @@ def _init_subapp(
 ) -> None:
     subapp.on_response_prepare.append(_on_prepare)
 
-    async def _set_root_ctx(subapp: web.Application):
+    async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
         # These are the public APIs exposed to plugins as well.
         subapp["ctx"] = root_app["ctx"]
@@ -576,11 +604,6 @@ async def server_main(
     pidx: int,
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
-    from .context import DEFAULT_BACKENDS, RootContext
-    from .migration import check_latest
-    from .storages.storage_pool import StoragePool
-    from .volumes.noop import init_noop_volume
-
     local_config: StorageProxyUnifiedConfig = _args[0]
     loop.set_debug(local_config.debug.asyncio)
 
@@ -635,6 +658,35 @@ async def server_main(
         await health_probe.start()
         storage_init_stack.push_async_callback(health_probe.stop)
 
+        # Initialize volume stats observer
+        volume_stats_options = VolumeStatsObserverOptions(
+            observe_interval=local_config.storage_proxy.volume_stats.observe_interval,
+            timeout_per_volume=local_config.storage_proxy.volume_stats.observe_timeout,
+            cache_ttl=local_config.storage_proxy.volume_stats.cache_ttl,
+        )
+        valkey_volume_stats_client = await ValkeyVolumeStatsClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_STATISTICS_DB,
+            human_readable_name=f"storage-proxy-volume-stats-{pidx}",
+        )
+        storage_init_stack.push_async_callback(valkey_volume_stats_client.close)
+
+        volume_stats_observer = VolumeStatsObserver(
+            volume_pool=volume_pool,
+            valkey_client=valkey_volume_stats_client,
+            options=volume_stats_options,
+        )
+        volume_stats_runner = Runner(resources=[])
+        await volume_stats_runner.register_observer(volume_stats_observer)
+        await volume_stats_runner.start()
+        storage_init_stack.push_async_callback(volume_stats_runner.close)
+
+        volume_stats_state = VolumeState(
+            volume_pool=volume_pool,
+            valkey_client=valkey_volume_stats_client,
+            options=volume_stats_options,
+        )
+
         # Build reservoir registry configs for ManagerHTTPClientPool
         reservoir_registry_configs: dict[str, ReservoirConfig] = {
             name: r.reservoir
@@ -664,13 +716,15 @@ async def server_main(
             watcher=watcher_client,
             metric_registry=metric_registry,
             cors_options={
-                "*": aiohttp_cors.ResourceOptions(
+                "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
                     allow_credentials=False, expose_headers="*", allow_headers="*"
                 ),
             },
             manager_client_pool=manager_client_pool,
             valkey_artifact_client=valkey_artifact_client,
             health_probe=health_probe,
+            volume_stats_observer=volume_stats_observer,
+            volume_stats_state=volume_stats_state,
             backends={**DEFAULT_BACKENDS},
             volumes={
                 NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
@@ -692,7 +746,7 @@ async def server_main(
         monitor.console_locals["internal_api_app"] = internal_api_app
 
         await storage_init_stack.enter_async_context(
-            service_discovery_ctx(local_config, etcd, redis_config)
+            service_discovery_ctx(local_config, etcd, redis_config, event_producer)
         )
 
         if _is_root():
@@ -748,8 +802,6 @@ def main(
     debug: bool = False,
 ) -> int:
     """Start the storage-proxy service as a foreground process."""
-    from .watcher import main_job
-
     log_level = LogLevel.DEBUG if debug else log_level
     try:
         local_config = load_local_config(config_path, log_level=log_level)
@@ -759,7 +811,7 @@ def main(
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     # Note: logging configuration is handled separately in Logger class
     # Debug mode is already set during config loading if needed
 
@@ -794,10 +846,13 @@ def main(
                 if local_config.debug.enabled:
                     print("== Storage proxy configuration ==")
                     pprint(local_config.model_dump())
+                runner: Callable[..., Any]
                 match local_config.storage_proxy.event_loop:
                     case EventLoopType.UVLOOP:
-                        import uvloop
-
+                        if uvloop is None:
+                            raise ImportError(
+                                "uvloop is not installed. Install it with: pip install uvloop"
+                            )
                         runner = uvloop.run
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
@@ -831,13 +886,16 @@ def main(
                 else:
                     extra_procs = tuple()
 
-                aiotools.start_server(
-                    server_main_logwrapper,
-                    num_workers=num_workers,
-                    extra_procs=extra_procs,
-                    args=(local_config, log_endpoint),
-                    runner=runner,
-                )
+                try:
+                    aiotools.start_server(
+                        server_main_logwrapper,
+                        num_workers=num_workers,
+                        extra_procs=extra_procs,
+                        args=(local_config, log_endpoint),
+                        runner=runner,
+                    )
+                finally:
+                    cleanup_prometheus_multiprocess_dir()
                 log.info("exit.")
         finally:
             if local_config.storage_proxy.pid_file.is_file():

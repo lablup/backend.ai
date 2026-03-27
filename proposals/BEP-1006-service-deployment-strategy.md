@@ -2,6 +2,9 @@
 Author: Jeongseok Kang (jskang@lablup.com)
 Status: Accepted
 Created: 2025-06-27
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # Backend.AI Model Service Deployment Strategy Enhancement

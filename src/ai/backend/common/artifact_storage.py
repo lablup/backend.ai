@@ -1,13 +1,17 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Any
 
-from ai.backend.common.data.storage.registries.types import ModelTarget
-from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.types import StreamReader
 
 
 class AbstractStorage(ABC):
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        raise NotImplementedError
+
     @abstractmethod
     async def stream_upload(
         self,
@@ -57,14 +61,3 @@ class AbstractStoragePool(ABC):
     def has_storage(self, name: str) -> bool:
         """Check if storage exists in the pool"""
         raise NotImplementedError
-
-
-@dataclass
-class ImportStepContext:
-    """Context shared across import steps"""
-
-    model: ModelTarget
-    registry_name: str
-    storage_pool: AbstractStoragePool
-    storage_step_mappings: dict[ArtifactStorageImportStep, str]
-    step_metadata: dict[str, Any]  # For passing data between steps

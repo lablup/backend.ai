@@ -1,6 +1,7 @@
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 
 from ai.backend.client.output.fields import user_fields
 from ai.backend.test.contexts.auth import KeypairContext
@@ -22,7 +23,7 @@ class AddGroupToKeypairTemplate(WrapperTestTemplate):
 
     @override
     @actxmgr
-    async def _context(self):
+    async def _context(self) -> AsyncIterator[None]:
         created_group_meta = CreatedGroupContext.current()
         keypair = KeypairContext.current()
         client_session = ClientSessionContext.current()
@@ -53,7 +54,7 @@ class AddGroupToKeypairTemplate(WrapperTestTemplate):
                     f"{user_info_after.group_ids} != {original_group_ids}"
                 )
 
-    async def _get_user_info_by_keypair(self, client_session, access_key: str) -> _UserInfo:
+    async def _get_user_info_by_keypair(self, client_session: Any, access_key: str) -> _UserInfo:
         keypair_info = await client_session.KeyPair(access_key).info()
         user_id = keypair_info["user_id"]
         user_info = await client_session.User.detail(user_id, fields=(user_fields["groups"],))

@@ -1,13 +1,21 @@
+from __future__ import annotations
+
 import secrets
 import uuid
+from collections.abc import Iterator
 from http import HTTPStatus
+from typing import TYPE_CHECKING
 from unittest import mock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from ai.backend.client.session import AsyncSession
 from ai.backend.client.versioning import get_naming
-from ai.backend.testutils.mock import AsyncContextMock, AsyncMock
+from ai.backend.testutils.mock import AsyncContextMock
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 simulated_api_versions = [
     (4, "20190615"),
@@ -17,15 +25,14 @@ simulated_api_versions = [
 
 
 @pytest.fixture(scope="module", autouse=True, params=simulated_api_versions)
-def api_version(request):
+def api_version(request: pytest.FixtureRequest) -> Iterator[tuple[int, str]]:
     mock_nego_func = AsyncMock()
     mock_nego_func.return_value = request.param
     with mock.patch("ai.backend.client.session._negotiate_api_version", mock_nego_func):
         yield request.param
 
 
-@pytest.mark.asyncio
-async def test_create_kernel_url(mocker):
+async def test_create_kernel_url(mocker: MockerFixture) -> None:
     mock_req_obj = mock.Mock()
     mock_req_obj.fetch.return_value = AsyncContextMock(
         status=HTTPStatus.CREATED,
@@ -45,8 +52,7 @@ async def test_create_kernel_url(mocker):
         mock_req_obj.fetch.return_value.json.assert_awaited_once_with()
 
 
-@pytest.mark.asyncio
-async def test_destroy_kernel_url(mocker):
+async def test_destroy_kernel_url(mocker: MockerFixture) -> None:
     mock_req_obj = mock.Mock()
     mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.NO_CONTENT)
     session_name = secrets.token_hex(12)
@@ -57,8 +63,7 @@ async def test_destroy_kernel_url(mocker):
         mock_req_cls.assert_called_once_with("DELETE", f"/{prefix}/{session_name}", params={})
 
 
-@pytest.mark.asyncio
-async def test_restart_kernel_url(mocker):
+async def test_restart_kernel_url(mocker: MockerFixture) -> None:
     mock_req_obj = mock.Mock()
     mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.NO_CONTENT)
     session_name = secrets.token_hex(12)
@@ -69,9 +74,8 @@ async def test_restart_kernel_url(mocker):
         mock_req_cls.assert_called_once_with("PATCH", f"/{prefix}/{session_name}", params={})
 
 
-@pytest.mark.asyncio
-async def test_get_kernel_info_url(mocker):
-    return_value = {}
+async def test_get_kernel_info_url(mocker: MockerFixture) -> None:
+    return_value: dict[str, str] = {}
     mock_json_coro = AsyncMock(return_value=return_value)
     mock_req_obj = mock.Mock()
     mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.OK, json=mock_json_coro)
@@ -83,8 +87,7 @@ async def test_get_kernel_info_url(mocker):
         mock_req_cls.assert_called_once_with("GET", f"/{prefix}/{session_name}", params={})
 
 
-@pytest.mark.asyncio
-async def test_execute_code_url(mocker):
+async def test_execute_code_url(mocker: MockerFixture) -> None:
     return_value = {"result": "hi"}
     mock_json_coro = AsyncMock(return_value=return_value)
     mock_req_obj = mock.Mock()

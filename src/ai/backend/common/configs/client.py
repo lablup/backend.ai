@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from aiohttp import ClientTimeout
 from pydantic import AliasChoices, Field
@@ -16,7 +16,7 @@ class HttpTimeoutConfig(BaseConfigSchema):
     """
 
     total: Annotated[
-        Optional[float],
+        float | None,
         Field(default=300.0),
         BackendAIConfigMeta(
             description=(
@@ -27,7 +27,7 @@ class HttpTimeoutConfig(BaseConfigSchema):
         ),
     ]
     connect: Annotated[
-        Optional[float],
+        float | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -39,7 +39,7 @@ class HttpTimeoutConfig(BaseConfigSchema):
         ),
     ]
     sock_connect: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=30.0,
             validation_alias=AliasChoices("sock-connect", "sock_connect"),
@@ -55,7 +55,7 @@ class HttpTimeoutConfig(BaseConfigSchema):
         ),
     ]
     sock_read: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             validation_alias=AliasChoices("sock-read", "sock_read"),

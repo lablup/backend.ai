@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Optional, cast
+from typing import cast
 
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
@@ -12,6 +11,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import (
     DomainData,
     UserInfo,
@@ -25,21 +25,27 @@ from ai.backend.manager.errors.resource import (
     InvalidDomainConfiguration,
 )
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
-from ai.backend.manager.models.group import ProjectType, groups
-from ai.backend.manager.models.kernel import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    kernels,
-)
+from ai.backend.manager.models.group import GroupRow, ProjectType, groups
+from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
+from ai.backend.manager.repositories.domain.db_source import DomainDBSource
+from ai.backend.manager.repositories.domain.purgers import (
+    DomainBatchPurgerSpec,
+    DomainKernelBatchPurgerSpec,
+)
+from ai.backend.manager.repositories.domain.types import DomainSearchResult, DomainSearchScope
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
 domain_repository_resilience = Resilience(
@@ -60,13 +66,15 @@ domain_repository_resilience = Resilience(
 class DomainRepository:
     _db: ExtendedAsyncSAEngine
     _role_manager: RoleManager
+    _db_source: DomainDBSource
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
         self._role_manager = RoleManager()
+        self._db_source = DomainDBSource(db)
 
     @domain_repository_resilience.apply()
-    async def create_domain_validated(self, creator: Creator[DomainRow]) -> DomainData:
+    async def create_domain(self, creator: Creator[DomainRow]) -> DomainData:
         """
         Creates a new domain with model-store group.
         Validates domain creation permissions.
@@ -90,7 +98,7 @@ class DomainRepository:
             return data
 
     @domain_repository_resilience.apply()
-    async def modify_domain_validated(self, updater: Updater[DomainRow]) -> DomainData:
+    async def modify_domain(self, updater: Updater[DomainRow]) -> DomainData:
         """
         Modifies an existing domain.
         Validates domain modification permissions.
@@ -103,7 +111,7 @@ class DomainRepository:
             return result.row.to_data()
 
     @domain_repository_resilience.apply()
-    async def soft_delete_domain_validated(self, domain_name: str) -> None:
+    async def soft_delete_domain(self, domain_name: str) -> None:
         """
         Soft deletes a domain by setting is_active to False.
         Validates domain deletion permissions.
@@ -117,38 +125,40 @@ class DomainRepository:
                 raise DomainNotFound(f"Domain not found: {domain_name}")
 
     @domain_repository_resilience.apply()
-    async def purge_domain_validated(self, domain_name: str) -> None:
+    async def purge_domain(self, domain_name: str) -> None:
         """
         Permanently deletes a domain after validation checks.
         Validates domain purge permissions and prerequisites.
         """
-        async with self._db.begin() as conn:
+        async with self._db.begin_session() as session:
             # Validate prerequisites
-            if await self._domain_has_active_kernels(conn, domain_name):
+            if await self._domain_has_active_kernels(session, domain_name):
                 raise DomainHasActiveKernels(
                     "Domain has some active kernels. Terminate them first."
                 )
 
-            user_count = await self._get_domain_user_count(conn, domain_name)
+            user_count = await self._get_domain_user_count(session, domain_name)
             if user_count > 0:
                 raise DomainHasUsers("There are users bound to the domain. Remove users first.")
 
-            group_count = await self._get_domain_group_count(conn, domain_name)
+            group_count = await self._get_domain_group_count(session, domain_name)
             if group_count > 0:
                 raise DomainHasGroups("There are groups bound to the domain. Remove groups first.")
 
             # Clean up kernels
-            await self._delete_kernels(conn, domain_name)
+            await self._delete_kernels(session, domain_name)
 
             # Delete domain
-            delete_query = sa.delete(domains).where(domains.c.name == domain_name)
-            result = await conn.execute(delete_query)
-            if result.rowcount == 0:
+            result = await execute_batch_purger(
+                session,
+                BatchPurger(spec=DomainBatchPurgerSpec(domain_name=domain_name), batch_size=1),
+            )
+            if result.deleted_count == 0:
                 raise DomainDeletionFailed(f"Failed to delete domain: {domain_name}")
 
     @domain_repository_resilience.apply()
-    async def create_domain_node_validated(
-        self, creator: Creator[DomainRow], scaling_groups: Optional[list[str]] = None
+    async def create_domain_node(
+        self, creator: Creator[DomainRow], scaling_groups: list[str] | None = None
     ) -> DomainData:
         """
         Creates a domain node with scaling groups.
@@ -177,11 +187,11 @@ class DomainRepository:
             return domain_row.to_data()
 
     @domain_repository_resilience.apply()
-    async def modify_domain_node_validated(
+    async def modify_domain_node(
         self,
         updater: Updater[DomainRow],
-        sgroups_to_add: Optional[set[str]] = None,
-        sgroups_to_remove: Optional[set[str]] = None,
+        sgroups_to_add: set[str] | None = None,
+        sgroups_to_remove: set[str] | None = None,
     ) -> DomainData:
         """
         Modifies a domain node with scaling group changes.
@@ -232,57 +242,67 @@ class DomainRepository:
             "description": "Model Store",
             "is_active": True,
             "domain_name": domain_name,
-            "total_resource_slots": {},
-            "allowed_vfolder_hosts": {},
+            "total_resource_slots": ResourceSlot(),
+            "allowed_vfolder_hosts": VFolderHostPermissionMap(),
             "integration_id": None,
             "resource_policy": "default",
             "type": ProjectType.MODEL_STORE,
         })
         await db_session.execute(model_store_insert_query)
 
-    async def _delete_kernels(self, conn: SAConnection, domain_name: str) -> int:
+    async def _delete_kernels(self, session: SASession, domain_name: str) -> int:
         """
         Private method to delete all kernels for a domain.
         """
-        delete_query = sa.delete(kernels).where(kernels.c.domain_name == domain_name)
-        result = await conn.execute(delete_query)
-        return result.rowcount
+        result = await execute_batch_purger(
+            session,
+            BatchPurger(spec=DomainKernelBatchPurgerSpec(domain_name=domain_name)),
+        )
+        return result.deleted_count
 
-    async def _domain_has_active_kernels(self, conn: SAConnection, domain_name: str) -> bool:
+    async def _domain_has_active_kernels(self, session: SASession, domain_name: str) -> bool:
         """
         Private method to check if domain has active kernels.
         """
         query = (
             sa.select(sa.func.count())
-            .select_from(kernels)
+            .select_from(KernelRow)
             .where(
-                (kernels.c.domain_name == domain_name)
-                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                (KernelRow.domain_name == domain_name)
+                & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
             )
         )
-        active_kernel_count = await conn.scalar(query)
+        active_kernel_count = await session.scalar(query)
         return (active_kernel_count or 0) > 0
 
-    async def _get_domain_user_count(self, conn: SAConnection, domain_name: str) -> int:
+    async def _get_domain_user_count(self, session: SASession, domain_name: str) -> int:
         """
         Private method to get user count for a domain.
         """
-        query = sa.select(sa.func.count()).where(users.c.domain_name == domain_name)
-        return await conn.scalar(query) or 0
+        query = (
+            sa.select(sa.func.count())
+            .select_from(UserRow)
+            .where(UserRow.domain_name == domain_name)
+        )
+        return await session.scalar(query) or 0
 
-    async def _get_domain_group_count(self, conn: SAConnection, domain_name: str) -> int:
+    async def _get_domain_group_count(self, session: SASession, domain_name: str) -> int:
         """
         Private method to get group count for a domain.
         """
-        query = sa.select(sa.func.count()).where(groups.c.domain_name == domain_name)
-        return await conn.scalar(query) or 0
+        query = (
+            sa.select(sa.func.count())
+            .select_from(GroupRow)
+            .where(GroupRow.domain_name == domain_name)
+        )
+        return await session.scalar(query) or 0
 
     @domain_repository_resilience.apply()
     async def create_domain_node_with_permissions(
         self,
         creator: Creator[DomainRow],
         user_info: UserInfo,
-        scaling_groups: Optional[list[str]] = None,
+        scaling_groups: list[str] | None = None,
     ) -> DomainData:
         """
         Creates a domain node with scaling groups and permission checks.
@@ -294,15 +314,15 @@ class DomainRepository:
                 await self._ensure_sgroup_permission(
                     user_info, scaling_groups, db_session=db_session
                 )
-            return await self.create_domain_node_validated(creator, scaling_groups)
+            return await self.create_domain_node(creator, scaling_groups)
 
     @domain_repository_resilience.apply()
     async def modify_domain_node_with_permissions(
         self,
         updater: Updater[DomainRow],
         user_info: UserInfo,
-        sgroups_to_add: Optional[set[str]] = None,
-        sgroups_to_remove: Optional[set[str]] = None,
+        sgroups_to_add: set[str] | None = None,
+        sgroups_to_remove: set[str] | None = None,
     ) -> DomainData:
         """
         Modifies a domain node with scaling group changes and permission checks.
@@ -332,7 +352,7 @@ class DomainRepository:
                     user_info, sgroups_to_remove, db_session=db_session
                 )
 
-            return await self.modify_domain_node_validated(
+            return await self.modify_domain_node(
                 updater,
                 sgroups_to_add,
                 sgroups_to_remove,
@@ -357,3 +377,48 @@ class DomainRepository:
             raise InvalidDomainConfiguration(
                 f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"
             )
+
+    # ==================== V2 Repository Methods ====================
+
+    @domain_repository_resilience.apply()
+    async def get_domain(self, domain_name: str) -> DomainData:
+        """Get a single domain by name.
+
+        Args:
+            domain_name: The name of the domain to retrieve.
+
+        Returns:
+            DomainData for the domain.
+
+        Raises:
+            DomainNotFound: If the domain does not exist.
+        """
+        return await self._db_source.get_domain(domain_name)
+
+    @domain_repository_resilience.apply()
+    async def search_domains(self, querier: BatchQuerier) -> DomainSearchResult:
+        """Search all domains with pagination and filters.
+
+        Args:
+            querier: Contains conditions, orders, and pagination.
+
+        Returns:
+            DomainSearchResult with items, total_count, and pagination flags.
+        """
+        return await self._db_source.search_domains(querier)
+
+    async def search_rg_domains(
+        self,
+        scope: DomainSearchScope,
+        querier: BatchQuerier,
+    ) -> DomainSearchResult:
+        """Search domains within a resource group scope.
+
+        Args:
+            scope: DomainSearchScope containing resource_group filter.
+            querier: Contains additional conditions, orders, and pagination.
+
+        Returns:
+            DomainSearchResult with items, total_count, and pagination flags.
+        """
+        return await self._db_source.search_rg_domains(scope, querier)

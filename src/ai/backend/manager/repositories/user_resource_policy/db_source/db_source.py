@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
@@ -55,7 +55,7 @@ class UserResourcePolicyDBSource:
     @user_resource_policy_db_source_resilience.apply()
     async def get_by_name(self, name: str) -> UserResourcePolicyData:
         """Retrieves a user resource policy by name."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
             row = await db_sess.scalar(query)
             if row is None:
@@ -89,7 +89,7 @@ class UserResourcePolicyDBSource:
                 .from_statement(delete_stmt)
                 .execution_options(populate_existing=True)
             )
-            row: Optional[UserResourcePolicyRow] = await db_sess.scalar(query_stms)
+            row: UserResourcePolicyRow | None = await db_sess.scalar(query_stms)
             if row is None:
                 raise UserResourcePolicyNotFound(
                     f"User resource policy with name {name} not found."

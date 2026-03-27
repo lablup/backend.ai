@@ -5,7 +5,7 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Optional
+from typing import Any
 
 import aiodocker
 
@@ -22,13 +22,15 @@ from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
-    ContainerMeasurement,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
+)
+from ai.backend.agent.stats import (
+    ContainerMeasurement,
     NodeMeasurement,
+    ProcessMeasurement,
     StatContext,
 )
-from ai.backend.agent.stats import ProcessMeasurement
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
@@ -75,7 +77,7 @@ class WarboyPlugin(AbstractComputePlugin):
     warboy_config: Any
 
     _rbln_stat_path: str
-    _all_devices: Optional[list[WarboyDevice]]
+    _all_devices: list[WarboyDevice] | None
 
     async def init(self, context: Any = None) -> None:
         self._all_devices = None

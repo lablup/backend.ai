@@ -33,7 +33,7 @@ mapper_registry = registry(metadata=metadata)
 Base: Any = mapper_registry.generate_base()
 
 
-class AuditLogRowInUpgrade(Base):
+class AuditLogRowInUpgrade(Base):  # type: ignore[misc]
     __tablename__ = "audit_logs"
     __table_args__ = {"extend_existing": True}
 
@@ -48,7 +48,7 @@ class AuditLogRowInUpgrade(Base):
     status = sa.Column("status", sa.String(length=64), nullable=False)
 
 
-class AuditLogRowInDowngrade(Base):
+class AuditLogRowInDowngrade(Base):  # type: ignore[misc]
     __tablename__ = "audit_logs"
     __table_args__ = {"extend_existing": True}
 

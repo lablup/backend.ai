@@ -50,7 +50,11 @@ def main(
 
     This is a thin wrapper that defers the heavy import of server module.
     """
+    from ai.backend.common.metrics.multiprocess import setup_prometheus_multiprocess_dir
     from ai.backend.logging import LogLevel
+
+    setup_prometheus_multiprocess_dir("storage")
+
     from ai.backend.storage.server import main as server_main
 
     ctx.invoke(

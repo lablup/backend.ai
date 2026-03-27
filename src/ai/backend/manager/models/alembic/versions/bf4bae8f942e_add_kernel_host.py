@@ -16,9 +16,9 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column("kernels", sa.Column("kernel_host", sa.String(length=128), nullable=True))
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("kernels", "kernel_host")

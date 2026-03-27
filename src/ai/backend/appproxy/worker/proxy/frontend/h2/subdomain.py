@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from asyncio import subprocess
+from typing import Any
 
 from yarl import URL
 
@@ -13,17 +14,17 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .base import H2Frontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SubdomainFrontend(H2Frontend[str]):
     process: subprocess.Process | None
-    log_monitor_tasks: list[asyncio.Task]
-    proc_monitor_task: asyncio.Task | None
+    log_monitor_tasks: list[asyncio.Task[Any]]
+    proc_monitor_task: asyncio.Task[Any] | None
 
     api_port: int | None
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         self.process = None

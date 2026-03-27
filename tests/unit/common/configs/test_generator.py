@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 from typing import Annotated
 
 import pytest
@@ -30,9 +31,9 @@ from ai.backend.common.meta import (
 
 class TestFieldVisibility:
     def test_enum_values(self) -> None:
-        assert FieldVisibility.REQUIRED == "required"
-        assert FieldVisibility.OPTIONAL == "optional"
-        assert FieldVisibility.HIDDEN == "hidden"
+        assert FieldVisibility.REQUIRED.value == "required"
+        assert FieldVisibility.OPTIONAL.value == "optional"
+        assert FieldVisibility.HIDDEN.value == "hidden"
 
 
 class TestFormattedValue:
@@ -200,8 +201,6 @@ class TestEnumFormatter:
         )
 
     def test_format_string_enum(self, formatter: EnumFormatter, enum_field: FieldSchema) -> None:
-        from enum import Enum
-
         class Status(Enum):
             ACTIVE = "active"
             INACTIVE = "inactive"

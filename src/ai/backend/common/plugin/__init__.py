@@ -5,7 +5,7 @@ import logging
 import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterator, Mapping
-from typing import Any, ClassVar, Generic, TypeVar
+from typing import Any, ClassVar, TypeVar
 from weakref import WeakSet
 
 from ai.backend.common.asyncio import cancel_tasks
@@ -84,7 +84,7 @@ class AbstractPlugin(metaclass=ABCMeta):
 P = TypeVar("P", bound=AbstractPlugin)
 
 
-class BasePluginContext(Generic[P]):
+class BasePluginContext[P: AbstractPlugin]:
     """
     A minimal plugin manager which controls the lifecycles of the given plugins
     and watches & applies the configuration changes in etcd.
@@ -99,7 +99,7 @@ class BasePluginContext(Generic[P]):
     allowlist: ClassVar[set[str] | None] = None
     blocklist: ClassVar[set[str] | None] = None
 
-    _config_watchers: WeakSet[asyncio.Task]
+    _config_watchers: WeakSet[asyncio.Task[Any]]
 
     def __init__(self, etcd: AbstractKVStore, local_config: Mapping[str, Any]) -> None:
         self.etcd = etcd
@@ -137,8 +137,8 @@ class BasePluginContext(Generic[P]):
     async def init(
         self,
         context: Any | None = None,
-        allowlist: set | None = None,
-        blocklist: set | None = None,
+        allowlist: set[str] | None = None,
+        blocklist: set[str] | None = None,
     ) -> None:
         if allowlist is not None and blocklist is not None:
             if union := allowlist & blocklist:

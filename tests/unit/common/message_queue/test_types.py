@@ -1,18 +1,18 @@
 from uuid import UUID
 
-from ai.backend.common.data.user.types import UserData
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.message_queue.types import MessageMetadata
 
 
 class TestMessageMetadata:
-    def test_serialize_with_all_fields(self):
+    def test_serialize_with_all_fields(self) -> None:
         user = UserData(
             user_id=UUID("12345678-1234-5678-1234-567812345678"),
             is_authorized=True,
             is_admin=False,
             is_superadmin=False,
-            role="user",
+            role=UserRole.USER,
             domain_name="default",
         )
         metadata = MessageMetadata(request_id="req-123", user=user)
@@ -30,7 +30,7 @@ class TestMessageMetadata:
         assert deserialized_dict["user"]["role"] == "user"
         assert deserialized_dict["user"]["domain_name"] == "default"
 
-    def test_serialize_with_no_user(self):
+    def test_serialize_with_no_user(self) -> None:
         metadata = MessageMetadata(request_id="req-456", user=None)
 
         serialized = metadata.serialize()
@@ -40,13 +40,13 @@ class TestMessageMetadata:
         assert deserialized_dict["request_id"] == "req-456"
         assert deserialized_dict["user"] is None
 
-    def test_serialize_with_no_request_id(self):
+    def test_serialize_with_no_request_id(self) -> None:
         user = UserData(
             user_id=UUID("87654321-4321-8765-4321-876543218765"),
             is_authorized=True,
             is_admin=True,
             is_superadmin=False,
-            role="admin",
+            role=UserRole.ADMIN,
             domain_name="test-domain",
         )
         metadata = MessageMetadata(request_id=None, user=user)
@@ -58,7 +58,7 @@ class TestMessageMetadata:
         assert deserialized_dict["request_id"] is None
         assert "user" in deserialized_dict
 
-    def test_serialize_with_no_fields(self):
+    def test_serialize_with_no_fields(self) -> None:
         metadata = MessageMetadata()
 
         serialized = metadata.serialize()
@@ -68,7 +68,7 @@ class TestMessageMetadata:
         assert deserialized_dict["request_id"] is None
         assert deserialized_dict["user"] is None
 
-    def test_deserialize_with_all_fields(self):
+    def test_deserialize_with_all_fields(self) -> None:
         data = {
             "request_id": "req-789",
             "user": {
@@ -76,7 +76,7 @@ class TestMessageMetadata:
                 "is_authorized": True,
                 "is_admin": False,
                 "is_superadmin": False,
-                "role": "member",
+                "role": "user",
                 "domain_name": "org1",
             },
         }
@@ -89,10 +89,10 @@ class TestMessageMetadata:
         assert metadata.user.is_authorized is True
         assert metadata.user.is_admin is False
         assert metadata.user.is_superadmin is False
-        assert metadata.user.role == "member"
+        assert metadata.user.role == UserRole.USER
         assert metadata.user.domain_name == "org1"
 
-    def test_deserialize_from_string(self):
+    def test_deserialize_from_string(self) -> None:
         data = {
             "request_id": "req-string",
             "user": {
@@ -114,7 +114,7 @@ class TestMessageMetadata:
         assert metadata.user.is_admin is True
         assert metadata.user.is_superadmin is True
 
-    def test_deserialize_with_legacy_user_id_field(self):
+    def test_deserialize_with_legacy_user_id_field(self) -> None:
         # Test backward compatibility - remove user_id if present
         data = {
             "request_id": "req-legacy",
@@ -136,7 +136,7 @@ class TestMessageMetadata:
         assert hasattr(metadata, "user_id") is False  # user_id field should be removed
         assert str(metadata.user.user_id) == "99999999-8888-7777-6666-555544443333"
 
-    def test_deserialize_with_invalid_user_data(self):
+    def test_deserialize_with_invalid_user_data(self) -> None:
         # Test when user is not a dict
         data = {"request_id": "req-invalid", "user": "invalid-user-data"}
         serialized = dump_json(data)
@@ -145,7 +145,7 @@ class TestMessageMetadata:
         assert metadata.request_id == "req-invalid"
         assert metadata.user is None
 
-    def test_deserialize_with_no_user(self):
+    def test_deserialize_with_no_user(self) -> None:
         data = {"request_id": "req-no-user"}
         serialized = dump_json(data)
 
@@ -153,22 +153,22 @@ class TestMessageMetadata:
         assert metadata.request_id == "req-no-user"
         assert metadata.user is None
 
-    def test_deserialize_empty_data(self):
-        data = {}
+    def test_deserialize_empty_data(self) -> None:
+        data: dict[str, str] = {}
         serialized = dump_json(data)
 
         metadata = MessageMetadata.deserialize(serialized)
         assert metadata.request_id is None
         assert metadata.user is None
 
-    def test_serialize_deserialize_roundtrip(self):
+    def test_serialize_deserialize_roundtrip(self) -> None:
         # Test complete roundtrip
         user = UserData(
             user_id=UUID("fedcba98-7654-3210-fedc-ba9876543210"),
             is_authorized=True,
-            is_admin=True,
+            is_admin=False,
             is_superadmin=False,
-            role="manager",
+            role=UserRole.USER,
             domain_name="enterprise",
         )
         original = MessageMetadata(request_id="roundtrip-test", user=user)

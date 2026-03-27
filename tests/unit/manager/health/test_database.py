@@ -7,12 +7,10 @@ import sqlalchemy as sa
 
 from ai.backend.common.health_checker.types import CID_POSTGRES
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.manager.config.bootstrap import DatabaseConfig
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.manager.config.unified import DatabaseConfig
 from ai.backend.manager.health.database import DatabaseHealthChecker
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_database
-from ai.backend.testutils.bootstrap import (
-    HostPortPairModel,
-)
 
 
 @pytest.fixture
@@ -34,7 +32,6 @@ async def database_engine(
 class TestDatabaseHealthChecker:
     """Test DatabaseHealthChecker with real database connections."""
 
-    @pytest.mark.asyncio
     async def test_success(
         self,
         database_engine: ExtendedAsyncSAEngine,
@@ -49,7 +46,6 @@ class TestDatabaseHealthChecker:
         # Should not raise - this tests actual DB connection
         await checker.check_service()
 
-    @pytest.mark.asyncio
     async def test_timeout_property(self) -> None:
         """Test that timeout property returns the correct value."""
         # Create a dummy engine (won't be used for actual connection)
@@ -70,7 +66,6 @@ class TestDatabaseHealthChecker:
         finally:
             await extended_engine.dispose()
 
-    @pytest.mark.asyncio
     async def test_multiple_checks(
         self,
         database_engine: ExtendedAsyncSAEngine,
@@ -86,7 +81,6 @@ class TestDatabaseHealthChecker:
         await checker.check_service()
         await checker.check_service()
 
-    @pytest.mark.asyncio
     async def test_invalid_connection(self) -> None:
         """Test health check failure with invalid database connection."""
         # Create engine with invalid connection string

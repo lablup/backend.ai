@@ -17,7 +17,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.drop_index("ix_kernels_sess_id_role", table_name="kernels")
     op.drop_index("ix_kernels_unique_sess_token", table_name="kernels")
 
@@ -55,7 +55,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_index("ix_kernels_unique_sess_token", table_name="kernels")
     op.drop_index("ix_kernels_sess_id_role", table_name="kernels")
 

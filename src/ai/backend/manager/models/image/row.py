@@ -11,9 +11,7 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
-    TypeAlias,
     cast,
     override,
 )
@@ -59,6 +57,7 @@ from ai.backend.manager.data.image.types import (
     ImageLabelsData,
     ImageResourcesData,
     ImageStatus,
+    ImageTagEntry,
     ImageType,
     KVPair,
     RescanImagesResult,
@@ -89,7 +88,7 @@ from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask.bgtask import ProgressReporter
+    from ai.backend.common.bgtask.reporter import ProgressReporter
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -136,8 +135,8 @@ class RelationLoadingOption(enum.StrEnum):
 
 
 def _apply_loading_option(
-    query_stmt: sa.sql.Select, options: Iterable[RelationLoadingOption]
-) -> sa.sql.Select:
+    query_stmt: sa.sql.Select[Any], options: Iterable[RelationLoadingOption]
+) -> sa.sql.Select[Any]:
     for op in options:
         match op:
             case RelationLoadingOption.ALIASES:
@@ -151,7 +150,7 @@ def _apply_loading_option(
 
 async def load_configured_registries(
     db: ExtendedAsyncSAEngine,
-    project: Optional[str],
+    project: str | None,
 ) -> dict[str, ContainerRegistryRow]:
     join = functools.partial(join_non_empty, sep="/")
 
@@ -167,18 +166,17 @@ async def load_configured_registries(
                 },
             )
         else:
-            registries = cast(
-                dict[str, ContainerRegistryRow],
-                {join(row.registry_name, row.project): row for row in result.scalars().all()},
-            )
+            registries = {
+                join(row.registry_name, row.project): row for row in result.scalars().all()
+            }
 
-    return cast(dict[str, ContainerRegistryRow], registries)
+    return registries
 
 
 async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
-    reporter: Optional[ProgressReporter] = None,
+    reporter: ProgressReporter | None = None,
 ) -> RescanImagesResult:
     """
     Performs an image rescan for all images in the registries.
@@ -260,10 +258,10 @@ def filter_registries_by_registry_name(
 
 async def rescan_images(
     db: ExtendedAsyncSAEngine,
-    registry_or_image: Optional[str] = None,
-    project: Optional[str] = None,
+    registry_or_image: str | None = None,
+    project: str | None = None,
     *,
-    reporter: Optional[ProgressReporter] = None,
+    reporter: ProgressReporter | None = None,
 ) -> RescanImagesResult:
     """
     Rescan container registries and the update images table.
@@ -305,19 +303,19 @@ type Resources = dict[SlotName, dict[str, Any]]
 
 
 # Defined for avoiding circular import
-def _get_image_endpoint_join_condition():
+def _get_image_endpoint_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return ImageRow.id == foreign(EndpointRow.image)
 
 
-def _get_container_registry_join_condition():
+def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
 
 
-class ImageRow(Base):
+class ImageRow(Base):  # type: ignore[misc]
     __tablename__ = "images"
     __table_args__ = (
         sa.UniqueConstraint(
@@ -376,6 +374,12 @@ class ImageRow(Base):
         server_default=ImageStatus.ALIVE.name,
         nullable=False,
     )
+    last_used_at: Mapped[datetime] = mapped_column(
+        "last_used_at",
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
+    )
 
     aliases = relationship("ImageAliasRow", back_populates="image")
     # sessions = relationship("SessionRow", back_populates="image_row")
@@ -393,36 +397,36 @@ class ImageRow(Base):
 
     def __init__(
         self,
-        name,
-        project,
-        architecture,
-        registry_id,
-        is_local=False,
-        registry=None,
-        image=None,
-        tag=None,
-        config_digest=None,
-        size_bytes=None,
-        type=None,
-        accelerators=None,
-        labels=None,
-        resources=None,
-        status=ImageStatus.ALIVE,
+        name: str,
+        project: str | None,
+        architecture: str,
+        registry_id: UUID,
+        is_local: bool = False,
+        registry: str | None = None,
+        image: str | None = None,
+        tag: str | None = None,
+        config_digest: str | None = None,
+        size_bytes: int | None = None,
+        type: ImageType | None = None,
+        accelerators: str | None = None,
+        labels: dict[str, Any] | None = None,
+        resources: dict[str, Any] | None = None,
+        status: ImageStatus = ImageStatus.ALIVE,
     ) -> None:
         self.name = name
         self.project = project
-        self.registry = registry
+        self.registry = registry  # type: ignore[assignment]
         self.registry_id = registry_id
-        self.image = image
+        self.image = image  # type: ignore[assignment]
         self.tag = tag
         self.architecture = architecture
         self.is_local = is_local
-        self.config_digest = config_digest
-        self.size_bytes = size_bytes
-        self.type = type
+        self.config_digest = config_digest  # type: ignore[assignment]
+        self.size_bytes = size_bytes  # type: ignore[assignment]
+        self.type = type  # type: ignore[assignment]
         self.accelerators = accelerators
-        self.labels = labels
-        self._resources = resources
+        self.labels = labels  # type: ignore[assignment]
+        self._resources = resources  # type: ignore[assignment]
         self.status = status
 
     @property
@@ -454,7 +458,7 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
@@ -482,7 +486,7 @@ class ImageRow(Base):
         session: AsyncSession,
         identifier: ImageIdentifier,
         load_aliases: bool = True,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
@@ -516,7 +520,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
         """
@@ -564,7 +568,7 @@ class ImageRow(Base):
             type=image_data.type,
             accelerators=image_data.accelerators,
             labels=image_data.labels.label_data,
-            resources=image_data.resources.resources_data,
+            resources={str(k): v for k, v in image_data.resources.resources_data.items()},
             status=image_data.status,
         )
         image_row.id = image_data.id
@@ -594,7 +598,7 @@ class ImageRow(Base):
         return image_row
 
     @classmethod
-    def from_optional_dataclass(cls, image_data: Optional[ImageData]) -> Optional[Self]:
+    def from_optional_dataclass(cls, image_data: ImageData | None) -> Self | None:
         if image_data is None:
             return None
         return cls.from_dataclass(image_data)
@@ -606,7 +610,7 @@ class ImageRow(Base):
         reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
         *,
         strict_arch: bool = False,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> Self:
@@ -665,7 +669,8 @@ class ImageRow(Base):
                     filter_by_statuses=filter_by_statuses,
                     loading_options=loading_options,
                 ):
-                    return row
+                    result: Self = row
+                    return result
             except UnknownImageReference:
                 continue
         raise ImageNotFound("Unknown image references: " + ", ".join(searched_refs))
@@ -701,9 +706,9 @@ class ImageRow(Base):
         cls,
         session: AsyncSession,
         image_id: UUID,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = False,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(ImageRow.id == image_id)
@@ -719,7 +724,7 @@ class ImageRow(Base):
     async def list(
         cls,
         session: AsyncSession,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = False,
     ) -> list[Self]:
         if filter_by_statuses is None:
@@ -770,7 +775,10 @@ class ImageRow(Base):
                             merged_spec["min"] = max(mins, key=BinarySize.from_str)
 
             merged_resources[label_key_str] = merged_spec
-        return ImageRow._resources.type._schema.check(merged_resources)
+        result: dict[SlotName, dict[str, Any]] = ImageRow._resources.type._schema.check(
+            merged_resources
+        )
+        return result
 
     def get_resources_from_labels(self) -> Resources:
         if self.labels is None:
@@ -789,7 +797,8 @@ class ImageRow(Base):
             res_key = k[len(RESOURCE_LABEL_PREFIX) :]
             resources[res_key] = {"min": v}
 
-        return ImageRow._resources.type._schema.check(resources)
+        result: dict[SlotName, dict[str, Any]] = ImageRow._resources.type._schema.check(resources)
+        return result
 
     async def get_min_slot(self, etcd_loader: LegacyEtcdLoader) -> ResourceSlot:
         slot_units = await etcd_loader.get_resource_slots()
@@ -818,7 +827,7 @@ class ImageRow(Base):
 
         return min_slot
 
-    def _parse_row(self):
+    def _parse_row(self) -> dict[str, Any]:
         res_limits = []
         for slot_key, slot_range in self.resources.items():
             min_value = slot_range.get("min")
@@ -833,11 +842,11 @@ class ImageRow(Base):
                 "max": max_value,
             })
 
-        accels = self.accelerators
-        if accels is None:
-            accels = []
+        accels_str = self.accelerators
+        if accels_str is None:
+            accels: list[str] = []
         else:
-            accels = accels.split(",")
+            accels = accels_str.split(",")
 
         return {
             "canonical_ref": self.name,
@@ -865,8 +874,8 @@ class ImageRow(Base):
     def set_resource_limit(
         self,
         slot_type: str,
-        value_range: tuple[Optional[Decimal], Optional[Decimal]],
-    ):
+        value_range: tuple[Decimal | None, Decimal | None],
+    ) -> None:
         resources = self._resources
         if resources.get(slot_type) is None:
             resources[slot_type] = {}
@@ -880,11 +889,13 @@ class ImageRow(Base):
     def is_owned_by(self, user_id: UUID) -> bool:
         if not self.customized:
             return False
-        return self.labels["ai.backend.customized-image.owner"].split(":")[1] == str(user_id)
+        result: bool = self.labels["ai.backend.customized-image.owner"].split(":")[1] == str(
+            user_id
+        )
+        return result
 
     def to_dataclass(self) -> ImageData:
-        from ai.backend.manager.data.image.types import ImageData
-
+        _, ptag_set = self.image_ref.tag_set
         return ImageData(
             id=ImageID(self.id),
             name=ImageCanonical(self.name),
@@ -902,7 +913,15 @@ class ImageRow(Base):
             accelerators=self.accelerators,
             labels=ImageLabelsData(label_data=self.labels),
             resources=ImageResourcesData(resources_data=self.resources),
+            resource_limits=[
+                ResourceLimit(
+                    key=str(k), min=v.get("min", Decimal(0)), max=v.get("max", Decimal("Infinity"))
+                )
+                for k, v in self.resources.items()
+            ],
+            tags=[ImageTagEntry(key=k, value=v) for k, v in ptag_set.items()],
             status=self.status,
+            last_used_at=self.last_used_at,
         )
 
     def to_detailed_dataclass(self) -> ImageDataWithDetails:
@@ -932,6 +951,8 @@ class ImageRow(Base):
                 for k, v in self.resources.items()
             ],
             supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
+            created_at=self.created_at,
+            last_used_at=self.last_used_at,
             # legacy
             hash=self.trimmed_digest or None,
         )
@@ -1003,7 +1024,7 @@ async def bulk_get_image_configs(
     return result
 
 
-class ImageAliasRow(Base):
+class ImageAliasRow(Base):  # type: ignore[misc]
     __tablename__ = "image_aliases"
     id: Mapped[UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -1021,7 +1042,7 @@ class ImageAliasRow(Base):
         alias: str,
         target: ImageRow,
     ) -> Self:
-        existing_alias: Optional[ImageRow] = await session.scalar(
+        existing_alias: ImageRow | None = await session.scalar(
             sa.select(ImageAliasRow)
             .where(ImageAliasRow.alias == alias)
             .options(selectinload(ImageAliasRow.image)),
@@ -1045,9 +1066,7 @@ class ImageAliasRow(Base):
         return ImageAliasData(id=self.id, alias=self.alias or "")
 
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 # TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
 ALL_IMAGE_PERMISSIONS = frozenset([perm for perm in ImagePermission])
@@ -1073,12 +1092,12 @@ MEMBER_PERMISSIONS: frozenset[ImagePermission] = frozenset([
 @dataclass
 class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow, UUID]):
     @property
-    def query_condition(self) -> Optional[WhereClauseType]:
+    def query_condition(self) -> WhereClauseType | None:
         cond: WhereClauseType | None = None
 
         def _OR_coalesce(
-            base_cond: Optional[WhereClauseType],
-            _cond: sa.sql.expression.BinaryExpression,
+            base_cond: WhereClauseType | None,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -1092,7 +1111,7 @@ class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow
             )
         return cond
 
-    async def build_query(self) -> Optional[sa.sql.Select]:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -1100,7 +1119,7 @@ class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow
 
     async def calculate_final_permission(self, rbac_obj: ImageRow) -> frozenset[ImagePermission]:
         image_row = rbac_obj
-        image_id = cast(UUID, image_row.id)
+        image_id = image_row.id
         permissions: set[ImagePermission] = set()
 
         if (
@@ -1149,7 +1168,7 @@ class ImagePermissionContextBuilder(
     async def apply_customized_role(
         self,
         ctx: ClientContext,
-        target_scope: ScopeType,
+        _target_scope: ScopeType,
     ) -> frozenset[ImagePermission]:
         if ctx.user_role == UserRole.SUPERADMIN:
             return ALL_IMAGE_PERMISSIONS
@@ -1234,11 +1253,13 @@ class ImagePermissionContextBuilder(
         perm_ctx.merge(non_global_container_registries_perm_ctx)
         return perm_ctx
 
-    async def _get_allowed_registries_for_user(self, ctx: ClientContext, user_id: UUID) -> set[str]:
+    async def _get_allowed_registries_for_user(
+        self, _ctx: ClientContext, user_id: UUID
+    ) -> set[str]:
         user_query_stmt = (
             sa.select(UserRow).where(UserRow.uuid == user_id).options(joinedload(UserRow.domain))
         )
-        user_row = cast(Optional[UserRow], await self.db_session.scalar(user_query_stmt))
+        user_row = cast(UserRow | None, await self.db_session.scalar(user_query_stmt))
         if user_row is None:
             raise InvalidScope(f"User not found (id:{user_id})")
         if user_row.domain is None:
@@ -1280,7 +1301,7 @@ class ImagePermissionContextBuilder(
         )
 
         for row in await self.db_session.scalars(img_query_stmt):
-            image_row = cast(ImageRow, row)
+            image_row = row
             if not image_row.customized or not access_criteria.is_accessible_image(image_row):
                 continue
 
@@ -1302,7 +1323,7 @@ class ImagePermissionContextBuilder(
         image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
 
         domain_query_stmt = sa.select(DomainRow).where(DomainRow.name == scope.domain_name)
-        domain_row = cast(Optional[DomainRow], await self.db_session.scalar(domain_query_stmt))
+        domain_row = cast(DomainRow | None, await self.db_session.scalar(domain_query_stmt))
         if domain_row is None:
             raise InvalidScope(f"Domain not found (n:{scope.domain_name})")
 
@@ -1321,7 +1342,7 @@ class ImagePermissionContextBuilder(
         )
 
         for row in await self.db_session.scalars(img_query_stmt):
-            image_row = cast(ImageRow, row)
+            image_row = row
             if not access_criteria.is_accessible_image(image_row):
                 continue
 
@@ -1333,7 +1354,7 @@ class ImagePermissionContextBuilder(
 
     async def _get_user_accessible_project_scopes(
         self,
-        ctx: ClientContext,
+        _ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
         from ai.backend.manager.models.group import AssocGroupUserRow
@@ -1347,7 +1368,7 @@ class ImagePermissionContextBuilder(
 
     async def _get_domain_accessible_project_scopes(
         self,
-        ctx: ClientContext,
+        _ctx: ClientContext,
         scope: DomainScope,
     ) -> list[ProjectScope]:
         from ai.backend.manager.models.group import GroupRow
@@ -1362,7 +1383,7 @@ class ImagePermissionContextBuilder(
         from ai.backend.manager.models.group import GroupRow
 
         group_query_stmt = sa.select(GroupRow).where(GroupRow.id == scope.project_id)
-        group_row = cast(Optional[GroupRow], await self.db_session.scalar(group_query_stmt))
+        group_row = cast(GroupRow | None, await self.db_session.scalar(group_query_stmt))
         if group_row is None:
             raise InvalidScope(f"Project not found (project_id: {scope.project_id})")
 
@@ -1399,7 +1420,7 @@ class ImagePermissionContextBuilder(
 
         result = (await self.db_session.scalars(image_select_stmt)).unique()
         for row in result:
-            img_row = cast(ImageRow, row)
+            img_row = row
 
             allowed_registries = await self._get_allowed_registries_for_user(ctx, ctx.user_id)
             access_criteria = ImageAccessCriteria(
@@ -1421,9 +1442,9 @@ class ImagePermissionContextBuilder(
                     for assoc in img_row.registry_row.association_container_registries_groups_rows
                 ]
                 for project_id in assoc_project_ids:
-                    image_id_to_permission_map[img_row.id] = project_id_to_permission_map[
-                        str(project_id)
-                    ]
+                    perm = project_id_to_permission_map.get(str(project_id))
+                    if perm is not None:
+                        image_id_to_permission_map[img_row.id] = perm
 
         return ImagePermissionContext(
             object_id_to_additional_permission_map=image_id_to_permission_map
@@ -1436,7 +1457,9 @@ class ImagePermissionContextBuilder(
     ) -> ImagePermissionContext:
         from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-        def global_registry_condition(project_ids: list[Any]):
+        def global_registry_condition(
+            _project_ids: list[Any],
+        ) -> sa.sql.elements.ColumnElement[Any]:
             return ContainerRegistryRow.is_global == true()
 
         return await self._in_project_scopes_by_registry_condition(
@@ -1453,7 +1476,9 @@ class ImagePermissionContextBuilder(
         )
         from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-        def non_global_registry_condition(project_ids: list[Any]):
+        def non_global_registry_condition(
+            project_ids: list[Any],
+        ) -> sa.sql.elements.ColumnElement[Any]:
             return ContainerRegistryRow.association_container_registries_groups_rows.any(
                 AssociationContainerRegistriesGroupsRow.group_id.in_(project_ids)
             )

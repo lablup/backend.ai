@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import uuid as uuid_mod
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -14,20 +16,33 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
-from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, UserCreationError
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.errors.auth import (
+    ActiveLoginSessionExistsError,
+    AuthorizationFailed,
+    GroupMembershipNotFoundError,
+    LoginSessionNotFoundError,
+    UserCreationError,
+)
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.group import association_groups_users, groups
-from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
+from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
     UserStatus,
     check_credential,
-    check_credential_with_migration,
+    compare_to_hashed_password,
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.types import SearchScope
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -42,6 +57,23 @@ auth_db_source_resilience = Resilience(
         ),
     ]
 )
+
+
+@dataclass(frozen=True)
+class ActiveSessionInfo:
+    session_token: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class LoginSessionCreationResult:
+    session_token: str
+
+
+@dataclass(frozen=True)
+class CredentialVerificationResult:
+    user: sa.RowMapping
+    active_sessions: list[ActiveSessionInfo]  # ordered by created_at ASC
 
 
 class AuthDBSource:
@@ -87,8 +119,8 @@ class AuthDBSource:
     @auth_db_source_resilience.apply()
     async def insert_user_with_keypair(
         self,
-        user_data: dict,
-        keypair_data: dict,
+        user_data: dict[str, Any],
+        keypair_data: dict[str, Any],
         group_name: str,
         domain_name: str,
     ) -> UserData:
@@ -125,7 +157,7 @@ class AuthDBSource:
                 assoc_query = association_groups_users.insert().values(values)
                 await conn.execute(assoc_query)
 
-            return self._user_row_to_data(UserRow.from_row(user_row))
+            return self._user_row_to_data(user_row)
 
     @auth_db_source_resilience.apply()
     async def modify_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:
@@ -178,7 +210,7 @@ class AuthDBSource:
             password_changed_at = result.scalar()
             if password_changed_at is None:
                 raise UserNotFound(extra_data={"user_uuid": str(user_uuid)})
-            return password_changed_at
+            return cast(datetime, password_changed_at)
 
     @auth_db_source_resilience.apply()
     async def mark_user_and_keypairs_inactive(self, email: str) -> None:
@@ -197,7 +229,7 @@ class AuthDBSource:
             await conn.execute(keypair_query)
 
     @auth_db_source_resilience.apply()
-    async def fetch_ssh_public_key(self, access_key: str) -> Optional[str]:
+    async def fetch_ssh_public_key(self, access_key: str) -> str | None:
         """Fetch SSH public key for an access key from database."""
         async with self._db.begin() as conn:
             query = sa.select(keypairs.c.ssh_public_key).where(keypairs.c.access_key == access_key)
@@ -214,7 +246,7 @@ class AuthDBSource:
             query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
             await conn.execute(query)
 
-    def _user_row_to_data(self, row: UserRow) -> UserData:
+    def _user_row_to_data(self, row: UserRow | sa.Row[Any]) -> UserData:
         """Convert UserRow to UserData."""
         return UserData(
             uuid=row.uuid,
@@ -238,19 +270,235 @@ class AuthDBSource:
         )
 
     @auth_db_source_resilience.apply()
-    async def verify_credential_with_migration(
+    async def fetch_user_info_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
+        """Join keypairs→users to get (domain_name, role) for the owner of *access_key*.
+
+        Raises ``ValueError`` if the access key is unknown.
+        """
+        async with self._db.begin_readonly() as conn:
+            query = (
+                sa.select(users.c.domain_name, users.c.role)
+                .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
+                .where(keypairs.c.access_key == access_key)
+            )
+            result = await conn.execute(query)
+            row = result.first()
+            if row is None:
+                raise ValueError("Unknown owner access key")
+            return row.domain_name, row.role
+
+    @auth_db_source_resilience.apply()
+    async def fetch_user_info_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
+        """Fetch (uuid, role, domain_name) for a user identified by *email*.
+
+        Raises ``ValueError`` if the user is not found.
+        """
+        async with self._db.begin_readonly() as conn:
+            query = (
+                sa.select(users.c.uuid, users.c.role, users.c.domain_name)
+                .select_from(users)
+                .where(users.c.email == email)
+            )
+            result = await conn.execute(query)
+            row = result.first()
+            if row is None:
+                raise ValueError("Cannot delegate an unknown user")
+            return row.uuid, row.role, row.domain_name
+
+    @auth_db_source_resilience.apply()
+    async def fetch_user_uuid_by_email(self, email: str, domain_name: str) -> UUID | None:
+        """Fetch user UUID by email and domain. Returns None if user not found."""
+        async with self._db.begin_readonly() as conn:
+            return await conn.scalar(
+                sa.select(users.c.uuid)
+                .select_from(users)
+                .where((users.c.email == email) & (users.c.domain_name == domain_name))
+            )
+
+    async def _check_password(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        row: sa.Row[Any],
+        target_password_info: PasswordInfo,
+    ) -> None:
+        """Verify password against stored hash. Raises AuthorizationFailed on mismatch."""
+        if row.password is None:
+            raise AuthorizationFailed("User credential mismatch.")
+        try:
+            if not compare_to_hashed_password(target_password_info.password, row.password):
+                raise AuthorizationFailed("User credential mismatch.")
+        except ValueError:
+            raise AuthorizationFailed("User credential mismatch.") from None
+
+    async def _migrate_password_hash(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        row: sa.Row[Any],
+        domain_name: str,
+        email: str,
+        target_password_info: PasswordInfo,
+    ) -> None:
+        """Migrate password hash if the current algorithm differs from the target."""
+        current_hash_info = HashInfo.from_hash_string(row.password)
+        if target_password_info.need_migration(current_hash_info):
+            await conn.execute(
+                sa.update(users)
+                .where((users.c.email == email) & (users.c.domain_name == domain_name))
+                .values(password=target_password_info)
+            )
+
+    async def _record_login_history(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        user_id: UUID,
+        domain_name: str,
+        result: LoginAttemptResult,
+        fail_reason: str | None,
+    ) -> None:
+        """Insert a login history record (internal, within an existing connection)."""
+        await conn.execute(
+            sa.insert(LoginHistoryRow.__table__).values(
+                user_id=user_id,
+                domain_name=domain_name,
+                result=result,
+                fail_reason=fail_reason,
+            )
+        )
+
+    @auth_db_source_resilience.apply()
+    async def record_login_history(
+        self,
+        user_id: UUID,
+        domain_name: str,
+        result: LoginAttemptResult,
+        fail_reason: str | None = None,
+    ) -> None:
+        """Insert a login history record (public, manages its own transaction)."""
+        async with self._db.begin_session() as db_session:
+            await db_session.execute(
+                sa.insert(LoginHistoryRow.__table__).values(
+                    user_id=user_id,
+                    domain_name=domain_name,
+                    result=result,
+                    fail_reason=fail_reason,
+                )
+            )
+
+    @auth_db_source_resilience.apply()
+    async def verify_credential(
         self,
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-    ) -> sa.RowMapping:
-        """Verify credentials with password migration support."""
-        return await check_credential_with_migration(
-            db=self._db,
-            domain=domain_name,
-            email=email,
-            target_password_info=target_password_info,
-        )
+    ) -> CredentialVerificationResult:
+        """Verify credentials, migrate password hash, and fetch active sessions.
+
+        Does NOT record login history — the caller (service layer) handles
+        all history recording via try/except.
+        """
+        async with self._db.connect() as conn:
+            result = await conn.execute(
+                sa.select(users)
+                .select_from(users)
+                .where((users.c.email == email) & (users.c.domain_name == domain_name)),
+            )
+            row = result.first()
+
+            if row is None:
+                raise AuthorizationFailed("User credential mismatch.")
+
+            await self._check_password(conn, row, target_password_info)
+            await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
+
+            # Fetch active sessions for the user within the same connection
+            session_result = await conn.execute(
+                sa.select(
+                    LoginSessionRow.__table__.c.session_token,
+                    LoginSessionRow.__table__.c.created_at,
+                )
+                .where(
+                    (LoginSessionRow.__table__.c.user_id == row.uuid)
+                    & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
+                )
+                .order_by(LoginSessionRow.__table__.c.created_at.asc())
+            )
+            active_sessions = [
+                ActiveSessionInfo(session_token=r.session_token, created_at=r.created_at)
+                for r in session_result
+            ]
+
+            await conn.commit()
+            return CredentialVerificationResult(
+                user=row._mapping,
+                active_sessions=active_sessions,
+            )
+
+    @auth_db_source_resilience.apply()
+    async def create_login_session(
+        self,
+        user_id: UUID,
+        access_key: str,
+        domain_name: str,
+        *,
+        max_concurrent_sessions: int = 1,
+        tokens_to_invalidate: list[str] | None = None,
+    ) -> LoginSessionCreationResult:
+        """Atomically invalidate old sessions (if force), check limit, create session, and record success history.
+
+        Raises ActiveLoginSessionExistsError if the active session count would exceed
+        max_concurrent_sessions after invalidation.
+        """
+        session_token = uuid_mod.uuid4().hex
+        async with self._db.connect() as conn:
+            # Force: invalidate specified sessions
+            if tokens_to_invalidate:
+                await conn.execute(
+                    sa.update(LoginSessionRow.__table__)
+                    .where(
+                        LoginSessionRow.__table__.c.session_token.in_(tokens_to_invalidate)
+                        & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
+                    )
+                    .values(
+                        status=LoginSessionStatus.INVALIDATED,
+                        invalidated_at=sa.func.now(),
+                    )
+                )
+
+            # Conditional INSERT: only if active count < max
+            insert_query = sa.insert(LoginSessionRow.__table__).from_select(
+                ["user_id", "access_key", "session_token", "status"],
+                sa.select(
+                    sa.literal(user_id).label("user_id"),
+                    sa.literal(access_key).label("access_key"),
+                    sa.literal(session_token).label("session_token"),
+                    sa.literal(LoginSessionStatus.ACTIVE.value).label("status"),
+                ).where(
+                    sa.select(sa.func.count())
+                    .select_from(LoginSessionRow.__table__)
+                    .where(
+                        (LoginSessionRow.__table__.c.user_id == user_id)
+                        & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
+                    )
+                    .correlate(None)
+                    .scalar_subquery()
+                    < max_concurrent_sessions
+                ),
+            )
+            result = await conn.execute(insert_query)
+
+            if result.rowcount == 0:
+                await conn.rollback()
+                raise ActiveLoginSessionExistsError(
+                    extra_msg="An active login session already exists. Use force=true to override."
+                )
+
+            # Record successful login in the same transaction
+            await self._record_login_history(
+                conn, user_id, domain_name, LoginAttemptResult.SUCCESS, fail_reason=None
+            )
+
+            await conn.commit()
+        return LoginSessionCreationResult(session_token=session_token)
 
     @auth_db_source_resilience.apply()
     async def verify_credential_without_migration(
@@ -270,7 +518,7 @@ class AuthDBSource:
     @auth_db_source_resilience.apply()
     async def fetch_user_row_by_uuid(self, user_uuid: UUID) -> UserRow:
         """Fetch user row by UUID from database."""
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             user_query = (
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)
@@ -289,5 +537,177 @@ class AuthDBSource:
         """Fetch current time from database."""
         async with self._db.begin_readonly() as db_conn:
             result = await db_conn.scalar(sa.select(sa.func.now()))
-            assert result is not None
+            if result is None:
+                raise InternalServerError("Failed to retrieve current database timestamp")
             return result
+
+    # --- Login Session ---
+
+    @auth_db_source_resilience.apply()
+    async def fetch_active_session_tokens(self, user_id: UUID) -> list[ActiveSessionInfo]:
+        """Fetch active session tokens for a user, ordered by created_at ASC (oldest first)."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = (
+                sa.select(
+                    LoginSessionRow.session_token,
+                    LoginSessionRow.created_at,
+                )
+                .where(
+                    (LoginSessionRow.user_id == user_id)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .order_by(LoginSessionRow.created_at.asc())
+            )
+            result = await db_session.execute(query)
+            return [
+                ActiveSessionInfo(session_token=row.session_token, created_at=row.created_at)
+                for row in result
+            ]
+
+    @auth_db_source_resilience.apply()
+    async def invalidate_session_by_token(self, session_token: str) -> None:
+        """Invalidate a single login session by its token."""
+        async with self._db.begin_session() as db_session:
+            query = (
+                sa.update(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.session_token == session_token)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .values(
+                    status=LoginSessionStatus.INVALIDATED,
+                    invalidated_at=sa.func.now(),
+                )
+            )
+            await db_session.execute(query)
+
+    @auth_db_source_resilience.apply()
+    async def invalidate_sessions_by_user(self, user_id: UUID) -> None:
+        """Invalidate all active login sessions for a user."""
+        async with self._db.begin_session() as db_session:
+            query = (
+                sa.update(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.user_id == user_id)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .values(
+                    status=LoginSessionStatus.INVALIDATED,
+                    invalidated_at=sa.func.now(),
+                )
+            )
+            await db_session.execute(query)
+
+    @auth_db_source_resilience.apply()
+    async def admin_search_login_sessions(
+        self,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginSessionData]:
+        """Search all login sessions without scope restriction (admin only)."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginSessionRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=None)
+            items = [row.LoginSessionRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @auth_db_source_resilience.apply()
+    async def search_login_sessions(
+        self,
+        scope: SearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginSessionData]:
+        """Search login sessions within a given scope."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginSessionRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            items = [row.LoginSessionRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @auth_db_source_resilience.apply()
+    async def fetch_login_session_by_id(self, session_id: UUID) -> LoginSessionData:
+        """Fetch a single login session by its ID.
+
+        Raises LoginSessionNotFoundError if the session does not exist.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginSessionRow).where(LoginSessionRow.id == session_id)
+            row = await db_session.scalar(query)
+            if row is None:
+                raise LoginSessionNotFoundError(extra_msg=f"Login session not found: {session_id}")
+            return row.to_data()
+
+    @auth_db_source_resilience.apply()
+    async def revoke_session_by_id(self, session_id: UUID) -> str:
+        """Revoke an active login session by its ID.
+
+        Sets status to REVOKED and invalidated_at to current time.
+        Returns the session_token of the revoked session.
+        Raises LoginSessionNotFoundError if no matching active session is found.
+        """
+        async with self._db.begin_session() as db_session:
+            query = (
+                sa.update(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.id == session_id)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .values(
+                    status=LoginSessionStatus.REVOKED,
+                    invalidated_at=sa.func.now(),
+                )
+                .returning(LoginSessionRow.session_token)
+            )
+            result = await db_session.execute(query)
+            session_token = result.scalar()
+            if session_token is None:
+                raise LoginSessionNotFoundError(
+                    extra_msg=f"No active login session found with id: {session_id}"
+                )
+            return session_token
+
+    # --- Login History ---
+
+    @auth_db_source_resilience.apply()
+    async def admin_search_login_history(
+        self,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginHistoryData]:
+        """Search all login history without scope restriction (admin only)."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginHistoryRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=None)
+            items = [row.LoginHistoryRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @auth_db_source_resilience.apply()
+    async def search_login_history(
+        self,
+        scope: SearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginHistoryData]:
+        """Search login history within a given scope."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginHistoryRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            items = [row.LoginHistoryRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

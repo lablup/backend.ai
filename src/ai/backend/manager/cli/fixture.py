@@ -22,7 +22,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()
-def cli():
+def cli() -> None:
     pass
 
 
@@ -30,7 +30,7 @@ def cli():
 @click.argument("fixture_path", type=Path)
 @click.pass_obj
 def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
-    async def _impl():
+    async def _impl() -> None:
         log.info("Populating fixture '{0}' ...", fixture_path)
         try:
             fixture = load_json(fixture_path.read_text(encoding="utf8"))
@@ -69,6 +69,6 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
 
 @cli.command()
 @click.pass_obj
-def list(cli_ctx: CLIContext) -> None:
+def list(_cli_ctx: CLIContext) -> None:
     """List all available fixtures."""
     log.warning("This command is deprecated.")

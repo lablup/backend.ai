@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from datetime import timedelta
-from typing import TYPE_CHECKING, Optional, Self, cast
+from typing import TYPE_CHECKING, Self, cast
 
 import graphene
 from dateutil.parser import parse as dtparse
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.models.audit_log import (
-    AuditLogEntityType,
     AuditLogRow,
 )
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
@@ -25,7 +27,7 @@ if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
 
-class AuditLogSchema(graphene.ObjectType):
+class AuditLogSchema(graphene.ObjectType):  # type: ignore[misc]
     """
     A schema that contains metadata related to the AuditLogNode.
     It provides a list of values, such as entity_type and status, that can be used in the AuditLog, allowing clients to retrieve them.
@@ -41,13 +43,13 @@ class AuditLogSchema(graphene.ObjectType):
     )
 
     async def resolve_entity_type_variants(self, info: graphene.ResolveInfo) -> list[str]:
-        return list(AuditLogEntityType.__members__.values())
+        return list(EntityType)
 
     async def resolve_status_variants(self, info: graphene.ResolveInfo) -> list[str]:
         return list(OperationStatus.__members__.values())
 
 
-class AuditLogNode(graphene.ObjectType):
+class AuditLogNode(graphene.ObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -99,7 +101,7 @@ class AuditLogNode(graphene.ObjectType):
     }
 
     @classmethod
-    def from_row(cls, ctx, row: AuditLogRow) -> Self:
+    def from_row(cls, ctx: GraphQueryContext, row: AuditLogRow) -> Self:
         return cls(
             id=row.id,
             row_id=row.id,
@@ -119,14 +121,14 @@ class AuditLogNode(graphene.ObjectType):
     async def get_connection(
         cls,
         info: graphene.ResolveInfo,
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
-    ) -> ConnectionResolverResult:
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult[AuditLogNode]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))

@@ -1,0 +1,78 @@
+"""
+Infrastructure DTOs for Manager API.
+"""
+
+from .request import (
+    CheckPresetsRequest,
+    DeleteConfigRequest,
+    GetConfigRequest,
+    GetResourceMetadataRequest,
+    GetWSProxyVersionRequest,
+    ListPresetsRequest,
+    ListScalingGroupsRequest,
+    SetConfigRequest,
+    UsagePerMonthRequest,
+    UsagePerPeriodRequest,
+    WatcherAgentRequest,
+)
+from .response import (
+    AcceleratorMetadataDTO,
+    CheckPresetsResponse,
+    DeleteConfigResponse,
+    GetConfigResponse,
+    GetContainerRegistriesResponse,
+    GetResourceMetadataResponse,
+    GetResourceSlotsResponse,
+    GetVFolderTypesResponse,
+    GetWSProxyVersionResponse,
+    ListPresetsResponse,
+    ListScalingGroupsResponse,
+    MonthStatsResponse,
+    NumberFormatDTO,
+    RecalculateUsageResponse,
+    ResourcePresetDTO,
+    ScalingGroupDTO,
+    SetConfigResponse,
+    UsagePerMonthResponse,
+    UsagePerPeriodResponse,
+    WatcherAgentActionResponse,
+    WatcherStatusResponse,
+)
+
+__all__ = (
+    # Request DTOs
+    "GetResourceMetadataRequest",
+    "GetConfigRequest",
+    "SetConfigRequest",
+    "DeleteConfigRequest",
+    "ListScalingGroupsRequest",
+    "GetWSProxyVersionRequest",
+    "ListPresetsRequest",
+    "CheckPresetsRequest",
+    "UsagePerMonthRequest",
+    "UsagePerPeriodRequest",
+    "WatcherAgentRequest",
+    # Response DTOs
+    "GetResourceSlotsResponse",
+    "GetResourceMetadataResponse",
+    "GetVFolderTypesResponse",
+    "GetConfigResponse",
+    "SetConfigResponse",
+    "DeleteConfigResponse",
+    "ListScalingGroupsResponse",
+    "GetWSProxyVersionResponse",
+    "ListPresetsResponse",
+    "CheckPresetsResponse",
+    "RecalculateUsageResponse",
+    "UsagePerMonthResponse",
+    "UsagePerPeriodResponse",
+    "MonthStatsResponse",
+    "WatcherStatusResponse",
+    "WatcherAgentActionResponse",
+    "GetContainerRegistriesResponse",
+    # Nested DTOs
+    "NumberFormatDTO",
+    "AcceleratorMetadataDTO",
+    "ScalingGroupDTO",
+    "ResourcePresetDTO",
+)

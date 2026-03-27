@@ -65,7 +65,7 @@ class HostPortPair(BaseSchema):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def __getitem__(self, *args) -> int | str:
+    def __getitem__(self, *args: Any) -> int | str:
         if args[0] == 0:
             return self.host
         if args[0] == 1:
@@ -83,9 +83,11 @@ class UserID:
         value: int | str | None,
     ) -> int:
         if value is None:
-            assert cls.default_uid, "value is None but default_uid not provided"
+            if not cls.default_uid:
+                raise ValueError("value is None but default_uid not provided")
             return cls.default_uid
-        assert isinstance(value, (int, str)), "value must be an integer"
+        if not isinstance(value, (int, str)):
+            raise TypeError("value must be an integer or string")
         match value:
             case int():
                 if value == -1:
@@ -100,8 +102,8 @@ class UserID:
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_uid
-                    except KeyError:
-                        raise ValueError(f"no such user {value} in system")
+                    except KeyError as e:
+                        raise ValueError(f"no such user {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -153,8 +155,11 @@ class GroupID:
         value: int | str | None,
     ) -> int:
         if value is None:
-            assert cls.default_gid, "value is None but default_gid not provided"
-        assert isinstance(value, (int, str)), "value must be an integer"
+            if not cls.default_gid:
+                raise ValueError("value is None but default_gid not provided")
+            return cls.default_gid
+        if not isinstance(value, (int, str)):
+            raise TypeError("value must be an integer or string")
         match value:
             case int():
                 if value == -1:
@@ -169,8 +174,8 @@ class GroupID:
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_gid
-                    except KeyError:
-                        raise ValueError(f"no such user {value} in system")
+                    except KeyError as e:
+                        raise ValueError(f"no such user {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -329,7 +334,7 @@ class AccountManagerConfig(BaseSchema):
     group: Annotated[
         int,
         GroupID(default_gid=_file_perm.st_gid),
-        Field(default=_file_perm.st_uid, description="Process group."),
+        Field(default=_file_perm.st_gid, description="Process group."),
     ]
     ssl_enabled: Annotated[
         bool, Field(description="Use TLS to communicate. Default is false.", default=False)
@@ -416,7 +421,7 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
             file=sys.stderr,
         )
         print(pformat(e), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
         return server_config
 
@@ -432,7 +437,7 @@ class UnsupportedTypeError(RuntimeError):
 def generate_example_json(
     schema: type[BaseSchema] | types.GenericAlias | types.UnionType,
     parent: list[str] | None = None,
-) -> dict | list:
+) -> dict[str, Any] | list[Any]:
     if parent is None:
         parent = []
     if isinstance(schema, types.UnionType):
@@ -445,7 +450,8 @@ def generate_example_json(
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]
-            assert info.annotation
+            if not info.annotation:
+                raise ValueError(f"Field {name} in {schema} has no annotation")
             alternative_example = Undefined
             if info.examples:
                 res[name] = info.examples[0]

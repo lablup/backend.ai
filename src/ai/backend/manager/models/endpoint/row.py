@@ -5,7 +5,6 @@ import uuid
 from collections import defaultdict
 from collections.abc import (
     Iterable,
-    Mapping,
     Sequence,
 )
 from datetime import UTC, datetime
@@ -14,9 +13,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
-    TypeAlias,
     cast,
 )
 from uuid import UUID, uuid4
@@ -28,6 +25,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import (
     Mapped,
@@ -37,7 +35,6 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.types import (
@@ -66,17 +63,13 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    DeploymentLifecycleSubStep,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
-    ExecutionSpec,
     ModelDeploymentAutoScalingRuleData,
-    ModelRevisionSpec,
-    MountMetadata,
     ReplicaSpec,
-    ResourceSpec,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
@@ -106,39 +99,35 @@ from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 from ai.backend.manager.types import MountOptionModel, UserScope
 
 if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-    from ai.backend.manager.models.gql import GraphQueryContext
 
 __all__ = (
     "EndpointAutoScalingRuleRow",
     "EndpointLifecycle",
     "EndpointRow",
-    "EndpointStatistics",
     "EndpointTokenRow",
     "ModelServiceHelper",
 )
 
 
-ModelServiceSerializableConnectionInfo: TypeAlias = dict[str, list[dict[str, Any]]]
+type ModelServiceSerializableConnectionInfo = dict[str, list[dict[str, Any]]]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _get_endpoint_tokens_join_condition():
+def _get_endpoint_tokens_join_condition() -> Any:
     from ai.backend.manager.models.endpoint import EndpointTokenRow
 
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
-def _get_endpoint_revisions_join_condition():
+def _get_endpoint_revisions_join_condition() -> Any:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
     return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
 
 
-def _get_endpoint_auto_scaling_policy_join_condition():
+def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
     from ai.backend.manager.models.deployment_auto_scaling_policy import (
         DeploymentAutoScalingPolicyRow,
     )
@@ -146,35 +135,35 @@ def _get_endpoint_auto_scaling_policy_join_condition():
     return EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)
 
 
-def _get_endpoint_deployment_policy_join_condition():
+def _get_endpoint_deployment_policy_join_condition() -> Any:
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 
     return EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)
 
 
-def _get_image_row_join_condition():
+def _get_image_row_join_condition() -> Any:
     from ai.backend.manager.models.image import ImageRow
 
     return foreign(EndpointRow.image) == ImageRow.id
 
 
-def _get_created_user_row_join_condition():
+def _get_created_user_row_join_condition() -> Any:
     from ai.backend.manager.models.user import UserRow
 
     return foreign(EndpointRow.created_user) == UserRow.uuid
 
 
-def _get_session_owner_row_join_condition():
+def _get_session_owner_row_join_condition() -> Any:
     from ai.backend.manager.models.user import UserRow
 
     return foreign(EndpointRow.session_owner) == UserRow.uuid
 
 
-def _get_endpoint_token_endpoint_row_join_condition():
+def _get_endpoint_token_endpoint_row_join_condition() -> Any:
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
-class EndpointRow(Base):
+class EndpointRow(Base):  # type: ignore[misc]
     __tablename__ = "endpoints"
 
     __table_args__ = (
@@ -192,6 +181,11 @@ class EndpointRow(Base):
             "project",
             unique=True,
             postgresql_where=(sa.column("lifecycle_stage") != EndpointLifecycle.DESTROYED.value),
+        ),
+        sa.Index(
+            "ix_endpoints_lifecycle_sub_step",
+            "lifecycle_stage",
+            "sub_step",
         ),
     )
 
@@ -314,6 +308,12 @@ class EndpointRow(Base):
     deploying_revision: Mapped[UUID | None] = mapped_column(
         "deploying_revision", GUID, nullable=True
     )
+    sub_step: Mapped[DeploymentLifecycleSubStep | None] = mapped_column(
+        "sub_step",
+        StrEnumType(DeploymentLifecycleSubStep),
+        nullable=True,
+        default=None,
+    )
     revision_history_limit: Mapped[int] = mapped_column(
         "revision_history_limit",
         sa.Integer,
@@ -375,9 +375,9 @@ class EndpointRow(Base):
         cls,
         session: AsyncSession,
         endpoint_id: UUID,
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_routes: bool = False,
         load_tokens: bool = False,
         load_image: bool = False,
@@ -419,9 +419,9 @@ class EndpointRow(Base):
     async def list(
         cls,
         session: AsyncSession,
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_routes: bool = False,
         load_image: bool = False,
         load_tokens: bool = False,
@@ -458,9 +458,9 @@ class EndpointRow(Base):
         cls,
         session: AsyncSession,
         endpoint_ids: Sequence[EndpointId],
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_routes: bool = False,
         load_image: bool = False,
         load_tokens: bool = False,
@@ -499,9 +499,9 @@ class EndpointRow(Base):
         cls,
         session: AsyncSession,
         model_id: UUID,
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_routes: bool = False,
         load_image: bool = False,
         load_tokens: bool = False,
@@ -643,7 +643,7 @@ class EndpointRow(Base):
                     kernel.id,
                 )
                 continue
-            service_ports_list = cast(list[dict[str, Any]], kernel.service_ports)
+            service_ports_list = kernel.service_ports
             num_inference_ports = len([*filter(lambda x: x["is_inference"], service_ports_list)])
             if num_inference_ports > 1:
                 log.warning(
@@ -763,34 +763,9 @@ class EndpointRow(Base):
         )
 
     def to_deployment_info(self) -> DeploymentInfo:
-        """
-        Convert EndpointRow to DeploymentInfo dataclass.
+        """Convert EndpointRow to DeploymentInfo dataclass using revision data."""
+        model_revisions = [rev_row.to_model_revision_spec() for rev_row in self.revisions]
 
-        If current_revision is set and revisions are loaded, uses revision data.
-        Otherwise, falls back to endpoint-level fields for legacy compatibility.
-        """
-        # Try to use current revision if available
-        if self.current_revision and hasattr(self, "revisions") and self.revisions:
-            current_rev = next(
-                (r for r in self.revisions if r.id == self.current_revision),
-                None,
-            )
-            if current_rev:
-                return self._to_deployment_info_from_revision(current_rev)
-
-        # Fallback: use endpoint-level fields (legacy)
-        return self._to_deployment_info_legacy()
-
-    def _to_deployment_info_from_revision(
-        self,
-        revision: DeploymentRevisionRow,
-    ) -> DeploymentInfo:
-        """Build DeploymentInfo using revision data."""
-        # Get image identifier from revision's image_row
-        image_identifier = ImageIdentifier(
-            canonical=revision.image_row.name,
-            architecture=revision.image_row.architecture,
-        )
         return DeploymentInfo(
             id=self.id,
             metadata=DeploymentMetadata(
@@ -816,98 +791,15 @@ class EndpointRow(Base):
                 open_to_public=self.open_to_public if self.open_to_public is not None else False,
                 url=self.url,
             ),
-            model_revisions=[
-                ModelRevisionSpec(
-                    image_identifier=image_identifier,
-                    resource_spec=ResourceSpec(
-                        cluster_mode=ClusterMode(revision.cluster_mode),
-                        cluster_size=revision.cluster_size,
-                        resource_slots=revision.resource_slots,
-                        resource_opts=revision.resource_opts,
-                    ),
-                    mounts=MountMetadata(
-                        model_vfolder_id=revision.model or uuid.UUID(int=0),
-                        model_definition_path=revision.model_definition_path,
-                        model_mount_destination=revision.model_mount_destination,
-                        extra_mounts=revision.extra_mounts or [],
-                    ),
-                    execution=ExecutionSpec(
-                        startup_command=revision.startup_command,
-                        bootstrap_script=revision.bootstrap_script,
-                        environ=revision.environ,
-                        runtime_variant=revision.runtime_variant,
-                        callback_url=yarl.URL(revision.callback_url)
-                        if revision.callback_url
-                        else None,
-                    ),
-                ),
-            ],
+            model_revisions=model_revisions,
             current_revision_id=self.current_revision,
-        )
-
-    def _to_deployment_info_legacy(self) -> DeploymentInfo:
-        """Build DeploymentInfo using endpoint-level fields (legacy fallback)."""
-        # Create ImageIdentifier from endpoint's image_row
-        if self.image_row is None:
-            raise ValueError("image_row is not loaded")
-        image_identifier = ImageIdentifier(
-            canonical=self.image_row.name,
-            architecture=self.image_row.architecture,
-        )
-        return DeploymentInfo(
-            id=self.id,
-            metadata=DeploymentMetadata(
-                name=self.name,
-                domain=self.domain,
-                project=self.project,
-                resource_group=self.resource_group,
-                created_user=self.created_user,
-                session_owner=self.session_owner,
-                created_at=self.created_at,
-                revision_history_limit=self.revision_history_limit,
-                tag=self.tag,
-            ),
-            state=DeploymentState(
-                lifecycle=self.lifecycle_stage,
-                retry_count=self.retries,
-            ),
-            replica_spec=ReplicaSpec(
-                replica_count=self.replicas,
-                desired_replica_count=self.desired_replicas,
-            ),
-            network=DeploymentNetworkSpec(
-                open_to_public=self.open_to_public if self.open_to_public is not None else False,
-                url=self.url,
-            ),
-            model_revisions=[
-                ModelRevisionSpec(
-                    image_identifier=image_identifier,
-                    resource_spec=ResourceSpec(
-                        cluster_mode=ClusterMode(self.cluster_mode),
-                        cluster_size=self.cluster_size,
-                        resource_slots=self.resource_slots,
-                        resource_opts=self.resource_opts,
-                    ),
-                    mounts=MountMetadata(
-                        model_vfolder_id=self.model or uuid.UUID(int=0),
-                        model_definition_path=self.model_definition_path,
-                        model_mount_destination=self.model_mount_destination,
-                        extra_mounts=self.extra_mounts,
-                    ),
-                    execution=ExecutionSpec(
-                        startup_command=self.startup_command,
-                        bootstrap_script=self.bootstrap_script,
-                        environ=self.environ,
-                        runtime_variant=self.runtime_variant,
-                        callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
-                    ),
-                ),
-            ],
-            current_revision_id=self.current_revision,
+            deploying_revision_id=self.deploying_revision,
+            sub_step=self.sub_step,
+            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
         )
 
 
-class EndpointTokenRow(Base):
+class EndpointTokenRow(Base):  # type: ignore[misc]
     __tablename__ = "endpoint_tokens"
 
     id: Mapped[UUID] = mapped_column(
@@ -961,9 +853,9 @@ class EndpointTokenRow(Base):
         session: AsyncSession,
         endpoint_id: UUID,
         *,
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_endpoint: bool = False,
     ) -> Sequence[Self]:
         query = (
@@ -988,9 +880,9 @@ class EndpointTokenRow(Base):
         session: AsyncSession,
         token: str,
         *,
-        domain: Optional[str] = None,
-        project: Optional[UUID] = None,
-        user_uuid: Optional[UUID] = None,
+        domain: str | None = None,
+        project: UUID | None = None,
+        user_uuid: UUID | None = None,
         load_endpoint: bool = False,
     ) -> Self:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
@@ -1023,7 +915,7 @@ class EndpointTokenRow(Base):
         )
 
 
-class EndpointAutoScalingRuleRow(Base):
+class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     __tablename__ = "endpoint_auto_scaling_rules"
 
     id: Mapped[UUID] = mapped_column(
@@ -1190,8 +1082,8 @@ class EndpointAutoScalingRuleRow(Base):
     def to_model_deployment_data(self) -> ModelDeploymentAutoScalingRuleData:
         """Convert to ModelDeploymentAutoScalingRuleData (new type)."""
         # Map threshold + comparator back to min/max threshold
-        min_threshold: Optional[Decimal] = None
-        max_threshold: Optional[Decimal] = None
+        min_threshold: Decimal | None = None
+        max_threshold: Decimal | None = None
 
         if self.comparator == AutoScalingMetricComparator.GREATER_THAN:
             max_threshold = self.threshold
@@ -1343,7 +1235,7 @@ class ModelServiceHelper:
         )
 
         for vfolder in vfolder_mounts:
-            if vfolder.kernel_path == model_mount_destination:
+            if str(vfolder.kernel_path) == model_mount_destination:
                 raise InvalidAPIParameters(
                     "extra_mounts.mount_destination conflicts with model_mount_destination config. Make sure not to shadow value defined at model_mount_destination as a mount destination of extra VFolders."
                 )
@@ -1403,7 +1295,8 @@ class ModelServiceHelper:
             model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
             for item in storage_reply["items"]:
                 if item["name"] in model_definition_candidates:
-                    return item["name"]
+                    result: str = item["name"]
+                    return result
             else:
                 raise InvalidAPIParameters(
                     'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
@@ -1428,7 +1321,8 @@ class ModelServiceHelper:
         )
         model_definition_yaml = chunks.decode("utf-8")
         yaml = YAML()
-        return yaml.load(model_definition_yaml)
+        result: dict[str, Any] = yaml.load(model_definition_yaml)
+        return result
 
     @staticmethod
     async def validate_model_definition(
@@ -1452,40 +1346,11 @@ class ModelServiceHelper:
             model_definition = model_definition_iv.check(raw_model_definition)
             if model_definition is None:
                 raise DataTransformationFailed("Model definition validation returned None")
-            return model_definition
+            result: dict[str, Any] = model_definition
+            return result
         except t.DataError as e:
             raise InvalidAPIParameters(
                 f"Failed to validate model definition from VFolder (ID {vfid.folder_id}): {e}",
             ) from e
         except YAMLError as e:
             raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
-
-
-class EndpointStatistics:
-    @classmethod
-    async def batch_load_by_endpoint_impl(
-        cls,
-        valkey_stat_client: ValkeyStatClient,
-        endpoint_ids: Sequence[UUID],
-    ) -> Sequence[Optional[Mapping[str, Any]]]:
-        endpoint_id_strs = [str(endpoint_id) for endpoint_id in endpoint_ids]
-        return await valkey_stat_client.get_inference_app_statistics_batch(endpoint_id_strs)
-
-    @classmethod
-    async def batch_load_by_endpoint(
-        cls,
-        ctx: GraphQueryContext,
-        endpoint_ids: Sequence[UUID],
-    ) -> Sequence[Optional[Mapping[str, Any]]]:
-        return await cls.batch_load_by_endpoint_impl(ctx.valkey_stat, endpoint_ids)
-
-    @classmethod
-    async def batch_load_by_replica(
-        cls,
-        ctx: GraphQueryContext,
-        endpoint_replica_ids: Sequence[tuple[UUID, UUID]],
-    ) -> Sequence[Optional[Mapping[str, Any]]]:
-        endpoint_replica_pairs = [
-            (str(endpoint_id), str(replica_id)) for endpoint_id, replica_id in endpoint_replica_ids
-        ]
-        return await ctx.valkey_stat.get_inference_replica_statistics_batch(endpoint_replica_pairs)

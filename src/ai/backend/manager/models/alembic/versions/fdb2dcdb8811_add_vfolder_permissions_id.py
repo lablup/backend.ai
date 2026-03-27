@@ -18,7 +18,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column(
         "vfolder_permissions",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
@@ -26,6 +26,6 @@ def upgrade():
     op.create_primary_key("pk_vfolder_permissions", "vfolder_permissions", ["id"])
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_constraint("pk_vfolder_permissions", "vfolder_permissions", type_="primary")
     op.drop_column("vfolder_permissions", "id")

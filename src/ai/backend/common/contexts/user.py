@@ -1,14 +1,13 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Optional
 
 from ai.backend.common.data.user.types import UserData
 
 _user_var: ContextVar[UserData] = ContextVar("user_data")
 
 
-def current_user() -> Optional[UserData]:
+def current_user() -> UserData | None:
     """
     Get the current user ID from the context.
     Returns None if not set.

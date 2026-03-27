@@ -1,4 +1,4 @@
-from typing import Optional, Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -6,12 +6,12 @@ from ai.backend.common.events.user_event.user_event import UserEvent
 
 class BaseIdleCheckEvent(AbstractAnycastEvent):
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls()
 
     @classmethod
@@ -20,11 +20,11 @@ class BaseIdleCheckEvent(AbstractAnycastEvent):
         return EventDomain.IDLE_CHECK
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 

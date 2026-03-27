@@ -1,12 +1,28 @@
+from __future__ import annotations
+
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import yarl
+from pytest_mock import MockerFixture
 
-from ai.backend.common.types import ClusterMode, EndpointId, ResourceSlot, RuntimeVariant
+from ai.backend.common.types import (
+    ClusterMode,
+    EndpointId,
+    ResourceSlot,
+    RuntimeVariant,
+    VFolderUsageMode,
+)
+from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.model_serving.types import EndpointData
+from ai.backend.manager.data.vfolder.types import (
+    VFolderMountPermission,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+)
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -21,14 +37,11 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
-from ai.backend.manager.repositories.model_serving.admin_repository import (
-    AdminModelServingRepository,
-)
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 
 
 @pytest.fixture
-def mock_db_engine():
+def mock_db_engine() -> MagicMock:
     """Mock database engine for repository testing."""
     mock_engine = MagicMock(spec=ExtendedAsyncSAEngine)
 
@@ -37,6 +50,7 @@ def mock_db_engine():
     async_cm_readonly.__aenter__ = AsyncMock()
     async_cm_readonly.__aexit__ = AsyncMock()
     mock_engine.begin_readonly_session.return_value = async_cm_readonly
+    mock_engine.begin_readonly_session_read_committed.return_value = async_cm_readonly
 
     async_cm = AsyncMock()
     async_cm.__aenter__ = AsyncMock()
@@ -47,19 +61,13 @@ def mock_db_engine():
 
 
 @pytest.fixture
-def model_serving_repository(mock_db_engine):
+def model_serving_repository(mock_db_engine: MagicMock) -> ModelServingRepository:
     """Create a ModelServingRepository instance with mocked database."""
     return ModelServingRepository(db=mock_db_engine)
 
 
 @pytest.fixture
-def admin_model_serving_repository(mock_db_engine):
-    """Create an AdminModelServingRepository instance with mocked database."""
-    return AdminModelServingRepository(db=mock_db_engine)
-
-
-@pytest.fixture
-def sample_user():
+def sample_user() -> UserRow:
     """Create a sample user for testing."""
     return UserRow(
         uuid=uuid.uuid4(),
@@ -82,7 +90,7 @@ def sample_user():
 
 
 @pytest.fixture
-def sample_admin_user():
+def sample_admin_user() -> UserRow:
     """Create a sample admin user for testing."""
     return UserRow(
         uuid=uuid.uuid4(),
@@ -105,7 +113,7 @@ def sample_admin_user():
 
 
 @pytest.fixture
-def sample_superadmin_user():
+def sample_superadmin_user() -> UserRow:
     """Create a sample superadmin user for testing."""
     return UserRow(
         uuid=uuid.uuid4(),
@@ -128,7 +136,7 @@ def sample_superadmin_user():
 
 
 @pytest.fixture
-def sample_image():
+def sample_image() -> ImageRow:
     """Create a sample image for testing."""
     image = ImageRow(
         name="test-model-image", project=None, architecture="x86_64", registry_id=uuid.uuid4()
@@ -139,18 +147,18 @@ def sample_image():
     image.tag = "latest"
     image.is_local = False
     image.size_bytes = 1073741824  # 1GB
-    image.type = "COMPUTE"
+    image.type = ImageType.COMPUTE
     image.accelerators = ""
     image.labels = {}
     image._resources = {}
     image.created_at = datetime.now(UTC)
     image.config_digest = "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-    image.status = "active"
+    image.status = ImageStatus.ALIVE
     return image
 
 
 @pytest.fixture
-def sample_vfolder():
+def sample_vfolder() -> VFolderRow:
     """Create a sample vfolder for testing."""
     vfolder = VFolderRow()
     vfolder.id = uuid.uuid4()
@@ -159,7 +167,7 @@ def sample_vfolder():
     vfolder.group = None
     vfolder.host = "storage-host"
     vfolder.domain_name = "default"
-    vfolder.ownership_type = "user"
+    vfolder.ownership_type = VFolderOwnershipType.USER
     vfolder.max_files = 10000
     vfolder.max_size = 10737418240  # 10GB
     vfolder.num_files = 100
@@ -167,15 +175,17 @@ def sample_vfolder():
     vfolder.created_at = datetime.now(UTC)
     vfolder.last_used = datetime.now(UTC)
     vfolder.unmanaged_path = ""
-    vfolder.usage_mode = "model"
-    vfolder.permission = "rw"
+    vfolder.usage_mode = VFolderUsageMode.MODEL
+    vfolder.permission = VFolderMountPermission.READ_WRITE
     vfolder.last_size_update = datetime.now(UTC)
-    vfolder.status = "ready"
+    vfolder.status = VFolderOperationStatus.READY
     return vfolder
 
 
 @pytest.fixture
-def sample_endpoint_creator_spec(sample_user, sample_image, sample_vfolder) -> EndpointCreatorSpec:
+def sample_endpoint_creator_spec(
+    sample_user: UserRow, sample_image: ImageRow, sample_vfolder: VFolderRow
+) -> EndpointCreatorSpec:
     return EndpointCreatorSpec(
         name="test-endpoint",
         model=sample_vfolder.id,
@@ -196,7 +206,7 @@ def sample_endpoint_creator_spec(sample_user, sample_image, sample_vfolder) -> E
         cluster_size=1,
         extra_mounts=[],
         created_user=sample_user.uuid,
-        project=sample_user.groups if hasattr(sample_user, "groups") else uuid.uuid4(),
+        project=uuid.uuid4(),
         domain="default",
         resource_group="default",
     )
@@ -212,7 +222,7 @@ def sample_endpoint_creator(
 
 @pytest.fixture
 def sample_endpoint(
-    sample_endpoint_creator_spec: EndpointCreatorSpec, sample_user, sample_image
+    sample_endpoint_creator_spec: EndpointCreatorSpec, sample_user: UserRow, sample_image: ImageRow
 ) -> EndpointRow:
     """Create a sample endpoint for testing."""
     endpoint = sample_endpoint_creator_spec.build_row()
@@ -233,7 +243,7 @@ def sample_endpoint(
 
 
 @pytest.fixture
-def sample_route(sample_endpoint):
+def sample_route(sample_endpoint: EndpointRow) -> RoutingRow:
     """Create a sample routing for testing."""
     return RoutingRow(
         id=uuid.uuid4(),
@@ -248,7 +258,7 @@ def sample_route(sample_endpoint):
 
 
 @pytest.fixture
-def sample_auto_scaling_rule(sample_endpoint):
+def sample_auto_scaling_rule(sample_endpoint: EndpointRow) -> EndpointAutoScalingRuleRow:
     """Create a sample auto scaling rule for testing."""
     return EndpointAutoScalingRuleRow(
         id=uuid.uuid4(),
@@ -267,7 +277,7 @@ def sample_auto_scaling_rule(sample_endpoint):
 
 
 @pytest.fixture
-def mock_session():
+def mock_session() -> AsyncMock:
     """Create a mock database session."""
     session = AsyncMock()
     session.execute = AsyncMock()
@@ -292,21 +302,24 @@ def mock_session():
 
 
 @pytest.fixture
-def setup_readonly_session(mock_db_engine, mock_session):
+def setup_readonly_session(mock_db_engine: MagicMock, mock_session: AsyncMock) -> AsyncMock:
     """Automatically sets up a readonly session fixture"""
     mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
+    mock_db_engine.begin_readonly_session_read_committed.return_value.__aenter__.return_value = (
+        mock_session
+    )
     return mock_session
 
 
 @pytest.fixture
-def setup_writable_session(mock_db_engine, mock_session):
+def setup_writable_session(mock_db_engine: MagicMock, mock_session: AsyncMock) -> AsyncMock:
     """Automatically sets up a writable session fixture"""
     mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
     return mock_session
 
 
 @pytest.fixture
-def patch_endpoint_get(mocker):
+def patch_endpoint_get(mocker: MockerFixture) -> AsyncMock:
     """Patch EndpointRow.get method using mocker."""
     return mocker.patch(
         "ai.backend.manager.models.endpoint.EndpointRow.get", new_callable=AsyncMock
@@ -314,31 +327,31 @@ def patch_endpoint_get(mocker):
 
 
 @pytest.fixture
-def patch_routing_get(mocker):
+def patch_routing_get(mocker: MockerFixture) -> AsyncMock:
     """Patch RoutingRow.get method using mocker."""
     return mocker.patch("ai.backend.manager.models.routing.RoutingRow.get", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_user_get(mocker):
+def patch_user_get(mocker: MockerFixture) -> AsyncMock:
     """Patch UserRow.get method using mocker."""
     return mocker.patch("ai.backend.manager.models.user.UserRow.get", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_vfolder_get(mocker):
+def patch_vfolder_get(mocker: MockerFixture) -> AsyncMock:
     """Patch VFolderRow.get method using mocker."""
     return mocker.patch("ai.backend.manager.models.vfolder.VFolderRow.get", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_image_resolve(mocker):
+def patch_image_resolve(mocker: MockerFixture) -> AsyncMock:
     """Patch ImageRow.resolve method using mocker."""
     return mocker.patch("ai.backend.manager.models.image.ImageRow.resolve", new_callable=AsyncMock)
 
 
 @pytest.fixture
-def patch_session_get(mocker):
+def patch_session_get(mocker: MockerFixture) -> AsyncMock:
     """Patch SessionRow.get_session method using mocker."""
     return mocker.patch(
         "ai.backend.manager.models.session.SessionRow.get_session", new_callable=AsyncMock
@@ -346,7 +359,7 @@ def patch_session_get(mocker):
 
 
 @pytest.fixture
-def patch_auto_scaling_rule_get(mocker):
+def patch_auto_scaling_rule_get(mocker: MockerFixture) -> AsyncMock:
     """Patch EndpointAutoScalingRuleRow.get method using mocker."""
     return mocker.patch(
         "ai.backend.manager.models.endpoint.EndpointAutoScalingRuleRow.get", new_callable=AsyncMock
@@ -354,23 +367,29 @@ def patch_auto_scaling_rule_get(mocker):
 
 
 @pytest.fixture
-def patch_resolve_group_name_or_id(mocker):
+def patch_resolve_group_name_or_id(mocker: MockerFixture) -> MagicMock:
     """Patch resolve_group_name_or_id function using mocker."""
     return mocker.patch(
         "ai.backend.manager.repositories.model_serving.repository.resolve_group_name_or_id"
     )
 
 
-def setup_db_session_mock(mock_db_engine, mock_session):
+def setup_db_session_mock(mock_db_engine: MagicMock, mock_session: AsyncMock) -> AsyncMock:
     """Helper function to set up database session mocking consistently."""
     mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
+    mock_db_engine.begin_readonly_session_read_committed.return_value.__aenter__.return_value = (
+        mock_session
+    )
     mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
     return mock_session
 
 
 def setup_mock_query_result(
-    mock_session, scalar_result=None, scalars_all_result=None, scalar_one_or_none_result=None
-):
+    mock_session: AsyncMock,
+    scalar_result: Any = None,
+    scalars_all_result: Any = None,
+    scalar_one_or_none_result: Any = None,
+) -> AsyncMock:
     """Helper function to set up common query result patterns."""
     if scalar_result is not None:
         mock_session.execute.return_value.scalar.return_value = scalar_result
@@ -383,7 +402,9 @@ def setup_mock_query_result(
     return mock_session
 
 
-def assert_update_query_executed(mock_session, expected_field=None):
+def assert_update_query_executed(
+    mock_session: AsyncMock, expected_field: str | None = None
+) -> None:
     """Helper function to verify that an update query was executed"""
     mock_session.execute.assert_called()
     if expected_field:
@@ -391,7 +412,7 @@ def assert_update_query_executed(mock_session, expected_field=None):
         assert expected_field in str(executed_query)
 
 
-def assert_basic_endpoint_result(result, endpoint_row):
+def assert_basic_endpoint_result(result: EndpointData, endpoint_row: EndpointRow) -> None:
     """Helper function to validate basic endpoint result"""
     assert result is not None
     assert isinstance(result, EndpointData)
@@ -399,16 +420,16 @@ def assert_basic_endpoint_result(result, endpoint_row):
     assert result.name == endpoint_row.name
 
 
-def assert_endpoint_creation_operations(mock_session, endpoint_row):
+def assert_endpoint_creation_operations(mock_session: AsyncMock, endpoint_row: EndpointRow) -> None:
     """Helper function to verify database operations related to endpoint creation"""
     mock_session.add.assert_called_once_with(endpoint_row)
     mock_session.flush.assert_called_once()
     mock_session.refresh.assert_called_once_with(endpoint_row)
 
 
-def create_full_featured_endpoint(sample_user, sample_image, sample_vfolder):
-    from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
-
+def create_full_featured_endpoint(
+    sample_user: UserRow, sample_image: ImageRow, sample_vfolder: VFolderRow
+) -> EndpointRow:
     endpoint_row = EndpointRow(
         name="full-featured-endpoint",
         domain="test-domain",
@@ -432,6 +453,7 @@ def create_full_featured_endpoint(sample_user, sample_image, sample_vfolder):
         cluster_size=3,
         extra_mounts=[],
         created_user=sample_user.uuid,
+        current_revision=uuid.uuid4(),
     )
 
     # Set attributes normally set by database

@@ -1,14 +1,27 @@
+from __future__ import annotations
+
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aioresponses import aioresponses
 
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.endpoint.types import EndpointStatus
-from ai.backend.manager.data.model_serving.types import EndpointTokenData, RequesterCtx
-from ai.backend.manager.data.user.types import UserRole
+from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.hub import EventHub
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.model_serving.types import EndpointTokenData
+from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
+from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.generate_token import (
     GenerateTokenAction,
     GenerateTokenActionResult,
@@ -16,78 +29,211 @@ from ai.backend.manager.services.model_serving.actions.generate_token import (
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
+from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
+from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
+    RevisionGeneratorRegistry,
+)
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.testutils.scenario import ScenarioBase
 
 
-@pytest.fixture
-def mock_check_requester_access_token(mocker, model_serving_service):
-    mock = mocker.patch.object(
-        model_serving_service,
-        "check_requester_access",
-        new_callable=AsyncMock,
-    )
-    mock.return_value = None
-    return mock
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_force_token(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "get_endpoint_by_id_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_create_endpoint_token_force(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "create_endpoint_token_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_validated_token(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.repository,
-        "get_endpoint_by_id_validated",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_create_endpoint_token_validated(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.repository,
-        "create_endpoint_token_validated",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_get_scaling_group_info_token(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.repository,
-        "get_scaling_group_info",
-        new_callable=AsyncMock,
-    )
-
-
 class TestGenerateToken:
+    @pytest.fixture
+    def user_data(self) -> UserData:
+        return UserData(
+            user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+
+    @pytest.fixture(autouse=True)
+    def set_user_context(self, user_data: UserData) -> Iterator[None]:
+        with with_user(user_data):
+            yield
+
+    @pytest.fixture
+    def mock_storage_manager(self) -> MagicMock:
+        return MagicMock(spec=StorageSessionManager)
+
+    @pytest.fixture
+    def mock_action_monitor(self) -> MagicMock:
+        return MagicMock(spec=ActionMonitor)
+
+    @pytest.fixture
+    def mock_event_dispatcher(self) -> MagicMock:
+        mock = MagicMock(spec=EventDispatcher)
+        mock.dispatch = AsyncMock()
+        return mock
+
+    @pytest.fixture
+    def mock_agent_registry(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_config_provider(self) -> MagicMock:
+        return MagicMock(spec=ManagerConfigProvider)
+
+    @pytest.fixture
+    def mock_repositories(self) -> MagicMock:
+        mock = MagicMock(spec=ModelServingRepositories)
+        mock.repository = MagicMock(spec=ModelServingRepository)
+        return mock
+
+    @pytest.fixture
+    def mock_background_task_manager(self) -> MagicMock:
+        return MagicMock(spec=BackgroundTaskManager)
+
+    @pytest.fixture
+    def mock_valkey_live(self) -> MagicMock:
+        mock = MagicMock()
+        mock.store_live_data = AsyncMock()
+        mock.get_live_data = AsyncMock()
+        mock.delete_live_data = AsyncMock()
+        return mock
+
+    @pytest.fixture
+    def mock_deployment_controller(self) -> MagicMock:
+        mock = MagicMock(spec=DeploymentController)
+        mock.mark_lifecycle_needed = AsyncMock()
+        return mock
+
+    @pytest.fixture
+    def mock_deployment_repository(self) -> MagicMock:
+        mock = MagicMock()
+        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        return mock
+
+    @pytest.fixture
+    def mock_event_hub(self) -> MagicMock:
+        mock = MagicMock(spec=EventHub)
+        mock.register_event_propagator = MagicMock()
+        mock.unregister_event_propagator = MagicMock()
+        return mock
+
+    @pytest.fixture
+    def mock_scheduling_controller(self) -> MagicMock:
+        mock = MagicMock(spec=SchedulingController)
+        mock.enqueue_session = AsyncMock()
+        mock.mark_sessions_for_termination = AsyncMock()
+        return mock
+
+    @pytest.fixture
+    def mock_revision_generator_registry(self) -> MagicMock:
+        return MagicMock(spec=RevisionGeneratorRegistry)
+
+    @pytest.fixture
+    def model_serving_service(
+        self,
+        mock_storage_manager: MagicMock,
+        mock_event_dispatcher: MagicMock,
+        mock_event_hub: MagicMock,
+        mock_agent_registry: MagicMock,
+        mock_background_task_manager: MagicMock,
+        mock_config_provider: MagicMock,
+        mock_valkey_live: MagicMock,
+        mock_repositories: MagicMock,
+        mock_deployment_repository: MagicMock,
+        mock_deployment_controller: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        mock_revision_generator_registry: MagicMock,
+    ) -> ModelServingService:
+        return ModelServingService(
+            agent_registry=mock_agent_registry,
+            background_task_manager=mock_background_task_manager,
+            event_dispatcher=mock_event_dispatcher,
+            event_hub=mock_event_hub,
+            storage_manager=mock_storage_manager,
+            config_provider=mock_config_provider,
+            valkey_live=mock_valkey_live,
+            repository=mock_repositories.repository,
+            deployment_repository=mock_deployment_repository,
+            deployment_controller=mock_deployment_controller,
+            scheduling_controller=mock_scheduling_controller,
+            revision_generator_registry=mock_revision_generator_registry,
+        )
+
+    @pytest.fixture
+    def model_serving_processors(
+        self,
+        mock_action_monitor: MagicMock,
+        model_serving_service: ModelServingService,
+        mock_action_validators: ActionValidators,
+    ) -> ModelServingProcessors:
+        return ModelServingProcessors(
+            service=model_serving_service,
+            action_monitors=[mock_action_monitor],
+            validators=mock_action_validators,
+        )
+
+    @pytest.fixture
+    def mock_check_user_access_token(self, mocker: Any, model_serving_service: Any) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                model_serving_service,
+                "check_user_access",
+                new_callable=AsyncMock,
+            ),
+        )
+        mock.return_value = None
+        return mock
+
+    @pytest.fixture
+    def mock_get_endpoint_by_id_token(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_by_id",
+                new_callable=AsyncMock,
+            ),
+        )
+
+    @pytest.fixture
+    def mock_get_endpoint_access_validation_data_token(
+        self, mocker: Any, mock_repositories: Any
+    ) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_access_validation_data",
+                new_callable=AsyncMock,
+            ),
+        )
+
+    @pytest.fixture
+    def mock_create_endpoint_token(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "create_endpoint_token",
+                new_callable=AsyncMock,
+            ),
+        )
+
+    @pytest.fixture
+    def mock_get_scaling_group_info_token(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_scaling_group_info",
+                new_callable=AsyncMock,
+            ),
+        )
+
     @pytest.mark.parametrize(
         "scenario",
         [
             ScenarioBase.success(
                 "regular token generation",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
                     duration=None,
                     valid_until=None,
@@ -108,12 +254,6 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "unlimited token",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
                     duration=None,
                     valid_until=None,
@@ -134,12 +274,6 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "limited scope token",
                 GenerateTokenAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     service_id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
                     duration=None,
                     valid_until=None,
@@ -159,23 +293,30 @@ class TestGenerateToken:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_generate_token(
         self,
         scenario: ScenarioBase[GenerateTokenAction, GenerateTokenActionResult],
+        user_data: UserData,
         model_serving_processors: ModelServingProcessors,
-        mock_check_requester_access_token,
-        mock_get_endpoint_by_id_force_token,
-        mock_create_endpoint_token_force,
-        mock_get_endpoint_by_id_validated_token,
-        mock_create_endpoint_token_validated,
-        mock_get_scaling_group_info_token,
-    ):
+        mock_check_user_access_token: AsyncMock,
+        mock_get_endpoint_by_id_token: AsyncMock,
+        mock_get_endpoint_access_validation_data_token: AsyncMock,
+        mock_create_endpoint_token: AsyncMock,
+        mock_get_scaling_group_info_token: AsyncMock,
+    ) -> None:
         action = scenario.input
         expected = scenario.expected
 
         # Mock setup based on scenario data
         expected = cast(GenerateTokenActionResult, expected)
+
+        mock_validation_data = MagicMock(
+            session_owner_id=expected.data.session_owner,
+            session_owner_role=UserRole(user_data.role),
+            domain=expected.data.domain,
+        )
+        mock_get_endpoint_access_validation_data_token.return_value = mock_validation_data
+
         mock_endpoint = MagicMock(
             id=action.service_id,
             status=EndpointStatus.READY,
@@ -199,14 +340,9 @@ class TestGenerateToken:
             created_at=expected.data.created_at,
         )
 
-        # Setup repository mocks based on user role
-        if action.requester_ctx.user_role == UserRole.SUPERADMIN:
-            mock_get_endpoint_by_id_force_token.return_value = mock_endpoint
-            mock_create_endpoint_token_force.return_value = mock_token_data
-        else:
-            mock_get_endpoint_by_id_validated_token.return_value = mock_endpoint
-            mock_create_endpoint_token_validated.return_value = mock_token_data
-
+        # Setup repository mocks - now uses single repository for all roles
+        mock_get_endpoint_by_id_token.return_value = mock_endpoint
+        mock_create_endpoint_token.return_value = mock_token_data
         mock_get_scaling_group_info_token.return_value = mock_scaling_group
 
         # TODO: Change using aioresponses to mocking client layer after refactoring service layer
@@ -219,7 +355,7 @@ class TestGenerateToken:
 
             with patch("uuid.uuid4", return_value=expected.data.id):
 
-                async def generate_token(action: GenerateTokenAction):
+                async def generate_token(action: GenerateTokenAction) -> GenerateTokenActionResult:
                     return await model_serving_processors.generate_token.wait_for_complete(action)
 
                 await scenario.test(generate_token)

@@ -1,8 +1,8 @@
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import NoResultFound
 
 from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
@@ -41,7 +41,7 @@ class ModelServingEventHandler:
 
     async def handle_model_service_status_update(
         self,
-        context: None,
+        _context: None,
         source: AgentId,
         event: ModelServiceStatusAnycastEvent,
     ) -> None:
@@ -75,11 +75,11 @@ class ModelServingEventHandler:
 
     async def handle_route_creation(
         self,
-        context: None,
-        source: AgentId,
+        _context: None,
+        _source: AgentId,
         event: RouteCreatedAnycastEvent,
     ) -> None:
-        endpoint: Optional[EndpointRow] = None
+        endpoint: EndpointRow | None = None
 
         try:
             async with self._db.begin_readonly_session() as db_sess:
@@ -193,7 +193,7 @@ class ModelServingEventHandler:
                 ],
             }
 
-            async def _update():
+            async def _update() -> None:
                 async with self._db.begin_session() as db_sess:
                     query = (
                         sa.update(RoutingRow)

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.manager.dependencies.bootstrap.config import BootstrapConfig
+from ai.backend.common.typed_validators import HostPortPair
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.dependencies.bootstrap.etcd import EtcdDependency
-from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
 class TestEtcdDependency:
@@ -18,9 +20,6 @@ class TestEtcdDependency:
         test_ns: str,
     ) -> BootstrapConfig:
         """Create a bootstrap config pointing to the test etcd container."""
-        from ai.backend.common.typed_validators import HostPortPair
-        from ai.backend.manager.config.unified import EtcdConfig
-
         container_id, etcd_addr = etcd_container
 
         # Create minimal etcd config for testing
@@ -34,7 +33,6 @@ class TestEtcdDependency:
         # Create a minimal BootstrapConfig with just etcd settings
         return BootstrapConfig(etcd=etcd_config)
 
-    @pytest.mark.asyncio
     async def test_provide_etcd_client(
         self,
         bootstrap_config: BootstrapConfig,
@@ -49,7 +47,6 @@ class TestEtcdDependency:
             value = await etcd.get("test_key")
             assert value == "test_value"
 
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         bootstrap_config: BootstrapConfig,

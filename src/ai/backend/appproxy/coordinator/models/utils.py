@@ -4,7 +4,7 @@ import asyncio
 import functools
 import json
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 from ai.backend.appproxy.coordinator.defs import LockID
 from ai.backend.common.types import Sentinel
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]
 
 # TODO: Implement begin(), begin_readonly() for AsyncSession also
@@ -58,7 +58,7 @@ class ExtendedAsyncSAEngine(SAEngine):
     A subclass to add a few more convenience methods to the SQLAlchemy's async engine.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
         self.lock_conn_timeout: float | None = (
             kwargs.pop("_lock_conn_timeout", 0) or None
@@ -228,7 +228,7 @@ class ExtendedAsyncSAEngine(SAEngine):
             except sa.exc.DBAPIError as e:
                 if getattr(e.orig, "pgcode", None) == "55P03":  # lock not available error
                     # This may happen upon shutdown after some time.
-                    raise asyncio.CancelledError()
+                    raise asyncio.CancelledError() from e
                 raise
             except asyncio.CancelledError:
                 raise
@@ -261,7 +261,7 @@ async def execute_with_txn_retry(
 # Setting "type ignore" here becuase Mypy deduces all fields and attributes in `sqlalchemy` module to `Any` type
 # including `SASession` and `SAConnection`.
 @overload
-async def execute_with_txn_retry(  # type: ignore[misc]
+async def execute_with_txn_retry(
     txn_func: Callable[Concatenate[SAConnection, P], Awaitable[TQueryResult]],
     begin_trx: Callable[..., AbstractAsyncCtxMgr[SAConnection]],
     connection: SAConnection,
@@ -297,23 +297,25 @@ async def execute_with_txn_retry(
         ):
             with attempt:
                 try:
-                    async with begin_trx(bind=connection) as session_or_conn:  # type: ignore[arg-type]
+                    async with begin_trx(bind=connection) as session_or_conn:
                         result = await txn_func(session_or_conn, *args, **kwargs)  # type: ignore[arg-type]
                 except DBAPIError as e:
                     if is_db_retry_error(e):
-                        raise TryAgain
+                        raise TryAgain from e
                     raise
-    except RetryError:
-        raise TimeoutError(f"DB serialization failed after {max_attempts} retry transactions")
+    except RetryError as e:
+        raise TimeoutError(
+            f"DB serialization failed after {max_attempts} retry transactions"
+        ) from e
     if result is Sentinel.TOKEN:
         raise TransactionResultError("Transaction did not produce a result")
     return result
 
 
 def create_async_engine(
-    *args,
+    *args: Any,
     _txn_concurrency_threshold: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
     sync_engine = _create_engine(*args, **kwargs)
@@ -366,42 +368,7 @@ async def connect_database(
     await db.dispose()
 
 
-@actxmgr
-async def reenter_txn(
-    pool: ExtendedAsyncSAEngine,
-    conn: SAConnection,
-    execution_opts: Mapping[str, Any] | None = None,
-) -> AsyncIterator[SAConnection]:
-    if conn is None:
-        async with pool.connect() as conn:
-            if execution_opts:
-                await conn.execution_options(**execution_opts)
-            async with conn.begin():
-                yield conn
-    else:
-        async with conn.begin_nested():
-            yield conn
-
-
-@actxmgr
-async def reenter_txn_session(
-    pool: ExtendedAsyncSAEngine,
-    sess: SASession,
-    read_only: bool = False,
-) -> AsyncIterator[SASession]:
-    if sess is None:
-        if read_only:
-            async with pool.begin_readonly_session() as sess:
-                yield sess
-        else:
-            async with pool.begin_session() as sess:
-                yield sess
-    else:
-        async with sess.begin_nested():
-            yield sess
-
-
-def _populate_column(column: sa.Column):
+def _populate_column(column: sa.Column[Any]) -> sa.Column[Any]:
     column_attrs = dict(column.__dict__)
     name = column_attrs.pop("name")
     return sa.Column(name, column.type, **{k: column_attrs[k] for k in column_constraints})
@@ -421,12 +388,12 @@ def regenerate_table(table: sa.Table, new_metadata: sa.MetaData) -> sa.Table:
     )
 
 
-def agg_to_str(column: sa.Column) -> sqlalchemy.sql.functions.Function:
+def agg_to_str(column: sa.Column[Any]) -> sqlalchemy.sql.functions.Function[Any]:
     # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.aggregate_order_by
     return sa.func.string_agg(column, psql.aggregate_order_by(sa.literal_column("','"), column))
 
 
-def agg_to_array(column: sa.Column) -> sqlalchemy.sql.functions.Function:
+def agg_to_array(column: sa.Column[Any]) -> sqlalchemy.sql.functions.Function[Any]:
     return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
 
 

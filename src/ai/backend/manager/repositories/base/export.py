@@ -45,6 +45,22 @@ type ExportFormatter = Callable[[Any], str]
 
 
 @dataclass(frozen=True)
+class JoinDef:
+    """JOIN definition for export queries.
+
+    Defines a table and condition for LEFT JOIN operations.
+    Used by ExportFieldDef to declare required joins for a field.
+
+    Attributes:
+        table: Table to join (e.g., ProjectResourcePolicyRow.__table__)
+        condition: JOIN condition as SQLAlchemy expression
+    """
+
+    table: sa.FromClause
+    condition: sa.ColumnElement[bool]
+
+
+@dataclass(frozen=True)
 class ExportFieldDef:
     """Export field definition.
 
@@ -58,6 +74,7 @@ class ExportFieldDef:
         field_type: Field type for client display
         column: ORM column reference for SELECT query building
         formatter: Custom formatter (None uses default conversion)
+        joins: Set of JoinDef required to access this field (None = no joins needed)
     """
 
     key: str
@@ -66,6 +83,7 @@ class ExportFieldDef:
     field_type: ExportFieldType
     column: InstrumentedAttribute[Any]
     formatter: ExportFormatter | None = None
+    joins: tuple[JoinDef, ...] | frozenset[JoinDef] | None = None
 
 
 @dataclass(frozen=True)

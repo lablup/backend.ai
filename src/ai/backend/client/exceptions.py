@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-__all__ = (
+__all__: tuple[str, ...] = (
     "APIVersionWarning",
     "BackendAPIError",
     "BackendClientError",
@@ -33,11 +33,13 @@ class BackendAPIError(BackendError):
 
     @property
     def status(self) -> int:
-        return self.args[0]
+        result: int = self.args[0]
+        return result
 
     @property
     def reason(self) -> str:
-        return self.args[1]
+        result: str = self.args[1]
+        return result
 
     @property
     def data(self) -> Any:

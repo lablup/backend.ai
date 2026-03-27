@@ -1,6 +1,5 @@
 import logging
 import time
-from typing import Generic
 
 import aiohttp_jinja2
 import jwt
@@ -17,15 +16,14 @@ from ai.backend.appproxy.worker.types import (
     InferenceAppInfo,
     InteractiveAppInfo,
     RootContext,
-    TCircuitKey,
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitKey]):
+class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TCircuitKeyType]):
     root_context: RootContext
 
     def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:

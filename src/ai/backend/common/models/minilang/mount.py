@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Annotated, TypeAlias
+from typing import Annotated, Any, cast
 
 from lark import Lark, Transformer, lexer
 from lark.exceptions import LarkError
@@ -21,10 +21,10 @@ _grammar = r"""
     %ignore WS
 """
 
-PairType: TypeAlias = tuple[str, str]
+type PairType = tuple[str, str]
 
 
-class DictTransformer(Transformer):
+class DictTransformer(Transformer[Any, Any]):
     reserved_keys = frozenset({"type", "source", "target", "perm", "permission"})
 
     def start(self, pairs: Sequence[PairType]) -> Mapping[str, str]:
@@ -57,5 +57,5 @@ class MountPointParser:
             ast = self._parser.parse(expr)
             result = DictTransformer().transform(ast)
         except LarkError as e:
-            raise ValueError(f"Virtual folder mount parsing error: {e}")
-        return result
+            raise ValueError(f"Virtual folder mount parsing error: {e}") from e
+        return cast(Mapping[str, str], result)

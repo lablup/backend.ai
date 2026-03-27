@@ -5,12 +5,13 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
@@ -22,6 +23,7 @@ from .types import (
     RoleOrderField,
     RoleSource,
     RoleStatus,
+    ScopeOrderField,
 )
 
 __all__ = (
@@ -34,7 +36,11 @@ __all__ = (
     "RevokeRoleRequest",
     "RoleFilter",
     "RoleOrder",
+    "ScopeFilter",
+    "ScopeOrder",
+    "SearchEntitiesRequest",
     "SearchRolesRequest",
+    "SearchScopesRequest",
     "SearchUsersAssignedToRoleRequest",
     "StringFilter",
     "UpdateRoleRequest",
@@ -47,16 +53,16 @@ class CreateRoleRequest(BaseRequestModel):
     name: str = Field(description="Role name")
     source: RoleSource = Field(default=RoleSource.CUSTOM, description="Role source")
     status: RoleStatus = Field(default=RoleStatus.ACTIVE, description="Role status")
-    description: Optional[str] = Field(default=None, description="Role description")
+    description: str | None = Field(default=None, description="Role description")
 
 
 class UpdateRoleRequest(BaseRequestModel):
     """Request to update a role."""
 
-    name: Optional[str] = Field(default=None, description="Updated role name")
-    source: Optional[RoleSource] = Field(default=None, description="Updated role source")
-    status: Optional[RoleStatus] = Field(default=None, description="Updated role status")
-    description: Optional[str | Sentinel] = Field(
+    name: str | None = Field(default=None, description="Updated role name")
+    source: RoleSource | None = Field(default=None, description="Updated role source")
+    status: RoleStatus | None = Field(default=None, description="Updated role status")
+    description: str | Sentinel | None = Field(
         default=SENTINEL, description="Updated role description"
     )
 
@@ -78,7 +84,7 @@ class AssignRoleRequest(BaseRequestModel):
 
     user_id: UUID = Field(description="User ID to assign the role to")
     role_id: UUID = Field(description="Role ID to assign")
-    granted_by: Optional[UUID] = Field(
+    granted_by: UUID | None = Field(
         default=None, description="User ID who granted this role assignment"
     )
 
@@ -93,11 +99,9 @@ class RevokeRoleRequest(BaseRequestModel):
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
-    name: Optional[StringFilter] = Field(default=None, description="Filter by name")
-    sources: Optional[list[RoleSource]] = Field(default=None, description="Filter by role sources")
-    statuses: Optional[list[RoleStatus]] = Field(
-        default=None, description="Filter by role statuses"
-    )
+    name: StringFilter | None = Field(default=None, description="Filter by name")
+    sources: list[RoleSource] | None = Field(default=None, description="Filter by role sources")
+    statuses: list[RoleStatus] | None = Field(default=None, description="Filter by role statuses")
 
 
 class RoleOrder(BaseRequestModel):
@@ -110,18 +114,20 @@ class RoleOrder(BaseRequestModel):
 class SearchRolesRequest(BaseRequestModel):
     """Request body for searching roles with filters, orders, and pagination."""
 
-    filter: Optional[RoleFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[RoleOrder]] = Field(default=None, description="Order specifications")
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    filter: RoleFilter | None = Field(default=None, description="Filter conditions")
+    order: list[RoleOrder] | None = Field(default=None, description="Order specifications")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
+    )
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
 class AssignedUserFilter(BaseRequestModel):
     """Filter for assigned users."""
 
-    username: Optional[StringFilter] = Field(default=None, description="Filter by username")
-    email: Optional[StringFilter] = Field(default=None, description="Filter by email")
-    granted_by: Optional[UUID] = Field(default=None, description="Filter by 'granted_by' user ID")
+    username: StringFilter | None = Field(default=None, description="Filter by username")
+    email: StringFilter | None = Field(default=None, description="Filter by email")
+    granted_by: UUID | None = Field(default=None, description="Filter by 'granted_by' user ID")
 
 
 class AssignedUserOrder(BaseRequestModel):
@@ -134,18 +140,20 @@ class AssignedUserOrder(BaseRequestModel):
 class SearchUsersAssignedToRoleRequest(BaseRequestModel):
     """Request body for searching users assigned to a specific role."""
 
-    filter: Optional[AssignedUserFilter] = Field(default=None, description="Filter conditions")
-    order: Optional[list[AssignedUserOrder]] = Field(
-        default=None, description="Order specifications"
+    filter: AssignedUserFilter | None = Field(default=None, description="Filter conditions")
+    order: list[AssignedUserOrder] | None = Field(default=None, description="Order specifications")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
     )
-    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
 class CreatePermissionRequest(BaseRequestModel):
-    """Request to create a permission in a permission group."""
+    """Request to create a permission."""
 
-    permission_group_id: UUID = Field(description="Permission group ID to add the permission to")
+    role_id: UUID = Field(description="Role ID for the permission")
+    scope_type: ScopeType = Field(description="Scope type for the permission")
+    scope_id: str = Field(description="Scope ID for the permission")
     entity_type: EntityType = Field(description="Entity type for the permission")
     operation: OperationType = Field(description="Operation type for the permission")
 
@@ -160,3 +168,36 @@ class CreateObjectPermissionRequest(BaseRequestModel):
     status: PermissionStatus = Field(
         default=PermissionStatus.ACTIVE, description="Permission status"
     )
+
+
+class ScopeFilter(BaseRequestModel):
+    """Filter for scopes."""
+
+    name: StringFilter | None = Field(default=None, description="Filter by name")
+
+
+class ScopeOrder(BaseRequestModel):
+    """Order specification for scopes."""
+
+    field: ScopeOrderField = Field(description="Field to order by")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction")
+
+
+class SearchScopesRequest(BaseRequestModel):
+    """Request body for searching scopes with filters and pagination."""
+
+    filter: ScopeFilter | None = Field(default=None, description="Filter conditions")
+    order: list[ScopeOrder] | None = Field(default=None, description="Order specifications")
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
+    )
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+
+
+class SearchEntitiesRequest(BaseRequestModel):
+    """Request body for searching entities within a scope."""
+
+    limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT, description="Maximum items to return"
+    )
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")

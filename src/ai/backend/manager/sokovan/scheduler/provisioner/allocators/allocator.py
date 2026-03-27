@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
-from ai.backend.manager.sokovan.scheduler.types import AllocationBatch
+from ai.backend.manager.repositories.scheduler.types import ScheduledSessionData
+from ai.backend.manager.sokovan.data import AllocationBatch
 
 
 class SchedulingAllocator(ABC):

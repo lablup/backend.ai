@@ -23,7 +23,7 @@ def get_all_permissions() -> Mapping[str, Any]:
     }
 
 
-class PredefinedAtomicPermission(graphene.ObjectType):
+class PredefinedAtomicPermission(graphene.ObjectType):  # type: ignore[misc]
     vfolder_host_permission_list = graphene.List(lambda: graphene.String)
 
     async def resolve_vfolder_host_permission_list(self, info: graphene.ResolveInfo) -> list[str]:

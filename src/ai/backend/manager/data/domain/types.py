@@ -4,8 +4,10 @@ import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Any, override
 
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import (
@@ -13,7 +15,6 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     ScopeType,
 )
-from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
@@ -27,7 +28,7 @@ class UserInfo:
 @dataclass
 class DomainData:
     name: str
-    description: Optional[str]
+    description: str | None
     is_active: bool
     created_at: datetime = field(compare=False)
     modified_at: datetime = field(compare=False)
@@ -35,7 +36,7 @@ class DomainData:
     allowed_vfolder_hosts: VFolderHostPermissionMap
     allowed_docker_registries: list[str]
     dotfiles: bytes
-    integration_id: Optional[str]
+    integration_id: str | None
 
     def scope_id(self) -> ScopeId:
         return ScopeId(
@@ -46,9 +47,9 @@ class DomainData:
     def role_name(self) -> str:
         return f"domain-{self.name}-admin"
 
-    def entity_operations(self) -> Mapping[EntityType, Iterable[OperationType]]:
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
         return {
-            entity: OperationType.admin_operations()
+            entity.to_element(): OperationType.admin_operations()
             for entity in EntityType.admin_accessible_entity_types_in_domain()
         }
 

@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
+    Any,
     Concatenate,
     ParamSpec,
     TypeVar,
@@ -32,7 +33,7 @@ from ai.backend.account_manager.config import ServerConfig
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def is_db_retry_error(e: Exception) -> bool:
@@ -48,7 +49,7 @@ class ExtendedAsyncSAEngine(SAEngine):
     A subclass to add a few more convenience methods to the SQLAlchemy's async engine.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
@@ -172,12 +173,12 @@ class ExtendedAsyncSAEngine(SAEngine):
         Reference: https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html
         """
 
-        # result: TQueryResult | Sentinel = Sentinel.token
         _begin_trx = cast(
             Callable[..., AbstractAsyncCtxMgr[SASession]],
             self.begin_session if begin_trx is None else begin_trx,
         )
 
+        result: TQueryResult | None = None
         max_attempts = 10
         try:
             async for attempt in AsyncRetrying(
@@ -191,17 +192,21 @@ class ExtendedAsyncSAEngine(SAEngine):
                             result = await txn_func(session_or_conn, *args, **kwargs)
                     except DBAPIError as e:
                         if is_db_retry_error(e):
-                            raise TryAgain
+                            raise TryAgain from e
                         raise
-        except RetryError:
-            raise TimeoutError(f"DB serialization failed after {max_attempts} retry transactions")
+        except RetryError as e:
+            raise TimeoutError(
+                f"DB serialization failed after {max_attempts} retry transactions"
+            ) from e
+        if result is None:
+            raise RuntimeError("AsyncRetrying loop completed without setting result")
         return result
 
 
 def create_async_engine(
-    *args,
+    *args: Any,
     _txn_concurrency_threshold: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
     sync_engine = _create_engine(*args, **kwargs)

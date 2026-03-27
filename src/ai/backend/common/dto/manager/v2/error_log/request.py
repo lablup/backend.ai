@@ -1,0 +1,62 @@
+"""
+Request DTOs for error_log DTO v2.
+"""
+
+from __future__ import annotations
+
+import json as _json
+from typing import Any
+
+from pydantic import Field, field_validator
+
+from ai.backend.common.api_handlers import BaseRequestModel
+
+__all__ = (
+    "AppendErrorLogInput",
+    "ListErrorLogsInput",
+    "MarkClearedInput",
+)
+
+
+class AppendErrorLogInput(BaseRequestModel):
+    """Input for appending a new error log entry."""
+
+    severity: str = Field(description="Log severity level (e.g. critical, error, warning)")
+    source: str = Field(description="Source service or component that generated the error")
+    message: str = Field(description="Error message")
+    context_lang: str = Field(description="Language context of the error")
+    context_env: dict[str, Any] = Field(description="Environment context as a JSON object")
+    request_url: str | None = Field(
+        default=None, description="URL of the request that caused the error"
+    )
+    request_status: int | None = Field(
+        default=None, description="HTTP status code of the failed request"
+    )
+    traceback: str | None = Field(default=None, description="Traceback string")
+
+    @field_validator("context_env", mode="before")
+    @classmethod
+    def _parse_context_env(cls, v: object) -> object:
+        if isinstance(v, str):
+            try:
+                parsed = _json.loads(v)
+            except (ValueError, _json.JSONDecodeError) as e:
+                raise ValueError(f"Invalid JSON in context_env: {v}") from e
+            if not isinstance(parsed, dict):
+                raise ValueError(f"context_env must be a JSON object, got {type(parsed).__name__}")
+            return parsed
+        return v
+
+
+class ListErrorLogsInput(BaseRequestModel):
+    """Input for listing error log entries."""
+
+    mark_read: bool = Field(default=False, description="Mark listed logs as read")
+    page_size: int = Field(default=20, ge=1, le=100, description="Number of logs per page")
+    page_no: int = Field(default=1, ge=1, description="Page number (1-based)")
+
+
+class MarkClearedInput(BaseRequestModel):
+    """Input for marking an error log entry as cleared."""
+
+    log_id: str = Field(description="Error log ID to mark as cleared")

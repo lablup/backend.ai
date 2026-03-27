@@ -6,12 +6,13 @@ Shared between Client SDK and Manager API.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 from .types import EntityType, OperationType, RoleSource, RoleStatus
 
@@ -24,13 +25,19 @@ __all__ = (
     "DeleteObjectPermissionResponse",
     "DeletePermissionResponse",
     "DeleteRoleResponse",
+    "EntityDTO",
+    "GetEntityTypesResponse",
     "GetRoleResponse",
+    "GetScopeTypesResponse",
     "ObjectPermissionDTO",
     "PaginationInfo",
     "PermissionDTO",
     "RevokeRoleResponse",
     "RoleDTO",
+    "ScopeDTO",
+    "SearchEntitiesResponse",
     "SearchRolesResponse",
+    "SearchScopesResponse",
     "SearchUsersAssignedToRoleResponse",
     "UpdateRoleResponse",
 )
@@ -45,24 +52,16 @@ class RoleDTO(BaseModel):
     status: RoleStatus = Field(description="Role status")
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
-    deleted_at: Optional[datetime] = Field(default=None, description="Deletion timestamp")
-    description: Optional[str] = Field(default=None, description="Role description")
+    deleted_at: datetime | None = Field(default=None, description="Deletion timestamp")
+    description: str | None = Field(default=None, description="Role description")
 
 
 class AssignedUserDTO(BaseModel):
     """DTO for user assigned to a role."""
 
     user_id: UUID = Field(description="User ID")
-    granted_by: Optional[UUID] = Field(default=None, description="ID of user who granted this role")
+    granted_by: UUID | None = Field(default=None, description="ID of user who granted this role")
     granted_at: datetime = Field(description="Timestamp when the role was granted")
-
-
-class PaginationInfo(BaseModel):
-    """Pagination information."""
-
-    total: int = Field(description="Total number of items")
-    offset: int = Field(description="Number of items skipped")
-    limit: Optional[int] = Field(default=None, description="Maximum items returned")
 
 
 class CreateRoleResponse(BaseResponseModel):
@@ -101,7 +100,7 @@ class AssignRoleResponse(BaseResponseModel):
 
     user_id: UUID = Field(description="User ID")
     role_id: UUID = Field(description="Role ID")
-    granted_by: Optional[UUID] = Field(default=None, description="ID of user who granted the role")
+    granted_by: UUID | None = Field(default=None, description="ID of user who granted the role")
 
 
 class RevokeRoleResponse(BaseResponseModel):
@@ -122,7 +121,6 @@ class PermissionDTO(BaseModel):
     """DTO for permission data."""
 
     id: UUID = Field(description="Permission ID")
-    permission_group_id: UUID = Field(description="Permission group ID")
     entity_type: EntityType = Field(description="Entity type")
     operation: OperationType = Field(description="Operation type")
 
@@ -159,3 +157,44 @@ class DeleteObjectPermissionResponse(BaseResponseModel):
     """Response for deleting an object permission."""
 
     deleted: bool = Field(description="Whether the object permission was deleted")
+
+
+class GetScopeTypesResponse(BaseResponseModel):
+    """Response for getting available scope types."""
+
+    items: list[ScopeType] = Field(description="List of available scope types")
+
+
+class ScopeDTO(BaseModel):
+    """DTO for scope data."""
+
+    scope_type: ScopeType = Field(description="Scope type")
+    scope_id: str = Field(description="Scope ID (domain name, project UUID, or user UUID)")
+    name: str = Field(description="Scope display name")
+
+
+class SearchScopesResponse(BaseResponseModel):
+    """Response for searching scopes."""
+
+    items: list[ScopeDTO] = Field(description="List of scopes")
+    pagination: PaginationInfo = Field(description="Pagination information")
+
+
+class GetEntityTypesResponse(BaseResponseModel):
+    """Response for getting available entity types."""
+
+    items: list[EntityType] = Field(description="List of available entity types")
+
+
+class EntityDTO(BaseModel):
+    """DTO for entity data."""
+
+    entity_type: EntityType = Field(description="Entity type")
+    entity_id: str = Field(description="Entity ID")
+
+
+class SearchEntitiesResponse(BaseResponseModel):
+    """Response for searching entities within a scope."""
+
+    items: list[EntityDTO] = Field(description="List of entities")
+    pagination: PaginationInfo = Field(description="Pagination information")

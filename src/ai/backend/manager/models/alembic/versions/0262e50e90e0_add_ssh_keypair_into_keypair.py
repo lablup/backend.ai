@@ -21,7 +21,7 @@ branch_labels = None
 depends_on = None
 
 
-def generate_ssh_keypair():
+def generate_ssh_keypair() -> tuple[str, str]:
     key = rsa.generate_private_key(
         backend=crypto_default_backend(), public_exponent=65537, key_size=2048
     )
@@ -40,7 +40,7 @@ def generate_ssh_keypair():
     return (public_key, private_key)
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column("keypairs", sa.Column("ssh_public_key", sa.String(length=750), nullable=True))
     op.add_column("keypairs", sa.Column("ssh_private_key", sa.String(length=2000), nullable=True))
 
@@ -56,18 +56,18 @@ def upgrade():
 
     # Fill in SSH keypairs in every keypairs.
     conn = op.get_bind()
-    query = sa.select([keypairs.c.access_key]).select_from(keypairs)
+    query = sa.select(keypairs.c.access_key).select_from(keypairs)
     rows = conn.execute(query).fetchall()
     for row in rows:
         pubkey, privkey = generate_ssh_keypair()
-        query = (
+        update_query = (
             sa.update(keypairs)
             .values(ssh_public_key=pubkey, ssh_private_key=privkey)
             .where(keypairs.c.access_key == row.access_key)
         )
-        conn.execute(query)
+        conn.execute(update_query)
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("keypairs", "ssh_public_key")
     op.drop_column("keypairs", "ssh_private_key")

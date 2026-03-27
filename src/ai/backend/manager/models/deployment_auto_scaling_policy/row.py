@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -24,16 +24,16 @@ if TYPE_CHECKING:
 
 __all__ = ("DeploymentAutoScalingPolicyRow",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _get_endpoint_join_condition():
+def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return foreign(DeploymentAutoScalingPolicyRow.endpoint) == EndpointRow.id
 
 
-class DeploymentAutoScalingPolicyRow(Base):
+class DeploymentAutoScalingPolicyRow(Base):  # type: ignore[misc]
     """
     Represents an auto-scaling policy for a deployment (K8s HPA equivalent).
 
@@ -150,14 +150,14 @@ class DeploymentAutoScalingPolicyData:
     endpoint: UUID
     min_replicas: int
     max_replicas: int
-    metric_source: Optional[AutoScalingMetricSource]
-    metric_name: Optional[str]
-    comparator: Optional[AutoScalingMetricComparator]
-    scale_up_threshold: Optional[Decimal]
-    scale_down_threshold: Optional[Decimal]
+    metric_source: AutoScalingMetricSource | None
+    metric_name: str | None
+    comparator: AutoScalingMetricComparator | None
+    scale_up_threshold: Decimal | None
+    scale_down_threshold: Decimal | None
     scale_up_step_size: int
     scale_down_step_size: int
     cooldown_seconds: int
-    last_scaled_at: Optional[datetime]
+    last_scaled_at: datetime | None
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime | None

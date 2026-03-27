@@ -9,6 +9,7 @@ import pathlib
 
 import click
 
+from ai.backend.common.cli import LazyGroup
 from ai.backend.common.configs.generator import (
     GeneratorConfig,
     TOMLGenerator,
@@ -60,7 +61,7 @@ def cli() -> None:
 )
 @click.pass_obj
 def generate_sample(
-    cli_ctx: CLIContext,
+    _cli_ctx: CLIContext,
     output: pathlib.Path,
     env: str,
     overwrite: bool,
@@ -106,7 +107,12 @@ Generated using BackendAIConfigMeta annotations.
         generator.generate_to_file(StorageProxyUnifiedConfig, output, header=header_comment.strip())
         log.info(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
-        raise click.ClickException(f"Failed to generate sample configuration: {e}")
+        raise click.ClickException(f"Failed to generate sample configuration: {e}") from e
+
+
+@cli.group(cls=LazyGroup, import_name="ai.backend.storage.cli.config_migrate:cli")
+def migrate() -> None:
+    """Migrate legacy configuration fields."""
 
 
 if __name__ == "__main__":

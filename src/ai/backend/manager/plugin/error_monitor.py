@@ -4,10 +4,10 @@ import logging
 import sys
 import traceback
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Optional, override
+from typing import TYPE_CHECKING, Any, override
 
-from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.event_types.agent.anycast import AgentErrorEvent
+from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.event import AbstractEventDispatcherPlugin
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId
@@ -17,7 +17,6 @@ from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.error_log.creators import ErrorLogCreatorSpec
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
     from ai.backend.manager.repositories.error_log import ErrorLogRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -26,17 +25,16 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ErrorMonitor(AbstractErrorReporterPlugin):
     _error_log_repository: ErrorLogRepository
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(
-                "manager.plugin.error_monitor is initialized without the root context. "
+                "manager.plugin.error_monitor is initialized without a context. "
                 "The plugin is disabled.",
             )
             self.enabled = False
             return
         self.enabled = True
-        root_ctx: RootContext = context["_root.context"]  # type: ignore
-        self._error_log_repository = root_ctx.repositories.error_log.repository
+        self._error_log_repository = context["error_log_repository"]
 
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         pass
@@ -46,8 +44,8 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
 
     async def capture_exception(
         self,
-        exc_instance: Optional[Exception] = None,
-        context: Optional[Mapping[str, Any]] = None,
+        exc_instance: Exception | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> None:
         if not self.enabled:
             return
@@ -97,17 +95,16 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
 class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
     _error_log_repository: ErrorLogRepository
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(
-                "manager.plugin.error_event_dispatcher is initialized without the root context. "
+                "manager.plugin.error_event_dispatcher is initialized without a context. "
                 "The plugin is disabled.",
             )
             self.enabled = False
             return
         self.enabled = True
-        root_ctx: RootContext = context
-        self._error_log_repository = root_ctx.repositories.error_log.repository
+        self._error_log_repository = context["error_log_repository"]
 
     @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:

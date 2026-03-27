@@ -18,7 +18,7 @@ from ai.backend.storage.errors import (
     SubprocessStdoutNotAvailableError,
 )
 from ai.backend.storage.subproc import run
-from ai.backend.storage.types import Optional, QuotaConfig, QuotaUsage
+from ai.backend.storage.types import QuotaConfig, QuotaUsage
 from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 
@@ -46,9 +46,9 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         return
 
     async def _read_project_id(self, pid_file_path: str | Path) -> int | None:
-        def _read():
+        def _read() -> int | None:
             try:
-                with open(pid_file_path) as f:
+                with Path(pid_file_path).open() as f:
                     return int(f.read())
             except FileNotFoundError:
                 return None
@@ -56,8 +56,8 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         return await asyncio.get_running_loop().run_in_executor(None, _read)
 
     async def _write_project_id(self, pid: int, pid_file_path: str | Path) -> None:
-        def _write():
-            with open(pid_file_path, "w") as f:
+        def _write() -> None:
+            with Path(pid_file_path).open("w") as f:
                 f.write(str(pid))
 
         await asyncio.get_running_loop().run_in_executor(None, _write)
@@ -85,7 +85,9 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                 path,
             ])
         except CalledProcessError as e:
-            raise DDNCommandFailedError(f"'lfs setquota -p {pid}' command failed: {e.stderr}")
+            raise DDNCommandFailedError(
+                f"'lfs setquota -p {pid}' command failed: {e.stderr}"
+            ) from e
 
     async def _unset_quota_by_project(self, pid: int, path: Path) -> None:
         await self._set_quota_by_project(pid, path, QuotaConfig(0))
@@ -104,6 +106,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
             if proc.stdout is None:
                 raise SubprocessStdoutNotAvailableError("lfs quota process stdout is not available")
             next_line_is_quota = False
+            line = ""
             while True:
                 try:
                     raw = await proc.stdout.readline()
@@ -140,8 +143,8 @@ class EXAScalerQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         pid_path = qspath / PROJECT_ID_FILE_NAME
@@ -172,7 +175,9 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                 str(qspath),
             ])
         except CalledProcessError as e:
-            raise DDNCommandFailedError(f"'lfs project -p {project_id}' command failed: {e.stderr}")
+            raise DDNCommandFailedError(
+                f"'lfs project -p {project_id}' command failed: {e.stderr}"
+            ) from e
 
         if options is not None:
             await self._set_quota_by_project(project_id, qspath, options)

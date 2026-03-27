@@ -9,7 +9,9 @@ from ai.backend.appproxy.worker.dependencies.infrastructure.redis import (
     RedisProvider,
     WorkerValkeyClients,
 )
-from ai.backend.testutils.bootstrap import HostPortPairModel
+from ai.backend.common.config import redis_config_iv
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import HostPortPair
 
 
 class TestRedisProvider:
@@ -21,9 +23,6 @@ class TestRedisProvider:
         redis_container: tuple[str, HostPortPairModel],
     ) -> ServerConfig:
         """Create a worker config pointing to the test redis container."""
-        from ai.backend.common.config import redis_config_iv
-        from ai.backend.common.types import HostPortPair
-
         container_id, redis_addr = redis_container
 
         # Create Redis config with single endpoint for all roles
@@ -44,7 +43,6 @@ class TestRedisProvider:
         config.redis = redis_mock
         return config
 
-    @pytest.mark.asyncio
     async def test_provide_valkey_clients(
         self,
         worker_config: ServerConfig,
@@ -62,7 +60,6 @@ class TestRedisProvider:
             server_time = await clients.valkey_live.get_server_time()
             assert server_time > 0
 
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         worker_config: ServerConfig,

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from ai.backend.client.request import Request
 from ai.backend.common.container_registry import (
     PatchContainerRegistryRequestModel,
@@ -35,4 +37,5 @@ class ContainerRegistry(BaseFunction):
         request.set_json(params)
 
         async with request.fetch() as resp:
-            return await resp.json()
+            result = await resp.json()
+            return cast(PatchContainerRegistryResponseModel, result)

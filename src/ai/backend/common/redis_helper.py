@@ -10,7 +10,6 @@ from collections.abc import Awaitable, Callable, Mapping, MutableMapping
 # Import ValkeyStatClient with TYPE_CHECKING to avoid circular imports
 from typing import (
     Any,
-    Optional,
     cast,
 )
 
@@ -79,11 +78,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # TODO: Remove this after migrating redis_lock client to valkey glide
 async def execute(
     redis_obj: RedisConnectionInfo,
-    func: Callable[[Redis | Any], Awaitable[Any]],
+    func: Callable[[Redis[Any] | Any], Awaitable[Any]],
     *,
-    service_name: Optional[str] = None,
-    encoding: Optional[str] = None,
-    command_timeout: Optional[float] = None,
+    service_name: str | None = None,
+    encoding: str | None = None,
+    command_timeout: float | None = None,
 ) -> Any:
     """
     Executes a function that issues Redis commands or returns a pipeline/transaction of commands,
@@ -124,6 +123,7 @@ async def execute(
             # pooling is handled automatically. The context manager in 5.x closes the pool
             # on exit, which is not desired for reuse.
             aw_or_pipe = func(redis_client)
+            result: Any
             if isinstance(aw_or_pipe, Pipeline):
                 async with aw_or_pipe:
                     result = await aw_or_pipe.execute()
@@ -208,7 +208,7 @@ def get_redis_object(
     *,
     name: str,
     db: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> RedisConnectionInfo:
     """
     Legacy function kept for external code that depends on the common package.
@@ -243,9 +243,8 @@ def get_redis_object(
 
         service_name = redis_target.get("service_name")
         password = redis_target.get("password")
-        assert service_name is not None, (
-            "config/redis/service_name is required when using Redis Sentinel"
-        )
+        if service_name is None:
+            raise ValueError("config/redis/service_name is required when using Redis Sentinel")
 
         kwargs = {
             "password": password,
@@ -277,7 +276,7 @@ def get_redis_object(
         raise ValueError("Redis URL is not provided in the configuration.")
 
     url = _parse_redis_url(redis_target, db)
-    connection_pool: ConnectionPool = ConnectionPool.from_url(
+    connection_pool: ConnectionPool[bytes] = ConnectionPool.from_url(  # type: ignore[type-var]
         str(url),
         **conn_pool_opts,
         **conn_opts,
@@ -296,7 +295,7 @@ def get_redis_object_for_lock(
     *,
     name: str,
     db: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> RedisConnectionInfo:
     """
     Create a Redis connection using BlockingConnectionPool for distributed locking.
@@ -333,9 +332,8 @@ def get_redis_object_for_lock(
 
         service_name = redis_target.get("service_name")
         password = redis_target.get("password")
-        assert service_name is not None, (
-            "config/redis/service_name is required when using Redis Sentinel"
-        )
+        if service_name is None:
+            raise ValueError("config/redis/service_name is required when using Redis Sentinel")
 
         kwargs = {
             "password": password,
@@ -367,7 +365,7 @@ def get_redis_object_for_lock(
         raise ValueError("Redis URL is not provided in the configuration.")
 
     url = _parse_redis_url(redis_target, db)
-    connection_pool: BlockingConnectionPool = BlockingConnectionPool.from_url(
+    connection_pool: BlockingConnectionPool[bytes] = BlockingConnectionPool.from_url(  # type: ignore[type-var]
         str(url),
         **conn_pool_opts,
         **conn_opts,
@@ -386,7 +384,7 @@ async def create_valkey_client(
     *,
     name: str,
     db: int = 0,
-    pubsub_channels: Optional[set[str]] = None,
+    pubsub_channels: set[str] | None = None,
 ) -> GlideClient:
     addresses: list[NodeAddress] = []
     if valkey_target.addr:
@@ -398,12 +396,12 @@ async def create_valkey_client(
             host, port = addr_to_hostport_pair(address)
             addresses.append(NodeAddress(host=str(host), port=int(port)))
 
-    credentials: Optional[ServerCredentials] = None
+    credentials: ServerCredentials | None = None
     if valkey_target.password:
         credentials = ServerCredentials(
             password=valkey_target.password,
         )
-    pubsub_subscriptions: Optional[GlideClientConfiguration.PubSubSubscriptions] = None
+    pubsub_subscriptions: GlideClientConfiguration.PubSubSubscriptions | None = None
     if pubsub_channels is not None:
         pubsub_subscriptions = GlideClientConfiguration.PubSubSubscriptions(
             channels_and_patterns={

@@ -23,7 +23,6 @@ from typing import (
     Any,
     Literal,
     NotRequired,
-    Optional,
     TypedDict,
     cast,
     overload,
@@ -51,6 +50,7 @@ from ai.backend.common.json import load_json
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
+    ContainerId,
     KernelId,
     ServicePort,
     SessionId,
@@ -72,6 +72,8 @@ from .exception import (
 )
 from .resources import KernelResourceSpec
 from .types import AgentEventData, KernelLifecycleStatus, KernelOwnershipData
+
+__all__ = ["KernelOwnershipData"]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -128,7 +130,7 @@ def _dump_json_bytes(obj: Any) -> bytes:
 class RunEvent(Exception):
     data: Any
 
-    def __init__(self, data=None) -> None:
+    def __init__(self, data: Any = None) -> None:
         super().__init__()
         self.data = data
 
@@ -156,24 +158,24 @@ class ExecTimeout(RunEvent):
 @dataclass
 class ResultRecord:
     msg_type: ResultType
-    data: Optional[str] = None
+    data: str | None = None
 
 
 class NextResult(TypedDict):
-    runId: Optional[str]
+    runId: str | None
     status: ResultType
-    exitCode: Optional[int]
-    options: Optional[Mapping[str, Any]]
+    exitCode: int | None
+    options: Mapping[str, Any] | None
     # v1
-    stdout: NotRequired[Optional[str]]
-    stderr: NotRequired[Optional[str]]
+    stdout: NotRequired[str | None]
+    stderr: NotRequired[str | None]
     media: NotRequired[Sequence[Any]]
     html: NotRequired[Sequence[Any]]
     # v2
     console: NotRequired[Sequence[Any]]
 
 
-class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
+class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
     version: int
     ownership_data: KernelOwnershipData
     agent_config: Mapping[str, Any]
@@ -181,22 +183,22 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     kernel_id: KernelId
     agent_id: AgentId
     network_id: str
-    container_id: Optional[str]
+    container_id: ContainerId | None
     image: ImageRef
     resource_spec: KernelResourceSpec
     service_ports: list[ServicePort]
     data: dict[Any, Any]
     last_used: float
-    termination_reason: Optional[KernelLifecycleEventReason]
-    clean_event: Optional[asyncio.Future]
+    termination_reason: KernelLifecycleEventReason | None
+    clean_event: asyncio.Future[Any] | None
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
     state: KernelLifecycleStatus
     session_type: SessionTypes
 
-    _tasks: set[asyncio.Task]
+    _tasks: set[asyncio.Task[Any]]
 
-    runner: Optional[AbstractCodeRunner]
+    runner: AbstractCodeRunner | None
 
     def __init__(
         self,
@@ -232,6 +234,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.state = KernelLifecycleStatus.PREPARING
         self.session_type = session_type
 
+    def set_container_id(self, cid: ContainerId) -> None:
+        self.container_id = cid
+        self["container_id"] = cid
+
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
             "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): starting new runner",
@@ -256,7 +262,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         del props["clean_event"]
         return props
 
-    def __setstate__(self, props) -> None:
+    def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         # Used when a `Kernel` object is loaded from pickle data.
         if "state" not in props:
             props["state"] = KernelLifecycleStatus.RUNNING
@@ -289,7 +295,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     # - restoration from running containers is done by computer's classmethod
     #   "restore_from_container"
 
-    def release_slots(self, computer_ctxs) -> None:
+    def release_slots(self, computer_ctxs: Mapping[str, Any]) -> None:
         """
         Release the resource slots occupied by the kernel
         to the allocation maps.
@@ -315,55 +321,55 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_status(self):
+    async def check_status(self) -> dict[str, Any] | None:
         raise NotImplementedError
 
     @abstractmethod
-    async def get_completions(self, text, opts) -> CodeCompletionResp:
+    async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
         raise NotImplementedError
 
     @abstractmethod
-    async def get_logs(self):
+    async def get_logs(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def interrupt_kernel(self):
+    async def interrupt_kernel(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def start_service(self, service, opts):
+    async def start_service(self, service: str, opts: Mapping[str, Any]) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def start_model_service(self, model_service):
+    async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def shutdown_service(self, service):
+    async def shutdown_service(self, service: str) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         raise NotImplementedError
 
     @abstractmethod
     async def commit(
         self,
-        kernel_id,
-        subdir,
+        kernel_id: KernelId,
+        subdir: str,
         *,
         canonical: str | None = None,
         filename: str | None = None,
         extra_labels: dict[str, str] | None = None,
-    ):
+    ) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    async def get_service_apps(self):
+    async def get_service_apps(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod
-    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
+    async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
         """
         Put the uploaded file to the designated container path.
         The path should be inside /home/work of the container.
@@ -376,7 +382,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def download_file(self, container_path: os.PathLike | str) -> bytes:
+    async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
         """
         Download the designated path (a single file or an entire directory) as a tar archive.
         The path should be inside /home/work of the container.
@@ -389,7 +395,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def download_single(self, container_path: os.PathLike | str) -> bytes:
+    async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
         """
         Download the designated path (a single file) as a tar archive.
         The path should be inside /home/work of the container.
@@ -401,7 +407,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def list_files(self, container_path: os.PathLike | str):
+    async def list_files(self, container_path: os.PathLike[str] | str) -> dict[str, Any]:
         """
         List the directory entries of the designated path.
         The path should be inside /home/work of the container.
@@ -410,7 +416,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def notify_event(self, evdata: AgentEventData):
+    async def notify_event(self, evdata: AgentEventData) -> None:
         raise NotImplementedError
 
     async def ping(self) -> dict[str, float] | None:
@@ -420,7 +426,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     async def execute(
         self,
-        run_id: Optional[str],
+        run_id: str | None,
         mode: Literal["batch", "query", "input", "continue"],
         text: str,
         *,
@@ -448,10 +454,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
                     await self.runner.feed_input(text)
                 elif mode == "continue":
                     pass
-            except zmq.ZMQError:
+            except zmq.ZMQError as e:
                 # cancel the operation by myself
                 # since the peer is gone.
-                raise asyncio.CancelledError
+                raise asyncio.CancelledError from e
+
             return await self.runner.get_next_result(
                 api_ver=api_version,
                 flush_timeout=flush_timeout,
@@ -604,7 +611,7 @@ class RobustSocket:
             _zctx = zmq.asyncio.Context()
         self._zctx = _zctx
 
-    def recreate_socket(self):
+    def recreate_socket(self) -> None:
         self._init_zctx()
         self._sock = self._zctx.socket(self._socket_type)
         self._sock.connect(self._addr)
@@ -639,7 +646,8 @@ class SocketPair:
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
                 log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {e!r})")
-                raise InvalidSocket
+                raise InvalidSocket from e
+
             raise
 
     def close(self) -> None:
@@ -651,14 +659,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     kernel_id: KernelId
     session_id: SessionId
     started_at: float
-    finished_at: Optional[float]
+    finished_at: float | None
     exec_timeout: float
     max_record_size: int
     client_features: frozenset[str]
 
     event_producer: EventProducer
 
-    _sockets: Optional[SocketPair]
+    _sockets: SocketPair | None
 
     completion_queue: asyncio.Queue[bytes]
     service_queue: asyncio.Queue[bytes]
@@ -666,13 +674,13 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
     _is_socket_invalid: bool
-    output_queue: Optional[asyncio.Queue[ResultRecord]]
-    current_run_id: Optional[str]
+    output_queue: asyncio.Queue[ResultRecord] | None
+    current_run_id: str | None
     pending_queues: OrderedDict[str, tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
 
-    read_task: Optional[asyncio.Task]
-    status_task: Optional[asyncio.Task]
-    watchdog_task: Optional[asyncio.Task]
+    read_task: asyncio.Task[Any] | None
+    status_task: asyncio.Task[Any] | None
+    watchdog_task: asyncio.Task[Any] | None
 
     _closed: bool
 
@@ -683,7 +691,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         event_producer: EventProducer,
         *,
         exec_timeout: float = 0,
-        client_features: Optional[frozenset[str]] = None,
+        client_features: frozenset[str] | None = None,
     ) -> None:
         global _zctx
         self.kernel_id = kernel_id
@@ -754,7 +762,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["event_producer"]
         return props
 
-    def __setstate__(self, props) -> None:
+    def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         global _zctx
         self.__dict__.update(props)
         if _zctx is None:
@@ -808,7 +816,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             self.watchdog_task = loop.create_task(self.watchdog())
 
     async def _close_tasks(self) -> None:
-        concurrent_safe_tasks: tuple[Optional[asyncio.Task], ...] = (
+        concurrent_safe_tasks: tuple[asyncio.Task[Any] | None, ...] = (
             self.status_task,
             self.read_task,
             self.watchdog_task,
@@ -825,7 +833,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             log.exception("AbstractCodeRunner.ping(): unexpected error")
             return None
 
-    async def ping_status(self):
+    async def ping_status(self) -> None:
         """
         This is to keep the REPL in/out port mapping in the Linux
         kernel's NAT table alive.
@@ -841,7 +849,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except Exception:
             log.exception("AbstractCodeRunner.ping_status(): unexpected error")
 
-    async def feed_batch(self, opts):
+    async def feed_batch(self, opts: Mapping[str, Any]) -> None:
         sock = await self._get_socket_pair()
         clean_cmd = opts.get("clean", "")
         if clean_cmd is None:
@@ -865,15 +873,15 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             exec_cmd.encode("utf8"),
         ])
 
-    async def feed_code(self, text: str):
+    async def feed_code(self, text: str) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"code", text.encode("utf8")])
 
-    async def feed_input(self, text: str):
+    async def feed_input(self, text: str) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"input", text.encode("utf8")])
 
-    async def feed_event(self, evdata: AgentEventData):
+    async def feed_event(self, evdata: AgentEventData) -> None:
         sock = await self._get_socket_pair()
         data = {
             "type": evdata.type,
@@ -881,7 +889,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         }
         await sock.send_multipart([b"event", _dump_json_bytes(data)])
 
-    async def feed_interrupt(self):
+    async def feed_interrupt(self) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"interrupt", b""])
 
@@ -891,11 +899,13 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         try:
             result = await self.status_queue.get()
             self.status_queue.task_done()
-            return msgpack.unpackb(result)
+            return cast(dict[str, float] | None, msgpack.unpackb(result))
         except asyncio.CancelledError:
             return None
 
-    async def feed_and_get_completion(self, code_text, opts) -> CodeCompletionResult:
+    async def feed_and_get_completion(
+        self, code_text: str, opts: Mapping[str, Any]
+    ) -> CodeCompletionResult:
         sock = await self._get_socket_pair()
         payload = {
             "code": code_text,
@@ -912,7 +922,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return CodeCompletionResult.failure()
 
-    async def feed_start_model_service(self, model_info):
+    async def feed_start_model_service(self, model_info: Mapping[str, Any]) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-model-service",
@@ -928,13 +938,13 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             async with timeout(timeout_seconds):
                 result = await self.model_service_queue.get()
             self.model_service_queue.task_done()
-            return load_json(result)
+            return cast(dict[str, Any], load_json(result))
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
-    async def feed_start_service(self, service_info):
+    async def feed_start_service(self, service_info: Mapping[str, Any]) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-service",
@@ -944,20 +954,20 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             with timeout(10):
                 result = await self.service_queue.get()
             self.service_queue.task_done()
-            return load_json(result)
+            return cast(dict[str, Any], load_json(result))
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
-    async def feed_shutdown_service(self, service_name: str):
+    async def feed_shutdown_service(self, service_name: str) -> None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"shutdown-service",
             _dump_json_bytes(service_name),
         ])
 
-    async def feed_service_apps(self):
+    async def feed_service_apps(self) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"get-apps",
@@ -967,7 +977,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             with timeout(10):
                 result = await self.service_apps_info_queue.get()
             self.service_apps_info_queue.task_done()
-            return load_json(result)
+            return cast(dict[str, Any], load_json(result))
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
         except TimeoutError:
@@ -1046,7 +1056,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         else:
             raise AssertionError("Unrecognized API version")
 
-    async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
+    async def get_next_result(self, api_ver: int = 2, flush_timeout: float = 2.0) -> NextResult:
         # Context: per API request
         has_continuation = ClientFeatures.CONTINUATION in self.client_features
         records = []
@@ -1142,7 +1152,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             log.exception("unexpected error")
             raise
 
-    async def attach_output_queue(self, run_id: Optional[str]) -> None:
+    async def attach_output_queue(self, run_id: str | None) -> None:
         # Context: per API request
         if run_id is None:
             run_id = secrets.token_hex(16)

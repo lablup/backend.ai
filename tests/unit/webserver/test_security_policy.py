@@ -15,7 +15,7 @@ from ai.backend.web.security import (
 
 @pytest.fixture
 async def async_handler() -> Handler:
-    async def handler(request):
+    async def handler(request: web.Request) -> web.Response:
         return web.Response()
 
     return handler
@@ -31,7 +31,9 @@ async def async_handler() -> Handler:
         "metadata.oraclecloud.com",
     ],
 )
-async def test_reject_metadata_local_link_policy(async_handler, meta_local_link) -> None:
+async def test_reject_metadata_local_link_policy(
+    async_handler: Handler, meta_local_link: str
+) -> None:
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
         request_policies=[reject_metadata_local_link_policy], response_policies=[]
@@ -54,7 +56,9 @@ async def test_reject_metadata_local_link_policy(async_handler, meta_local_link)
         ".svn",
     ],
 )
-async def test_reject_access_for_unsafe_file_policy(async_handler, url_suffix) -> None:
+async def test_reject_access_for_unsafe_file_policy(
+    async_handler: Handler, url_suffix: str
+) -> None:
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
         request_policies=[reject_access_for_unsafe_file_policy], response_policies=[]
@@ -66,7 +70,7 @@ async def test_reject_access_for_unsafe_file_policy(async_handler, url_suffix) -
         await security_policy_middleware(request, async_handler)
 
 
-async def test_add_self_content_security_policy(async_handler) -> None:
+async def test_add_self_content_security_policy(async_handler: Handler) -> None:
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
         request_policies=[], response_policies=[add_self_content_security_policy]
@@ -79,7 +83,7 @@ async def test_add_self_content_security_policy(async_handler) -> None:
     )
 
 
-async def test_set_content_type_nosniff_policy(async_handler) -> None:
+async def test_set_content_type_nosniff_policy(async_handler: Handler) -> None:
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
         request_policies=[], response_policies=[set_content_type_nosniff_policy]

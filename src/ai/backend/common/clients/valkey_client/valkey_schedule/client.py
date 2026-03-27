@@ -1,7 +1,7 @@
 import enum
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Optional, Self, cast
+from typing import Self, cast
 from uuid import UUID
 
 from glide import Batch, ExpirySet, ExpiryType
@@ -24,6 +24,7 @@ from ai.backend.common.resilience import (
 from ai.backend.common.types import AgentId, KernelId, SessionId, ValkeyTarget
 
 PENDING_QUEUE_EXPIRY_SEC = 600  # 10 minutes
+SESSION_FAILED_AGENTS_TTL_SEC = 3600  # 1 hour
 ROUTE_HEALTH_TTL_SEC = 120  # 2 minutes
 MAX_HEALTH_STALENESS_SEC = 300  # 5 minutes - threshold for health status staleness
 KERNEL_HEALTH_TTL_SEC = 300  # 5 minutes - TTL for kernel health status
@@ -136,13 +137,16 @@ class ValkeyScheduleClient:
         """
         return f"schedule:{schedule_type}"
 
-    def _get_deployment_key(self, lifecycle_type: str) -> str:
+    def _get_deployment_key(self, lifecycle_type: str, sub_step: str | None = None) -> str:
         """
         Generate the Redis key for the given deployment lifecycle type.
 
         :param lifecycle_type: The type of deployment lifecycle
+        :param sub_step: Optional sub-step for finer-grained marks
         :return: The formatted key string
         """
+        if sub_step is not None:
+            return f"deployment:{lifecycle_type}:{sub_step}"
         return f"deployment:{lifecycle_type}"
 
     def _get_route_key(self, lifecycle_type: str) -> str:
@@ -180,6 +184,15 @@ class ValkeyScheduleClient:
         :return: The formatted key string
         """
         return f"agent:last_check:{agent_id}"
+
+    def _get_session_failed_agents_key(self, session_id: SessionId) -> str:
+        """
+        Generate the Redis key for session-scoped failed agent tracking.
+
+        :param session_id: The session ID
+        :return: The formatted key string
+        """
+        return f"session:failed_agents:{session_id}"
 
     async def _get_redis_time(self) -> int:
         """
@@ -237,15 +250,18 @@ class ValkeyScheduleClient:
             return None
 
     @valkey_schedule_resilience.apply()
-    async def mark_schedule_needed(self, schedule_type: str) -> None:
+    async def mark_schedules_needed_batch(self, schedule_types: Sequence[str]) -> None:
         """
-        Mark that scheduling is needed for the given schedule type.
-        Simply sets a flag that will be checked in the next scheduling loop.
+        Batch mark that scheduling is needed for multiple schedule types.
 
-        :param schedule_type: The type of scheduling to mark
+        :param schedule_types: The types of scheduling to mark
         """
-        key = self._get_schedule_key(schedule_type)
-        await self._client.client.set(key, b"1")
+        if not schedule_types:
+            return
+        key_values: Mapping[str | bytes, str | bytes] = {
+            self._get_schedule_key(schedule_type): "1" for schedule_type in schedule_types
+        }
+        await self._client.client.mset(key_values)
 
     @valkey_schedule_resilience.apply()
     async def load_and_delete_schedule_mark(self, schedule_type: str) -> bool:
@@ -306,7 +322,7 @@ class ValkeyScheduleClient:
         return [SessionId(UUID(sid)) for sid in raw_session_ids]
 
     @valkey_schedule_resilience.apply()
-    async def get_queue_positions(self, session_ids: Sequence[SessionId]) -> list[Optional[int]]:
+    async def get_queue_positions(self, session_ids: Sequence[SessionId]) -> list[int | None]:
         """
         Get the positions of multiple sessions in their pending queue.
         """
@@ -320,38 +336,99 @@ class ValkeyScheduleClient:
         if batch_result is None:
             return [None for _ in session_ids]
 
-        result: list[Optional[int]] = []
+        result: list[int | None] = []
         for pos in batch_result:
             if pos is None:
                 result.append(None)
             else:
                 try:
-                    result.append(int(pos))  # type: ignore[arg-type]
+                    result.append(int(pos))
                 except ValueError:
                     result.append(None)
         return result
 
     @valkey_schedule_resilience.apply()
-    async def mark_deployment_needed(self, lifecycle_type: str) -> None:
+    async def record_session_failed_agents(
+        self,
+        session_id: SessionId,
+        agent_ids: Sequence[AgentId],
+        ttl_sec: int = SESSION_FAILED_AGENTS_TTL_SEC,
+    ) -> None:
+        """
+        Record agents that failed for a specific session.
+        Uses SADD to append to the set, so repeated calls accumulate failed agents.
+
+        :param session_id: The session that experienced the failure
+        :param agent_ids: Agent IDs that failed for this session
+        :param ttl_sec: TTL in seconds for auto-cleanup (default 1 hour)
+        """
+        if not agent_ids:
+            return
+        key = self._get_session_failed_agents_key(session_id)
+        members: list[str] = [str(aid) for aid in agent_ids]
+        batch = Batch(is_atomic=True)
+        batch.sadd(key, members)
+        batch.expire(key, ttl_sec)
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_schedule_resilience.apply()
+    async def get_multiple_session_failed_agents(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> list[frozenset[AgentId]]:
+        """
+        Get the sets of agents that previously failed for multiple sessions in one round-trip.
+
+        Uses a non-atomic Batch to pipeline all SMEMBERS commands, reducing N round-trips to 1.
+
+        :param session_ids: The sessions to look up
+        :return: List of frozensets of failed agent IDs, in the same order as session_ids
+        """
+        if not session_ids:
+            return []
+        batch = Batch(is_atomic=False)
+        for session_id in session_ids:
+            batch.smembers(self._get_session_failed_agents_key(session_id))
+        batch_result = await self._client.client.exec(batch, raise_on_error=True)
+        # batch_result is None only for atomic batches (transactions) when a WATCH-guarded key
+        # was modified before EXEC — non-atomic pipelines (is_atomic=False) never return None.
+        # This guard is kept for defensive typing since exec() is annotated Optional[List[...]].
+        if batch_result is None:
+            return [frozenset() for _ in session_ids]
+        return [
+            frozenset(AgentId(member.decode()) for member in members)
+            if isinstance(members, set)
+            else frozenset()
+            for members in batch_result
+        ]
+
+    @valkey_schedule_resilience.apply()
+    async def mark_deployment_needed(
+        self, lifecycle_type: str, sub_step: str | None = None
+    ) -> None:
         """
         Mark that a deployment lifecycle operation is needed.
         Simply sets a flag that will be checked in the next scheduling loop.
 
         :param lifecycle_type: The type of deployment lifecycle to mark
+        :param sub_step: Optional sub-step for finer-grained marks
         """
-        key = self._get_deployment_key(lifecycle_type)
+        key = self._get_deployment_key(lifecycle_type, sub_step)
         await self._client.client.set(key, b"1")
 
     @valkey_schedule_resilience.apply()
-    async def load_and_delete_deployment_mark(self, lifecycle_type: str) -> bool:
+    async def load_and_delete_deployment_mark(
+        self, lifecycle_type: str, sub_step: str | None = None
+    ) -> bool:
         """
         Check if a deployment lifecycle mark exists and atomically delete it.
         This ensures that only one scheduler processes the mark.
 
         :param lifecycle_type: The type of deployment lifecycle to check
+        :param sub_step: Optional sub-step for finer-grained marks
         :return: True if a mark existed (and was deleted), False otherwise
         """
-        key = self._get_deployment_key(lifecycle_type)
+        key = self._get_deployment_key(lifecycle_type, sub_step)
         # Use Batch for atomic GET and DELETE
         batch = Batch(is_atomic=True)
         batch.get(key)
@@ -396,7 +473,7 @@ class ValkeyScheduleClient:
         return False
 
     @valkey_schedule_resilience.apply()
-    async def get_route_health_status(self, route_id: str) -> Optional[HealthStatus]:
+    async def get_route_health_status(self, route_id: str) -> HealthStatus | None:
         """
         Get health status for a route from Redis.
 
@@ -501,7 +578,7 @@ class ValkeyScheduleClient:
     @valkey_schedule_resilience.apply()
     async def check_route_health_status(
         self, route_ids: list[str]
-    ) -> Mapping[str, Optional[HealthStatus]]:
+    ) -> Mapping[str, HealthStatus | None]:
         """
         Check health status for multiple routes and update last_check timestamp.
         This is used by the manager to track when it last checked each route.
@@ -527,7 +604,7 @@ class ValkeyScheduleClient:
             return dict.fromkeys(route_ids)
 
         # Process results - every 3rd result is the hgetall response
-        health_statuses: dict[str, Optional[HealthStatus]] = {}
+        health_statuses: dict[str, HealthStatus | None] = {}
         for i, route_id in enumerate(route_ids):
             # Results are in groups of 3: hset result, expire result, hgetall result
             hgetall_result = results[i * 3 + 2] if len(results) > i * 3 + 2 else None

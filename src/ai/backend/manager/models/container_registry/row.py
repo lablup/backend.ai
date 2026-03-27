@@ -5,14 +5,14 @@ import re
 import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 from urllib.parse import urlparse
 
 import sqlalchemy as sa
 import yarl
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.models.image import ImageRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "ContainerRegistryRow",
@@ -47,7 +47,7 @@ __all__: Sequence[str] = (
 class ContainerRegistryValidatorArgs:
     url: str
     type: ContainerRegistryType
-    project: Optional[str]
+    project: str | None
 
 
 # TODO: Refactor this using inheritance
@@ -58,14 +58,14 @@ class ContainerRegistryValidator:
 
     _url: str
     _type: ContainerRegistryType
-    _project: Optional[str]
+    _project: str | None
 
     def __init__(self, args: ContainerRegistryValidatorArgs) -> None:
         self._url = args.url
         self._type = args.type
         self._project = args.project
 
-    def _is_valid_url(self, url: str):
+    def _is_valid_url(self, url: str) -> bool:
         try:
             url = url.strip()
             if not url.startswith("http://") and not url.startswith("https://"):
@@ -97,13 +97,13 @@ class ContainerRegistryValidator:
                 pass
 
 
-def _get_image_join_condition():
+def _get_image_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.image import ImageRow
 
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
 
 
-def _get_association_join_condition():
+def _get_association_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.association_container_registries_groups import (
         AssociationContainerRegistriesGroupsRow,
     )
@@ -111,7 +111,7 @@ def _get_association_join_condition():
     return ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)
 
 
-class ContainerRegistryRow(Base):
+class ContainerRegistryRow(Base):  # type: ignore[misc]
     __tablename__ = "container_registries"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -164,12 +164,12 @@ class ContainerRegistryRow(Base):
         url: str,
         registry_name: str,
         type: ContainerRegistryType,
-        project: Optional[str] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        ssl_verify: Optional[bool] = None,
-        is_global: Optional[bool] = None,
-        extra: Optional[dict] = None,
+        project: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        ssl_verify: bool | None = None,
+        is_global: bool | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         self.id = id
         self.url = url
@@ -213,7 +213,7 @@ class ContainerRegistryRow(Base):
     @classmethod
     async def get_container_registry_info(
         cls, session: AsyncSession, registry_id: uuid.UUID
-    ) -> tuple[yarl.URL, dict]:
+    ) -> tuple[yarl.URL, dict[str, Any]]:
         query_stmt = (
             sa.select(ContainerRegistryRow)
             .where(ContainerRegistryRow.id == registry_id)

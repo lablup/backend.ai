@@ -21,13 +21,15 @@ from .types import (
 )
 
 
-def insert_if_data_exists(db_conn: Connection, row_type, data: Collection[dict[str, Any]]) -> None:
+def insert_if_data_exists(
+    db_conn: Connection, row_type: sa.Table, data: Collection[dict[str, Any]]
+) -> None:
     if data:
         db_conn.execute(sa.insert(row_type), list(data))
 
 
 def insert_skip_on_conflict(
-    db_conn: Connection, row_type, data: Collection[dict[str, Any]]
+    db_conn: Connection, row_type: sa.Table, data: Collection[dict[str, Any]]
 ) -> None:
     if data:
         stmt = pg_insert(row_type).values(list(data)).on_conflict_do_nothing()
@@ -36,12 +38,13 @@ def insert_skip_on_conflict(
 
 def insert_and_returning_id(
     db_conn: Connection,
-    row_type,
+    row_type: sa.Table,
     data: Any,
 ) -> uuid.UUID:
     stmt = sa.insert(row_type).values(data).returning(row_type.c.id)
     result = db_conn.execute(stmt)
-    return result.scalar_one()
+    result_id: uuid.UUID = result.scalar_one()
+    return result_id
 
 
 def query_role_rows_by_name(db_conn: Connection, role_names: Collection[str]) -> list[Row[Any]]:
@@ -80,7 +83,8 @@ class PermissionUpdateUtil:
         )
         role_row = result.fetchone()
         if role_row is not None:
-            return role_row.id
+            role_id: uuid.UUID = role_row.id
+            return role_id
         return insert_and_returning_id(
             db_conn,
             roles_table,

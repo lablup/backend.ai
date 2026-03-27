@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import logging
 import ssl
 import time
 import urllib.parse
-from collections.abc import Iterable, Mapping, MutableMapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, cast
 
 import aiohttp
 from aiohttp import web
@@ -23,13 +25,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class WekaQuota:
     quota_id: str
     inode_id: int
-    hard_limit: Optional[int]
-    soft_limit: Optional[int]
-    grace_seconds: Optional[int]
-    used_bytes: Optional[int]
+    hard_limit: int | None
+    soft_limit: int | None
+    grace_seconds: int | None
+    used_bytes: int | None
 
     @classmethod
-    def from_json(cls, quota_id: str, data: Any):
+    def from_json(cls, quota_id: str, data: Any) -> WekaQuota:
         return WekaQuota(
             quota_id,
             data["inode_id"],
@@ -39,7 +41,7 @@ class WekaQuota:
             data["used_bytes"],
         )
 
-    def to_json(self):
+    def to_json(self) -> dict[str, int | str | None]:
         return {
             "quota_id": self.quota_id,
             "inode_id": self.inode_id,
@@ -68,7 +70,8 @@ class WekaFs:
     ssd_budget: int
     total_budget: int
 
-    def from_json(data: Any):
+    @classmethod
+    def from_json(cls, data: Any) -> WekaFs:
         return WekaFs(
             data["id"],
             data["name"],
@@ -88,14 +91,14 @@ class WekaFs:
         )
 
 
-def error_handler(inner):
-    async def outer(*args, **kwargs):
+def error_handler(inner: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+    async def outer(*args: Any, **kwargs: Any) -> Any:
         try:
             return await inner(*args, **kwargs)
-        except web.HTTPBadRequest:
-            raise WekaInvalidBodyError
-        except web.HTTPNotFound:
-            raise WekaNotFoundError
+        except web.HTTPBadRequest as e:
+            raise WekaInvalidBodyError from e
+        except web.HTTPNotFound as e:
+            raise WekaNotFoundError from e
 
     return outer
 
@@ -107,8 +110,8 @@ class WekaAPIClient:
     organization: str
     ssl_context: ssl.SSLContext | bool
 
-    _access_token: Optional[str]
-    _refresh_token: Optional[str]
+    _access_token: str | None
+    _refresh_token: str | None
     _valid_until: int
 
     def __init__(
@@ -166,7 +169,7 @@ class WekaAPIClient:
         sess: aiohttp.ClientSession,
         method: str,
         path: str,
-        body: Optional[Any] = None,
+        body: Any | None = None,
     ) -> aiohttp.ClientResponse:
         match method:
             case "GET":
@@ -206,8 +209,8 @@ class WekaAPIClient:
                     ssl=self.ssl_context,
                 )
 
-            except web.HTTPUnauthorized:
-                raise WekaUnauthorizedError
+            except web.HTTPUnauthorized as e:
+                raise WekaUnauthorizedError from e
 
     @error_handler
     async def list_fs(self) -> Iterable[WekaFs]:
@@ -316,8 +319,8 @@ class WekaAPIClient:
         self,
         path: str,
         inode_id: int,
-        hard_limit: Optional[int] = None,
-        soft_limit: Optional[int] = None,
+        hard_limit: int | None = None,
+        soft_limit: int | None = None,
     ) -> None:
         """
         Sets quota using undocumented V1 API. Should be considered deprecated
@@ -373,15 +376,15 @@ class WekaAPIClient:
         ) as sess:
             response = await self._build_request(sess, "GET", "/cluster")
             data = await response.json()
-            return data["data"]
+            return cast(Mapping[str, Any], data["data"])
 
     @error_handler
     async def get_metric(
         self,
         metrics: Iterable[str],
         start_time: datetime,
-        end_time: Optional[datetime] = None,
-        category: Optional[str] = None,
+        end_time: datetime | None = None,
+        category: str | None = None,
     ) -> Mapping[str, Any]:
         params = [("start_time", start_time.isoformat() + "Z")]
         if end_time is not None:
@@ -400,4 +403,4 @@ class WekaAPIClient:
                 f"/stats?{querystring}",
             )
             data = await response.json()
-            return data["data"]["all"]
+            return cast(Mapping[str, Any], data["data"]["all"])

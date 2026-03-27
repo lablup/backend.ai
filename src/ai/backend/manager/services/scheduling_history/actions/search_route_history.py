@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import RouteHistoryData
 from ai.backend.manager.repositories.base import BatchQuerier
 
@@ -12,22 +14,22 @@ from .base import SchedulingHistoryAction
 
 @dataclass
 class SearchRouteHistoryAction(SchedulingHistoryAction):
-    """Action to search route history."""
+    """Action to search route history (admin API)."""
 
     querier: BatchQuerier
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "route:history"
+    def entity_type(cls) -> EntityType:
+        return EntityType.ROUTE_HISTORY
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -41,5 +43,5 @@ class SearchRouteHistoryActionResult(BaseActionResult):
     has_previous_page: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

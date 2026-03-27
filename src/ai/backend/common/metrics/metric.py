@@ -1,16 +1,26 @@
 import asyncio
 import enum
 import os
-from typing import Optional, Self
+from typing import Self
 
 import psutil
-from prometheus_client import Counter, Gauge, Histogram, generate_latest
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import BackendAIError, ErrorCode
+from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
+from ai.backend.common.metrics.safe import (
+    SafeCounter as Counter,
+)
+from ai.backend.common.metrics.safe import (
+    SafeGauge as Gauge,
+)
+from ai.backend.common.metrics.safe import (
+    SafeHistogram as Histogram,
+)
 
 
 class APIMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _request_count: Counter
     _request_duration_sec: Histogram
@@ -35,7 +45,7 @@ class APIMetricObserver:
         return cls._instance
 
     def _inc_request_total(
-        self, *, method: str, endpoint: str, error_code: Optional[ErrorCode], status_code: int
+        self, *, method: str, endpoint: str, error_code: ErrorCode | None, status_code: int
     ) -> None:
         self._request_count.labels(
             method=method,
@@ -51,7 +61,7 @@ class APIMetricObserver:
         *,
         method: str,
         endpoint: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         status_code: int,
         duration: float,
     ) -> None:
@@ -69,7 +79,7 @@ class APIMetricObserver:
         *,
         method: str,
         endpoint: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         status_code: int,
         duration: float,
     ) -> None:
@@ -86,7 +96,7 @@ class APIMetricObserver:
 
 
 class GraphQLMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _request_count: Counter
     _request_duration_sec: Histogram
@@ -135,7 +145,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         success: bool,
     ) -> None:
         self._request_count.labels(
@@ -156,7 +166,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         success: bool,
         duration: float,
     ) -> None:
@@ -178,7 +188,7 @@ class GraphQLMetricObserver:
         field_name: str,
         parent_type: str,
         operation_name: str,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
         success: bool,
         duration: float,
     ) -> None:
@@ -202,7 +212,7 @@ class GraphQLMetricObserver:
 
 
 class EventMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _event_count: Counter
     _event_failure_count: Counter
@@ -273,7 +283,7 @@ class EventMetricObserver:
 
 
 class BgTaskMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _bgtask_count: Gauge
     _bgtask_done_count: Counter
@@ -284,6 +294,7 @@ class BgTaskMetricObserver:
             name="backendai_bgtask_count",
             documentation="Total number of background tasks processed",
             labelnames=["task_name"],
+            multiprocess_mode="livesum",
         )
         self._bgtask_done_count = Counter(
             name="backendai_bgtask_done_count",
@@ -307,7 +318,7 @@ class BgTaskMetricObserver:
         self._bgtask_count.labels(task_name=task_name).inc()
 
     def observe_bgtask_done(
-        self, *, task_name: str, status: str, duration: float, error_code: Optional[ErrorCode]
+        self, *, task_name: str, status: str, duration: float, error_code: ErrorCode | None
     ) -> None:
         self._bgtask_count.labels(task_name=task_name).dec()
         self._bgtask_processing_time.labels(
@@ -327,7 +338,7 @@ class BgTaskMetricObserver:
 
 
 class ActionMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _action_count: Counter
     _action_duration_sec: Histogram
@@ -368,11 +379,11 @@ class ActionMetricObserver:
     def observe_action(
         self,
         *,
-        entity_type: str,
+        entity_type: EntityType,
         operation_type: str,
         status: str,
         duration: float,
-        error_code: Optional[ErrorCode],
+        error_code: ErrorCode | None,
     ) -> None:
         self._action_count.labels(
             entity_type=entity_type,
@@ -410,6 +421,10 @@ class LayerType(enum.StrEnum):
     CONTAINER_REGISTRY_REPOSITORY = "container_registry_repository"
     DEPLOYMENT_REPOSITORY = "deployment_repository"
     DOMAIN_REPOSITORY = "domain_repository"
+    DOTFILE_REPOSITORY = "dotfile_repository"
+    ETCD_CONFIG_REPOSITORY = "etcd_config_repository"
+    MANAGER_ADMIN_REPOSITORY = "manager_admin_repository"
+    TEMPLATE_REPOSITORY = "template_repository"
     ERROR_LOG_REPOSITORY = "error_log_repository"
     GROUP_REPOSITORY = "group_repository"
     HUGGINGFACE_REGISTRY_REPOSITORY = "huggingface_registry_repository"
@@ -420,6 +435,7 @@ class LayerType(enum.StrEnum):
     NOTIFICATION_REPOSITORY = "notification_repository"
     OBJECT_STORAGE_REPOSITORY = "object_storage_repository"
     PERMISSION_CONTROLLER_REPOSITORY = "permission_controller_repository"
+    PROMETHEUS_QUERY_PRESET_REPOSITORY = "prometheus_query_preset_repository"
     PROJECT_RESOURCE_POLICY_REPOSITORY = "project_resource_policy_repository"
     RESERVOIR_REGISTRY_REPOSITORY = "reservoir_registry_repository"
     RESOURCE_PRESET_REPOSITORY = "resource_preset_repository"
@@ -433,13 +449,19 @@ class LayerType(enum.StrEnum):
     USER_RESOURCE_POLICY_REPOSITORY = "user_resource_policy_repository"
     VFOLDER_REPOSITORY = "vfolder_repository"
     VFS_STORAGE_REPOSITORY = "vfs_storage_repository"
+    FAIR_SHARE_REPOSITORY = "fair_share_repository"
+    RESOURCE_USAGE_HISTORY_REPOSITORY = "resource_usage_history_repository"
+    RESOURCE_SLOT_REPOSITORY = "resource_slot_repository"
 
     # DB Source layers
     AUDIT_LOG_DB_SOURCE = "audit_log_db_source"
     AUTH_DB_SOURCE = "auth_db_source"
     AGENT_DB_SOURCE = "agent_db_source"
     DEPLOYMENT_DB_SOURCE = "deployment_db_source"
+    ETCD_CONFIG_DB_SOURCE = "etcd_config_db_source"
     ERROR_LOG_DB_SOURCE = "error_log_db_source"
+    MANAGER_ADMIN_DB_SOURCE = "manager_admin_db_source"
+    TEMPLATE_DB_SOURCE = "template_db_source"
     PERMISSION_CONTROLLER_DB_SOURCE = "permission_controller_db_source"
     RESOURCE_PRESET_DB_SOURCE = "resource_preset_db_source"
     SCHEDULE_DB_SOURCE = "schedule_db_source"
@@ -465,6 +487,7 @@ class LayerType(enum.StrEnum):
     VALKEY_STAT = "valkey_stat"
     VALKEY_STREAM = "valkey_stream"
     VALKEY_BGTASK = "valkey_bgtask"
+    VALKEY_VOLUME_STATS = "valkey_volume_stats"
 
     # Client layers
     AGENT_CLIENT = "agent_client"
@@ -477,7 +500,7 @@ ClientType = DomainType
 
 
 class LayerMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _layer_operation_triggered_count: Gauge
     _layer_operation_count: Counter
@@ -490,6 +513,7 @@ class LayerMetricObserver:
             name="backendai_layer_operation_triggered_count",
             documentation="Number of layer operations triggered",
             labelnames=["domain", "layer", "operation"],
+            multiprocess_mode="livesum",
         )
         self._layer_operation_count = Counter(
             name="backendai_layer_operation_count",
@@ -552,7 +576,7 @@ class LayerMetricObserver:
         layer: LayerType,
         operation: str,
         duration: float,
-        exception: Optional[BaseException] = None,
+        exception: BaseException | None = None,
     ) -> None:
         success = exception is None
         self._layer_operation_triggered_count.labels(
@@ -586,7 +610,7 @@ class LayerMetricObserver:
 
 
 class SystemMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _async_task_count: Gauge
     _cpu_usage_percent: Gauge
@@ -597,18 +621,22 @@ class SystemMetricObserver:
         self._async_task_count = Gauge(
             name="backendai_async_task_count",
             documentation="Number of active async tasks",
+            multiprocess_mode="livesum",
         )
         self._cpu_usage_percent = Gauge(
             name="backendai_cpu_usage_percent",
             documentation="CPU usage of the process",
+            multiprocess_mode="livesum",
         )
         self._memory_used_rss = Gauge(
             name="backendai_memory_used_rss",
             documentation="Memory used by the process in RSS",
+            multiprocess_mode="livesum",
         )
         self._memory_used_vms = Gauge(
             name="backendai_memory_used_vms",
             documentation="Memory used by the process in VMS",
+            multiprocess_mode="livesum",
         )
 
     @classmethod
@@ -626,7 +654,7 @@ class SystemMetricObserver:
 
 
 class SweeperMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _session_sweep_count: Counter
     _kernel_sweep_count: Counter
@@ -657,7 +685,7 @@ class SweeperMetricObserver:
 
 
 class EventPropagatorMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _propagator_count: Gauge
     _propagator_alias_count: Gauge
@@ -668,11 +696,13 @@ class EventPropagatorMetricObserver:
         self._propagator_count = Gauge(
             name="backendai_event_propagator_count",
             documentation="Current number of active event propagators",
+            multiprocess_mode="livesum",
         )
         self._propagator_alias_count = Gauge(
             name="backendai_event_propagator_alias_count",
             documentation="Current number of event propagator aliases",
             labelnames=["domain", "alias_id"],
+            multiprocess_mode="livesum",
         )
         self._propagator_registration_count = Counter(
             name="backendai_event_propagator_registration_count",
@@ -703,7 +733,7 @@ class EventPropagatorMetricObserver:
 
 
 class CommonMetricRegistry:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     api: APIMetricObserver
     gql: GraphQLMetricObserver
@@ -723,18 +753,18 @@ class CommonMetricRegistry:
         self.event_propagator_observer = EventPropagatorMetricObserver.instance()
 
     @classmethod
-    def instance(cls):
+    def instance(cls) -> Self:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
 
     def to_prometheus(self) -> str:
         self.system.observe()
-        return generate_latest().decode("utf-8")
+        return generate_latest_multiprocess().decode("utf-8")
 
 
 class StageObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _stage_count: Counter
 

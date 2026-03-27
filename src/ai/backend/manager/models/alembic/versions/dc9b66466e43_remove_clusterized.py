@@ -16,11 +16,11 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.drop_column("agents", "clusterized")
 
 
-def downgrade():
+def downgrade() -> None:
     op.add_column(
         "agents", sa.Column("clusterized", sa.BOOLEAN(), autoincrement=False, nullable=True)
     )

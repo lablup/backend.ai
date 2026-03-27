@@ -103,7 +103,6 @@ def korean_text_stream() -> ExportDataStream:
 class TestCSVExporter:
     """Tests for CSVExporter class."""
 
-    @pytest.mark.asyncio
     async def test_export_with_utf8_bom(self, single_row_stream: ExportDataStream) -> None:
         """Test that UTF-8 BOM is included for utf-8 encoding."""
         exporter = CSVExporter(single_row_stream, encoding="utf-8")
@@ -111,7 +110,6 @@ class TestCSVExporter:
 
         assert chunks[0] == b"\xef\xbb\xbf"
 
-    @pytest.mark.asyncio
     async def test_export_without_bom_for_euc_kr(self, single_row_stream: ExportDataStream) -> None:
         """Test that BOM is not included for non-UTF-8 encoding."""
         exporter = CSVExporter(single_row_stream, encoding="euc-kr")
@@ -120,7 +118,6 @@ class TestCSVExporter:
         assert chunks[0] != b"\xef\xbb\xbf"
         assert b"ID" in chunks[0]
 
-    @pytest.mark.asyncio
     async def test_export_header_row(self, empty_data_stream: ExportDataStream) -> None:
         """Test that header row contains field names."""
         exporter = CSVExporter(empty_data_stream)
@@ -131,7 +128,6 @@ class TestCSVExporter:
         assert "Name" in header
         assert "Value" in header
 
-    @pytest.mark.asyncio
     async def test_export_data_rows(self, multi_row_stream: ExportDataStream) -> None:
         """Test that data rows are correctly formatted."""
         exporter = CSVExporter(multi_row_stream)
@@ -143,7 +139,6 @@ class TestCSVExporter:
         assert "100" in data
         assert "id-2" in data
 
-    @pytest.mark.asyncio
     async def test_export_multiple_partitions(
         self, multi_partition_stream: ExportDataStream
     ) -> None:
@@ -154,7 +149,6 @@ class TestCSVExporter:
         # BOM + header + 3 data partitions = 5 chunks
         assert len(chunks) == 5
 
-    @pytest.mark.asyncio
     async def test_format_none_value(self, none_value_stream: ExportDataStream) -> None:
         """Test that None values are formatted as empty string."""
         exporter = CSVExporter(none_value_stream)
@@ -164,7 +158,6 @@ class TestCSVExporter:
         assert "id-1" in data
         assert "100" in data
 
-    @pytest.mark.asyncio
     async def test_format_dict_value(self, dict_value_stream: ExportDataStream) -> None:
         """Test that dict values are JSON serialized."""
         exporter = CSVExporter(dict_value_stream)
@@ -174,7 +167,6 @@ class TestCSVExporter:
         assert "key" in data
         assert "value" in data
 
-    @pytest.mark.asyncio
     async def test_format_list_value(self, list_value_stream: ExportDataStream) -> None:
         """Test that list values are JSON serialized."""
         exporter = CSVExporter(list_value_stream)
@@ -183,7 +175,6 @@ class TestCSVExporter:
         data = chunks[2].decode("utf-8")
         assert "[1, 2, 3]" in data
 
-    @pytest.mark.asyncio
     async def test_encoding_euc_kr(self, korean_text_stream: ExportDataStream) -> None:
         """Test that euc-kr encoding works for Korean characters."""
         exporter = CSVExporter(korean_text_stream, encoding="euc-kr")

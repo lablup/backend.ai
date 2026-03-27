@@ -47,8 +47,8 @@ class LegacyAgentSelector(AbstractAgentSelector):
         self,
         trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
+        _criteria: AgentSelectionCriteria,
+        _config: AgentSelectionConfig,
     ) -> AgentStateTracker:
         """
         Select an agent tracker based on resource priorities.
