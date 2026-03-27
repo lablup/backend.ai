@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import override
 
@@ -10,6 +9,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 from ai.backend.manager.services.session.base import SessionScopeAction
 
 
@@ -21,8 +21,8 @@ class SearchSessionsInProjectAction(SessionScopeAction):
     Used for project admin page.
     """
 
+    scope: ProjectSessionSearchScope
     querier: BatchQuerier
-    project_id: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:
@@ -39,13 +39,13 @@ class SearchSessionsInProjectAction(SessionScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return str(self.project_id)
+        return str(self.scope.project_id)
 
     @override
     def target_element(self) -> RBACElementRef:
         return RBACElementRef(
             element_type=RBACElementType.PROJECT,
-            element_id=str(self.project_id),
+            element_id=str(self.scope.project_id),
         )
 
 
