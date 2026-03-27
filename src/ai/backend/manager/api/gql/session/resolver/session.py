@@ -77,6 +77,53 @@ async def admin_sessions_v2(
     )
 
 
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="List sessions within a specific project. Requires project membership or higher privileges.",
+    )
+)  # type: ignore[misc]
+async def project_sessions_v2(
+    info: Info[StrawberryGQLContext],
+    scope: ProjectSessionScopeGQL,
+    filter: SessionV2FilterGQL | None = None,
+    order_by: list[SessionV2OrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> SessionV2ConnectionGQL:
+    from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+
+    payload = await info.context.adapters.session.gql_search_by_project(
+        scope=ProjectSessionSearchScope(project_id=scope.project_id),
+        input=AdminSearchSessionsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    nodes = [SessionV2GQL.from_pydantic(node) for node in payload.items]
+    edges = [SessionV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    return SessionV2ConnectionGQL(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )
+
+
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
