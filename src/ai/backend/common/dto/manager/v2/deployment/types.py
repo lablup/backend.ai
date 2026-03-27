@@ -121,6 +121,12 @@ class IntOrPercent(BaseModel):
                 raise ValueError("'count' must not be set when type is 'percent'")
         return self
 
+    @property
+    def is_zero(self) -> bool:
+        if self.type == IntOrPercentType.COUNT:
+            return self.count == 0
+        return self.percent == 0.0
+
 
 class DeploymentBasicInfo(BaseResponseModel):
     """Basic identifying information for a deployment."""

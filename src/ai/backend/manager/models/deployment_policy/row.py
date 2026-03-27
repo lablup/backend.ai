@@ -58,17 +58,7 @@ class RollingUpdateSpec(BaseModel):
         it cannot create new routes (would exceed max_total) nor terminate
         old routes (would fall below min_available), causing a deadlock.
         """
-        surge_zero = (
-            (self.max_surge.count == 0)
-            if self.max_surge.type == IntOrPercentType.COUNT
-            else (self.max_surge.percent == 0.0)
-        )
-        unavail_zero = (
-            (self.max_unavailable.count == 0)
-            if self.max_unavailable.type == IntOrPercentType.COUNT
-            else (self.max_unavailable.percent == 0.0)
-        )
-        if surge_zero and unavail_zero:
+        if self.max_surge.is_zero and self.max_unavailable.is_zero:
             raise ValueError(
                 "At least one of max_surge or max_unavailable must be positive; "
                 "otherwise the rolling update cannot make progress."
