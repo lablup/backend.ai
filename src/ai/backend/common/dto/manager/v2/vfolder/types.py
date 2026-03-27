@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
@@ -27,8 +27,10 @@ __all__ = (
     "VFolderOwnershipTypeField",
     "VFolderPermissionField",
     "VFolderPermissionInfo",
+    "VFolderStatusFilter",
     "VFolderUsageInfo",
     "VFolderUsageMode",
+    "VFolderUsageModeFilter",
 )
 
 
@@ -49,6 +51,20 @@ class VFolderInvitationState(StrEnum):
     CANCELED = "canceled"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
+
+
+class VFolderStatusFilter(BaseRequestModel):
+    """Filter for vfolder operation status values."""
+
+    in_: list[VFolderOperationStatusField] | None = None
+    not_in: list[VFolderOperationStatusField] | None = None
+
+
+class VFolderUsageModeFilter(BaseRequestModel):
+    """Filter for vfolder usage mode values."""
+
+    in_: list[VFolderUsageMode] | None = None
+    not_in: list[VFolderUsageMode] | None = None
 
 
 class VFolderBasicInfo(BaseResponseModel):
