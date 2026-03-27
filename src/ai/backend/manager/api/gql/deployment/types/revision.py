@@ -124,7 +124,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.image_federation import Image
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.federation import ResourceGroup
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder import VFolder
@@ -292,7 +292,7 @@ class ExtraVFolderMountInfoGQL:
     model=PreStartActionInfoDTO,
     name="PreStartAction",
 )
-class PreStartActionGQL(PydanticOutputMixin[PreStartActionInfoDTO]):
+class PreStartActionGQL:
     action: str = gql_field(description="The name of the pre-start action to execute.")
     args: JSON = gql_field(description="Arguments for the pre-start action.")
 
@@ -305,7 +305,7 @@ class PreStartActionGQL(PydanticOutputMixin[PreStartActionInfoDTO]):
     model=ModelHealthCheckInfoDTO,
     name="ModelHealthCheck",
 )
-class ModelHealthCheckGQL(PydanticOutputMixin[ModelHealthCheckInfoDTO]):
+class ModelHealthCheckGQL:
     interval: float = gql_field(description="Interval in seconds between health checks.")
     path: str = gql_field(description="Path to check for health status.")
     max_retries: int = gql_field(description="Maximum number of retries for health check.")
@@ -328,7 +328,7 @@ class ModelHealthCheckGQL(PydanticOutputMixin[ModelHealthCheckInfoDTO]):
     model=ModelServiceConfigInfoDTO,
     name="ModelServiceConfig",
 )
-class ModelServiceConfigGQL(PydanticOutputMixin[ModelServiceConfigInfoDTO]):
+class ModelServiceConfigGQL:
     pre_start_actions: list[PreStartActionGQL] = gql_field(
         description="List of pre-start actions to execute before starting the model service."
     )
@@ -349,7 +349,7 @@ class ModelServiceConfigGQL(PydanticOutputMixin[ModelServiceConfigInfoDTO]):
     model=ModelMetadataInfoDTO,
     name="ModelMetadata",
 )
-class ModelMetadataGQL(PydanticOutputMixin[ModelMetadataInfoDTO]):
+class ModelMetadataGQL:
     author: str | None = gql_field(description="Author of the model.", default=None)
     title: str | None = gql_field(description="Title of the model.", default=None)
     version: JSON | None = gql_field(description="Version identifier of the model.", default=None)
@@ -381,7 +381,7 @@ class ModelMetadataGQL(PydanticOutputMixin[ModelMetadataInfoDTO]):
     model=ModelConfigInfoDTO,
     name="ModelConfig",
 )
-class ModelConfigGQL(PydanticOutputMixin[ModelConfigInfoDTO]):
+class ModelConfigGQL:
     name: str = gql_field(description="Name of the model.")
     model_path: str = gql_field(description="Path to the model file.")
     service: ModelServiceConfigGQL | None = gql_field(
@@ -400,7 +400,7 @@ class ModelConfigGQL(PydanticOutputMixin[ModelConfigInfoDTO]):
     model=ModelDefinitionInfoDTO,
     name="ModelDefinition",
 )
-class ModelDefinitionGQL(PydanticOutputMixin[ModelDefinitionInfoDTO]):
+class ModelDefinitionGQL:
     models: list[ModelConfigGQL] = gql_field(description="List of models in the model definition.")
 
 
