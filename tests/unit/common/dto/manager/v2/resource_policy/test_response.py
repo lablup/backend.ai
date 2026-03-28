@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
+from ai.backend.common.dto.manager.v2.common import (
+    ResourceSlotEntryInfo,
+    VFolderHostPermissionEntryInfo,
+)
 from ai.backend.common.dto.manager.v2.resource_policy.response import (
     CreateKeypairResourcePolicyPayload,
     CreateProjectResourcePolicyPayload,
@@ -23,10 +28,14 @@ from ai.backend.common.dto.manager.v2.resource_policy.types import DefaultForUns
 
 def _make_keypair_policy_node(name: str = "default") -> KeypairResourcePolicyNode:
     return KeypairResourcePolicyNode(
+        id=name,
         name=name,
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         default_for_unspecified=DefaultForUnspecified.LIMITED,
-        total_resource_slots={"cpu": "4", "mem": "8g"},
+        total_resource_slots=[
+            ResourceSlotEntryInfo(resource_type="cpu", quantity=Decimal("4")),
+            ResourceSlotEntryInfo(resource_type="mem", quantity=Decimal("8589934592")),
+        ],
         max_session_lifetime=3600,
         max_concurrent_sessions=10,
         max_pending_session_count=None,
@@ -34,12 +43,15 @@ def _make_keypair_policy_node(name: str = "default") -> KeypairResourcePolicyNod
         max_concurrent_sftp_sessions=2,
         max_containers_per_session=1,
         idle_timeout=1800,
-        allowed_vfolder_hosts={"default": "rw"},
+        allowed_vfolder_hosts=[
+            VFolderHostPermissionEntryInfo(host="default", permissions=["mount-in-session"]),
+        ],
     )
 
 
 def _make_user_policy_node(name: str = "user-policy") -> UserResourcePolicyNode:
     return UserResourcePolicyNode(
+        id=name,
         name=name,
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         max_vfolder_count=10,
@@ -51,6 +63,7 @@ def _make_user_policy_node(name: str = "user-policy") -> UserResourcePolicyNode:
 
 def _make_project_policy_node(name: str = "project-policy") -> ProjectResourcePolicyNode:
     return ProjectResourcePolicyNode(
+        id=name,
         name=name,
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         max_vfolder_count=20,
@@ -71,15 +84,16 @@ class TestKeypairResourcePolicyNode:
 
     def test_valid_creation_without_created_at(self) -> None:
         node = KeypairResourcePolicyNode(
+            id="default",
             name="default",
             default_for_unspecified=DefaultForUnspecified.UNLIMITED,
-            total_resource_slots={},
+            total_resource_slots=[],
             max_session_lifetime=3600,
             max_concurrent_sessions=10,
             max_concurrent_sftp_sessions=2,
             max_containers_per_session=1,
             idle_timeout=1800,
-            allowed_vfolder_hosts={},
+            allowed_vfolder_hosts=[],
         )
         assert node.created_at is None
 

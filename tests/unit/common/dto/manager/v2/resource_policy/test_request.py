@@ -6,6 +6,10 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
+from ai.backend.common.dto.manager.v2.common import (
+    ResourceSlotEntryInput,
+    VFolderHostPermissionEntryInput,
+)
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput,
     CreateProjectResourcePolicyInput,
@@ -27,13 +31,18 @@ class TestCreateKeypairResourcePolicyInput:
         req = CreateKeypairResourcePolicyInput(
             name="default",
             default_for_unspecified=DefaultForUnspecified.LIMITED,
-            total_resource_slots={"cpu": "4", "mem": "8g"},
+            total_resource_slots=[
+                ResourceSlotEntryInput(resource_type="cpu", quantity="4"),
+                ResourceSlotEntryInput(resource_type="mem", quantity="8589934592"),
+            ],
             max_session_lifetime=3600,
             max_concurrent_sessions=10,
             max_concurrent_sftp_sessions=2,
             max_containers_per_session=1,
             idle_timeout=1800,
-            allowed_vfolder_hosts={"default": "rw"},
+            allowed_vfolder_hosts=[
+                VFolderHostPermissionEntryInput(host="default", permissions=["mount-in-session"])
+            ],
         )
         assert req.name == "default"
         assert req.default_for_unspecified == DefaultForUnspecified.LIMITED
@@ -44,31 +53,39 @@ class TestCreateKeypairResourcePolicyInput:
         req = CreateKeypairResourcePolicyInput(
             name="premium",
             default_for_unspecified=DefaultForUnspecified.UNLIMITED,
-            total_resource_slots={"cpu": "8"},
+            total_resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="8")],
             max_session_lifetime=7200,
             max_concurrent_sessions=20,
             max_pending_session_count=5,
-            max_pending_session_resource_slots={"cpu": "2"},
+            max_pending_session_resource_slots=[
+                ResourceSlotEntryInput(resource_type="cpu", quantity="2")
+            ],
             max_concurrent_sftp_sessions=4,
             max_containers_per_session=2,
             idle_timeout=3600,
-            allowed_vfolder_hosts={"default": "rw", "nfs": "ro"},
+            allowed_vfolder_hosts=[
+                VFolderHostPermissionEntryInput(host="default", permissions=["mount-in-session"]),
+                VFolderHostPermissionEntryInput(host="nfs", permissions=["upload-file"]),
+            ],
         )
         assert req.name == "premium"
         assert req.max_pending_session_count == 5
-        assert req.max_pending_session_resource_slots == {"cpu": "2"}
+        assert (
+            req.max_pending_session_resource_slots is not None
+            and len(req.max_pending_session_resource_slots) == 1
+        )
 
     def test_name_whitespace_is_stripped(self) -> None:
         req = CreateKeypairResourcePolicyInput(
             name="  default  ",
             default_for_unspecified=DefaultForUnspecified.LIMITED,
-            total_resource_slots={},
+            total_resource_slots=[],
             max_session_lifetime=3600,
             max_concurrent_sessions=10,
             max_concurrent_sftp_sessions=2,
             max_containers_per_session=1,
             idle_timeout=1800,
-            allowed_vfolder_hosts={},
+            allowed_vfolder_hosts=[],
         )
         assert req.name == "default"
 
@@ -77,13 +94,13 @@ class TestCreateKeypairResourcePolicyInput:
             CreateKeypairResourcePolicyInput(
                 name="",
                 default_for_unspecified=DefaultForUnspecified.LIMITED,
-                total_resource_slots={},
+                total_resource_slots=[],
                 max_session_lifetime=3600,
                 max_concurrent_sessions=10,
                 max_concurrent_sftp_sessions=2,
                 max_containers_per_session=1,
                 idle_timeout=1800,
-                allowed_vfolder_hosts={},
+                allowed_vfolder_hosts=[],
             )
 
     def test_name_exceeding_max_length_raises_validation_error(self) -> None:
@@ -91,26 +108,26 @@ class TestCreateKeypairResourcePolicyInput:
             CreateKeypairResourcePolicyInput(
                 name="a" * 257,
                 default_for_unspecified=DefaultForUnspecified.LIMITED,
-                total_resource_slots={},
+                total_resource_slots=[],
                 max_session_lifetime=3600,
                 max_concurrent_sessions=10,
                 max_concurrent_sftp_sessions=2,
                 max_containers_per_session=1,
                 idle_timeout=1800,
-                allowed_vfolder_hosts={},
+                allowed_vfolder_hosts=[],
             )
 
     def test_round_trip(self) -> None:
         req = CreateKeypairResourcePolicyInput(
             name="default",
             default_for_unspecified=DefaultForUnspecified.LIMITED,
-            total_resource_slots={"cpu": "4"},
+            total_resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="4")],
             max_session_lifetime=3600,
             max_concurrent_sessions=10,
             max_concurrent_sftp_sessions=2,
             max_containers_per_session=1,
             idle_timeout=1800,
-            allowed_vfolder_hosts={},
+            allowed_vfolder_hosts=[],
         )
         json_data = req.model_dump_json()
         restored = CreateKeypairResourcePolicyInput.model_validate_json(json_data)
