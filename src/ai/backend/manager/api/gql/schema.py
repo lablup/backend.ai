@@ -242,6 +242,25 @@ from .resource_group import (
     resource_groups,
     update_resource_group_fair_share_spec,
 )
+from .resource_policy_v2 import (
+    admin_create_keypair_resource_policy_v2,
+    admin_create_project_resource_policy_v2,
+    admin_create_user_resource_policy_v2,
+    admin_delete_keypair_resource_policy_v2,
+    admin_delete_project_resource_policy_v2,
+    admin_delete_user_resource_policy_v2,
+    admin_keypair_resource_policies_v2,
+    admin_keypair_resource_policy_v2,
+    admin_project_resource_policies_v2,
+    admin_project_resource_policy_v2,
+    admin_update_keypair_resource_policy_v2,
+    admin_update_project_resource_policy_v2,
+    admin_update_user_resource_policy_v2,
+    admin_user_resource_policies_v2,
+    admin_user_resource_policy_v2,
+    my_keypair_resource_policy_v2,
+    my_user_resource_policy_v2,
+)
 from .resource_slot.resolver import resource_slot_type, resource_slot_types
 from .resource_usage import (
     admin_domain_usage_buckets,
@@ -439,6 +458,15 @@ class Query:
     admin_projects_v2 = admin_projects_v2
     domain_projects_v2 = domain_projects_v2
     project_domain_v2 = project_domain_v2
+    # Resource Policy V2 APIs
+    admin_keypair_resource_policy_v2 = admin_keypair_resource_policy_v2
+    admin_keypair_resource_policies_v2 = admin_keypair_resource_policies_v2
+    admin_user_resource_policy_v2 = admin_user_resource_policy_v2
+    admin_user_resource_policies_v2 = admin_user_resource_policies_v2
+    admin_project_resource_policy_v2 = admin_project_resource_policy_v2
+    admin_project_resource_policies_v2 = admin_project_resource_policies_v2
+    my_keypair_resource_policy_v2 = my_keypair_resource_policy_v2
+    my_user_resource_policy_v2 = my_user_resource_policy_v2
 
 
 @strawberry.type
@@ -574,6 +602,16 @@ class Mutation:
     admin_revoke_role = admin_revoke_role
     admin_bulk_assign_role = admin_bulk_assign_role
     admin_bulk_revoke_role = admin_bulk_revoke_role
+    # Resource Policy V2 APIs
+    admin_create_keypair_resource_policy_v2 = admin_create_keypair_resource_policy_v2
+    admin_update_keypair_resource_policy_v2 = admin_update_keypair_resource_policy_v2
+    admin_delete_keypair_resource_policy_v2 = admin_delete_keypair_resource_policy_v2
+    admin_create_user_resource_policy_v2 = admin_create_user_resource_policy_v2
+    admin_update_user_resource_policy_v2 = admin_update_user_resource_policy_v2
+    admin_delete_user_resource_policy_v2 = admin_delete_user_resource_policy_v2
+    admin_create_project_resource_policy_v2 = admin_create_project_resource_policy_v2
+    admin_update_project_resource_policy_v2 = admin_update_project_resource_policy_v2
+    admin_delete_project_resource_policy_v2 = admin_delete_project_resource_policy_v2
 
 
 @strawberry.type

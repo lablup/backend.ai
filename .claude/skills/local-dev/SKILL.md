@@ -29,6 +29,21 @@ Manages Backend.AI services via tmux sessions.
 
 **Services:** `mgr`, `agent`, `storage`, `web`, `proxy-coordinator`, `proxy-worker`
 
+### Debugging Startup Crashes
+
+`./dev` runs services in tmux — if a service crashes on startup, the tmux window
+closes and logs are lost. To see the actual error, run the service directly:
+
+```bash
+# Run manager directly to see startup errors (e.g., import errors, schema issues)
+PYTHONPATH=src python -c "from ai.backend.manager.api.gql.schema import schema; print('OK')"
+
+# Or test a specific import chain
+PYTHONPATH=src python -c "from ai.backend.manager.api.adapters.registry import Adapters; print('OK')"
+```
+
+After fixing, restart with `./dev start mgr`.
+
 ### After Code Changes
 
 Server-side code changes (handler, adapter, DTO, model) require a server restart:

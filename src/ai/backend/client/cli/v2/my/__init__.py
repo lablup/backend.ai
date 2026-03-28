@@ -45,3 +45,12 @@ def export() -> None:
 @my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.session:session")
 def session() -> None:
     """My session commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.resource_policy:resource_policy",
+    name="resource-policy",
+)
+def resource_policy() -> None:
+    """My resource policy commands."""

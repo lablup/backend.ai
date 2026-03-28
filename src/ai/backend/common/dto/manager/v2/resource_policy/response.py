@@ -5,11 +5,14 @@ Response DTOs for resource policy DTO v2.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.common import (
+    ResourceSlotEntryInfo,
+    VFolderHostPermissionEntryInfo,
+)
 
 from .types import DefaultForUnspecified
 
@@ -32,6 +35,7 @@ __all__ = (
 class KeypairResourcePolicyNode(BaseResponseModel):
     """Node model representing a keypair resource policy entity."""
 
+    id: str = Field(description="Policy name (primary key).")
     name: str = Field(description="Unique name of the keypair resource policy.")
     created_at: datetime | None = Field(
         default=None,
@@ -40,7 +44,7 @@ class KeypairResourcePolicyNode(BaseResponseModel):
     default_for_unspecified: DefaultForUnspecified = Field(
         description="Default resource allocation for unspecified resource slots.",
     )
-    total_resource_slots: dict[str, Any] = Field(
+    total_resource_slots: list[ResourceSlotEntryInfo] = Field(
         description="Total resource slot limits for sessions using this policy.",
     )
     max_session_lifetime: int = Field(
@@ -53,7 +57,7 @@ class KeypairResourcePolicyNode(BaseResponseModel):
         default=None,
         description="Maximum number of sessions in pending state. Null means unlimited.",
     )
-    max_pending_session_resource_slots: dict[str, Any] | None = Field(
+    max_pending_session_resource_slots: list[ResourceSlotEntryInfo] | None = Field(
         default=None,
         description="Maximum resource slots occupied by pending sessions. Null means unlimited.",
     )
@@ -66,7 +70,7 @@ class KeypairResourcePolicyNode(BaseResponseModel):
     idle_timeout: int = Field(
         description="Idle timeout for sessions in seconds.",
     )
-    allowed_vfolder_hosts: dict[str, Any] = Field(
+    allowed_vfolder_hosts: list[VFolderHostPermissionEntryInfo] = Field(
         description="Allowed vfolder host permissions for this policy.",
     )
 
@@ -96,6 +100,7 @@ class DeleteKeypairResourcePolicyPayload(BaseResponseModel):
 class UserResourcePolicyNode(BaseResponseModel):
     """Node model representing a user resource policy entity."""
 
+    id: str = Field(description="Policy name (primary key).")
     name: str = Field(description="Unique name of the user resource policy.")
     created_at: datetime | None = Field(
         default=None,
@@ -140,6 +145,7 @@ class DeleteUserResourcePolicyPayload(BaseResponseModel):
 class ProjectResourcePolicyNode(BaseResponseModel):
     """Node model representing a project resource policy entity."""
 
+    id: str = Field(description="Policy name (primary key).")
     name: str = Field(description="Unique name of the project resource policy.")
     created_at: datetime | None = Field(
         default=None,
@@ -176,3 +182,24 @@ class DeleteProjectResourcePolicyPayload(BaseResponseModel):
     """Payload for project resource policy deletion mutation result."""
 
     name: str = Field(description="Name of the deleted project resource policy.")
+
+
+class SearchKeypairResourcePoliciesPayload(BaseResponseModel):
+    """Payload for keypair resource policy search results."""
+
+    items: list[KeypairResourcePolicyNode] = Field(description="List of keypair resource policies.")
+    total_count: int = Field(description="Total number of matching policies.")
+
+
+class SearchUserResourcePoliciesPayload(BaseResponseModel):
+    """Payload for user resource policy search results."""
+
+    items: list[UserResourcePolicyNode] = Field(description="List of user resource policies.")
+    total_count: int = Field(description="Total number of matching policies.")
+
+
+class SearchProjectResourcePoliciesPayload(BaseResponseModel):
+    """Payload for project resource policy search results."""
+
+    items: list[ProjectResourcePolicyNode] = Field(description="List of project resource policies.")
+    total_count: int = Field(description="Total number of matching policies.")

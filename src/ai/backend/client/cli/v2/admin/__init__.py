@@ -100,3 +100,12 @@ def service_catalog() -> None:
 )
 def prometheus_query_preset() -> None:
     """Admin prometheus query definition commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.resource_policy:resource_policy",
+    name="resource-policy",
+)
+def resource_policy() -> None:
+    """Admin resource policy commands."""

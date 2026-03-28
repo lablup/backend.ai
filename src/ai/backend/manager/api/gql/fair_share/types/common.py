@@ -8,13 +8,20 @@ from decimal import Decimal
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     FairShareCalculationSnapshotInfo,
     FairShareSpecInfo,
-    ResourceSlotEntryInfo,
-    ResourceSlotInfo,
     ResourceWeightEntryInfo,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     ResourceWeightEntryInput as ResourceWeightEntryInputDTO,
 )
+from ai.backend.manager.api.gql.common_types import (
+    ResourceSlotEntryGQL,
+    ResourceSlotGQL,
+)
+
+__all__ = [
+    "ResourceSlotEntryGQL",
+    "ResourceSlotGQL",
+]
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -24,29 +31,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version="26.1.0",
-        description=(
-            "A single entry representing one resource type and its allocated quantity. "
-            "Resource types include compute resources (cpu, mem), accelerators (cuda.shares, cuda.device, "
-            "rocm.device), and custom resources defined by plugins."
-        ),
-    ),
-    model=ResourceSlotEntryInfo,
-    name="ResourceSlotEntry",
-)
-class ResourceSlotEntryGQL(PydanticOutputMixin[ResourceSlotEntryInfo]):
-    """Single resource slot entry with resource type and quantity."""
-
-    resource_type: str = gql_field(
-        description="Resource type identifier. Common types include: 'cpu' (CPU cores), 'mem' (memory in bytes), 'cuda.shares' (fractional GPU), 'cuda.device' (whole GPU devices), 'rocm.device' (AMD GPU devices). Custom accelerator plugins may define additional types."
-    )
-    quantity: Decimal = gql_field(
-        description="Quantity of the resource. For 'cpu': number of cores (e.g., 2.0, 0.5). For 'mem': bytes (e.g., 4294967296 for 4GB). For accelerators: device count or share fraction."
-    )
 
 
 @gql_pydantic_input(
@@ -65,26 +49,6 @@ class ResourceWeightEntryInputGQL(PydanticInputMixin[ResourceWeightEntryInputDTO
     weight: Decimal | None = gql_field(
         description="Weight multiplier for this resource type in fair share calculations. Higher weight means this resource contributes more to the normalized usage. Set to null to remove this resource type (revert to default weight 1.0). Example: 0.001 for memory (bytes) to normalize against CPU cores.",
         default=None,
-    )
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version="26.1.0",
-        description=(
-            "A collection of compute resource allocations. "
-            "Represents the resources consumed, allocated, or available for a workload. "
-            "Each entry specifies a resource type and its quantity."
-        ),
-    ),
-    model=ResourceSlotInfo,
-    name="ResourceSlot",
-)
-class ResourceSlotGQL(PydanticOutputMixin[ResourceSlotInfo]):
-    """Resource slot containing multiple resource type entries."""
-
-    entries: list[ResourceSlotEntryGQL] = gql_field(
-        description="List of resource allocations. Each entry contains a resource type and quantity pair. The list may include cpu, mem, and various accelerator types depending on the cluster configuration."
     )
 
 

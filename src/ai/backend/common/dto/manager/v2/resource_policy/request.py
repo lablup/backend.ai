@@ -4,15 +4,26 @@ Request DTOs for resource policy DTO v2.
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    ResourceSlotEntryInput,
+    VFolderHostPermissionEntryInput,
+)
 
-from .types import DefaultForUnspecified
+from .types import (
+    DefaultForUnspecified,
+    KeypairResourcePolicyOrderField,
+    ProjectResourcePolicyOrderField,
+    UserResourcePolicyOrderField,
+)
 
 __all__ = (
+    "AdminSearchKeypairResourcePoliciesInput",
+    "AdminSearchProjectResourcePoliciesInput",
+    "AdminSearchUserResourcePoliciesInput",
     "CreateKeypairResourcePolicyInput",
     "CreateProjectResourcePolicyInput",
     "CreateUserResourcePolicyInput",
@@ -36,7 +47,7 @@ class CreateKeypairResourcePolicyInput(BaseRequestModel):
     default_for_unspecified: DefaultForUnspecified = Field(
         description="Default resource allocation for unspecified resource slots.",
     )
-    total_resource_slots: dict[str, Any] = Field(
+    total_resource_slots: list[ResourceSlotEntryInput] = Field(
         description="Total resource slot limits for sessions using this policy.",
     )
     max_session_lifetime: int = Field(
@@ -49,7 +60,7 @@ class CreateKeypairResourcePolicyInput(BaseRequestModel):
         default=None,
         description="Maximum number of sessions in pending state. Null means unlimited.",
     )
-    max_pending_session_resource_slots: dict[str, Any] | None = Field(
+    max_pending_session_resource_slots: list[ResourceSlotEntryInput] | None = Field(
         default=None,
         description="Maximum resource slots occupied by pending sessions. Null means unlimited.",
     )
@@ -62,7 +73,7 @@ class CreateKeypairResourcePolicyInput(BaseRequestModel):
     idle_timeout: int = Field(
         description="Idle timeout for sessions in seconds.",
     )
-    allowed_vfolder_hosts: dict[str, Any] = Field(
+    allowed_vfolder_hosts: list[VFolderHostPermissionEntryInput] = Field(
         description="Allowed vfolder host permissions for this policy.",
     )
 
@@ -83,9 +94,9 @@ class UpdateKeypairResourcePolicyInput(BaseRequestModel):
         default=None,
         description="Updated default resource allocation. Leave null to keep existing value.",
     )
-    total_resource_slots: dict[str, Any] | Sentinel | None = Field(
+    total_resource_slots: list[ResourceSlotEntryInput] | Sentinel | None = Field(
         default=SENTINEL,
-        description="Updated resource slot limits. Use SENTINEL to clear, null to keep existing.",
+        description="Updated resource slot limits. Set to null to clear.",
     )
     max_session_lifetime: int | None = Field(
         default=None,
@@ -97,14 +108,11 @@ class UpdateKeypairResourcePolicyInput(BaseRequestModel):
     )
     max_pending_session_count: int | Sentinel | None = Field(
         default=SENTINEL,
-        description="Updated max pending sessions. Use SENTINEL to clear, null to keep existing.",
+        description="Updated max pending sessions. Set to null to clear.",
     )
-    max_pending_session_resource_slots: dict[str, Any] | Sentinel | None = Field(
+    max_pending_session_resource_slots: list[ResourceSlotEntryInput] | Sentinel | None = Field(
         default=SENTINEL,
-        description=(
-            "Updated max pending session resource slots. "
-            "Use SENTINEL to clear, null to keep existing."
-        ),
+        description="Updated max pending session resource slots. Set to null to clear.",
     )
     max_concurrent_sftp_sessions: int | None = Field(
         default=None,
@@ -118,9 +126,9 @@ class UpdateKeypairResourcePolicyInput(BaseRequestModel):
         default=None,
         description="Updated idle timeout in seconds. Leave null to keep existing.",
     )
-    allowed_vfolder_hosts: dict[str, Any] | Sentinel | None = Field(
+    allowed_vfolder_hosts: list[VFolderHostPermissionEntryInput] | Sentinel | None = Field(
         default=SENTINEL,
-        description="Updated vfolder host permissions. Use SENTINEL to clear, null to keep existing.",
+        description="Updated vfolder host permissions. Set to null to clear.",
     )
 
 
@@ -237,3 +245,69 @@ class DeleteProjectResourcePolicyInput(BaseRequestModel):
     """Input for deleting a project resource policy."""
 
     name: str = Field(description="Name of the project resource policy to delete.")
+
+
+# ── Search DTOs ──
+
+
+class KeypairResourcePolicyOrder(BaseRequestModel):
+    """Order specification for keypair resource policy search."""
+
+    field: KeypairResourcePolicyOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
+
+
+class AdminSearchKeypairResourcePoliciesInput(BaseRequestModel):
+    """Input for admin search of keypair resource policies."""
+
+    order: list[KeypairResourcePolicyOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class UserResourcePolicyOrder(BaseRequestModel):
+    """Order specification for user resource policy search."""
+
+    field: UserResourcePolicyOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
+
+
+class AdminSearchUserResourcePoliciesInput(BaseRequestModel):
+    """Input for admin search of user resource policies."""
+
+    order: list[UserResourcePolicyOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class ProjectResourcePolicyOrder(BaseRequestModel):
+    """Order specification for project resource policy search."""
+
+    field: ProjectResourcePolicyOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
+
+
+class AdminSearchProjectResourcePoliciesInput(BaseRequestModel):
+    """Input for admin search of project resource policies."""
+
+    order: list[ProjectResourcePolicyOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")

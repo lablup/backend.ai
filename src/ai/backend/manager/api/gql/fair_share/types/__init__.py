@@ -1,10 +1,13 @@
 """Fair Share GQL types package."""
 
+from ai.backend.manager.api.gql.common_types import (
+    ResourceSlotEntryGQL,
+    ResourceSlotGQL,
+)
+
 from .common import (
     FairShareCalculationSnapshotGQL,
     FairShareSpecGQL,
-    ResourceSlotEntryGQL,
-    ResourceSlotGQL,
     ResourceWeightEntryInputGQL,
 )
 from .domain import (

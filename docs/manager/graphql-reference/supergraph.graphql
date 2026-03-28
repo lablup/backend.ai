@@ -2639,6 +2639,54 @@ input CreateKeyPairResourcePolicyInput
   max_pending_session_resource_slots: JSONString
 }
 
+"""Added in UNRELEASED. Input for creating a keypair resource policy."""
+input CreateKeypairResourcePolicyInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Policy name. Must be unique."""
+  name: String!
+
+  """Default for unspecified resource slots (LIMITED or UNLIMITED)."""
+  defaultForUnspecified: String!
+
+  """Total resource slot limits."""
+  totalResourceSlots: [ResourceSlotEntryInput!]!
+
+  """Maximum session lifetime in seconds."""
+  maxSessionLifetime: Int!
+
+  """Maximum concurrent sessions."""
+  maxConcurrentSessions: Int!
+
+  """Maximum containers per session."""
+  maxContainersPerSession: Int!
+
+  """Idle timeout in seconds."""
+  idleTimeout: Int!
+
+  """Maximum pending sessions. Null means unlimited."""
+  maxPendingSessionCount: Int = null
+
+  """Maximum pending session resource slots."""
+  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
+
+  """Maximum concurrent SFTP sessions."""
+  maxConcurrentSftpSessions: Int! = 1
+
+  """Allowed vfolder host permissions."""
+  allowedVfolderHosts: [VFolderHostPermissionEntryInput!]!
+}
+
+"""
+Added in UNRELEASED. Payload for keypair resource policy create/update mutations.
+"""
+type CreateKeypairResourcePolicyPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Created keypair resource policy."""
+  keypairResourcePolicy: KeypairResourcePolicyV2!
+}
+
 """Added in 24.12.0."""
 type CreateNetwork
   @join__type(graph: GRAPHENE)
@@ -2766,6 +2814,33 @@ input CreateProjectResourcePolicyInput
   Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks.
   """
   max_network_count: Int
+}
+
+"""Added in UNRELEASED. Input for creating a project resource policy."""
+input CreateProjectResourcePolicyInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Policy name. Must be unique."""
+  name: String!
+
+  """Maximum vfolders a project can have."""
+  maxVfolderCount: Int!
+
+  """Maximum quota scope size in bytes."""
+  maxQuotaScopeSize: Int!
+
+  """Maximum networks a project can create. -1 means unlimited."""
+  maxNetworkCount: Int!
+}
+
+"""
+Added in UNRELEASED. Payload for project resource policy create/update mutations.
+"""
+type CreateProjectResourcePolicyPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Created project resource policy."""
+  projectResourcePolicy: ProjectResourcePolicyV2!
 }
 
 """Added in 26.3.0. Input for creating a new query definition."""
@@ -2924,6 +2999,36 @@ input CreateUserResourcePolicyInput
   Added in 24.03.0. Maximum available number of customized images one can publish to.
   """
   max_customized_image_count: Int
+}
+
+"""Added in UNRELEASED. Input for creating a user resource policy."""
+input CreateUserResourcePolicyInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Policy name. Must be unique."""
+  name: String!
+
+  """Maximum vfolders a user can create."""
+  maxVfolderCount: Int!
+
+  """Maximum quota scope size in bytes."""
+  maxQuotaScopeSize: Int!
+
+  """Maximum sessions per model session."""
+  maxSessionCountPerModelSession: Int!
+
+  """Maximum customized images a user can create."""
+  maxCustomizedImageCount: Int!
+}
+
+"""
+Added in UNRELEASED. Payload for user resource policy create/update mutations.
+"""
+type CreateUserResourcePolicyPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Created user resource policy."""
+  userResourcePolicy: UserResourcePolicyV2!
 }
 
 """
@@ -3297,6 +3402,14 @@ type DeleteKeyPairResourcePolicy
   msg: String
 }
 
+"""Added in UNRELEASED. Payload for keypair resource policy deletion."""
+type DeleteKeypairResourcePolicyPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the deleted keypair resource policy."""
+  name: String!
+}
+
 """Added in 24.12.0."""
 type DeleteNetwork
   @join__type(graph: GRAPHENE)
@@ -3378,6 +3491,14 @@ type DeleteProjectResourcePolicy
 {
   ok: Boolean
   msg: String
+}
+
+"""Added in UNRELEASED. Payload for project resource policy deletion."""
+type DeleteProjectResourcePolicyPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the deleted project resource policy."""
+  name: String!
 }
 
 """Added in 26.3.0. Payload returned after deleting a query definition."""
@@ -3469,6 +3590,14 @@ type DeleteUserResourcePolicy
 {
   ok: Boolean
   msg: String
+}
+
+"""Added in UNRELEASED. Payload for user resource policy deletion."""
+type DeleteUserResourcePolicyPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the deleted user resource policy."""
+  name: String!
 }
 
 """
@@ -6208,6 +6337,82 @@ type KeyPairResourcePolicy
   max_pending_session_resource_slots: JSONString
 }
 
+"""
+Added in UNRELEASED. Keypair resource policy defining session and storage limits for API keypairs.
+"""
+type KeypairResourcePolicyV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Policy name."""
+  name: String!
+
+  """Timestamp when the policy was created."""
+  createdAt: DateTime
+
+  """
+  Default resource allocation for unspecified slots (LIMITED or UNLIMITED).
+  """
+  defaultForUnspecified: String!
+
+  """Total resource slot limits for sessions."""
+  totalResourceSlots: [ResourceSlotEntry!]!
+
+  """Maximum session lifetime in seconds."""
+  maxSessionLifetime: Int!
+
+  """Maximum concurrent sessions allowed."""
+  maxConcurrentSessions: Int!
+
+  """Maximum pending sessions. Null means unlimited."""
+  maxPendingSessionCount: Int
+
+  """Maximum resource slots for pending sessions. Null means unlimited."""
+  maxPendingSessionResourceSlots: [ResourceSlotEntry!]
+
+  """Maximum concurrent SFTP sessions allowed."""
+  maxConcurrentSftpSessions: Int!
+
+  """Maximum containers allowed per session."""
+  maxContainersPerSession: Int!
+
+  """Idle timeout for sessions in seconds."""
+  idleTimeout: Int!
+
+  """Allowed vfolder host permissions."""
+  allowedVfolderHosts: [VFolderHostPermissionEntry!]!
+}
+
+"""
+Added in UNRELEASED. Paginated connection for keypair resource policies.
+"""
+type KeypairResourcePolicyV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [KeypairResourcePolicyV2Edge!]!
+
+  """Total number of matching policies."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type KeypairResourcePolicyV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KeypairResourcePolicyV2!
+}
+
 type KVPair
   @join__type(graph: GRAPHENE)
 {
@@ -8378,6 +8583,43 @@ type Mutation
 
   """Added in 26.3.0. Bulk revoke a role from multiple users (admin only)."""
   adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Create a new keypair resource policy (admin only).
+  """
+  adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInputGQL!): CreateKeypairResourcePolicyPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Update a keypair resource policy (admin only). Only provided fields will be updated.
+  """
+  adminUpdateKeypairResourcePolicyV2(name: String!, input: UpdateKeypairResourcePolicyInputGQL!): UpdateKeypairResourcePolicyPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a keypair resource policy (admin only)."""
+  adminDeleteKeypairResourcePolicyV2(name: String!): DeleteKeypairResourcePolicyPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Create a new user resource policy (admin only)."""
+  adminCreateUserResourcePolicyV2(input: CreateUserResourcePolicyInputGQL!): CreateUserResourcePolicyPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Update a user resource policy (admin only). Only provided fields will be updated.
+  """
+  adminUpdateUserResourcePolicyV2(name: String!, input: UpdateUserResourcePolicyInputGQL!): UpdateUserResourcePolicyPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a user resource policy (admin only)."""
+  adminDeleteUserResourcePolicyV2(name: String!): DeleteUserResourcePolicyPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Create a new project resource policy (admin only).
+  """
+  adminCreateProjectResourcePolicyV2(input: CreateProjectResourcePolicyInputGQL!): CreateProjectResourcePolicyPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Update a project resource policy (admin only). Only provided fields will be updated.
+  """
+  adminUpdateProjectResourcePolicyV2(name: String!, input: UpdateProjectResourcePolicyInputGQL!): UpdateProjectResourcePolicyPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a project resource policy (admin only)."""
+  adminDeleteProjectResourcePolicyV2(name: String!): DeleteProjectResourcePolicyPayloadGQL! @join__field(graph: STRAWBERRY)
 }
 
 """
@@ -9228,6 +9470,59 @@ type ProjectResourcePolicy
   Added in 24.12.0. Limitation of the number of networks created on behalf of project.
   """
   max_network_count: Int
+}
+
+"""
+Added in UNRELEASED. Project resource policy defining vfolder, quota, and network limits per project.
+"""
+type ProjectResourcePolicyV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Policy name."""
+  name: String!
+
+  """Timestamp when the policy was created."""
+  createdAt: DateTime
+
+  """Maximum vfolders a project can have."""
+  maxVfolderCount: Int!
+
+  """Maximum quota scope size in bytes."""
+  maxQuotaScopeSize: Int!
+
+  """Maximum networks a project can create. -1 means unlimited."""
+  maxNetworkCount: Int!
+}
+
+"""
+Added in UNRELEASED. Paginated connection for project resource policies.
+"""
+type ProjectResourcePolicyV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ProjectResourcePolicyV2Edge!]!
+
+  """Total number of matching policies."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ProjectResourcePolicyV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ProjectResourcePolicyV2!
 }
 
 """
@@ -10574,6 +10869,42 @@ type Query
   Added in 26.2.0. Get the domain that a project belongs to. Returns an error if project or domain is not found.
   """
   projectDomainV2(projectId: UUID!): DomainV2 @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Get a single keypair resource policy by name (admin only).
+  """
+  adminKeypairResourcePolicyV2(name: String!): KeypairResourcePolicyV2 @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. List all keypair resource policies with pagination (admin only).
+  """
+  adminKeypairResourcePoliciesV2(limit: Int = null, offset: Int = null): KeypairResourcePolicyV2Connection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Get a single user resource policy by name (admin only).
+  """
+  adminUserResourcePolicyV2(name: String!): UserResourcePolicyV2 @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. List all user resource policies with pagination (admin only).
+  """
+  adminUserResourcePoliciesV2(limit: Int = null, offset: Int = null): UserResourcePolicyV2Connection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Get a single project resource policy by name (admin only).
+  """
+  adminProjectResourcePolicyV2(name: String!): ProjectResourcePolicyV2 @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. List all project resource policies with pagination (admin only).
+  """
+  adminProjectResourcePoliciesV2(limit: Int = null, offset: Int = null): ProjectResourcePolicyV2Connection @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get the current user's keypair resource policy."""
+  myKeypairResourcePolicyV2: KeypairResourcePolicyV2 @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get the current user's user resource policy."""
+  myUserResourcePolicyV2: UserResourcePolicyV2 @join__field(graph: STRAWBERRY)
 }
 
 """
@@ -13375,6 +13706,53 @@ type UpdateHuggingFaceRegistryPayload
 }
 
 """
+Added in UNRELEASED. Input for updating a keypair resource policy. All fields optional.
+"""
+input UpdateKeypairResourcePolicyInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated default for unspecified."""
+  defaultForUnspecified: String = null
+
+  """Updated resource slot limits."""
+  totalResourceSlots: [ResourceSlotEntryInput!] = null
+
+  """Updated max session lifetime."""
+  maxSessionLifetime: Int = null
+
+  """Updated max concurrent sessions."""
+  maxConcurrentSessions: Int = null
+
+  """Updated max pending sessions."""
+  maxPendingSessionCount: Int = null
+
+  """Updated max pending session resource slots."""
+  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
+
+  """Updated max concurrent SFTP sessions."""
+  maxConcurrentSftpSessions: Int = null
+
+  """Updated max containers per session."""
+  maxContainersPerSession: Int = null
+
+  """Updated idle timeout."""
+  idleTimeout: Int = null
+
+  """Updated vfolder host permissions."""
+  allowedVfolderHosts: [VFolderHostPermissionEntryInput!] = null
+}
+
+"""
+Added in UNRELEASED. Payload for keypair resource policy update mutation.
+"""
+type UpdateKeypairResourcePolicyPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated keypair resource policy."""
+  keypairResourcePolicy: KeypairResourcePolicyV2!
+}
+
+"""
 Added in 26.4.0. Input for updating the current user's allowed client IP list. Set allowed_client_ip to null to remove all restrictions. Use force=true to bypass the lockout safety check.
 """
 input UpdateMyAllowedClientIPInput
@@ -13516,6 +13894,32 @@ input UpdateProjectInputGQL
   resourcePolicy: String = null
 }
 
+"""
+Added in UNRELEASED. Input for updating a project resource policy. All fields optional.
+"""
+input UpdateProjectResourcePolicyInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated max vfolder count."""
+  maxVfolderCount: Int = null
+
+  """Updated max quota scope size."""
+  maxQuotaScopeSize: Int = null
+
+  """Updated max network count."""
+  maxNetworkCount: Int = null
+}
+
+"""
+Added in UNRELEASED. Payload for project resource policy update mutation.
+"""
+type UpdateProjectResourcePolicyPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated project resource policy."""
+  projectResourcePolicy: ProjectResourcePolicyV2!
+}
+
 """Added in 25.14.0. """
 input UpdateReservoirRegistryInput
   @join__type(graph: STRAWBERRY)
@@ -13654,6 +14058,33 @@ type UpdateRouteTrafficStatusPayload
 {
   """The updated route"""
   route: Route!
+}
+
+"""
+Added in UNRELEASED. Input for updating a user resource policy. All fields optional.
+"""
+input UpdateUserResourcePolicyInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated max vfolder count."""
+  maxVfolderCount: Int = null
+
+  """Updated max quota scope size."""
+  maxQuotaScopeSize: Int = null
+
+  """Updated max sessions per model session."""
+  maxSessionCountPerModelSession: Int = null
+
+  """Updated max customized image count."""
+  maxCustomizedImageCount: Int = null
+}
+
+"""Added in UNRELEASED. Payload for user resource policy update mutation."""
+type UpdateUserResourcePolicyPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated user resource policy."""
+  userResourcePolicy: UserResourcePolicyV2!
 }
 
 """
@@ -14324,6 +14755,60 @@ type UserResourcePolicy
 }
 
 """
+Added in UNRELEASED. User resource policy defining vfolder and quota limits per user.
+"""
+type UserResourcePolicyV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Policy name."""
+  name: String!
+
+  """Timestamp when the policy was created."""
+  createdAt: DateTime
+
+  """Maximum vfolders a user can create."""
+  maxVfolderCount: Int!
+
+  """Maximum quota scope size in bytes."""
+  maxQuotaScopeSize: Int!
+
+  """Maximum sessions per model session."""
+  maxSessionCountPerModelSession: Int!
+
+  """Maximum customized images a user can create."""
+  maxCustomizedImageCount: Int!
+}
+
+"""Added in UNRELEASED. Paginated connection for user resource policies."""
+type UserResourcePolicyV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [UserResourcePolicyV2Edge!]!
+
+  """Total number of matching policies."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type UserResourcePolicyV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: UserResourcePolicyV2!
+}
+
+"""
 Added in 26.2.0. User role determining access permissions. USER: Standard user with basic permissions. ADMIN: Domain administrator with elevated permissions. SUPERADMIN: System-wide administrator with full access. MONITOR: Read-only access for monitoring purposes.
 """
 enum UserRoleV2
@@ -14858,13 +15343,22 @@ Added in 26.2.0. Storage host permission configuration. Defines what operations 
 type VFolderHostPermissionEntry
   @join__type(graph: STRAWBERRY)
 {
-  """Storage host identifier (e.g., 'default', 'storage-01')."""
+  """Virtual folder host name (e.g., 'default', 'nfs-vol1')."""
   host: String!
 
-  """
-  List of permissions granted for this host. See VFolderHostPermission enum for available permissions.
-  """
+  """List of permission values (e.g., 'mount-in-session', 'upload-file')."""
   permissions: [VFolderHostPermissionV2!]!
+}
+
+"""Added in UNRELEASED. Input for a vfolder host with its permissions."""
+input VFolderHostPermissionEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Virtual folder host name."""
+  host: String!
+
+  """List of permission values."""
+  permissions: [String!]!
 }
 
 """

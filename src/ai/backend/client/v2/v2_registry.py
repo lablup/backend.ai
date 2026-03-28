@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from .domains_v2.rbac import V2RBACClient
     from .domains_v2.reservoir_registry import V2ReservoirRegistryClient
     from .domains_v2.resource_group import V2ResourceGroupClient
+    from .domains_v2.resource_policy import V2ResourcePolicyClient
     from .domains_v2.resource_slot import V2ResourceSlotClient
     from .domains_v2.resource_usage import V2ResourceUsageClient
     from .domains_v2.scheduling_history import V2SchedulingHistoryClient
@@ -201,6 +202,12 @@ class V2ClientRegistry:
         from .domains_v2.reservoir_registry import V2ReservoirRegistryClient
 
         return V2ReservoirRegistryClient(self._client)
+
+    @cached_property
+    def resource_policy(self) -> V2ResourcePolicyClient:
+        from .domains_v2.resource_policy import V2ResourcePolicyClient
+
+        return V2ResourcePolicyClient(self._client)
 
     @cached_property
     def resource_group(self) -> V2ResourceGroupClient:

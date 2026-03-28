@@ -8,18 +8,20 @@ from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 @dataclass
 class UserResourcePolicyData:
     name: str
-    max_vfolder_count: int
-    max_quota_scope_size: int
-    max_session_count_per_model_session: int
-    max_customized_image_count: int
+    created_at: datetime | None = field(compare=False, default=None)
+    max_vfolder_count: int = 0
+    max_quota_scope_size: int = 0
+    max_session_count_per_model_session: int = 0
+    max_customized_image_count: int = 3
 
 
 @dataclass
 class ProjectResourcePolicyData:
     name: str
-    max_vfolder_count: int
-    max_quota_scope_size: int
-    max_network_count: int
+    created_at: datetime | None = field(compare=False, default=None)
+    max_vfolder_count: int = 0
+    max_quota_scope_size: int = 0
+    max_network_count: int = 0
 
 
 @dataclass

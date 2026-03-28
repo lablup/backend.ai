@@ -67,9 +67,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceGroupInput as ResourceGroupInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    ResourceSlotEntryInput as ResourceSlotEntryInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceSlotInput as ResourceSlotInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -107,6 +104,7 @@ from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
     ResourceOptsInput,
 )
+from ai.backend.manager.api.gql.common_types import ResourceSlotEntryInputGQL, ResourceSlotGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -118,7 +116,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image_federation import Image
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.federation import ResourceGroup
@@ -408,21 +405,6 @@ class ResourceGroupInput(PydanticInputMixin[ResourceGroupInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="A single entry representing one resource type and its allocated quantity.",
-        added_version="26.1.0",
-    ),
-)
-class ResourceSlotEntryInput(PydanticInputMixin[ResourceSlotEntryInputDTO]):
-    """Single resource slot entry input with resource type and quantity."""
-
-    resource_type: str = gql_field(
-        description="Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device')."
-    )
-    quantity: str = gql_field(description="Quantity of the resource as a decimal string.")
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
         description="A collection of compute resource allocations for input.",
         added_version="26.1.0",
     ),
@@ -430,7 +412,9 @@ class ResourceSlotEntryInput(PydanticInputMixin[ResourceSlotEntryInputDTO]):
 class ResourceSlotInput(PydanticInputMixin[ResourceSlotInputDTO]):
     """Resource slot input containing multiple resource type entries."""
 
-    entries: list[ResourceSlotEntryInput] = gql_field(description="List of resource allocations.")
+    entries: list[ResourceSlotEntryInputGQL] = gql_field(
+        description="List of resource allocations."
+    )
 
 
 @gql_pydantic_input(
