@@ -1,0 +1,195 @@
+[service]
+ip = "0.0.0.0"
+port = {{ service_port }}
+wsproxy.url = ""  # only required to use wsproxy v1
+
+ssl_enabled = false
+# ssl_cert =
+# ssl_privkey =
+
+# force_endpoint_protocol = "https"
+# static_path = "/absolute/path/to/static/resources/"
+mode = "webui"
+
+enable_signup = false
+allow_anonymous_change_password = false
+allow_project_resource_monitor = false
+allow_change_signin_mode = false
+allow_manual_image_name_for_session = false
+allow_signup_without_confirmation = false
+always_enqueue_compute_session = false
+webui_debug = false
+mask_user_info = false
+
+# Comma-separeated list of available SSO vendors: "saml,openid"
+# single_sign_on_vendors = "saml"
+# Custom name to display at login page instead of just "SAML" or "OpenID"
+# sso_realm_name = "Custom Login"
+
+enable_container_commit = false
+# enable_model_store = false
+# enable_model_folders = false
+hide_agents = true
+
+enable_2FA = false
+force_2FA = false
+
+# URL to download the webui electron app. If blank, https://github.com/lablup/backend.ai-webui/releases/download will be used.
+# app_download_url = ""
+# Allow users to see the panel downloading the webui app from the summary page.
+allow_app_download_panel = true
+
+# Container image to use SSH/SFTP file upload when storage proxy configuration supports independent resource group for file transfer.
+# If the appropriate settings are not made, please leave it blank.
+# system_SSH_image = ""
+# If true, display the amount of usage per directory such as folder capacity, and number of files and directories.
+directory_based_usage = false
+# If true, display the custom allocation on the session launcher.
+# allow_custom_resource_allocation = true
+# If false, directory size in folder explorer will show "-". default value is set to true.
+is_directory_size_visible = true
+
+# If true, display the "Sign in with a different account" button on the interactive login page.
+# If false, hide the "Sign in with a different account" button from the interactive login page.
+enable_interactive_login_account_switch = true
+enable_extend_login_session = true
+# Default file browser image. If not specified, an arbitrary installed file browser image will be used.
+# default_file_browser_image = ""
+
+# SSO vendors to enable.
+# single_sign_on_vendors = "openid"
+# sso_realm_name = "Lablup Account"
+
+
+[resources]
+open_port_to_public = false
+allow_preferred_port = false
+allow_non_auth_tcp = true
+max_cpu_cores_per_container = {{ webserver_config.max_cpu_cores_per_container }}
+max_memory_per_container = {{ webserver_config.max_memory_per_container }}
+max_cuda_devices_per_container = {{ webserver_config.max_cuda_devices_per_container }}
+max_cuda_shares_per_container = {{ webserver_config.max_cuda_shares_per_container }}
+# max_rocm_devices_per_container = 8
+# max_ipu_devices_per_container = 8
+# max_atom_plus_device_per_container = 8
+# max_gaudi2_devices_per_container = 8
+# max_warboy_devices_per_container = 8
+max_shm_per_container = {{ webserver_config.max_shm_per_container }}
+max_file_upload_size = {{ webserver_config.max_file_upload_size }}
+
+
+[environments]
+# Comma-separated string
+# Image name should contain the repository (registry path and image name) part of the full image URL, excluding the protocol and tag
+# e.g. cr.backend.ai/stable/python
+# You should pick default_environment in ui section too.
+# allowlist = ""
+show_non_installed_images = true
+
+
+[plugin]
+# Comma-separated string
+# Should be same as plugin file in web UI plugin directory.
+# page = ""
+
+
+[pipeline]
+# Endpoint to the FastTrack service
+endpoint = "{{ fasttrack_endpoint }}"
+
+
+[ui]
+brand = "Backend.AI"
+# Default environment to show on session launcher
+default_environment = 'bai-repo:7080/bai/ngc-pytorch'
+# Default environment to import GitHub repositories / notebooks
+default_import_environment = 'bai-repo:7080/bai/filebrowser:21.02-ubuntu20.04'
+# Comma-separated sidebar menu pages to hide
+# menu_blocklist = "statistics"  # "import,statistics,pipeline,..."
+# Comma-separated sidebar menu pages to disable
+# menu_inactivelist = "statistics"
+# Enable/disable the LLM Playground tab in the service page
+enable_LLM_playground = true
+# Enable/disable the Models tab and MODEL usage mode in the Data page
+# enable_model_folders = true
+
+
+[api]
+domain = "default"
+endpoint = "{{ manager_api_endpoint }}"
+text = "Backend.AI"
+ssl_verify = false
+auth_token_name = "sToken"
+# Concurrent API connection limit. Tune for high-traffic environments.
+# connection_limit = 100
+
+[apollo-router]
+enabled = true
+endpoint = "{{ hive_gateway_endpoint }}"
+
+[session]
+redis.addr = "{{ redis_ip }}:{{ redis_port }}"
+redis.db = 10
+redis.password = "{{ redis_password }}"
+
+# Customizes the settings of the Redis connection object used in the web server.
+# redis.redis_helper_config.socket_timeout = 5
+# redis.redis_helper_config.socket_connect_timeout = 2
+# redis.redis_helper_config.reconnect_poll_timeout = 0.3
+
+max_age = 604800  # 1 week
+login_session_extension_sec = 43200  # 12 hr
+flush_on_startup = false
+login_block_time = 1200  # 20 min (in sec)
+login_allowed_fail_count = 10
+# Auto logout when user closes all Backend.AI web UI tab / window
+# auto_logout = false
+
+# The maximum allowed number of pre-opened ports. If you set this option to 0, the pre-opened port is disabled.
+max_count_for_preopen_ports = 10
+
+
+[license]
+# edition = "Open Source"
+# valid_since = ""
+# valid_until = ""
+
+
+[webserver]
+# pid-file = "./webserver.pid"
+# event-loop = "uvloop"
+ipc-base-path = "./tmp/backend.ai/ipc"
+
+{%- if otel_collector_endpoint %}
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "{{ otel_collector_endpoint }}"
+{%- endif %}
+
+
+[logging]
+level = "INFO"
+drivers = ["console", "file"]
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "{{ service_name }}.log"
+backup-count = 10
+rotation-size = "10M"
+
+[logging.logstash]
+endpoint = { host = "localhost", port = 9300 }
+protocol = "tcp"
+ssl-enabled = false
+ssl-verify = false
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "WARNING"
+"ai.backend" = "INFO"

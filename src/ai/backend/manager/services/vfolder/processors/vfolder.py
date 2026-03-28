@@ -32,6 +32,10 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.search_in_project import (
+    SearchVFoldersInProjectAction,
+    SearchVFoldersInProjectActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
     ChangeVFolderOwnershipActionResult,
@@ -67,6 +71,9 @@ class VFolderProcessors(AbstractProcessorPackage):
     create_vfolder: ScopeActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
     get_vfolder: SingleEntityActionProcessor[GetVFolderAction, GetVFolderActionResult]
     list_vfolder: ScopeActionProcessor[ListVFolderAction, ListVFolderActionResult]
+    search_vfolders_in_project: ScopeActionProcessor[
+        SearchVFoldersInProjectAction, SearchVFoldersInProjectActionResult
+    ]
     update_vfolder_attribute: SingleEntityActionProcessor[
         UpdateVFolderAttributeAction, UpdateVFolderAttributeActionResult
     ]
@@ -121,6 +128,9 @@ class VFolderProcessors(AbstractProcessorPackage):
         )
         self.list_vfolder = ScopeActionProcessor(
             service.list, action_monitors, validators=scope_rbac_validators
+        )
+        self.search_vfolders_in_project = ScopeActionProcessor(
+            service.search_in_project, action_monitors, validators=scope_rbac_validators
         )
 
         # Single entity actions with RBAC validation
@@ -178,6 +188,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             CreateVFolderAction.spec(),
             GetVFolderAction.spec(),
             ListVFolderAction.spec(),
+            SearchVFoldersInProjectAction.spec(),
             UpdateVFolderAttributeAction.spec(),
             MoveToTrashVFolderAction.spec(),
             RestoreVFolderFromTrashAction.spec(),

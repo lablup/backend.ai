@@ -1,0 +1,21 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+STATUS=$(curl "http://127.0.0.1:{{ config.haproxy_stat_port }}/stats;json" 2> /dev/null )
+
+function get_value {
+    # $1 value name
+    # $2 seq number
+    echo $STATUS | jq .[$2][] | jq 'select(.field.name == "'$1'")' | jq '.value.value' | tr -d "*" | tr -d "[:space:]"
+}
+
+echo "=============Active================"
+for nn in $(seq 3 5); do
+    printf "%-8s : %-8s ( %-8s )\n" $(get_value "svname" $nn) $(get_value "status" $nn) $(get_value "check_status" $nn)
+done
+
+echo "=============Replica==============="
+for nn in $(seq 8 10); do
+    printf "%-8s : %-8s ( %-8s )\n" $(get_value "svname" $nn) $(get_value "status" $nn) $(get_value "check_status" $nn)
+done

@@ -1109,7 +1109,7 @@ class UserDBSource:
         else:
             status_filter = {status for status in EndpointLifecycle}
 
-        endpoint_rows = await EndpointRow.list(
+        endpoint_rows = await EndpointRow.list_endpoint(
             session, user_uuid=user_uuid, load_tokens=True, status_filter=status_filter
         )
 

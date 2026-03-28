@@ -1,0 +1,72 @@
+#!/bin/bash
+set -e
+
+# Backend.AI Data Backup Script
+# Deployed by PyInfra - deploy/cores/manager/deploy_data_backup.py
+
+DATE=$(date +"%y%m%d_%H%M")
+HOMEDIR={{ home_dir }}
+MANAGERDIR=$HOMEDIR/manager
+BACKUPDIR={{ backup_dir }}/$DATE
+
+DB_HOST="{{ db_host }}"
+DB_PORT="{{ db_port }}"
+DB_USER="{{ db_user }}"
+DB_PASSWORD="{{ db_password }}"
+
+# Dynamically find container names
+{% raw %}
+DB_CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep 'postgres-node' | head -1)
+REDIS_CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep 'redis-node' | head -1)
+{% endraw %}
+
+cd $HOMEDIR
+mkdir -p "$BACKUPDIR"
+
+# static-python environment activation helper
+cd() {
+    builtin cd "$@"
+    if [ -f ".venv/bin/activate" ]; then
+        . .venv/bin/activate
+    elif [ -n "$VIRTUAL_ENV" ] && [ ! -f "$PWD/.venv/bin/activate" ]; then
+        if type deactivate &> /dev/null; then
+            deactivate
+        fi
+    fi
+}
+
+# Etcd config data
+if [[ -d "$MANAGERDIR" ]]; then
+    cd "$MANAGERDIR"
+    backend.ai mgr etcd get --prefix '' > "$BACKUPDIR"/etcd_configs.json
+    cd "$HOMEDIR"
+    echo "Stored etcd config as JSON."
+fi
+
+# Postgres data (via HAProxy to master DB)
+if [[ -n "$DB_CONTAINER_NAME" ]]; then
+    docker exec -e PGPASSWORD="$DB_PASSWORD" -t "$DB_CONTAINER_NAME" \
+        pg_dumpall -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" > "$BACKUPDIR"/db_dumped_all.sql
+    echo "Dumped postgres db (via HAProxy)."
+else
+    echo "Warning: PostgreSQL container not found."
+fi
+
+# Redis data (local container)
+if [[ -n "$REDIS_CONTAINER_NAME" ]]; then
+    docker cp "$REDIS_CONTAINER_NAME":/data/ "$BACKUPDIR"/redis-data
+    echo "Copied redis data."
+else
+    echo "Warning: Redis container not found."
+fi
+
+# Compress backup files
+TARBALL={{ backup_dir }}/bai_backup_$DATE.tar.gz
+tar czf "$TARBALL" -C {{ backup_dir }} "$DATE"
+rm -rf "$BACKUPDIR"
+echo "Compressed backup files as a gzipped tarball."
+
+# Clean up older files (keep last 30 days)
+find {{ backup_dir }} -name "*.tar.gz" -mtime +30 -exec rm -f {} \;
+
+echo "Backup completed: $TARBALL"

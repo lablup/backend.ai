@@ -84,7 +84,7 @@ class V2UserClient(BaseDomainClient):
         """Search users scoped to a specific domain."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/search-by-domain/{domain_name}",
+            f"{_PATH}/domains/{domain_name}/search",
             request=request,
             response_model=SearchUsersPayload,
         )
@@ -97,7 +97,7 @@ class V2UserClient(BaseDomainClient):
         """Search users scoped to a specific project."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/search-by-project/{project_id}",
+            f"{_PATH}/projects/{project_id}/search",
             request=request,
             response_model=SearchUsersPayload,
         )
@@ -110,7 +110,7 @@ class V2UserClient(BaseDomainClient):
         """Search users scoped to a specific role."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/search-by-role/{role_id}",
+            f"{_PATH}/roles/{role_id}/search",
             request=request,
             response_model=SearchUsersPayload,
         )

@@ -1,0 +1,255 @@
+apiVersion: 1
+
+# Backend.AI alert rules provisioned via file-based provisioning.
+# Alert rules are always deployed regardless of SMTP configuration,
+# so firing state is visible in the Grafana UI even without notifications.
+#
+# All Backend.AI services are scraped via a single Prometheus job ("http-sd")
+# backed by the Manager's HTTP service discovery endpoint. Individual services
+# are distinguished by the "service_group" label (manager, agent,
+# appproxy-coordinator, etc.). The job name is set in prometheus.yml.j2.
+#
+# To add new alert rules:
+# 1. Create the rule in a running Grafana instance
+# 2. Export via API: curl -s -u admin:<password> \
+#      "http://<grafana>:3000/api/v1/provisioning/alert-rules/export?format=yaml"
+# 3. Replace datasource UIDs with provisioning UIDs:
+#      - Prometheus: bai-prometheus
+#      - Loki: bai-loki
+# 4. Place the exported rule groups below
+
+{#- Service health rules: alert when up{service_group="..."} < 1 -#}
+{% set health_rules = [
+  {
+    "uid": "bai-svc-manager-down",
+    "title": "Backend.AI Manager Down",
+    "service_group": "manager",
+    "for": "2m",
+    "severity": "critical",
+    "service": "manager",
+    "summary": "Backend.AI Manager instance is unreachable",
+    "description": "The Backend.AI Manager service has been down for more than 2 minutes.",
+  },
+  {
+    "uid": "bai-svc-agent-down",
+    "title": "Backend.AI Agent Down",
+    "service_group": "agent",
+    "for": "5m",
+    "severity": "critical",
+    "service": "agent",
+    "summary": "Backend.AI Agent instance is unreachable",
+    "description": "A Backend.AI Agent has been down for more than 5 minutes.",
+  },
+  {
+    "uid": "bai-svc-proxy-down",
+    "title": "Backend.AI AppProxy Coordinator Down",
+    "service_group": "appproxy-coordinator",
+    "for": "2m",
+    "severity": "warning",
+    "service": "appproxy-coordinator",
+    "summary": "Backend.AI AppProxy Coordinator is unreachable",
+    "description": "The Backend.AI AppProxy Coordinator has been down for more than 2 minutes.",
+  },
+  {
+    "uid": "bai-svc-appproxy-worker-down",
+    "title": "Backend.AI AppProxy Worker Down",
+    "service_group": "appproxy-worker",
+    "for": "2m",
+    "severity": "warning",
+    "service": "appproxy-worker",
+    "summary": "Backend.AI AppProxy Worker is unreachable",
+    "description": "An AppProxy Worker instance has been down for more than 2 minutes. Sessions routed through this worker may be inaccessible.",
+  },
+  {
+    "uid": "bai-svc-storage-proxy-down",
+    "title": "Backend.AI Storage Proxy Down",
+    "service_group": "storage-proxy",
+    "for": "2m",
+    "severity": "critical",
+    "service": "storage-proxy",
+    "summary": "Backend.AI Storage Proxy is unreachable",
+    "description": "The Storage Proxy has been down for more than 2 minutes. File uploads, downloads, and vfolder mounts may be unavailable.",
+  },
+] %}
+
+{#- Service error rules: alert when rate of error metric > threshold -#}
+{% set error_rules = [
+  {
+    "uid": "bai-err-sync-lifecycle",
+    "title": "Backend.AI sync_container_lifecycle Failure",
+    "expr": 'sum(rate(backendai_sync_container_lifecycle_failure_count_total{job="http-sd"}[5m]))',
+    "threshold": 0,
+    "for": "10m",
+    "severity": "critical",
+    "service": "agent",
+    "summary": "Container lifecycle sync failure",
+    "description": "sync_container_lifecycle failures have persisted for more than 10 minutes. Possible container state inconsistency.",
+  },
+  {
+    "uid": "bai-err-rpc-failure",
+    "title": "Backend.AI RPC Failure Rate Increase",
+    "expr": 'sum(rate(backendai_rpc_failure_requests_total{job="http-sd"}[5m]))',
+    "threshold": 0.01,
+    "for": "15m",
+    "severity": "warning",
+    "service": "manager",
+    "summary": "Backend.AI RPC failure rate increase",
+    "description": "RPC failure rate has exceeded 0.01 req/s for more than 15 minutes. Possible agent communication issue.",
+  },
+  {
+    "uid": "bai-err-event-failure",
+    "title": "Backend.AI Event Processing Failure",
+    "expr": 'sum(rate(backendai_event_failure_count_total{job="http-sd"}[5m]))',
+    "threshold": 0,
+    "for": "10m",
+    "severity": "warning",
+    "service": "manager",
+    "summary": "Backend.AI event processing failure",
+    "description": "Event processing failures have persisted for more than 10 minutes. Check the event pipeline.",
+  },
+  {
+    "uid": "bai-err-bgtask-failure",
+    "title": "Backend.AI Background Task Failure",
+    "expr": 'sum(rate(backendai_bgtask_done_count_total{job="http-sd", result="failure"}[5m]))',
+    "threshold": 0,
+    "for": "10m",
+    "severity": "warning",
+    "service": "manager",
+    "summary": "Backend.AI background task failure",
+    "description": "Background task failures have persisted for more than 10 minutes.",
+  },
+] %}
+
+groups:
+  - orgId: 1
+    name: backend-ai-service-health
+    folder: Backend.AI Managed Alerts
+    interval: 1m
+    rules:
+{%- for rule in health_rules %}
+      - uid: {{ rule.uid }}
+        title: "{{ rule.title }}"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: {{ prometheus_uid }}
+            model:
+              expr: up{job="http-sd", service_group="{{ rule.service_group }}"}
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: []
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Alerting
+        for: {{ rule["for"] }}
+        annotations:
+          summary: "{{ rule.summary }}"
+          description: "{{ rule.description }}"
+        labels:
+          severity: {{ rule.severity }}
+          service: {{ rule.service }}
+{% endfor %}
+  - orgId: 1
+    name: backend-ai-service-errors
+    folder: Backend.AI Managed Alerts
+    interval: 1m
+    rules:
+{%- for rule in error_rules %}
+      - uid: {{ rule.uid }}
+        title: "{{ rule.title }}"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: {{ prometheus_uid }}
+            model:
+              expr: {{ rule.expr }}
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              refId: B
+              settings:
+                mode: dropNN
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - {{ rule.threshold }}
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: {{ rule["for"] }}
+        annotations:
+          summary: "{{ rule.summary }}"
+          description: "{{ rule.description }}"
+        labels:
+          severity: {{ rule.severity }}
+          service: {{ rule.service }}
+{% endfor -%}

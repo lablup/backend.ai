@@ -80,9 +80,23 @@ def login_session() -> None:
     """Admin login session commands."""
 
 
+@admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.export:export")
+def export() -> None:
+    """Admin CSV export commands."""
+
+
 @admin.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.service_catalog:service_catalog",
 )
 def service_catalog() -> None:
     """Admin service catalog commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.prometheus_query_preset:prometheus_query_preset",
+    name="prometheus-query-definition",
+)
+def prometheus_query_preset() -> None:
+    """Admin prometheus query definition commands."""

@@ -10,6 +10,8 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
+    "ClusterModeEnum",
+    "CreateSessionTypeEnum",
     "OrderDirection",
     "SessionOrderField",
     "SessionResultEnum",
@@ -64,6 +66,20 @@ class SessionOrderField(StrEnum):
     STATUS = "status"
     ID = "id"
     NAME = "name"
+
+
+class CreateSessionTypeEnum(StrEnum):
+    """Session types allowed for user-initiated creation."""
+
+    INTERACTIVE = "interactive"
+    BATCH = "batch"
+
+
+class ClusterModeEnum(StrEnum):
+    """Cluster networking modes."""
+
+    SINGLE_NODE = "single-node"
+    MULTI_NODE = "multi-node"
 
 
 class SessionStatusFilter(BaseRequestModel):

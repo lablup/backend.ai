@@ -68,6 +68,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentState,
     ModelDeploymentAutoScalingRuleData,
+    ModelRevisionSpec,
     ReplicaSpec,
 )
 from ai.backend.manager.data.model_serving.types import (
@@ -416,7 +417,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         return row
 
     @classmethod
-    async def list(
+    async def list_endpoint(
         cls,
         session: AsyncSession,
         domain: str | None = None,
@@ -587,7 +588,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         from ai.backend.manager.models.routing import RoutingRow
         from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 
-        endpoint_rows = await EndpointRow.list(
+        endpoint_rows = await EndpointRow.list_endpoint(
             db_session,
             user_uuid=owner_user_uuid,
             load_session_owner=True,
@@ -764,8 +765,26 @@ class EndpointRow(Base):  # type: ignore[misc]
 
     def to_deployment_info(self) -> DeploymentInfo:
         """Convert EndpointRow to DeploymentInfo dataclass using revision data."""
-        model_revisions = [rev_row.to_model_revision_spec() for rev_row in self.revisions]
+        policy_data = None
+        if self.deployment_policy is not None:
+            policy_data = self.deployment_policy.to_data()
 
+        model_revisions: list[ModelRevisionSpec] = []
+        for rev_row in self.revisions:
+            if rev_row.image_row is None:
+                continue
+            if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
+                model_revisions.append(rev_row.to_model_revision_spec())
+
+        info = self._to_deployment_info_with_revisions(model_revisions)
+        info.policy = policy_data
+        return info
+
+    def _to_deployment_info_with_revisions(
+        self,
+        model_revisions: list[ModelRevisionSpec],
+    ) -> DeploymentInfo:
+        """Build DeploymentInfo with pre-built model_revisions dict."""
         return DeploymentInfo(
             id=self.id,
             metadata=DeploymentMetadata(

@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
     from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -327,6 +328,7 @@ class ModelRevisionSpec(ConfiguredModel):
     resource_spec: ResourceSpec
     mounts: MountMetadata
     execution: ExecutionSpec
+    model_definition: ModelDefinition | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

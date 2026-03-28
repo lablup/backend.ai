@@ -1,0 +1,87 @@
+-- Initialize Backend.AI databases and users
+-- This script runs automatically on PostgreSQL container initialization
+-- Aligned with HA deployment logic from postgres_ha/postgres_cluster/templates/post_init.sh.j2
+
+-- Create read-only user for monitoring/analytics tools (always created)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{{ postgres_readonly_user }}') THEN
+    CREATE USER {{ postgres_readonly_user }} WITH PASSWORD '{{ postgres_readonly_password }}';
+    RAISE NOTICE 'Created user: {{ postgres_readonly_user }}';
+  ELSE
+    RAISE NOTICE 'User {{ postgres_readonly_user }} already exists';
+  END IF;
+END
+$$;
+
+-- Grant read-only permissions on backend database (always exists)
+\c backend
+
+GRANT CONNECT ON DATABASE backend TO {{ postgres_readonly_user }};
+GRANT USAGE ON SCHEMA public TO {{ postgres_readonly_user }};
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ postgres_readonly_user }};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ postgres_readonly_user }};
+
+-- Granted read-only access on backend database
+
+{%- if appproxy_config %}
+
+-- AppProxy user and database (conditional)
+\c postgres
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{{ appproxy_config.db_user }}') THEN
+    CREATE USER {{ appproxy_config.db_user }} WITH PASSWORD '{{ appproxy_config.db_password }}' CREATEDB;
+    RAISE NOTICE 'Created user: {{ appproxy_config.db_user }}';
+  ELSE
+    RAISE NOTICE 'User {{ appproxy_config.db_user }} already exists';
+  END IF;
+END
+$$;
+
+-- Create database conditionally using \gexec
+SELECT 'CREATE DATABASE {{ appproxy_config.db_name }} OWNER {{ appproxy_config.db_user }}'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{{ appproxy_config.db_name }}')\gexec
+
+\c {{ appproxy_config.db_name }}
+
+GRANT ALL ON SCHEMA public TO {{ appproxy_config.db_user }};
+
+-- Grant read-only access to monitoring user
+GRANT CONNECT ON DATABASE {{ appproxy_config.db_name }} TO {{ postgres_readonly_user }};
+GRANT USAGE ON SCHEMA public TO {{ postgres_readonly_user }};
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ postgres_readonly_user }};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ postgres_readonly_user }};
+{%- endif %}
+
+{%- if fasttrack_config %}
+
+-- FastTrack user and database (conditional)
+\c postgres
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{{ fasttrack_config.postgres_user }}') THEN
+    CREATE USER {{ fasttrack_config.postgres_user }} WITH PASSWORD '{{ fasttrack_config.postgres_password }}' CREATEDB;
+    RAISE NOTICE 'Created user: {{ fasttrack_config.postgres_user }}';
+  ELSE
+    RAISE NOTICE 'User {{ fasttrack_config.postgres_user }} already exists';
+  END IF;
+END
+$$;
+
+-- Create database conditionally using \gexec
+SELECT 'CREATE DATABASE {{ fasttrack_config.postgres_db }} OWNER {{ fasttrack_config.postgres_user }}'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{{ fasttrack_config.postgres_db }}')\gexec
+
+\c {{ fasttrack_config.postgres_db }}
+
+GRANT ALL ON SCHEMA public TO {{ fasttrack_config.postgres_user }};
+
+-- Grant read-only access to monitoring user
+GRANT CONNECT ON DATABASE {{ fasttrack_config.postgres_db }} TO {{ postgres_readonly_user }};
+GRANT USAGE ON SCHEMA public TO {{ postgres_readonly_user }};
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ postgres_readonly_user }};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ postgres_readonly_user }};
+{%- endif %}

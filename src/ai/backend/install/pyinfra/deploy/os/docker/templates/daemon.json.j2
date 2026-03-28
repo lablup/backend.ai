@@ -1,0 +1,31 @@
+{
+    "insecure-registries": [
+        "{{ docker_insecure_registries }}"
+    ],
+    "exec-opts": [
+        "native.cgroupdriver=cgroupfs"
+    ],
+    "icc": false,
+    "log-level": "info",
+    "features": {
+        "containerd-snapshotter": false
+    }
+    {%- if data_root -%},
+    "data-root": "{{ data_root }}"
+    {% endif %}
+    {%- if accelerator_type == 'cuda' -%},
+    "runtimes": {
+        "nvidia": {
+            "path": "nvidia-container-runtime",
+            "runtimeArgs": []
+        }
+    }
+    {%- endif %}
+    {%- if default_address_pools -%},
+    "default-address-pools": [
+        {%- for pool in default_address_pools %}
+        {{ pool | tojson }}{{ "," if not loop.last else ""}}
+        {%- endfor %}
+    ]
+    {%- endif %}
+}

@@ -60,8 +60,14 @@
 
 **search — always two variants:**
 - `adminFoosV2`: superadmin only, no scope — queries entire system.
-- `domainFoosV2` / `projectFoosV2`: non-admin, scope parameter required — queries within the given scope only.
+- `{scope}FoosV2` (e.g., `projectSessionsV2`): non-admin, scope parameter required — queries within the given scope only.
+- `myFoosV2`: self-service, adapter resolves current user as scope internally.
 - There is NO "search everything without scope" for non-admin users.
+
+**Scoped search naming convention:**
+- GQL query names use scope as prefix: `projectSessionsV2`, `domainUsersV2`.
+- The scope ID is a required argument, not an optional filter.
+- Maps to REST pattern: `POST /v2/{entity}/{scope_type}/{scope_id}/search`.
 
 **create / update / get / delete / purge — when to separate `admin_` vs non-admin:**
 - **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` mutation/query.

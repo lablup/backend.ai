@@ -48,13 +48,25 @@ class V2DomainHandler:
 - Self-service endpoints: `/v2/{entity}/my/` — entity first, `my` as scope qualifier.
 
 **search — always two variants:**
-- `POST /v2/admin/{entity}/search`: superadmin only, no scope — queries entire system.
-- `POST /v2/domains/{domain}/{entity}/search`: non-admin, scope in URL path — queries within the given scope only.
+- `POST /v2/{entity}/search`: superadmin only, no scope — queries entire system.
+- Scoped search (non-admin): scope is a **required** path segment — queries within the given scope only.
 - There is NO "search everything without scope" for non-admin users.
 
+**Scoped search URL pattern:**
+- Pattern: `POST /v2/{entity}/{scope_type}/{scope_id}/search`
+- The scope type and ID are expressed as nested resource path segments.
+- Examples:
+  - `POST /v2/sessions/projects/{project_id}/search` — sessions within a project
+  - `POST /v2/sessions/agents/{agent_id}/search` — sessions on an agent
+  - `POST /v2/users/domains/{domain_name}/search` — users within a domain
+  - `POST /v2/users/projects/{project_id}/search` — users within a project
+  - `POST /v2/users/roles/{role_id}/search` — users with a specific role
+- Do NOT use `search-by-{scope}` pattern (e.g., `/search-by-agent/{id}` is wrong).
+- All scoped search routes use `auth_required` middleware.
+
 **Self-service (`my`) endpoints:**
-- URL pattern: `POST /v2/{entity}/my/{operation}` (entity is the primary resource, `my` is a scope qualifier).
-- Example: `POST /v2/keypairs/my/search`, `POST /v2/keypairs/my/issue`.
+- URL pattern: `POST /v2/{entity}/my/{operation}` (entity is the primary resource, `my` as scope qualifier).
+- Examples: `POST /v2/keypairs/my/search`, `POST /v2/sessions/my/search`.
 - The adapter resolves the current user internally via `current_user()`.
 - All `my` routes use `auth_required` middleware.
 

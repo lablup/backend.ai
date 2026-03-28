@@ -90,12 +90,14 @@ class TestCheckPendingDeployments:
             proxy_targets_by_scaling_group
         )
 
-        entity_ids = [pending_deployment_no_revision.deployment_info.id]
-        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await deployment_executor.check_pending_deployments([
-                pending_deployment_no_revision
-            ])
+        expected_url = "http://endpoint.test/v1"
+        with patch.object(deployment_executor, "_register_endpoint", return_value=expected_url):
+            entity_ids = [pending_deployment_no_revision.deployment_info.id]
+            with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
+                # Act
+                result = await deployment_executor.check_pending_deployments([
+                    pending_deployment_no_revision
+                ])
 
         # Assert - Deployment skipped due to missing revision
         assert len(result.successes) == 0
@@ -127,6 +129,7 @@ class TestCheckPendingDeployments:
         # Assert
         assert len(result.successes) == 0
         assert len(result.failures) == 0
+        assert len(result.skipped) == 1
 
     async def test_endpoint_registration_failure_captured(
         self,
@@ -235,7 +238,6 @@ class TestCheckReadyDeployments:
     async def test_empty_deployment_list(
         self,
         deployment_executor: DeploymentExecutor,
-        mock_deployment_repo: AsyncMock,
     ) -> None:
         """CR-003: Empty deployment list returns empty result.
 
@@ -393,6 +395,7 @@ class TestScaleDeployment:
             result = await deployment_executor.scale_deployment([ready_deployment_needs_scale_up])
 
         # Assert - KeyError since deployment.id not in empty dict
+        assert len(result.successes) == 0
         assert len(result.failures) == 1
 
 

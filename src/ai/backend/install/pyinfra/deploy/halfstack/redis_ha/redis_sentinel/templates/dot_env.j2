@@ -1,0 +1,30 @@
+REDIS_BASE_IMG={{ config.container_image }}
+MASTER_HOSTNAME=redis1
+REDIS_PASSWORD={{ config.password }}
+
+# Cluster node IPs
+{% for node in config.cluster_nodes -%}
+REDIS{{ node.node_number }}_IP={{ node.ip }}
+{% endfor -%}
+
+# Cluster configuration
+REDIS_CLUSTER_NAME={{ config.name }}
+{% for node in config.cluster_nodes -%}
+REDIS{{ node.node_number }}_PORT={{ node.port }}
+{% endfor -%}
+MASTER_SERVICE_PORT={{ config.get_master_node().port }}
+
+# Sentinel configuration
+REDIS_SENTINEL_SERVICE_PORT={{ config.sentinel_port }}
+SENTINEL_QUORUM={{ config.sentinel_quorum }}
+SENTINEL_DOWN_AFTER_MS={{ config.sentinel_down_after_milliseconds }}
+SENTINEL_FAILOVER_TIMEOUT={{ config.sentinel_failover_timeout }}
+SENTINEL_PARALLEL_SYNCS={{ config.sentinel_parallel_syncs }}
+
+# Runtime configuration variables for sed replacement
+THIS_HOST_IP={{ current_node.ip }}
+
+# Deployment configuration
+TARGET_HOME_DIR={{ home_dir }}
+TARGET_UNAME={{ target_uname }}
+PIDS_LIMIT_VALUE={{ config.pids_limit }}

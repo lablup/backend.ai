@@ -225,6 +225,7 @@ from .rbac import (
     admin_update_permission,
     admin_update_role,
     my_roles,
+    rbac_entity_operation_combinations,
     rbac_scope_entity_combinations,
 )
 from .reservoir_registry import (
@@ -377,6 +378,7 @@ class Query:
     # RBAC User APIs
     my_roles = my_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
+    rbac_entity_operation_combinations = rbac_entity_operation_combinations
     # Session Scoped APIs
     session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs

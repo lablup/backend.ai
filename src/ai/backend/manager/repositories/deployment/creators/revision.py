@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, override
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.types import (
     ResourceSlot,
     RuntimeVariant,
@@ -36,7 +37,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     model_id: uuid.UUID | None
     model_mount_destination: str
     model_definition_path: str | None
-    model_definition: Mapping[str, Any] | None
+    model_definition: ModelDefinition | None
     startup_command: str | None
     bootstrap_script: str | None
     environ: Mapping[str, Any]
@@ -60,7 +61,9 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             model=self.model_id,
             model_mount_destination=self.model_mount_destination,
             model_definition_path=self.model_definition_path,
-            model_definition=self.model_definition,
+            model_definition=self.model_definition.model_dump(exclude_none=True, by_alias=True)
+            if self.model_definition
+            else None,
             resource_group=self.resource_group,
             resource_slots=self.resource_slots,
             resource_opts=self.resource_opts,

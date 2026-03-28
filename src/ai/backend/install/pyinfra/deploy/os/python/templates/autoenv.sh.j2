@@ -1,0 +1,10 @@
+# Add the line below in ~/.bashrc or your shell.
+# . ~/scripts/autoenv.sh
+cd() {
+    builtin cd "$@"
+    if [ -f ".venv/bin/activate" ]; then
+        . .venv/bin/activate
+    elif [ "$VIRTUAL_ENV" != "" ] && [ "$PWD" != "$VIRTUAL_ENV" ]; then
+        deactivate
+    fi
+}

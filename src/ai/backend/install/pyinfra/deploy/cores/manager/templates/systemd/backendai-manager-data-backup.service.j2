@@ -1,0 +1,10 @@
+[Unit]
+Description=Backend.AI Manager Data Backup Service
+
+[Service]
+Type=oneshot
+ExecStart={{ home_dir }}/scripts/backup_bai_data.sh
+User={{ bai_user }}
+WorkingDirectory={{ home_dir }}
+StandardOutput=journal
+StandardError=journal

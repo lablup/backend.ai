@@ -1,0 +1,112 @@
+[etcd]
+namespace = "local"
+addr = { host = "{{ etcd_ip }}", port = {{ etcd_port }} }
+user = ""
+password = ""
+
+[storage-proxy]
+node-id = "{{ node_id }}"
+num-proc = 2
+pid-file = "./{{ service_name }}.pid"
+event-loop = "uvloop"
+
+# The base directory to put domain sockets for IPC.
+# Normally you don't have to change it.
+# NOTE: If Docker is installed via Snap (https://snapcraft.io/docker),
+#       you must change this to a directory under your *home* directory.
+ipc-base-path = "./tmp/backend.ai/ipc"
+
+# The maximum number of directory entries to return upon
+# a scandir operation to prevent excessive loads/delays on filesystems.
+# Settings it zero means no limit.
+scandir-limit = 1000
+
+# The maximum allowed size of a single upload session.
+max-upload-size = "100g"
+
+# Used to generate JWT tokens for download/upload sessions
+secret = "{{ jwt_secret }}"
+
+# The download/upload session tokens are valid for:
+session-expire = "1d"
+
+user = {{ user_id }}
+group = {{ group_id }}
+
+aiomonitor-termui-port = 28300
+aiomonitor-webui-port = 29300
+
+# The socket fd path prefix to communicate with storage proxy watcher
+# The path should not have any permission issue with UID/GID
+# The full socket fd name will be like this. "/path/to/file/socket-<PIDx>"
+# watcher-insock-path-prefix = ""
+# watcher-outsock-path-prefix = ""
+
+# Watcher delegates root permission and do privileged tasks. This option enables the use of watcher.
+use-watcher = false
+
+
+[api.client]
+service-addr = { host = "0.0.0.0", port = {{ client_port }} }
+ssl-enabled = false
+
+
+[api.manager]
+service-addr = { host = "0.0.0.0", port = {{ manager_port }} }
+# Set the internal hostname/port to accept internal API requests.
+internal-addr = { host = "{{ internal_host }}", port = {{ internal_port }} }
+announce-internal-addr = { host = "{{ announce_internal_host }}", port = {{ announce_internal_port }} }
+ssl-enabled = false
+# ssl-cert = "configs/storage-proxy/ssl/manager-api-selfsigned.cert.pem"
+# ssl-privkey = "configs/storage-proxy/ssl/manager-api-selfsigned.key.pem"
+
+# Used to authenticate managers
+secret = "{{ manager_token }}"
+
+{%- if otel_collector_endpoint %}
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "{{ otel_collector_endpoint }}"
+{%- endif %}
+
+[debug]
+enabled = false
+asyncio = false
+
+# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
+enhanced-aiomonitor-task-info = false
+
+# Enable logging events from EventProducer and EventDispatcher
+log-events = true
+
+
+[logging]
+level = "INFO"
+drivers = ["console", "file"]
+
+[logging.console]
+colored = true
+format = "simple"
+
+[logging.file]
+path = "./logs"
+filename = "{{ service_name }}.log"
+backup-count = 10
+rotation-size = "10M"
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "WARNING"
+"ai.backend" = "INFO"
+
+
+[volume]
+
+{%- set volume_names = volume_names.split(',') -%}
+{%- for volume in volume_names %}
+[volume.{{ volume }}]
+backend = "vfs"
+path = "{{ vfroot_path }}/{{ volume }}"
+{%- endfor %}

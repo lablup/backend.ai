@@ -35,15 +35,18 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     DeletePermissionPayload as DeletePermissionPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    PermissionNode as PermissionNodeDTO,
+    EntityOperationCombinationInfo,
+    OperationInfo,
+    ScopeEntityCombinationInfo,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    ScopeEntityCombinationInfo,
+    PermissionNode as PermissionNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
     RBACElementTypeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
@@ -302,6 +305,33 @@ class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
 class ScopeEntityCombinationGQL(PydanticOutputMixin[ScopeEntityCombinationInfo]):
     scope_type: RBACElementTypeGQL
     valid_entity_types: list[RBACElementTypeGQL]
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Information about a single RBAC operation.",
+    ),
+    model=OperationInfo,
+    name="OperationInfo",
+)
+class OperationInfoGQL(PydanticOutputMixin[OperationInfo]):
+    operation: str
+    description: str
+    required_permission: OperationTypeGQL
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Valid entity-operation combination for RBAC actions.",
+    ),
+    model=EntityOperationCombinationInfo,
+    name="EntityOperationCombination",
+)
+class EntityOperationCombinationGQL(PydanticOutputMixin[EntityOperationCombinationInfo]):
+    entity_type: RBACElementTypeGQL
+    operations: list[OperationInfoGQL]
 
 
 PermissionEdge = Edge[PermissionGQL]

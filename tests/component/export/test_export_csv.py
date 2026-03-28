@@ -7,10 +7,10 @@ import pytest
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.export import (
-    KeypairExportCSVRequest,
-    ProjectExportCSVRequest,
-    UserExportCSVRequest,
+from ai.backend.common.dto.manager.v2.export import (
+    KeypairExportCSVInput,
+    ProjectExportCSVInput,
+    UserExportCSVInput,
 )
 
 
@@ -23,7 +23,7 @@ class TestUserCSVContentValidation:
     ) -> None:
         """Downloaded CSV contains headers matching the requested fields."""
         requested_fields = ["uuid", "email"]
-        request = UserExportCSVRequest(fields=requested_fields)
+        request = UserExportCSVInput(fields=requested_fields)
         raw = await admin_registry.export.download_users_csv(request)
         assert isinstance(raw, bytes)
 
@@ -37,7 +37,7 @@ class TestUserCSVContentValidation:
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         """CSV bytes are valid UTF-8."""
-        request = UserExportCSVRequest(fields=["uuid", "email"])
+        request = UserExportCSVInput(fields=["uuid", "email"])
         raw = await admin_registry.export.download_users_csv(request)
         text = raw.decode("utf-8-sig")
         assert len(text) > 0
@@ -47,7 +47,7 @@ class TestUserCSVContentValidation:
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         """The user CSV includes at least the header line."""
-        request = UserExportCSVRequest(fields=["uuid", "email"])
+        request = UserExportCSVInput(fields=["uuid", "email"])
         raw = await admin_registry.export.download_users_csv(request)
         text = raw.decode("utf-8-sig")
         reader = csv.reader(io.StringIO(text))
@@ -60,7 +60,7 @@ class TestUserCSVContentValidation:
     ) -> None:
         """Regular users are blocked from exporting user CSV."""
         with pytest.raises(PermissionDeniedError):
-            await user_registry.export.download_users_csv(UserExportCSVRequest(fields=["uuid"]))
+            await user_registry.export.download_users_csv(UserExportCSVInput(fields=["uuid"]))
 
 
 class TestProjectCSVContentValidation:
@@ -72,7 +72,7 @@ class TestProjectCSVContentValidation:
     ) -> None:
         """Downloaded project CSV contains field headers."""
         requested_fields = ["id", "name"]
-        request = ProjectExportCSVRequest(fields=requested_fields)
+        request = ProjectExportCSVInput(fields=requested_fields)
         raw = await admin_registry.export.download_projects_csv(request)
         assert isinstance(raw, bytes)
 
@@ -86,7 +86,7 @@ class TestProjectCSVContentValidation:
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         """The project CSV includes at least the header line."""
-        request = ProjectExportCSVRequest(fields=["id", "name"])
+        request = ProjectExportCSVInput(fields=["id", "name"])
         raw = await admin_registry.export.download_projects_csv(request)
         text = raw.decode("utf-8-sig")
         reader = csv.reader(io.StringIO(text))
@@ -103,7 +103,7 @@ class TestKeypairCSVContentValidation:
     ) -> None:
         """Downloaded keypair CSV contains headers matching requested field count."""
         requested_fields = ["access_key", "user_id"]
-        request = KeypairExportCSVRequest(fields=requested_fields)
+        request = KeypairExportCSVInput(fields=requested_fields)
         raw = await admin_registry.export.download_keypairs_csv(request)
         assert isinstance(raw, bytes)
 
@@ -117,7 +117,7 @@ class TestKeypairCSVContentValidation:
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         """When requesting specific fields, secret_key is not included unless asked."""
-        request = KeypairExportCSVRequest(fields=["access_key", "user_id"])
+        request = KeypairExportCSVInput(fields=["access_key", "user_id"])
         raw = await admin_registry.export.download_keypairs_csv(request)
         text = raw.decode("utf-8-sig")
         reader = csv.reader(io.StringIO(text))

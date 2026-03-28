@@ -2,8 +2,8 @@
 
 import logging
 from datetime import UTC, datetime
-from uuid import UUID
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -30,6 +30,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
     ModelRevisionData,
     ModelRuntimeConfigData,
+    MountMetadata,
     ReplicaStateData,
     ResourceConfigData,
     RouteInfo,
@@ -149,6 +150,10 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentActionResult,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.definition_generator.base import ModelDefinitionContext
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    ModelDefinitionGeneratorRegistry,
+)
 from ai.backend.manager.sokovan.deployment.exceptions import (
     DeploymentAlreadyInProgress,
     InvalidEndpointState,
@@ -276,17 +281,20 @@ class DeploymentService:
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
     _revision_generator_registry: RevisionGeneratorRegistry
+    _model_definition_generator_registry: ModelDefinitionGeneratorRegistry
 
     def __init__(
         self,
         deployment_controller: DeploymentController,
         deployment_repository: DeploymentRepository,
         revision_generator_registry: RevisionGeneratorRegistry,
+        model_definition_generator_registry: ModelDefinitionGeneratorRegistry,
     ) -> None:
         """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
         self._deployment_repository = deployment_repository
         self._revision_generator_registry = revision_generator_registry
+        self._model_definition_generator_registry = model_definition_generator_registry
 
     # ========== Deployment CRUD ==========
 
@@ -569,21 +577,47 @@ class DeploymentService:
             model_definition=revision_creator.model_definition,
         )
 
-    async def _build_revision(
+    async def _resolve_model_definition(
         self,
-        deployment_id: UUID,
         revision_creator: ModelRevisionCreator,
-    ) -> ModelRevisionData:
-        """Build and create a revision from the given creator.
+    ) -> ModelDefinition:
+        """Generate the final model definition for a revision.
+
+        Builds a ModelDefinitionContext from the creator data and delegates to
+        ModelDefinitionGeneratorRegistry, which performs the full merge:
+        programmatic generation → user override → storage file override.
+        """
+        context = ModelDefinitionContext(
+            mounts=MountMetadata(
+                model_vfolder_id=revision_creator.mounts.model_vfolder_id,
+                model_definition_path=revision_creator.mounts.model_definition_path,
+                model_mount_destination=revision_creator.mounts.model_mount_destination,
+            ),
+            execution=revision_creator.execution,
+            model_definition=revision_creator.model_definition,
+        )
+        return await self._model_definition_generator_registry.generate_model_definition(context)
+
+    async def add_model_revision(
+        self, action: AddModelRevisionAction
+    ) -> AddModelRevisionActionResult:
+        """Add a new model revision to an existing deployment.
+
+        Resolves the final model definition before creating the revision,
+        so the DB row contains the fully-merged definition from the start.
+        Subsequent PROVISIONING uses the stored value directly.
 
         Uses an atomic read-then-write operation for revision_number
         assignment to prevent race conditions from concurrent requests.
         The revision_number placeholder (0) is replaced atomically
         inside the repository.
         """
-        endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
+        deployment_id = action.model_deployment_id
+        log.info("Adding model revision to deployment {}", deployment_id)
 
-        merged_creator = await self._merge_service_definition(revision_creator)
+        endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
+        merged_creator = await self._merge_service_definition(action.adder)
+        resolved_model_definition = await self._resolve_model_definition(merged_creator)
 
         spec = DeploymentRevisionCreatorSpec(
             endpoint_id=deployment_id,
@@ -597,9 +631,7 @@ class DeploymentService:
             model_id=merged_creator.mounts.model_vfolder_id,
             model_mount_destination=merged_creator.mounts.model_mount_destination,
             model_definition_path=merged_creator.mounts.model_definition_path,
-            model_definition=merged_creator.model_definition.model_dump(
-                exclude_none=True, by_alias=True
-            ),
+            model_definition=resolved_model_definition,
             startup_command=merged_creator.execution.startup_command,
             bootstrap_script=merged_creator.execution.bootstrap_script,
             # TODO: None and {} have different semantics (not provided vs empty environ). CreatorSpec should accept Optional.
@@ -619,16 +651,9 @@ class DeploymentService:
                 element_id=str(deployment_id),
             ),
         )
-        return await self._deployment_repository.create_revision_with_next_number(
+        revision_data = await self._deployment_repository.create_revision_with_next_number(
             creator, deployment_id
         )
-
-    async def add_model_revision(
-        self, action: AddModelRevisionAction
-    ) -> AddModelRevisionActionResult:
-        """Add a new model revision to an existing deployment."""
-        log.info("Adding model revision to deployment {}", action.model_deployment_id)
-        revision_data = await self._build_revision(action.model_deployment_id, action.adder)
         return AddModelRevisionActionResult(revision=revision_data)
 
     async def get_revision_by_id(

@@ -1,0 +1,30 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  restart: unless-stopped
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  postgres-exporter:
+    <<: *base
+    image: prometheuscommunity/postgres-exporter:${POSTGRES_EXPORTER_IMAGE_TAG}
+    container_name: bai-postgres-exporter
+    ports:
+      - "${POSTGRES_EXPORTER_PORT}:9187"
+    volumes:
+      - "/etc/hosts:/etc/hosts:ro"
+    environment:
+      - DATA_SOURCE_URI=${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable
+      - DATA_SOURCE_USER=${DB_USER}
+      - DATA_SOURCE_PASS=${DB_PASSWORD}
+    # Health check disabled due to minimal container image
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:9187/metrics"]
+    #   interval: 15s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 10s

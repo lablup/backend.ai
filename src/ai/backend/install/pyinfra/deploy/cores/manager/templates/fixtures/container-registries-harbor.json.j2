@@ -1,0 +1,16 @@
+{
+    "container_registries": [
+        {%- set registry_projects = registry_projects.split(',') -%}
+        {%- for project in registry_projects %}
+        {
+            "registry_name": "{{ registry_name }}:{{ registry_port }}",
+            "url": "{{ registry_scheme }}://{{ registry_name }}:{{ registry_port }}",
+            "type": "{{ registry_type }}",
+            "project": "{{ project }}",
+            "username": "{{ registry_username }}",
+            "password": "{{ registry_password }}",
+            "ssl_verify": false
+        }{%- if not loop.last %},{% endif %}
+        {%- endfor %}
+    ]
+}

@@ -72,6 +72,7 @@ def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInputDTO:
             mount_destination="/models",
             definition_path="/models/model.yaml",
         ),
+        "model_definition": ModelDefinition(),
     }
     defaults.update(kwargs)
     return CreateRevisionInputDTO(**defaults)

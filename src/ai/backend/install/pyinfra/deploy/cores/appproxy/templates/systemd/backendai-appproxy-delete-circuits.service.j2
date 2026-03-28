@@ -1,0 +1,11 @@
+[Unit]
+Description=Backend.AI AppProxy Delete Unused Circuits
+
+[Service]
+Type=oneshot
+ExecStart={{ home_dir }}/scripts/.venv/bin/python {{ home_dir }}/scripts/delete_unused_circuits.py
+User={{ bai_user }}
+WorkingDirectory={{ home_dir }}/scripts
+StandardOutput=journal
+StandardError=journal
+Environment="PYTHONUNBUFFERED=1"

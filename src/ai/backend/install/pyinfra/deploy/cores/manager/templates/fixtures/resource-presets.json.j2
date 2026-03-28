@@ -1,0 +1,39 @@
+{
+  "resource_presets": [
+    {
+      "name": "cpu-only",
+      "resource_slots": {
+        "cpu": "16",
+        "mem": "34359738368"
+      },
+      "shared_memory": 2147483648
+    },
+    {
+      "name": "cuda01-small",
+      "resource_slots": {
+        "cpu": "4",
+        "mem": "21474836480",
+        "cuda.shares": "0.5"
+      },
+      "shared_memory": 1073741824
+    },
+    {
+      "name": "cuda02-medium",
+      "resource_slots": {
+        "cpu": "8",
+        "mem": "42949672960",
+        "cuda.shares": "1.0"
+      },
+      "shared_memory": 1073741824
+    },
+    {
+      "name": "cuda03-large",
+      "resource_slots": {
+        "cpu": "32",
+        "mem": "171798691840",
+        "cuda.shares": "4.0"
+      },
+      "shared_memory": 2147483648
+    }
+  ]
+}

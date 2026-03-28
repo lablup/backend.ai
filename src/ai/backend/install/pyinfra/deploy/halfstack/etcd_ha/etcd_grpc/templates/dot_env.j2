@@ -1,0 +1,23 @@
+# For ALL
+TARGET_UID={{uid}}
+TARGET_GID={{gid}}
+TARGET_UNAME={{user_name}}
+ETCD_BASE_IMG={{etcd_container_image}}
+
+# For this ETCD cluster
+{% for node in etcd_nodes %}
+ETCD{{node.node_number}}_IP={{node.client_ip}}
+ETCD{{node.node_number}}_CLIENT_PORT={{node.client_port}}
+ETCD{{node.node_number}}_PEER_PORT={{node.peer_port}}
+{% endfor %}
+ETCD_UID=${TARGET_UID}
+ETCD_GID=${TARGET_GID}
+ETCD_CLUSTER_NAME={{etcd_cluster_name}}
+INITIAL_ETCD_CLUSTER_TOKEN=bai-etcd-cluster-${ETCD_CLUSTER_NAME}
+
+# for this host
+ETCD_GRPC_PORT={{etcd_grpc_service_port}}
+ETCD_GRPC_ADVERTISE_CLIENT_IP={{etcd_grpc_service_ip}}
+
+# for security configuration
+PIDS_LIMIT_VALUE=1000

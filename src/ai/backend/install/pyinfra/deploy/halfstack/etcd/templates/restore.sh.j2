@@ -1,0 +1,89 @@
+#!/bin/bash
+set -euo pipefail
+
+BACKUP_DIR="{{ service_dir }}/backups"
+CONTAINER_NAME="{{ container_name }}"
+DATA_DIR="{{ data_dir }}"
+
+show_usage() {
+    echo "Usage: $0 <backup_file>"
+    echo ""
+    echo "Available backup files:"
+    find "${BACKUP_DIR}" -name "etcd_snapshot_*.db.gz" -type f | sort -r | head -10
+    exit 1
+}
+
+if [ $# -eq 0 ]; then
+    show_usage
+fi
+
+BACKUP_FILE="$1"
+if [ ! -f "$BACKUP_FILE" ]; then
+    echo "Error: Backup file '$BACKUP_FILE' not found"
+    show_usage
+fi
+
+echo "Starting etcd restore..."
+echo "Backup file: $BACKUP_FILE"
+
+if docker ps --format "table {{ '{{.Names}}' }}" | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Warning: etcd container '${CONTAINER_NAME}' is currently running"
+    echo "The container will be stopped for restore operation."
+    read -p "Continue? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "Restore cancelled."
+        exit 0
+    fi
+    echo "Stopping etcd container..."
+    docker stop "${CONTAINER_NAME}"
+fi
+
+echo ""
+echo "WARNING: This will completely replace the current etcd data!"
+echo "Container: ${CONTAINER_NAME}"
+echo "Data directory: ${DATA_DIR}"
+echo "Backup file: ${BACKUP_FILE}"
+echo ""
+read -p "Are you sure you want to continue? (yes/no): " confirm
+if [ "$confirm" != "yes" ]; then
+    echo "Restore cancelled."
+    exit 0
+fi
+
+# Extract backup file to mounted backups directory
+SNAPSHOT_FILE="${BACKUP_DIR}/temp_restore_snapshot.db"
+echo "Extracting backup file..."
+if [[ "$BACKUP_FILE" =~ \.gz$ ]]; then
+    zcat "$BACKUP_FILE" > "${SNAPSHOT_FILE}"
+else
+    cp "$BACKUP_FILE" "${SNAPSHOT_FILE}"
+fi
+
+# Backup current data directory
+if [ -d "${DATA_DIR}" ]; then
+    echo "Backing up current data directory..."
+    mv "${DATA_DIR}" "${DATA_DIR}.backup.$(date +%Y%m%d_%H%M%S)"
+fi
+
+# Restore from snapshot using the same image as the running container
+echo "Restoring from snapshot..."
+mkdir -p "${DATA_DIR}"
+docker run --rm \
+    -v "${BACKUP_DIR}:/backups:ro" \
+    -v "${DATA_DIR}:/etcd-data:rw" \
+    {{ container_image }} \
+    etcdctl snapshot restore /backups/temp_restore_snapshot.db \
+        --data-dir /etcd-data \
+        --name bai-etcd1 \
+        --initial-cluster bai-etcd1=http://{{ etcd_advertise_client_ip | default('127.0.0.1') }}:8320 \
+        --initial-cluster-token backendai-etcd-token \
+        --initial-advertise-peer-urls http://{{ etcd_advertise_client_ip | default('127.0.0.1') }}:8320
+
+# Clean up temporary snapshot file
+rm -f "${SNAPSHOT_FILE}"
+
+echo "Restore completed successfully!"
+echo "Please restart the etcd container to apply the restored data."
+echo ""
+echo "To start the container, run:"
+echo "  docker start ${CONTAINER_NAME}"
