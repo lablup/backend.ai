@@ -65,10 +65,6 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserByIdAction,
     PurgeUserByIdActionResult,
 )
-from ai.backend.manager.services.user.actions.search_assignable_users import (
-    SearchAssignableUsersAction,
-    SearchAssignableUsersActionResult,
-)
 from ai.backend.manager.services.user.actions.search_users import (
     SearchUsersAction,
     SearchUsersActionResult,
@@ -411,20 +407,6 @@ class UserService:
             scope=action.scope, querier=action.querier
         )
         return SearchUsersByProjectActionResult(
-            users=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_assignable_users(
-        self, action: SearchAssignableUsersAction
-    ) -> SearchAssignableUsersActionResult:
-        """Search users assignable to a project."""
-        result = await self._user_repository.search_assignable_users(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchAssignableUsersActionResult(
             users=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

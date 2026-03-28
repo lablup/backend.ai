@@ -42,10 +42,4 @@ def register_v2_user_routes(
         handler.role_search,
         middlewares=[auth_required],
     )
-    reg.add(
-        "POST",
-        "/projects/{project_id}/assignable/search",
-        handler.assignable_search,
-        middlewares=[auth_required],
-    )
     return reg

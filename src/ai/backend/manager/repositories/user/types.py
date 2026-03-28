@@ -17,11 +17,10 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.user import UserRow, UserStatus
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 __all__ = (
-    "AssignableUserSearchScope",
     "DomainUserSearchScope",
     "ProjectUserSearchScope",
     "RoleUserSearchScope",
@@ -118,43 +117,5 @@ class RoleUserSearchScope(SearchScope):
                 column=RoleRow.id,
                 value=self.role_id,
                 error=RoleNotFound(str(self.role_id)),
-            ),
-        ]
-
-
-@dataclass(frozen=True)
-class AssignableUserSearchScope(SearchScope):
-    """Scope for searching users assignable to a project.
-
-    Returns active users in the same domain that are NOT already project members.
-    No JOIN needed — uses NOT IN subquery for exclusion.
-    """
-
-    project_id: UUID
-    domain_name: str
-
-    def to_condition(self) -> QueryCondition:
-        project_id = self.project_id
-        domain_name = self.domain_name
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            existing_members = sa.select(AssocGroupUserRow.user_id).where(
-                AssocGroupUserRow.group_id == project_id
-            )
-            return (
-                (UserRow.domain_name == domain_name)
-                & (UserRow.status == UserStatus.ACTIVE)
-                & ~UserRow.uuid.in_(existing_members)
-            )
-
-        return inner
-
-    @property
-    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
-        return [
-            ExistenceCheck(
-                column=GroupRow.id,
-                value=self.project_id,
-                error=ProjectNotFound(str(self.project_id)),
             ),
         ]
