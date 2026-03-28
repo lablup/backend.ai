@@ -296,9 +296,9 @@ class SessionEventHandler:
             # Enriched fields — allow the callback receiver to reconstruct
             # intermediate status transitions with accurate timestamps and
             # to read the session result/error details without an extra API call.
-            "status_history": session.status_history,
-            "result": session.result.name,
-            "status_data": dict(session.status_data) if session.status_data else None,
+            "status_history": dict(session.status_history or {}),
+            "result": session.result.name if session.result is not None else None,
+            "status_data": dict(session.status_data) if session.status_data is not None else None,
         }
 
         self._registry.webhook_ptask_group.create_task(
