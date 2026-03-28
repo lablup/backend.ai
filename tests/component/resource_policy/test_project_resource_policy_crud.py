@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 
-from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UpdateProjectResourcePolicyInput,
 )
@@ -20,7 +20,7 @@ class TestProjectResourcePolicyCreate:
 
     async def test_s1_create_returns_correct_fields(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         project_resource_policy_factory: ProjectResourcePolicyFactory,
     ) -> None:
         """S-1: Create project resource policy with all fields."""
@@ -40,7 +40,7 @@ class TestProjectResourcePolicyCreate:
 
     async def test_s2_create_with_unlimited_networks(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         project_resource_policy_factory: ProjectResourcePolicyFactory,
     ) -> None:
         """S-2: Create with max_network_count=-1 (unlimited)."""
@@ -53,14 +53,14 @@ class TestProjectResourcePolicyGet:
 
     async def test_s1_get_by_name(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         project_resource_policy_factory: ProjectResourcePolicyFactory,
     ) -> None:
         """S-1: Get policy by name."""
         created = await project_resource_policy_factory()
         name = created.project_resource_policy.name
 
-        result = await admin_registry.resource_policy.admin_get_project_resource_policy(name)
+        result = await admin_v2_registry.resource_policy.admin_get_project_resource_policy(name)
         assert result.name == name
         assert result.max_vfolder_count == created.project_resource_policy.max_vfolder_count
 
@@ -70,14 +70,14 @@ class TestProjectResourcePolicyUpdate:
 
     async def test_s1_update_partial_fields(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         project_resource_policy_factory: ProjectResourcePolicyFactory,
     ) -> None:
         """S-1: Update max_network_count, others unchanged."""
         created = await project_resource_policy_factory(max_network_count=3)
         name = created.project_resource_policy.name
 
-        result = await admin_registry.resource_policy.admin_update_project_resource_policy(
+        result = await admin_v2_registry.resource_policy.admin_update_project_resource_policy(
             name, UpdateProjectResourcePolicyInput(max_network_count=20)
         )
         assert result.project_resource_policy.max_network_count == 20
@@ -92,12 +92,12 @@ class TestProjectResourcePolicyDelete:
 
     async def test_s1_delete_by_name(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         project_resource_policy_factory: ProjectResourcePolicyFactory,
     ) -> None:
         """S-1: Delete policy."""
         created = await project_resource_policy_factory()
         name = created.project_resource_policy.name
 
-        result = await admin_registry.resource_policy.admin_delete_project_resource_policy(name)
+        result = await admin_v2_registry.resource_policy.admin_delete_project_resource_policy(name)
         assert result.name == name

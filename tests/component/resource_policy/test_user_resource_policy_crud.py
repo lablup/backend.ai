@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 
-from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UpdateUserResourcePolicyInput,
 )
@@ -20,7 +20,7 @@ class TestUserResourcePolicyCreate:
 
     async def test_s1_create_returns_correct_fields(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         user_resource_policy_factory: UserResourcePolicyFactory,
     ) -> None:
         """S-1: Create user resource policy with all fields."""
@@ -47,14 +47,14 @@ class TestUserResourcePolicyGet:
 
     async def test_s1_get_by_name(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         user_resource_policy_factory: UserResourcePolicyFactory,
     ) -> None:
         """S-1: Get policy by name."""
         created = await user_resource_policy_factory()
         name = created.user_resource_policy.name
 
-        result = await admin_registry.resource_policy.admin_get_user_resource_policy(name)
+        result = await admin_v2_registry.resource_policy.admin_get_user_resource_policy(name)
         assert result.name == name
         assert result.max_vfolder_count == created.user_resource_policy.max_vfolder_count
 
@@ -64,14 +64,14 @@ class TestUserResourcePolicyUpdate:
 
     async def test_s1_update_partial_fields(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         user_resource_policy_factory: UserResourcePolicyFactory,
     ) -> None:
         """S-1: Update max_vfolder_count, others unchanged."""
         created = await user_resource_policy_factory(max_vfolder_count=5)
         name = created.user_resource_policy.name
 
-        result = await admin_registry.resource_policy.admin_update_user_resource_policy(
+        result = await admin_v2_registry.resource_policy.admin_update_user_resource_policy(
             name, UpdateUserResourcePolicyInput(max_vfolder_count=50)
         )
         assert result.user_resource_policy.max_vfolder_count == 50
@@ -86,12 +86,12 @@ class TestUserResourcePolicyDelete:
 
     async def test_s1_delete_by_name(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         user_resource_policy_factory: UserResourcePolicyFactory,
     ) -> None:
         """S-1: Delete policy."""
         created = await user_resource_policy_factory()
         name = created.user_resource_policy.name
 
-        result = await admin_registry.resource_policy.admin_delete_user_resource_policy(name)
+        result = await admin_v2_registry.resource_policy.admin_delete_user_resource_policy(name)
         assert result.name == name

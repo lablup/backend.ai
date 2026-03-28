@@ -22,7 +22,7 @@ def _load_input(
     json_str: str | None,
     file_path: str | None,
     **kwargs: object,
-) -> dict:
+) -> dict[str, Any]:
     """Resolve input from --json, --file, or click options (mutually exclusive)."""
     sources = sum([json_str is not None, file_path is not None])
     if sources > 1:
@@ -30,7 +30,8 @@ def _load_input(
         sys.exit(1)
     if json_str is not None:
         try:
-            return json.loads(json_str)
+            result: dict[str, Any] = json.loads(json_str)
+            return result
         except json.JSONDecodeError as e:
             click.echo(f"Invalid JSON: {e}", err=True)
             sys.exit(1)
@@ -92,8 +93,13 @@ def keypair() -> None:
 @click.option("--offset", default=0, help="Number of results to skip.")
 @click.option("--name-contains", default=None, help="Filter by name containing this string.")
 @click.option("--order-by", multiple=True, help="Order by field:direction (e.g., name:asc).")
+@click.option("--json", "json_str", default=None, help="Full search input as JSON string.")
 def keypair_search(
-    limit: int, offset: int, name_contains: str | None, order_by: tuple[str, ...]
+    limit: int,
+    offset: int,
+    name_contains: str | None,
+    order_by: tuple[str, ...],
+    json_str: str | None,
 ) -> None:
     """Search keypair resource policies."""
     from ai.backend.common.dto.manager.v2.resource_policy.request import (
@@ -105,28 +111,34 @@ def keypair_search(
         KeypairResourcePolicyOrderField,
     )
 
-    filter_dto = None
-    if name_contains is not None:
-        from ai.backend.common.dto.manager.query import StringFilter
+    if json_str is not None:
+        search_input = _build_dto(AdminSearchKeypairResourcePoliciesInput, json.loads(json_str))
+    else:
+        filter_dto = None
+        if name_contains is not None:
+            from ai.backend.common.dto.manager.query import StringFilter
 
-        filter_dto = KeypairResourcePolicyFilter(name=StringFilter(contains=name_contains))
+            filter_dto = KeypairResourcePolicyFilter(name=StringFilter(contains=name_contains))
 
-    orders = (
-        parse_order_options(order_by, KeypairResourcePolicyOrderField, KeypairResourcePolicyOrder)
-        if order_by
-        else None
-    )
+        orders = (
+            parse_order_options(
+                order_by, KeypairResourcePolicyOrderField, KeypairResourcePolicyOrder
+            )
+            if order_by
+            else None
+        )
+        search_input = AdminSearchKeypairResourcePoliciesInput(
+            filter=filter_dto,
+            order=orders,
+            limit=limit,
+            offset=offset,
+        )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_policy.admin_search_keypair_resource_policies(
-                AdminSearchKeypairResourcePoliciesInput(
-                    filter=filter_dto,
-                    order=orders,
-                    limit=limit,
-                    offset=offset,
-                )
+                search_input
             )
             print_result(result)
         finally:
@@ -225,7 +237,7 @@ def keypair_create(
         CreateKeypairResourcePolicyInput,
     )
 
-    opts: dict = {}
+    opts: dict[str, Any] = {}
     if name is not None:
         opts["name"] = name
     if default_for_unspecified is not None:
@@ -359,8 +371,13 @@ def user_rp() -> None:
 @click.option("--offset", default=0, help="Number of results to skip.")
 @click.option("--name-contains", default=None, help="Filter by name containing this string.")
 @click.option("--order-by", multiple=True, help="Order by field:direction (e.g., name:asc).")
+@click.option("--json", "json_str", default=None, help="Full search input as JSON string.")
 def user_search(
-    limit: int, offset: int, name_contains: str | None, order_by: tuple[str, ...]
+    limit: int,
+    offset: int,
+    name_contains: str | None,
+    order_by: tuple[str, ...],
+    json_str: str | None,
 ) -> None:
     """Search user resource policies."""
     from ai.backend.common.dto.manager.v2.resource_policy.request import (
@@ -370,28 +387,32 @@ def user_search(
     )
     from ai.backend.common.dto.manager.v2.resource_policy.types import UserResourcePolicyOrderField
 
-    filter_dto = None
-    if name_contains is not None:
-        from ai.backend.common.dto.manager.query import StringFilter
+    if json_str is not None:
+        search_input = _build_dto(AdminSearchUserResourcePoliciesInput, json.loads(json_str))
+    else:
+        filter_dto = None
+        if name_contains is not None:
+            from ai.backend.common.dto.manager.query import StringFilter
 
-        filter_dto = UserResourcePolicyFilter(name=StringFilter(contains=name_contains))
+            filter_dto = UserResourcePolicyFilter(name=StringFilter(contains=name_contains))
 
-    orders = (
-        parse_order_options(order_by, UserResourcePolicyOrderField, UserResourcePolicyOrder)
-        if order_by
-        else None
-    )
+        orders = (
+            parse_order_options(order_by, UserResourcePolicyOrderField, UserResourcePolicyOrder)
+            if order_by
+            else None
+        )
+        search_input = AdminSearchUserResourcePoliciesInput(
+            filter=filter_dto,
+            order=orders,
+            limit=limit,
+            offset=offset,
+        )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_policy.admin_search_user_resource_policies(
-                AdminSearchUserResourcePoliciesInput(
-                    filter=filter_dto,
-                    order=orders,
-                    limit=limit,
-                    offset=offset,
-                )
+                search_input
             )
             print_result(result)
         finally:
@@ -564,8 +585,13 @@ def project() -> None:
 @click.option("--offset", default=0, help="Number of results to skip.")
 @click.option("--name-contains", default=None, help="Filter by name containing this string.")
 @click.option("--order-by", multiple=True, help="Order by field:direction (e.g., name:asc).")
+@click.option("--json", "json_str", default=None, help="Full search input as JSON string.")
 def project_search(
-    limit: int, offset: int, name_contains: str | None, order_by: tuple[str, ...]
+    limit: int,
+    offset: int,
+    name_contains: str | None,
+    order_by: tuple[str, ...],
+    json_str: str | None,
 ) -> None:
     """Search project resource policies."""
     from ai.backend.common.dto.manager.v2.resource_policy.request import (
@@ -577,28 +603,34 @@ def project_search(
         ProjectResourcePolicyOrderField,
     )
 
-    filter_dto = None
-    if name_contains is not None:
-        from ai.backend.common.dto.manager.query import StringFilter
+    if json_str is not None:
+        search_input = _build_dto(AdminSearchProjectResourcePoliciesInput, json.loads(json_str))
+    else:
+        filter_dto = None
+        if name_contains is not None:
+            from ai.backend.common.dto.manager.query import StringFilter
 
-        filter_dto = ProjectResourcePolicyFilter(name=StringFilter(contains=name_contains))
+            filter_dto = ProjectResourcePolicyFilter(name=StringFilter(contains=name_contains))
 
-    orders = (
-        parse_order_options(order_by, ProjectResourcePolicyOrderField, ProjectResourcePolicyOrder)
-        if order_by
-        else None
-    )
+        orders = (
+            parse_order_options(
+                order_by, ProjectResourcePolicyOrderField, ProjectResourcePolicyOrder
+            )
+            if order_by
+            else None
+        )
+        search_input = AdminSearchProjectResourcePoliciesInput(
+            filter=filter_dto,
+            order=orders,
+            limit=limit,
+            offset=offset,
+        )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_policy.admin_search_project_resource_policies(
-                AdminSearchProjectResourcePoliciesInput(
-                    filter=filter_dto,
-                    order=orders,
-                    limit=limit,
-                    offset=offset,
-                )
+                search_input
             )
             print_result(result)
         finally:

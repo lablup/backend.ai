@@ -13,7 +13,7 @@ from __future__ import annotations
 import secrets
 from decimal import Decimal
 
-from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UpdateKeypairResourcePolicyInput,
 )
@@ -29,7 +29,7 @@ class TestKeypairResourcePolicyCreate:
 
     async def test_s1_create_returns_correct_name_and_fields(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         keypair_resource_policy_factory: KeypairResourcePolicyFactory,
     ) -> None:
         """S-1: Create keypair resource policy with all fields."""
@@ -61,7 +61,7 @@ class TestKeypairResourcePolicyCreate:
 
     async def test_s2_create_with_typed_resource_slots(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         keypair_resource_policy_factory: KeypairResourcePolicyFactory,
     ) -> None:
         """S-2: Verify resource slots are returned as typed entries."""
@@ -82,7 +82,7 @@ class TestKeypairResourcePolicyCreate:
 
     async def test_s3_create_with_typed_vfolder_hosts(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         keypair_resource_policy_factory: KeypairResourcePolicyFactory,
     ) -> None:
         """S-3: Verify vfolder hosts are returned as typed entries."""
@@ -103,14 +103,14 @@ class TestKeypairResourcePolicyGet:
 
     async def test_s1_get_by_name(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         keypair_resource_policy_factory: KeypairResourcePolicyFactory,
     ) -> None:
         """S-1: Get policy by name returns correct data."""
         created = await keypair_resource_policy_factory()
         name = created.keypair_resource_policy.name
 
-        result = await admin_registry.resource_policy.admin_get_keypair_resource_policy(name)
+        result = await admin_v2_registry.resource_policy.admin_get_keypair_resource_policy(name)
         assert result.name == name
         assert (
             result.max_concurrent_sessions
@@ -123,14 +123,14 @@ class TestKeypairResourcePolicyUpdate:
 
     async def test_s1_update_partial_fields(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         keypair_resource_policy_factory: KeypairResourcePolicyFactory,
     ) -> None:
         """S-1: Update only specific fields, others remain unchanged."""
         created = await keypair_resource_policy_factory(max_concurrent_sessions=5)
         name = created.keypair_resource_policy.name
 
-        result = await admin_registry.resource_policy.admin_update_keypair_resource_policy(
+        result = await admin_v2_registry.resource_policy.admin_update_keypair_resource_policy(
             name, UpdateKeypairResourcePolicyInput(max_concurrent_sessions=20)
         )
         assert result.keypair_resource_policy.max_concurrent_sessions == 20
@@ -146,12 +146,12 @@ class TestKeypairResourcePolicyDelete:
 
     async def test_s1_delete_by_name(
         self,
-        admin_registry: BackendAIClientRegistry,
+        admin_v2_registry: V2ClientRegistry,
         keypair_resource_policy_factory: KeypairResourcePolicyFactory,
     ) -> None:
         """S-1: Delete policy, verify it's gone."""
         created = await keypair_resource_policy_factory()
         name = created.keypair_resource_policy.name
 
-        result = await admin_registry.resource_policy.admin_delete_keypair_resource_policy(name)
+        result = await admin_v2_registry.resource_policy.admin_delete_keypair_resource_policy(name)
         assert result.name == name

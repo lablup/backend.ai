@@ -8,9 +8,12 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+import yarl
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.client.v2.auth import HMACAuth
+from ai.backend.client.v2.config import ClientConfig
+from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput,
     CreateProjectResourcePolicyInput,
@@ -63,6 +66,9 @@ from ai.backend.manager.services.user_resource_policy.processors import (
 from ai.backend.manager.services.user_resource_policy.service import (
     UserResourcePolicyService,
 )
+
+if __name__ != "__main__":
+    from tests.component.conftest import ServerInfo, UserFixtureData
 
 KeypairResourcePolicyFactory = Callable[
     ..., Coroutine[Any, Any, CreateKeypairResourcePolicyPayload]
@@ -120,7 +126,6 @@ def server_module_registries(
     """Register v2 resource policy REST routes for testing."""
     kp_proc, up_proc, pp_proc = resource_policy_processors
 
-    # Build a minimal Processors mock with only resource_policy processors
     processors = MagicMock(spec=Processors)
     processors.keypair_resource_policy = kp_proc
     processors.user_resource_policy = up_proc
@@ -129,15 +134,33 @@ def server_module_registries(
     adapter = ResourcePolicyAdapter(processors)
     handler = V2ResourcePolicyHandler(adapter=adapter)
 
-    # Wrap in a v2 parent registry
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_resource_policy_routes(handler, route_deps))
     return [v2_reg]
 
 
 @pytest.fixture()
+async def admin_v2_registry(
+    server: ServerInfo,
+    admin_user_fixture: UserFixtureData,
+) -> AsyncIterator[V2ClientRegistry]:
+    """Create a V2ClientRegistry with superadmin keypair for v2 REST endpoints."""
+    registry = await V2ClientRegistry.create(
+        ClientConfig(endpoint=yarl.URL(server.url)),
+        HMACAuth(
+            access_key=admin_user_fixture.keypair.access_key,
+            secret_key=admin_user_fixture.keypair.secret_key,
+        ),
+    )
+    try:
+        yield registry
+    finally:
+        await registry.close()
+
+
+@pytest.fixture()
 async def keypair_resource_policy_factory(
-    admin_registry: BackendAIClientRegistry,
+    admin_v2_registry: V2ClientRegistry,
     db_engine: SAEngine,
 ) -> AsyncIterator[KeypairResourcePolicyFactory]:
     """Factory fixture that creates keypair resource policies and cleans up."""
@@ -160,7 +183,7 @@ async def keypair_resource_policy_factory(
             "allowed_vfolder_hosts": [],
         }
         params.update(overrides)
-        result = await admin_registry.resource_policy.admin_create_keypair_resource_policy(
+        result = await admin_v2_registry.resource_policy.admin_create_keypair_resource_policy(
             CreateKeypairResourcePolicyInput(**params)
         )
         created_names.append(result.keypair_resource_policy.name)
@@ -170,7 +193,7 @@ async def keypair_resource_policy_factory(
 
     for name in reversed(created_names):
         try:
-            await admin_registry.resource_policy.admin_delete_keypair_resource_policy(name)
+            await admin_v2_registry.resource_policy.admin_delete_keypair_resource_policy(name)
         except Exception:
             async with db_engine.begin() as conn:
                 await conn.execute(
@@ -182,7 +205,7 @@ async def keypair_resource_policy_factory(
 
 @pytest.fixture()
 async def user_resource_policy_factory(
-    admin_registry: BackendAIClientRegistry,
+    admin_v2_registry: V2ClientRegistry,
     db_engine: SAEngine,
 ) -> AsyncIterator[UserResourcePolicyFactory]:
     """Factory fixture that creates user resource policies and cleans up."""
@@ -198,7 +221,7 @@ async def user_resource_policy_factory(
             "max_customized_image_count": 5,
         }
         params.update(overrides)
-        result = await admin_registry.resource_policy.admin_create_user_resource_policy(
+        result = await admin_v2_registry.resource_policy.admin_create_user_resource_policy(
             CreateUserResourcePolicyInput(**params)
         )
         created_names.append(result.user_resource_policy.name)
@@ -208,7 +231,7 @@ async def user_resource_policy_factory(
 
     for name in reversed(created_names):
         try:
-            await admin_registry.resource_policy.admin_delete_user_resource_policy(name)
+            await admin_v2_registry.resource_policy.admin_delete_user_resource_policy(name)
         except Exception:
             async with db_engine.begin() as conn:
                 await conn.execute(
@@ -220,7 +243,7 @@ async def user_resource_policy_factory(
 
 @pytest.fixture()
 async def project_resource_policy_factory(
-    admin_registry: BackendAIClientRegistry,
+    admin_v2_registry: V2ClientRegistry,
     db_engine: SAEngine,
 ) -> AsyncIterator[ProjectResourcePolicyFactory]:
     """Factory fixture that creates project resource policies and cleans up."""
@@ -235,7 +258,7 @@ async def project_resource_policy_factory(
             "max_network_count": 5,
         }
         params.update(overrides)
-        result = await admin_registry.resource_policy.admin_create_project_resource_policy(
+        result = await admin_v2_registry.resource_policy.admin_create_project_resource_policy(
             CreateProjectResourcePolicyInput(**params)
         )
         created_names.append(result.project_resource_policy.name)
@@ -245,7 +268,7 @@ async def project_resource_policy_factory(
 
     for name in reversed(created_names):
         try:
-            await admin_registry.resource_policy.admin_delete_project_resource_policy(name)
+            await admin_v2_registry.resource_policy.admin_delete_project_resource_policy(name)
         except Exception:
             async with db_engine.begin() as conn:
                 await conn.execute(
