@@ -8,11 +8,13 @@ from typing import Any, Self, cast
 from uuid import UUID
 
 from strawberry import Info
-from strawberry.relay import NodeID
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
@@ -82,3 +84,20 @@ class ContainerRegistryGQL(PydanticNodeMixin[Any]):
             UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
+
+
+ContainerRegistryV2Edge = Edge[ContainerRegistryGQL]
+
+
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Paginated connection for container registries.",
+    )
+)
+class ContainerRegistryV2Connection(Connection[ContainerRegistryGQL]):
+    count: int = gql_field(description="Total number of matching registries.")
+
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count

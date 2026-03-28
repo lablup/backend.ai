@@ -50,6 +50,12 @@ from .artifact import (
 from .artifact_registry import default_artifact_registry
 from .audit_log import admin_audit_logs_v2
 from .background_task import background_task_events
+from .container_registry import (
+    admin_container_registries_v2,
+    admin_create_container_registry_v2,
+    admin_delete_container_registry_v2,
+    admin_update_container_registry_v2,
+)
 from .deployment import (
     # Revision
     activate_deployment_revision,
@@ -373,6 +379,7 @@ class Query:
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
+    admin_container_registries_v2 = admin_container_registries_v2
     admin_login_sessions_v2 = admin_login_sessions_v2
     admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
@@ -483,6 +490,10 @@ class Mutation:
     restore_artifacts = restore_artifacts
     cleanup_artifact_revisions = cleanup_artifact_revisions
     cancel_import_artifact = cancel_import_artifact
+    # Container Registry V2 APIs
+    admin_create_container_registry_v2 = admin_create_container_registry_v2
+    admin_update_container_registry_v2 = admin_update_container_registry_v2
+    admin_delete_container_registry_v2 = admin_delete_container_registry_v2
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment

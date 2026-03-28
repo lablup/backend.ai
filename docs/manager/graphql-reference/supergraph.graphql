@@ -2317,6 +2317,16 @@ enum ContainerRegistryType
 scalar ContainerRegistryTypeField
   @join__type(graph: GRAPHENE)
 
+"""Added in UNRELEASED. Filter by container registry type."""
+input ContainerRegistryTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  equals: ContainerRegistryType = null
+  notEquals: ContainerRegistryType = null
+  in_: [ContainerRegistryType!] = null
+  notIn: [ContainerRegistryType!] = null
+}
+
 """Added in 26.4.0. Container registry node."""
 type ContainerRegistryV2 implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -2351,6 +2361,63 @@ type ContainerRegistryV2 implements Node
 
   """Extra metadata for the container registry"""
   extra: JSON
+}
+
+"""Added in UNRELEASED. Paginated connection for container registries."""
+type ContainerRegistryV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ContainerRegistryV2Edge!]!
+
+  """Total number of matching registries."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ContainerRegistryV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ContainerRegistryV2!
+}
+
+"""Added in UNRELEASED. Filter for container registries."""
+input ContainerRegistryV2Filter
+  @join__type(graph: STRAWBERRY)
+{
+  registryName: StringFilter = null
+  type: ContainerRegistryTypeFilter = null
+  isGlobal: Boolean = null
+}
+
+"""Added in UNRELEASED. Ordering specification for container registries."""
+input ContainerRegistryV2OrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: ContainerRegistryV2OrderField! = REGISTRY_NAME
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering container registries.
+"""
+enum ContainerRegistryV2OrderField
+  @join__type(graph: STRAWBERRY)
+{
+  REGISTRY_NAME @join__enumValue(graph: STRAWBERRY)
+  URL @join__enumValue(graph: STRAWBERRY)
+  TYPE @join__enumValue(graph: STRAWBERRY)
+  IS_GLOBAL @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.6.0."""
@@ -2443,6 +2510,38 @@ input CreateContainerRegistryInput
   is_global: Boolean
 }
 
+"""Added in UNRELEASED. Input for creating a container registry."""
+input CreateContainerRegistryInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """URL of the container registry."""
+  url: String!
+
+  """Unique name of the container registry."""
+  registryName: String!
+
+  """Type of the container registry."""
+  type: ContainerRegistryType!
+
+  """Project or namespace."""
+  project: String = null
+
+  """Username for authentication."""
+  username: String = null
+
+  """Password for authentication."""
+  password: String = null
+
+  """Whether to verify SSL."""
+  sslVerify: Boolean = null
+
+  """Whether globally accessible."""
+  isGlobal: Boolean = null
+
+  """Extra metadata."""
+  extra: JSON = null
+}
+
 """Added in 24.09.0."""
 type CreateContainerRegistryNode
   @join__type(graph: GRAPHENE)
@@ -2490,6 +2589,16 @@ type CreateContainerRegistryNodeV2
   @join__type(graph: GRAPHENE)
 {
   container_registry: ContainerRegistryNode
+}
+
+"""
+Added in UNRELEASED. Payload for container registry create/update mutations.
+"""
+type CreateContainerRegistryPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Created container registry."""
+  registry: ContainerRegistryV2!
 }
 
 """Added in 25.3.0."""
@@ -3308,6 +3417,14 @@ type DeleteContainerRegistryNodeV2
   @join__type(graph: GRAPHENE)
 {
   container_registry: ContainerRegistryNode
+}
+
+"""Added in UNRELEASED. Payload for container registry deletion."""
+type DeleteContainerRegistryPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted container registry."""
+  id: String!
 }
 
 """Added in 25.3.0."""
@@ -8235,6 +8352,15 @@ type Mutation
   """
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload! @join__field(graph: STRAWBERRY)
 
+  """Added in UNRELEASED. Create a new container registry (admin only)."""
+  adminCreateContainerRegistryV2(input: CreateContainerRegistryInputGQL!): CreateContainerRegistryPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Update a container registry (admin only)."""
+  adminUpdateContainerRegistryV2(input: UpdateContainerRegistryInputGQL!): UpdateContainerRegistryPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a container registry (admin only)."""
+  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayloadGQL! @join__field(graph: STRAWBERRY)
+
   """Added in 25.16.0. Create model deployment."""
   createModelDeployment(input: CreateDeploymentInput!): CreateDeploymentPayload! @join__field(graph: STRAWBERRY)
 
@@ -10669,6 +10795,11 @@ type Query
   Added in 26.3.0. Query audit logs with pagination and filtering. (admin only)
   """
   adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. List container registries with filtering, ordering, and pagination (admin only).
+  """
+  adminContainerRegistriesV2(filter: ContainerRegistryV2Filter = null, orderBy: [ContainerRegistryV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ContainerRegistryV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Query login sessions with pagination and filtering. (admin only)
@@ -13696,6 +13827,51 @@ type UpdateAutoScalingRulePayload
 {
   """Updated auto-scaling rule"""
   rule: AutoScalingRule!
+}
+
+"""
+Added in UNRELEASED. Input for updating a container registry. All fields optional except id.
+"""
+input UpdateContainerRegistryInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the registry to update."""
+  id: String!
+
+  """Updated URL."""
+  url: String = null
+
+  """Updated registry name."""
+  registryName: String = null
+
+  """Updated type."""
+  type: ContainerRegistryType = null
+
+  """Updated project."""
+  project: String = null
+
+  """Updated username."""
+  username: String = null
+
+  """Updated password."""
+  password: String = null
+
+  """Updated SSL verification."""
+  sslVerify: Boolean = null
+
+  """Updated global accessibility."""
+  isGlobal: Boolean = null
+
+  """Updated extra metadata."""
+  extra: JSON = null
+}
+
+"""Added in UNRELEASED. Payload for container registry update mutation."""
+type UpdateContainerRegistryPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated container registry."""
+  registry: ContainerRegistryV2!
 }
 
 """Added in 25.3.0."""
