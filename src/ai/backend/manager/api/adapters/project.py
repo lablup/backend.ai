@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     GroupFilter,
     GroupOrder,
     PurgeGroupInput,
+    UnassignUsersFromProjectInput,
     UpdateGroupInput,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
@@ -29,6 +30,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
     ProjectPayload,
     ProjectStorageInfo,
     PurgeProjectPayload,
+    UnassignUsersFromProjectPayload,
     VFolderHostPermissionEntry,
 )
 from ai.backend.common.dto.manager.v2.group.types import (
@@ -74,6 +76,9 @@ from ai.backend.manager.services.group.actions.search_projects import (
     SearchProjectsAction,
     SearchProjectsByDomainAction,
     SearchProjectsByUserAction,
+)
+from ai.backend.manager.services.group.actions.unassign_users import (
+    UnassignUsersFromProjectAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -222,6 +227,15 @@ class ProjectAdapter(BaseAdapter):
             PurgeGroupAction(group_id=input.group_id)
         )
         return PurgeProjectPayload(purged=True)
+
+    async def unassign_users(
+        self, project_id: UUID, input: UnassignUsersFromProjectInput
+    ) -> UnassignUsersFromProjectPayload:
+        """Unassign users from a project."""
+        await self._processors.group.unassign_users.wait_for_complete(
+            UnassignUsersFromProjectAction(project_id=project_id, user_uuids=input.user_ids)
+        )
+        return UnassignUsersFromProjectPayload(unassigned=True)
 
     async def search_by_domain(
         self,

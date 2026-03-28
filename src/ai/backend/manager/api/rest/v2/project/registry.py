@@ -31,4 +31,10 @@ def register_v2_project_routes(
         handler.assign_users,
         middlewares=[auth_required],
     )
+    reg.add(
+        "POST",
+        "/{project_id}/users/unassign",
+        handler.unassign_users,
+        middlewares=[auth_required],
+    )
     return reg

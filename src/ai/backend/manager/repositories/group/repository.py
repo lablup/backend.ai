@@ -132,6 +132,11 @@ class GroupRepository:
         return await self._db_source.assign_users_to_project(project_id, user_ids)
 
     @group_repository_resilience.apply()
+    async def unassign_users(self, project_id: uuid.UUID, user_uuids: list[uuid.UUID]) -> None:
+        """Remove users from a project."""
+        await self._db_source.unassign_users(project_id, user_uuids)
+
+    @group_repository_resilience.apply()
     async def get_project(self, project_id: UUID) -> GroupData:
         """Get a single project by UUID.
 

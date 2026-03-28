@@ -639,6 +639,21 @@ class GroupDBSource:
 
             return [row.to_data() for row in new_user_rows]
 
+    async def unassign_users(self, project_id: uuid.UUID, user_uuids: list[uuid.UUID]) -> None:
+        """Remove users from a project."""
+        async with self._db.begin_session() as session:
+            existing_group = await session.scalar(
+                sa.select(groups.c.id).where(groups.c.id == project_id)
+            )
+            if existing_group is None:
+                raise ProjectNotFound(f"Group not found: {project_id}")
+            await session.execute(
+                sa.delete(association_groups_users).where(
+                    (association_groups_users.c.user_id.in_(user_uuids))
+                    & (association_groups_users.c.group_id == project_id),
+                ),
+            )
+
     async def get_project(self, project_id: UUID) -> GroupData:
         """Get a single project by UUID.
 

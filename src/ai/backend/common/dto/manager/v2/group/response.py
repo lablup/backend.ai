@@ -27,6 +27,7 @@ __all__ = (
     "ProjectStorageInfo",
     "PurgeProjectPayload",
     "SearchProjectsPayload",
+    "UnassignUsersFromProjectPayload",
     "VFolderHostPermissionEntry",
 )
 
@@ -175,3 +176,11 @@ class AdminSearchGroupsPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of groups matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class UnassignUsersFromProjectPayload(BaseResponseModel):
+    """Payload for user unassignment from project."""
+
+    unassigned: bool = Field(
+        description="Whether the unassignment was successful.",
+    )
