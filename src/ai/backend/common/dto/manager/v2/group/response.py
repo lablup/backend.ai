@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.group.types import ProjectType
+from ai.backend.common.dto.manager.v2.user.response import UserNode
 
 __all__ = (
     "AdminSearchGroupsPayload",
@@ -164,7 +165,7 @@ class PurgeProjectPayload(BaseResponseModel):
 class AssignUsersToProjectPayload(BaseResponseModel):
     """Payload for assign users to project response."""
 
-    assigned_count: int = Field(description="Number of users actually assigned.")
+    items: list[UserNode] = Field(description="List of users actually assigned.")
 
 
 class AdminSearchGroupsPayload(BaseResponseModel):

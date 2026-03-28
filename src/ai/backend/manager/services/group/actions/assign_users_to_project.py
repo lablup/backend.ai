@@ -7,6 +7,7 @@ from uuid import UUID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.services.group.actions.base import (
     GroupSingleEntityAction,
     GroupSingleEntityActionResult,
@@ -34,7 +35,7 @@ class AssignUsersToProjectAction(GroupSingleEntityAction):
 
 @dataclass
 class AssignUsersToProjectActionResult(GroupSingleEntityActionResult):
-    assigned_count: int
+    assigned_users: list[UserData]
 
     @override
     def target_entity_id(self) -> str:

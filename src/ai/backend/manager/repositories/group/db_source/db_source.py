@@ -24,6 +24,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
     ProjectHasActiveEndpointsError,
     ProjectHasActiveKernelsError,
@@ -48,7 +49,7 @@ from ai.backend.manager.models.resource_policy import project_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
@@ -65,8 +66,16 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
+from ai.backend.manager.repositories.base.rbac.scope_binder import (
+    RBACScopeBinder,
+    RBACScopeBindingPair,
+    execute_rbac_scope_binder,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
+from ai.backend.manager.repositories.group.creators import (
+    AssocGroupUserCreatorSpec,
+    GroupCreatorSpec,
+)
 from ai.backend.manager.repositories.group.purgers import (
     GroupBatchPurgerSpec,
     GroupEndpointBatchPurgerSpec,
@@ -574,14 +583,19 @@ class GroupDBSource:
                 session, BatchPurger(spec=SessionByIdsBatchPurgerSpec(session_ids=session_ids))
             )
 
-    async def assign_users_to_project(self, project_id: UUID, user_ids: list[UUID]) -> int:
-        """Assign users to a project with domain validation.
+    async def assign_users_to_project(
+        self, project_id: UUID, user_ids: list[UUID]
+    ) -> list[UserData]:
+        """Assign users to a project with domain validation and RBAC scope binding.
 
         Validates that the project exists, users are in the same domain and active,
-        and filters out already-assigned users. Returns the count of newly assigned users.
+        and filters out already-assigned users. Creates both the business association
+        (association_groups_users) and the RBAC scope association atomically.
+
+        Returns the list of newly assigned users.
         """
         if not user_ids:
-            return 0
+            return []
 
         async with self._db.begin_session() as session:
             # Fetch project domain
@@ -593,35 +607,46 @@ class GroupDBSource:
             project_domain = project_row
 
             # Find valid users: same domain and active
-            valid_users_result = await session.execute(
-                sa.select(users.c.uuid).where(
-                    users.c.uuid.in_(user_ids)
-                    & (users.c.domain_name == project_domain)
-                    & (users.c.status == "active")
+            valid_user_rows = (
+                await session.scalars(
+                    sa.select(UserRow).where(
+                        UserRow.uuid.in_(user_ids)
+                        & (UserRow.domain_name == project_domain)
+                        & (UserRow.status == "active")
+                    )
                 )
-            )
-            valid_user_ids = {row.uuid for row in valid_users_result.fetchall()}
+            ).all()
+            valid_user_map = {row.uuid: row for row in valid_user_rows}
 
-            if not valid_user_ids:
-                return 0
+            if not valid_user_map:
+                return []
 
             # Filter out already-assigned users
             existing_result = await session.execute(
                 sa.select(association_groups_users.c.user_id).where(
                     (association_groups_users.c.group_id == project_id)
-                    & (association_groups_users.c.user_id.in_(valid_user_ids))
+                    & (association_groups_users.c.user_id.in_(valid_user_map.keys()))
                 )
             )
             existing_user_ids = {row.user_id for row in existing_result.fetchall()}
-            new_user_ids = valid_user_ids - existing_user_ids
+            new_user_ids = set(valid_user_map.keys()) - existing_user_ids
 
             if not new_user_ids:
-                return 0
+                return []
 
-            # Bulk insert
-            values = [{"user_id": uid, "group_id": project_id} for uid in new_user_ids]
-            await session.execute(sa.insert(association_groups_users).values(values))
-            return len(new_user_ids)
+            # Build scope binder pairs for atomic business + RBAC association
+            project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
+            pairs = [
+                RBACScopeBindingPair(
+                    spec=AssocGroupUserCreatorSpec(user_id=uid, group_id=project_id),
+                    entity_ref=RBACElementRef(RBACElementType.USER, str(uid)),
+                    scope_ref=project_scope_ref,
+                )
+                for uid in new_user_ids
+            ]
+            await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=pairs))
+
+            return [valid_user_map[uid].to_data() for uid in new_user_ids]
 
     async def get_project(self, project_id: UUID) -> GroupData:
         """Get a single project by UUID.

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.models.group.row import AssocGroupUserRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
 
@@ -40,4 +42,19 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
             resource_policy=self.resource_policy,
             dotfiles=self.dotfiles,
             container_registry=self.container_registry,
+        )
+
+
+@dataclass
+class AssocGroupUserCreatorSpec(CreatorSpec[AssocGroupUserRow]):
+    """CreatorSpec for user-project association."""
+
+    user_id: UUID
+    group_id: UUID
+
+    @override
+    def build_row(self) -> AssocGroupUserRow:
+        return AssocGroupUserRow(
+            user_id=self.user_id,
+            group_id=self.group_id,
         )

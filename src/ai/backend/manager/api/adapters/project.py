@@ -78,6 +78,7 @@ from ai.backend.manager.services.group.actions.search_projects import (
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
+from .user import UserAdapter
 
 _PROJECT_PAGINATION_SPEC = PaginationSpec(
     forward_order=GroupOrders.created_at(ascending=False),
@@ -297,7 +298,9 @@ class ProjectAdapter(BaseAdapter):
         result = await self._processors.group.assign_users_to_project.wait_for_complete(
             AssignUsersToProjectAction(project_id=project_id, user_ids=input.user_ids)
         )
-        return AssignUsersToProjectPayload(assigned_count=result.assigned_count)
+        return AssignUsersToProjectPayload(
+            items=[UserAdapter._user_data_to_node(u) for u in result.assigned_users],
+        )
 
     def _convert_group_filter(self, filter: GroupFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
