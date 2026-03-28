@@ -5,6 +5,7 @@ from .mutation import (
     admin_delete_project_v2,
     admin_purge_project_v2,
     admin_update_project_v2,
+    unassign_users_from_project_v2,
 )
 from .query import (
     admin_projects_v2,
@@ -24,4 +25,5 @@ __all__ = [
     "admin_update_project_v2",
     "admin_delete_project_v2",
     "admin_purge_project_v2",
+    "unassign_users_from_project_v2",
 ]

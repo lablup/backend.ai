@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from ai.backend.common.dto.manager.v2.group.request import (
     CreateGroupInput as CreateGroupInputDTO,
+)
+from ai.backend.common.dto.manager.v2.group.request import (
+    UnassignUsersFromProjectInput as UnassignUsersFromProjectInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.request import (
     UpdateGroupInput as UpdateGroupInputDTO,
@@ -16,6 +21,9 @@ from ai.backend.common.dto.manager.v2.group.response import (
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     PurgeProjectPayload as PurgeProjectPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import (
+    UnassignUsersFromProjectPayload as UnassignUsersFromProjectPayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
@@ -111,3 +119,31 @@ class PurgeProjectPayloadGQL(PydanticOutputMixin[PurgeProjectPayloadDTO]):
     """Payload for project permanent purge."""
 
     purged: bool = gql_field(description="Whether the purge was successful.")
+
+
+# --- Unassign Users ---
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for unassigning users from a project.",
+    )
+)
+class UnassignUsersFromProjectInputGQL(PydanticInputMixin[UnassignUsersFromProjectInputDTO]):
+    """Input for unassigning users from a project."""
+
+    user_ids: list[UUID] = gql_field(description="List of user UUIDs to unassign from the project.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for user unassignment from project.",
+    ),
+    model=UnassignUsersFromProjectPayloadDTO,
+)
+class UnassignUsersFromProjectPayloadGQL(PydanticOutputMixin[UnassignUsersFromProjectPayloadDTO]):
+    """Payload for user unassignment from project."""
+
+    unassigned: bool = gql_field(description="Whether the unassignment was successful.")

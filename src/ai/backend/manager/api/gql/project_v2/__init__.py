@@ -13,6 +13,7 @@ from .resolver import (
     domain_projects_v2,
     project_domain_v2,
     project_v2,
+    unassign_users_from_project_v2,
 )
 from .types import (
     ProjectBasicInfoGQL,
@@ -38,6 +39,7 @@ __all__ = [
     "admin_update_project_v2",
     "admin_delete_project_v2",
     "admin_purge_project_v2",
+    "unassign_users_from_project_v2",
     # Enums
     "ProjectTypeEnum",
     "VFolderHostPermissionEnum",
