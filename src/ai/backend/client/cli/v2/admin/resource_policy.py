@@ -38,7 +38,8 @@ def _load_input(
     if file_path is not None:
         try:
             with Path(file_path).open() as f:
-                return json.load(f)
+                data: dict[str, Any] = json.load(f)
+                return data
         except (json.JSONDecodeError, OSError) as e:
             click.echo(f"Error reading file: {e}", err=True)
             sys.exit(1)

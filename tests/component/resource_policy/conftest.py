@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import AsyncIterator, Callable, Coroutine
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -14,6 +14,9 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+
+if TYPE_CHECKING:
+    from tests.component.conftest import ServerInfo, UserFixtureData
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput,
     CreateProjectResourcePolicyInput,
@@ -66,9 +69,6 @@ from ai.backend.manager.services.user_resource_policy.processors import (
 from ai.backend.manager.services.user_resource_policy.service import (
     UserResourcePolicyService,
 )
-
-if __name__ != "__main__":
-    from tests.component.conftest import ServerInfo, UserFixtureData
 
 KeypairResourcePolicyFactory = Callable[
     ..., Coroutine[Any, Any, CreateKeypairResourcePolicyPayload]
