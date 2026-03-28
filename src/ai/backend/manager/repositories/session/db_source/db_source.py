@@ -562,28 +562,19 @@ class SessionDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def validate_sessions_in_project(
+    async def filter_sessions_in_project(
         self,
         session_ids: list[SessionId],
         project_id: uuid.UUID,
-    ) -> None:
-        """Validate that all given sessions belong to the specified project.
-
-        Raises:
-            GenericBadRequest: If any session does not belong to the project.
-        """
+    ) -> list[SessionId]:
+        """Return session IDs that belong to the specified project."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(SessionRow.id).where(
                 SessionRow.id.in_(session_ids),
                 SessionRow.group_id == project_id,
             )
             result = await db_sess.execute(query)
-            found_ids = {row.id for row in result}
-            missing = set(session_ids) - found_ids
-            if missing:
-                raise GenericBadRequest(
-                    f"Sessions {[str(s) for s in missing]} do not belong to project {project_id}."
-                )
+            return [row.id for row in result]
 
     async def search_kernels(
         self,

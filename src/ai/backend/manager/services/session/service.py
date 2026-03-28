@@ -816,18 +816,29 @@ class SessionService:
     async def terminate_sessions_in_project(
         self, action: TerminateSessionsInProjectAction
     ) -> TerminateSessionsInProjectActionResult:
-        """Terminate multiple sessions within a project scope."""
-        await self._session_repository.validate_sessions_in_project(
+        """Terminate multiple sessions within a project scope.
+
+        Sessions not belonging to the project are filtered out and returned
+        in the ``not_in_project`` field instead of raising an error.
+        """
+        valid_ids = await self._session_repository.filter_sessions_in_project(
             action.session_ids, action.project_id
         )
-        result = await self.terminate_sessions(
-            TerminateSessionsAction(session_ids=action.session_ids, forced=action.forced)
-        )
+        valid_set = set(valid_ids)
+        not_in_project = [uuid.UUID(str(sid)) for sid in action.session_ids if sid not in valid_set]
+        if valid_ids:
+            result = await self.terminate_sessions(
+                TerminateSessionsAction(session_ids=valid_ids, forced=action.forced)
+            )
+            return TerminateSessionsInProjectActionResult(
+                cancelled=result.cancelled,
+                terminating=result.terminating,
+                force_terminated=result.force_terminated,
+                skipped=result.skipped,
+                not_in_project=not_in_project,
+            )
         return TerminateSessionsInProjectActionResult(
-            cancelled=result.cancelled,
-            terminating=result.terminating,
-            force_terminated=result.force_terminated,
-            skipped=result.skipped,
+            not_in_project=not_in_project,
         )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:

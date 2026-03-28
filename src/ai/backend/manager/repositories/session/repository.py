@@ -290,13 +290,13 @@ class SessionRepository:
         return await self._db_source.search_in_project(querier, scope)
 
     @session_repository_resilience.apply()
-    async def validate_sessions_in_project(
+    async def filter_sessions_in_project(
         self,
         session_ids: list[SessionId],
         project_id: uuid.UUID,
-    ) -> None:
-        """Validate that all given sessions belong to the specified project."""
-        await self._db_source.validate_sessions_in_project(session_ids, project_id)
+    ) -> list[SessionId]:
+        """Return session IDs that belong to the specified project."""
+        return await self._db_source.filter_sessions_in_project(session_ids, project_id)
 
     @session_repository_resilience.apply()
     async def search_kernels(

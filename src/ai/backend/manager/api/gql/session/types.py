@@ -45,7 +45,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionRuntimeInfoGQLDTO,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
-    TerminateSessionsPayload as TerminateSessionsPayloadDTO,
+    TerminateSessionsInProjectPayload as TerminateSessionsInProjectPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
@@ -574,13 +574,16 @@ class EnqueueSessionPayloadGQL:
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Payload returned after terminating sessions.",
+        description="Payload returned after terminating sessions in a project.",
     ),
-    model=TerminateSessionsPayloadDTO,
-    name="TerminateSessionsPayload",
+    model=TerminateSessionsInProjectPayloadDTO,
+    name="TerminateSessionsInProjectPayload",
 )
-class TerminateSessionsPayloadGQL:
+class TerminateSessionsInProjectPayloadGQL:
     cancelled: list[ID] = gql_field(description="Sessions cancelled from PENDING.")
     terminating: list[ID] = gql_field(description="Sessions marked TERMINATING.")
     force_terminated: list[ID] = gql_field(description="Sessions force-terminated.")
     skipped: list[ID] = gql_field(description="Sessions already terminated or not found.")
+    not_in_project: list[ID] = gql_field(
+        description="Sessions that do not belong to the specified project."
+    )
