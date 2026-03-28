@@ -10519,6 +10519,13 @@ type VFolderMetadataInfo {
   cloneable: Boolean!
 }
 
+"""Added in UNRELEASED. Mount permission level for a virtual folder."""
+enum VFolderMountPermission {
+  READ_ONLY
+  READ_WRITE
+  RW_DELETE
+}
+
 """Added in UNRELEASED. Operation status of a virtual folder."""
 enum VFolderOperationStatus {
   READY
@@ -10535,13 +10542,6 @@ Added in UNRELEASED. Ownership type of a virtual folder (USER or GROUP).
 enum VFolderOwnershipType {
   USER
   GROUP
-}
-
-"""Added in UNRELEASED. Mount permission level for a virtual folder."""
-enum VFolderMountPermission {
-  READ_ONLY
-  READ_WRITE
-  RW_DELETE
 }
 
 """
@@ -10582,9 +10582,7 @@ type VFolderV2 implements Node {
   """
   metadata: VFolderMetadataInfo!
 
-  """
-  Access control including permission level and ownership type.
-  """
+  """Access control including permission level and ownership type."""
   accessControl: VFolderAccessControlInfo!
 
   """Usage statistics; None when usage data is not loaded."""

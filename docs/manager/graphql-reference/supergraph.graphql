@@ -16267,6 +16267,15 @@ type VFolderMetadataInfo
   cloneable: Boolean!
 }
 
+"""Added in UNRELEASED. Mount permission level for a virtual folder."""
+enum VFolderMountPermission
+  @join__type(graph: STRAWBERRY)
+{
+  READ_ONLY @join__enumValue(graph: STRAWBERRY)
+  READ_WRITE @join__enumValue(graph: STRAWBERRY)
+  RW_DELETE @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in UNRELEASED. Operation status of a virtual folder."""
 enum VFolderOperationStatus
   @join__type(graph: STRAWBERRY)
@@ -16287,15 +16296,6 @@ enum VFolderOwnershipType
 {
   USER @join__enumValue(graph: STRAWBERRY)
   GROUP @join__enumValue(graph: STRAWBERRY)
-}
-
-"""Added in UNRELEASED. Mount permission level for a virtual folder."""
-enum VFolderMountPermission
-  @join__type(graph: STRAWBERRY)
-{
-  READ_ONLY @join__enumValue(graph: STRAWBERRY)
-  READ_WRITE @join__enumValue(graph: STRAWBERRY)
-  RW_DELETE @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -16349,9 +16349,7 @@ type VFolderV2 implements Node
   """
   metadata: VFolderMetadataInfo!
 
-  """
-  Access control including permission level and ownership type.
-  """
+  """Access control including permission level and ownership type."""
   accessControl: VFolderAccessControlInfo!
 
   """Usage statistics; None when usage data is not loaded."""
