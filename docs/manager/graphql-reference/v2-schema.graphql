@@ -6393,7 +6393,7 @@ type Query {
   """
   Added in UNRELEASED. List all keypair resource policies with pagination (admin only).
   """
-  adminKeypairResourcePoliciesV2(limit: Int = null, offset: Int = null): KeypairResourcePolicyV2Connection
+  adminKeypairResourcePoliciesV2(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeypairResourcePolicyV2Connection
 
   """
   Added in UNRELEASED. Get a single user resource policy by name (admin only).
@@ -6403,7 +6403,7 @@ type Query {
   """
   Added in UNRELEASED. List all user resource policies with pagination (admin only).
   """
-  adminUserResourcePoliciesV2(limit: Int = null, offset: Int = null): UserResourcePolicyV2Connection
+  adminUserResourcePoliciesV2(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserResourcePolicyV2Connection
 
   """
   Added in UNRELEASED. Get a single project resource policy by name (admin only).
@@ -6413,7 +6413,7 @@ type Query {
   """
   Added in UNRELEASED. List all project resource policies with pagination (admin only).
   """
-  adminProjectResourcePoliciesV2(limit: Int = null, offset: Int = null): ProjectResourcePolicyV2Connection
+  adminProjectResourcePoliciesV2(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectResourcePolicyV2Connection
 
   """Added in UNRELEASED. Get the current user's keypair resource policy."""
   myKeypairResourcePolicyV2: KeypairResourcePolicyV2
