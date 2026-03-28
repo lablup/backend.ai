@@ -312,7 +312,7 @@ from .scheduling_history import (
     session_scoped_scheduling_histories,
 )
 from .service_catalog import admin_service_catalogs
-from .session.resolver import admin_sessions_v2
+from .session.resolver import admin_sessions_v2, terminate_project_sessions_v2
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -667,6 +667,8 @@ class Mutation:
     admin_create_resource_preset_v2 = admin_create_resource_preset_v2
     admin_update_resource_preset_v2 = admin_update_resource_preset_v2
     admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
+    # Session V2 mutations
+    terminate_project_sessions_v2 = terminate_project_sessions_v2
 
 
 @strawberry.type

@@ -129,6 +129,10 @@ from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
     TerminateSessionsActionResult,
 )
+from ai.backend.manager.services.session.actions.terminate_sessions_in_project import (
+    TerminateSessionsInProjectAction,
+    TerminateSessionsInProjectActionResult,
+)
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
@@ -178,6 +182,9 @@ class SessionProcessors(AbstractProcessorPackage):
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
     terminate_sessions: ActionProcessor[TerminateSessionsAction, TerminateSessionsActionResult]
+    terminate_sessions_in_project: ActionProcessor[
+        TerminateSessionsInProjectAction, TerminateSessionsInProjectActionResult
+    ]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
     modify_session: ActionProcessor[ModifySessionAction, ModifySessionActionResult]
     check_and_transit_status: ActionProcessor[
@@ -260,6 +267,11 @@ class SessionProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=[cast(ActionValidator, scope_validator)],
         )
+        self.terminate_sessions_in_project = ActionProcessor(
+            service.terminate_sessions_in_project,
+            action_monitors,
+            validators=[cast(ActionValidator, scope_validator)],
+        )
 
         # Single entity actions with RBAC validation
         self.destroy_session = ActionProcessor(
@@ -315,6 +327,7 @@ class SessionProcessors(AbstractProcessorPackage):
             ShutdownServiceAction.spec(),
             StartServiceAction.spec(),
             TerminateSessionsAction.spec(),
+            TerminateSessionsInProjectAction.spec(),
             UploadFilesAction.spec(),
             ModifySessionAction.spec(),
             CheckAndTransitStatusAction.spec(),

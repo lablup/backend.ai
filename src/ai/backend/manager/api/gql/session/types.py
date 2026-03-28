@@ -44,7 +44,11 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionResourceInfoGQLDTO,
     SessionRuntimeInfoGQLDTO,
 )
+from ai.backend.common.dto.manager.v2.session.response import (
+    TerminateSessionsPayload as TerminateSessionsPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.session.types import (
+    ProjectSessionScope,
     SessionStatusFilter,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -155,6 +159,22 @@ class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
 class SessionV2OrderByGQL(PydanticInputMixin[SessionOrder]):
     field: SessionV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
+
+
+# ========== Scope Types ==========
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for session operations within a specific project.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ProjectSessionV2Scope",
+)
+class ProjectSessionScopeGQL(PydanticInputMixin[ProjectSessionScope]):
+    """Scope for project-level session operations."""
+
+    project_id: UUID = gql_field(description="Project UUID to scope the session operation.")
 
 
 # ========== Session Info Sub-Types ==========
@@ -549,3 +569,18 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
 )
 class EnqueueSessionPayloadGQL:
     session: SessionV2GQL = gql_field(description="Created session details.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after terminating sessions.",
+    ),
+    model=TerminateSessionsPayloadDTO,
+    name="TerminateSessionsPayload",
+)
+class TerminateSessionsPayloadGQL:
+    cancelled: list[ID] = gql_field(description="Sessions cancelled from PENDING.")
+    terminating: list[ID] = gql_field(description="Sessions marked TERMINATING.")
+    force_terminated: list[ID] = gql_field(description="Sessions force-terminated.")
+    skipped: list[ID] = gql_field(description="Sessions already terminated or not found.")

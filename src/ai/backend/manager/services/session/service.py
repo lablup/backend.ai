@@ -201,6 +201,10 @@ from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
     TerminateSessionsActionResult,
 )
+from ai.backend.manager.services.session.actions.terminate_sessions_in_project import (
+    TerminateSessionsInProjectAction,
+    TerminateSessionsInProjectActionResult,
+)
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
@@ -807,6 +811,23 @@ class SessionService:
             terminating=[uuid.UUID(str(s)) for s in mark_result.terminating_sessions],
             force_terminated=[uuid.UUID(str(s)) for s in mark_result.force_terminated_sessions],
             skipped=[uuid.UUID(str(s)) for s in mark_result.skipped_sessions],
+        )
+
+    async def terminate_sessions_in_project(
+        self, action: TerminateSessionsInProjectAction
+    ) -> TerminateSessionsInProjectActionResult:
+        """Terminate multiple sessions within a project scope."""
+        await self._session_repository.validate_sessions_in_project(
+            action.session_ids, action.project_id
+        )
+        result = await self.terminate_sessions(
+            TerminateSessionsAction(session_ids=action.session_ids, forced=action.forced)
+        )
+        return TerminateSessionsInProjectActionResult(
+            cancelled=result.cancelled,
+            terminating=result.terminating,
+            force_terminated=result.force_terminated,
+            skipped=result.skipped,
         )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:

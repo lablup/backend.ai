@@ -47,6 +47,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     SessionOrder,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
+    TerminateSessionsInProjectInput,
     TerminateSessionsInput,
     UpdateSessionInput,
 )
@@ -133,6 +134,9 @@ from ai.backend.manager.services.session.actions.shutdown_service import Shutdow
 from ai.backend.manager.services.session.actions.start_service import StartServiceAction
 from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
+)
+from ai.backend.manager.services.session.actions.terminate_sessions_in_project import (
+    TerminateSessionsInProjectAction,
 )
 
 from .base import BaseAdapter
@@ -728,6 +732,25 @@ class SessionAdapter(BaseAdapter):
             forced=input.forced,
         )
         result = await self._processors.session.terminate_sessions.wait_for_complete(action)
+        return TerminateSessionsPayload(
+            cancelled=result.cancelled,
+            terminating=result.terminating,
+            force_terminated=result.force_terminated,
+            skipped=result.skipped,
+        )
+
+    async def terminate_in_project(
+        self, input: TerminateSessionsInProjectInput
+    ) -> TerminateSessionsPayload:
+        """Terminate one or more sessions within a project scope."""
+        action = TerminateSessionsInProjectAction(
+            project_id=input.project_id,
+            session_ids=[SessionId(sid) for sid in input.session_ids],
+            forced=input.forced,
+        )
+        result = await self._processors.session.terminate_sessions_in_project.wait_for_complete(
+            action
+        )
         return TerminateSessionsPayload(
             cancelled=result.cancelled,
             terminating=result.terminating,

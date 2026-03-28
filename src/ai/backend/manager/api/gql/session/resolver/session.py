@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import strawberry
-from strawberry import Info
+from strawberry import ID, Info
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+from ai.backend.common.dto.manager.v2.session.request import (
+    AdminSearchSessionsInput,
+    TerminateSessionsInProjectInput,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -15,11 +20,13 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.session.types import (
     EnqueueSessionInputGQL,
     EnqueueSessionPayloadGQL,
+    ProjectSessionScopeGQL,
     SessionV2ConnectionGQL,
     SessionV2EdgeGQL,
     SessionV2FilterGQL,
     SessionV2GQL,
     SessionV2OrderByGQL,
+    TerminateSessionsPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -95,4 +102,32 @@ async def enqueue_session(
     )
     return EnqueueSessionPayloadGQL(
         session=SessionV2GQL.from_pydantic(payload.session),
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Terminate sessions within a project scope.",
+    ),
+)  # type: ignore[misc]
+async def terminate_project_sessions_v2(
+    info: Info[StrawberryGQLContext],
+    scope: ProjectSessionScopeGQL,
+    session_ids: list[ID],
+    forced: bool = False,
+) -> TerminateSessionsPayloadGQL:
+    """Terminate one or more sessions scoped to a project."""
+    payload = await info.context.adapters.session.terminate_in_project(
+        TerminateSessionsInProjectInput(
+            project_id=scope.project_id,
+            session_ids=[UUID(str(sid)) for sid in session_ids],
+            forced=forced,
+        )
+    )
+    return TerminateSessionsPayloadGQL(
+        cancelled=[ID(str(sid)) for sid in payload.cancelled],
+        terminating=[ID(str(sid)) for sid in payload.terminating],
+        force_terminated=[ID(str(sid)) for sid in payload.force_terminated],
+        skipped=[ID(str(sid)) for sid in payload.skipped],
     )
