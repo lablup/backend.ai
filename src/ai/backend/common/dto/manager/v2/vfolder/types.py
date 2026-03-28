@@ -75,6 +75,7 @@ class VFolderMetadataInfo(BaseResponseModel):
     quota_scope_id: str | None
     created_at: datetime
     last_used: datetime | None
+    cloneable: bool
 
 
 class VFolderAccessControlInfo(BaseResponseModel):
@@ -82,7 +83,6 @@ class VFolderAccessControlInfo(BaseResponseModel):
 
     permission: VFolderPermissionField
     ownership_type: VFolderOwnershipTypeField
-    cloneable: bool
 
 
 class VFolderOwnerInfo(BaseResponseModel):

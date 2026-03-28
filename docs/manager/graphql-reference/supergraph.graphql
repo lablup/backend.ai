@@ -16204,14 +16204,13 @@ type ValidateNotificationRulePayload
 }
 
 """
-Added in UNRELEASED. Access control information for a virtual folder. Includes the mount permission level (read-only, read-write, read-write-delete), ownership type (user or project), and clone eligibility.
+Added in UNRELEASED. Access control information for a virtual folder. Includes the mount permission level (read-only, read-write, read-write-delete) and ownership type (user or project).
 """
 type VFolderAccessControlInfo
   @join__type(graph: STRAWBERRY)
 {
-  permission: VFolderPermission!
+  permission: VFolderMountPermission!
   ownershipType: VFolderOwnershipType!
-  cloneable: Boolean!
 }
 
 """
@@ -16255,7 +16254,7 @@ enum VFolderHostPermissionV2
 }
 
 """
-Added in UNRELEASED. Descriptive metadata for a virtual folder. Includes the folder name, usage mode, quota scope, and timestamps.
+Added in UNRELEASED. Descriptive metadata for a virtual folder. Includes the folder name, usage mode, quota scope, timestamps, and clone eligibility.
 """
 type VFolderMetadataInfo
   @join__type(graph: STRAWBERRY)
@@ -16265,6 +16264,7 @@ type VFolderMetadataInfo
   quotaScopeId: String
   createdAt: DateTime!
   lastUsed: DateTime
+  cloneable: Boolean!
 }
 
 """Added in UNRELEASED. Operation status of a virtual folder."""
@@ -16272,10 +16272,7 @@ enum VFolderOperationStatus
   @join__type(graph: STRAWBERRY)
 {
   READY @join__enumValue(graph: STRAWBERRY)
-  PERFORMING @join__enumValue(graph: STRAWBERRY)
   CLONING @join__enumValue(graph: STRAWBERRY)
-  MOUNTED @join__enumValue(graph: STRAWBERRY)
-  ERROR @join__enumValue(graph: STRAWBERRY)
   DELETE_PENDING @join__enumValue(graph: STRAWBERRY)
   DELETE_ONGOING @join__enumValue(graph: STRAWBERRY)
   DELETE_COMPLETE @join__enumValue(graph: STRAWBERRY)
@@ -16293,7 +16290,7 @@ enum VFolderOwnershipType
 }
 
 """Added in UNRELEASED. Mount permission level for a virtual folder."""
-enum VFolderPermission
+enum VFolderMountPermission
   @join__type(graph: STRAWBERRY)
 {
   READ_ONLY @join__enumValue(graph: STRAWBERRY)
@@ -16340,7 +16337,7 @@ type VFolderV2 implements Node
   id: ID!
 
   """
-  Current operation status. READY, PERFORMING, CLONING, MOUNTED, ERROR, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
+  Current operation status. READY, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
   """
   status: VFolderOperationStatus!
 
@@ -16348,12 +16345,12 @@ type VFolderV2 implements Node
   host: String!
 
   """
-  Descriptive metadata including name, usage mode, quota scope, and timestamps.
+  Descriptive metadata including name, usage mode, quota scope, timestamps, and clone eligibility.
   """
   metadata: VFolderMetadataInfo!
 
   """
-  Access control including permission level, ownership type, and clone eligibility.
+  Access control including permission level and ownership type.
   """
   accessControl: VFolderAccessControlInfo!
 

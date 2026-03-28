@@ -10466,12 +10466,11 @@ type VFSStorageEdge {
 }
 
 """
-Added in UNRELEASED. Access control information for a virtual folder. Includes the mount permission level (read-only, read-write, read-write-delete), ownership type (user or project), and clone eligibility.
+Added in UNRELEASED. Access control information for a virtual folder. Includes the mount permission level (read-only, read-write, read-write-delete) and ownership type (user or project).
 """
 type VFolderAccessControlInfo {
-  permission: VFolderPermission!
+  permission: VFolderMountPermission!
   ownershipType: VFolderOwnershipType!
-  cloneable: Boolean!
 }
 
 """
@@ -10509,7 +10508,7 @@ enum VFolderHostPermissionV2 {
 }
 
 """
-Added in UNRELEASED. Descriptive metadata for a virtual folder. Includes the folder name, usage mode, quota scope, and timestamps.
+Added in UNRELEASED. Descriptive metadata for a virtual folder. Includes the folder name, usage mode, quota scope, timestamps, and clone eligibility.
 """
 type VFolderMetadataInfo {
   name: String!
@@ -10517,15 +10516,13 @@ type VFolderMetadataInfo {
   quotaScopeId: String
   createdAt: DateTime!
   lastUsed: DateTime
+  cloneable: Boolean!
 }
 
 """Added in UNRELEASED. Operation status of a virtual folder."""
 enum VFolderOperationStatus {
   READY
-  PERFORMING
   CLONING
-  MOUNTED
-  ERROR
   DELETE_PENDING
   DELETE_ONGOING
   DELETE_COMPLETE
@@ -10541,7 +10538,7 @@ enum VFolderOwnershipType {
 }
 
 """Added in UNRELEASED. Mount permission level for a virtual folder."""
-enum VFolderPermission {
+enum VFolderMountPermission {
   READ_ONLY
   READ_WRITE
   RW_DELETE
@@ -10573,7 +10570,7 @@ type VFolderV2 implements Node {
   id: ID!
 
   """
-  Current operation status. READY, PERFORMING, CLONING, MOUNTED, ERROR, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
+  Current operation status. READY, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
   """
   status: VFolderOperationStatus!
 
@@ -10581,12 +10578,12 @@ type VFolderV2 implements Node {
   host: String!
 
   """
-  Descriptive metadata including name, usage mode, quota scope, and timestamps.
+  Descriptive metadata including name, usage mode, quota scope, timestamps, and clone eligibility.
   """
   metadata: VFolderMetadataInfo!
 
   """
-  Access control including permission level, ownership type, and clone eligibility.
+  Access control including permission level and ownership type.
   """
   accessControl: VFolderAccessControlInfo!
 

@@ -47,6 +47,7 @@ def _make_metadata_info() -> VFolderMetadataInfo:
         quota_scope_id="user:abc",
         created_at=datetime.now(tz=UTC),
         last_used=None,
+        cloneable=False,
     )
 
 
@@ -54,7 +55,6 @@ def _make_access_control_info() -> VFolderAccessControlInfo:
     return VFolderAccessControlInfo(
         permission=VFolderPermissionField.READ_WRITE,
         ownership_type=VFolderOwnershipTypeField.USER,
-        cloneable=False,
     )
 
 
@@ -110,7 +110,7 @@ class TestVFolderNodeCreation:
         )
         restored = VFolderNode.model_validate_json(node.model_dump_json())
         assert restored.metadata.name == node.metadata.name
-        assert restored.access_control.cloneable == node.access_control.cloneable
+        assert restored.metadata.cloneable == node.metadata.cloneable
         assert restored.usage is not None
         assert restored.usage.used_bytes == 1024
 

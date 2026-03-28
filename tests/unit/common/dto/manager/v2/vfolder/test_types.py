@@ -120,9 +120,11 @@ class TestVFolderMetadataInfo:
             quota_scope_id="user:abc",
             created_at=now,
             last_used=None,
+            cloneable=False,
         )
         assert info.name == "my-folder"
         assert info.last_used is None
+        assert info.cloneable is False
 
     def test_round_trip(self) -> None:
         now = datetime.now(tz=UTC)
@@ -132,10 +134,12 @@ class TestVFolderMetadataInfo:
             quota_scope_id=None,
             created_at=now,
             last_used=now,
+            cloneable=True,
         )
         restored = VFolderMetadataInfo.model_validate_json(info.model_dump_json())
         assert restored.name == info.name
         assert restored.usage_mode == VFolderUsageMode.MODEL
+        assert restored.cloneable is True
 
 
 class TestVFolderAccessControlInfo:
@@ -145,15 +149,13 @@ class TestVFolderAccessControlInfo:
         info = VFolderAccessControlInfo(
             permission=VFolderPermissionField.READ_WRITE,
             ownership_type=VFolderOwnershipTypeField.USER,
-            cloneable=False,
         )
-        assert info.cloneable is False
+        assert info.permission == VFolderPermissionField.READ_WRITE
 
     def test_round_trip(self) -> None:
         info = VFolderAccessControlInfo(
             permission=VFolderPermissionField.READ_ONLY,
             ownership_type=VFolderOwnershipTypeField.GROUP,
-            cloneable=True,
         )
         restored = VFolderAccessControlInfo.model_validate_json(info.model_dump_json())
         assert restored.permission == VFolderPermissionField.READ_ONLY

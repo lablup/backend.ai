@@ -26,9 +26,9 @@ class VFolderUsageModeGQL(StrEnum):
         added_version=NEXT_RELEASE_VERSION,
         description="Mount permission level for a virtual folder.",
     ),
-    name="VFolderPermission",
+    name="VFolderMountPermission",
 )
-class VFolderPermissionGQL(StrEnum):
+class VFolderMountPermissionGQL(StrEnum):
     READ_ONLY = "ro"
     READ_WRITE = "rw"
     RW_DELETE = "wd"
@@ -55,10 +55,7 @@ class VFolderOwnershipTypeGQL(StrEnum):
 )
 class VFolderOperationStatusGQL(StrEnum):
     READY = "ready"
-    PERFORMING = "performing"
     CLONING = "cloning"
-    MOUNTED = "mounted"
-    ERROR = "error"
     DELETE_PENDING = "delete-pending"
     DELETE_ONGOING = "delete-ongoing"
     DELETE_COMPLETE = "delete-complete"

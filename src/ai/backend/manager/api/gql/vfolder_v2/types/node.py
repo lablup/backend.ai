@@ -52,7 +52,7 @@ class VFolderV2GQL(PydanticNodeMixin[VFolderNode]):
     status: VFolderOperationStatusGQL = gql_field(
         description=(
             "Current operation status. "
-            "READY, PERFORMING, CLONING, MOUNTED, ERROR, "
+            "READY, CLONING, "
             "DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR."
         )
     )
@@ -60,10 +60,10 @@ class VFolderV2GQL(PydanticNodeMixin[VFolderNode]):
         description="Storage host where the virtual folder is physically located."
     )
     metadata: VFolderMetadataInfoGQL = gql_field(
-        description="Descriptive metadata including name, usage mode, quota scope, and timestamps."
+        description="Descriptive metadata including name, usage mode, quota scope, timestamps, and clone eligibility."
     )
     access_control: VFolderAccessControlInfoGQL = gql_field(
-        description="Access control including permission level, ownership type, and clone eligibility."
+        description="Access control including permission level and ownership type."
     )
     usage: VFolderUsageInfoGQL | None = gql_field(
         description="Usage statistics; None when usage data is not loaded."

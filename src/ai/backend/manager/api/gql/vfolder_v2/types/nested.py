@@ -20,8 +20,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
+    VFolderMountPermissionGQL,
     VFolderOwnershipTypeGQL,
-    VFolderPermissionGQL,
     VFolderUsageModeGQL,
 )
 
@@ -32,7 +32,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
         description=(
             "Descriptive metadata for a virtual folder. "
             "Includes the folder name, usage mode, quota scope, "
-            "and timestamps."
+            "timestamps, and clone eligibility."
         ),
     ),
     model=VFolderMetadataInfoDTO,
@@ -52,6 +52,9 @@ class VFolderMetadataInfoGQL:
     last_used: datetime | None = gql_field(
         description="Timestamp of the most recent access. Null if never accessed after creation."
     )
+    cloneable: bool = gql_field(
+        description="Whether this virtual folder can be cloned by other users."
+    )
 
 
 @gql_pydantic_type(
@@ -59,8 +62,8 @@ class VFolderMetadataInfoGQL:
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Access control information for a virtual folder. "
-            "Includes the mount permission level (read-only, read-write, read-write-delete), "
-            "ownership type (user or project), and clone eligibility."
+            "Includes the mount permission level (read-only, read-write, read-write-delete) "
+            "and ownership type (user or project)."
         ),
     ),
     model=VFolderAccessControlInfoDTO,
@@ -69,14 +72,11 @@ class VFolderMetadataInfoGQL:
 class VFolderAccessControlInfoGQL:
     """Access control and ownership type information."""
 
-    permission: VFolderPermissionGQL = gql_field(
+    permission: VFolderMountPermissionGQL = gql_field(
         description="Mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd)."
     )
     ownership_type: VFolderOwnershipTypeGQL = gql_field(
         description="Ownership type: USER (personal folder) or GROUP (project-shared folder)."
-    )
-    cloneable: bool = gql_field(
-        description="Whether this virtual folder can be cloned by other users."
     )
 
 
