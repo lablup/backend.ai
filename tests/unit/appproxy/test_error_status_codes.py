@@ -46,20 +46,20 @@ from ai.backend.appproxy.common.errors import (
         (QueryNotImplemented, 501),
     ],
 )
-def test_error_status_codes(error_cls, expected_status):
+def test_error_status_codes(error_cls: type, expected_status: int) -> None:
     err = error_cls()
     assert err.status_code == expected_status, (
         f"{error_cls.__name__} has status_code={err.status_code}, expected {expected_status}"
     )
 
 
-def test_error_status_code_not_negative_one():
+def test_error_status_code_not_negative_one() -> None:
     """No AppProxy error should have the default -1 status code."""
     err = URLNotFound()
     assert err.status_code != -1
 
 
-def test_method_not_allowed_with_extra_msg():
+def test_method_not_allowed_with_extra_msg() -> None:
     err = MethodNotAllowed(
         extra_msg="Method GET not allowed",
         extra_data={"allowed_methods": ["POST"]},
