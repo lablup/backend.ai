@@ -17,6 +17,14 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
+from ai.backend.manager.api.gql.resource_policy_v2.types.filters import (
+    KeypairResourcePolicyV2Filter,
+    KeypairResourcePolicyV2OrderBy,
+    ProjectResourcePolicyV2Filter,
+    ProjectResourcePolicyV2OrderBy,
+    UserResourcePolicyV2Filter,
+    UserResourcePolicyV2OrderBy,
+)
 from ai.backend.manager.api.gql.resource_policy_v2.types.node import (
     KeypairResourcePolicyV2Connection,
     KeypairResourcePolicyV2GQL,
@@ -54,6 +62,8 @@ async def admin_keypair_resource_policy_v2(
 )  # type: ignore[misc]
 async def admin_keypair_resource_policies_v2(
     info: Info[StrawberryGQLContext],
+    filter: KeypairResourcePolicyV2Filter | None = None,
+    order_by: list[KeypairResourcePolicyV2OrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -64,6 +74,8 @@ async def admin_keypair_resource_policies_v2(
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_search_keypair_resource_policies(
         AdminSearchKeypairResourcePoliciesInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
             after=after,
             last=last,
@@ -125,6 +137,8 @@ async def admin_user_resource_policy_v2(
 )  # type: ignore[misc]
 async def admin_user_resource_policies_v2(
     info: Info[StrawberryGQLContext],
+    filter: UserResourcePolicyV2Filter | None = None,
+    order_by: list[UserResourcePolicyV2OrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -135,6 +149,8 @@ async def admin_user_resource_policies_v2(
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_search_user_resource_policies(
         AdminSearchUserResourcePoliciesInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
             after=after,
             last=last,
@@ -196,6 +212,8 @@ async def admin_project_resource_policy_v2(
 )  # type: ignore[misc]
 async def admin_project_resource_policies_v2(
     info: Info[StrawberryGQLContext],
+    filter: ProjectResourcePolicyV2Filter | None = None,
+    order_by: list[ProjectResourcePolicyV2OrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -206,6 +224,8 @@ async def admin_project_resource_policies_v2(
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_search_project_resource_policies(
         AdminSearchProjectResourcePoliciesInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
             after=after,
             last=last,

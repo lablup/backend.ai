@@ -13,6 +13,7 @@ import click
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
+    parse_order_options,
     print_result,
 )
 
@@ -89,17 +90,43 @@ def keypair() -> None:
 @keypair.command(name="search")
 @click.option("--limit", default=20, help="Maximum number of results.")
 @click.option("--offset", default=0, help="Number of results to skip.")
-def keypair_search(limit: int, offset: int) -> None:
+@click.option("--name-contains", default=None, help="Filter by name containing this string.")
+@click.option("--order-by", multiple=True, help="Order by field:direction (e.g., name:asc).")
+def keypair_search(
+    limit: int, offset: int, name_contains: str | None, order_by: tuple[str, ...]
+) -> None:
     """Search keypair resource policies."""
     from ai.backend.common.dto.manager.v2.resource_policy.request import (
         AdminSearchKeypairResourcePoliciesInput,
+        KeypairResourcePolicyFilter,
+        KeypairResourcePolicyOrder,
+    )
+    from ai.backend.common.dto.manager.v2.resource_policy.types import (
+        KeypairResourcePolicyOrderField,
+    )
+
+    filter_dto = None
+    if name_contains is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = KeypairResourcePolicyFilter(name=StringFilter(contains=name_contains))
+
+    orders = (
+        parse_order_options(order_by, KeypairResourcePolicyOrderField, KeypairResourcePolicyOrder)
+        if order_by
+        else None
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_policy.admin_search_keypair_resource_policies(
-                AdminSearchKeypairResourcePoliciesInput(limit=limit, offset=offset)
+                AdminSearchKeypairResourcePoliciesInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                )
             )
             print_result(result)
         finally:
@@ -330,17 +357,41 @@ def user_rp() -> None:
 @user_rp.command(name="search")
 @click.option("--limit", default=20, help="Maximum number of results.")
 @click.option("--offset", default=0, help="Number of results to skip.")
-def user_search(limit: int, offset: int) -> None:
+@click.option("--name-contains", default=None, help="Filter by name containing this string.")
+@click.option("--order-by", multiple=True, help="Order by field:direction (e.g., name:asc).")
+def user_search(
+    limit: int, offset: int, name_contains: str | None, order_by: tuple[str, ...]
+) -> None:
     """Search user resource policies."""
     from ai.backend.common.dto.manager.v2.resource_policy.request import (
         AdminSearchUserResourcePoliciesInput,
+        UserResourcePolicyFilter,
+        UserResourcePolicyOrder,
+    )
+    from ai.backend.common.dto.manager.v2.resource_policy.types import UserResourcePolicyOrderField
+
+    filter_dto = None
+    if name_contains is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = UserResourcePolicyFilter(name=StringFilter(contains=name_contains))
+
+    orders = (
+        parse_order_options(order_by, UserResourcePolicyOrderField, UserResourcePolicyOrder)
+        if order_by
+        else None
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_policy.admin_search_user_resource_policies(
-                AdminSearchUserResourcePoliciesInput(limit=limit, offset=offset)
+                AdminSearchUserResourcePoliciesInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                )
             )
             print_result(result)
         finally:
@@ -511,17 +562,43 @@ def project() -> None:
 @project.command(name="search")
 @click.option("--limit", default=20, help="Maximum number of results.")
 @click.option("--offset", default=0, help="Number of results to skip.")
-def project_search(limit: int, offset: int) -> None:
+@click.option("--name-contains", default=None, help="Filter by name containing this string.")
+@click.option("--order-by", multiple=True, help="Order by field:direction (e.g., name:asc).")
+def project_search(
+    limit: int, offset: int, name_contains: str | None, order_by: tuple[str, ...]
+) -> None:
     """Search project resource policies."""
     from ai.backend.common.dto.manager.v2.resource_policy.request import (
         AdminSearchProjectResourcePoliciesInput,
+        ProjectResourcePolicyFilter,
+        ProjectResourcePolicyOrder,
+    )
+    from ai.backend.common.dto.manager.v2.resource_policy.types import (
+        ProjectResourcePolicyOrderField,
+    )
+
+    filter_dto = None
+    if name_contains is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = ProjectResourcePolicyFilter(name=StringFilter(contains=name_contains))
+
+    orders = (
+        parse_order_options(order_by, ProjectResourcePolicyOrderField, ProjectResourcePolicyOrder)
+        if order_by
+        else None
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_policy.admin_search_project_resource_policies(
-                AdminSearchProjectResourcePoliciesInput(limit=limit, offset=offset)
+                AdminSearchProjectResourcePoliciesInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                )
             )
             print_result(result)
         finally:

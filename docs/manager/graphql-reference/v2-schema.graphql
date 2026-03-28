@@ -3763,6 +3763,43 @@ type KeypairResourcePolicyV2Edge {
   node: KeypairResourcePolicyV2!
 }
 
+"""Added in UNRELEASED. Filter for keypair resource policies."""
+input KeypairResourcePolicyV2Filter {
+  name: StringFilter = null
+  createdAt: DateTimeFilter = null
+  maxSessionLifetime: IntFilter = null
+  maxConcurrentSessions: IntFilter = null
+  maxContainersPerSession: IntFilter = null
+  idleTimeout: IntFilter = null
+  maxConcurrentSftpSessions: IntFilter = null
+  maxPendingSessionCount: IntFilter = null
+}
+
+"""
+Added in UNRELEASED. Ordering specification for keypair resource policies.
+"""
+input KeypairResourcePolicyV2OrderBy {
+  """Field to order by."""
+  field: KeypairResourcePolicyV2OrderField! = CREATED_AT
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering keypair resource policies.
+"""
+enum KeypairResourcePolicyV2OrderField {
+  NAME
+  CREATED_AT
+  MAX_SESSION_LIFETIME
+  MAX_CONCURRENT_SESSIONS
+  MAX_CONTAINERS_PER_SESSION
+  IDLE_TIMEOUT
+  MAX_CONCURRENT_SFTP_SESSIONS
+  MAX_PENDING_SESSION_COUNT
+}
+
 """
 Added in 25.19.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
 """
@@ -5566,6 +5603,37 @@ type ProjectResourcePolicyV2Edge {
   node: ProjectResourcePolicyV2!
 }
 
+"""Added in UNRELEASED. Filter for project resource policies."""
+input ProjectResourcePolicyV2Filter {
+  name: StringFilter = null
+  createdAt: DateTimeFilter = null
+  maxVfolderCount: IntFilter = null
+  maxQuotaScopeSize: IntFilter = null
+  maxNetworkCount: IntFilter = null
+}
+
+"""
+Added in UNRELEASED. Ordering specification for project resource policies.
+"""
+input ProjectResourcePolicyV2OrderBy {
+  """Field to order by."""
+  field: ProjectResourcePolicyV2OrderField! = CREATED_AT
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering project resource policies.
+"""
+enum ProjectResourcePolicyV2OrderField {
+  NAME
+  CREATED_AT
+  MAX_VFOLDER_COUNT
+  MAX_QUOTA_SCOPE_SIZE
+  MAX_NETWORK_COUNT
+}
+
 """
 Added in 26.2.0. Project storage configuration. Contains allowed virtual folder hosts and their permissions.
 """
@@ -6393,7 +6461,7 @@ type Query {
   """
   Added in UNRELEASED. List all keypair resource policies with pagination (admin only).
   """
-  adminKeypairResourcePoliciesV2(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeypairResourcePolicyV2Connection
+  adminKeypairResourcePoliciesV2(filter: KeypairResourcePolicyV2Filter = null, orderBy: [KeypairResourcePolicyV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeypairResourcePolicyV2Connection
 
   """
   Added in UNRELEASED. Get a single user resource policy by name (admin only).
@@ -6403,7 +6471,7 @@ type Query {
   """
   Added in UNRELEASED. List all user resource policies with pagination (admin only).
   """
-  adminUserResourcePoliciesV2(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserResourcePolicyV2Connection
+  adminUserResourcePoliciesV2(filter: UserResourcePolicyV2Filter = null, orderBy: [UserResourcePolicyV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserResourcePolicyV2Connection
 
   """
   Added in UNRELEASED. Get a single project resource policy by name (admin only).
@@ -6413,7 +6481,7 @@ type Query {
   """
   Added in UNRELEASED. List all project resource policies with pagination (admin only).
   """
-  adminProjectResourcePoliciesV2(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectResourcePolicyV2Connection
+  adminProjectResourcePoliciesV2(filter: ProjectResourcePolicyV2Filter = null, orderBy: [ProjectResourcePolicyV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectResourcePolicyV2Connection
 
   """Added in UNRELEASED. Get the current user's keypair resource policy."""
   myKeypairResourcePolicyV2: KeypairResourcePolicyV2
@@ -9288,6 +9356,39 @@ type UserResourcePolicyV2Edge {
 
   """The item at the end of the edge"""
   node: UserResourcePolicyV2!
+}
+
+"""Added in UNRELEASED. Filter for user resource policies."""
+input UserResourcePolicyV2Filter {
+  name: StringFilter = null
+  createdAt: DateTimeFilter = null
+  maxVfolderCount: IntFilter = null
+  maxQuotaScopeSize: IntFilter = null
+  maxSessionCountPerModelSession: IntFilter = null
+  maxCustomizedImageCount: IntFilter = null
+}
+
+"""
+Added in UNRELEASED. Ordering specification for user resource policies.
+"""
+input UserResourcePolicyV2OrderBy {
+  """Field to order by."""
+  field: UserResourcePolicyV2OrderField! = CREATED_AT
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering user resource policies.
+"""
+enum UserResourcePolicyV2OrderField {
+  NAME
+  CREATED_AT
+  MAX_VFOLDER_COUNT
+  MAX_QUOTA_SCOPE_SIZE
+  MAX_SESSION_COUNT_PER_MODEL_SESSION
+  MAX_CUSTOMIZED_IMAGE_COUNT
 }
 
 """

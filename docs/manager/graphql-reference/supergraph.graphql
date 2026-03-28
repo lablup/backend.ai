@@ -6413,6 +6413,49 @@ type KeypairResourcePolicyV2Edge
   node: KeypairResourcePolicyV2!
 }
 
+"""Added in UNRELEASED. Filter for keypair resource policies."""
+input KeypairResourcePolicyV2Filter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  createdAt: DateTimeFilter = null
+  maxSessionLifetime: IntFilter = null
+  maxConcurrentSessions: IntFilter = null
+  maxContainersPerSession: IntFilter = null
+  idleTimeout: IntFilter = null
+  maxConcurrentSftpSessions: IntFilter = null
+  maxPendingSessionCount: IntFilter = null
+}
+
+"""
+Added in UNRELEASED. Ordering specification for keypair resource policies.
+"""
+input KeypairResourcePolicyV2OrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: KeypairResourcePolicyV2OrderField! = CREATED_AT
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering keypair resource policies.
+"""
+enum KeypairResourcePolicyV2OrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  MAX_SESSION_LIFETIME @join__enumValue(graph: STRAWBERRY)
+  MAX_CONCURRENT_SESSIONS @join__enumValue(graph: STRAWBERRY)
+  MAX_CONTAINERS_PER_SESSION @join__enumValue(graph: STRAWBERRY)
+  IDLE_TIMEOUT @join__enumValue(graph: STRAWBERRY)
+  MAX_CONCURRENT_SFTP_SESSIONS @join__enumValue(graph: STRAWBERRY)
+  MAX_PENDING_SESSION_COUNT @join__enumValue(graph: STRAWBERRY)
+}
+
 type KVPair
   @join__type(graph: GRAPHENE)
 {
@@ -9525,6 +9568,43 @@ type ProjectResourcePolicyV2Edge
   node: ProjectResourcePolicyV2!
 }
 
+"""Added in UNRELEASED. Filter for project resource policies."""
+input ProjectResourcePolicyV2Filter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  createdAt: DateTimeFilter = null
+  maxVfolderCount: IntFilter = null
+  maxQuotaScopeSize: IntFilter = null
+  maxNetworkCount: IntFilter = null
+}
+
+"""
+Added in UNRELEASED. Ordering specification for project resource policies.
+"""
+input ProjectResourcePolicyV2OrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: ProjectResourcePolicyV2OrderField! = CREATED_AT
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering project resource policies.
+"""
+enum ProjectResourcePolicyV2OrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  MAX_VFOLDER_COUNT @join__enumValue(graph: STRAWBERRY)
+  MAX_QUOTA_SCOPE_SIZE @join__enumValue(graph: STRAWBERRY)
+  MAX_NETWORK_COUNT @join__enumValue(graph: STRAWBERRY)
+}
+
 """
 Added in 26.2.0. Project storage configuration. Contains allowed virtual folder hosts and their permissions.
 """
@@ -10878,7 +10958,7 @@ type Query
   """
   Added in UNRELEASED. List all keypair resource policies with pagination (admin only).
   """
-  adminKeypairResourcePoliciesV2(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeypairResourcePolicyV2Connection @join__field(graph: STRAWBERRY)
+  adminKeypairResourcePoliciesV2(filter: KeypairResourcePolicyV2Filter = null, orderBy: [KeypairResourcePolicyV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeypairResourcePolicyV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Get a single user resource policy by name (admin only).
@@ -10888,7 +10968,7 @@ type Query
   """
   Added in UNRELEASED. List all user resource policies with pagination (admin only).
   """
-  adminUserResourcePoliciesV2(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserResourcePolicyV2Connection @join__field(graph: STRAWBERRY)
+  adminUserResourcePoliciesV2(filter: UserResourcePolicyV2Filter = null, orderBy: [UserResourcePolicyV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserResourcePolicyV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Get a single project resource policy by name (admin only).
@@ -10898,7 +10978,7 @@ type Query
   """
   Added in UNRELEASED. List all project resource policies with pagination (admin only).
   """
-  adminProjectResourcePoliciesV2(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectResourcePolicyV2Connection @join__field(graph: STRAWBERRY)
+  adminProjectResourcePoliciesV2(filter: ProjectResourcePolicyV2Filter = null, orderBy: [ProjectResourcePolicyV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectResourcePolicyV2Connection @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. Get the current user's keypair resource policy."""
   myKeypairResourcePolicyV2: KeypairResourcePolicyV2 @join__field(graph: STRAWBERRY)
@@ -14806,6 +14886,45 @@ type UserResourcePolicyV2Edge
 
   """The item at the end of the edge"""
   node: UserResourcePolicyV2!
+}
+
+"""Added in UNRELEASED. Filter for user resource policies."""
+input UserResourcePolicyV2Filter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  createdAt: DateTimeFilter = null
+  maxVfolderCount: IntFilter = null
+  maxQuotaScopeSize: IntFilter = null
+  maxSessionCountPerModelSession: IntFilter = null
+  maxCustomizedImageCount: IntFilter = null
+}
+
+"""
+Added in UNRELEASED. Ordering specification for user resource policies.
+"""
+input UserResourcePolicyV2OrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: UserResourcePolicyV2OrderField! = CREATED_AT
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering user resource policies.
+"""
+enum UserResourcePolicyV2OrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  MAX_VFOLDER_COUNT @join__enumValue(graph: STRAWBERRY)
+  MAX_QUOTA_SCOPE_SIZE @join__enumValue(graph: STRAWBERRY)
+  MAX_SESSION_COUNT_PER_MODEL_SESSION @join__enumValue(graph: STRAWBERRY)
+  MAX_CUSTOMIZED_IMAGE_COUNT @join__enumValue(graph: STRAWBERRY)
 }
 
 """
