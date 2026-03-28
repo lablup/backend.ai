@@ -31,10 +31,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
         description=(
             "VFolder operation status. "
             "READY: Folder is ready for use. "
-            "PERFORMING: An operation is in progress. "
             "CLONING: Folder is being cloned. "
-            "MOUNTED: Folder is mounted to a session. "
-            "ERROR: An error occurred. "
             "DELETE_PENDING: Folder is in trash bin (recoverable). "
             "DELETE_ONGOING: Deletion is in progress. "
             "DELETE_COMPLETE: Deletion is complete. "
@@ -45,10 +42,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 )
 class VFolderV2OperationStatusGQL(StrEnum):
     READY = "ready"
-    PERFORMING = "performing"
     CLONING = "cloning"
-    MOUNTED = "mounted"
-    ERROR = "error"
     DELETE_PENDING = "delete-pending"
     DELETE_ONGOING = "delete-ongoing"
     DELETE_COMPLETE = "delete-complete"
