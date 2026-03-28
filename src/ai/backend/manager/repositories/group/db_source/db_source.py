@@ -583,6 +583,7 @@ class GroupDBSource:
                 session, BatchPurger(spec=SessionByIdsBatchPurgerSpec(session_ids=session_ids))
             )
 
+<<<<<<< HEAD
     async def assign_users_to_project(
         self, project_id: UUID, user_ids: list[UUID]
     ) -> list[UserData]:
@@ -639,20 +640,38 @@ class GroupDBSource:
 
             return [row.to_data() for row in new_user_rows]
 
-    async def unassign_users(self, project_id: uuid.UUID, user_uuids: list[uuid.UUID]) -> None:
-        """Remove users from a project."""
+    async def unassign_users(
+        self, project_id: uuid.UUID, user_uuids: list[uuid.UUID]
+    ) -> list[UserData]:
+        """Remove users from a project and return the unassigned users' data."""
         async with self._db.begin_session() as session:
             existing_group = await session.scalar(
                 sa.select(groups.c.id).where(groups.c.id == project_id)
             )
             if existing_group is None:
                 raise ProjectNotFound(f"Group not found: {project_id}")
+            # Fetch users that are actually associated before removing
+            actual_assoc_query = (
+                sa.select(UserRow)
+                .join(
+                    association_groups_users,
+                    UserRow.uuid == association_groups_users.c.user_id,
+                )
+                .where(
+                    (association_groups_users.c.user_id.in_(user_uuids))
+                    & (association_groups_users.c.group_id == project_id),
+                )
+            )
+            result = await session.scalars(actual_assoc_query)
+            unassigned_users = [row.to_data() for row in result.all()]
+            # Delete associations
             await session.execute(
                 sa.delete(association_groups_users).where(
                     (association_groups_users.c.user_id.in_(user_uuids))
                     & (association_groups_users.c.group_id == project_id),
                 ),
             )
+            return unassigned_users
 
     async def get_project(self, project_id: UUID) -> GroupData:
         """Get a single project by UUID.

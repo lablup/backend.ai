@@ -232,10 +232,15 @@ class ProjectAdapter(BaseAdapter):
         self, project_id: UUID, input: UnassignUsersFromProjectInput
     ) -> UnassignUsersFromProjectPayload:
         """Unassign users from a project."""
-        await self._processors.group.unassign_users.wait_for_complete(
+        result = await self._processors.group.unassign_users.wait_for_complete(
             UnassignUsersFromProjectAction(project_id=project_id, user_uuids=input.user_ids)
         )
-        return UnassignUsersFromProjectPayload(unassigned=True)
+        return UnassignUsersFromProjectPayload(
+            unassigned=True,
+            users=[
+                UserAdapter._user_data_to_node(user_data) for user_data in result.unassigned_users
+            ],
+        )
 
     async def search_by_domain(
         self,

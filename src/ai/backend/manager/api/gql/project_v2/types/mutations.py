@@ -34,6 +34,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 UNSET = None
 
@@ -147,3 +148,6 @@ class UnassignUsersFromProjectPayloadGQL(PydanticOutputMixin[UnassignUsersFromPr
     """Payload for user unassignment from project."""
 
     unassigned: bool = gql_field(description="Whether the unassignment was successful.")
+    users: list[UserV2GQL] = gql_field(
+        description="List of users that were unassigned from the project."
+    )

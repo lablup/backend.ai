@@ -114,8 +114,12 @@ class GroupService:
     async def unassign_users(
         self, action: UnassignUsersFromProjectAction
     ) -> UnassignUsersFromProjectActionResult:
-        await self._group_repository.unassign_users(action.project_id, action.user_uuids)
-        return UnassignUsersFromProjectActionResult(project_id=action.project_id)
+        unassigned_users = await self._group_repository.unassign_users(
+            action.project_id, action.user_uuids
+        )
+        return UnassignUsersFromProjectActionResult(
+            project_id=action.project_id, unassigned_users=unassigned_users
+        )
 
     async def _get_project_stats_for_period(
         self,

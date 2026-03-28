@@ -184,3 +184,6 @@ class UnassignUsersFromProjectPayload(BaseResponseModel):
     unassigned: bool = Field(
         description="Whether the unassignment was successful.",
     )
+    users: list[UserNode] = Field(
+        description="List of users that were unassigned from the project.",
+    )
