@@ -14510,6 +14510,9 @@ type UnassignUsersFromProjectPayloadGQL
 {
   """Whether the unassignment was successful."""
   unassigned: Boolean!
+
+  """List of users that were unassigned from the project."""
+  users: [UserV2!]!
 }
 
 type UnloadImage
