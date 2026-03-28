@@ -16305,17 +16305,6 @@ scalar VFolderPermissionValueField
   @join__type(graph: GRAPHENE)
 
 """
-Added in UNRELEASED. Storage usage statistics for a virtual folder. Reports current file count and byte usage, along with configured quota limits. May be null in list responses where usage data is not loaded for performance reasons.
-"""
-type VFolderUsageInfo
-  @join__type(graph: STRAWBERRY)
-{
-  usedBytes: Int!
-  maxSize: Int
-  maxFiles: Int!
-}
-
-"""
 Added in UNRELEASED. Usage mode of a virtual folder (GENERAL, MODEL, DATA).
 """
 enum VFolderUsageMode
@@ -16351,9 +16340,6 @@ type VFolderV2 implements Node
 
   """Access control including permission level and ownership type."""
   accessControl: VFolderAccessControlInfo!
-
-  """Usage statistics; None when usage data is not loaded."""
-  usage: VFolderUsageInfo
 
   """Path for unmanaged virtual folders."""
   unmanagedPath: String

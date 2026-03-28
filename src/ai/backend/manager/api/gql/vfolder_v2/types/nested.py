@@ -10,9 +10,6 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderMetadataInfo as VFolderMetadataInfoDTO,
 )
-from ai.backend.common.dto.manager.v2.vfolder.types import (
-    VFolderUsageInfo as VFolderUsageInfoDTO,
-)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -77,31 +74,4 @@ class VFolderAccessControlInfoGQL:
     )
     ownership_type: VFolderOwnershipTypeGQL = gql_field(
         description="Ownership type: USER (personal folder) or GROUP (project-shared folder)."
-    )
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Storage usage statistics for a virtual folder. "
-            "Reports current file count and byte usage, along with "
-            "configured quota limits. May be null in list responses "
-            "where usage data is not loaded for performance reasons."
-        ),
-    ),
-    model=VFolderUsageInfoDTO,
-    name="VFolderUsageInfo",
-)
-class VFolderUsageInfoGQL:
-    """Storage usage statistics and quota limits."""
-
-    used_bytes: int = gql_field(
-        description="Total storage space used by the virtual folder, in bytes."
-    )
-    max_size: int | None = gql_field(
-        description="Maximum allowed storage size in bytes. Null if unlimited."
-    )
-    max_files: int = gql_field(
-        description="Maximum allowed number of files. 0 indicates no limit is configured."
     )

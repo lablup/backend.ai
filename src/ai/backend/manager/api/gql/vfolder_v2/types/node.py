@@ -29,7 +29,6 @@ from ai.backend.manager.api.gql.vfolder_v2.types.enum import VFolderOperationSta
 from .nested import (
     VFolderAccessControlInfoGQL,
     VFolderMetadataInfoGQL,
-    VFolderUsageInfoGQL,
 )
 
 
@@ -64,9 +63,6 @@ class VFolderV2GQL(PydanticNodeMixin[VFolderNode]):
     )
     access_control: VFolderAccessControlInfoGQL = gql_field(
         description="Access control including permission level and ownership type."
-    )
-    usage: VFolderUsageInfoGQL | None = gql_field(
-        description="Usage statistics; None when usage data is not loaded."
     )
     unmanaged_path: str | None = gql_field(description="Path for unmanaged virtual folders.")
 

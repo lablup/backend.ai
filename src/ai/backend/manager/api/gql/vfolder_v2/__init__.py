@@ -8,7 +8,6 @@ from .resolver import project_vfolders_v2
 from .types import (
     VFolderAccessControlInfoGQL,
     VFolderMetadataInfoGQL,
-    VFolderUsageInfoGQL,
     VFolderV2Connection,
     VFolderV2Edge,
     VFolderV2FilterGQL,
@@ -37,7 +36,6 @@ __all__ = [
     # Nested types
     "VFolderMetadataInfoGQL",
     "VFolderAccessControlInfoGQL",
-    "VFolderUsageInfoGQL",
     # Node types
     "VFolderV2GQL",
     "VFolderV2Edge",

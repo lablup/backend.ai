@@ -18,7 +18,6 @@ from .filters import (
 from .nested import (
     VFolderAccessControlInfoGQL,
     VFolderMetadataInfoGQL,
-    VFolderUsageInfoGQL,
 )
 from .node import VFolderV2Connection, VFolderV2Edge, VFolderV2GQL
 
@@ -40,7 +39,6 @@ __all__ = [
     # Nested types
     "VFolderMetadataInfoGQL",
     "VFolderAccessControlInfoGQL",
-    "VFolderUsageInfoGQL",
     # Node types
     "VFolderV2GQL",
     "VFolderV2Edge",
