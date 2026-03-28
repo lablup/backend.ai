@@ -59,6 +59,7 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
+from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.group.types import (
     DomainProjectSearchScope,
     UserProjectSearchScope,
@@ -233,7 +234,11 @@ class ProjectAdapter(BaseAdapter):
     ) -> UnassignUsersFromProjectPayload:
         """Unassign users from a project."""
         result = await self._processors.group.unassign_users.wait_for_complete(
-            UnassignUsersFromProjectAction(project_id=project_id, user_uuids=input.user_ids)
+            UnassignUsersFromProjectAction(
+                unbinder=UserProjectEntityUnbinder(
+                    user_uuids=input.user_ids, project_id=project_id
+                ),
+            )
         )
         return UnassignUsersFromProjectPayload(
             unassigned=True,

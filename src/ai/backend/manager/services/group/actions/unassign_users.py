@@ -1,11 +1,12 @@
-import uuid
 from dataclasses import dataclass, field
 from typing import override
+from uuid import UUID
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.services.group.actions.base import (
     GroupSingleEntityAction,
     GroupSingleEntityActionResult,
@@ -14,8 +15,7 @@ from ai.backend.manager.services.group.actions.base import (
 
 @dataclass
 class UnassignUsersFromProjectAction(GroupSingleEntityAction):
-    project_id: uuid.UUID
-    user_uuids: list[uuid.UUID]
+    unbinder: UserProjectEntityUnbinder
 
     @override
     @classmethod
@@ -24,16 +24,16 @@ class UnassignUsersFromProjectAction(GroupSingleEntityAction):
 
     @override
     def target_entity_id(self) -> str:
-        return str(self.project_id)
+        return str(self.unbinder.project_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.PROJECT, str(self.project_id))
+        return RBACElementRef(RBACElementType.PROJECT, str(self.unbinder.project_id))
 
 
 @dataclass
 class UnassignUsersFromProjectActionResult(GroupSingleEntityActionResult):
-    project_id: uuid.UUID
+    project_id: UUID
     unassigned_users: list[UserData] = field(default_factory=list)
 
     @override

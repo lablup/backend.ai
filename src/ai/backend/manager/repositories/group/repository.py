@@ -26,6 +26,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
+from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.group.types import (
     DomainProjectSearchScope,
     GroupSearchResult,
@@ -132,11 +133,9 @@ class GroupRepository:
         return await self._db_source.assign_users_to_project(project_id, user_ids)
 
     @group_repository_resilience.apply()
-    async def unassign_users(
-        self, project_id: uuid.UUID, user_uuids: list[uuid.UUID]
-    ) -> list[UserData]:
+    async def unassign_users(self, unbinder: UserProjectEntityUnbinder) -> list[UserData]:
         """Remove users from a project and return the unassigned users' data."""
-        return await self._db_source.unassign_users(project_id, user_uuids)
+        return await self._db_source.unassign_users(unbinder)
 
     @group_repository_resilience.apply()
     async def get_project(self, project_id: UUID) -> GroupData:
