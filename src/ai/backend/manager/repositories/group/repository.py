@@ -121,6 +121,14 @@ class GroupRepository:
         return await self._db_source.purge_group(group_id, self._storage_manager)
 
     @group_repository_resilience.apply()
+    async def assign_users_to_project(self, project_id: UUID, user_ids: list[UUID]) -> int:
+        """Assign users to a project with domain validation.
+
+        Returns the count of newly assigned users.
+        """
+        return await self._db_source.assign_users_to_project(project_id, user_ids)
+
+    @group_repository_resilience.apply()
     async def get_project(self, project_id: UUID) -> GroupData:
         """Get a single project by UUID.
 

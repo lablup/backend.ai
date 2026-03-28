@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.group.types import ProjectType
 
 __all__ = (
     "AdminSearchGroupsPayload",
+    "AssignUsersToProjectPayload",
     "DeleteProjectPayload",
     "ProjectBasicInfo",
     "ProjectLifecycleInfo",
@@ -158,6 +159,12 @@ class PurgeProjectPayload(BaseResponseModel):
     purged: bool = Field(
         description="Whether the purge was successful.",
     )
+
+
+class AssignUsersToProjectPayload(BaseResponseModel):
+    """Payload for assign users to project response."""
+
+    assigned_count: int = Field(description="Number of users actually assigned.")
 
 
 class AdminSearchGroupsPayload(BaseResponseModel):

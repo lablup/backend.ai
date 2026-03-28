@@ -108,6 +108,7 @@ from ai.backend.manager.repositories.user.purgers import (
     create_user_vfolder_permission_purger,
 )
 from ai.backend.manager.repositories.user.types import (
+    AssignableUserSearchScope,
     DomainUserSearchScope,
     ProjectUserSearchScope,
     RoleUserSearchScope,
@@ -1234,6 +1235,28 @@ class UserDBSource:
                     UserRow.uuid == UserRoleRow.user_id,
                 )
             )
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+
+            items = [row.UserRow.to_data() for row in result.rows]
+            return UserSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_assignable_users(
+        self,
+        scope: AssignableUserSearchScope,
+        querier: BatchQuerier,
+    ) -> UserSearchResult:
+        """Search users assignable to a project.
+
+        Returns active users in the same domain that are NOT already project members.
+        No JOIN needed — scope condition handles domain/status/exclusion via subquery.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(UserRow).select_from(UserRow)
             result = await execute_batch_querier(db_session, query, querier, scope=scope)
 
             items = [row.UserRow.to_data() for row in result.rows]

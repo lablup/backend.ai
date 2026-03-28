@@ -574,6 +574,55 @@ class GroupDBSource:
                 session, BatchPurger(spec=SessionByIdsBatchPurgerSpec(session_ids=session_ids))
             )
 
+    async def assign_users_to_project(self, project_id: UUID, user_ids: list[UUID]) -> int:
+        """Assign users to a project with domain validation.
+
+        Validates that the project exists, users are in the same domain and active,
+        and filters out already-assigned users. Returns the count of newly assigned users.
+        """
+        if not user_ids:
+            return 0
+
+        async with self._db.begin_session() as session:
+            # Fetch project domain
+            project_row = await session.scalar(
+                sa.select(groups.c.domain_name).where(groups.c.id == project_id)
+            )
+            if project_row is None:
+                raise ProjectNotFound(f"Project {project_id} not found")
+            project_domain = project_row
+
+            # Find valid users: same domain and active
+            valid_users_result = await session.execute(
+                sa.select(users.c.uuid).where(
+                    users.c.uuid.in_(user_ids)
+                    & (users.c.domain_name == project_domain)
+                    & (users.c.status == "active")
+                )
+            )
+            valid_user_ids = {row.uuid for row in valid_users_result.fetchall()}
+
+            if not valid_user_ids:
+                return 0
+
+            # Filter out already-assigned users
+            existing_result = await session.execute(
+                sa.select(association_groups_users.c.user_id).where(
+                    (association_groups_users.c.group_id == project_id)
+                    & (association_groups_users.c.user_id.in_(valid_user_ids))
+                )
+            )
+            existing_user_ids = {row.user_id for row in existing_result.fetchall()}
+            new_user_ids = valid_user_ids - existing_user_ids
+
+            if not new_user_ids:
+                return 0
+
+            # Bulk insert
+            values = [{"user_id": uid, "group_id": project_id} for uid in new_user_ids]
+            await session.execute(sa.insert(association_groups_users).values(values))
+            return len(new_user_ids)
+
     async def get_project(self, project_id: UUID) -> GroupData:
         """Get a single project by UUID.
 

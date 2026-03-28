@@ -102,11 +102,13 @@ from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
 from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
+    AssignableUserSearchScope,
     DomainUserSearchScope,
     ProjectUserSearchScope,
     RoleUserSearchScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.services.group.actions.search_projects import GetProjectAction
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     CreateUserAction,
@@ -128,6 +130,9 @@ from ai.backend.manager.services.user.actions.modify_user import (
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     PurgeUserByIdAction,
+)
+from ai.backend.manager.services.user.actions.search_assignable_users import (
+    SearchAssignableUsersAction,
 )
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
@@ -351,6 +356,32 @@ class UserAdapter(BaseAdapter):
         scope = RoleUserSearchScope(role_id=role_id)
         action_result = await self._processors.user.search_users_by_role.wait_for_complete(
             SearchUsersByRoleAction(scope=scope, querier=querier)
+        )
+        return SearchUsersPayload(
+            items=[self._user_data_to_node(u) for u in action_result.users],
+            pagination=PaginationInfo(
+                total=action_result.total_count,
+                offset=input.offset,
+                limit=input.limit,
+            ),
+        )
+
+    async def search_assignable_users(
+        self,
+        project_id: UUID,
+        input: SearchUsersRequest,
+    ) -> SearchUsersPayload:
+        """Search users assignable to a project (same domain, active, not yet assigned)."""
+        # Get project domain
+        project_result = await self._processors.group.get_project.wait_for_complete(
+            GetProjectAction(project_id=project_id)
+        )
+        domain_name = project_result.data.domain_name
+
+        querier = self._build_search_querier(input)
+        scope = AssignableUserSearchScope(project_id=project_id, domain_name=domain_name)
+        action_result = await self._processors.user.search_assignable_users.wait_for_complete(
+            SearchAssignableUsersAction(scope=scope, querier=querier)
         )
         return SearchUsersPayload(
             items=[self._user_data_to_node(u) for u in action_result.users],

@@ -10,6 +10,7 @@ from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchGroupsInput,
+    AssignUsersToProjectInput,
     CreateGroupInput,
     DeleteGroupInput,
     GroupFilter,
@@ -19,6 +20,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     AdminSearchGroupsPayload,
+    AssignUsersToProjectPayload,
     DeleteProjectPayload,
     ProjectBasicInfo,
     ProjectLifecycleInfo,
@@ -60,6 +62,9 @@ from ai.backend.manager.repositories.group.types import (
     UserProjectSearchScope,
 )
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
+from ai.backend.manager.services.group.actions.assign_users_to_project import (
+    AssignUsersToProjectAction,
+)
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.group.actions.delete_group import DeleteGroupAction
 from ai.backend.manager.services.group.actions.modify_group import ModifyGroupAction
@@ -282,6 +287,17 @@ class ProjectAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    async def assign_users(
+        self,
+        project_id: UUID,
+        input: AssignUsersToProjectInput,
+    ) -> AssignUsersToProjectPayload:
+        """Assign users to a project."""
+        result = await self._processors.group.assign_users_to_project.wait_for_complete(
+            AssignUsersToProjectAction(project_id=project_id, user_ids=input.user_ids)
+        )
+        return AssignUsersToProjectPayload(assigned_count=result.assigned_count)
 
     def _convert_group_filter(self, filter: GroupFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

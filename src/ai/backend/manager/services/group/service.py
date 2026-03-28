@@ -21,6 +21,10 @@ from ai.backend.manager.models.resource_usage import (
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.services.group.actions.assign_users_to_project import (
+    AssignUsersToProjectAction,
+    AssignUsersToProjectActionResult,
+)
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
@@ -225,6 +229,14 @@ class GroupService:
             _scope_type=action.scope_type(),
             _scope_id=action.scope_id(),
         )
+
+    async def assign_users_to_project(
+        self, action: AssignUsersToProjectAction
+    ) -> AssignUsersToProjectActionResult:
+        count = await self._group_repository.assign_users_to_project(
+            action.project_id, action.user_ids
+        )
+        return AssignUsersToProjectActionResult(assigned_count=count)
 
     async def get_project(self, action: GetProjectAction) -> GetProjectActionResult:
         """Get a single project by UUID.

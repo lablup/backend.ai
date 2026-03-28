@@ -100,3 +100,12 @@ class V2UserHandler:
         """Search users scoped to a role."""
         result = await self._adapter.role_search(path.parsed.role_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def assignable_search(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[SearchUsersRequest],
+    ) -> APIResponse:
+        """Search users assignable to a project."""
+        result = await self._adapter.search_assignable_users(path.parsed.project_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

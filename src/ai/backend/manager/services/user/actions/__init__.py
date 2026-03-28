@@ -42,6 +42,10 @@ from .purge_user import (
     PurgeUserAction,
     PurgeUserActionResult,
 )
+from .search_assignable_users import (
+    SearchAssignableUsersAction,
+    SearchAssignableUsersActionResult,
+)
 from .search_users import (
     SearchUsersAction,
     SearchUsersActionResult,
@@ -82,6 +86,8 @@ __all__ = (
     "ModifyUserActionResult",
     "PurgeUserAction",
     "PurgeUserActionResult",
+    "SearchAssignableUsersAction",
+    "SearchAssignableUsersActionResult",
     "SearchUsersAction",
     "SearchUsersActionResult",
     "SearchUsersByDomainAction",

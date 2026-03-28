@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
 
 __all__ = (
     "AdminSearchGroupsInput",
+    "AssignUsersToProjectInput",
     "CreateGroupInput",
     "DeleteGroupInput",
     "GroupFilter",
@@ -159,3 +160,9 @@ class AdminSearchGroupsInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class AssignUsersToProjectInput(BaseRequestModel):
+    """Input for assigning users to a project."""
+
+    user_ids: list[UUID] = Field(description="List of user UUIDs to assign to the project.")

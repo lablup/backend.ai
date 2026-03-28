@@ -55,6 +55,10 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserByIdAction,
     PurgeUserByIdActionResult,
 )
+from ai.backend.manager.services.user.actions.search_assignable_users import (
+    SearchAssignableUsersAction,
+    SearchAssignableUsersActionResult,
+)
 from ai.backend.manager.services.user.actions.search_users import (
     SearchUsersAction,
     SearchUsersActionResult,
@@ -103,6 +107,9 @@ class UserProcessors(AbstractProcessorPackage):
     # Internal/stats actions without RBAC
     user_month_stats: ActionProcessor[UserMonthStatsAction, UserMonthStatsActionResult]
     admin_month_stats: ActionProcessor[AdminMonthStatsAction, AdminMonthStatsActionResult]
+    search_assignable_users: ActionProcessor[
+        SearchAssignableUsersAction, SearchAssignableUsersActionResult
+    ]
     search_users: ActionProcessor[SearchUsersAction, SearchUsersActionResult]
     issue_my_keypair: ActionProcessor[IssueMyKeypairAction, IssueMyKeypairActionResult]
     revoke_my_keypair: ActionProcessor[RevokeMyKeypairAction, RevokeMyKeypairActionResult]
@@ -132,6 +139,11 @@ class UserProcessors(AbstractProcessorPackage):
         )
         self.search_users_by_role = ActionProcessor(
             user_service.search_users_by_role, action_monitors
+        )
+        self.search_assignable_users = ActionProcessor(
+            user_service.search_assignable_users,
+            action_monitors,
+            validators=[cast(ActionValidator, validators.rbac.scope)],
         )
         # Single entity actions with RBAC
         self.get_user = SingleEntityActionProcessor(
@@ -195,6 +207,7 @@ class UserProcessors(AbstractProcessorPackage):
             SearchUsersByDomainAction.spec(),
             SearchUsersByProjectAction.spec(),
             SearchUsersByRoleAction.spec(),
+            SearchAssignableUsersAction.spec(),
             IssueMyKeypairAction.spec(),
             RevokeMyKeypairAction.spec(),
             SwitchMyMainAccessKeyAction.spec(),

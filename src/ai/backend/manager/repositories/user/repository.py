@@ -39,6 +39,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.types import (
+    AssignableUserSearchScope,
     DomainUserSearchScope,
     ProjectUserSearchScope,
     RoleUserSearchScope,
@@ -287,6 +288,13 @@ class UserRepository:
     ) -> UserSearchResult:
         """Search users assigned to a role."""
         return await self._db_source.search_users_by_role(scope, querier)
+
+    @user_repository_resilience.apply()
+    async def search_assignable_users(
+        self, scope: AssignableUserSearchScope, querier: BatchQuerier
+    ) -> UserSearchResult:
+        """Search users assignable to a project."""
+        return await self._db_source.search_assignable_users(scope, querier)
 
     @user_repository_resilience.apply()
     async def issue_my_keypair(self, user_uuid: UUID) -> GeneratedKeyPairData:

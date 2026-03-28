@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Final
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchGroupsInput,
+    AssignUsersToProjectInput,
     CreateGroupInput,
     DeleteGroupInput,
     PurgeGroupInput,
@@ -76,4 +77,13 @@ class V2ProjectHandler:
     ) -> APIResponse:
         """Permanently purge a project (superadmin only)."""
         result = await self._adapter.admin_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def assign_users(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[AssignUsersToProjectInput],
+    ) -> APIResponse:
+        """Assign users to a project."""
+        result = await self._adapter.assign_users(path.parsed.project_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
