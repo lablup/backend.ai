@@ -5263,6 +5263,11 @@ type Mutation {
   adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayloadGQL!
 
   """
+  Added in UNRELEASED. Unassign users from a project. RBAC validates project admin permission.
+  """
+  unassignUsersFromProjectV2(projectId: UUID!, input: UnassignUsersFromProjectInputGQL!): UnassignUsersFromProjectPayloadGQL!
+
+  """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user
   """
   adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload!
@@ -9233,6 +9238,18 @@ input UUIDFilter {
   in: [UUID!] = null
   notEquals: UUID = null
   notIn: [UUID!] = null
+}
+
+"""Added in UNRELEASED. Input for unassigning users from a project."""
+input UnassignUsersFromProjectInputGQL {
+  """List of user UUIDs to unassign from the project."""
+  userIds: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for user unassignment from project."""
+type UnassignUsersFromProjectPayloadGQL {
+  """Whether the unassignment was successful."""
+  unassigned: Boolean!
 }
 
 """Added in 25.15.0. Input type for unregistering a storage namespace."""
