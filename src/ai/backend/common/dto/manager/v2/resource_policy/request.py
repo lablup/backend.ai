@@ -7,6 +7,7 @@ from __future__ import annotations
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.dto.manager.query import DateTimeFilter, IntFilter, StringFilter
 from ai.backend.common.dto.manager.v2.common import (
     OrderDirection,
     ResourceSlotEntryInput,
@@ -24,6 +25,12 @@ __all__ = (
     "AdminSearchKeypairResourcePoliciesInput",
     "AdminSearchProjectResourcePoliciesInput",
     "AdminSearchUserResourcePoliciesInput",
+    "KeypairResourcePolicyFilter",
+    "UserResourcePolicyFilter",
+    "ProjectResourcePolicyFilter",
+    "KeypairResourcePolicyOrder",
+    "UserResourcePolicyOrder",
+    "ProjectResourcePolicyOrder",
     "CreateKeypairResourcePolicyInput",
     "CreateProjectResourcePolicyInput",
     "CreateUserResourcePolicyInput",
@@ -247,7 +254,65 @@ class DeleteProjectResourcePolicyInput(BaseRequestModel):
     name: str = Field(description="Name of the project resource policy to delete.")
 
 
-# ── Search DTOs ──
+# ── Filter & Order DTOs ──
+
+
+class KeypairResourcePolicyFilter(BaseRequestModel):
+    """Filter for keypair resource policy search."""
+
+    name: StringFilter | None = Field(default=None, description="Filter by policy name.")
+    created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
+    max_session_lifetime: IntFilter | None = Field(
+        default=None, description="Filter by max session lifetime."
+    )
+    max_concurrent_sessions: IntFilter | None = Field(
+        default=None, description="Filter by max concurrent sessions."
+    )
+    max_containers_per_session: IntFilter | None = Field(
+        default=None, description="Filter by max containers per session."
+    )
+    idle_timeout: IntFilter | None = Field(default=None, description="Filter by idle timeout.")
+    max_concurrent_sftp_sessions: IntFilter | None = Field(
+        default=None, description="Filter by max concurrent SFTP sessions."
+    )
+    max_pending_session_count: IntFilter | None = Field(
+        default=None, description="Filter by max pending session count."
+    )
+
+
+class UserResourcePolicyFilter(BaseRequestModel):
+    """Filter for user resource policy search."""
+
+    name: StringFilter | None = Field(default=None, description="Filter by policy name.")
+    created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
+    max_vfolder_count: IntFilter | None = Field(
+        default=None, description="Filter by max vfolder count."
+    )
+    max_quota_scope_size: IntFilter | None = Field(
+        default=None, description="Filter by max quota scope size."
+    )
+    max_session_count_per_model_session: IntFilter | None = Field(
+        default=None, description="Filter by max sessions per model session."
+    )
+    max_customized_image_count: IntFilter | None = Field(
+        default=None, description="Filter by max customized image count."
+    )
+
+
+class ProjectResourcePolicyFilter(BaseRequestModel):
+    """Filter for project resource policy search."""
+
+    name: StringFilter | None = Field(default=None, description="Filter by policy name.")
+    created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
+    max_vfolder_count: IntFilter | None = Field(
+        default=None, description="Filter by max vfolder count."
+    )
+    max_quota_scope_size: IntFilter | None = Field(
+        default=None, description="Filter by max quota scope size."
+    )
+    max_network_count: IntFilter | None = Field(
+        default=None, description="Filter by max network count."
+    )
 
 
 class KeypairResourcePolicyOrder(BaseRequestModel):
@@ -257,9 +322,29 @@ class KeypairResourcePolicyOrder(BaseRequestModel):
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
 
 
+class UserResourcePolicyOrder(BaseRequestModel):
+    """Order specification for user resource policy search."""
+
+    field: UserResourcePolicyOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
+
+
+class ProjectResourcePolicyOrder(BaseRequestModel):
+    """Order specification for project resource policy search."""
+
+    field: ProjectResourcePolicyOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
+
+
+# ── Search Input DTOs ──
+
+
 class AdminSearchKeypairResourcePoliciesInput(BaseRequestModel):
     """Input for admin search of keypair resource policies."""
 
+    filter: KeypairResourcePolicyFilter | None = Field(
+        default=None, description="Filter conditions."
+    )
     order: list[KeypairResourcePolicyOrder] | None = Field(
         default=None, description="Order specifications."
     )
@@ -271,16 +356,10 @@ class AdminSearchKeypairResourcePoliciesInput(BaseRequestModel):
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
 
 
-class UserResourcePolicyOrder(BaseRequestModel):
-    """Order specification for user resource policy search."""
-
-    field: UserResourcePolicyOrderField = Field(description="Field to order by.")
-    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
-
-
 class AdminSearchUserResourcePoliciesInput(BaseRequestModel):
     """Input for admin search of user resource policies."""
 
+    filter: UserResourcePolicyFilter | None = Field(default=None, description="Filter conditions.")
     order: list[UserResourcePolicyOrder] | None = Field(
         default=None, description="Order specifications."
     )
@@ -292,16 +371,12 @@ class AdminSearchUserResourcePoliciesInput(BaseRequestModel):
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
 
 
-class ProjectResourcePolicyOrder(BaseRequestModel):
-    """Order specification for project resource policy search."""
-
-    field: ProjectResourcePolicyOrderField = Field(description="Field to order by.")
-    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
-
-
 class AdminSearchProjectResourcePoliciesInput(BaseRequestModel):
     """Input for admin search of project resource policies."""
 
+    filter: ProjectResourcePolicyFilter | None = Field(
+        default=None, description="Filter conditions."
+    )
     order: list[ProjectResourcePolicyOrder] | None = Field(
         default=None, description="Order specifications."
     )

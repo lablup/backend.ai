@@ -36,6 +36,42 @@ class IntFilter(BaseRequestModel):
         default=None, description="Less than or equal to this integer"
     )
 
+    def build_query_condition(
+        self,
+        equals_factory: Callable[[int], _QC],
+        not_equals_factory: Callable[[int], _QC],
+        greater_than_factory: Callable[[int], _QC],
+        greater_than_or_equal_factory: Callable[[int], _QC],
+        less_than_factory: Callable[[int], _QC],
+        less_than_or_equal_factory: Callable[[int], _QC],
+    ) -> _QC | None:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            equals_factory: Factory for == comparison.
+            not_equals_factory: Factory for != comparison.
+            greater_than_factory: Factory for > comparison.
+            greater_than_or_equal_factory: Factory for >= comparison.
+            less_than_factory: Factory for < comparison.
+            less_than_or_equal_factory: Factory for <= comparison.
+
+        Returns:
+            A query condition if any filter field is set, None otherwise.
+        """
+        if self.equals is not None:
+            return equals_factory(self.equals)
+        if self.not_equals is not None:
+            return not_equals_factory(self.not_equals)
+        if self.greater_than is not None:
+            return greater_than_factory(self.greater_than)
+        if self.greater_than_or_equal is not None:
+            return greater_than_or_equal_factory(self.greater_than_or_equal)
+        if self.less_than is not None:
+            return less_than_factory(self.less_than)
+        if self.less_than_or_equal is not None:
+            return less_than_or_equal_factory(self.less_than_or_equal)
+        return None
+
 
 class DateTimeFilter(BaseRequestModel):
     """Filter for datetime fields supporting range and equality operations."""

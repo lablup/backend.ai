@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Any
+
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
@@ -10,8 +13,63 @@ from ai.backend.manager.repositories.base import QueryCondition
 from .row import KeyPairResourcePolicyRow, ProjectResourcePolicyRow, UserResourcePolicyRow
 
 
+def _make_int_conditions(
+    column: sa.orm.InstrumentedAttribute[Any],
+) -> tuple[
+    type,  # Container class with 6 static methods
+]:
+    """Generate a class with 6 int comparison condition factories for a column."""
+
+    class _Conds:
+        @staticmethod
+        def equals(val: int) -> QueryCondition:
+            def inner() -> sa.sql.expression.ColumnElement[bool]:
+                return column == val
+
+            return inner
+
+        @staticmethod
+        def not_equals(val: int) -> QueryCondition:
+            def inner() -> sa.sql.expression.ColumnElement[bool]:
+                return column != val
+
+            return inner
+
+        @staticmethod
+        def gt(val: int) -> QueryCondition:
+            def inner() -> sa.sql.expression.ColumnElement[bool]:
+                return column > val
+
+            return inner
+
+        @staticmethod
+        def gte(val: int) -> QueryCondition:
+            def inner() -> sa.sql.expression.ColumnElement[bool]:
+                return column >= val
+
+            return inner
+
+        @staticmethod
+        def lt(val: int) -> QueryCondition:
+            def inner() -> sa.sql.expression.ColumnElement[bool]:
+                return column < val
+
+            return inner
+
+        @staticmethod
+        def lte(val: int) -> QueryCondition:
+            def inner() -> sa.sql.expression.ColumnElement[bool]:
+                return column <= val
+
+            return inner
+
+    return _Conds
+
+
 class KeypairResourcePolicyConditions:
     """Query conditions for filtering keypair resource policies."""
+
+    # ==================== Name Filters ====================
 
     @staticmethod
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -65,6 +123,48 @@ class KeypairResourcePolicyConditions:
 
         return inner
 
+    # ==================== DateTime Filters ====================
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KeyPairResourcePolicyRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KeyPairResourcePolicyRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KeyPairResourcePolicyRow.created_at == dt
+
+        return inner
+
+    # ==================== Int Filters ====================
+
+    by_max_session_lifetime = _make_int_conditions(KeyPairResourcePolicyRow.max_session_lifetime)
+    by_max_concurrent_sessions = _make_int_conditions(
+        KeyPairResourcePolicyRow.max_concurrent_sessions
+    )
+    by_max_containers_per_session = _make_int_conditions(
+        KeyPairResourcePolicyRow.max_containers_per_session
+    )
+    by_idle_timeout = _make_int_conditions(KeyPairResourcePolicyRow.idle_timeout)
+    by_max_concurrent_sftp_sessions = _make_int_conditions(
+        KeyPairResourcePolicyRow.max_concurrent_sftp_sessions
+    )
+    by_max_pending_session_count = _make_int_conditions(
+        KeyPairResourcePolicyRow.max_pending_session_count
+    )
+
+    # ==================== Cursor Conditions ====================
+
     @staticmethod
     def by_cursor_forward(cursor_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -92,6 +192,8 @@ class KeypairResourcePolicyConditions:
 
 class UserResourcePolicyConditions:
     """Query conditions for filtering user resource policies."""
+
+    # ==================== Name Filters ====================
 
     @staticmethod
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -145,6 +247,42 @@ class UserResourcePolicyConditions:
 
         return inner
 
+    # ==================== DateTime Filters ====================
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserResourcePolicyRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserResourcePolicyRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserResourcePolicyRow.created_at == dt
+
+        return inner
+
+    # ==================== Int Filters ====================
+
+    by_max_vfolder_count = _make_int_conditions(UserResourcePolicyRow.max_vfolder_count)
+    by_max_quota_scope_size = _make_int_conditions(UserResourcePolicyRow.max_quota_scope_size)
+    by_max_session_count_per_model_session = _make_int_conditions(
+        UserResourcePolicyRow.max_session_count_per_model_session
+    )
+    by_max_customized_image_count = _make_int_conditions(
+        UserResourcePolicyRow.max_customized_image_count
+    )
+
+    # ==================== Cursor Conditions ====================
+
     @staticmethod
     def by_cursor_forward(cursor_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -172,6 +310,8 @@ class UserResourcePolicyConditions:
 
 class ProjectResourcePolicyConditions:
     """Query conditions for filtering project resource policies."""
+
+    # ==================== Name Filters ====================
 
     @staticmethod
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -224,6 +364,37 @@ class ProjectResourcePolicyConditions:
             return cond
 
         return inner
+
+    # ==================== DateTime Filters ====================
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectResourcePolicyRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectResourcePolicyRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectResourcePolicyRow.created_at == dt
+
+        return inner
+
+    # ==================== Int Filters ====================
+
+    by_max_vfolder_count = _make_int_conditions(ProjectResourcePolicyRow.max_vfolder_count)
+    by_max_quota_scope_size = _make_int_conditions(ProjectResourcePolicyRow.max_quota_scope_size)
+    by_max_network_count = _make_int_conditions(ProjectResourcePolicyRow.max_network_count)
+
+    # ==================== Cursor Conditions ====================
 
     @staticmethod
     def by_cursor_forward(cursor_name: str) -> QueryCondition:
