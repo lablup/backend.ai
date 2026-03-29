@@ -818,8 +818,8 @@ class SessionService:
     ) -> TerminateSessionsInProjectActionResult:
         """Terminate multiple sessions within a project scope.
 
-        Sessions not belonging to the project are filtered out and returned
-        in the ``not_in_project`` field instead of raising an error.
+        Sessions not belonging to the project are filtered out and
+        included in the ``skipped`` list of the result.
         """
         valid_ids = await self._session_repository.filter_sessions_in_project(
             action.session_ids, action.project_id
@@ -834,11 +834,10 @@ class SessionService:
                 cancelled=result.cancelled,
                 terminating=result.terminating,
                 force_terminated=result.force_terminated,
-                skipped=result.skipped,
-                not_in_project=not_in_project,
+                skipped=result.skipped + not_in_project,
             )
         return TerminateSessionsInProjectActionResult(
-            not_in_project=not_in_project,
+            skipped=not_in_project,
         )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:

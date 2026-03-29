@@ -26,7 +26,7 @@ from ai.backend.manager.api.gql.session.types import (
     SessionV2FilterGQL,
     SessionV2GQL,
     SessionV2OrderByGQL,
-    TerminateSessionsInProjectPayloadGQL,
+    TerminateSessionsPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -116,7 +116,7 @@ async def terminate_project_sessions_v2(
     scope: ProjectSessionScopeGQL,
     session_ids: list[ID],
     forced: bool = False,
-) -> TerminateSessionsInProjectPayloadGQL:
+) -> TerminateSessionsPayloadGQL:
     """Terminate one or more sessions scoped to a project."""
     payload = await info.context.adapters.session.terminate_in_project(
         TerminateSessionsInProjectInput(
@@ -125,10 +125,9 @@ async def terminate_project_sessions_v2(
             forced=forced,
         )
     )
-    return TerminateSessionsInProjectPayloadGQL(
+    return TerminateSessionsPayloadGQL(
         cancelled=[ID(str(sid)) for sid in payload.cancelled],
         terminating=[ID(str(sid)) for sid in payload.terminating],
         force_terminated=[ID(str(sid)) for sid in payload.force_terminated],
         skipped=[ID(str(sid)) for sid in payload.skipped],
-        not_in_project=[ID(str(sid)) for sid in payload.not_in_project],
     )

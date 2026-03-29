@@ -568,10 +568,12 @@ class SessionDBSource:
         project_id: uuid.UUID,
     ) -> list[SessionId]:
         """Return session IDs that belong to the specified project."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(SessionRow.id).where(
-                SessionRow.id.in_(session_ids),
-                SessionRow.group_id == project_id,
+                sa.and_(
+                    SessionRow.id.in_(session_ids),
+                    SessionRow.group_id == project_id,
+                )
             )
             result = await db_sess.execute(query)
             return [row.id for row in result]

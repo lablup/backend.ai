@@ -35,7 +35,6 @@ __all__ = (
     "SessionRuntimeInfoGQLDTO",
     "StartServicePayload",
     "StartSessionServicePayload",
-    "TerminateSessionsInProjectPayload",
     "TerminateSessionsPayload",
     "UpdateSessionPayload",
 )
@@ -242,27 +241,6 @@ class TerminateSessionsPayload(BaseResponseModel):
     )
     skipped: list[UUID] = Field(
         default_factory=list, description="Sessions already terminated or not found."
-    )
-
-
-class TerminateSessionsInProjectPayload(BaseResponseModel):
-    """Payload for project-scoped session termination with per-session outcome."""
-
-    cancelled: list[UUID] = Field(
-        default_factory=list, description="Sessions cancelled from PENDING."
-    )
-    terminating: list[UUID] = Field(
-        default_factory=list, description="Sessions marked TERMINATING."
-    )
-    force_terminated: list[UUID] = Field(
-        default_factory=list, description="Sessions force-terminated."
-    )
-    skipped: list[UUID] = Field(
-        default_factory=list, description="Sessions already terminated or not found."
-    )
-    not_in_project: list[UUID] = Field(
-        default_factory=list,
-        description="Sessions that do not belong to the specified project.",
     )
 
 

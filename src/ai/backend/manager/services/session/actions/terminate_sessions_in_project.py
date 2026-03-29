@@ -57,7 +57,6 @@ class TerminateSessionsInProjectActionResult(BaseActionResult):
     terminating: list[UUID] = field(default_factory=list)
     force_terminated: list[UUID] = field(default_factory=list)
     skipped: list[UUID] = field(default_factory=list)
-    not_in_project: list[UUID] = field(default_factory=list)
 
     @override
     def entity_id(self) -> str | None:

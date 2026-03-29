@@ -18,7 +18,7 @@ from .types import (
     SessionV2RuntimeInfoGQL,
     SessionV2StatusFilterGQL,
     SessionV2StatusGQL,
-    TerminateSessionsInProjectPayloadGQL,
+    TerminateSessionsPayloadGQL,
 )
 
 __all__ = [
@@ -40,5 +40,5 @@ __all__ = [
     "SessionV2StatusFilterGQL",
     "SessionV2StatusGQL",
     "SessionV2GQL",
-    "TerminateSessionsInProjectPayloadGQL",
+    "TerminateSessionsPayloadGQL",
 ]

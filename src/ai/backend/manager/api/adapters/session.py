@@ -62,7 +62,6 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionResourceInfoGQLDTO,
     SessionRuntimeInfoGQLDTO,
     StartSessionServicePayload,
-    TerminateSessionsInProjectPayload,
     TerminateSessionsPayload,
     UpdateSessionPayload,
 )
@@ -742,7 +741,7 @@ class SessionAdapter(BaseAdapter):
 
     async def terminate_in_project(
         self, input: TerminateSessionsInProjectInput
-    ) -> TerminateSessionsInProjectPayload:
+    ) -> TerminateSessionsPayload:
         """Terminate one or more sessions within a project scope."""
         action = TerminateSessionsInProjectAction(
             project_id=input.project_id,
@@ -752,12 +751,11 @@ class SessionAdapter(BaseAdapter):
         result = await self._processors.session.terminate_sessions_in_project.wait_for_complete(
             action
         )
-        return TerminateSessionsInProjectPayload(
+        return TerminateSessionsPayload(
             cancelled=result.cancelled,
             terminating=result.terminating,
             force_terminated=result.force_terminated,
             skipped=result.skipped,
-            not_in_project=result.not_in_project,
         )
 
     # -------------------------------------------------------------------------

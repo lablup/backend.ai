@@ -36,7 +36,6 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionResourceInfo,
     SessionRuntimeInfo,
     StartServicePayload,
-    TerminateSessionsInProjectPayload,
 )
 from ai.backend.common.dto.manager.v2.session.types import (
     OrderDirection,
@@ -90,5 +89,4 @@ __all__ = (
     "SessionResourceInfo",
     "SessionRuntimeInfo",
     "StartServicePayload",
-    "TerminateSessionsInProjectPayload",
 )
