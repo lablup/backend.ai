@@ -14,7 +14,6 @@ from unittest.mock import MagicMock
 
 import pytest
 import yarl
-from tests.component.conftest import _TestConfigProvider
 
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
@@ -86,7 +85,8 @@ def _make_config_provider(
         if config_dict.get("api") and config_dict["api"].get("resources"):
             config_dict["api"]["resources"]["group_resource_visibility"] = False
     new_config = ManagerUnifiedConfig.model_validate(config_dict)
-    return _TestConfigProvider(new_config)
+    # Use the same concrete class as the base provider (typically _TestConfigProvider)
+    return type(base_provider)(new_config)
 
 
 def _build_registries(
