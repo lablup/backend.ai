@@ -5,6 +5,7 @@ from __future__ import annotations
 import secrets
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.dto.manager.v2.common import BinarySizeInput
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UpdateUserResourcePolicyInput,
 )
@@ -29,7 +30,7 @@ class TestUserResourcePolicyCreate:
         result = await user_resource_policy_factory(
             name=name,
             max_vfolder_count=20,
-            max_quota_scope_size=1073741824,
+            max_quota_scope_size=BinarySizeInput(expr="1073741824"),
             max_session_count_per_model_session=5,
             max_customized_image_count=10,
         )
@@ -37,7 +38,7 @@ class TestUserResourcePolicyCreate:
         policy = result.user_resource_policy
         assert policy.name == name
         assert policy.max_vfolder_count == 20
-        assert policy.max_quota_scope_size == 1073741824
+        assert policy.max_quota_scope_size.value == 1073741824
         assert policy.max_session_count_per_model_session == 5
         assert policy.max_customized_image_count == 10
 

@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import BinarySizeInput, ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.session.request import (
     BatchConfigInput,
     EnqueueSessionInput,
@@ -140,10 +140,11 @@ class TestEnqueueSessionInput:
             image_id=uuid4(),
             resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
             project_id=uuid4(),
-            resource_opts=ResourceOptsInput(shmem="2g"),
+            resource_opts=ResourceOptsInput(shmem=BinarySizeInput(expr="2g")),
         )
         assert result.resource_opts is not None
-        assert result.resource_opts.shmem == "2g"
+        assert result.resource_opts.shmem is not None
+        assert result.resource_opts.shmem.expr == "2g"
 
     def test_project_id_required(self) -> None:
         """project_id is required."""
@@ -332,8 +333,9 @@ class TestResourceOptsInput:
     """Tests for ResourceOptsInput model."""
 
     def test_valid_shmem(self) -> None:
-        result = ResourceOptsInput(shmem="2g")
-        assert result.shmem == "2g"
+        result = ResourceOptsInput(shmem=BinarySizeInput(expr="2g"))
+        assert result.shmem is not None
+        assert result.shmem.expr == "2g"
 
     def test_default_none(self) -> None:
         result = ResourceOptsInput()

@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.common import (
+    BinarySizeInput,
     ResourceSlotEntryInput,
     VFolderHostPermissionEntryInput,
 )
@@ -189,19 +190,19 @@ class TestCreateUserResourcePolicyInput:
         req = CreateUserResourcePolicyInput(
             name="user-policy",
             max_vfolder_count=10,
-            max_quota_scope_size=1073741824,
+            max_quota_scope_size=BinarySizeInput(expr="1073741824"),
             max_session_count_per_model_session=5,
             max_customized_image_count=3,
         )
         assert req.name == "user-policy"
         assert req.max_vfolder_count == 10
-        assert req.max_quota_scope_size == 1073741824
+        assert req.max_quota_scope_size.expr == "1073741824"
 
     def test_name_whitespace_stripped(self) -> None:
         req = CreateUserResourcePolicyInput(
             name="  user-policy  ",
             max_vfolder_count=10,
-            max_quota_scope_size=1073741824,
+            max_quota_scope_size=BinarySizeInput(expr="1073741824"),
             max_session_count_per_model_session=5,
             max_customized_image_count=3,
         )
@@ -212,7 +213,7 @@ class TestCreateUserResourcePolicyInput:
             CreateUserResourcePolicyInput(
                 name="",
                 max_vfolder_count=10,
-                max_quota_scope_size=1073741824,
+                max_quota_scope_size=BinarySizeInput(expr="1073741824"),
                 max_session_count_per_model_session=5,
                 max_customized_image_count=3,
             )
@@ -221,7 +222,7 @@ class TestCreateUserResourcePolicyInput:
         req = CreateUserResourcePolicyInput(
             name="user-policy",
             max_vfolder_count=10,
-            max_quota_scope_size=1073741824,
+            max_quota_scope_size=BinarySizeInput(expr="1073741824"),
             max_session_count_per_model_session=5,
             max_customized_image_count=3,
         )
@@ -272,7 +273,7 @@ class TestCreateProjectResourcePolicyInput:
         req = CreateProjectResourcePolicyInput(
             name="project-policy",
             max_vfolder_count=20,
-            max_quota_scope_size=10737418240,
+            max_quota_scope_size=BinarySizeInput(expr="10737418240"),
             max_network_count=5,
         )
         assert req.name == "project-policy"
@@ -283,7 +284,7 @@ class TestCreateProjectResourcePolicyInput:
         req = CreateProjectResourcePolicyInput(
             name="  project-policy  ",
             max_vfolder_count=20,
-            max_quota_scope_size=10737418240,
+            max_quota_scope_size=BinarySizeInput(expr="10737418240"),
             max_network_count=5,
         )
         assert req.name == "project-policy"
@@ -293,7 +294,7 @@ class TestCreateProjectResourcePolicyInput:
             CreateProjectResourcePolicyInput(
                 name="",
                 max_vfolder_count=20,
-                max_quota_scope_size=10737418240,
+                max_quota_scope_size=BinarySizeInput(expr="10737418240"),
                 max_network_count=5,
             )
 
@@ -301,7 +302,7 @@ class TestCreateProjectResourcePolicyInput:
         req = CreateProjectResourcePolicyInput(
             name="project-policy",
             max_vfolder_count=20,
-            max_quota_scope_size=10737418240,
+            max_quota_scope_size=BinarySizeInput(expr="10737418240"),
             max_network_count=5,
         )
         json_data = req.model_dump_json()

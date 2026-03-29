@@ -6,6 +6,7 @@ import json
 import uuid
 from datetime import UTC, datetime
 
+from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     CloneVFolderPayload,
     CreateDownloadSessionPayload,
@@ -66,7 +67,12 @@ def _make_owner_info() -> VFolderOwnerInfo:
 
 
 def _make_usage_info() -> VFolderUsageInfo:
-    return VFolderUsageInfo(num_files=10, used_bytes=1024, max_size=None, max_files=1000)
+    return VFolderUsageInfo(
+        num_files=10,
+        used_bytes=BinarySizeInfo(value=1024, display="1024"),
+        max_size=None,
+        max_files=1000,
+    )
 
 
 class TestVFolderNodeCreation:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import secrets
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.dto.manager.v2.common import BinarySizeInput
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UpdateProjectResourcePolicyInput,
 )
@@ -29,7 +30,7 @@ class TestProjectResourcePolicyCreate:
         result = await project_resource_policy_factory(
             name=name,
             max_vfolder_count=20,
-            max_quota_scope_size=0,
+            max_quota_scope_size=BinarySizeInput(expr="0"),
             max_network_count=10,
         )
         assert isinstance(result, CreateProjectResourcePolicyPayload)

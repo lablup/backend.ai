@@ -17,6 +17,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
+from ai.backend.common.dto.manager.v2.common import BinarySizeInput
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput,
     CreateProjectResourcePolicyInput,
@@ -216,7 +217,7 @@ async def user_resource_policy_factory(
         params: dict[str, Any] = {
             "name": f"test-urp-{unique}",
             "max_vfolder_count": 10,
-            "max_quota_scope_size": 0,
+            "max_quota_scope_size": BinarySizeInput(expr="0"),
             "max_session_count_per_model_session": 3,
             "max_customized_image_count": 5,
         }
@@ -254,7 +255,7 @@ async def project_resource_policy_factory(
         params: dict[str, Any] = {
             "name": f"test-prp-{unique}",
             "max_vfolder_count": 10,
-            "max_quota_scope_size": 0,
+            "max_quota_scope_size": BinarySizeInput(expr="0"),
             "max_network_count": 5,
         }
         params.update(overrides)
