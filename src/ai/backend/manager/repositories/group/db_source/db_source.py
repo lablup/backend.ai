@@ -24,7 +24,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.user.types import UserData, UserStatus
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
     ProjectHasActiveEndpointsError,
     ProjectHasActiveKernelsError,
@@ -599,7 +599,7 @@ class GroupDBSource:
 
         async with self._db.begin_session_read_committed() as session:
             # Find assignable users in a single query:
-            # same domain as the project, active, and not already assigned
+            # same domain as the project and not already assigned
             project_domain_subq = (
                 sa.select(groups.c.domain_name).where(groups.c.id == project_id).scalar_subquery()
             )
@@ -616,7 +616,6 @@ class GroupDBSource:
                     .where(
                         UserRow.uuid.in_(user_ids)
                         & (UserRow.domain_name == project_domain_subq)
-                        & (UserRow.status == UserStatus.ACTIVE)
                         & association_groups_users.c.user_id.is_(None)
                     )
                 )
