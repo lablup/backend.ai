@@ -112,7 +112,7 @@ class TestVFolderNodeCreation:
         assert restored.metadata.name == node.metadata.name
         assert restored.metadata.cloneable == node.metadata.cloneable
         assert restored.usage is not None
-        assert restored.usage.used_bytes == 1024
+        assert restored.usage.used_bytes.value == 1024
 
     def test_round_trip_without_usage(self) -> None:
         node = VFolderNode(
