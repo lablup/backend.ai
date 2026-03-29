@@ -22,7 +22,30 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedProjectsPayload,
     AllowedResourceGroupsPayload,
 )
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, ScalingGroupRow
+
+
+@pytest.fixture()
+async def clean_domain_fixture(
+    db_engine: SAEngine,
+) -> AsyncIterator[str]:
+    """Create a domain with no pre-existing scaling group associations."""
+    domain_name = f"clean-domain-{secrets.token_hex(6)}"
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(domains).values(
+                name=domain_name,
+                description=f"Clean test domain {domain_name}",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
+            )
+        )
+    yield domain_name
+    async with db_engine.begin() as conn:
+        await conn.execute(domains.delete().where(domains.c.name == domain_name))
 
 
 @pytest.fixture()
@@ -40,7 +63,7 @@ async def extra_scaling_group(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts={},
+                scheduler_opts=ScalingGroupOpts(),
             )
         )
     yield name
@@ -65,7 +88,7 @@ async def second_scaling_group(
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts={},
+                scheduler_opts=ScalingGroupOpts(),
             )
         )
     yield name
@@ -81,11 +104,11 @@ class TestAllowedResourceGroupsForDomain:
     async def test_get_empty_allowed_list(
         self,
         admin_v2_registry: V2ClientRegistry,
-        domain_fixture: str,
+        clean_domain_fixture: str,
     ) -> None:
         """Initially, a domain has no allowed resource groups."""
         result = await admin_v2_registry.resource_group.get_allowed_resource_groups_for_domain(
-            domain_fixture
+            clean_domain_fixture
         )
         assert isinstance(result, AllowedResourceGroupsPayload)
         assert result.items == []

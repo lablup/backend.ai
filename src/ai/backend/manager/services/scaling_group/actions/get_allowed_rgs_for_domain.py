@@ -18,7 +18,7 @@ class GetAllowedResourceGroupsForDomainAction(ScalingGroupDomainAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.READ
+        return ActionOperationType.GET
 
     @override
     def entity_id(self) -> str | None:
