@@ -3027,8 +3027,8 @@ input CreateProjectResourcePolicyInputGQL
   """Maximum vfolders a project can have."""
   maxVfolderCount: Int!
 
-  """Maximum quota scope size in bytes."""
-  maxQuotaScopeSize: Int!
+  """Maximum quota scope size (e.g., '1g', '536870912')."""
+  maxQuotaScopeSize: BinarySizeInput!
 
   """Maximum networks a project can create. -1 means unlimited."""
   maxNetworkCount: Int!
@@ -3264,8 +3264,8 @@ input CreateUserResourcePolicyInputGQL
   """Maximum vfolders a user can create."""
   maxVfolderCount: Int!
 
-  """Maximum quota scope size in bytes."""
-  maxQuotaScopeSize: Int!
+  """Maximum quota scope size (e.g., '1g', '536870912')."""
+  maxQuotaScopeSize: BinarySizeInput!
 
   """Maximum sessions per model session."""
   maxSessionCountPerModelSession: Int!
@@ -4797,7 +4797,7 @@ type EffectiveResourceAllocationV2
   @join__type(graph: STRAWBERRY)
 {
   """Effective assignable resources (minimum across all scopes)."""
-  assignable: [ResourceSlotEntry!]!
+  assignable: [ResourceLimitEntry!]!
 
   """Per-scope breakdown of resource limits and usage."""
   breakdown: EffectiveBreakdownV2!
@@ -9947,8 +9947,8 @@ type ProjectResourcePolicyV2 implements Node
   """Maximum vfolders a project can have."""
   maxVfolderCount: Int!
 
-  """Maximum quota scope size in bytes."""
-  maxQuotaScopeSize: Int!
+  """Maximum quota scope size."""
+  maxQuotaScopeSize: BinarySizeInfo!
 
   """Maximum networks a project can create. -1 means unlimited."""
   maxNetworkCount: Int!
@@ -13347,7 +13347,7 @@ type ScopeResourceUsageV2
   used: [ResourceSlotEntry!]!
 
   """Assignable resources within policy limits (limits - used)."""
-  assignable: [ResourceSlotEntry!]!
+  assignable: [ResourceLimitEntry!]!
 }
 
 """Added in 26.3.0. A registered service instance in the catalog."""
@@ -14698,7 +14698,7 @@ input UpdateProjectResourcePolicyInputGQL
   maxVfolderCount: Int = null
 
   """Updated max quota scope size."""
-  maxQuotaScopeSize: Int = null
+  maxQuotaScopeSize: BinarySizeInput = null
 
   """Updated max network count."""
   maxNetworkCount: Int = null
@@ -14894,7 +14894,7 @@ input UpdateUserResourcePolicyInputGQL
   maxVfolderCount: Int = null
 
   """Updated max quota scope size."""
-  maxQuotaScopeSize: Int = null
+  maxQuotaScopeSize: BinarySizeInput = null
 
   """Updated max sessions per model session."""
   maxSessionCountPerModelSession: Int = null
@@ -15597,8 +15597,8 @@ type UserResourcePolicyV2 implements Node
   """Maximum vfolders a user can create."""
   maxVfolderCount: Int!
 
-  """Maximum quota scope size in bytes."""
-  maxQuotaScopeSize: Int!
+  """Maximum quota scope size."""
+  maxQuotaScopeSize: BinarySizeInfo!
 
   """Maximum sessions per model session."""
   maxSessionCountPerModelSession: Int!
