@@ -11,6 +11,7 @@ from typing import Any
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.common import (
+    ResourceLimitEntryInfo,
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
     VFolderHostPermissionEntryInfo,
@@ -561,6 +562,19 @@ class ResourcePolicyAdapter(BaseAdapter):
         return [ResourceSlotEntryInfo(resource_type=k, quantity=v) for k, v in slot.items()]
 
     @staticmethod
+    def _resource_slot_to_limit_entries(
+        slot: ResourceSlot,
+    ) -> list[ResourceLimitEntryInfo]:
+        return [
+            ResourceLimitEntryInfo(
+                resource_type=k,
+                quantity=v if v.is_finite() else None,
+                unlimited=not v.is_finite(),
+            )
+            for k, v in slot.items()
+        ]
+
+    @staticmethod
     def _entries_to_vfolder_hosts(
         entries: list[VFolderHostPermissionEntryInput],
     ) -> dict[str, Any]:
@@ -587,12 +601,12 @@ class ResourcePolicyAdapter(BaseAdapter):
             name=data.name,
             created_at=data.created_at,
             default_for_unspecified=data.default_for_unspecified,
-            total_resource_slots=cls._resource_slot_to_entries(data.total_resource_slots),
+            total_resource_slots=cls._resource_slot_to_limit_entries(data.total_resource_slots),
             max_session_lifetime=data.max_session_lifetime,
             max_concurrent_sessions=data.max_concurrent_sessions,
             max_pending_session_count=data.max_pending_session_count,
             max_pending_session_resource_slots=(
-                cls._resource_slot_to_entries(data.max_pending_session_resource_slots)
+                cls._resource_slot_to_limit_entries(data.max_pending_session_resource_slots)
                 if data.max_pending_session_resource_slots is not None
                 else None
             ),

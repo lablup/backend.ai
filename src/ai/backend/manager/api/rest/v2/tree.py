@@ -66,6 +66,8 @@ def build_v2_routes(
     from .rbac.registry import register_v2_rbac_routes
     from .reservoir_registry.handler import V2ReservoirRegistryHandler
     from .reservoir_registry.registry import register_v2_reservoir_registry_routes
+    from .resource_allocation.handler import V2ResourceAllocationHandler
+    from .resource_allocation.registry import register_v2_resource_allocation_routes
     from .resource_group.handler import V2ResourceGroupHandler
     from .resource_group.registry import register_v2_resource_group_routes
     from .resource_policy.handler import V2ResourcePolicyHandler
@@ -114,6 +116,7 @@ def build_v2_routes(
     )
     rbac_handler = V2RBACHandler(adapter=adapters.rbac)
     reservoir_registry_handler = V2ReservoirRegistryHandler(adapter=adapters.reservoir_registry)
+    resource_allocation_handler = V2ResourceAllocationHandler(adapter=adapters.resource_allocation)
     resource_group_handler = V2ResourceGroupHandler(adapter=adapters.resource_group)
     resource_policy_handler = V2ResourcePolicyHandler(adapter=adapters.resource_policy)
     resource_preset_handler = V2ResourcePresetHandler(adapter=adapters.resource_preset)
@@ -159,6 +162,9 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_rbac_routes(rbac_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_reservoir_registry_routes(reservoir_registry_handler, route_deps)
+    )
+    v2_reg.add_subregistry(
+        register_v2_resource_allocation_routes(resource_allocation_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_resource_group_routes(resource_group_handler, route_deps))
     v2_reg.add_subregistry(register_v2_resource_policy_routes(resource_policy_handler, route_deps))

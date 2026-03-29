@@ -235,3 +235,28 @@ def delete(preset_id: uuid.UUID) -> None:
             await registry.close()
 
     _run_async(_run)
+
+
+@resource_preset.command(name="check-availability")
+@click.option("--project-id", required=True, type=click.UUID, help="Project ID.")
+@click.option("--resource-group", required=True, type=str, help="Resource group name.")
+def check_availability(project_id: uuid.UUID, resource_group: str) -> None:
+    """Check which resource presets are available for session creation."""
+    from ai.backend.common.dto.manager.v2.resource_allocation.request import (
+        CheckPresetAvailabilityInput,
+    )
+
+    request = CheckPresetAvailabilityInput(
+        project_id=project_id,
+        resource_group_name=resource_group,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_preset.check_availability(request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    _run_async(_run)

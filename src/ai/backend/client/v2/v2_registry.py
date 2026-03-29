@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from .domains_v2.prometheus_query_preset import V2PrometheusQueryPresetClient
     from .domains_v2.rbac import V2RBACClient
     from .domains_v2.reservoir_registry import V2ReservoirRegistryClient
+    from .domains_v2.resource_allocation import V2ResourceAllocationClient
     from .domains_v2.resource_group import V2ResourceGroupClient
     from .domains_v2.resource_policy import V2ResourcePolicyClient
     from .domains_v2.resource_preset import V2ResourcePresetClient
@@ -203,6 +204,12 @@ class V2ClientRegistry:
         from .domains_v2.reservoir_registry import V2ReservoirRegistryClient
 
         return V2ReservoirRegistryClient(self._client)
+
+    @cached_property
+    def resource_allocation(self) -> V2ResourceAllocationClient:
+        from .domains_v2.resource_allocation import V2ResourceAllocationClient
+
+        return V2ResourceAllocationClient(self._client)
 
     @cached_property
     def resource_policy(self) -> V2ResourcePolicyClient:

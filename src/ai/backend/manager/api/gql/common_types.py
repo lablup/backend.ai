@@ -12,6 +12,7 @@ from enum import StrEnum
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInfo,
     BinarySizeInput,
+    ResourceLimitEntryInfo,
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
     ResourceSlotInfo,
@@ -55,6 +56,19 @@ class BinarySizeInputGQL(PydanticInputMixin[BinarySizeInput]):
     name="BinarySizeInfo",
 )
 class BinarySizeInfoGQL(PydanticOutputMixin[BinarySizeInfo]):
+    pass
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A resource limit entry that may be unlimited.",
+    ),
+    model=ResourceLimitEntryInfo,
+    all_fields=True,
+    name="ResourceLimitEntry",
+)
+class ResourceLimitEntryGQL(PydanticOutputMixin[ResourceLimitEntryInfo]):
     pass
 
 

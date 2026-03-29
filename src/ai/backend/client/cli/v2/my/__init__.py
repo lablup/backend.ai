@@ -49,6 +49,15 @@ def session() -> None:
 
 @my.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.resource_allocation:resource_allocation",
+    name="resource-allocation",
+)
+def resource_allocation() -> None:
+    """My resource allocation commands."""
+
+
+@my.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.my.resource_policy:resource_policy",
     name="resource-policy",
 )

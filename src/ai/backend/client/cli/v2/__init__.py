@@ -154,6 +154,15 @@ def rbac() -> None:
     """RBAC commands."""
 
 
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.resource_allocation:resource_allocation",
+    name="resource-allocation",
+)
+def resource_allocation() -> None:
+    """Resource allocation commands."""
+
+
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.resource_group:resource_group")
 def resource_group() -> None:
     """Resource group commands."""

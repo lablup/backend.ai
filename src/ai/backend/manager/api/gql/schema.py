@@ -241,6 +241,15 @@ from .reservoir_registry import (
     reservoir_registry,
     update_reservoir_registry,
 )
+from .resource_allocation import (
+    admin_domain_resource_allocation_v2,
+    admin_effective_resource_allocation_v2,
+    check_preset_availability_v2,
+    effective_resource_allocation_v2,
+    my_keypair_resource_allocation_v2,
+    project_resource_allocation_v2,
+    resource_group_resource_allocation_v2,
+)
 from .resource_group import (
     admin_allowed_domains_for_resource_group_v2,
     admin_allowed_projects_for_resource_group_v2,
@@ -500,6 +509,14 @@ class Query:
     # Resource Preset V2 APIs
     admin_resource_presets_v2 = admin_resource_presets_v2
     admin_resource_preset_v2 = admin_resource_preset_v2
+    # Resource Allocation V2 APIs
+    my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
+    project_resource_allocation_v2 = project_resource_allocation_v2
+    admin_domain_resource_allocation_v2 = admin_domain_resource_allocation_v2
+    resource_group_resource_allocation_v2 = resource_group_resource_allocation_v2
+    effective_resource_allocation_v2 = effective_resource_allocation_v2
+    admin_effective_resource_allocation_v2 = admin_effective_resource_allocation_v2
+    check_preset_availability_v2 = check_preset_availability_v2
 
 
 @strawberry.type

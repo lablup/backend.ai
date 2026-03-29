@@ -10,7 +10,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import (
-    ResourceSlotEntryInfo,
+    ResourceLimitEntryInfo,
     VFolderHostPermissionEntryInfo,
 )
 
@@ -44,7 +44,7 @@ class KeypairResourcePolicyNode(BaseResponseModel):
     default_for_unspecified: DefaultForUnspecified = Field(
         description="Default resource allocation for unspecified resource slots.",
     )
-    total_resource_slots: list[ResourceSlotEntryInfo] = Field(
+    total_resource_slots: list[ResourceLimitEntryInfo] = Field(
         description="Total resource slot limits for sessions using this policy.",
     )
     max_session_lifetime: int = Field(
@@ -57,7 +57,7 @@ class KeypairResourcePolicyNode(BaseResponseModel):
         default=None,
         description="Maximum number of sessions in pending state. Null means unlimited.",
     )
-    max_pending_session_resource_slots: list[ResourceSlotEntryInfo] | None = Field(
+    max_pending_session_resource_slots: list[ResourceLimitEntryInfo] | None = Field(
         default=None,
         description="Maximum resource slots occupied by pending sessions. Null means unlimited.",
     )

@@ -57,6 +57,44 @@ def min_quantities(*lists: list[SlotQuantity]) -> list[SlotQuantity]:
     ]
 
 
+def max_quantities(agents: list[list[SlotQuantity]]) -> list[SlotQuantity]:
+    """Element-wise maximum across multiple agent slot lists.
+
+    Returns a list where each slot has the maximum quantity seen across all agents.
+    Uses the first non-empty list's order as the reference order.
+    """
+    if not agents:
+        return []
+    # Find the first non-empty list for ordering reference
+    first: list[SlotQuantity] | None = None
+    for agent in agents:
+        if agent:
+            first = agent
+            break
+    if first is None:
+        return []
+
+    all_names: dict[str, Decimal] = {}
+    for agent in agents:
+        for sq in agent:
+            current = all_names.get(sq.slot_name)
+            if current is None or sq.quantity > current:
+                all_names[sq.slot_name] = sq.quantity
+
+    # Preserve order from first list, then append any extras
+    first_names = [sq.slot_name for sq in first]
+    result: list[SlotQuantity] = []
+    seen: set[str] = set()
+    for name in first_names:
+        if name in all_names:
+            result.append(SlotQuantity(name, all_names[name]))
+            seen.add(name)
+    for name, qty in all_names.items():
+        if name not in seen:
+            result.append(SlotQuantity(name, qty))
+    return result
+
+
 def quantities_ge(a: list[SlotQuantity], b: list[SlotQuantity]) -> bool:
     """Check if every slot in b has a corresponding slot in a with >= quantity."""
     a_map = {sq.slot_name: sq.quantity for sq in a}

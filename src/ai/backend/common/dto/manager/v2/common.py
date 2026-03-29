@@ -14,6 +14,7 @@ __all__ = (
     "BinarySizeInfo",
     "BinarySizeInput",
     "OrderDirection",
+    "ResourceLimitEntryInfo",
     "ResourceSlotEntryInfo",
     "ResourceSlotEntryInput",
     "ResourceSlotInfo",
@@ -71,6 +72,20 @@ class ResourceSlotEntryInfo(BaseResponseModel):
 
     resource_type: str = Field(description="Resource type identifier (e.g., cpu, mem, cuda.shares)")
     quantity: Decimal = Field(description="Quantity of the resource")
+
+
+class ResourceLimitEntryInfo(BaseResponseModel):
+    """A single resource limit entry that may be unlimited.
+
+    When unlimited=True, quantity is null (no limit for this resource type).
+    When unlimited=False, quantity holds the finite limit value.
+    """
+
+    resource_type: str = Field(description="Resource type identifier (e.g., cpu, mem, cuda.shares)")
+    quantity: Decimal | None = Field(
+        default=None, description="Limit quantity. Null when unlimited."
+    )
+    unlimited: bool = Field(default=False, description="Whether this resource type has no limit.")
 
 
 class ResourceSlotInfo(BaseResponseModel):

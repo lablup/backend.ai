@@ -104,6 +104,15 @@ def prometheus_query_preset() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.resource_allocation:resource_allocation",
+    name="resource-allocation",
+)
+def resource_allocation() -> None:
+    """Admin resource allocation commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.resource_policy:resource_policy",
     name="resource-policy",
 )

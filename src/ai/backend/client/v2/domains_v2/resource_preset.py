@@ -5,6 +5,12 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.resource_allocation.request import (
+    CheckPresetAvailabilityInput,
+)
+from ai.backend.common.dto.manager.v2.resource_allocation.response import (
+    CheckPresetAvailabilityPayload,
+)
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
     AdminSearchResourcePresetsInput,
     CreateResourcePresetInput,
@@ -69,4 +75,15 @@ class V2ResourcePresetClient(BaseDomainClient):
             "DELETE",
             f"{_PATH}/{preset_id}",
             response_model=DeleteResourcePresetPayload,
+        )
+
+    async def check_availability(
+        self, request: CheckPresetAvailabilityInput
+    ) -> CheckPresetAvailabilityPayload:
+        """Check which resource presets are available for session creation."""
+        return await self._client.typed_request(
+            "POST",
+            "/v2/resource-allocation/check-preset-availability",
+            request=request,
+            response_model=CheckPresetAvailabilityPayload,
         )

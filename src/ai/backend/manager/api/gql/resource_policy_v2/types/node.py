@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
-    ResourceSlotEntryGQL,
+    ResourceLimitEntryGQL,
     VFolderHostPermissionEntryGQL,
 )
 from ai.backend.manager.api.gql.decorators import (
@@ -42,7 +42,7 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     default_for_unspecified: str = gql_field(
         description="Default resource allocation for unspecified slots (LIMITED or UNLIMITED)."
     )
-    total_resource_slots: list[ResourceSlotEntryGQL] = gql_field(
+    total_resource_slots: list[ResourceLimitEntryGQL] = gql_field(
         description="Total resource slot limits for sessions."
     )
     max_session_lifetime: int = gql_field(description="Maximum session lifetime in seconds.")
@@ -50,7 +50,7 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     max_pending_session_count: int | None = gql_field(
         description="Maximum pending sessions. Null means unlimited."
     )
-    max_pending_session_resource_slots: list[ResourceSlotEntryGQL] | None = gql_field(
+    max_pending_session_resource_slots: list[ResourceLimitEntryGQL] | None = gql_field(
         description="Maximum resource slots for pending sessions. Null means unlimited."
     )
     max_concurrent_sftp_sessions: int = gql_field(
