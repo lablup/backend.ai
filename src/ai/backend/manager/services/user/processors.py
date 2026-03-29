@@ -28,6 +28,16 @@ from ai.backend.manager.services.user.actions.get_user import (
     GetUserActionResult,
 )
 from ai.backend.manager.services.user.actions.keypair_ops import (
+    AdminCreateKeypairAction,
+    AdminCreateKeypairActionResult,
+    AdminDeleteKeypairAction,
+    AdminDeleteKeypairActionResult,
+    AdminGetKeypairAction,
+    AdminGetKeypairActionResult,
+    AdminSearchKeypairsAction,
+    AdminSearchKeypairsActionResult,
+    AdminUpdateKeypairAction,
+    AdminUpdateKeypairActionResult,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
@@ -111,6 +121,14 @@ class UserProcessors(AbstractProcessorPackage):
     ]
     update_my_keypair: ActionProcessor[UpdateMyKeypairAction, UpdateMyKeypairActionResult]
     search_my_keypairs: ActionProcessor[SearchMyKeypairsAction, SearchMyKeypairsActionResult]
+    # Admin keypair operations
+    admin_create_keypair: ActionProcessor[AdminCreateKeypairAction, AdminCreateKeypairActionResult]
+    admin_update_keypair: ActionProcessor[AdminUpdateKeypairAction, AdminUpdateKeypairActionResult]
+    admin_delete_keypair: ActionProcessor[AdminDeleteKeypairAction, AdminDeleteKeypairActionResult]
+    admin_search_keypairs: ActionProcessor[
+        AdminSearchKeypairsAction, AdminSearchKeypairsActionResult
+    ]
+    admin_get_keypair: ActionProcessor[AdminGetKeypairAction, AdminGetKeypairActionResult]
 
     def __init__(
         self,
@@ -174,6 +192,20 @@ class UserProcessors(AbstractProcessorPackage):
         )
         self.update_my_keypair = ActionProcessor(user_service.update_my_keypair, action_monitors)
         self.search_my_keypairs = ActionProcessor(user_service.search_my_keypairs, action_monitors)
+        # Admin keypair operations
+        self.admin_create_keypair = ActionProcessor(
+            user_service.admin_create_keypair, action_monitors
+        )
+        self.admin_update_keypair = ActionProcessor(
+            user_service.admin_update_keypair, action_monitors
+        )
+        self.admin_delete_keypair = ActionProcessor(
+            user_service.admin_delete_keypair, action_monitors
+        )
+        self.admin_search_keypairs = ActionProcessor(
+            user_service.admin_search_keypairs, action_monitors
+        )
+        self.admin_get_keypair = ActionProcessor(user_service.admin_get_keypair, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -200,4 +232,9 @@ class UserProcessors(AbstractProcessorPackage):
             SwitchMyMainAccessKeyAction.spec(),
             UpdateMyKeypairAction.spec(),
             SearchMyKeypairsAction.spec(),
+            AdminCreateKeypairAction.spec(),
+            AdminUpdateKeypairAction.spec(),
+            AdminDeleteKeypairAction.spec(),
+            AdminSearchKeypairsAction.spec(),
+            AdminGetKeypairAction.spec(),
         ]

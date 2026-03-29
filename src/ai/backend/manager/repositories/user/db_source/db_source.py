@@ -1396,3 +1396,96 @@ class UserDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    # ------------------------------------------------------------------ admin keypair operations
+
+    async def admin_create_keypair(
+        self, user_id: UUID, creator: KeyPairCreator
+    ) -> GeneratedKeyPairData:
+        """Admin creates a keypair for a given user."""
+        async with self._db.begin_session() as session:
+            user_row = (
+                await session.scalars(
+                    sa.select(UserRow)
+                    .where(UserRow.uuid == user_id)
+                    .options(load_only(UserRow.email))
+                )
+            ).first()
+            if not user_row:
+                raise UserNotFound(f"User {user_id} not found")
+
+            secrets = generate_keypair_data()
+            kp_spec = KeyPairCreatorSpec(
+                creator=creator,
+                generated_data=secrets,
+                user_id=user_id,
+                email=user_row.email,
+            )
+            kp_creator = Creator(spec=kp_spec)
+            result = await execute_creator(session, kp_creator)
+            return GeneratedKeyPairData(keypair=result.row.to_data())
+
+    async def admin_update_keypair(self, updater: Updater[KeyPairRow]) -> KeyPairData:
+        """Admin updates any keypair by access key."""
+        access_key = str(updater.pk_value)
+        async with self._db.begin_session() as session:
+            update_result = await execute_updater(session, updater)
+            if update_result is None:
+                raise KeyPairNotFound(f"Keypair {access_key} not found")
+            return update_result.row.to_data()
+
+    async def admin_delete_keypair(self, access_key: str) -> None:
+        """Admin deletes any keypair by access key."""
+        async with self._db.begin_session() as session:
+            kp_row = (
+                await session.scalars(
+                    sa.select(KeyPairRow)
+                    .where(KeyPairRow.access_key == access_key)
+                    .options(load_only(KeyPairRow.access_key, KeyPairRow.user))
+                )
+            ).first()
+            if not kp_row:
+                raise KeyPairNotFound(f"Keypair {access_key} not found")
+
+            # Prevent deleting a keypair that is set as main access key
+            user_row = (
+                await session.scalars(
+                    sa.select(UserRow)
+                    .where(UserRow.uuid == kp_row.user)
+                    .options(load_only(UserRow.main_access_key))
+                )
+            ).first()
+            if user_row and user_row.main_access_key == access_key:
+                raise KeyPairForbidden("Cannot delete a keypair set as the user's main access key.")
+
+            await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
+
+    async def admin_search_keypairs(
+        self,
+        querier: BatchQuerier,
+    ) -> SearchResult[KeyPairData]:
+        """Admin search all keypairs without scope restriction."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(KeyPairRow)
+            result = await execute_batch_querier(db_session, query, querier)
+            items = [row.KeyPairRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def admin_get_keypair(self, access_key: str) -> KeyPairData:
+        """Admin retrieves a single keypair by access key."""
+        async with self._db.begin_readonly_session() as db_session:
+            kp_row = (
+                await db_session.scalars(
+                    sa.select(KeyPairRow)
+                    .where(KeyPairRow.access_key == access_key)
+                    .options(noload("*"))
+                )
+            ).first()
+            if not kp_row:
+                raise KeyPairNotFound(f"Keypair {access_key} not found")
+            return kp_row.to_data()

@@ -14,13 +14,22 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair import (
+    AdminSearchKeypairsInput,
     KeypairFilter,
     KeypairNode,
     KeypairOrderBy,
     KeypairOrderField,
     SearchMyKeypairsRequest,
 )
+from ai.backend.common.dto.manager.v2.keypair.request import (
+    AdminCreateKeypairInput,
+    AdminUpdateKeypairInput,
+)
 from ai.backend.common.dto.manager.v2.keypair.response import (
+    AdminCreateKeypairPayload,
+    AdminDeleteKeypairPayload,
+    AdminSearchKeypairsPayload,
+    AdminUpdateKeypairPayload,
     IssueMyKeypairPayload,
     RevokeMyKeypairPayload,
     SwitchMyMainAccessKeyPayload,
@@ -75,7 +84,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.keypair.types import KeyPairData
+from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
 from ai.backend.manager.models.domain.conditions import DomainConditions
@@ -114,6 +123,11 @@ from ai.backend.manager.services.user.actions.create_user import (
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserByIdAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
+    AdminCreateKeypairAction,
+    AdminDeleteKeypairAction,
+    AdminGetKeypairAction,
+    AdminSearchKeypairsAction,
+    AdminUpdateKeypairAction,
     IssueMyKeypairAction,
     RevokeMyKeypairAction,
     SearchMyKeypairsAction,
@@ -680,6 +694,130 @@ class UserAdapter(BaseAdapter):
             resource_policy=data.resource_policy_name,
             ssh_public_key=data.ssh_public_key,
             user_id=data.user_id,
+        )
+
+    # ------------------------------------------------------------------ admin keypair operations
+
+    async def admin_create_keypair(
+        self, input: AdminCreateKeypairInput
+    ) -> AdminCreateKeypairPayload:
+        """Admin creates a keypair for a given user."""
+        creator = KeyPairCreator(
+            is_active=input.is_active,
+            is_admin=input.is_admin,
+            resource_policy=input.resource_policy,
+            rate_limit=input.rate_limit,
+        )
+        result = await self._processors.user.admin_create_keypair.wait_for_complete(
+            AdminCreateKeypairAction(user_id=input.user_id, creator=creator)
+        )
+        return AdminCreateKeypairPayload(
+            keypair=self._keypair_data_to_node(result.generated_data.keypair),
+            secret_key=str(result.generated_data.keypair.secret_key),
+        )
+
+    async def admin_update_keypair(
+        self, input: AdminUpdateKeypairInput
+    ) -> AdminUpdateKeypairPayload:
+        """Admin updates any keypair."""
+        updater_spec = KeyPairUpdaterSpec(
+            is_active=(
+                OptionalState.update(input.is_active)
+                if input.is_active is not None
+                else OptionalState.nop()
+            ),
+            is_admin=(
+                OptionalState.update(input.is_admin)
+                if input.is_admin is not None
+                else OptionalState.nop()
+            ),
+            resource_policy=(
+                OptionalState.update(input.resource_policy)
+                if input.resource_policy is not None
+                else OptionalState.nop()
+            ),
+            rate_limit=(
+                OptionalState.update(input.rate_limit)
+                if input.rate_limit is not None
+                else OptionalState.nop()
+            ),
+        )
+        updater: Updater[KeyPairRow] = Updater(spec=updater_spec, pk_value=input.access_key)
+        result = await self._processors.user.admin_update_keypair.wait_for_complete(
+            AdminUpdateKeypairAction(updater=updater)
+        )
+        return AdminUpdateKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
+
+    async def admin_delete_keypair(self, access_key: str) -> AdminDeleteKeypairPayload:
+        """Admin deletes any keypair."""
+        result = await self._processors.user.admin_delete_keypair.wait_for_complete(
+            AdminDeleteKeypairAction(access_key=access_key)
+        )
+        return AdminDeleteKeypairPayload(access_key=result.access_key)
+
+    async def admin_get_keypair(self, access_key: str) -> KeypairNode:
+        """Admin retrieves a single keypair by access key."""
+        result = await self._processors.user.admin_get_keypair.wait_for_complete(
+            AdminGetKeypairAction(access_key=access_key)
+        )
+        return self._keypair_data_to_node(result.keypair)
+
+    async def admin_search_keypairs(
+        self,
+        input: AdminSearchKeypairsInput,
+    ) -> AdminSearchKeypairsPayload:
+        """Admin search all keypairs (REST)."""
+        conditions = self._convert_keypair_filter(input.filter) if input.filter else []
+        orders = self._convert_keypair_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_KEYPAIR_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.user.admin_search_keypairs.wait_for_complete(
+            AdminSearchKeypairsAction(querier=querier)
+        )
+        return AdminSearchKeypairsPayload(
+            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
+            pagination=PaginationInfo(
+                total=action_result.result.total_count,
+                offset=input.offset or 0,
+                limit=input.limit,
+            ),
+        )
+
+    async def gql_admin_search_keypairs(
+        self,
+        input: AdminSearchKeypairsInput,
+    ) -> SearchResult[KeypairNode]:
+        """Admin search all keypairs (GQL, returns SearchResult for connection)."""
+        conditions = self._convert_keypair_filter(input.filter) if input.filter else []
+        orders = self._convert_keypair_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_KEYPAIR_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.user.admin_search_keypairs.wait_for_complete(
+            AdminSearchKeypairsAction(querier=querier)
+        )
+        return SearchResult(
+            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
+            total_count=action_result.result.total_count,
+            has_next_page=action_result.result.has_next_page,
+            has_previous_page=action_result.result.has_previous_page,
         )
 
     def _convert_keypair_filter(self, filter_req: KeypairFilter) -> list[QueryCondition]:

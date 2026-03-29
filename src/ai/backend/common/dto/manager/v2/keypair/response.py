@@ -13,6 +13,10 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
+    "AdminCreateKeypairPayload",
+    "AdminDeleteKeypairPayload",
+    "AdminSearchKeypairsPayload",
+    "AdminUpdateKeypairPayload",
     "IssueMyKeypairPayload",
     "KeypairNode",
     "RevokeMyKeypairPayload",
@@ -78,6 +82,36 @@ class SwitchMyMainAccessKeyPayload(BaseResponseModel):
 
 class SearchMyKeypairsPayload(BaseResponseModel):
     """Payload for keypair search responses."""
+
+    items: list[KeypairNode] = Field(
+        description="List of keypair entities matching the search criteria.",
+    )
+    pagination: PaginationInfo = Field(
+        description="Pagination information for the result set.",
+    )
+
+
+class AdminCreateKeypairPayload(BaseResponseModel):
+    """Payload returned after admin creates a keypair for a user."""
+
+    keypair: KeypairNode = Field(description="The newly created keypair.")
+    secret_key: str = Field(description="The secret key. Only returned at creation time.")
+
+
+class AdminUpdateKeypairPayload(BaseResponseModel):
+    """Payload returned after admin updates a keypair."""
+
+    keypair: KeypairNode = Field(description="The updated keypair.")
+
+
+class AdminDeleteKeypairPayload(BaseResponseModel):
+    """Payload returned after admin deletes a keypair."""
+
+    access_key: str = Field(description="The access key of the deleted keypair.")
+
+
+class AdminSearchKeypairsPayload(BaseResponseModel):
+    """Payload for admin keypair search responses."""
 
     items: list[KeypairNode] = Field(
         description="List of keypair entities matching the search criteria.",

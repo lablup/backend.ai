@@ -164,6 +164,47 @@ type AddRevisionPayload
   revision: ModelRevision!
 }
 
+"""Added in UNRELEASED. Admin input for creating a keypair for a user."""
+input AdminCreateKeypairInput
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the target user."""
+  userId: UUID!
+
+  """Name of the resource policy to assign."""
+  resourcePolicy: String!
+
+  """Whether the keypair should be active."""
+  isActive: Boolean! = true
+
+  """Whether the keypair has admin privileges."""
+  isAdmin: Boolean! = false
+
+  """API rate limit (requests per minute)."""
+  rateLimit: Int! = 30000
+}
+
+"""
+Added in UNRELEASED. Payload returned after admin creates a keypair. The secret_key is only shown once.
+"""
+type AdminCreateKeypairPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The newly created keypair."""
+  keypair: KeyPairGQL!
+
+  """The secret key. Only returned at creation time."""
+  secretKey: String!
+}
+
+"""Added in UNRELEASED. Payload returned after admin deletes a keypair."""
+type AdminDeleteKeypairPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The access key of the deleted keypair."""
+  accessKey: String!
+}
+
 """
 Added in UNRELEASED. Input for admin querying effective assignable resources for a specific user.
 """
@@ -178,6 +219,34 @@ input AdminEffectiveResourceAllocationV2Input
 
   """Resource group name to check allocation for."""
   resourceGroupName: String!
+}
+
+"""Added in UNRELEASED. Admin input for updating a keypair."""
+input AdminUpdateKeypairInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Access key of the keypair to update."""
+  accessKey: String!
+
+  """New active state."""
+  isActive: Boolean = null
+
+  """New admin privilege state."""
+  isAdmin: Boolean = null
+
+  """New resource policy name."""
+  resourcePolicy: String = null
+
+  """New API rate limit."""
+  rateLimit: Int = null
+}
+
+"""Added in UNRELEASED. Payload returned after admin updates a keypair."""
+type AdminUpdateKeypairPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated keypair."""
+  keypair: KeyPairGQL!
 }
 
 type Agent implements Item
@@ -8947,6 +9016,21 @@ type Mutation
   """
   updateMyKeypair(input: UpdateMyKeypairInput!): UpdateMyKeypairPayload! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in UNRELEASED. Admin creates a keypair for a specified user. The secret_key is only returned at creation time.
+  """
+  adminCreateKeypairV2(input: AdminCreateKeypairInput!): AdminCreateKeypairPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Admin updates a keypair (e.g. toggle active state, change resource policy).
+  """
+  adminUpdateKeypairV2(input: AdminUpdateKeypairInput!): AdminUpdateKeypairPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Admin deletes a keypair by access key. Cannot delete a main access key.
+  """
+  adminDeleteKeypairV2(accessKey: String!): AdminDeleteKeypairPayload! @join__field(graph: STRAWBERRY)
+
   """Added in UNRELEASED. Revoke a login session. (admin only)"""
   adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload! @join__field(graph: STRAWBERRY)
 
@@ -11172,6 +11256,16 @@ type Query
   Added in UNRELEASED. List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.
   """
   myKeypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Get a single keypair by access key (admin only). Requires superadmin privileges.
+  """
+  adminKeypairV2(accessKey: String!): KeyPairGQL @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. List all keypairs with filtering and pagination (admin only). Requires superadmin privileges.
+  """
+  adminKeypairsV2(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection! @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Query login sessions of the current user with pagination and filtering.

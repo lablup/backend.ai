@@ -15,6 +15,9 @@ class KeyPairUpdaterSpec(UpdaterSpec[KeyPairRow]):
     """UpdaterSpec for keypair updates."""
 
     is_active: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    is_admin: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    resource_policy: OptionalState[str] = field(default_factory=OptionalState.nop)
+    rate_limit: OptionalState[int] = field(default_factory=OptionalState.nop)
 
     @property
     @override
@@ -25,4 +28,7 @@ class KeyPairUpdaterSpec(UpdaterSpec[KeyPairRow]):
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.is_active.update_dict(to_update, "is_active")
+        self.is_admin.update_dict(to_update, "is_admin")
+        self.resource_policy.update_dict(to_update, "resource_policy")
+        self.rate_limit.update_dict(to_update, "rate_limit")
         return to_update

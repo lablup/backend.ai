@@ -146,6 +146,11 @@ from .image import (
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .keypair import (
+    admin_create_keypair_v2,
+    admin_delete_keypair_v2,
+    admin_keypair_v2,
+    admin_keypairs_v2,
+    admin_update_keypair_v2,
     issue_my_keypair,
     my_keypairs,
     revoke_my_keypair,
@@ -430,6 +435,9 @@ class Query:
     admin_entities = admin_entities
     # Keypair self-service queries
     my_keypairs = my_keypairs
+    # Keypair admin queries
+    admin_keypair_v2 = admin_keypair_v2
+    admin_keypairs_v2 = admin_keypairs_v2
     # Login session/history self-service queries
     my_login_sessions_v2 = my_login_sessions_v2
     my_login_history_v2 = my_login_history_v2
@@ -649,6 +657,10 @@ class Mutation:
     revoke_my_keypair = revoke_my_keypair
     switch_my_main_access_key = switch_my_main_access_key
     update_my_keypair = update_my_keypair
+    # Keypair admin mutations
+    admin_create_keypair_v2 = admin_create_keypair_v2
+    admin_update_keypair_v2 = admin_update_keypair_v2
+    admin_delete_keypair_v2 = admin_delete_keypair_v2
     # Login session mutations
     admin_revoke_login_session = admin_revoke_login_session
     my_revoke_login_session = my_revoke_login_session
