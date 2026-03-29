@@ -630,6 +630,14 @@ type AliasImage
   msg: String
 }
 
+"""Added in UNRELEASED. Payload containing allowed domain names."""
+type AllowedDomainsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Allowed domain names."""
+  items: [String!]!
+}
+
 """Added in 25.3.0."""
 input AllowedGroups
   @join__type(graph: GRAPHENE)
@@ -639,6 +647,22 @@ input AllowedGroups
 
   """List of group_ids to remove associations. Added in 25.3.0."""
   remove: [String] = []
+}
+
+"""Added in UNRELEASED. Payload containing allowed project IDs."""
+type AllowedProjectsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Allowed project IDs."""
+  items: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload containing allowed resource group names."""
+type AllowedResourceGroupsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Allowed resource group names."""
+  items: [String!]!
 }
 
 """Added in 25.16.0. App configuration data."""
@@ -3003,6 +3027,28 @@ type CreateReservoirRegistryPayload
   reservoir: ReservoirRegistry!
 }
 
+"""Added in UNRELEASED. Input for creating a new resource group."""
+input CreateResourceGroupInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group name."""
+  name: String!
+
+  """Domain to create the resource group in."""
+  domainName: String!
+
+  """Optional description."""
+  description: String = null
+}
+
+"""Added in UNRELEASED. Payload for resource group creation."""
+type CreateResourceGroupPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Created resource group."""
+  resourceGroup: ResourceGroup!
+}
+
 type CreateResourcePreset
   @join__type(graph: GRAPHENE)
 {
@@ -3648,6 +3694,14 @@ type DeleteReservoirRegistryPayload
 {
   """ID of the deleted Reservoir registry"""
   id: UUID!
+}
+
+"""Added in UNRELEASED. Payload for resource group deletion."""
+type DeleteResourceGroupPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the deleted resource group."""
+  id: String!
 }
 
 type DeleteResourcePreset
@@ -8599,6 +8653,32 @@ type Mutation
   """
   adminUpdateResourceGroup(input: UpdateResourceGroupInput!): UpdateResourceGroupPayload! @join__field(graph: STRAWBERRY)
 
+  """Added in UNRELEASED. Create a new resource group (admin only)."""
+  adminCreateResourceGroupV2(input: CreateResourceGroupInput!): CreateResourceGroupPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a resource group (admin only)."""
+  adminDeleteResourceGroupV2(name: String!): DeleteResourceGroupPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Update allowed resource groups for a domain (admin only).
+  """
+  adminUpdateAllowedResourceGroupsForDomainV2(input: UpdateAllowedResourceGroupsForDomainInput!): AllowedResourceGroupsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Update allowed resource groups for a project (admin only).
+  """
+  adminUpdateAllowedResourceGroupsForProjectV2(input: UpdateAllowedResourceGroupsForProjectInput!): AllowedResourceGroupsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Update allowed domains for a resource group (admin only).
+  """
+  adminUpdateAllowedDomainsForResourceGroupV2(input: UpdateAllowedDomainsForResourceGroupInput!): AllowedDomainsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Update allowed projects for a resource group (admin only).
+  """
+  adminUpdateAllowedProjectsForResourceGroupV2(input: UpdateAllowedProjectsForResourceGroupInput!): AllowedProjectsPayload! @join__field(graph: STRAWBERRY)
+
   """
   Added in 26.2.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
   """
@@ -10724,6 +10804,29 @@ type Query
 
   """Added in 26.2.0. List resource groups (admin only)"""
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get a single resource group by name (admin only)."""
+  adminResourceGroupV2(name: String!): ResourceGroup @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Get allowed resource groups for a domain (admin only).
+  """
+  adminAllowedResourceGroupsForDomainV2(domainName: String!): AllowedResourceGroupsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Get allowed resource groups for a project (admin only).
+  """
+  adminAllowedResourceGroupsForProjectV2(projectId: UUID!): AllowedResourceGroupsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Get allowed domains for a resource group (admin only).
+  """
+  adminAllowedDomainsForResourceGroupV2(resourceGroupName: String!): AllowedDomainsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Get allowed projects for a resource group (admin only).
+  """
+  adminAllowedProjectsForResourceGroupV2(resourceGroupName: String!): AllowedProjectsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Query service catalog entries. Admin only."""
   adminServiceCatalogs(filter: ServiceCatalogFilter = null, orderBy: [ServiceCatalogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): [ServiceCatalog!]! @join__field(graph: STRAWBERRY)
@@ -13780,6 +13883,70 @@ type UntagImageFromRegistry
 
   """Added since 24.03.1."""
   image: ImageNode
+}
+
+"""
+Added in UNRELEASED. Input for updating allowed domains for a resource group.
+"""
+input UpdateAllowedDomainsForResourceGroupInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group name."""
+  resourceGroupName: String!
+
+  """Domain names to allow."""
+  add: [String!] = null
+
+  """Domain names to disallow."""
+  remove: [String!] = null
+}
+
+"""
+Added in UNRELEASED. Input for updating allowed projects for a resource group.
+"""
+input UpdateAllowedProjectsForResourceGroupInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource group name."""
+  resourceGroupName: String!
+
+  """Project IDs to allow."""
+  add: [UUID!] = null
+
+  """Project IDs to disallow."""
+  remove: [UUID!] = null
+}
+
+"""
+Added in UNRELEASED. Input for updating allowed resource groups for a domain.
+"""
+input UpdateAllowedResourceGroupsForDomainInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Domain name."""
+  domainName: String!
+
+  """Resource group names to allow."""
+  add: [String!] = null
+
+  """Resource group names to disallow."""
+  remove: [String!] = null
+}
+
+"""
+Added in UNRELEASED. Input for updating allowed resource groups for a project.
+"""
+input UpdateAllowedResourceGroupsForProjectInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Project ID."""
+  projectId: UUID!
+
+  """Resource group names to allow."""
+  add: [String!] = null
+
+  """Resource group names to disallow."""
+  remove: [String!] = null
 }
 
 """

@@ -6,33 +6,30 @@ from typing import override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 
-from .base import ScalingGroupAction
+from .domain_base import ScalingGroupDomainAction
 
 
 @dataclass(frozen=True)
-class ListAllowedScalingGroupsAction(ScalingGroupAction):
-    """Action to list scaling groups allowed for a user."""
+class GetAllowedResourceGroupsForDomainAction(ScalingGroupDomainAction):
+    """Action to get allowed resource groups for a domain."""
 
     domain_name: str
-    group: str
-    access_key: str
-    is_admin: bool
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+        return ActionOperationType.READ
 
     @override
     def entity_id(self) -> str | None:
-        return None
+        return self.domain_name
 
 
 @dataclass(frozen=True)
-class ListAllowedScalingGroupsActionResult(BaseActionResult):
-    """Result of listing allowed scaling groups."""
+class GetAllowedResourceGroupsForDomainActionResult(BaseActionResult):
+    """Result containing the allowed resource groups for the domain."""
 
-    scaling_group_names: list[str]
+    items: list[str]
 
     @override
     def entity_id(self) -> str | None:

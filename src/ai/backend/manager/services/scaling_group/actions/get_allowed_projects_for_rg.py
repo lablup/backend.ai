@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
@@ -10,29 +11,26 @@ from .base import ScalingGroupAction
 
 
 @dataclass(frozen=True)
-class ListAllowedScalingGroupsAction(ScalingGroupAction):
-    """Action to list scaling groups allowed for a user."""
+class GetAllowedProjectsForResourceGroupAction(ScalingGroupAction):
+    """Action to get allowed projects for a resource group."""
 
-    domain_name: str
-    group: str
-    access_key: str
-    is_admin: bool
+    resource_group_name: str
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+        return ActionOperationType.READ
 
     @override
     def entity_id(self) -> str | None:
-        return None
+        return self.resource_group_name
 
 
 @dataclass(frozen=True)
-class ListAllowedScalingGroupsActionResult(BaseActionResult):
-    """Result of listing allowed scaling groups."""
+class GetAllowedProjectsForResourceGroupActionResult(BaseActionResult):
+    """Result containing the allowed projects for the resource group."""
 
-    scaling_group_names: list[str]
+    items: list[UUID]
 
     @override
     def entity_id(self) -> str | None:

@@ -11,7 +11,7 @@ from ai.backend.manager.repositories.base.rbac.scope_binder import RBACScopeBind
 from .user_group_base import ScalingGroupUserGroupAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class AssociateScalingGroupWithUserGroupsAction(ScalingGroupUserGroupAction):
     """Action to associate a scaling group with multiple user groups (projects)."""
 
@@ -27,7 +27,7 @@ class AssociateScalingGroupWithUserGroupsAction(ScalingGroupUserGroupAction):
         return None
 
 
-@dataclass
+@dataclass(frozen=True)
 class AssociateScalingGroupWithUserGroupsActionResult(BaseActionResult):
     """Result of associating a scaling group with user groups."""
 

@@ -242,7 +242,18 @@ from .reservoir_registry import (
     update_reservoir_registry,
 )
 from .resource_group import (
+    admin_allowed_domains_for_resource_group_v2,
+    admin_allowed_projects_for_resource_group_v2,
+    admin_allowed_resource_groups_for_domain_v2,
+    admin_allowed_resource_groups_for_project_v2,
+    admin_create_resource_group_v2,
+    admin_delete_resource_group_v2,
+    admin_resource_group_v2,
     admin_resource_groups,
+    admin_update_allowed_domains_for_resource_group_v2,
+    admin_update_allowed_projects_for_resource_group_v2,
+    admin_update_allowed_resource_groups_for_domain_v2,
+    admin_update_allowed_resource_groups_for_project_v2,
     admin_update_resource_group,
     admin_update_resource_group_fair_share_spec,
     resource_groups,
@@ -358,6 +369,11 @@ class Query:
     image_alias = image_alias
     # Admin APIs
     admin_resource_groups = admin_resource_groups
+    admin_resource_group_v2 = admin_resource_group_v2
+    admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
+    admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
+    admin_allowed_domains_for_resource_group_v2 = admin_allowed_domains_for_resource_group_v2
+    admin_allowed_projects_for_resource_group_v2 = admin_allowed_projects_for_resource_group_v2
     admin_service_catalogs = admin_service_catalogs
     admin_session_scheduling_histories = admin_session_scheduling_histories
     admin_deployment_histories = admin_deployment_histories
@@ -565,6 +581,20 @@ class Mutation:
     # Resource Group - Admin APIs
     admin_update_resource_group_fair_share_spec = admin_update_resource_group_fair_share_spec
     admin_update_resource_group = admin_update_resource_group
+    admin_create_resource_group_v2 = admin_create_resource_group_v2
+    admin_delete_resource_group_v2 = admin_delete_resource_group_v2
+    admin_update_allowed_resource_groups_for_domain_v2 = (
+        admin_update_allowed_resource_groups_for_domain_v2
+    )
+    admin_update_allowed_resource_groups_for_project_v2 = (
+        admin_update_allowed_resource_groups_for_project_v2
+    )
+    admin_update_allowed_domains_for_resource_group_v2 = (
+        admin_update_allowed_domains_for_resource_group_v2
+    )
+    admin_update_allowed_projects_for_resource_group_v2 = (
+        admin_update_allowed_projects_for_resource_group_v2
+    )
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
     # Domain V2 APIs

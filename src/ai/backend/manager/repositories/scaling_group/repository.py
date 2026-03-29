@@ -231,3 +231,85 @@ class ScalingGroupRepository:
             ScalingGroupNotFound: If the scaling group does not exist.
         """
         return await self._db_source.get_resource_info(scaling_group)
+
+    # Allow / Disallow operations
+
+    async def update_allowed_resource_groups_for_domain(
+        self,
+        domain_name: str,
+        add: list[str],
+        remove: list[str],
+    ) -> list[str]:
+        """Atomically add/remove allowed resource groups for a domain."""
+        return await self._db_source.update_allowed_resource_groups_for_domain(
+            domain_name=domain_name,
+            add=add,
+            remove=remove,
+        )
+
+    async def update_allowed_resource_groups_for_project(
+        self,
+        project_id: UUID,
+        add: list[str],
+        remove: list[str],
+    ) -> list[str]:
+        """Atomically add/remove allowed resource groups for a project."""
+        return await self._db_source.update_allowed_resource_groups_for_project(
+            project_id=project_id,
+            add=add,
+            remove=remove,
+        )
+
+    async def update_allowed_domains_for_resource_group(
+        self,
+        resource_group_name: str,
+        add: list[str],
+        remove: list[str],
+    ) -> list[str]:
+        """Atomically add/remove allowed domains for a resource group."""
+        return await self._db_source.update_allowed_domains_for_resource_group(
+            resource_group_name=resource_group_name,
+            add=add,
+            remove=remove,
+        )
+
+    async def update_allowed_projects_for_resource_group(
+        self,
+        resource_group_name: str,
+        add: list[UUID],
+        remove: list[UUID],
+    ) -> list[UUID]:
+        """Atomically add/remove allowed projects for a resource group."""
+        return await self._db_source.update_allowed_projects_for_resource_group(
+            resource_group_name=resource_group_name,
+            add=add,
+            remove=remove,
+        )
+
+    async def get_allowed_resource_groups_for_domain(
+        self,
+        domain_name: str,
+    ) -> list[str]:
+        """Get allowed resource group names for a domain."""
+        return await self._db_source.get_allowed_resource_groups_for_domain(domain_name)
+
+    async def get_allowed_resource_groups_for_project(
+        self,
+        project_id: UUID,
+    ) -> list[str]:
+        """Get allowed resource group names for a project."""
+        return await self._db_source.get_allowed_resource_groups_for_project(project_id)
+
+    async def get_allowed_domains_for_resource_group(
+        self,
+        resource_group_name: str,
+    ) -> list[str]:
+        """Get allowed domain names for a resource group."""
+        return await self._db_source.get_allowed_domains_for_resource_group(resource_group_name)
+
+    async def get_allowed_projects_for_resource_group(
+        self,
+        resource_group_name: str,
+    ) -> list[UUID]:
+        """Get allowed projects for a resource group."""
+        return await self._db_source.get_allowed_projects_for_resource_group(resource_group_name)

@@ -6,10 +6,14 @@ from collections.abc import Iterable
 from decimal import Decimal
 from enum import StrEnum
 from typing import Self
+from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import NodeID
 
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    CreateResourceGroupInput as CreateResourceGroupInputDTO,
+)
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     PreemptionConfigInputDTO,
 )
@@ -20,10 +24,37 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     ResourceGroupOrder as ResourceGroupOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
+    UpdateAllowedDomainsForResourceGroupInput as UpdateAllowedDomainsForResourceGroupInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    UpdateAllowedProjectsForResourceGroupInput as UpdateAllowedProjectsForResourceGroupInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    UpdateAllowedResourceGroupsForDomainInput as UpdateAllowedResourceGroupsForDomainInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    UpdateAllowedResourceGroupsForProjectInput as UpdateAllowedResourceGroupsForProjectInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupConfigInput as UpdateResourceGroupConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupFairShareSpecInput as UpdateResourceGroupFairShareSpecInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.response import (
+    AllowedDomainsPayload as AllowedDomainsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.response import (
+    AllowedProjectsPayload as AllowedProjectsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.response import (
+    AllowedResourceGroupsPayload as AllowedResourceGroupsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.response import (
+    CreateResourceGroupPayload as CreateResourceGroupPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.response import (
+    DeleteResourceGroupPayload as DeleteResourceGroupPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     FairShareScalingGroupSpecInfo,
@@ -37,6 +68,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     UpdateResourceGroupConfigPayloadNode,
     UpdateResourceGroupFairShareSpecPayloadNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -513,3 +545,147 @@ class UpdateResourceGroupPayload(PydanticOutputMixin[UpdateResourceGroupConfigPa
     resource_group: ResourceGroupGQL = gql_field(
         description="The updated resource group with new configuration."
     )
+
+
+# Create/Delete types
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for creating a new resource group.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="CreateResourceGroupInput",
+)
+class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO]):
+    name: str = gql_field(description="Resource group name.")
+    domain_name: str = gql_field(description="Domain to create the resource group in.")
+    description: str | None = gql_field(default=None, description="Optional description.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for resource group creation.",
+    ),
+    model=CreateResourceGroupPayloadDTO,
+)
+class CreateResourceGroupPayloadGQL(PydanticOutputMixin[CreateResourceGroupPayloadDTO]):
+    resource_group: ResourceGroupGQL = gql_field(description="The created resource group.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for resource group deletion.",
+    ),
+    model=DeleteResourceGroupPayloadDTO,
+)
+class DeleteResourceGroupPayloadGQL(PydanticOutputMixin[DeleteResourceGroupPayloadDTO]):
+    id: str = gql_field(description="ID of the deleted resource group.")
+
+
+# Allow / Disallow types
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating allowed resource groups for a domain.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="UpdateAllowedResourceGroupsForDomainInput",
+)
+class UpdateAllowedResourceGroupsForDomainInputGQL(
+    PydanticInputMixin[UpdateAllowedResourceGroupsForDomainInputDTO]
+):
+    domain_name: str = gql_field(description="Domain name.")
+    add: list[str] | None = gql_field(default=None, description="Resource group names to allow.")
+    remove: list[str] | None = gql_field(
+        default=None, description="Resource group names to disallow."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating allowed resource groups for a project.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="UpdateAllowedResourceGroupsForProjectInput",
+)
+class UpdateAllowedResourceGroupsForProjectInputGQL(
+    PydanticInputMixin[UpdateAllowedResourceGroupsForProjectInputDTO]
+):
+    project_id: UUID = gql_field(description="Project ID.")
+    add: list[str] | None = gql_field(default=None, description="Resource group names to allow.")
+    remove: list[str] | None = gql_field(
+        default=None, description="Resource group names to disallow."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating allowed domains for a resource group.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="UpdateAllowedDomainsForResourceGroupInput",
+)
+class UpdateAllowedDomainsForResourceGroupInputGQL(
+    PydanticInputMixin[UpdateAllowedDomainsForResourceGroupInputDTO]
+):
+    resource_group_name: str = gql_field(description="Resource group name.")
+    add: list[str] | None = gql_field(default=None, description="Domain names to allow.")
+    remove: list[str] | None = gql_field(default=None, description="Domain names to disallow.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating allowed projects for a resource group.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="UpdateAllowedProjectsForResourceGroupInput",
+)
+class UpdateAllowedProjectsForResourceGroupInputGQL(
+    PydanticInputMixin[UpdateAllowedProjectsForResourceGroupInputDTO]
+):
+    resource_group_name: str = gql_field(description="Resource group name.")
+    add: list[UUID] | None = gql_field(default=None, description="Project IDs to allow.")
+    remove: list[UUID] | None = gql_field(default=None, description="Project IDs to disallow.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload containing allowed resource group names.",
+    ),
+    model=AllowedResourceGroupsPayloadDTO,
+    all_fields=True,
+    name="AllowedResourceGroupsPayload",
+)
+class AllowedResourceGroupsPayloadGQL(PydanticOutputMixin[AllowedResourceGroupsPayloadDTO]):
+    pass
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload containing allowed domain names.",
+    ),
+    model=AllowedDomainsPayloadDTO,
+    all_fields=True,
+    name="AllowedDomainsPayload",
+)
+class AllowedDomainsPayloadGQL(PydanticOutputMixin[AllowedDomainsPayloadDTO]):
+    pass
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload containing allowed project IDs.",
+    ),
+    model=AllowedProjectsPayloadDTO,
+    all_fields=True,
+    name="AllowedProjectsPayload",
+)
+class AllowedProjectsPayloadGQL(PydanticOutputMixin[AllowedProjectsPayloadDTO]):
+    pass

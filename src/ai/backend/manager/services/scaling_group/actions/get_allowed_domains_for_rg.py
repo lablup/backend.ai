@@ -10,29 +10,26 @@ from .base import ScalingGroupAction
 
 
 @dataclass(frozen=True)
-class ListAllowedScalingGroupsAction(ScalingGroupAction):
-    """Action to list scaling groups allowed for a user."""
+class GetAllowedDomainsForResourceGroupAction(ScalingGroupAction):
+    """Action to get allowed domains for a resource group."""
 
-    domain_name: str
-    group: str
-    access_key: str
-    is_admin: bool
+    resource_group_name: str
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+        return ActionOperationType.READ
 
     @override
     def entity_id(self) -> str | None:
-        return None
+        return self.resource_group_name
 
 
 @dataclass(frozen=True)
-class ListAllowedScalingGroupsActionResult(BaseActionResult):
-    """Result of listing allowed scaling groups."""
+class GetAllowedDomainsForResourceGroupActionResult(BaseActionResult):
+    """Result containing the allowed domains for the resource group."""
 
-    scaling_group_names: list[str]
+    items: list[str]
 
     @override
     def entity_id(self) -> str | None:
