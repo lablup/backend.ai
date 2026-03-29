@@ -5157,6 +5157,9 @@ type Mutation {
 
   """Added in UNRELEASED. Delete a resource preset (admin only)."""
   adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL!
+
+  """Added in UNRELEASED. Terminate sessions within a project scope."""
+  terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload!
 }
 
 """
@@ -5874,6 +5877,14 @@ enum ProjectResourcePolicyV2OrderField {
   MAX_VFOLDER_COUNT
   MAX_QUOTA_SCOPE_SIZE
   MAX_NETWORK_COUNT
+}
+
+"""
+Added in UNRELEASED. Scope for session operations within a specific project.
+"""
+input ProjectSessionV2Scope {
+  """Project UUID to scope the session operation."""
+  projectId: UUID!
 }
 
 """
@@ -8754,6 +8765,21 @@ input SyncReplicaInput {
 type SyncReplicaPayload {
   """Whether the sync succeeded"""
   success: Boolean!
+}
+
+"""Added in UNRELEASED. Payload returned after terminating sessions."""
+type TerminateSessionsPayload {
+  """Sessions cancelled from PENDING."""
+  cancelled: [ID!]!
+
+  """Sessions marked TERMINATING."""
+  terminating: [ID!]!
+
+  """Sessions force-terminated."""
+  forceTerminated: [ID!]!
+
+  """Sessions already terminated or not found."""
+  skipped: [ID!]!
 }
 
 """

@@ -8945,6 +8945,9 @@ type Mutation
 
   """Added in UNRELEASED. Delete a resource preset (admin only)."""
   adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Terminate sessions within a project scope."""
+  terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload! @join__field(graph: STRAWBERRY)
 }
 
 """
@@ -9885,6 +9888,16 @@ enum ProjectResourcePolicyV2OrderField
   MAX_VFOLDER_COUNT @join__enumValue(graph: STRAWBERRY)
   MAX_QUOTA_SCOPE_SIZE @join__enumValue(graph: STRAWBERRY)
   MAX_NETWORK_COUNT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. Scope for session operations within a specific project.
+"""
+input ProjectSessionV2Scope
+  @join__type(graph: STRAWBERRY)
+{
+  """Project UUID to scope the session operation."""
+  projectId: UUID!
 }
 
 """
@@ -13952,6 +13965,23 @@ type SyncReplicaPayload
 {
   """Whether the sync succeeded"""
   success: Boolean!
+}
+
+"""Added in UNRELEASED. Payload returned after terminating sessions."""
+type TerminateSessionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Sessions cancelled from PENDING."""
+  cancelled: [ID!]!
+
+  """Sessions marked TERMINATING."""
+  terminating: [ID!]!
+
+  """Sessions force-terminated."""
+  forceTerminated: [ID!]!
+
+  """Sessions already terminated or not found."""
+  skipped: [ID!]!
 }
 
 """Added in 25.5.0."""
