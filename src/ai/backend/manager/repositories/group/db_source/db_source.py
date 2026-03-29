@@ -598,52 +598,46 @@ class GroupDBSource:
             return []
 
         async with self._db.begin_session_read_committed() as session:
-            # Fetch project domain (existence already validated by RBAC)
-            project_domain = await session.scalar(
-                sa.select(groups.c.domain_name).where(groups.c.id == project_id)
+            # Find assignable users in a single query:
+            # same domain as the project, active, and not already assigned
+            project_domain_subq = (
+                sa.select(groups.c.domain_name).where(groups.c.id == project_id).scalar_subquery()
             )
-
-            # Find valid users: same domain and active
-            valid_user_rows = (
+            j = sa.outerjoin(
+                UserRow,
+                association_groups_users,
+                (UserRow.uuid == association_groups_users.c.user_id)
+                & (association_groups_users.c.group_id == project_id),
+            )
+            new_user_rows = (
                 await session.scalars(
-                    sa.select(UserRow).where(
+                    sa.select(UserRow)
+                    .select_from(j)
+                    .where(
                         UserRow.uuid.in_(user_ids)
-                        & (UserRow.domain_name == project_domain)
+                        & (UserRow.domain_name == project_domain_subq)
                         & (UserRow.status == UserStatus.ACTIVE)
+                        & association_groups_users.c.user_id.is_(None)
                     )
                 )
             ).all()
-            valid_user_map = {row.uuid: row for row in valid_user_rows}
 
-            if not valid_user_map:
-                return []
-
-            # Filter out already-assigned users
-            existing_result = await session.execute(
-                sa.select(association_groups_users.c.user_id).where(
-                    (association_groups_users.c.group_id == project_id)
-                    & (association_groups_users.c.user_id.in_(valid_user_map.keys()))
-                )
-            )
-            existing_user_ids = {row.user_id for row in existing_result.fetchall()}
-            new_user_ids = set(valid_user_map.keys()) - existing_user_ids
-
-            if not new_user_ids:
+            if not new_user_rows:
                 return []
 
             # Build scope binder pairs for atomic business + RBAC association
             project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
             pairs = [
                 RBACScopeBindingPair(
-                    spec=AssocGroupUserCreatorSpec(user_id=uid, group_id=project_id),
-                    entity_ref=RBACElementRef(RBACElementType.USER, str(uid)),
+                    spec=AssocGroupUserCreatorSpec(user_id=row.uuid, group_id=project_id),
+                    entity_ref=RBACElementRef(RBACElementType.USER, str(row.uuid)),
                     scope_ref=project_scope_ref,
                 )
-                for uid in new_user_ids
+                for row in new_user_rows
             ]
             await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=pairs))
 
-            return [valid_user_map[uid].to_data() for uid in new_user_ids]
+            return [row.to_data() for row in new_user_rows]
 
     async def get_project(self, project_id: UUID) -> GroupData:
         """Get a single project by UUID.
