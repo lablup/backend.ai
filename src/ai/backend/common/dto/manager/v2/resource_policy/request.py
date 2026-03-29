@@ -9,6 +9,7 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, IntFilter, StringFilter
 from ai.backend.common.dto.manager.v2.common import (
+    BinarySizeInput,
     OrderDirection,
     ResourceSlotEntryInput,
     VFolderHostPermissionEntryInput,
@@ -156,8 +157,8 @@ class CreateUserResourcePolicyInput(BaseRequestModel):
     max_vfolder_count: int = Field(
         description="Maximum number of vfolders a user can create.",
     )
-    max_quota_scope_size: int = Field(
-        description="Maximum quota scope size in bytes.",
+    max_quota_scope_size: BinarySizeInput = Field(
+        description="Maximum quota scope size (e.g., '1g', '536870912').",
     )
     max_session_count_per_model_session: int = Field(
         description="Maximum number of sessions allowed per model session.",
@@ -183,7 +184,7 @@ class UpdateUserResourcePolicyInput(BaseRequestModel):
         default=SENTINEL,
         description="Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
     )
-    max_quota_scope_size: int | Sentinel | None = Field(
+    max_quota_scope_size: BinarySizeInput | Sentinel | None = Field(
         default=SENTINEL,
         description="Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
     )
@@ -214,8 +215,8 @@ class CreateProjectResourcePolicyInput(BaseRequestModel):
     max_vfolder_count: int = Field(
         description="Maximum number of vfolders a project can have.",
     )
-    max_quota_scope_size: int = Field(
-        description="Maximum quota scope size in bytes.",
+    max_quota_scope_size: BinarySizeInput = Field(
+        description="Maximum quota scope size (e.g., '1g', '536870912').",
     )
     max_network_count: int = Field(
         description="Maximum number of networks a project can create.",
@@ -238,7 +239,7 @@ class UpdateProjectResourcePolicyInput(BaseRequestModel):
         default=SENTINEL,
         description="Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
     )
-    max_quota_scope_size: int | Sentinel | None = Field(
+    max_quota_scope_size: BinarySizeInput | Sentinel | None = Field(
         default=SENTINEL,
         description="Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
     )

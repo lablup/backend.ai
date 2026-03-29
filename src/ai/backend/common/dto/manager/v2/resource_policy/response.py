@@ -10,6 +10,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import (
+    BinarySizeInfo,
     ResourceLimitEntryInfo,
     VFolderHostPermissionEntryInfo,
 )
@@ -109,8 +110,8 @@ class UserResourcePolicyNode(BaseResponseModel):
     max_vfolder_count: int = Field(
         description="Maximum number of vfolders a user can create.",
     )
-    max_quota_scope_size: int = Field(
-        description="Maximum quota scope size in bytes.",
+    max_quota_scope_size: BinarySizeInfo = Field(
+        description="Maximum quota scope size.",
     )
     max_session_count_per_model_session: int = Field(
         description="Maximum number of sessions allowed per model session.",
@@ -154,8 +155,8 @@ class ProjectResourcePolicyNode(BaseResponseModel):
     max_vfolder_count: int = Field(
         description="Maximum number of vfolders a project can have.",
     )
-    max_quota_scope_size: int = Field(
-        description="Maximum quota scope size in bytes.",
+    max_quota_scope_size: BinarySizeInfo = Field(
+        description="Maximum quota scope size.",
     )
     max_network_count: int = Field(
         description="Maximum number of networks a project can create.",

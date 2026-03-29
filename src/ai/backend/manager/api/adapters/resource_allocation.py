@@ -360,7 +360,7 @@ def _scope_usage_to_node(data: ScopeUsageData) -> ScopeResourceUsageNode:
     return ScopeResourceUsageNode(
         limits=_slot_quantities_to_limit_entries(data.limits),
         used=_slot_quantities_to_entries(data.used),
-        assignable=_slot_quantities_to_entries(data.assignable),
+        assignable=_slot_quantities_to_limit_entries(data.assignable),
     )
 
 
@@ -379,7 +379,7 @@ def _allocation_to_payload(
 ) -> EffectiveResourceAllocationPayload:
     """Convert EffectiveAllocationData to EffectiveResourceAllocationPayload DTO."""
     return EffectiveResourceAllocationPayload(
-        assignable=_slot_quantities_to_entries(data.assignable),
+        assignable=_slot_quantities_to_limit_entries(data.assignable),
         breakdown=EffectiveBreakdownNode(
             keypair=_scope_usage_to_node(data.keypair),
             project=_scope_usage_to_node(data.project) if data.project else None,
@@ -392,10 +392,15 @@ def _allocation_to_payload(
 def _preset_availability_to_node(data: PresetAvailabilityData) -> PresetAvailabilityNode:
     """Convert PresetAvailabilityData to PresetAvailabilityNode DTO."""
     return PresetAvailabilityNode(
-        id=UUID(int=0),  # preset ID not available from PresetAvailabilityData
-        name=data.preset_name,
-        resource_slots=_slot_quantities_to_entries(data.preset_slots),
-        shared_memory=None,
-        resource_group_name=None,
-        available=data.allocatable,
+        id=data.preset.id,
+        name=data.preset.name,
+        resource_slots=[
+            ResourceSlotEntryInfo(resource_type=k, quantity=v)
+            for k, v in data.preset.resource_slots.items()
+        ],
+        shared_memory=(
+            _to_binary_size_info(data.preset.shared_memory) if data.preset.shared_memory else None
+        ),
+        resource_group_name=data.preset.scaling_group_name,
+        available=data.available,
     )

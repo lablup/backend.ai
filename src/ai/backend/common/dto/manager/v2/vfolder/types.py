@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, OrderDirection
 from ai.backend.common.types import VFolderUsageMode
 
 __all__ = (
@@ -101,6 +101,6 @@ class VFolderUsageInfo(BaseResponseModel):
     """Usage statistics fields for a virtual folder."""
 
     num_files: int
-    used_bytes: int
-    max_size: int | None
+    used_bytes: BinarySizeInfo
+    max_size: BinarySizeInfo | None
     max_files: int

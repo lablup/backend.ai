@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai.backend.common.types import AccessKey, SlotQuantity
+from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 
 
 @dataclass(frozen=True)
@@ -43,9 +44,8 @@ class EffectiveAllocationData:
 class PresetAvailabilityData:
     """Resource preset with availability information."""
 
-    preset_name: str
-    preset_slots: list[SlotQuantity]
-    allocatable: bool
+    preset: ResourcePresetData
+    available: bool
 
 
 @dataclass(frozen=True)

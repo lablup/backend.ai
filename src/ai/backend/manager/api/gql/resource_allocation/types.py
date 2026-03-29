@@ -93,7 +93,7 @@ class ScopeResourceUsageGQL(PydanticOutputMixin[ScopeResourceUsageNodeDTO]):
     used: list[ResourceSlotEntryGQL] = gql_field(
         description="Currently occupied resources.",
     )
-    assignable: list[ResourceSlotEntryGQL] = gql_field(
+    assignable: list[ResourceLimitEntryGQL] = gql_field(
         description="Assignable resources within policy limits (limits - used).",
     )
 
@@ -155,7 +155,7 @@ class EffectiveBreakdownGQL(PydanticOutputMixin[EffectiveBreakdownNodeDTO]):
 class EffectiveResourceAllocationPayloadGQL(
     PydanticOutputMixin[EffectiveResourceAllocationPayloadDTO],
 ):
-    assignable: list[ResourceSlotEntryGQL] = gql_field(
+    assignable: list[ResourceLimitEntryGQL] = gql_field(
         description="Effective assignable resources (minimum across all scopes).",
     )
     breakdown: EffectiveBreakdownGQL = gql_field(

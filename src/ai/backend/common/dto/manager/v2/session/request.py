@@ -14,7 +14,7 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import BinarySizeInput, ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
@@ -249,7 +249,9 @@ class GetContainerLogsInput(BaseRequestModel):
 class ResourceOptsInput(BaseRequestModel):
     """Additional resource options."""
 
-    shmem: str | None = Field(default=None, description="Shared memory size (e.g., '1g').")
+    shmem: BinarySizeInput | None = Field(
+        default=None, description="Shared memory size (e.g., '1g')."
+    )
 
 
 class MountItemInput(BaseRequestModel):

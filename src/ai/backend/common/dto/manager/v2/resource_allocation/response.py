@@ -32,7 +32,7 @@ class ScopeResourceUsageNode(BaseResponseModel):
 
     limits: list[ResourceLimitEntryInfo] = Field(description="Policy-defined resource limits.")
     used: list[ResourceSlotEntryInfo] = Field(description="Currently occupied resources.")
-    assignable: list[ResourceSlotEntryInfo] = Field(
+    assignable: list[ResourceLimitEntryInfo] = Field(
         description="Assignable resources within policy limits (limits - used)."
     )
 
@@ -66,7 +66,7 @@ class EffectiveBreakdownNode(BaseResponseModel):
 class EffectiveResourceAllocationPayload(BaseResponseModel):
     """Effective assignable resources considering all scope constraints."""
 
-    assignable: list[ResourceSlotEntryInfo] = Field(
+    assignable: list[ResourceLimitEntryInfo] = Field(
         description="Effective assignable resources (minimum across all scopes)."
     )
     breakdown: EffectiveBreakdownNode = Field(

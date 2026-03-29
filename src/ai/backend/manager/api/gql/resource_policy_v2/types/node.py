@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
+    BinarySizeInfoGQL,
     ResourceLimitEntryGQL,
     VFolderHostPermissionEntryGQL,
 )
@@ -97,7 +98,7 @@ class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
     name: str = gql_field(description="Policy name.")
     created_at: datetime | None = gql_field(description="Timestamp when the policy was created.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a user can create.")
-    max_quota_scope_size: int = gql_field(description="Maximum quota scope size in bytes.")
+    max_quota_scope_size: BinarySizeInfoGQL = gql_field(description="Maximum quota scope size.")
     max_session_count_per_model_session: int = gql_field(
         description="Maximum sessions per model session."
     )
@@ -138,7 +139,7 @@ class ProjectResourcePolicyV2GQL(PydanticNodeMixin[ProjectResourcePolicyNode]):
     name: str = gql_field(description="Policy name.")
     created_at: datetime | None = gql_field(description="Timestamp when the policy was created.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a project can have.")
-    max_quota_scope_size: int = gql_field(description="Maximum quota scope size in bytes.")
+    max_quota_scope_size: BinarySizeInfoGQL = gql_field(description="Maximum quota scope size.")
     max_network_count: int = gql_field(
         description="Maximum networks a project can create. -1 means unlimited."
     )

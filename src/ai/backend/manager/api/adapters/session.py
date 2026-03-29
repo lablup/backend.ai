@@ -262,7 +262,9 @@ class SessionAdapter(BaseAdapter):
                     for e in input.resource_entries
                 ],
                 resource_group=input.resource_group,
-                shmem=input.resource_opts.shmem if input.resource_opts else None,
+                shmem=input.resource_opts.shmem.expr
+                if input.resource_opts and input.resource_opts.shmem
+                else None,
                 cluster_mode=(
                     ClusterMode.MULTI_NODE
                     if input.cluster_mode == ClusterModeEnum.MULTI_NODE

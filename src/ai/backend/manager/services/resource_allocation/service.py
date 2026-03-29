@@ -159,9 +159,8 @@ class ResourceAllocationService:
 
             presets.append(
                 PresetAvailabilityData(
-                    preset_name=preset_data.name,
-                    preset_slots=preset_slots,
-                    allocatable=allocatable,
+                    preset=preset_data,
+                    available=allocatable,
                 )
             )
 

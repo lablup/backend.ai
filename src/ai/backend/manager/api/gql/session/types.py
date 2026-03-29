@@ -55,6 +55,7 @@ from ai.backend.manager.api.gql.common.types import (
     SessionV2ResultGQL,
     SessionV2TypeGQL,
 )
+from ai.backend.manager.api.gql.common_types import BinarySizeInputGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -458,7 +459,9 @@ class SessionResourceSlotEntryInputGQL(PydanticInputMixin[ResourceSlotEntryInput
     name="SessionResourceOptsInput",
 )
 class SessionResourceOptsInputGQL(PydanticInputMixin[ResourceOptsInputDTO]):
-    shmem: str | None = gql_field(default=None, description="Shared memory size (e.g., '1g').")
+    shmem: BinarySizeInputGQL | None = gql_field(
+        default=None, description="Shared memory size (e.g., '1g')."
+    )
 
 
 @gql_pydantic_input(

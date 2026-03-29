@@ -49,6 +49,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
+    BinarySizeInputGQL,
     ResourceSlotEntryInputGQL,
     VFolderHostPermissionEntryInputGQL,
 )
@@ -153,7 +154,9 @@ class UpdateKeypairResourcePolicyInputGQL(PydanticInputMixin[UpdateKeypairResour
 class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePolicyInputDTO]):
     name: str = gql_field(description="Policy name. Must be unique.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a user can create.")
-    max_quota_scope_size: int = gql_field(description="Maximum quota scope size in bytes.")
+    max_quota_scope_size: BinarySizeInputGQL = gql_field(
+        description="Maximum quota scope size (e.g., '1g', '536870912').",
+    )
     max_session_count_per_model_session: int = gql_field(
         description="Maximum sessions per model session."
     )
@@ -172,7 +175,7 @@ class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePoli
     max_vfolder_count: int | None = gql_field(
         default=UNSET, description="Updated max vfolder count."
     )
-    max_quota_scope_size: int | None = gql_field(
+    max_quota_scope_size: BinarySizeInputGQL | None = gql_field(
         default=UNSET, description="Updated max quota scope size."
     )
     max_session_count_per_model_session: int | None = gql_field(
@@ -195,7 +198,9 @@ class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePoli
 class CreateProjectResourcePolicyInputGQL(PydanticInputMixin[CreateProjectResourcePolicyInputDTO]):
     name: str = gql_field(description="Policy name. Must be unique.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a project can have.")
-    max_quota_scope_size: int = gql_field(description="Maximum quota scope size in bytes.")
+    max_quota_scope_size: BinarySizeInputGQL = gql_field(
+        description="Maximum quota scope size (e.g., '1g', '536870912').",
+    )
     max_network_count: int = gql_field(
         description="Maximum networks a project can create. -1 means unlimited."
     )
@@ -211,7 +216,7 @@ class UpdateProjectResourcePolicyInputGQL(PydanticInputMixin[UpdateProjectResour
     max_vfolder_count: int | None = gql_field(
         default=UNSET, description="Updated max vfolder count."
     )
-    max_quota_scope_size: int | None = gql_field(
+    max_quota_scope_size: BinarySizeInputGQL | None = gql_field(
         default=UNSET, description="Updated max quota scope size."
     )
     max_network_count: int | None = gql_field(
