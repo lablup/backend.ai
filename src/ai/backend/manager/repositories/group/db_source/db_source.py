@@ -597,14 +597,11 @@ class GroupDBSource:
         if not user_ids:
             return []
 
-        async with self._db.begin_session() as session:
-            # Fetch project domain
-            project_row = await session.scalar(
+        async with self._db.begin_session_read_committed() as session:
+            # Fetch project domain (existence already validated by RBAC)
+            project_domain = await session.scalar(
                 sa.select(groups.c.domain_name).where(groups.c.id == project_id)
             )
-            if project_row is None:
-                raise ProjectNotFound(f"Project {project_id} not found")
-            project_domain = project_row
 
             # Find valid users: same domain and active
             valid_user_rows = (
