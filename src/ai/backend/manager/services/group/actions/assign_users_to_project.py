@@ -35,8 +35,9 @@ class AssignUsersToProjectAction(GroupSingleEntityAction):
 
 @dataclass
 class AssignUsersToProjectActionResult(GroupSingleEntityActionResult):
+    project_id: UUID
     assigned_users: list[UserData]
 
     @override
     def target_entity_id(self) -> str:
-        return ""
+        return str(self.project_id)

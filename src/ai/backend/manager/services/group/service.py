@@ -236,7 +236,9 @@ class GroupService:
         assigned_users = await self._group_repository.assign_users_to_project(
             action.project_id, action.user_ids
         )
-        return AssignUsersToProjectActionResult(assigned_users=assigned_users)
+        return AssignUsersToProjectActionResult(
+            project_id=action.project_id, assigned_users=assigned_users
+        )
 
     async def get_project(self, action: GetProjectAction) -> GetProjectActionResult:
         """Get a single project by UUID.

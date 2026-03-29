@@ -24,7 +24,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.errors.resource import (
     ProjectHasActiveEndpointsError,
     ProjectHasActiveKernelsError,
@@ -612,7 +612,7 @@ class GroupDBSource:
                     sa.select(UserRow).where(
                         UserRow.uuid.in_(user_ids)
                         & (UserRow.domain_name == project_domain)
-                        & (UserRow.status == "active")
+                        & (UserRow.status == UserStatus.ACTIVE)
                     )
                 )
             ).all()
