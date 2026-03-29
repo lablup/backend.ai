@@ -3995,7 +3995,7 @@ type KeypairResourcePolicyV2 implements Node {
   defaultForUnspecified: String!
 
   """Total resource slot limits for sessions."""
-  totalResourceSlots: [ResourceSlotEntry!]!
+  totalResourceSlots: [ResourceLimitEntry!]!
 
   """Maximum session lifetime in seconds."""
   maxSessionLifetime: Int!
@@ -4007,7 +4007,7 @@ type KeypairResourcePolicyV2 implements Node {
   maxPendingSessionCount: Int
 
   """Maximum resource slots for pending sessions. Null means unlimited."""
-  maxPendingSessionResourceSlots: [ResourceSlotEntry!]
+  maxPendingSessionResourceSlots: [ResourceLimitEntry!]
 
   """Maximum concurrent SFTP sessions allowed."""
   maxConcurrentSftpSessions: Int!
@@ -7533,6 +7533,18 @@ type ResourceInfo {
   free: ResourceSlot!
 }
 
+"""Added in UNRELEASED. A resource limit entry that may be unlimited."""
+type ResourceLimitEntry {
+  """Resource type identifier (e.g., cpu, mem, cuda.shares)"""
+  resourceType: String!
+
+  """Limit quantity. Null when unlimited."""
+  quantity: Decimal
+
+  """Whether this resource type has no limit."""
+  unlimited: Boolean!
+}
+
 """
 Added in 26.1.0. A collection of additional resource options for a deployment. Contains key-value pairs for resource configuration like shared memory.
 """
@@ -8327,7 +8339,7 @@ Added in UNRELEASED. Resource usage for a single scope (keypair, project, domain
 """
 type ScopeResourceUsageV2 {
   """Policy-defined resource limits."""
-  limits: [ResourceSlotEntry!]!
+  limits: [ResourceLimitEntry!]!
 
   """Currently occupied resources."""
   used: [ResourceSlotEntry!]!
