@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from decimal import Decimal
 from enum import StrEnum
+from functools import cached_property
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 
 __all__ = (
+    "BinarySizeInfo",
+    "BinarySizeInput",
     "OrderDirection",
     "ResourceSlotEntryInfo",
     "ResourceSlotEntryInput",
@@ -17,6 +20,33 @@ __all__ = (
     "VFolderHostPermissionEntryInfo",
     "VFolderHostPermissionEntryInput",
 )
+
+
+class BinarySizeInput(BaseRequestModel):
+    """Binary size input accepting bytes integer or human-readable string.
+
+    Examples: '536870912', '512m', '1g', '2048k'
+    """
+
+    model_config = {"frozen": True}
+
+    expr: str = Field(
+        description="Size as bytes integer or human-readable format (e.g., '536870912', '512m', '1g').",
+    )
+
+    @cached_property
+    def bytes(self) -> int:
+        """Parse the expression to bytes integer."""
+        from ai.backend.common.types import BinarySize
+
+        return int(BinarySize.finite_from_str(self.expr))
+
+
+class BinarySizeInfo(BaseResponseModel):
+    """Binary size output with both raw bytes and human-readable format."""
+
+    value: int = Field(description="Size in bytes.")
+    display: str = Field(description="Size in human-readable format (e.g., '1g', '512m').")
 
 
 class OrderDirection(StrEnum):

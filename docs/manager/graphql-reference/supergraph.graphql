@@ -1571,6 +1571,31 @@ to support integers outside the range of a signed 32-bit integer.
 scalar BigInt
   @join__type(graph: GRAPHENE)
 
+"""
+Added in UNRELEASED. Binary size with both raw bytes and human-readable format.
+"""
+type BinarySizeInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Size in bytes."""
+  value: Int!
+
+  """Size in human-readable format (e.g., '1g', '512m')."""
+  display: String!
+}
+
+"""
+Added in UNRELEASED. Binary size input accepting bytes integer or human-readable string.
+"""
+input BinarySizeInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Size as bytes integer or human-readable format (e.g., '536870912', '512m', '1g').
+  """
+  expr: String!
+}
+
 """Added in 25.19.0. Configuration for blue-green deployment strategy."""
 input BlueGreenConfigInput
   @join__type(graph: STRAWBERRY)
@@ -3069,6 +3094,31 @@ input CreateResourcePresetInput
   scaling_group_name: String
 }
 
+"""Added in UNRELEASED. Payload for resource preset creation."""
+type CreateResourcePresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Created resource preset."""
+  resourcePreset: ResourcePresetV2!
+}
+
+"""Added in UNRELEASED. Input for creating a new resource preset."""
+input CreateResourcePresetV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource preset name."""
+  name: String!
+
+  """Resource slot allocations."""
+  resourceSlots: [ResourceSlotEntryInput!]!
+
+  """Shared memory size (e.g., expr: '512m' or '536870912')."""
+  sharedMemory: BinarySizeInput = null
+
+  """Resource group name. If null, the preset is global."""
+  resourceGroupName: String = null
+}
+
 """
 Added in 25.19.0. Input for specifying revision configuration within a deployment.
 """
@@ -3709,6 +3759,14 @@ type DeleteResourcePreset
 {
   ok: Boolean
   msg: String
+}
+
+"""Added in UNRELEASED. Payload for resource preset deletion."""
+type DeleteResourcePresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the deleted resource preset."""
+  id: String!
 }
 
 """Added in 26.3.0. Input for soft-deleting a role"""
@@ -8878,6 +8936,15 @@ type Mutation
 
   """Added in UNRELEASED. Delete a project resource policy (admin only)."""
   adminDeleteProjectResourcePolicyV2(name: String!): DeleteProjectResourcePolicyPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Create a new resource preset (admin only)."""
+  adminCreateResourcePresetV2(input: CreateResourcePresetV2Input!): CreateResourcePresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Update a resource preset (admin only)."""
+  adminUpdateResourcePresetV2(input: UpdateResourcePresetV2Input!): UpdateResourcePresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a resource preset (admin only)."""
+  adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL! @join__field(graph: STRAWBERRY)
 }
 
 """
@@ -11228,6 +11295,12 @@ type Query
 
   """Added in UNRELEASED. Get the current user's user resource policy."""
   myUserResourcePolicyV2: UserResourcePolicyV2 @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. List resource presets (admin only)."""
+  adminResourcePresetsV2(filter: ResourcePresetFilter = null, orderBy: [ResourcePresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourcePresetConnection @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get a single resource preset by ID (admin only)."""
+  adminResourcePresetV2(id: UUID!): ResourcePresetV2 @join__field(graph: STRAWBERRY)
 }
 
 """
@@ -11965,6 +12038,76 @@ type ResourcePreset
   Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
   """
   scaling_group_name: String
+}
+
+"""Added in UNRELEASED. Resource preset connection."""
+type ResourcePresetConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ResourcePresetV2Edge!]!
+  count: Int!
+}
+
+"""Added in UNRELEASED. Filter for resource presets."""
+input ResourcePresetFilter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  resourceGroupName: StringFilter = null
+  AND: [ResourcePresetFilter!] = null
+  OR: [ResourcePresetFilter!] = null
+  NOT: [ResourcePresetFilter!] = null
+}
+
+"""Added in UNRELEASED. Order by specification for resource presets."""
+input ResourcePresetOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: ResourcePresetOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""Added in UNRELEASED. Fields available for ordering resource presets."""
+enum ResourcePresetOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in UNRELEASED. Resource preset with resource slot allocations."""
+type ResourcePresetV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Resource preset name."""
+  name: String!
+
+  """Resource slot allocations for this preset."""
+  resourceSlots: [ResourceSlotEntry!]!
+
+  """Shared memory size with both bytes and human-readable format."""
+  sharedMemory: BinarySizeInfo
+
+  """Resource group name. Null means global preset."""
+  resourceGroupName: String
+}
+
+"""An edge in a connection."""
+type ResourcePresetV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ResourcePresetV2!
 }
 
 """
@@ -14461,6 +14604,36 @@ type UpdateResourceGroupPayload
 {
   """The updated resource group with new configuration."""
   resourceGroup: ResourceGroup!
+}
+
+"""Added in UNRELEASED. Payload for resource preset update."""
+type UpdateResourcePresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated resource preset."""
+  resourcePreset: ResourcePresetV2!
+}
+
+"""
+Added in UNRELEASED. Input for updating a resource preset. All fields optional for partial update.
+"""
+input UpdateResourcePresetV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the resource preset to update."""
+  id: UUID!
+
+  """Updated name."""
+  name: String = null
+
+  """Updated resource slot allocations."""
+  resourceSlots: [ResourceSlotEntryInput!] = null
+
+  """Updated shared memory. Use null to clear."""
+  sharedMemory: BinarySizeInput = null
+
+  """Updated resource group name. Use null to make global."""
+  resourceGroupName: String = null
 }
 
 """Added in 26.3.0. Input for updating a role"""

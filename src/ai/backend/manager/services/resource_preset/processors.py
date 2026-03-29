@@ -24,6 +24,10 @@ from ai.backend.manager.services.resource_preset.actions.modify_preset import (
     ModifyResourcePresetAction,
     ModifyResourcePresetActionResult,
 )
+from ai.backend.manager.services.resource_preset.actions.search_presets import (
+    SearchResourcePresetsV2Action,
+    SearchResourcePresetsV2ActionResult,
+)
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 
 
@@ -33,6 +37,9 @@ class ResourcePresetProcessors(AbstractProcessorPackage):
     delete_preset: ActionProcessor[DeleteResourcePresetAction, DeleteResourcePresetActionResult]
     list_presets: ActionProcessor[ListResourcePresetsAction, ListResourcePresetsResult]
     check_presets: ActionProcessor[CheckResourcePresetsAction, CheckResourcePresetsActionResult]
+    search_presets_v2: ActionProcessor[
+        SearchResourcePresetsV2Action, SearchResourcePresetsV2ActionResult
+    ]
 
     def __init__(
         self,
@@ -45,6 +52,7 @@ class ResourcePresetProcessors(AbstractProcessorPackage):
         self.delete_preset = ActionProcessor(service.delete_preset, action_monitors)
         self.list_presets = ActionProcessor(service.list_presets, action_monitors)
         self.check_presets = ActionProcessor(service.check_presets, action_monitors)
+        self.search_presets_v2 = ActionProcessor(service.search_presets_v2, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -54,4 +62,5 @@ class ResourcePresetProcessors(AbstractProcessorPackage):
             DeleteResourcePresetAction.spec(),
             ListResourcePresetsAction.spec(),
             CheckResourcePresetsAction.spec(),
+            SearchResourcePresetsV2Action.spec(),
         ]

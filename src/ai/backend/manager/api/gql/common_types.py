@@ -10,6 +10,8 @@ from decimal import Decimal
 from enum import StrEnum
 
 from ai.backend.common.dto.manager.v2.common import (
+    BinarySizeInfo,
+    BinarySizeInput,
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
     ResourceSlotInfo,
@@ -26,6 +28,34 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Binary size input accepting bytes integer or human-readable string.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="BinarySizeInput",
+)
+class BinarySizeInputGQL(PydanticInputMixin[BinarySizeInput]):
+    """Binary size input (e.g., '536870912', '512m', '1g')."""
+
+    expr: str = gql_field(
+        description="Size as bytes integer or human-readable format (e.g., '536870912', '512m', '1g').",
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Binary size with both raw bytes and human-readable format.",
+    ),
+    model=BinarySizeInfo,
+    all_fields=True,
+    name="BinarySizeInfo",
+)
+class BinarySizeInfoGQL(PydanticOutputMixin[BinarySizeInfo]):
+    pass
 
 
 @gql_pydantic_type(

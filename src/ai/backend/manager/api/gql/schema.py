@@ -278,6 +278,13 @@ from .resource_policy_v2 import (
     my_keypair_resource_policy_v2,
     my_user_resource_policy_v2,
 )
+from .resource_preset import (
+    admin_create_resource_preset_v2,
+    admin_delete_resource_preset_v2,
+    admin_resource_preset_v2,
+    admin_resource_presets_v2,
+    admin_update_resource_preset_v2,
+)
 from .resource_slot.resolver import resource_slot_type, resource_slot_types
 from .resource_usage import (
     admin_domain_usage_buckets,
@@ -490,6 +497,9 @@ class Query:
     admin_project_resource_policies_v2 = admin_project_resource_policies_v2
     my_keypair_resource_policy_v2 = my_keypair_resource_policy_v2
     my_user_resource_policy_v2 = my_user_resource_policy_v2
+    # Resource Preset V2 APIs
+    admin_resource_presets_v2 = admin_resource_presets_v2
+    admin_resource_preset_v2 = admin_resource_preset_v2
 
 
 @strawberry.type
@@ -653,6 +663,10 @@ class Mutation:
     admin_create_project_resource_policy_v2 = admin_create_project_resource_policy_v2
     admin_update_project_resource_policy_v2 = admin_update_project_resource_policy_v2
     admin_delete_project_resource_policy_v2 = admin_delete_project_resource_policy_v2
+    # Resource Preset V2 APIs
+    admin_create_resource_preset_v2 = admin_create_resource_preset_v2
+    admin_update_resource_preset_v2 = admin_update_resource_preset_v2
+    admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
 
 
 @strawberry.type

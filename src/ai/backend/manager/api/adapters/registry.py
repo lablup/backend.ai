@@ -25,6 +25,7 @@ from ai.backend.manager.api.adapters.rbac import RBACAdapter
 from ai.backend.manager.api.adapters.reservoir_registry import ReservoirRegistryAdapter
 from ai.backend.manager.api.adapters.resource_group import ResourceGroupAdapter
 from ai.backend.manager.api.adapters.resource_policy import ResourcePolicyAdapter
+from ai.backend.manager.api.adapters.resource_preset import ResourcePresetAdapter
 from ai.backend.manager.api.adapters.resource_slot import ResourceSlotAdapter
 from ai.backend.manager.api.adapters.resource_usage import ResourceUsageAdapter
 from ai.backend.manager.api.adapters.scheduling_history import SchedulingHistoryAdapter
@@ -70,6 +71,7 @@ class Adapters:
         reservoir_registry: ReservoirRegistryAdapter,
         resource_group: ResourceGroupAdapter,
         resource_policy: ResourcePolicyAdapter,
+        resource_preset: ResourcePresetAdapter,
         resource_slot: ResourceSlotAdapter,
         resource_usage: ResourceUsageAdapter,
         scheduling_history: SchedulingHistoryAdapter,
@@ -100,6 +102,7 @@ class Adapters:
         self.reservoir_registry = reservoir_registry
         self.resource_group = resource_group
         self.resource_policy = resource_policy
+        self.resource_preset = resource_preset
         self.resource_slot = resource_slot
         self.resource_usage = resource_usage
         self.scheduling_history = scheduling_history
@@ -134,6 +137,7 @@ class Adapters:
             reservoir_registry=ReservoirRegistryAdapter(processors),
             resource_group=ResourceGroupAdapter(processors),
             resource_policy=ResourcePolicyAdapter(processors),
+            resource_preset=ResourcePresetAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
             resource_usage=ResourceUsageAdapter(processors),
             scheduling_history=SchedulingHistoryAdapter(processors),

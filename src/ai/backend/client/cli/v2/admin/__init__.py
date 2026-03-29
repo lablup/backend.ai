@@ -109,3 +109,12 @@ def prometheus_query_preset() -> None:
 )
 def resource_policy() -> None:
     """Admin resource policy commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.resource_preset:resource_preset",
+    name="resource-preset",
+)
+def resource_preset() -> None:
+    """Admin resource preset commands."""
