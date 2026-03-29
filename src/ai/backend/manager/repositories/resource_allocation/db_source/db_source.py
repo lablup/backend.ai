@@ -28,7 +28,7 @@ from ai.backend.manager.data.resource_allocation.types import (
     ResourceGroupUsageData,
     ScopeUsageData,
 )
-from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
+from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound, ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import groups
@@ -40,6 +40,7 @@ from ai.backend.manager.models.resource_slot import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.resource_preset.db_source.types import (
@@ -188,6 +189,13 @@ class ResourceAllocationDBSource:
     ) -> ResourceGroupUsageData:
         """Get resource group (scaling group) usage with max_per_node."""
         async with self._db.begin_readonly_session() as session:
+            # Verify scaling group exists
+            sg_exists = await session.scalar(
+                sa.select(sa.exists().where(ScalingGroupRow.name == rg_name))
+            )
+            if not sg_exists:
+                raise ScalingGroupNotFound(rg_name)
+
             rst = ResourceSlotTypeRow.__table__
             j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id).join(
                 rst, AgentResourceRow.slot_name == rst.c.slot_name
@@ -274,28 +282,26 @@ class ResourceAllocationDBSource:
         project_usage = await self.get_project_usage(project_id, known_slot_types)
         domain_usage = await self.get_domain_usage(domain_name, known_slot_types)
 
+        # Always fetch RG data for effective calculation
+        rg_usage = await self.get_resource_group_usage(rg_name, known_slot_types)
+
         # Build list of assignable values for min computation
+        # Always include all scopes internally for accurate effective calculation
         assignable_sources = [
             keypair_usage.assignable,
+            project_usage.assignable,
             domain_usage.assignable,
+            rg_usage.free,
         ]
-        if group_resource_visibility:
-            assignable_sources.append(project_usage.assignable)
-
-        # Include resource group free slots if agents are not hidden
-        rg_usage: ResourceGroupUsageData | None = None
-        if not hide_agents or is_admin:
-            rg_usage = await self.get_resource_group_usage(rg_name, known_slot_types)
-            assignable_sources.append(rg_usage.free)
-
         effective_assignable = min_quantities(*assignable_sources)
 
+        # Apply visibility rules to breakdown only (not to effective calculation)
         return EffectiveAllocationData(
             assignable=effective_assignable,
             keypair=keypair_usage,
-            project=project_usage if group_resource_visibility else None,
+            project=project_usage if (group_resource_visibility or is_admin) else None,
             domain=domain_usage,
-            resource_group=rg_usage,
+            resource_group=rg_usage if (not hide_agents or is_admin) else None,
         )
 
     async def _get_resource_occupancy(
