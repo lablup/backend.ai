@@ -9,7 +9,7 @@ import shutil
 import tempfile
 import textwrap
 import uuid
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -957,6 +957,12 @@ def config_provider(
         "redis": {"addr": {"host": redis_addr.host, "port": redis_addr.port}},
     })
     return _TestConfigProvider(unified_config)
+
+
+@pytest.fixture()
+def config_provider_factory() -> Callable[[ManagerUnifiedConfig], ManagerConfigProvider]:
+    """Factory for creating _TestConfigProvider instances with custom configs."""
+    return _TestConfigProvider
 
 
 # ---------------------------------------------------------------------------

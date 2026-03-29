@@ -8,7 +8,7 @@ in the effective allocation response.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
@@ -63,6 +63,7 @@ if TYPE_CHECKING:
 
 def _make_config_provider(
     base_provider: ManagerConfigProvider,
+    factory: Callable[[ManagerUnifiedConfig], ManagerConfigProvider],
     *,
     hide_agents: bool = False,
     group_resource_visibility: bool = False,
@@ -71,6 +72,8 @@ def _make_config_provider(
 
     Copies the base config and patches the manager.hide_agents and
     api.resources.group_resource_visibility fields.
+    Uses the factory fixture (config_provider_factory) from conftest to create
+    a properly typed _TestConfigProvider instance.
     """
     base_config = base_provider.config
     config_dict = base_config.model_dump(mode="python")
@@ -85,8 +88,7 @@ def _make_config_provider(
         if config_dict.get("api") and config_dict["api"].get("resources"):
             config_dict["api"]["resources"]["group_resource_visibility"] = False
     new_config = ManagerUnifiedConfig.model_validate(config_dict)
-    # Use the same concrete class as the base provider (typically _TestConfigProvider)
-    return type(base_provider)(new_config)
+    return factory(new_config)
 
 
 def _build_registries(
@@ -119,8 +121,9 @@ class TestHideAgentsVisibility:
     def config_provider_hide_agents(
         self,
         config_provider: ManagerConfigProvider,
+        config_provider_factory: Callable[[ManagerUnifiedConfig], ManagerConfigProvider],
     ) -> ManagerConfigProvider:
-        return _make_config_provider(config_provider, hide_agents=True)
+        return _make_config_provider(config_provider, config_provider_factory, hide_agents=True)
 
     @pytest.fixture()
     def resource_allocation_processors_hide(
@@ -246,8 +249,11 @@ class TestGroupResourceVisibility:
     def config_provider_no_grv(
         self,
         config_provider: ManagerConfigProvider,
+        config_provider_factory: Callable[[ManagerUnifiedConfig], ManagerConfigProvider],
     ) -> ManagerConfigProvider:
-        return _make_config_provider(config_provider, group_resource_visibility=False)
+        return _make_config_provider(
+            config_provider, config_provider_factory, group_resource_visibility=False
+        )
 
     @pytest.fixture()
     def resource_allocation_processors_no_grv(
