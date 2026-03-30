@@ -6,9 +6,9 @@ from abc import ABC, abstractmethod
 from uuid import UUID
 
 from ai.backend.manager.data.deployment.types import (
+    DeploymentConfig,
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
-    ModelServiceDefinition,
 )
 
 
@@ -28,11 +28,11 @@ class RevisionGenerator(ABC):
         default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
-        Process draft revision by loading service definition and merging.
+        Process draft revision by loading deployment config and merging.
 
         Args:
             draft_revision: Draft model revision from API
-            vfolder_id: VFolder ID containing model and service definition
+            vfolder_id: VFolder ID containing model definition and deployment config
             default_architecture: Default architecture from scaling group agents
 
         Returns:
@@ -44,20 +44,20 @@ class RevisionGenerator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def load_service_definition(
+    async def load_deployment_config(
         self,
         vfolder_id: UUID,
         runtime_variant: str,
-    ) -> ModelServiceDefinition | None:
+    ) -> DeploymentConfig | None:
         """
-        Load service definition from vfolder.
+        Load deployment config from vfolder.
 
         Args:
-            vfolder_id: VFolder ID containing service definition
-            runtime_variant: Runtime variant to load definition for
+            vfolder_id: VFolder ID containing deployment config
+            runtime_variant: Runtime variant to load config for
 
         Returns:
-            Service definition if found, None otherwise
+            DeploymentConfig if found, None otherwise
         """
         raise NotImplementedError
 
@@ -65,15 +65,15 @@ class RevisionGenerator(ABC):
     def merge_revision(
         self,
         draft_revision: ModelRevisionSpecDraft,
-        service_definition: ModelServiceDefinition | None,
+        deployment_config: DeploymentConfig | None,
         default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
-        Merge draft revision with service definition.
+        Merge draft revision with deployment config.
 
         Args:
             draft_revision: Draft model revision from API
-            service_definition: Optional service definition from file
+            deployment_config: Optional deployment config from file
             default_architecture: Default architecture from scaling group agents
 
         Returns:

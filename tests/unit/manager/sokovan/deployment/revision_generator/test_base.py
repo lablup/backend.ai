@@ -12,12 +12,12 @@ import pytest
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
+    DeploymentConfig,
     ExecutionSpec,
     ImageEnvironment,
     ImageIdentifierDraft,
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
-    ModelServiceDefinition,
     MountMetadata,
     ResourceSpec,
     ResourceSpecDraft,
@@ -52,17 +52,17 @@ class _ExpectedResult:
 
 
 @dataclass
-class _LoadServiceDefinitionTestCase:
-    """Test case for load_service_definition."""
+class _LoadDeploymentConfigTestCase:
+    """Test case for load_deployment_config."""
 
     id: str
-    service_definition_dict: dict[str, Any]
+    deployment_config_dict: dict[str, Any]
     runtime_variant: str
     expected: _ExpectedResult
 
 
-class TestLoadServiceDefinition:
-    """Test load_service_definition method - Root level + Runtime variant merge."""
+class TestLoadDeploymentConfig:
+    """Test load_deployment_config method - Root level + Runtime variant merge."""
 
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
@@ -82,9 +82,9 @@ class TestLoadServiceDefinition:
     @pytest.mark.parametrize(
         "test_case",
         [
-            _LoadServiceDefinitionTestCase(
+            _LoadDeploymentConfigTestCase(
                 id="root_level_only",
-                service_definition_dict={
+                deployment_config_dict={
                     "environment": {
                         "image": "default-image:latest",
                         "architecture": "x86_64",
@@ -105,9 +105,9 @@ class TestLoadServiceDefinition:
                     environ={"MY_VAR": "default"},
                 ),
             ),
-            _LoadServiceDefinitionTestCase(
+            _LoadDeploymentConfigTestCase(
                 id="variant_section_only",
-                service_definition_dict={
+                deployment_config_dict={
                     "vllm": {
                         "environment": {
                             "image": "vllm-image:latest",
@@ -130,9 +130,9 @@ class TestLoadServiceDefinition:
                     environ={"VLLM_VAR": "vllm-value"},
                 ),
             ),
-            _LoadServiceDefinitionTestCase(
+            _LoadDeploymentConfigTestCase(
                 id="field_level_merge_partial_override",
-                service_definition_dict={
+                deployment_config_dict={
                     # Root level (base)
                     "environment": {
                         "image": "default-image:latest",
@@ -173,9 +173,9 @@ class TestLoadServiceDefinition:
                     resource_opts={"shmem": "32g"},  # from vllm
                 ),
             ),
-            _LoadServiceDefinitionTestCase(
+            _LoadDeploymentConfigTestCase(
                 id="other_variant_sections_filtered_out",
-                service_definition_dict={
+                deployment_config_dict={
                     # Root level
                     "environment": {
                         "image": "default-image:latest",
@@ -212,21 +212,21 @@ class TestLoadServiceDefinition:
         ],
         ids=lambda tc: tc.id,
     )
-    async def test_load_service_definition(
+    async def test_load_deployment_config(
         self,
-        test_case: _LoadServiceDefinitionTestCase,
+        test_case: _LoadDeploymentConfigTestCase,
         base_generator: BaseRevisionGenerator,
         mock_deployment_repository: MagicMock,
         vfolder_id: UUID,
     ) -> None:
-        """Test load_service_definition with various override scenarios."""
-        # Given: Service definition
-        mock_deployment_repository.fetch_service_definition = AsyncMock(
-            return_value=test_case.service_definition_dict
+        """Test load_deployment_config with various override scenarios."""
+        # Given: Deployment config
+        mock_deployment_repository.fetch_deployment_config = AsyncMock(
+            return_value=test_case.deployment_config_dict
         )
 
-        # When: Loading service definition
-        result = await base_generator.load_service_definition(
+        # When: Loading deployment config
+        result = await base_generator.load_deployment_config(
             vfolder_id=vfolder_id,
             runtime_variant=test_case.runtime_variant,
         )
@@ -240,18 +240,18 @@ class TestLoadServiceDefinition:
         assert result.environ == test_case.expected.environ
         assert result.resource_opts == test_case.expected.resource_opts
 
-    async def test_no_service_definition(
+    async def test_no_deployment_config(
         self,
         base_generator: BaseRevisionGenerator,
         mock_deployment_repository: MagicMock,
         vfolder_id: UUID,
     ) -> None:
-        """Test when service definition is None."""
-        # Given: No service definition
-        mock_deployment_repository.fetch_service_definition = AsyncMock(return_value=None)
+        """Test when deployment config is None."""
+        # Given: No deployment config
+        mock_deployment_repository.fetch_deployment_config = AsyncMock(return_value=None)
 
-        # When: Loading service definition
-        result = await base_generator.load_service_definition(
+        # When: Loading deployment config
+        result = await base_generator.load_deployment_config(
             vfolder_id=vfolder_id,
             runtime_variant="vllm",
         )
@@ -265,14 +265,14 @@ class _MergeRevisionTestCase:
     """Test case for merge_revision."""
 
     id: str
-    service_definition: ModelServiceDefinition | None
+    deployment_config: DeploymentConfig | None
     request: _RequestSpec
     expected: _ExpectedResult
     default_architecture: str | None = None
 
 
 class TestMergeRevision:
-    """Test merge_revision and _override_revision - Service definition + API request merge."""
+    """Test merge_revision and _override_revision - Deployment config + API request merge."""
 
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
@@ -298,8 +298,8 @@ class TestMergeRevision:
         "test_case",
         [
             _MergeRevisionTestCase(
-                id="no_service_definition_api_request_only",
-                service_definition=None,
+                id="no_deployment_config_api_request_only",
+                deployment_config=None,
                 request=_RequestSpec(
                     image="request-image:latest",
                     architecture="aarch64",
@@ -314,8 +314,8 @@ class TestMergeRevision:
                 ),
             ),
             _MergeRevisionTestCase(
-                id="service_definition_only_api_request_omits_optional_fields",
-                service_definition=ModelServiceDefinition(
+                id="deployment_config_only_api_request_omits_optional_fields",
+                deployment_config=DeploymentConfig(
                     environment=ImageEnvironment(
                         image="service-image:v1",
                         architecture="x86_64",
@@ -339,8 +339,8 @@ class TestMergeRevision:
                 ),
             ),
             _MergeRevisionTestCase(
-                id="field_level_override_api_request_overrides_service_definition",
-                service_definition=ModelServiceDefinition(
+                id="field_level_override_api_request_overrides_deployment_config",
+                deployment_config=DeploymentConfig(
                     environment=ImageEnvironment(
                         image="service-image:v1",
                         architecture="x86_64",
@@ -351,7 +351,7 @@ class TestMergeRevision:
                 ),
                 request=_RequestSpec(
                     image="request-image:latest",  # Override
-                    architecture=None,  # Use service definition
+                    architecture=None,  # Use deployment config
                     resource_slots={"cpu": 2},  # Override cpu only
                     environ={"REQUEST_VAR": "request-value"},  # Merge with service
                     resource_opts={"shmem": "32g"},  # Override shmem only
@@ -376,8 +376,8 @@ class TestMergeRevision:
             # default_architecture tests
             _MergeRevisionTestCase(
                 id="default_arch_used_when_no_service_def_env",
-                # No environment in service_definition means architecture comes from default
-                service_definition=ModelServiceDefinition(
+                # No environment in deployment_config means architecture comes from default
+                deployment_config=DeploymentConfig(
                     environment=None,  # No environment section
                     resource_slots={"cpu": 4, "mem": "8gb"},
                     environ=None,
@@ -398,10 +398,10 @@ class TestMergeRevision:
             ),
             _MergeRevisionTestCase(
                 id="service_def_overrides_default_arch",
-                service_definition=ModelServiceDefinition(
+                deployment_config=DeploymentConfig(
                     environment=ImageEnvironment(
                         image="service-image:v1",
-                        architecture="aarch64",  # Service definition has architecture
+                        architecture="aarch64",  # Deployment config has architecture
                     ),
                     resource_slots={"cpu": 4, "mem": "8gb"},
                     environ=None,
@@ -415,15 +415,15 @@ class TestMergeRevision:
                 default_architecture="x86_64",
                 expected=_ExpectedResult(
                     image="service-image:v1",
-                    architecture="aarch64",  # service def overrides default
+                    architecture="aarch64",  # deployment config overrides default
                     resource_slots={"cpu": 4, "mem": "8gb"},
                     environ=None,
                 ),
             ),
             _MergeRevisionTestCase(
                 id="request_overrides_default_arch",
-                # Use environment=None so service def doesn't provide architecture
-                service_definition=ModelServiceDefinition(
+                # Use environment=None so deployment config doesn't provide architecture
+                deployment_config=DeploymentConfig(
                     environment=None,
                     resource_slots={"cpu": 4, "mem": "8gb"},
                     environ=None,
@@ -444,10 +444,10 @@ class TestMergeRevision:
             ),
             _MergeRevisionTestCase(
                 id="request_overrides_all_including_default_and_service_def",
-                service_definition=ModelServiceDefinition(
+                deployment_config=DeploymentConfig(
                     environment=ImageEnvironment(
                         image="service-image:v1",
-                        architecture="arm64",  # Service definition has architecture
+                        architecture="arm64",  # Deployment config has architecture
                     ),
                     resource_slots={"cpu": 4, "mem": "8gb"},
                     environ=None,
@@ -461,14 +461,14 @@ class TestMergeRevision:
                 default_architecture="x86_64",
                 expected=_ExpectedResult(
                     image="service-image:v1",
-                    architecture="aarch64",  # request overrides both service def and default
+                    architecture="aarch64",  # request overrides both deployment config and default
                     resource_slots={"cpu": 4, "mem": "8gb"},
                     environ=None,
                 ),
             ),
             _MergeRevisionTestCase(
                 id="no_default_arch_uses_service_def",
-                service_definition=ModelServiceDefinition(
+                deployment_config=DeploymentConfig(
                     environment=ImageEnvironment(
                         image="service-image:v1",
                         architecture="x86_64",
@@ -485,7 +485,7 @@ class TestMergeRevision:
                 default_architecture=None,  # No default architecture
                 expected=_ExpectedResult(
                     image="service-image:v1",
-                    architecture="x86_64",  # from service def
+                    architecture="x86_64",  # from deployment config
                     resource_slots={"cpu": 4, "mem": "8gb"},
                     environ=None,
                 ),
@@ -524,7 +524,7 @@ class TestMergeRevision:
         # When: Merging (with optional default_architecture)
         result = base_generator.merge_revision(
             draft_revision,
-            test_case.service_definition,
+            test_case.deployment_config,
             test_case.default_architecture,
         )
 
@@ -541,7 +541,7 @@ class _CompletePipelineTestCase:
     """Test case for complete pipeline."""
 
     id: str
-    service_definition_dict: dict[str, Any]
+    deployment_config_dict: dict[str, Any]
     runtime_variant: str
     request: _RequestSpec
     expected: _ExpectedResult
@@ -572,7 +572,7 @@ class TestCompleteOverridePipeline:
         return MountMetadata(
             model_vfolder_id=vfolder_id,
             model_mount_destination="/models",
-            model_definition_path="service-definition.toml",
+            model_definition_path="deployment-config.yaml",
             extra_mounts=[],
         )
 
@@ -581,7 +581,7 @@ class TestCompleteOverridePipeline:
         [
             _CompletePipelineTestCase(
                 id="complete_pipeline_all_three_stages",
-                service_definition_dict={
+                deployment_config_dict={
                     # Root level (base)
                     "environment": {
                         "image": "default-image:latest",
@@ -616,7 +616,7 @@ class TestCompleteOverridePipeline:
                 runtime_variant="vllm",
                 request=_RequestSpec(
                     image="request-image:latest",  # Override vllm's image
-                    architecture=None,  # Use from service definition
+                    architecture=None,  # Use from deployment config
                     resource_slots={"cpu": 2},  # Override vllm's cpu again
                     environ={"REQUEST_VAR": "request-value"},
                     resource_opts={"shmem": "32g"},  # Override vllm's shmem
@@ -638,7 +638,7 @@ class TestCompleteOverridePipeline:
             ),
             _CompletePipelineTestCase(
                 id="verify_priority_order",
-                service_definition_dict={
+                deployment_config_dict={
                     # Root level
                     "environment": {
                         "image": "root-image:latest",
@@ -672,10 +672,10 @@ class TestCompleteOverridePipeline:
                 ),
             ),
             # default_architecture tests with complete pipeline
-            # Note: service_definition_dict must provide architecture since ImageEnvironment requires it
+            # Note: deployment_config_dict must provide architecture since ImageEnvironment requires it
             _CompletePipelineTestCase(
                 id="complete_pipeline_default_arch_overridden_by_service_def",
-                service_definition_dict={
+                deployment_config_dict={
                     # Root level
                     "environment": {
                         "image": "default-image:latest",
@@ -702,14 +702,14 @@ class TestCompleteOverridePipeline:
                 default_architecture="x86_64",
                 expected=_ExpectedResult(
                     image="default-image:latest",  # from root
-                    architecture="aarch64",  # from service def (overrides default)
+                    architecture="aarch64",  # from deployment config (overrides default)
                     resource_slots={"cpu": 8, "mem": "16gb"},  # cpu from vllm, mem from root
                     environ=None,
                 ),
             ),
             _CompletePipelineTestCase(
                 id="complete_pipeline_default_arch_overridden_by_request",
-                service_definition_dict={
+                deployment_config_dict={
                     # Root level
                     "environment": {
                         "image": "default-image:latest",
@@ -722,7 +722,7 @@ class TestCompleteOverridePipeline:
                 runtime_variant="vllm",
                 request=_RequestSpec(
                     image=None,
-                    architecture="arm64",  # Request overrides service def and default
+                    architecture="arm64",  # Request overrides deployment config and default
                     resource_slots=None,
                     environ=None,
                 ),
@@ -736,7 +736,7 @@ class TestCompleteOverridePipeline:
             ),
             _CompletePipelineTestCase(
                 id="complete_pipeline_full_priority_chain",
-                service_definition_dict={
+                deployment_config_dict={
                     # Root level
                     "environment": {
                         "image": "root-image:latest",
@@ -780,9 +780,9 @@ class TestCompleteOverridePipeline:
         base_mount_metadata: MountMetadata,
     ) -> None:
         """Test complete pipeline: Root → Variant → Request."""
-        # Given: Service definition
-        mock_deployment_repository.fetch_service_definition = AsyncMock(
-            return_value=test_case.service_definition_dict
+        # Given: Deployment config
+        mock_deployment_repository.fetch_deployment_config = AsyncMock(
+            return_value=test_case.deployment_config_dict
         )
 
         # And: API request
@@ -864,8 +864,8 @@ class TestDefinitionFileRequirement:
         """
         Test that non-CUSTOM runtime variants do NOT require model-definition.yaml
         """
-        # Given: Only service definition exists (no model definition)
-        mock_deployment_repository.fetch_service_definition = AsyncMock(
+        # Given: Only deployment config exists (no model definition)
+        mock_deployment_repository.fetch_deployment_config = AsyncMock(
             return_value={
                 "environment": {
                     "image": "test-image:latest",
@@ -909,21 +909,21 @@ class TestDefinitionFileRequirement:
 
         # Then: Should succeed without requiring model definition
         assert result is not None
-        # Then: Should have called fetch_service_definition (not fetch_model_definition)
-        mock_deployment_repository.fetch_service_definition.assert_called_once_with(vfolder_id)
+        # Then: Should have called fetch_deployment_config (not fetch_model_definition)
+        mock_deployment_repository.fetch_deployment_config.assert_called_once_with(vfolder_id)
 
-    async def test_non_custom_variants_work_without_service_definition(
+    async def test_non_custom_variants_work_without_deployment_config(
         self,
         base_generator: BaseRevisionGenerator,
         mock_deployment_repository: MagicMock,
         vfolder_id: UUID,
     ) -> None:
         """
-        Test that non-CUSTOM variants work even when service definition is missing.
-        Service definition is optional for all variants.
+        Test that non-CUSTOM variants work even when deployment config is missing.
+        Deployment config is optional for all variants.
         """
-        # Given: No service definition at all
-        mock_deployment_repository.fetch_service_definition = AsyncMock(return_value=None)
+        # Given: No deployment config at all
+        mock_deployment_repository.fetch_deployment_config = AsyncMock(return_value=None)
 
         # And: API request provides all required fields
         draft_revision = ModelRevisionSpecDraft(
@@ -1011,7 +1011,7 @@ class TestDefinitionFileRequirement:
         # When: Validating revision (should call fetch_model_definition)
         await custom_generator.validate_revision(revision)
 
-        # Then: Should call fetch_model_definition (not fetch_service_definition)
+        # Then: Should call fetch_model_definition (not fetch_deployment_config)
         mock_deployment_repository.fetch_model_definition.assert_called_once_with(
             vfolder_id=vfolder_id,
             model_definition_path=None,

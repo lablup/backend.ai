@@ -8,9 +8,9 @@ from uuid import UUID
 
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
+    DeploymentConfig,
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
-    ModelServiceDefinition,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.revision_generator.abc import RevisionGenerator
@@ -37,89 +37,87 @@ class BaseRevisionGenerator(RevisionGenerator):
         """
         Generate revision with common override logic and variant-specific validation.
         """
-        service_definition = await self.load_service_definition(
+        deployment_config = await self.load_deployment_config(
             vfolder_id=vfolder_id,
             runtime_variant=draft_revision.execution.runtime_variant.value,
         )
-        revision = self.merge_revision(draft_revision, service_definition, default_architecture)
+        revision = self.merge_revision(draft_revision, deployment_config, default_architecture)
         await self.validate_revision(revision)
 
         return revision
 
     @override
-    async def load_service_definition(
+    async def load_deployment_config(
         self,
         vfolder_id: UUID,
         runtime_variant: str,
-    ) -> ModelServiceDefinition | None:
+    ) -> DeploymentConfig | None:
         """
-        Load service definition from vfolder with field-level override.
+        Load deployment config from vfolder with field-level override.
 
         Override priority (later overrides earlier):
         1. Root level (base configuration)
         2. Runtime variant section (field-level override)
 
-        Example service-definition.toml:
-        ```toml
+        Example deployment-config.yaml:
+        ```yaml
         # Root level (default for all variants)
-        [environment]
-        image = "default-image:latest"
-        architecture = "x86_64"
+        environment:
+          image: "default-image:latest"
+          architecture: "x86_64"
 
-        [resource_slots]
-        cpu = 4
-        mem = "16gb"
+        resource_slots:
+          cpu: 4
+          mem: "16gb"
 
-        [environ]
-        MY_VAR = "default"
+        environ:
+          MY_VAR: "default"
 
-        [resource_opts]
-        shmem = "8g"
+        resource_opts:
+          shmem: "8g"
 
         # vllm variant (overrides specific fields only)
-        [vllm.environment]
-        image = "vllm-optimized:latest"
-
-        [vllm.resource_slots]
-        cpu = 8
-
-        [vllm.environ]
-        VLLM_SPECIFIC = "true"
-
-        [vllm.resource_opts]
-        shmem = "32g"
+        vllm:
+          environment:
+            image: "vllm-optimized:latest"
+          resource_slots:
+            cpu: 8
+          environ:
+            VLLM_SPECIFIC: "true"
+          resource_opts:
+            shmem: "32g"
         ```
         Result for vllm:
         - environment.image: "vllm-optimized:latest" (from vllm)
         - environment.architecture: "x86_64" (from root)
         - resource_slots.cpu: 8 (from vllm)
         - resource_slots.mem: "16gb" (from root)
-        - resource_opts.shmem: "32g" (from vllm)
+        - resource_opts.shmem: "32g" (from vllm variant)
         - environ: {MY_VAR: "default", VLLM_SPECIFIC: "true"} (merged)
         """
-        service_definition_dict = await self._deployment_repository.fetch_service_definition(
+        deployment_config_dict = await self._deployment_repository.fetch_deployment_config(
             vfolder_id
         )
-        if service_definition_dict is None:
+        if deployment_config_dict is None:
             return None
 
         all_variant_keys = {variant.value for variant in RuntimeVariant}
         root_level_dict = {
-            k: v for k, v in service_definition_dict.items() if k not in all_variant_keys
+            k: v for k, v in deployment_config_dict.items() if k not in all_variant_keys
         }
 
-        variant_overrides = service_definition_dict.get(runtime_variant, {})
+        variant_overrides = deployment_config_dict.get(runtime_variant, {})
 
         # Merge: root level + variant overrides (field-level)
-        merged_dict = self._merge_service_definition_dicts(root_level_dict, variant_overrides)
+        merged_dict = self._merge_deployment_config_dicts(root_level_dict, variant_overrides)
 
-        return ModelServiceDefinition.model_validate(merged_dict)
+        return DeploymentConfig.model_validate(merged_dict)
 
-    def _merge_service_definition_dicts(
+    def _merge_deployment_config_dicts(
         self, base: dict[str, Any], override: dict[str, Any]
     ) -> dict[str, Any]:
         """
-        Merge service definition dictionaries with field-level override.
+        Merge deployment config dictionaries with field-level override.
         Override takes precedence over base for each nested field.
 
         For nested dicts (environment, resource_slots, resource_opts, environ),
@@ -141,56 +139,54 @@ class BaseRevisionGenerator(RevisionGenerator):
     def merge_revision(
         self,
         draft_revision: ModelRevisionSpecDraft,
-        service_definition: ModelServiceDefinition | None,
+        deployment_config: DeploymentConfig | None,
         default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
-        Merge requested revision with service definition.
+        Merge requested revision with deployment config.
 
         Override priority (later overrides earlier):
         1. Default architecture from scaling group (lowest priority)
-        2. Root level service definition (base)
-        3. Runtime variant section in service definition
+        2. Root level deployment config (base)
+        3. Runtime variant section in deployment config
         4. API request (highest priority)
 
-        If service definition is None, creates an empty one to ensure
+        If deployment config is None, creates an empty one to ensure
         default_architecture and other common logic is applied consistently.
         """
-        effective_service_definition = service_definition or ModelServiceDefinition()
-        return self._override_revision(
-            draft_revision, effective_service_definition, default_architecture
-        )
+        effective_config = deployment_config or DeploymentConfig()
+        return self._override_revision(draft_revision, effective_config, default_architecture)
 
     def _override_revision(
         self,
         draft_revision: ModelRevisionSpecDraft,
-        service_definition: ModelServiceDefinition,
+        deployment_config: DeploymentConfig,
         default_architecture: str | None = None,
     ) -> ModelRevisionSpec:
         """
-        Merge service definition and API request with field-level override.
-        API request takes precedence over service definition for each field.
+        Merge deployment config and API request with field-level override.
+        API request takes precedence over deployment config for each field.
 
         Override priority (later overrides earlier):
         1. Default architecture from scaling group (lowest priority)
-        2. Service definition (already merged from root + variant)
+        2. Deployment config (already merged from root + variant)
         3. API request (field-level override, highest priority)
         """
-        service_dict: dict[str, Any] = {}
-        if service_definition.environment is not None:
-            service_dict["environment"] = {
-                "image": service_definition.environment.image,
-                "architecture": service_definition.environment.architecture,
+        config_dict: dict[str, Any] = {}
+        if deployment_config.environment is not None:
+            config_dict["environment"] = {
+                "image": deployment_config.environment.image,
+                "architecture": deployment_config.environment.architecture,
             }
 
-        if service_definition.resource_slots is not None:
-            service_dict["resource_slots"] = service_definition.resource_slots
+        if deployment_config.resource_slots is not None:
+            config_dict["resource_slots"] = deployment_config.resource_slots
 
-        if service_definition.environ is not None:
-            service_dict["environ"] = service_definition.environ
+        if deployment_config.environ is not None:
+            config_dict["environ"] = deployment_config.environ
 
-        if service_definition.resource_opts is not None:
-            service_dict["resource_opts"] = service_definition.resource_opts
+        if deployment_config.resource_opts is not None:
+            config_dict["resource_opts"] = deployment_config.resource_opts
 
         request_dict = draft_revision.model_dump(mode="python")
         merged_dict: dict[str, Any] = {
@@ -211,11 +207,11 @@ class BaseRevisionGenerator(RevisionGenerator):
         if default_architecture is not None:
             merged_dict["image_identifier"]["architecture"] = default_architecture
 
-        # 2. Service definition overrides default
-        if "environment" in service_dict:
-            merged_dict["image_identifier"]["canonical"] = service_dict["environment"]["image"]
-            if service_dict["environment"]["architecture"] is not None:
-                merged_dict["image_identifier"]["architecture"] = service_dict["environment"][
+        # 2. Deployment config overrides default
+        if "environment" in config_dict:
+            merged_dict["image_identifier"]["canonical"] = config_dict["environment"]["image"]
+            if config_dict["environment"]["architecture"] is not None:
+                merged_dict["image_identifier"]["architecture"] = config_dict["environment"][
                     "architecture"
                 ]
 
@@ -229,8 +225,8 @@ class BaseRevisionGenerator(RevisionGenerator):
                 "architecture"
             ]
 
-        if "resource_slots" in service_dict:
-            merged_dict["resource_spec"]["resource_slots"] = service_dict["resource_slots"]
+        if "resource_slots" in config_dict:
+            merged_dict["resource_spec"]["resource_slots"] = config_dict["resource_slots"]
 
         if request_dict["resource_spec"]["resource_slots"] is not None:
             # Field-level merge for resource_slots
@@ -238,19 +234,19 @@ class BaseRevisionGenerator(RevisionGenerator):
             request_slots = request_dict["resource_spec"]["resource_slots"]
             merged_dict["resource_spec"]["resource_slots"] = {**base_slots, **request_slots}
 
-        # Merge resource_opts: service definition as base, request overrides field-level
-        if "resource_opts" in service_dict:
-            merged_dict["resource_spec"]["resource_opts"] = service_dict["resource_opts"]
+        # Merge resource_opts: deployment config as base, request overrides field-level
+        if "resource_opts" in config_dict:
+            merged_dict["resource_spec"]["resource_opts"] = config_dict["resource_opts"]
 
         if request_dict["resource_spec"]["resource_opts"] is not None:
             base_opts = merged_dict["resource_spec"].get("resource_opts") or {}
             request_opts = request_dict["resource_spec"]["resource_opts"]
             merged_dict["resource_spec"]["resource_opts"] = {**base_opts, **request_opts}
 
-        # Merge environ: service definition as base, request overrides
-        service_environ = service_dict.get("environ", {})
+        # Merge environ: deployment config as base, request overrides
+        config_environ = config_dict.get("environ", {})
         request_environ = request_dict["execution"].get("environ") or {}
-        merged_environ = {**service_environ, **request_environ}
+        merged_environ = {**config_environ, **request_environ}
         merged_dict["execution"]["environ"] = merged_environ if merged_environ else None
 
         return ModelRevisionSpec.model_validate(merged_dict)

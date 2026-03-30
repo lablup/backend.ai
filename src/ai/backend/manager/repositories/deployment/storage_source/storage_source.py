@@ -1,12 +1,18 @@
 """Storage source implementation for deployment repository."""
 
+import logging
+from typing import Any, cast
+
 import tomli
+from ruamel.yaml import YAML
 
 from ai.backend.common.types import VFolderID
-from ai.backend.manager.data.deployment.types import ModelServiceDefinition
+from ai.backend.manager.data.deployment.types import DeploymentConfig
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.models.storage import StorageSessionManager
+
+log = logging.getLogger(__name__)
 
 
 class DeploymentStorageSource:
@@ -17,18 +23,21 @@ class DeploymentStorageSource:
     def __init__(self, storage_manager: StorageSessionManager) -> None:
         self._storage_manager = storage_manager
 
-    async def fetch_service_config(
+    async def fetch_deployment_config(
         self,
         model_vfolder: VFolderLocation,
-    ) -> ModelServiceDefinition | None:
+    ) -> DeploymentConfig | None:
         """
-        Fetch and parse service-definition.toml from model vfolder.
+        Fetch and parse deployment config from model vfolder.
+
+        Tries ``deployment-config.yaml`` first. Falls back to the legacy
+        ``service-definition.toml`` for backward compatibility.
 
         Args:
             model_vfolder: The model vfolder location information
 
         Returns:
-            Parsed service definition as ModelServiceDefinition, or None if not found
+            Parsed deployment config as DeploymentConfig, or None if not found
         """
         try:
             vfid = VFolderID(model_vfolder.quota_scope_id, model_vfolder.id)
@@ -37,19 +46,37 @@ class DeploymentStorageSource:
             proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host)
             manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
 
+            # Try deployment-config.yaml first (new format)
+            try:
+                chunks = await manager_client.fetch_file_content(
+                    volume_name,
+                    str(vfid),
+                    "./deployment-config.yaml",
+                )
+                if chunks:
+                    yaml = YAML()
+                    parsed: dict[str, Any] = cast(dict[str, Any], yaml.load(chunks))
+                    return DeploymentConfig(**parsed)
+            except Exception:
+                pass
+
+            # Fall back to legacy service-definition.toml
             chunks = await manager_client.fetch_file_content(
                 volume_name,
                 str(vfid),
                 "./service-definition.toml",
             )
-
             if chunks:
                 raw_content = chunks.decode("utf-8")
                 parsed_toml = tomli.loads(raw_content)
-                return ModelServiceDefinition(**parsed_toml)
+                log.info(
+                    "Found legacy service-definition.toml in vfolder %s. "
+                    "Please rename it to deployment-config.yaml.",
+                    vfid,
+                )
+                return DeploymentConfig(**parsed_toml)
 
         except Exception:
-            # Service definition file not found or parse error
             pass
 
         return None

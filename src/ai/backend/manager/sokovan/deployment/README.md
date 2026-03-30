@@ -74,7 +74,7 @@ DeploymentCoordinator acts as the top-level orchestrator of deployment lifecycle
 
 ### DeploymentController
 
-DeploymentController performs the actual control logic for deployments. It handles basic CRUD operations such as creating, updating, and deleting deployments, and manages the replica count for each deployment. It automatically generates final revision spec tailored to deployment types (vLLM, TGI, SGLang, etc.) with deployment user request, service-definition toml file, and applies configured auto-scaling policies to deployments.
+DeploymentController performs the actual control logic for deployments. It handles basic CRUD operations such as creating, updating, and deleting deployments, and manages the replica count for each deployment. It automatically generates final revision spec tailored to deployment types (vLLM, TGI, SGLang, etc.) with deployment user request, deployment-config.yaml file, and applies configured auto-scaling policies to deployments.
 
 **Key Methods:**
 - `create_deployment()`: Creates a new deployment
@@ -92,8 +92,8 @@ DeploymentController performs the actual control logic for deployments. It handl
 3. Select Revision Generator based on runtime variant
    ↓
 4. Generate final deployment creator
-   ├─ Load service definition from vfolder (if exists)
-   ├─ Merge service definition with API request
+   ├─ Load deployment config from vfolder (if exists)
+   ├─ Merge deployment config with API request
    └─ Validate the final revision
    ↓
 5. Validate session specification with SchedulingController
@@ -143,41 +143,39 @@ Service definitions are TOML files stored in model vfolders that provide default
 3. API request parameters (highest priority, explicit user input)
 ```
 
-**Service Definition Structure:**
+**Deployment Config Structure:**
 
-```toml
-# service-definition.toml
+```yaml
+# deployment-config.yaml
 
 # Root level - Default configuration for all variants
-[environment]
-image = "default-inference:latest"
-architecture = "x86_64"
+environment:
+  image: "default-inference:latest"
+  architecture: "x86_64"
 
-[resource_slots]
-cpu = 4
-mem = "16gb"
-gpu = 1
+resource_slots:
+  cpu: 4
+  mem: "16gb"
+  gpu: 1
 
-[environ]
-LOG_LEVEL = "INFO"
-MAX_BATCH_SIZE = "32"
+environ:
+  LOG_LEVEL: "INFO"
+  MAX_BATCH_SIZE: "32"
 
-[resource_opts]
-shmem = "8g"
+resource_opts:
+  shmem: "8g"
 
 # vLLM variant - Overrides specific fields only
-[vllm.environment]
-image = "vllm-optimized:0.4.0"
-
-[vllm.resource_slots]
-cpu = 8
-gpu = 2
-
-[vllm.environ]
-VLLM_GPU_MEMORY_UTILIZATION = "0.95"
-
-[vllm.resource_opts]
-shmem = "32g"
+vllm:
+  environment:
+    image: "vllm-optimized:0.4.0"
+  resource_slots:
+    cpu: 8
+    gpu: 2
+  environ:
+    VLLM_GPU_MEMORY_UTILIZATION: "0.95"
+  resource_opts:
+    shmem: "32g"
 ```
 
 **Override Resolution Example:**
@@ -196,10 +194,10 @@ If the API request specifies `resource_slots.gpu = 4`, the final value will be `
 **Revision Generation Process:**
 
 ```
-1. Load service-definition.toml from vfolder (if exists)
+1. Load deployment-config.yaml from vfolder (if exists)
    ↓
-2. Merge service definition with API request (draft revision)
-   ├─ Service definition provides defaults
+2. Merge deployment config with API request (draft revision)
+   ├─ Deployment config provides defaults
    └─ API request overrides specific fields
    ↓
 3. Validate final ModelRevisionSpec

@@ -472,17 +472,20 @@ class DeploymentRepository:
         return cast(dict[str, Any], yaml.load(model_definition_bytes))
 
     @deployment_repository_resilience.apply()
-    async def fetch_service_definition(
+    async def fetch_deployment_config(
         self,
         vfolder_id: uuid.UUID,
     ) -> dict[str, Any] | None:
         """
-        Fetch service definition file from model vfolder.
+        Fetch deployment config file from model vfolder.
+
+        Tries ``deployment-config.yaml`` first. Falls back to the legacy
+        ``service-definition.toml`` for backward compatibility.
 
         Args:
             vfolder_id: ID of the model vfolder
         Returns:
-            dict: Parsed service definition content
+            dict: Parsed deployment config content, or None if not found
         """
         vfolder_location = await self._db_source.get_vfolder_by_id(vfolder_id)
         if vfolder_location.ownership_type == VFolderOwnershipType.GROUP:
@@ -490,19 +493,32 @@ class DeploymentRepository:
                 "Cannot create model service with the project type's vfolder"
             )
 
-        # Read service definition from storage
-        service_definition_content: dict[str, Any] | None = None
+        # Try deployment-config.yaml first (new format)
         try:
-            service_definition_bytes = await self._storage_source.fetch_definition_file(
+            yaml_bytes = await self._storage_source.fetch_definition_file(
+                vfolder_location,
+                ["deployment-config.yaml"],
+            )
+            yaml = YAML()
+            return cast(dict[str, Any], yaml.load(yaml_bytes))
+        except DefinitionFileNotFound:
+            pass
+
+        # Fall back to legacy service-definition.toml
+        try:
+            toml_bytes = await self._storage_source.fetch_definition_file(
                 vfolder_location,
                 ["service-definition.toml"],
             )
-            service_definition_content = tomli.loads(service_definition_bytes.decode("utf-8"))
+            log.info(
+                "Found legacy service-definition.toml in vfolder {}. "
+                "Please rename it to deployment-config.yaml.",
+                vfolder_id,
+            )
+            return tomli.loads(toml_bytes.decode("utf-8"))
         except DefinitionFileNotFound:
-            # Service definition is optional
-            pass
-
-        return service_definition_content
+            # Deployment config is optional
+            return None
 
     @deployment_repository_resilience.apply()
     async def fetch_definition_files(
@@ -511,23 +527,23 @@ class DeploymentRepository:
         model_definition_path: str | None,
     ) -> DefinitionFiles:
         """
-        Fetch definition files(Both service and model definitions) from model vfolder.
+        Fetch definition files(Both deployment config and model definition) from model vfolder.
 
         Args:
             vfolder_id: ID of the model vfolder
             definition_path: Path to the definition file
         Returns:
-            DefinitionFiles: Contains service definition and model definition bytes
+            DefinitionFiles: Contains deployment config and model definition bytes
         """
         model_definition_content: dict[str, Any] = await self.fetch_model_definition(
             vfolder_id, model_definition_path
         )
-        service_definition_content: dict[str, Any] | None = await self.fetch_service_definition(
+        deployment_config_content: dict[str, Any] | None = await self.fetch_deployment_config(
             vfolder_id
         )
 
         return DefinitionFiles(
-            service_definition=service_definition_content,
+            deployment_config=deployment_config_content,
             model_definition=model_definition_content,
         )
 

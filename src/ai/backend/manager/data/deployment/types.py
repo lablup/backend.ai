@@ -60,7 +60,7 @@ class ImageEnvironment(BaseModel):
     )
 
 
-class ModelServiceDefinition(BaseModel):
+class DeploymentConfig(BaseModel):
     environment: ImageEnvironment | None = Field(
         default=None,
         description="""
@@ -440,7 +440,7 @@ class ScaleOutDecision:
 
 @dataclass
 class DefinitionFiles:
-    service_definition: dict[str, Any] | None
+    deployment_config: dict[str, Any] | None
     model_definition: dict[str, Any]
 
 
