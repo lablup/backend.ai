@@ -649,17 +649,17 @@ class GroupDBSource:
         Deletes both the business N:N mapping (association_groups_users) and
         RBAC scope associations (AssociationScopesEntitiesRow) atomically.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_session_read_committed() as session:
             # Fetch users that are actually associated before removing
             actual_assoc_query = (
                 sa.select(UserRow)
                 .join(
-                    association_groups_users,
-                    UserRow.uuid == association_groups_users.c.user_id,
+                    AssocGroupUserRow,
+                    UserRow.uuid == AssocGroupUserRow.user_id,
                 )
                 .where(
-                    (association_groups_users.c.user_id.in_(unbinder.user_uuids))
-                    & (association_groups_users.c.group_id == unbinder.project_id),
+                    AssocGroupUserRow.user_id.in_(unbinder.user_uuids)
+                    & (AssocGroupUserRow.group_id == unbinder.project_id),
                 )
             )
             result = await session.scalars(actual_assoc_query)
