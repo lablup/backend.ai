@@ -35,9 +35,9 @@ class DomainBasicInfo(BaseModel):
         default=None,
         description="Optional description of the domain.",
     )
-    integration_id: str | None = Field(
+    integration_name: str | None = Field(
         default=None,
-        description="External system integration identifier.",
+        description="External system integration name.",
     )
 
 

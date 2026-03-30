@@ -68,7 +68,7 @@ _SAMPLE_DOMAIN_DTO: dict[str, Any] = {
     "total_resource_slots": {},
     "allowed_vfolder_hosts": {},
     "allowed_docker_registries": [],
-    "integration_id": None,
+    "integration_name": None,
 }
 
 

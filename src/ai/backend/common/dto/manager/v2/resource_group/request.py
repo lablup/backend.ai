@@ -54,9 +54,9 @@ class CreateResourceGroupInput(BaseRequestModel):
         default=None,
         description="Allowed vfolder host permissions for the resource group.",
     )
-    integration_id: str | None = Field(
+    integration_name: str | None = Field(
         default=None,
-        description="External integration ID associated with this resource group.",
+        description="External integration name associated with this resource group.",
     )
     resource_policy: str | None = Field(
         default=None,
@@ -101,10 +101,10 @@ class UpdateResourceGroupInput(BaseRequestModel):
             "Use SENTINEL to clear, null to keep existing value."
         ),
     )
-    integration_id: str | Sentinel | None = Field(
+    integration_name: str | Sentinel | None = Field(
         default=SENTINEL,
         description=(
-            "Updated external integration ID. Use SENTINEL to clear, null to keep existing value."
+            "Updated external integration name. Use SENTINEL to clear, null to keep existing value."
         ),
     )
     resource_policy: str | Sentinel | None = Field(

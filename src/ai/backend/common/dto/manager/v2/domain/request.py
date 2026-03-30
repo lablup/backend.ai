@@ -48,9 +48,9 @@ class CreateDomainInput(BaseRequestModel):
         default=None,
         description="List of allowed Docker registry URLs for this domain.",
     )
-    integration_id: str | None = Field(
+    integration_name: str | None = Field(
         default=None,
-        description="External integration identifier for the domain.",
+        description="External integration name for the domain.",
     )
 
 
@@ -74,9 +74,9 @@ class UpdateDomainInput(BaseRequestModel):
         default=SENTINEL,
         description="New list of allowed Docker registry URLs. Set to null to clear.",
     )
-    integration_id: str | Sentinel | None = Field(
+    integration_name: str | Sentinel | None = Field(
         default=SENTINEL,
-        description="New external integration identifier. Set to null to clear.",
+        description="New external integration name. Set to null to clear.",
     )
 
 
