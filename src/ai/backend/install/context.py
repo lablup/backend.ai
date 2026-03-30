@@ -957,6 +957,60 @@ class Context(metaclass=ABCMeta):
         with worker_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
+        # TCP Worker
+        tcp_worker_conf = self.copy_config("app-proxy-worker-tcp.toml")
+        with tcp_worker_conf.open("r") as fp:
+            data = tomlkit.load(fp)
+            redis_addr_table = tomlkit.inline_table()
+            redis_addr_table["host"] = halfstack.redis_addr.face.host
+            redis_addr_table["port"] = halfstack.redis_addr.face.port
+            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
+
+            data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
+                f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
+            )
+
+            api_bind_addr_table = tomlkit.inline_table()
+            api_bind_addr_table["host"] = service.appproxy_tcp_worker_addr.bind.host
+            api_bind_addr_table["port"] = service.appproxy_tcp_worker_addr.bind.port
+            data["proxy_worker"]["api_bind_addr"] = api_bind_addr_table  # type: ignore[index]
+
+            api_advertised_addr_table = tomlkit.inline_table()
+            api_advertised_addr_table["host"] = public_facing_address
+            api_advertised_addr_table["port"] = service.appproxy_tcp_worker_addr.bind.port
+            data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+
+            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
+            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
+            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+
+            if tls_advertised:
+                data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
+
+            data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
+
+            if frontend_mode == FrontendMode.WILDCARD:
+                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
+                    del data["proxy_worker"]["port_proxy"]
+                api_advertised_addr_table = tomlkit.inline_table()
+                api_advertised_addr_table["host"] = app_address
+                api_advertised_addr_table["port"] = advertised_port
+                data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+                if wildcard_domain:
+                    wildcard_table = tomlkit.table()
+                    wildcard_table["domain"] = wildcard_domain
+                    bind_addr_table = tomlkit.inline_table()
+                    bind_addr_table["host"] = "0.0.0.0"
+                    bind_addr_table["port"] = 10550
+                    wildcard_table["bind_addr"] = bind_addr_table
+                    wildcard_table["advertised_port"] = advertised_port
+                    wildcard_table.add(tomlkit.nl())
+                    data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
+            else:
+                data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
+        with tcp_worker_conf.open("w") as fp:
+            tomlkit.dump(data, fp)
+
         # Alembic migration config
         alembic_cfg = self.copy_config("alembic-appproxy.ini")
         self.sed_in_place_multi(
@@ -1245,6 +1299,7 @@ class DevContext(Context):
             appproxy_permit_hash_secret=secrets.token_hex(32),
             appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
             appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
+            appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
         )
 
         return InstallInfo(

@@ -199,6 +199,9 @@ class ServiceConfig:
     appproxy_worker_addr: ServerAddr = dataclasses.field(
         default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10201))
     )
+    appproxy_tcp_worker_addr: ServerAddr = dataclasses.field(
+        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10202))
+    )
 
 
 @dataclasses.dataclass
