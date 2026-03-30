@@ -1,4 +1,4 @@
-"""VFolderV2 GraphQL nested types for structured field groups."""
+"""VFolder GraphQL nested types for structured field groups."""
 
 from __future__ import annotations
 

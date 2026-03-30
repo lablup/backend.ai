@@ -1,4 +1,4 @@
-"""VFolderV2 GraphQL types package."""
+"""VFolder GraphQL types package."""
 
 from .enum import (
     VFolderMountPermissionGQL,
@@ -7,19 +7,17 @@ from .enum import (
     VFolderUsageModeGQL,
 )
 from .filters import (
-    VFolderV2FilterGQL,
-    VFolderV2OperationStatusFilterGQL,
-    VFolderV2OperationStatusGQL,
-    VFolderV2OrderByGQL,
-    VFolderV2OrderFieldGQL,
-    VFolderV2UsageModeFilterGQL,
-    VFolderV2UsageModeGQL,
+    VFolderFilterGQL,
+    VFolderOperationStatusFilterGQL,
+    VFolderOrderByGQL,
+    VFolderOrderFieldGQL,
+    VFolderUsageModeFilterGQL,
 )
 from .nested import (
     VFolderAccessControlInfoGQL,
     VFolderMetadataInfoGQL,
 )
-from .node import VFolderV2Connection, VFolderV2Edge, VFolderV2GQL
+from .node import VFolderConnection, VFolderEdge, VFolderGQL
 
 __all__ = [
     # Enum types
@@ -27,20 +25,18 @@ __all__ = [
     "VFolderMountPermissionGQL",
     "VFolderOwnershipTypeGQL",
     "VFolderOperationStatusGQL",
-    "VFolderV2OperationStatusGQL",
-    "VFolderV2UsageModeGQL",
     # Enum filters
-    "VFolderV2OperationStatusFilterGQL",
-    "VFolderV2UsageModeFilterGQL",
+    "VFolderOperationStatusFilterGQL",
+    "VFolderUsageModeFilterGQL",
     # Filter and OrderBy
-    "VFolderV2FilterGQL",
-    "VFolderV2OrderByGQL",
-    "VFolderV2OrderFieldGQL",
+    "VFolderFilterGQL",
+    "VFolderOrderByGQL",
+    "VFolderOrderFieldGQL",
     # Nested types
     "VFolderMetadataInfoGQL",
     "VFolderAccessControlInfoGQL",
     # Node types
-    "VFolderV2GQL",
-    "VFolderV2Edge",
-    "VFolderV2Connection",
+    "VFolderGQL",
+    "VFolderEdge",
+    "VFolderConnection",
 ]

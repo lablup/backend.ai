@@ -40,8 +40,8 @@ __all__ = (
     "ShareVFolderInput",
     "UnshareVFolderInput",
     "UpdateVFolderInput",
-    "VFolderV2Filter",
-    "VFolderV2Order",
+    "VFolderFilter",
+    "VFolderOrder",
 )
 
 
@@ -246,7 +246,7 @@ class DeleteInvitationInput(BaseRequestModel):
 # ============================================================
 
 
-class VFolderV2Filter(BaseRequestModel):
+class VFolderFilter(BaseRequestModel):
     """Filter criteria for searching virtual folders."""
 
     name: StringFilter | None = Field(default=None, description="Filter by vfolder name.")
@@ -258,15 +258,15 @@ class VFolderV2Filter(BaseRequestModel):
         default=None, description="Filter by usage mode."
     )
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
-    AND: list[VFolderV2Filter] | None = Field(default=None, description="AND logical combinator.")
-    OR: list[VFolderV2Filter] | None = Field(default=None, description="OR logical combinator.")
-    NOT: list[VFolderV2Filter] | None = Field(default=None, description="NOT logical combinator.")
+    AND: list[VFolderFilter] | None = Field(default=None, description="AND logical combinator.")
+    OR: list[VFolderFilter] | None = Field(default=None, description="OR logical combinator.")
+    NOT: list[VFolderFilter] | None = Field(default=None, description="NOT logical combinator.")
 
 
-VFolderV2Filter.model_rebuild()
+VFolderFilter.model_rebuild()
 
 
-class VFolderV2Order(BaseRequestModel):
+class VFolderOrder(BaseRequestModel):
     """Order specification for virtual folder search results."""
 
     field: VFolderOrderField

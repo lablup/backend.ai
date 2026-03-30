@@ -21,8 +21,8 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     ShareVFolderInput,
     UnshareVFolderInput,
     UpdateVFolderInput,
-    VFolderV2Filter,
-    VFolderV2Order,
+    VFolderFilter,
+    VFolderOrder,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     CloneVFolderPayload,
@@ -94,8 +94,8 @@ __all__ = (
     "ShareVFolderInput",
     "UnshareVFolderInput",
     "UpdateVFolderInput",
-    "VFolderV2Filter",
-    "VFolderV2Order",
+    "VFolderFilter",
+    "VFolderOrder",
     # Node and Payload models (response)
     "CloneVFolderPayload",
     "CreateDownloadSessionPayload",

@@ -1,4 +1,4 @@
-"""VFolderV2 GraphQL enum types."""
+"""VFolder GraphQL enum types."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""VFolderV2 GraphQL Node, Edge, and Connection types."""
+"""VFolder GraphQL Node, Edge, and Connection types."""
 
 from __future__ import annotations
 
@@ -42,9 +42,9 @@ from .nested import (
             "and usage (storage statistics). Owner and creator are resolved as Node references."
         ),
     ),
-    name="VFolderV2",
+    name="VFolder",
 )
-class VFolderV2GQL(PydanticNodeMixin[VFolderNode]):
+class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     """Virtual folder entity with structured field groups."""
 
     id: NodeID[str] = gql_field(description="Unique identifier of the virtual folder.")
@@ -117,14 +117,14 @@ class VFolderV2GQL(PydanticNodeMixin[VFolderNode]):
         info: None = None,
         node_ids: Iterable[str] | None = None,
         required: bool = False,
-    ) -> Iterable[VFolderV2GQL | None]:
+    ) -> Iterable[VFolderGQL | None]:
         # Stub: returns None for each requested ID until a data loader is wired in.
         if node_ids is None:
             return []
         return [None for _ in node_ids]
 
 
-VFolderV2Edge = Edge[VFolderV2GQL]
+VFolderEdge = Edge[VFolderGQL]
 
 
 @gql_connection_type(
@@ -138,7 +138,7 @@ VFolderV2Edge = Edge[VFolderV2GQL]
         ),
     )
 )
-class VFolderV2Connection(Connection[VFolderV2GQL]):
+class VFolderConnection(Connection[VFolderGQL]):
     """Paginated connection for virtual folder records."""
 
     count: int = gql_field(

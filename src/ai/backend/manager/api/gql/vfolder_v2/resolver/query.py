@@ -1,4 +1,4 @@
-"""VFolderV2 GraphQL query resolvers."""
+"""VFolder GraphQL query resolvers."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types import (
-    VFolderV2Connection,
+    VFolderConnection,
 )
 
 
@@ -33,10 +33,10 @@ async def project_vfolders_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> VFolderV2Connection:
+) -> VFolderConnection:
     """List virtual folders within a specific project."""
     # Stub: returns empty connection until adapter is wired.
-    return VFolderV2Connection(
+    return VFolderConnection(
         edges=[],
         page_info=PageInfo(
             has_next_page=False,

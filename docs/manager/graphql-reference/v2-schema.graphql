@@ -6906,7 +6906,7 @@ type Query {
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2!
 
   """Added in UNRELEASED. List virtual folders within a specific project."""
-  projectVfoldersV2(projectId: UUID!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderV2Connection!
+  projectVfoldersV2(projectId: UUID!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
 }
 
 """
@@ -10556,7 +10556,7 @@ enum VFolderUsageMode {
 """
 Added in UNRELEASED. Virtual folder entity with structured field groups. Provides comprehensive vfolder information organized into logical categories: metadata (descriptive), permission (access control), and usage (storage statistics). Owner and creator are resolved as Node references.
 """
-type VFolderV2 implements Node {
+type VFolder implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
@@ -10594,24 +10594,24 @@ type VFolderV2 implements Node {
 """
 Added in UNRELEASED. Paginated connection for virtual folder records. Provides relay-style cursor-based pagination for efficient traversal of vfolder data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
 """
-type VFolderV2Connection {
+type VFolderConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
 
   """Contains the nodes in this connection"""
-  edges: [VFolderV2Edge!]!
+  edges: [VFolderEdge!]!
 
   """Total number of virtual folder records matching the query criteria."""
   count: Int!
 }
 
 """An edge in a connection."""
-type VFolderV2Edge {
+type VFolderEdge {
   """A cursor for use in pagination"""
   cursor: String!
 
   """The item at the end of the edge"""
-  node: VFolderV2!
+  node: VFolder!
 }
 
 """Added in 24.09.0. Input for validate notification channel mutation"""

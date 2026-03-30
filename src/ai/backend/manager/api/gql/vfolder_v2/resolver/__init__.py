@@ -1,4 +1,4 @@
-"""VFolderV2 GraphQL resolver package."""
+"""VFolder GraphQL resolver package."""
 
 from .query import project_vfolders_v2
 
