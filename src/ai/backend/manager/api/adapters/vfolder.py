@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
@@ -20,6 +21,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import BinarySize, VFolderUsageMode
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.vfolder.types import (
@@ -45,8 +47,12 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     AdminSearchVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
+    SearchUserVFoldersAction,
 )
 
 from .base import BaseAdapter
@@ -127,6 +133,41 @@ class VFolderAdapter(BaseAdapter):
             await self._processors.vfolder_admin.admin_search_vfolders.wait_for_complete(
                 AdminSearchVFoldersAction(querier=querier)
             )
+        )
+        return SearchVFoldersPayload(
+            items=[self._vfolder_data_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def my_search(
+        self,
+        input: SearchVFoldersInput,
+    ) -> SearchVFoldersPayload:
+        """Search vfolders accessible to the current user.
+
+        Calls current_user() internally -- the caller does not need to pass scope.
+        """
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        scope = UserVFolderSearchScope(user_id=me.user_id)
+        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
+        orders = self._convert_vfolder_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_VFOLDER_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.vfolder.search_user_vfolders.wait_for_complete(
+            SearchUserVFoldersAction(scope=scope, querier=querier)
         )
         return SearchVFoldersPayload(
             items=[self._vfolder_data_to_node(item) for item in action_result.data],
