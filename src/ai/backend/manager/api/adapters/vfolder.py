@@ -6,12 +6,12 @@ from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.request import (
-    AdminSearchVFoldersInput,
+    SearchVFoldersInput,
     VFolderFilter,
     VFolderOrder,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
-    AdminSearchVFoldersPayload,
+    SearchVFoldersPayload,
     VFolderNode,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
@@ -109,8 +109,8 @@ class VFolderAdapter(BaseAdapter):
 
     async def admin_search(
         self,
-        input: AdminSearchVFoldersInput,
-    ) -> AdminSearchVFoldersPayload:
+        input: SearchVFoldersInput,
+    ) -> SearchVFoldersPayload:
         """Admin search for VFolders with system scope."""
         conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
         orders = self._convert_vfolder_orders(input.order) if input.order else []
@@ -130,7 +130,7 @@ class VFolderAdapter(BaseAdapter):
                 AdminSearchVFoldersAction(querier=querier)
             )
         )
-        return AdminSearchVFoldersPayload(
+        return SearchVFoldersPayload(
             items=[self._vfolder_data_to_node(item) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,

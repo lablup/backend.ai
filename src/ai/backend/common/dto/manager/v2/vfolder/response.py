@@ -22,7 +22,6 @@ from .types import (
 )
 
 __all__ = (
-    "AdminSearchVFoldersPayload",
     "CloneVFolderPayload",
     "CreateDownloadSessionPayload",
     "CreateUploadSessionPayload",
@@ -41,6 +40,7 @@ __all__ = (
     "VFolderCompactNode",
     "VFolderInvitationNode",
     "VFolderNode",
+    "SearchVFoldersPayload",
 )
 
 
@@ -212,8 +212,8 @@ class UnshareVFolderPayload(BaseResponseModel):
 # ============================================================
 
 
-class AdminSearchVFoldersPayload(BaseResponseModel):
-    """Payload for admin search of vfolders."""
+class SearchVFoldersPayload(BaseResponseModel):
+    """Payload for vfolder search (shared by admin and scoped searches)."""
 
     items: list[VFolderNode] = Field(description="List of vfolder nodes.")
     total_count: int = Field(description="Total number of records matching the filter.")

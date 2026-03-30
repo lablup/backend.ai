@@ -23,7 +23,7 @@ from .types import (
 
 __all__ = (
     "AcceptInvitationInput",
-    "AdminSearchVFoldersInput",
+    "SearchVFoldersInput",
     "CloneVFolderInput",
     "CreateDownloadSessionInput",
     "CreateUploadSessionInput",
@@ -274,8 +274,8 @@ class VFolderOrder(BaseRequestModel):
     direction: OrderDirection
 
 
-class AdminSearchVFoldersInput(BaseRequestModel):
-    """Input for admin search of vfolders with cursor and offset pagination."""
+class SearchVFoldersInput(BaseRequestModel):
+    """Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches)."""
 
     filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")
     order: list[VFolderOrder] | None = Field(default=None, description="Order specifications.")

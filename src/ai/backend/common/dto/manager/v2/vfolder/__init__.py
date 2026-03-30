@@ -4,7 +4,6 @@ VFolder DTOs v2 for Manager API.
 
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     AcceptInvitationInput,
-    AdminSearchVFoldersInput,
     CloneVFolderInput,
     CreateDownloadSessionInput,
     CreateUploadSessionInput,
@@ -19,6 +18,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderInput,
     RenameFileInput,
     RestoreVFolderInput,
+    SearchVFoldersInput,
     ShareVFolderInput,
     UnshareVFolderInput,
     UpdateVFolderInput,
@@ -26,7 +26,6 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     VFolderOrder,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
-    AdminSearchVFoldersPayload,
     CloneVFolderPayload,
     CreateDownloadSessionPayload,
     CreateUploadSessionPayload,
@@ -39,6 +38,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     MkdirPayload,
     PurgeVFolderPayload,
     RestoreVFolderPayload,
+    SearchVFoldersPayload,
     ShareVFolderPayload,
     UnshareVFolderPayload,
     UpdateVFolderPayload,
@@ -79,7 +79,7 @@ __all__ = (
     "VFolderUsageModeFilter",
     # Input models (request)
     "AcceptInvitationInput",
-    "AdminSearchVFoldersInput",
+    "SearchVFoldersInput",
     "CloneVFolderInput",
     "CreateDownloadSessionInput",
     "CreateUploadSessionInput",
@@ -100,7 +100,7 @@ __all__ = (
     "VFolderFilter",
     "VFolderOrder",
     # Node and Payload models (response)
-    "AdminSearchVFoldersPayload",
+    "SearchVFoldersPayload",
     "CloneVFolderPayload",
     "CreateDownloadSessionPayload",
     "CreateUploadSessionPayload",
