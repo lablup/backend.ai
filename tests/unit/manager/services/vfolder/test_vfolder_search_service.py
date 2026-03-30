@@ -1,5 +1,5 @@
 """
-Tests for VFolderService.admin_search_vfolders() functionality.
+Tests for VFolderAdminService.admin_search_vfolders() functionality.
 Verifies that service methods correctly delegate to the repository and map results.
 """
 
@@ -20,31 +20,27 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderSearchResult,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     AdminSearchVFoldersAction,
     AdminSearchVFoldersActionResult,
 )
-from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
 
 
-class TestVFolderServiceAdminSearchVFolders:
-    """Tests for VFolderService.admin_search_vfolders()"""
-
-    @pytest.fixture
-    def mock_vfolder_repository(self) -> MagicMock:
-        return MagicMock(spec=VfolderRepository)
+class TestVFolderAdminServiceAdminSearchVFolders:
+    """Tests for VFolderAdminService.admin_search_vfolders()"""
 
     @pytest.fixture
-    def vfolder_service(self, mock_vfolder_repository: MagicMock) -> VFolderService:
-        return VFolderService(
-            config_provider=MagicMock(),
-            etcd=MagicMock(),
-            storage_manager=MagicMock(),
-            background_task_manager=MagicMock(),
-            vfolder_repository=mock_vfolder_repository,
-            user_repository=MagicMock(),
-            valkey_stat_client=MagicMock(),
+    def mock_vfolder_admin_repository(self) -> MagicMock:
+        return MagicMock(spec=VFolderAdminRepository)
+
+    @pytest.fixture
+    def vfolder_admin_service(
+        self, mock_vfolder_admin_repository: MagicMock
+    ) -> VFolderAdminService:
+        return VFolderAdminService(
+            vfolder_admin_repository=mock_vfolder_admin_repository,
         )
 
     @pytest.fixture
@@ -103,13 +99,13 @@ class TestVFolderServiceAdminSearchVFolders:
 
     async def test_admin_search_vfolders_delegates_to_repository(
         self,
-        vfolder_service: VFolderService,
-        mock_vfolder_repository: MagicMock,
+        vfolder_admin_service: VFolderAdminService,
+        mock_vfolder_admin_repository: MagicMock,
         vfolder_1: VFolderData,
         vfolder_2: VFolderData,
     ) -> None:
         """admin_search_vfolders delegates to repository and maps result correctly."""
-        mock_vfolder_repository.search_vfolders = AsyncMock(
+        mock_vfolder_admin_repository.search_vfolders = AsyncMock(
             return_value=VFolderSearchResult(
                 items=[vfolder_1, vfolder_2],
                 total_count=2,
@@ -120,11 +116,11 @@ class TestVFolderServiceAdminSearchVFolders:
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = AdminSearchVFoldersAction(querier=querier)
 
-        result = await vfolder_service.admin_search_vfolders(action)
+        result = await vfolder_admin_service.admin_search_vfolders(action)
 
         assert isinstance(result, AdminSearchVFoldersActionResult)
         assert result.data == [vfolder_1, vfolder_2]
         assert result.total_count == 2
         assert result.has_next_page is False
         assert result.has_previous_page is False
-        mock_vfolder_repository.search_vfolders.assert_called_once_with(querier=querier)
+        mock_vfolder_admin_repository.search_vfolders.assert_called_once_with(querier=querier)
