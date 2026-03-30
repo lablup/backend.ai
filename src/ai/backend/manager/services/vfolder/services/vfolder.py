@@ -67,10 +67,6 @@ from ai.backend.manager.models.vfolder import (
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
-from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
-    AdminSearchVFoldersAction,
-    AdminSearchVFoldersActionResult,
-)
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
@@ -539,18 +535,6 @@ class VFolderService:
         result = await self._vfolder_repository.search_in_project(action.querier, action.scope)
         return SearchVFoldersInProjectActionResult(
             project_id=action.scope.project_id,
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def admin_search_vfolders(
-        self, action: AdminSearchVFoldersAction
-    ) -> AdminSearchVFoldersActionResult:
-        """Search all vfolders without scope restriction (admin-only)."""
-        result = await self._vfolder_repository.search_vfolders(querier=action.querier)
-        return AdminSearchVFoldersActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
