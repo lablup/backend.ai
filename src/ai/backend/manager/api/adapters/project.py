@@ -233,7 +233,7 @@ class ProjectAdapter(BaseAdapter):
         self, project_id: UUID, input: UnassignUsersFromProjectInput
     ) -> UnassignUsersFromProjectPayload:
         """Unassign users from a project."""
-        result = await self._processors.group.unassign_users.wait_for_complete(
+        result = await self._processors.group.unassign_users_from_project.wait_for_complete(
             UnassignUsersFromProjectAction(
                 unbinder=UserProjectEntityUnbinder(
                     user_uuids=input.user_ids, project_id=project_id
@@ -241,8 +241,7 @@ class ProjectAdapter(BaseAdapter):
             )
         )
         return UnassignUsersFromProjectPayload(
-            unassigned=True,
-            users=[
+            items=[
                 UserAdapter._user_data_to_node(user_data) for user_data in result.unassigned_users
             ],
         )

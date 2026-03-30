@@ -147,7 +147,6 @@ class UnassignUsersFromProjectInputGQL(PydanticInputMixin[UnassignUsersFromProje
 class UnassignUsersFromProjectPayloadGQL(PydanticOutputMixin[UnassignUsersFromProjectPayloadDTO]):
     """Payload for user unassignment from project."""
 
-    unassigned: bool = gql_field(description="Whether the unassignment was successful.")
-    users: list[UserV2GQL] = gql_field(
+    items: list[UserV2GQL] = gql_field(
         description="List of users that were unassigned from the project."
     )

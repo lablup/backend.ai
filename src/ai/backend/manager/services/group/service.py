@@ -111,10 +111,10 @@ class GroupService:
         await self._group_repository.purge_group(action.group_id)
         return PurgeGroupActionResult(group_id=action.group_id)
 
-    async def unassign_users(
+    async def unassign_users_from_project(
         self, action: UnassignUsersFromProjectAction
     ) -> UnassignUsersFromProjectActionResult:
-        unassigned_users = await self._group_repository.unassign_users(action.unbinder)
+        unassigned_users = await self._group_repository.unassign_users_from_project(action.unbinder)
         return UnassignUsersFromProjectActionResult(
             project_id=action.unbinder.project_id, unassigned_users=unassigned_users
         )

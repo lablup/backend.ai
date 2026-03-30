@@ -9248,11 +9248,8 @@ input UnassignUsersFromProjectInputGQL {
 
 """Added in UNRELEASED. Payload for user unassignment from project."""
 type UnassignUsersFromProjectPayloadGQL {
-  """Whether the unassignment was successful."""
-  unassigned: Boolean!
-
   """List of users that were unassigned from the project."""
-  users: [UserV2!]!
+  items: [UserV2!]!
 }
 
 """Added in 25.15.0. Input type for unregistering a storage namespace."""

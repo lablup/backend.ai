@@ -1,4 +1,4 @@
-"""Tests for GroupDBSource.unassign_users()"""
+"""Tests for GroupDBSource.unassign_users_from_project()"""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ from ai.backend.testutils.db import with_tables
 
 
 class TestUnassignUsersFromProject:
-    """Tests for GroupDBSource.unassign_users"""
+    """Tests for GroupDBSource.unassign_users_from_project"""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -240,7 +240,7 @@ class TestUnassignUsersFromProject:
             user_uuids=assigned_users,
             project_id=test_project,
         )
-        result = await group_db_source.unassign_users(unbinder)
+        result = await group_db_source.unassign_users_from_project(unbinder)
 
         assert len(result) == 3
         result_uuids = {u.uuid for u in result}
@@ -270,7 +270,7 @@ class TestUnassignUsersFromProject:
             user_uuids=fake_ids,
             project_id=test_project,
         )
-        result = await group_db_source.unassign_users(unbinder)
+        result = await group_db_source.unassign_users_from_project(unbinder)
 
         assert result == []
 

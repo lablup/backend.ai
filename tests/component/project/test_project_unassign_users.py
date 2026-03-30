@@ -32,8 +32,7 @@ class TestUnassignUsersFromProject:
             UnassignUsersFromProjectInput(user_ids=assigned_users),
         )
 
-        assert result.unassigned is True
-        returned_ids = {u.id for u in result.users}
+        returned_ids = {u.id for u in result.items}
         assert returned_ids == set(assigned_users)
 
         # Verify rows removed from association_groups_users
@@ -66,8 +65,7 @@ class TestUnassignUsersFromProject:
             UnassignUsersFromProjectInput(user_ids=fake_ids),
         )
 
-        assert result.unassigned is True
-        assert result.users == []
+        assert result.items == []
 
     async def test_unassign_partial_users(
         self,
@@ -86,8 +84,7 @@ class TestUnassignUsersFromProject:
             UnassignUsersFromProjectInput(user_ids=mixed_ids),
         )
 
-        assert result.unassigned is True
-        returned_ids = {u.id for u in result.users}
+        returned_ids = {u.id for u in result.items}
         assert returned_ids == {assigned_users[0]}
 
         # The other assigned users should still be in the association

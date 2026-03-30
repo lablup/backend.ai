@@ -68,7 +68,7 @@ class GroupProcessors(AbstractProcessorPackage):
     assign_users_to_project: SingleEntityActionProcessor[
         AssignUsersToProjectAction, AssignUsersToProjectActionResult
     ]
-    unassign_users: SingleEntityActionProcessor[
+    unassign_users_from_project: SingleEntityActionProcessor[
         UnassignUsersFromProjectAction, UnassignUsersFromProjectActionResult
     ]
 
@@ -109,8 +109,10 @@ class GroupProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=rbac_single_entity_validators,
         )
-        self.unassign_users = SingleEntityActionProcessor(
-            group_service.unassign_users, action_monitors, validators=rbac_single_entity_validators
+        self.unassign_users_from_project = SingleEntityActionProcessor(
+            group_service.unassign_users_from_project,
+            action_monitors,
+            validators=rbac_single_entity_validators,
         )
 
     @override

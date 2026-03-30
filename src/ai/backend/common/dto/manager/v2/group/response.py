@@ -181,9 +181,6 @@ class AdminSearchGroupsPayload(BaseResponseModel):
 class UnassignUsersFromProjectPayload(BaseResponseModel):
     """Payload for user unassignment from project."""
 
-    unassigned: bool = Field(
-        description="Whether the unassignment was successful.",
-    )
-    users: list[UserNode] = Field(
+    items: list[UserNode] = Field(
         description="List of users that were unassigned from the project.",
     )

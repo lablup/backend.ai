@@ -643,7 +643,9 @@ class GroupDBSource:
 
             return [row.to_data() for row in new_user_rows]
 
-    async def unassign_users(self, unbinder: UserProjectEntityUnbinder) -> list[UserData]:
+    async def unassign_users_from_project(
+        self, unbinder: UserProjectEntityUnbinder
+    ) -> list[UserData]:
         """Remove users from a project and return the unassigned users' data.
 
         Deletes both the business N:N mapping (association_groups_users) and
