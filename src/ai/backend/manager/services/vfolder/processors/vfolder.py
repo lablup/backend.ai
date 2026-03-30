@@ -6,10 +6,6 @@ from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
-    AdminSearchVFoldersAction,
-    AdminSearchVFoldersActionResult,
-)
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
@@ -75,9 +71,6 @@ class VFolderProcessors(AbstractProcessorPackage):
     create_vfolder: ScopeActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
     get_vfolder: SingleEntityActionProcessor[GetVFolderAction, GetVFolderActionResult]
     list_vfolder: ScopeActionProcessor[ListVFolderAction, ListVFolderActionResult]
-    admin_search_vfolders: ActionProcessor[
-        AdminSearchVFoldersAction, AdminSearchVFoldersActionResult
-    ]
     search_vfolders_in_project: ScopeActionProcessor[
         SearchVFoldersInProjectAction, SearchVFoldersInProjectActionResult
     ]
@@ -166,9 +159,6 @@ class VFolderProcessors(AbstractProcessorPackage):
             service.clone, action_monitors, validators=single_entity_rbac_validators
         )
 
-        # Admin search (no RBAC scope)
-        self.admin_search_vfolders = ActionProcessor(service.admin_search_vfolders, action_monitors)
-
         # Actions without RBAC validation (internal/legacy/storage ops)
         self.get_task_logs = SingleEntityActionProcessor(service.get_task_logs, action_monitors)
         self.list_allowed_types = ActionProcessor(service.list_allowed_types, action_monitors)
@@ -198,7 +188,6 @@ class VFolderProcessors(AbstractProcessorPackage):
             CreateVFolderAction.spec(),
             GetVFolderAction.spec(),
             ListVFolderAction.spec(),
-            AdminSearchVFoldersAction.spec(),
             SearchVFoldersInProjectAction.spec(),
             UpdateVFolderAttributeAction.spec(),
             MoveToTrashVFolderAction.spec(),
