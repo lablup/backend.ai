@@ -9,9 +9,12 @@ from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
 from ai.backend.manager.api.adapters.deployment import DeploymentAdapter
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    ModelConfigData,
+    ModelDefinitionData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
+    ModelServiceConfigData,
     ResourceConfigData,
 )
 
@@ -39,18 +42,22 @@ class TestRevisionDataToDTO:
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
             ),
-            model_definition={
-                "models": [
-                    {
-                        "name": "demo-model",
-                        "model_path": "/models/demo",
-                        "service": {
-                            "start_command": "python serve.py",
-                            "port": 8000,
-                        },
-                    }
-                ]
-            },
+            model_definition=ModelDefinitionData(
+                models=[
+                    ModelConfigData(
+                        name="demo-model",
+                        model_path="/models/demo",
+                        service=ModelServiceConfigData(
+                            start_command="python serve.py",
+                            port=8000,
+                            pre_start_actions=[],
+                            shell="/bin/bash",
+                            health_check=None,
+                        ),
+                        metadata=None,
+                    ),
+                ],
+            ),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             image_id=uuid4(),
             extra_vfolder_mounts=[],
