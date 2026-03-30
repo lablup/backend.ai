@@ -8036,7 +8036,9 @@ input RoleStatusFilter {
   notIn: [RoleStatus!] = null
 }
 
-"""Added in 25.19.0. Configuration for rolling update strategy."""
+"""
+Added in 25.19.0. Configuration for rolling update strategy. Defaults: max_surge=50%, max_unavailable=0%.
+"""
 input RollingUpdateConfigInput {
   maxSurge: IntOrPercentInput
   maxUnavailable: IntOrPercentInput

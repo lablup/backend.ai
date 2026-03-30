@@ -149,7 +149,7 @@ class DeploymentPolicyGQL(PydanticNodeMixin[DeploymentPolicyNodeDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Configuration for rolling update strategy.",
+        description="Configuration for rolling update strategy. Defaults: max_surge=50%, max_unavailable=0%.",
         added_version="25.19.0",
     ),
     name="RollingUpdateConfigInput",

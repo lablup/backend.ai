@@ -33,6 +33,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
 from ai.backend.common.types import AutoScalingMetricSource, ClusterMode, RuntimeVariant
+from ai.backend.common.utils import dedent_strip
 
 __all__ = (
     "AccessTokenFilter",
@@ -254,7 +255,11 @@ class RollingUpdateConfigInput(BaseRequestModel):
 
     max_surge: IntOrPercent = Field(
         default_factory=lambda: IntOrPercent(percent=0.5),
-        description="Maximum number of extra replicas that can be created during a rolling update.",
+        description=dedent_strip("""
+            Maximum number of extra replicas that can be created
+            during a rolling update.
+            Defaults to 50% of desired replicas.
+        """),
         examples=[
             {"count": 2},
             {"percent": 0.25},
@@ -262,7 +267,11 @@ class RollingUpdateConfigInput(BaseRequestModel):
     )
     max_unavailable: IntOrPercent = Field(
         default_factory=lambda: IntOrPercent(percent=0.0),
-        description="Maximum number of replicas that can be unavailable during a rolling update.",
+        description=dedent_strip("""
+            Maximum number of replicas that can be unavailable
+            during a rolling update.
+            Defaults to 0%.
+        """),
         examples=[
             {"count": 0},
             {"percent": 0.0},
