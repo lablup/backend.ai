@@ -82,6 +82,15 @@ class ModelServiceDefinition(BaseModel):
             {"cpu": 1, "mem": "2gb"},
         ],
     )
+    resource_opts: dict[str, Any] | None = Field(
+        default=None,
+        description="""
+        Resource options for the model service session (e.g., shmem).
+        """,
+        examples=[
+            {"shmem": "16g"},
+        ],
+    )
     environ: dict[str, str] | None = Field(
         default=None,
         description="""

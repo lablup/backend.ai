@@ -250,7 +250,7 @@ class ModelServingService:
                 cluster_mode=action.creator.cluster_mode,
                 cluster_size=action.creator.cluster_size,
                 resource_slots=action.creator.config.resources,
-                resource_opts=None,
+                resource_opts=action.creator.config.resource_opts,
             ),
             mounts=MountMetadata(
                 model_vfolder_id=model_vfolder_id,
@@ -268,6 +268,8 @@ class ModelServingService:
         action.creator = action.creator.with_revision(revision)
 
         creation_config = action.creator.config.to_dict()
+        # Override resource_opts with merged values from service-definition.toml + API request
+        creation_config["resource_opts"] = dict(revision.resource_spec.resource_opts or {})
         creation_config["mounts"] = [
             model_vfolder_id,
             *[m.vfid.folder_id for m in service_prepare_ctx.extra_mounts],
@@ -482,7 +484,7 @@ class ModelServingService:
                 cluster_mode=action.cluster_mode,
                 cluster_size=action.cluster_size,
                 resource_slots=action.config.resources,
-                resource_opts=None,
+                resource_opts=action.config.resource_opts,
             ),
             mounts=MountMetadata(
                 model_vfolder_id=model_vfolder_id,

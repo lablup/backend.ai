@@ -73,6 +73,9 @@ class BaseRevisionGenerator(RevisionGenerator):
         [environ]
         MY_VAR = "default"
 
+        [resource_opts]
+        shmem = "8g"
+
         # vllm variant (overrides specific fields only)
         [vllm.environment]
         image = "vllm-optimized:latest"
@@ -82,12 +85,16 @@ class BaseRevisionGenerator(RevisionGenerator):
 
         [vllm.environ]
         VLLM_SPECIFIC = "true"
+
+        [vllm.resource_opts]
+        shmem = "32g"
         ```
         Result for vllm:
         - environment.image: "vllm-optimized:latest" (from vllm)
         - environment.architecture: "x86_64" (from root)
         - resource_slots.cpu: 8 (from vllm)
         - resource_slots.mem: "16gb" (from root)
+        - resource_opts.shmem: "32g" (from vllm)
         - environ: {MY_VAR: "default", VLLM_SPECIFIC: "true"} (merged)
         """
         service_definition_dict = await self._deployment_repository.fetch_service_definition(
@@ -115,7 +122,7 @@ class BaseRevisionGenerator(RevisionGenerator):
         Merge service definition dictionaries with field-level override.
         Override takes precedence over base for each nested field.
 
-        For nested dicts (environment, resource_slots, environ),
+        For nested dicts (environment, resource_slots, resource_opts, environ),
         merge field by field rather than replacing the entire dict.
         """
         merged = base.copy()
@@ -182,6 +189,9 @@ class BaseRevisionGenerator(RevisionGenerator):
         if service_definition.environ is not None:
             service_dict["environ"] = service_definition.environ
 
+        if service_definition.resource_opts is not None:
+            service_dict["resource_opts"] = service_definition.resource_opts
+
         request_dict = draft_revision.model_dump(mode="python")
         merged_dict: dict[str, Any] = {
             "image_identifier": {},
@@ -227,6 +237,15 @@ class BaseRevisionGenerator(RevisionGenerator):
             base_slots = merged_dict["resource_spec"].get("resource_slots", {})
             request_slots = request_dict["resource_spec"]["resource_slots"]
             merged_dict["resource_spec"]["resource_slots"] = {**base_slots, **request_slots}
+
+        # Merge resource_opts: service definition as base, request overrides field-level
+        if "resource_opts" in service_dict:
+            merged_dict["resource_spec"]["resource_opts"] = service_dict["resource_opts"]
+
+        if request_dict["resource_spec"]["resource_opts"] is not None:
+            base_opts = merged_dict["resource_spec"].get("resource_opts") or {}
+            request_opts = request_dict["resource_spec"]["resource_opts"]
+            merged_dict["resource_spec"]["resource_opts"] = {**base_opts, **request_opts}
 
         # Merge environ: service definition as base, request overrides
         service_environ = service_dict.get("environ", {})

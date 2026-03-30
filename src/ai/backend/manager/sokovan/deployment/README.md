@@ -162,6 +162,9 @@ gpu = 1
 LOG_LEVEL = "INFO"
 MAX_BATCH_SIZE = "32"
 
+[resource_opts]
+shmem = "8g"
+
 # vLLM variant - Overrides specific fields only
 [vllm.environment]
 image = "vllm-optimized:0.4.0"
@@ -172,6 +175,9 @@ gpu = 2
 
 [vllm.environ]
 VLLM_GPU_MEMORY_UTILIZATION = "0.95"
+
+[vllm.resource_opts]
+shmem = "32g"
 ```
 
 **Override Resolution Example:**
@@ -182,6 +188,7 @@ For a vLLM deployment, the final configuration merges:
 - `resource_slots.cpu`: `8` (from vllm variant)
 - `resource_slots.mem`: `"16gb"` (from root, not overridden)
 - `resource_slots.gpu`: `2` (from vllm variant)
+- `resource_opts.shmem`: `"32g"` (from vllm variant)
 - `environ`: `{LOG_LEVEL: "INFO", MAX_BATCH_SIZE: "32", VLLM_GPU_MEMORY_UTILIZATION: "0.95"}` (merged)
 
 If the API request specifies `resource_slots.gpu = 4`, the final value will be `4` (API request overrides all).
