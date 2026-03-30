@@ -103,9 +103,7 @@ class BaseQuotaModel(AbstractQuotaModel):
                 lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
             )
         except FileExistsError as e:
-            raise QuotaScopeAlreadyExists(
-                f"Quota scope '{quota_scope_id}' already exists"
-            ) from e
+            raise QuotaScopeAlreadyExists(f"Quota scope '{quota_scope_id}' already exists") from e
 
     async def describe_quota_scope(
         self,
@@ -168,9 +166,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
                 lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
             )
         except FileExistsError as e:
-            raise QuotaScopeAlreadyExists(
-                f"Quota scope '{quota_scope_id}' already exists"
-            ) from e
+            raise QuotaScopeAlreadyExists(f"Quota scope '{quota_scope_id}' already exists") from e
         # TODO: setgid impl.
 
     async def describe_quota_scope(
