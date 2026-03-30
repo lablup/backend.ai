@@ -18,6 +18,17 @@ from .rbac import (
     RBACRequiredPermission,
     build_operation_description,
 )
+from .rbac_model_deployment import (
+    ModelDeploymentCreateRBACAction,
+    ModelDeploymentGetRBACAction,
+    ModelDeploymentGrantAllRBACAction,
+    ModelDeploymentGrantHardDeleteRBACAction,
+    ModelDeploymentGrantReadRBACAction,
+    ModelDeploymentGrantUpdateRBACAction,
+    ModelDeploymentHardDeleteRBACAction,
+    ModelDeploymentSearchRBACAction,
+    ModelDeploymentUpdateRBACAction,
+)
 from .rbac_session import (
     SessionCreateRBACAction,
     SessionGetRBACAction,
@@ -31,6 +42,15 @@ from .rbac_session import (
 )
 
 RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
+    ModelDeploymentCreateRBACAction,
+    ModelDeploymentGetRBACAction,
+    ModelDeploymentSearchRBACAction,
+    ModelDeploymentUpdateRBACAction,
+    ModelDeploymentHardDeleteRBACAction,
+    ModelDeploymentGrantAllRBACAction,
+    ModelDeploymentGrantReadRBACAction,
+    ModelDeploymentGrantUpdateRBACAction,
+    ModelDeploymentGrantHardDeleteRBACAction,
     SessionCreateRBACAction,
     SessionGetRBACAction,
     SessionSearchRBACAction,
