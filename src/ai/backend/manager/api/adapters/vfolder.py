@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
@@ -136,14 +134,6 @@ class VFolderAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
-
-    async def get(self, vfolder_id: UUID) -> VFolderNode:
-        """Retrieve a single VFolder by ID."""
-        raise NotImplementedError
-
-    async def my_search(self) -> object:
-        """Self-service search for VFolders using current user context."""
-        raise NotImplementedError
 
     # -------------------------------------------------------------------------
     # Filter / Order conversion
