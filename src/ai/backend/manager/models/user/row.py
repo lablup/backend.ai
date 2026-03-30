@@ -404,15 +404,13 @@ class UserRow(Base):  # type: ignore[misc]
             email=self.email,
         )
 
-    def to_data(self) -> UserData:
-        groups: list[UserGroupMembership] = []
-        if "groups" not in sa.inspect(self).unloaded:
-            groups = [
-                UserGroupMembership(id=assoc.group.id, name=assoc.group.name)
-                for assoc in self.groups
-                if assoc.group is not None
-            ]
-
+    def to_data(
+        self,
+        *,
+        groups: list[UserGroupMembership] | None = None,
+    ) -> UserData:
+        if groups is None:
+            groups = []
         return UserData(
             id=self.uuid,
             uuid=self.uuid,

@@ -31,6 +31,7 @@ from ai.backend.manager.data.user.types import (
     BulkUserUpdateResultData,
     UserCreateResultData,
     UserData,
+    UserGroupMembership,
     UserSearchResult,
 )
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
@@ -143,7 +144,12 @@ class UserDBSource:
                     .load_only(GroupRow.id, GroupRow.name),
                 ],
             )
-            return user_row.to_data()
+            group_memberships = [
+                UserGroupMembership(id=assoc.group.id, name=assoc.group.name)
+                for assoc in user_row.groups
+                if assoc.group is not None
+            ]
+            return user_row.to_data(groups=group_memberships)
 
     async def get_by_email_validated(
         self,
