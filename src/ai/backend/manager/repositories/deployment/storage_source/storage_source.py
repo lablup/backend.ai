@@ -1,6 +1,5 @@
 """Storage source implementation for deployment repository."""
 
-import logging
 from typing import Any, cast
 
 import tomli
@@ -11,8 +10,6 @@ from ai.backend.manager.data.deployment.types import DeploymentConfig
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.models.storage import StorageSessionManager
-
-log = logging.getLogger(__name__)
 
 
 class DeploymentStorageSource:
@@ -69,11 +66,6 @@ class DeploymentStorageSource:
             if chunks:
                 raw_content = chunks.decode("utf-8")
                 parsed_toml = tomli.loads(raw_content)
-                log.info(
-                    "Found legacy service-definition.toml in vfolder %s. "
-                    "Please rename it to deployment-config.yaml.",
-                    vfid,
-                )
                 return DeploymentConfig(**parsed_toml)
 
         except Exception:
