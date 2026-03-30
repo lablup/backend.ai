@@ -9,6 +9,8 @@ This test suite covers:
 
 from __future__ import annotations
 
+import urllib.parse
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -136,29 +138,42 @@ class TestDownloadArchiveHandler:
         return ctx
 
     @pytest.fixture
-    def mock_query_param(
+    def make_query(
         self,
         secret: str,
+    ) -> Callable[..., MagicMock]:
+        """Factory that creates a mock QueryParam with JWT token from given token data."""
+
+        def _make(token_data: ArchiveDownloadTokenData) -> MagicMock:
+            payload = token_data.model_dump(mode="json")
+            payload["exp"] = int(token_data.exp.timestamp())
+            token = jwt.encode(payload, secret, algorithm="HS256")
+            query = MagicMock()
+            query.parsed.token = token
+            return query
+
+        return _make
+
+    @pytest.fixture
+    def mock_query_param(
+        self,
         token_data: ArchiveDownloadTokenData,
+        make_query: Callable[..., MagicMock],
     ) -> MagicMock:
-        """Create mock QueryParam with JWT token."""
-        # Encode JWT from Pydantic model (convert datetime to Unix timestamp)
-        payload = token_data.model_dump(mode="json")
-        payload["exp"] = int(token_data.exp.timestamp())
-        token = jwt.encode(payload, secret, algorithm="HS256")
+        """Create mock QueryParam with JWT token from default token_data."""
+        return make_query(token_data)
 
-        # Mock query param
-        query = MagicMock()
-        query.parsed.token = token
-
-        return query
+    @pytest.fixture
+    def download_handler(self, secret: str) -> DownloadHandler:
+        """Create a DownloadHandler instance."""
+        return DownloadHandler(secret=secret)
 
     async def test_handler_decodes_jwt_and_uses_paths(
         self,
         mock_context: MagicMock,
         mock_query_param: MagicMock,
         token_data: ArchiveDownloadTokenData,
-        secret: str,
+        download_handler: DownloadHandler,
         tmp_path: Path,
     ) -> None:
         """
@@ -176,10 +191,8 @@ class TestDownloadArchiveHandler:
         dir1.mkdir()
         (dir1 / "file2.txt").write_text("content2")
 
-        # Create handler and call download_archive (undecorated method via __wrapped__)
-        handler = DownloadHandler(secret=secret)
         unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
-        response = await unwrapped(handler, mock_query_param, mock_context)
+        response = await unwrapped(download_handler, mock_query_param, mock_context)
 
         # Verify volume was accessed from token
         mock_context.root_ctx.get_volume.assert_called_once_with(token_data.volume)
@@ -193,7 +206,8 @@ class TestDownloadArchiveHandler:
     async def test_handler_prevents_path_traversal(
         self,
         mock_context: MagicMock,
-        secret: str,
+        download_handler: DownloadHandler,
+        make_query: Callable[..., MagicMock],
         tmp_path: Path,
     ) -> None:
         """
@@ -204,39 +218,26 @@ class TestDownloadArchiveHandler:
         2. Call download_archive
         3. Verify InvalidAPIParameters is raised with path escape error
         """
-        # Create malicious token data with path traversal attempt
         malicious_token_data = ArchiveDownloadTokenData(
             operation=TokenOperationType.DOWNLOAD,
             volume="test-volume",
             virtual_folder_id=VFolderID(None, uuid4()),
-            files=["../../etc/passwd"],  # Path traversal attempt
+            files=["../../etc/passwd"],
             exp=datetime.now(UTC) + timedelta(hours=1),
         )
+        query = make_query(malicious_token_data)
 
-        # Encode JWT with malicious path (convert datetime to Unix timestamp)
-        payload = malicious_token_data.model_dump(mode="json")
-        payload["exp"] = int(malicious_token_data.exp.timestamp())
-        token = jwt.encode(payload, secret, algorithm="HS256")
-
-        # Create query param with malicious token
-        query = MagicMock()
-        query.parsed.token = token
-
-        # Create handler and attempt download
-        handler = DownloadHandler(secret=secret)
-
-        # Verify InvalidAPIParameters is raised
         unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
         with pytest.raises(InvalidAPIParameters) as exc_info:
-            await unwrapped(handler, query, mock_context)
+            await unwrapped(download_handler, query, mock_context)
 
-        # Verify error message mentions path escape
         assert "escapes vfolder boundary" in str(exc_info.value.extra_msg)
 
     async def test_handler_validates_file_existence(
         self,
         mock_context: MagicMock,
-        secret: str,
+        download_handler: DownloadHandler,
+        make_query: Callable[..., MagicMock],
         tmp_path: Path,
     ) -> None:
         """
@@ -247,41 +248,26 @@ class TestDownloadArchiveHandler:
         2. Call download_archive
         3. Verify HTTPNotFound is raised with file name
         """
-        # Create token data with non-existent file
         nonexistent_token_data = ArchiveDownloadTokenData(
             operation=TokenOperationType.DOWNLOAD,
             volume="test-volume",
             virtual_folder_id=VFolderID(None, uuid4()),
-            files=["nonexistent_file.txt"],  # File doesn't exist
+            files=["nonexistent_file.txt"],
             exp=datetime.now(UTC) + timedelta(hours=1),
         )
+        query = make_query(nonexistent_token_data)
 
-        # Encode JWT (convert datetime to Unix timestamp)
-        payload = nonexistent_token_data.model_dump(mode="json")
-        payload["exp"] = int(nonexistent_token_data.exp.timestamp())
-        token = jwt.encode(payload, secret, algorithm="HS256")
-
-        # Create query param
-        query = MagicMock()
-        query.parsed.token = token
-
-        # Create handler and attempt download
-        handler = DownloadHandler(secret=secret)
-
-        # Verify HTTPNotFound is raised
         unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
         with pytest.raises(web.HTTPNotFound) as exc_info:
-            await unwrapped(handler, query, mock_context)
+            await unwrapped(download_handler, query, mock_context)
 
-        # Verify error message mentions the file name
         assert "nonexistent_file.txt" in str(exc_info.value.reason)
 
     async def test_handler_creates_stream_reader_with_files(
         self,
         mock_context: MagicMock,
         mock_query_param: MagicMock,
-        token_data: ArchiveDownloadTokenData,
-        secret: str,
+        download_handler: DownloadHandler,
         tmp_path: Path,
     ) -> None:
         """
@@ -293,60 +279,85 @@ class TestDownloadArchiveHandler:
         3. Verify StreamReader is created with correct base_path
         4. Verify all files from token are added to StreamReader
         """
-        # Create test files matching token_data.files
         (tmp_path / "file1.txt").write_text("content1")
         dir1 = tmp_path / "dir1"
         dir1.mkdir()
         (dir1 / "file2.txt").write_text("content2")
 
-        # Create handler and call download_archive (undecorated method via __wrapped__)
-        handler = DownloadHandler(secret=secret)
         unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
-        response = await unwrapped(handler, mock_query_param, mock_context)
+        response = await unwrapped(download_handler, mock_query_param, mock_context)
 
-        # Verify StreamReader is created
         api_response = cast(APIStreamResponse, response)
         assert isinstance(api_response.body, ZipArchiveStreamReader)
+        assert api_response.body._base_path == tmp_path
 
-        # Verify base_path is correct
-        reader = api_response.body
-        assert reader._base_path == tmp_path
-
-    async def test_handler_uses_filename_from_reader(
+    async def test_handler_uses_default_filename_when_token_filename_is_absent_or_null(
         self,
         mock_context: MagicMock,
         mock_query_param: MagicMock,
-        secret: str,
+        download_handler: DownloadHandler,
         tmp_path: Path,
     ) -> None:
         """
-        Test that handler uses filename from StreamReader (not hardcoded).
+        Test that handler uses reader.filename() when token filename is absent or null.
 
         Scenario:
-        1. Call download_archive
-        2. Verify response headers contain filename from reader.filename()
-        3. Verify filename is not hardcoded "archive.zip"
+        1. Call download_archive with token whose filename is null
+        2. Verify Content-Disposition header contains reader.filename() default
         """
-        # Create test files matching token_data.files
         (tmp_path / "file1.txt").write_text("content1")
         dir1 = tmp_path / "dir1"
         dir1.mkdir()
         (dir1 / "file2.txt").write_text("content2")
 
-        # Create handler and call download_archive (undecorated method via __wrapped__)
-        handler = DownloadHandler(secret=secret)
         unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
-        response = await unwrapped(handler, mock_query_param, mock_context)
+        response = await unwrapped(download_handler, mock_query_param, mock_context)
 
-        # Verify response has headers
-        assert response.headers is not None
-
-        # Verify Content-Disposition header exists and contains filename
         content_disposition = response.headers.get("Content-Disposition")
         assert content_disposition is not None
-
-        # Verify filename comes from reader.filename() (default is "archive.zip")
         api_response = cast(APIStreamResponse, response)
         reader = cast(ZipArchiveStreamReader, api_response.body)
-        expected_filename = reader.filename()
-        assert expected_filename in content_disposition
+        assert reader.filename() in content_disposition
+
+    @pytest.mark.parametrize(
+        ("custom_filename", "expected_in_header"),
+        [
+            ("my-export.zip", "my-export.zip"),
+            (
+                "데이터-export.zip",
+                f"filename*=UTF-8''{urllib.parse.quote('데이터-export.zip', encoding='utf-8')}",
+            ),
+        ],
+        ids=["ascii", "unicode-rfc5987"],
+    )
+    async def test_handler_uses_custom_filename_from_token(
+        self,
+        mock_context: MagicMock,
+        download_handler: DownloadHandler,
+        make_query: Callable[..., MagicMock],
+        tmp_path: Path,
+        custom_filename: str,
+        expected_in_header: str,
+    ) -> None:
+        """
+        Test that handler uses custom filename from JWT token in Content-Disposition,
+        including RFC-5987 encoding for Unicode filenames.
+        """
+        token_data_with_filename = ArchiveDownloadTokenData(
+            operation=TokenOperationType.DOWNLOAD,
+            volume="test-volume",
+            virtual_folder_id=VFolderID(None, uuid4()),
+            files=["file1.txt"],
+            filename=custom_filename,
+            exp=datetime.now(UTC) + timedelta(hours=1),
+        )
+        query = make_query(token_data_with_filename)
+
+        (tmp_path / "file1.txt").write_text("content1")
+
+        unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
+        response = await unwrapped(download_handler, query, mock_context)
+
+        content_disposition = response.headers.get("Content-Disposition")
+        assert content_disposition is not None
+        assert expected_in_header in content_disposition

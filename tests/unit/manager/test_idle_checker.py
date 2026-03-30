@@ -804,8 +804,8 @@ class TestUtilizationIdleChecker:
         expected_utilization = {
             "cpu_util": current_test_config.expected_cpu_util,
             "mem": current_test_config.expected_mem_util,
-            "cuda_mem": 0.0,
-            "cuda_util": 0.0,
+            "cuda_mem": None,
+            "cuda_util": None,
         }
 
         # When
@@ -1235,3 +1235,91 @@ class TestUtilizationIdleChecker:
         assert should_alive is insufficient_test_config.expected_alive
         assert remaining == insufficient_test_config.expected_remaining
         assert util_info is not None
+
+    # Test 5: Missing metrics should be excluded from idle decision
+    @pytest.fixture
+    async def missing_cpu_stat_checker(
+        self,
+        base_time: datetime,
+        valkey_live: AsyncMock,
+        valkey_stat: AsyncMock,
+        event_producer: AsyncMock,
+        mocker: Any,
+    ) -> UtilizationIdleChecker:
+        """UtilizationIdleChecker where cpu_util stat is missing from live_stat.
+
+        Simulates a scenario where stat collection fails for cpu_util
+        but memory is collected normally with sufficient utilization.
+        Uses OR operator so that if cpu_util were treated as 0.0
+        (old behavior), the session would be falsely terminated.
+        """
+        elapsed_seconds = 50
+        time_window_seconds = 15
+        now = base_time + timedelta(seconds=elapsed_seconds)
+        valkey_live.get_server_time.return_value = now.timestamp()
+        mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
+
+        # live_stat has Memory but NO cpu_util key
+        live_stat = {
+            "mem": {"current": "5.0", "pct": "10.0"},
+        }
+        valkey_stat.get_kernel_statistics.return_value = live_stat
+
+        util_first_collected = now.timestamp() - time_window_seconds
+
+        def get_live_data_side_effect(key: str) -> bytes | None:
+            if ".util_first_collected" in key:
+                return f"{util_first_collected:.06f}".encode()
+            if ".util_series" in key:
+                return msgpack.packb({"cpu_util": [], "mem": []})
+            if ".utilization_extra" in key:
+                return msgpack.packb({"resources": {}})
+            if ".utilization" in key:
+                return msgpack.packb(-1)
+            return None
+
+        valkey_live.get_live_data.side_effect = get_live_data_side_effect
+
+        checker = UtilizationIdleChecker(
+            IdleCheckerArgs(
+                event_producer=event_producer,
+                redis_live=valkey_live,
+                valkey_stat_client=valkey_stat,
+            )
+        )
+        await checker.populate_config({
+            "initial-grace-period": "0",
+            "resource-thresholds": {
+                "cpu_util": {"average": "10"},
+                "mem": {"average": "10"},
+            },
+            "thresholds-check-operator": "or",
+            "time-window": str(time_window_seconds),
+        })
+        return checker
+
+    async def test_missing_metrics_excluded_from_idle_decision(
+        self,
+        missing_cpu_stat_checker: UtilizationIdleChecker,
+        utilization_kernel_row: Any,
+        session_id: SessionId,
+        db_connection: AsyncMock,
+    ) -> None:
+        """Test that missing metrics (stat collection failure) are excluded from idle check.
+
+        With OR operator, ALL configured metrics must exceed their thresholds for
+        the session to stay alive. If missing cpu_util were treated as 0.0
+        (old behavior), the session would be falsely terminated because
+        0.0 < threshold (10%). With the fix, missing metrics are excluded from
+        the decision, so only memory (above 10%) is checked.
+        """
+        # When
+        should_alive = await missing_cpu_stat_checker.check_idleness(
+            utilization_kernel_row,
+            db_connection,
+            mock_row(idle_timeout=15),
+        )
+
+        # Then - session should stay alive because cpu_util is excluded,
+        # not treated as 0.0
+        assert should_alive is True

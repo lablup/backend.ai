@@ -203,8 +203,8 @@ class APIResponse:
         return cls(_status_code=status_code, _data=None)
 
     @property
-    def to_json(self) -> JSONDict | list[Any] | None:
-        return self._data.model_dump(mode="json") if self._data else None
+    def to_json(self) -> JSONDict | list[Any] | str | None:
+        return self._data.model_dump(mode="json", by_alias=True) if self._data else None
 
     @property
     def status_code(self) -> int:

@@ -11,7 +11,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -23,7 +23,17 @@ from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.conditions import (
+    DomainScopeConditions,
+    ProjectScopeConditions,
+    UserScopeConditions,
+)
+from ai.backend.manager.models.rbac_models.orders import (
+    DomainScopeOrders,
+    ProjectScopeOrders,
+    UserScopeOrders,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -37,14 +47,6 @@ from ai.backend.manager.models.user import PasswordHashAlgorithm, PasswordInfo, 
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.permission_controller.options import (
-    DomainScopeConditions,
-    DomainScopeOrders,
-    ProjectScopeConditions,
-    ProjectScopeOrders,
-    UserScopeConditions,
-    UserScopeOrders,
-)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -79,6 +81,7 @@ class TestSearchDomainScopes:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -158,7 +161,9 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.DOMAIN, querier)
+        result = await permission_controller_repository.search_scopes(
+            RBACElementType.DOMAIN, querier
+        )
 
         assert result.total_count == len(sample_domains)
         assert len(result.items) == len(sample_domains)
@@ -179,7 +184,9 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.DOMAIN, querier)
+        result = await permission_controller_repository.search_scopes(
+            RBACElementType.DOMAIN, querier
+        )
 
         # sample_domains has "test-domain-alpha", "test-domain-beta", "prod-domain"
         # Only domains containing "test" should be returned
@@ -201,7 +208,9 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.DOMAIN, querier)
+        result = await permission_controller_repository.search_scopes(
+            RBACElementType.DOMAIN, querier
+        )
 
         assert result.total_count == 1
         assert result.items[0].name == target_name
@@ -219,7 +228,9 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.DOMAIN, querier)
+        result = await permission_controller_repository.search_scopes(
+            RBACElementType.DOMAIN, querier
+        )
 
         assert result.total_count == 2
         for item in result.items:
@@ -237,7 +248,9 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.DOMAIN, querier)
+        result = await permission_controller_repository.search_scopes(
+            RBACElementType.DOMAIN, querier
+        )
 
         names = [item.name for item in result.items]
         assert names == sorted(names)
@@ -254,7 +267,9 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.DOMAIN, querier)
+        result = await permission_controller_repository.search_scopes(
+            RBACElementType.DOMAIN, querier
+        )
 
         names = [item.name for item in result.items]
         assert names == sorted(names, reverse=True)
@@ -272,7 +287,7 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=5, offset=0),
         )
         result_page1 = await permission_controller_repository.search_scopes(
-            ScopeType.DOMAIN, querier_page1
+            RBACElementType.DOMAIN, querier_page1
         )
 
         assert len(result_page1.items) == 5
@@ -287,7 +302,7 @@ class TestSearchDomainScopes:
             pagination=OffsetPagination(limit=5, offset=5),
         )
         result_page2 = await permission_controller_repository.search_scopes(
-            ScopeType.DOMAIN, querier_page2
+            RBACElementType.DOMAIN, querier_page2
         )
 
         assert len(result_page2.items) == 5
@@ -318,6 +333,7 @@ class TestSearchProjectScopes:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -443,7 +459,9 @@ class TestSearchProjectScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.PROJECT, querier)
+        result = await permission_controller_repository.search_scopes(
+            RBACElementType.PROJECT, querier
+        )
 
         assert result.total_count == len(sample_projects)
         for item in result.items:
@@ -462,7 +480,9 @@ class TestSearchProjectScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.PROJECT, querier)
+        result = await permission_controller_repository.search_scopes(
+            RBACElementType.PROJECT, querier
+        )
 
         assert result.total_count == 1
         assert "alpha" in result.items[0].name.lower()
@@ -479,7 +499,9 @@ class TestSearchProjectScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.PROJECT, querier)
+        result = await permission_controller_repository.search_scopes(
+            RBACElementType.PROJECT, querier
+        )
 
         names = [item.name for item in result.items]
         assert names == sorted(names)
@@ -496,7 +518,9 @@ class TestSearchProjectScopes:
             pagination=OffsetPagination(limit=5, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.PROJECT, querier)
+        result = await permission_controller_repository.search_scopes(
+            RBACElementType.PROJECT, querier
+        )
 
         assert len(result.items) == 5
         assert result.total_count == 15
@@ -521,6 +545,7 @@ class TestSearchUserScopes:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -653,7 +678,7 @@ class TestSearchUserScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.USER, querier)
+        result = await permission_controller_repository.search_scopes(RBACElementType.USER, querier)
 
         assert result.total_count == len(sample_users)
         for item in result.items:
@@ -673,7 +698,7 @@ class TestSearchUserScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.USER, querier)
+        result = await permission_controller_repository.search_scopes(RBACElementType.USER, querier)
 
         # Users with "example" in email: alpha@example.com, beta@example.com
         assert result.total_count == 2
@@ -690,7 +715,7 @@ class TestSearchUserScopes:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.USER, querier)
+        result = await permission_controller_repository.search_scopes(RBACElementType.USER, querier)
 
         names = [item.name for item in result.items]
         assert names == sorted(names)
@@ -707,7 +732,7 @@ class TestSearchUserScopes:
             pagination=OffsetPagination(limit=5, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.USER, querier)
+        result = await permission_controller_repository.search_scopes(RBACElementType.USER, querier)
 
         assert len(result.items) == 5
         assert result.total_count == 15
@@ -732,6 +757,7 @@ class TestSearchGlobalScope:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -759,27 +785,6 @@ class TestSearchGlobalScope:
         """Create PermissionControllerRepository instance."""
         return PermissionControllerRepository(db_with_scope_tables)
 
-    async def test_search_scopes_global_returns_static_result(
-        self,
-        permission_controller_repository: PermissionControllerRepository,
-    ) -> None:
-        """Test global scope returns single static result."""
-        querier = BatchQuerier(
-            conditions=[],
-            orders=[],
-            pagination=OffsetPagination(limit=10, offset=0),
-        )
-
-        result = await permission_controller_repository.search_scopes(ScopeType.GLOBAL, querier)
-
-        assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.items[0].id.scope_type == ScopeType.GLOBAL
-        assert result.items[0].id.scope_id == GLOBAL_SCOPE_ID
-        assert result.items[0].name == GLOBAL_SCOPE_ID
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-
 
 class TestSearchScopesEmptyResult:
     """Tests for empty result handling."""
@@ -799,6 +804,7 @@ class TestSearchScopesEmptyResult:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -862,7 +868,9 @@ class TestSearchScopesEmptyResult:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await permission_controller_repository.search_scopes(ScopeType.DOMAIN, querier)
+        result = await permission_controller_repository.search_scopes(
+            RBACElementType.DOMAIN, querier
+        )
 
         assert result.total_count == 0
         assert len(result.items) == 0

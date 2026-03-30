@@ -150,12 +150,19 @@ def _associate_non_global_container_registries_to_scope(db_conn: Connection) -> 
 
 
 def _associate_global_container_registries_to_scope(db_conn: Connection) -> None:
-    """Associate global container registries to ALL domain scopes.
+    """Associate global container registries to ALL project scopes.
 
-    Global registries (is_global = true) are available to all domains.
-    Pages by registry IDs first, then CROSS JOINs with domains to get
-    all scope associations for each batch.
+    Global registries (is_global = true) are available to all projects.
+    Fetches all global registry IDs upfront (typically few), then pages
+    through projects in batches to avoid large CROSS JOINs.
     """
+    registry_query = sa.text("""
+        SELECT id FROM container_registries WHERE is_global = true
+    """)
+    registry_ids = [row.id for row in db_conn.execute(registry_query).all()]
+    if not registry_ids:
+        return
+
     insert_query = sa.text("""
         INSERT INTO association_scopes_entities
             (scope_type, scope_id, entity_type, entity_id, relation_type)
@@ -165,38 +172,28 @@ def _associate_global_container_registries_to_scope(db_conn: Connection) -> None
 
     last_id = UUID("00000000-0000-0000-0000-000000000000")
     while True:
-        id_query = sa.text("""
-            SELECT id FROM container_registries
-            WHERE is_global = true AND id > :last_id
+        group_query = sa.text("""
+            SELECT id FROM groups
+            WHERE id > :last_id
             ORDER BY id
             LIMIT :limit
         """)
-        id_rows = db_conn.execute(id_query, {"last_id": last_id, "limit": BATCH_SIZE}).all()
-        if not id_rows:
+        group_rows = db_conn.execute(group_query, {"last_id": last_id, "limit": BATCH_SIZE}).all()
+        if not group_rows:
             break
-
-        last_id = id_rows[-1].id
-        entity_ids = [row.id for row in id_rows]
-
-        assoc_query = sa.text("""
-            SELECT cr.id AS entity_id, d.name AS scope_id
-            FROM container_registries cr
-            CROSS JOIN domains d
-            WHERE cr.id = ANY(:entity_ids)
-        """)
-        rows = db_conn.execute(assoc_query, {"entity_ids": entity_ids}).all()
+        last_id = group_rows[-1].id
 
         values_list = [
             {
-                "scope_type": "domain",
-                "scope_id": row.scope_id,
+                "scope_type": "project",
+                "scope_id": str(group_row.id),
                 "entity_type": ENTITY_TYPE_CONTAINER_REGISTRY,
-                "entity_id": str(row.entity_id),
+                "entity_id": str(registry_id),
                 "relation_type": "auto",
             }
-            for row in rows
+            for group_row in group_rows
+            for registry_id in registry_ids
         ]
-
         if values_list:
             db_conn.execute(insert_query, values_list)
 

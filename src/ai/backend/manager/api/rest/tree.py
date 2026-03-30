@@ -19,8 +19,8 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
         ValkeyRateLimitClient,
     )
-    from ai.backend.common.health_checker.probe import HealthProbe
     from ai.backend.common.plugin.monitor import ErrorPluginContext
+    from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
         StreamCleanupEventHandler,
@@ -33,12 +33,12 @@ if TYPE_CHECKING:
 def build_api_routes(
     *,
     processors: Processors,
+    adapters: Adapters,
     cors_options: CORSOptions,
     config_provider: ManagerConfigProvider,
     error_monitor: ErrorPluginContext,
     gql_context_deps: GQLContextDeps,
     valkey_rate_limit: ValkeyRateLimitClient | None,
-    health_probe: HealthProbe | None,
     root_app: web.Application,
     stream_cleanup_handler: StreamCleanupEventHandler,
     pidx: int = 0,
@@ -134,6 +134,7 @@ def build_api_routes(
     from .user.registry import register_user_routes
     from .userconfig.handler import UserConfigHandler
     from .userconfig.registry import register_userconfig_routes
+    from .v2.tree import build_v2_routes
     from .vfolder.handler import VFolderHandler
     from .vfolder.registry import register_vfolder_routes
     from .vfs_storage.handler import VFSStorageHandler
@@ -254,9 +255,7 @@ def build_api_routes(
     session_template_reg = register_session_template_routes(session_template_handler, route_deps)
 
     # Health handler
-    if health_probe is None:
-        raise RuntimeError("health_probe is required for the health module")
-    health_handler = HealthHandler(health_probe=health_probe)
+    health_handler = HealthHandler()
 
     # Spec handler
     spec_handler = SpecHandler(config_provider=config_provider, root_app=root_app)
@@ -287,8 +286,16 @@ def build_api_routes(
     prometheus_processor = processors.prometheus_query_preset
     prometheus_query_preset_handler = PrometheusQueryPresetHandler(processor=prometheus_processor)
 
+    # v2 REST API routes
+    v2_registry = build_v2_routes(
+        adapters=adapters,
+        route_deps=route_deps,
+        export_handler=export_handler,
+    )
+
     # 3. Build all registries
     return [
+        v2_registry,
         register_auth_routes(auth_handler, route_deps),
         register_acl_routes(acl_handler, route_deps),
         register_admin_routes(

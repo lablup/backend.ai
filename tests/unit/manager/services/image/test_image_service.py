@@ -16,11 +16,17 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
+from ai.backend.manager.actions.validators.rbac.single_entity import (
+    SingleEntityActionRBACValidator,
+)
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
@@ -31,6 +37,7 @@ from ai.backend.manager.data.image.types import (
     RescanImagesResult,
     ResourceLimitInput,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.image import (
     ImageAccessForbiddenError,
     ImageAliasNotFound,
@@ -38,7 +45,8 @@ from ai.backend.manager.errors.image import (
 )
 from ai.backend.manager.models.image import ImageStatus, ImageType
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
@@ -119,7 +127,14 @@ class ImageServiceBaseFixtures:
     @pytest.fixture
     def processors(self, image_service: ImageService) -> ImageProcessors:
         """Create ImageProcessors with mock ImageService."""
-        return ImageProcessors(image_service, [], MagicMock(spec=ActionValidators))
+        mock_scope = MagicMock(spec=ScopeActionRBACValidator)
+        mock_scope.validate = AsyncMock()
+        mock_single_entity = MagicMock(spec=SingleEntityActionRBACValidator)
+        mock_single_entity.validate = AsyncMock()
+        validators = ActionValidators(
+            rbac=RBACValidators(scope=mock_scope, single_entity=mock_single_entity),
+        )
+        return ImageProcessors(image_service, [], validators)
 
     @pytest.fixture
     def container_registry_id(self) -> uuid.UUID:
@@ -992,10 +1007,15 @@ class TestAliasImageById(ImageServiceBaseFixtures):
         assert result.image_alias == image_alias_data
         mock_image_repository.add_image_alias_by_id.assert_called_once()
         creator_arg = mock_image_repository.add_image_alias_by_id.call_args[0][0]
-        assert isinstance(creator_arg, Creator)
+        assert isinstance(creator_arg, RBACEntityCreator)
         assert isinstance(creator_arg.spec, ImageAliasCreatorSpec)
         assert creator_arg.spec.alias == "python"
         assert creator_arg.spec.image_id == image_id
+        assert creator_arg.element_type == RBACElementType.IMAGE_ALIAS
+        assert creator_arg.scope_ref == RBACElementRef(
+            element_type=RBACElementType.IMAGE,
+            element_id=str(image_id),
+        )
 
 
 class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):

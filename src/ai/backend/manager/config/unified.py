@@ -205,7 +205,12 @@ from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep, NamedStorageTarget
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
@@ -501,6 +506,24 @@ class AuthConfig(BaseConfigSchema):
             ),
             added_version="25.8.0",
             example=ConfigExample(local="32", prod="32"),
+        ),
+    ]
+    login_session_max_age: Annotated[
+        int,
+        Field(
+            default=604800,
+            ge=60,
+            validation_alias=AliasChoices("login-session-max-age", "login_session_max_age"),
+            serialization_alias="login-session-max-age",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum login session age in seconds. "
+                "Default is 604800 (7 days). "
+                "Sessions older than this are considered expired."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="604800", prod="604800"),
         ),
     ]
 

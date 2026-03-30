@@ -263,7 +263,7 @@ class TestVFolderGetInfo:
         """S-1: Admin retrieves vfolder info by name."""
         result = await admin_registry.vfolder.get_info(target_vfolder["name"])
         assert isinstance(result, VFolderGetInfoResponse)
-        assert result.item.name == target_vfolder["name"]
+        assert result.root.name == target_vfolder["name"]
 
     @pytest.mark.xfail(
         strict=True,
@@ -284,7 +284,7 @@ class TestVFolderGetInfo:
         )
         result = await admin_registry.vfolder.get_info(vf["name"])
         assert isinstance(result, VFolderGetInfoResponse)
-        assert result.item.name == vf["name"]
+        assert result.root.name == vf["name"]
 
     async def test_get_nonexistent_vfolder_raises_error(
         self,
@@ -324,4 +324,4 @@ class TestVFolderGetID:
             GetVFolderIDReq(name=target_vfolder["name"]),
         )
         assert isinstance(result, VFolderGetIDResponse)
-        assert result.item.id == target_vfolder["id"].hex
+        assert result.root.id == target_vfolder["id"].hex

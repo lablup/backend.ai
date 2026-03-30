@@ -13,6 +13,7 @@ import strawberry
 from ai.backend.manager.api.gql.app_config import AppConfig
 from ai.backend.manager.api.gql.artifact.types import Artifact, ArtifactRevision
 from ai.backend.manager.api.gql.artifact_registry import ArtifactRegistry
+from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
 from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.image.types import ImageV2GQL
@@ -23,6 +24,7 @@ from ai.backend.manager.api.gql.notification.types import (
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+from ai.backend.manager.api.gql.session.types import SessionV2GQL
 from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.api.gql.vfolder import VFolder
@@ -38,6 +40,7 @@ EntityNode = Annotated[
     | VFolder
     | ImageV2GQL
     | Session
+    | SessionV2GQL
     | Artifact
     | ArtifactRegistry
     | AppConfig
@@ -45,6 +48,7 @@ EntityNode = Annotated[
     | NotificationRule
     | ModelDeployment
     | ResourceGroupGQL
+    | ContainerRegistryGQL
     | ArtifactRevision
     | RoleGQL,
     strawberry.union("EntityNode"),

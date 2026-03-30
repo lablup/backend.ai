@@ -2,6 +2,7 @@ import logging
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
@@ -9,6 +10,7 @@ from ai.backend.common.types import AgentId, ImageAlias, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageWithAgentInstallStatus
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
 from ai.backend.manager.models.image import (
     ImageIdentifier,
@@ -16,7 +18,7 @@ from ai.backend.manager.models.image import (
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
 from ai.backend.manager.repositories.image.repository import ImageRepository
@@ -57,10 +59,6 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImageByIdentifierActionResult,
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
-)
-from ai.backend.manager.services.image.actions.load_image_last_used import (
-    LoadImageLastUsedAction,
-    LoadImageLastUsedActionResult,
 )
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
@@ -103,6 +101,10 @@ from ai.backend.manager.services.image.actions.unload_image import (
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
     UntagImageFromRegistryActionResult,
+)
+from ai.backend.manager.services.image.actions.update_image_by_id import (
+    UpdateImageByIdAction,
+    UpdateImageByIdActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -268,6 +270,13 @@ class ImageService:
 
         return ModifyImageActionResult(image=updated_image_data)
 
+    async def update_image_by_id(
+        self, action: UpdateImageByIdAction
+    ) -> UpdateImageByIdActionResult:
+        updater: Updater[ImageRow] = Updater(spec=action.updater_spec, pk_value=action.image_id)
+        updated_image_data = await self._image_repository.update_image_properties(updater)
+        return UpdateImageByIdActionResult(image=updated_image_data)
+
     async def purge_image_by_id(self, action: PurgeImageByIdAction) -> PurgeImageByIdActionResult:
         # Regular users need ownership validation
         user = current_user()
@@ -405,13 +414,18 @@ class ImageService:
         """
         Creates an alias for an image by its ID.
         """
-        creator = Creator(
+        rbac_creator = RBACEntityCreator(
             spec=ImageAliasCreatorSpec(
                 alias=action.alias,
                 image_id=action.image_id,
-            )
+            ),
+            element_type=RBACElementType.IMAGE_ALIAS,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.IMAGE,
+                element_id=str(action.image_id),
+            ),
         )
-        image_alias = await self._image_repository.add_image_alias_by_id(creator)
+        image_alias = await self._image_repository.add_image_alias_by_id(rbac_creator)
         return AliasImageByIdActionResult(
             image_id=action.image_id,
             image_alias=image_alias,
@@ -462,10 +476,3 @@ class ImageService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
-
-    async def load_image_last_used(
-        self, action: LoadImageLastUsedAction
-    ) -> LoadImageLastUsedActionResult:
-        """Load last used timestamps for images."""
-        last_used_map = await self._image_repository.load_image_last_used(action.image_ids)
-        return LoadImageLastUsedActionResult(last_used_map=last_used_map)

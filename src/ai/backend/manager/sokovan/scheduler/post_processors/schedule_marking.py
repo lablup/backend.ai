@@ -26,6 +26,8 @@ STATUS_TO_NEXT_SCHEDULE_TYPE: dict[SessionStatus, ScheduleType] = {
     SessionStatus.PREPARED: ScheduleType.START,
     SessionStatus.DEPRIORITIZING: ScheduleType.DEPRIORITIZE,
     SessionStatus.TERMINATING: ScheduleType.TERMINATE,
+    # When a session terminates, freed resources may allow pending sessions to be scheduled.
+    SessionStatus.TERMINATED: ScheduleType.SCHEDULE,
 }
 
 

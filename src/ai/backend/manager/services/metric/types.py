@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from ai.backend.common.dto.clients.prometheus.response import MetricResponseInfo
+from ai.backend.common.exception import InvalidAPIParameters
 
 
 class ValueType(enum.StrEnum):
@@ -39,6 +40,10 @@ class ContainerMetricResponseInfo:
 
     @classmethod
     def from_metric_response_info(cls, info: MetricResponseInfo) -> Self:
+        if info.value_type is None:
+            raise InvalidAPIParameters(
+                f"Missing required label 'value_type' for container metric (metric={info.name!r})"
+            )
         return cls(
             value_type=info.value_type,
             container_metric_name=info.container_metric_name,

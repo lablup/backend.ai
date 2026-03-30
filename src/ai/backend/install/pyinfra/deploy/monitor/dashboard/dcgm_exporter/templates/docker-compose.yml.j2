@@ -1,0 +1,28 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  restart: unless-stopped
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  dcgm-exporter:
+    <<: *base
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:${DCGM_EXPORTER_IMAGE_TAG}
+    container_name: bai-dcgm-exporter
+    hostname: ${DCGM_EXPORTER_HOSTNAME}
+    runtime: nvidia
+    cap_add:
+      - SYS_ADMIN
+    ports:
+      # Container always listens on 9400 (DCGM Exporter default); host port is configurable
+      - "${DCGM_EXPORTER_PORT}:9400"
+    volumes:
+      - "/etc/hosts:/etc/hosts:ro"
+    # Health check disabled — DCGM Exporter image may not ship curl;
+    # use host-side show_status.sh for health verification.
+    healthcheck:
+      disable: true

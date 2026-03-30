@@ -14,7 +14,9 @@ class KeyPairCreator:
 
 
 @dataclass
-class GeneratedKeyPairData:
+class KeyPairSecrets:
+    """Raw generated cryptographic material used before DB insert."""
+
     access_key: AccessKey
     secret_key: SecretKey
     ssh_public_key: str
@@ -38,3 +40,13 @@ class KeyPairData:
     ssh_private_key: str | None
     dotfiles: bytes
     bootstrap_script: str
+
+    last_used: datetime | None = None
+    num_queries: int = 0
+
+
+@dataclass
+class GeneratedKeyPairData:
+    """Result of keypair creation. Contains the full keypair data including secrets."""
+
+    keypair: KeyPairData

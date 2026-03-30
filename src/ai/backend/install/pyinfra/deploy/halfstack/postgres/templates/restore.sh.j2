@@ -1,0 +1,63 @@
+#!/bin/bash
+set -euo pipefail
+
+BACKUP_DIR="{{ service_dir }}/backups"
+CONTAINER_NAME="{{ container_name }}"
+DB_USER="{{ db_user }}"
+
+show_usage() {
+    echo "Usage: $0 <backup_file>"
+    echo ""
+    echo "Available backup files:"
+    find "${BACKUP_DIR}" -name "postgres_full_backup_*.dump.gz" -type f | sort -r | head -10
+    exit 1
+}
+
+if [ $# -eq 0 ]; then
+    show_usage
+fi
+
+BACKUP_FILE="$1"
+if [ ! -f "$BACKUP_FILE" ]; then
+    echo "Error: Backup file '$BACKUP_FILE' not found"
+    show_usage
+fi
+
+echo "Starting PostgreSQL restore..."
+echo "Backup file: $BACKUP_FILE"
+
+if ! docker ps --format "table {{ '{{.Names}}' }}" | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Error: PostgreSQL container '${CONTAINER_NAME}' is not running"
+    exit 1
+fi
+
+echo ""
+echo "WARNING: This may completely replace all databases and users!"
+echo "Container: ${CONTAINER_NAME}"
+echo "Backup file: ${BACKUP_FILE}"
+echo ""
+read -p "Are you sure you want to continue? (yes/no): " confirm
+if [ "$confirm" != "yes" ]; then
+    echo "Restore cancelled."
+    exit 0
+fi
+
+# Stop all connections to databases (except template databases)
+echo "Terminating active connections..."
+docker exec "${CONTAINER_NAME}" psql -U "${DB_USER}" -d postgres -c "
+    SELECT pg_terminate_backend(pg_stat_activity.pid)
+    FROM pg_stat_activity
+    WHERE pg_stat_activity.datname NOT IN ('template0', 'template1', 'postgres')
+      AND pid <> pg_backend_pid();
+"
+
+# Restore from backup
+echo "Restoring from backup..."
+if [[ "$BACKUP_FILE" =~ \.gz$ ]]; then
+    zcat "$BACKUP_FILE" | docker exec -i "${CONTAINER_NAME}" psql -U "${DB_USER}" -d postgres
+else
+    cat "$BACKUP_FILE" | docker exec -i "${CONTAINER_NAME}" psql -U "${DB_USER}" -d postgres
+fi
+
+echo "Restore completed successfully!"
+echo "Please verify your databases and restart dependent services if needed."

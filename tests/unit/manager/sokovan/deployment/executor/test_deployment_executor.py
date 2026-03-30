@@ -62,7 +62,7 @@ class TestCheckPendingDeployments:
 
         # Assert
         assert len(result.successes) == 1
-        assert len(result.errors) == 0
+        assert len(result.failures) == 0
         mock_register.assert_awaited_once()
         mock_deployment_repo.update_endpoint_urls_bulk.assert_awaited_once()
 
@@ -72,35 +72,37 @@ class TestCheckPendingDeployments:
         assert pending_deployment.deployment_info.id in url_updates
         assert url_updates[pending_deployment.deployment_info.id] == expected_url
 
-    async def test_deployment_without_revision_skipped(
+    async def test_deployment_without_revision_is_skipped(
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
         pending_deployment_no_revision: DeploymentWithHistory,
         proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
     ) -> None:
-        """CD-002: Deployment without target revision is skipped.
+        """CD-002: Deployment without current_revision_id is skipped.
 
         Given: PENDING deployment without target revision
         When: Check pending deployments
-        Then: Deployment skipped (no endpoint registration)
+        Then: Deployment is skipped (not failed, not succeeded)
         """
         # Arrange
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
 
-        entity_ids = [pending_deployment_no_revision.deployment_info.id]
-        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await deployment_executor.check_pending_deployments([
-                pending_deployment_no_revision
-            ])
+        expected_url = "http://endpoint.test/v1"
+        with patch.object(deployment_executor, "_register_endpoint", return_value=expected_url):
+            entity_ids = [pending_deployment_no_revision.deployment_info.id]
+            with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
+                # Act
+                result = await deployment_executor.check_pending_deployments([
+                    pending_deployment_no_revision
+                ])
 
-        # Assert - No successful registrations
+        # Assert - Deployment skipped due to missing revision
         assert len(result.successes) == 0
-        assert len(result.errors) == 0
-        mock_deployment_repo.update_endpoint_urls_bulk.assert_not_awaited()
+        assert len(result.failures) == 0
+        assert len(result.skipped) == 1
 
     async def test_no_proxy_target_deployment_skipped(
         self,
@@ -126,7 +128,8 @@ class TestCheckPendingDeployments:
 
         # Assert
         assert len(result.successes) == 0
-        assert len(result.errors) == 0
+        assert len(result.failures) == 0
+        assert len(result.skipped) == 1
 
     async def test_endpoint_registration_failure_captured(
         self,
@@ -158,8 +161,8 @@ class TestCheckPendingDeployments:
 
         # Assert
         assert len(result.successes) == 0
-        assert len(result.errors) == 1
-        assert "Registration failed" in result.errors[0].reason
+        assert len(result.failures) == 1
+        assert "Registration failed" in result.failures[0].reason
 
 
 # =============================================================================
@@ -200,7 +203,7 @@ class TestCheckReadyDeployments:
 
         # Assert
         assert len(result.successes) == 1
-        assert len(result.errors) == 0
+        assert len(result.failures) == 0
 
     async def test_replica_count_mismatch_captured(
         self,
@@ -229,13 +232,12 @@ class TestCheckReadyDeployments:
 
         # Assert
         assert len(result.successes) == 0
-        assert len(result.errors) == 1
-        assert "Mismatched" in result.errors[0].reason
+        assert len(result.failures) == 1
+        assert "Mismatched" in result.failures[0].reason
 
     async def test_empty_deployment_list(
         self,
         deployment_executor: DeploymentExecutor,
-        mock_deployment_repo: AsyncMock,
     ) -> None:
         """CR-003: Empty deployment list returns empty result.
 
@@ -249,7 +251,7 @@ class TestCheckReadyDeployments:
 
         # Assert
         assert len(result.successes) == 0
-        assert len(result.errors) == 0
+        assert len(result.failures) == 0
 
 
 # =============================================================================
@@ -393,7 +395,8 @@ class TestScaleDeployment:
             result = await deployment_executor.scale_deployment([ready_deployment_needs_scale_up])
 
         # Assert - KeyError since deployment.id not in empty dict
-        assert len(result.errors) == 1
+        assert len(result.successes) == 0
+        assert len(result.failures) == 1
 
 
 # =============================================================================
@@ -440,7 +443,7 @@ class TestDestroyDeployment:
 
         # Assert
         assert len(result.successes) == 1
-        assert len(result.errors) == 0
+        assert len(result.failures) == 0
         mock_deployment_repo.mark_terminating_route_status_bulk.assert_awaited_once()
         mock_unregister.assert_awaited_once()
 
@@ -485,7 +488,7 @@ class TestDestroyDeployment:
 
         # Assert
         assert len(result.successes) == 2
-        assert len(result.errors) == 0
+        assert len(result.failures) == 0
 
     async def test_unregister_failure_captured(
         self,
@@ -520,8 +523,8 @@ class TestDestroyDeployment:
 
         # Assert
         assert len(result.successes) == 0
-        assert len(result.errors) == 1
-        assert "Unregister" in result.errors[0].error_detail
+        assert len(result.failures) == 1
+        assert "Unregister" in result.failures[0].error_detail
 
 
 # =============================================================================

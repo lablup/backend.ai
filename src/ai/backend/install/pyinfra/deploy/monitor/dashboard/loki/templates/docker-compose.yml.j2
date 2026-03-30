@@ -1,0 +1,31 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  restart: unless-stopped
+  cpu_count: 2
+  mem_limit: "4g"
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  loki:
+    <<: *base
+    image: grafana/loki:${LOKI_IMAGE_TAG}
+    container_name: bai-loki
+    user: "10001:10001"  # loki user
+    ports:
+      - "${LOKI_PORT}:3100"
+    volumes:
+      - "/etc/hosts:/etc/hosts:ro"
+      - "./configs/loki-config.yml:/etc/loki/local-config.yml:ro"
+      - "{{ data_dir }}:/loki:rw"
+    command: -config.file=/etc/loki/local-config.yml
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

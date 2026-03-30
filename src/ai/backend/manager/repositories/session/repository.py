@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy.orm.strategy_options import _AbstractLoad
@@ -15,7 +16,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult
-from ai.backend.manager.data.session.types import SessionListResult
+from ai.backend.manager.data.session.types import SessionData, SessionListResult
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
@@ -25,6 +26,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.session.db_source import SessionDBSource
+from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 
 session_repository_resilience = Resilience(
     policies=[
@@ -271,6 +273,32 @@ class SessionRepository:
         return await self._db_source.search(querier)
 
     @session_repository_resilience.apply()
+    async def search_in_project(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectSessionSearchScope,
+    ) -> SessionListResult:
+        """Search sessions scoped to a project.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+            scope: ProjectSessionSearchScope that filters by project and validates existence
+
+        Returns:
+            SessionListResult with items, total count, and pagination info
+        """
+        return await self._db_source.search_in_project(querier, scope)
+
+    @session_repository_resilience.apply()
+    async def filter_sessions_in_project(
+        self,
+        session_ids: list[SessionId],
+        project_id: uuid.UUID,
+    ) -> list[SessionId]:
+        """Return session IDs that belong to the specified project."""
+        return await self._db_source.filter_sessions_in_project(session_ids, project_id)
+
+    @session_repository_resilience.apply()
     async def search_kernels(
         self,
         querier: BatchQuerier,
@@ -284,3 +312,27 @@ class SessionRepository:
             KernelListResult with items, total count, and pagination info
         """
         return await self._db_source.search_kernels(querier)
+
+    @session_repository_resilience.apply()
+    async def resolve_image_by_id(
+        self,
+        image_id: uuid.UUID,
+    ) -> ImageRow:
+        """Resolve an image by its UUID."""
+        return await self._db_source.resolve_image_by_id(image_id)
+
+    @session_repository_resilience.apply()
+    async def get_session_data_by_id(
+        self,
+        session_id: SessionId,
+    ) -> SessionData:
+        """Get session data by session ID for response construction."""
+        return await self._db_source.get_session_data_by_id(session_id)
+
+    @session_repository_resilience.apply()
+    async def update_image_last_used_at(
+        self,
+        image_id: uuid.UUID,
+        timestamp: datetime,
+    ) -> None:
+        await self._db_source.update_image_last_used_at(image_id, timestamp)

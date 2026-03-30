@@ -2,8 +2,8 @@
 
 import logging
 from datetime import UTC, datetime
-from uuid import UUID
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -21,7 +21,7 @@ from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
-    DeploymentSubStep,
+    DeploymentLifecycleSubStep,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
@@ -30,6 +30,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
     ModelRevisionData,
     ModelRuntimeConfigData,
+    MountMetadata,
     ReplicaStateData,
     ResourceConfigData,
     RouteInfo,
@@ -37,9 +38,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
-from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -151,6 +150,10 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentActionResult,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.definition_generator.base import ModelDefinitionContext
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    ModelDefinitionGeneratorRegistry,
+)
 from ai.backend.manager.sokovan.deployment.exceptions import (
     DeploymentAlreadyInProgress,
     InvalidEndpointState,
@@ -247,6 +250,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         default_deployment_strategy=DeploymentStrategy.ROLLING,
         created_user_id=info.metadata.created_user,
         policy=info.policy,
+        sub_step=info.sub_step,
     )
 
 
@@ -277,17 +281,20 @@ class DeploymentService:
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
     _revision_generator_registry: RevisionGeneratorRegistry
+    _model_definition_generator_registry: ModelDefinitionGeneratorRegistry
 
     def __init__(
         self,
         deployment_controller: DeploymentController,
         deployment_repository: DeploymentRepository,
         revision_generator_registry: RevisionGeneratorRegistry,
+        model_definition_generator_registry: ModelDefinitionGeneratorRegistry,
     ) -> None:
         """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
         self._deployment_repository = deployment_repository
         self._revision_generator_registry = revision_generator_registry
+        self._model_definition_generator_registry = model_definition_generator_registry
 
     # ========== Deployment CRUD ==========
 
@@ -509,7 +516,6 @@ class DeploymentService:
             endpoint_id=policy_upserter.deployment_id,
             strategy=policy_upserter.strategy,
             strategy_spec=policy_upserter.strategy_spec,
-            rollback_on_failure=policy_upserter.rollback_on_failure,
         )
         repo_upserter: Upserter[DeploymentPolicyRow] = Upserter(spec=spec)
         result = await self._deployment_repository.upsert_deployment_policy(repo_upserter)
@@ -568,23 +574,50 @@ class DeploymentService:
             execution=revision_creator.execution.model_copy(
                 update={"environ": merged_environ},
             ),
+            model_definition=revision_creator.model_definition,
         )
 
-    async def _build_revision(
+    async def _resolve_model_definition(
         self,
-        deployment_id: UUID,
         revision_creator: ModelRevisionCreator,
-    ) -> ModelRevisionData:
-        """Build and create a revision from the given creator.
+    ) -> ModelDefinition:
+        """Generate the final model definition for a revision.
+
+        Builds a ModelDefinitionContext from the creator data and delegates to
+        ModelDefinitionGeneratorRegistry, which performs the full merge:
+        programmatic generation → user override → storage file override.
+        """
+        context = ModelDefinitionContext(
+            mounts=MountMetadata(
+                model_vfolder_id=revision_creator.mounts.model_vfolder_id,
+                model_definition_path=revision_creator.mounts.model_definition_path,
+                model_mount_destination=revision_creator.mounts.model_mount_destination,
+            ),
+            execution=revision_creator.execution,
+            model_definition=revision_creator.model_definition,
+        )
+        return await self._model_definition_generator_registry.generate_model_definition(context)
+
+    async def add_model_revision(
+        self, action: AddModelRevisionAction
+    ) -> AddModelRevisionActionResult:
+        """Add a new model revision to an existing deployment.
+
+        Resolves the final model definition before creating the revision,
+        so the DB row contains the fully-merged definition from the start.
+        Subsequent PROVISIONING uses the stored value directly.
 
         Uses an atomic read-then-write operation for revision_number
         assignment to prevent race conditions from concurrent requests.
         The revision_number placeholder (0) is replaced atomically
         inside the repository.
         """
-        endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
+        deployment_id = action.model_deployment_id
+        log.info("Adding model revision to deployment {}", deployment_id)
 
-        merged_creator = await self._merge_service_definition(revision_creator)
+        endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
+        merged_creator = await self._merge_service_definition(action.adder)
+        resolved_model_definition = await self._resolve_model_definition(merged_creator)
 
         spec = DeploymentRevisionCreatorSpec(
             endpoint_id=deployment_id,
@@ -598,8 +631,7 @@ class DeploymentService:
             model_id=merged_creator.mounts.model_vfolder_id,
             model_mount_destination=merged_creator.mounts.model_mount_destination,
             model_definition_path=merged_creator.mounts.model_definition_path,
-            # TODO: model_definition is always hardcoded to None. Should be propagated from input or loaded from service-definition.
-            model_definition=None,
+            model_definition=resolved_model_definition,
             startup_command=merged_creator.execution.startup_command,
             bootstrap_script=merged_creator.execution.bootstrap_script,
             # TODO: None and {} have different semantics (not provided vs empty environ). CreatorSpec should accept Optional.
@@ -611,17 +643,17 @@ class DeploymentService:
             # TODO: Convert merged_creator.mounts.extra_mounts (list[MountInfo]) to Sequence[VFolderMount] instead of discarding.
             extra_mounts=(),
         )
-        creator: Creator[DeploymentRevisionRow] = Creator(spec=spec)
-        return await self._deployment_repository.create_revision_with_next_number(
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.DEPLOYMENT_REVISION,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(deployment_id),
+            ),
+        )
+        revision_data = await self._deployment_repository.create_revision_with_next_number(
             creator, deployment_id
         )
-
-    async def add_model_revision(
-        self, action: AddModelRevisionAction
-    ) -> AddModelRevisionActionResult:
-        """Add a new model revision to an existing deployment."""
-        log.info("Adding model revision to deployment {}", action.model_deployment_id)
-        revision_data = await self._build_revision(action.model_deployment_id, action.adder)
         return AddModelRevisionActionResult(revision=revision_data)
 
     async def get_revision_by_id(
@@ -692,7 +724,8 @@ class DeploymentService:
 
         # 4. Trigger DEPLOYING lifecycle to start strategy execution
         await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROVISIONING
+            DeploymentLifecycleType.DEPLOYING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
         )
 
         log.info(
@@ -858,14 +891,22 @@ class DeploymentService:
             action.creator.model_deployment_id
         )
 
-        # Create the Creator with EndpointTokenCreatorSpec
+        # Create the RBACEntityCreator with EndpointTokenCreatorSpec
+        endpoint_id = action.creator.model_deployment_id
         spec = EndpointTokenCreatorSpec(
-            endpoint_id=action.creator.model_deployment_id,
+            endpoint_id=endpoint_id,
             domain=endpoint_info.metadata.domain,
             project_id=endpoint_info.metadata.project,
             session_owner_id=endpoint_info.metadata.session_owner,
         )
-        creator: Creator[EndpointTokenRow] = Creator(spec=spec)
+        creator: RBACEntityCreator[EndpointTokenRow] = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.DEPLOYMENT_TOKEN,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(endpoint_id),
+            ),
+        )
 
         # Create the token via repository
         token_row = await self._deployment_repository.create_access_token(creator)

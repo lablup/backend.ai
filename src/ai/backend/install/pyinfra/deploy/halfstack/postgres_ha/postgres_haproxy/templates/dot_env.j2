@@ -1,0 +1,9 @@
+# PostgreSQL HAProxy Configuration
+{% for node in config.cluster_nodes -%}
+{{ node.hostname | upper }}_IP={{ node.ip }}
+{% endfor %}
+HAPROXY_STAT_PORT={{ config.haproxy_stat_port | default('7000') }}
+PG_ACTIVE_PORT={{ config.pg_active_port }}
+PG_STANDBY_PORT={{ config.pg_standby_port }}
+
+PIDS_LIMIT_VALUE=100

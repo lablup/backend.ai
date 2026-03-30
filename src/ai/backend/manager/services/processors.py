@@ -15,6 +15,9 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_live.client import (
         ValkeyLiveClient,  # pants: no-infer-dep
     )
+    from ai.backend.common.clients.valkey_client.valkey_session.client import (
+        ValkeySessionClient,  # pants: no-infer-dep
+    )
     from ai.backend.common.clients.valkey_client.valkey_stat.client import (
         ValkeyStatClient,  # pants: no-infer-dep
     )
@@ -177,6 +180,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.prometheus_query_preset.service import (
         PrometheusQueryPresetService,  # pants: no-infer-dep
     )
+    from ai.backend.manager.services.resource_allocation.processors import (
+        ResourceAllocationProcessors,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.resource_allocation.service import (
+        ResourceAllocationService,  # pants: no-infer-dep
+    )
     from ai.backend.manager.services.resource_preset.processors import (
         ResourcePresetProcessors,  # pants: no-infer-dep
     )
@@ -283,6 +292,7 @@ class ServiceArgs:
     valkey_stat_client: ValkeyStatClient
     valkey_live: ValkeyLiveClient
     valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
+    valkey_session_client: ValkeySessionClient
     event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
     event_hub: EventHub
@@ -347,6 +357,7 @@ class Services:
     scheduling_history: SchedulingHistoryService
     service_catalog: ServiceCatalogService
     template: TemplateService
+    resource_allocation: ResourceAllocationService
     stream: StreamService
     events: EventsService
 
@@ -403,6 +414,7 @@ class Processors(AbstractProcessorPackage):
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors
     template: TemplateProcessors
+    resource_allocation: ResourceAllocationProcessors
     stream: StreamProcessors
     events: EventsProcessors
 
@@ -452,6 +464,7 @@ class Processors(AbstractProcessorPackage):
             *self.scheduling_history.supported_actions(),
             *self.service_catalog.supported_actions(),
             *self.template.supported_actions(),
+            *self.resource_allocation.supported_actions(),
             *self.stream.supported_actions(),
             *self.events.supported_actions(),
         ]

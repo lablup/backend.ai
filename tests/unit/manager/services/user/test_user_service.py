@@ -68,7 +68,7 @@ from ai.backend.manager.services.user.actions.search_users_by_project import (
 )
 from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 from ai.backend.manager.services.user.service import UserService
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 def _make_user_data(
@@ -406,7 +406,7 @@ class TestBulkModifyUser:
             UserUpdateSpec(
                 user_id=uuid.uuid4(),
                 updater_spec=UserUpdaterSpec(
-                    full_name=OptionalState.update(f"User {i}"),
+                    full_name=TriState.update(f"User {i}"),
                 ),
             )
             for i in range(5)
@@ -430,7 +430,7 @@ class TestBulkModifyUser:
         failures: list[BulkUpdaterError[UserRow]] = [
             BulkUpdaterError(
                 spec=UserUpdaterSpec(
-                    full_name=OptionalState.update("User 3"),
+                    full_name=TriState.update("User 3"),
                 ),
                 exception=UserNotFound("User not found"),
                 index=3,
@@ -444,7 +444,7 @@ class TestBulkModifyUser:
             UserUpdateSpec(
                 user_id=uuid.uuid4(),
                 updater_spec=UserUpdaterSpec(
-                    full_name=OptionalState.update(f"User {i}"),
+                    full_name=TriState.update(f"User {i}"),
                 ),
             )
             for i in range(5)
@@ -693,7 +693,7 @@ class TestModifyUser:
         mock_user_repository.update_user_validated = AsyncMock(return_value=user)
 
         updater = Updater(
-            spec=UserUpdaterSpec(full_name=OptionalState.update("New Name")),
+            spec=UserUpdaterSpec(full_name=TriState.update("New Name")),
             pk_value=uuid.uuid4(),
         )
         action = ModifyUserAction(email="user@example.com", updater=updater)
@@ -716,7 +716,7 @@ class TestModifyUser:
         )
 
         updater = Updater(
-            spec=UserUpdaterSpec(full_name=OptionalState.update("Name")),
+            spec=UserUpdaterSpec(full_name=TriState.update("Name")),
             pk_value=uuid.uuid4(),
         )
         action = ModifyUserAction(email="missing@example.com", updater=updater)

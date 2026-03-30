@@ -30,22 +30,50 @@ from ai.backend.manager.services.user.actions.create_user import (
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
+    DeleteUserByIdAction,
+    DeleteUserByIdActionResult,
 )
 from ai.backend.manager.services.user.actions.get_user import (
     GetUserAction,
     GetUserActionResult,
+)
+from ai.backend.manager.services.user.actions.keypair_ops import (
+    AdminCreateKeypairAction,
+    AdminCreateKeypairActionResult,
+    AdminDeleteKeypairAction,
+    AdminDeleteKeypairActionResult,
+    AdminGetKeypairAction,
+    AdminGetKeypairActionResult,
+    AdminSearchKeypairsAction,
+    AdminSearchKeypairsActionResult,
+    AdminUpdateKeypairAction,
+    AdminUpdateKeypairActionResult,
+    IssueMyKeypairAction,
+    IssueMyKeypairActionResult,
+    RevokeMyKeypairAction,
+    RevokeMyKeypairActionResult,
+    SearchMyKeypairsAction,
+    SearchMyKeypairsActionResult,
+    SwitchMyMainAccessKeyAction,
+    SwitchMyMainAccessKeyActionResult,
+    UpdateMyKeypairAction,
+    UpdateMyKeypairActionResult,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
     BulkModifyUserActionResult,
     ModifyUserAction,
     ModifyUserActionResult,
+    ModifyUserByIdAction,
+    ModifyUserByIdActionResult,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     BulkPurgeUserActionResult,
     PurgeUserAction,
     PurgeUserActionResult,
+    PurgeUserByIdAction,
+    PurgeUserByIdActionResult,
 )
 from ai.backend.manager.services.user.actions.search_users import (
     SearchUsersAction,
@@ -126,6 +154,34 @@ class UserService:
             email=action.email,
         )
         return DeleteUserActionResult()
+
+    async def modify_user_by_id(self, action: ModifyUserByIdAction) -> ModifyUserByIdActionResult:
+        user_data = await self._user_repository.update_user_by_uuid_validated(
+            user_uuid=action.user_id,
+            updater=action.updater,
+        )
+        return ModifyUserByIdActionResult(data=user_data)
+
+    async def delete_user_by_id(self, action: DeleteUserByIdAction) -> DeleteUserByIdActionResult:
+        await self._user_repository.delete_user_by_uuid_validated(user_uuid=action.user_id)
+        return DeleteUserByIdActionResult()
+
+    async def purge_user_by_id(self, action: PurgeUserByIdAction) -> PurgeUserByIdActionResult:
+        admin_user = await self._user_repository.get_user_by_uuid(action.admin_user_id)
+        user_info_ctx = UserInfoContext(
+            uuid=admin_user.uuid,
+            email=admin_user.email,
+            main_access_key=AccessKey(admin_user.main_access_key or ""),
+        )
+        # Reuse the internal UUID-based purge logic shared with bulk_purge_users
+        bulk_action = BulkPurgeUserAction(
+            user_ids=[action.user_id],
+            admin_user_id=action.admin_user_id,
+            purge_shared_vfolders=action.purge_shared_vfolders,
+            delegate_endpoint_ownership=action.delegate_endpoint_ownership,
+        )
+        await self._purge_single_user(action.user_id, bulk_action, user_info_ctx)
+        return PurgeUserByIdActionResult(user_uuid=action.user_id)
 
     async def get_user(self, action: GetUserAction) -> GetUserActionResult:
         """Retrieve a single user by UUID.
@@ -212,7 +268,7 @@ class UserService:
         # Finally purge the user completely
         await self._user_repository.purge_user(email)
 
-        return PurgeUserActionResult()
+        return PurgeUserActionResult(user_uuid=user_uuid)
 
     async def _purge_single_user(
         self,
@@ -380,3 +436,76 @@ class UserService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def issue_my_keypair(self, action: IssueMyKeypairAction) -> IssueMyKeypairActionResult:
+        generated = await self._user_repository.issue_my_keypair(user_uuid=action.user_uuid)
+        return IssueMyKeypairActionResult(generated_data=generated)
+
+    async def revoke_my_keypair(self, action: RevokeMyKeypairAction) -> RevokeMyKeypairActionResult:
+        await self._user_repository.revoke_my_keypair(
+            user_uuid=action.user_uuid, access_key=action.access_key
+        )
+        return RevokeMyKeypairActionResult(success=True)
+
+    async def update_my_keypair(self, action: UpdateMyKeypairAction) -> UpdateMyKeypairActionResult:
+        keypair_data = await self._user_repository.update_my_keypair(
+            user_uuid=action.user_uuid,
+            updater=action.updater,
+        )
+        return UpdateMyKeypairActionResult(keypair=keypair_data)
+
+    async def switch_my_main_access_key(
+        self, action: SwitchMyMainAccessKeyAction
+    ) -> SwitchMyMainAccessKeyActionResult:
+        await self._user_repository.switch_my_main_access_key(
+            user_uuid=action.user_uuid, access_key=action.access_key
+        )
+        return SwitchMyMainAccessKeyActionResult(success=True)
+
+    async def search_my_keypairs(
+        self, action: SearchMyKeypairsAction
+    ) -> SearchMyKeypairsActionResult:
+        """Search keypairs owned by the current user."""
+        result = await self._user_repository.search_my_keypairs(
+            scope=action.scope, querier=action.querier
+        )
+        return SearchMyKeypairsActionResult(result=result)
+
+    # ------------------------------------------------------------------ admin keypair operations
+
+    async def admin_create_keypair(
+        self, action: AdminCreateKeypairAction
+    ) -> AdminCreateKeypairActionResult:
+        """Admin creates a keypair for a given user."""
+        generated = await self._user_repository.admin_create_keypair(
+            user_id=action.user_id, creator=action.creator
+        )
+        return AdminCreateKeypairActionResult(generated_data=generated)
+
+    async def admin_update_keypair(
+        self, action: AdminUpdateKeypairAction
+    ) -> AdminUpdateKeypairActionResult:
+        """Admin updates any keypair."""
+        keypair_data = await self._user_repository.admin_update_keypair(
+            updater=action.updater,
+        )
+        return AdminUpdateKeypairActionResult(keypair=keypair_data)
+
+    async def admin_delete_keypair(
+        self, action: AdminDeleteKeypairAction
+    ) -> AdminDeleteKeypairActionResult:
+        """Admin deletes any keypair."""
+        await self._user_repository.admin_delete_keypair(access_key=action.access_key)
+        return AdminDeleteKeypairActionResult(access_key=action.access_key)
+
+    async def admin_search_keypairs(
+        self, action: AdminSearchKeypairsAction
+    ) -> AdminSearchKeypairsActionResult:
+        """Admin search all keypairs."""
+        result = await self._user_repository.admin_search_keypairs(querier=action.querier)
+        return AdminSearchKeypairsActionResult(result=result)
+
+    async def admin_get_keypair(self, action: AdminGetKeypairAction) -> AdminGetKeypairActionResult:
+        """Admin retrieves a single keypair by access key."""
+        keypair_data = await self._user_repository.admin_get_keypair(access_key=action.access_key)
+        return AdminGetKeypairActionResult(keypair=keypair_data)

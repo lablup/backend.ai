@@ -7,17 +7,17 @@ from ai.backend.common.config import (
     ModelServiceConfig,
 )
 from ai.backend.common.types import MODEL_SERVICE_RUNTIME_PROFILES, RuntimeVariant
-from ai.backend.manager.data.deployment.types import (
-    ModelRevisionSpec,
+from ai.backend.manager.sokovan.deployment.definition_generator.base import (
+    ModelDefinitionContext,
+    ModelDefinitionGenerator,
 )
-from ai.backend.manager.sokovan.deployment.definition_generator.base import ModelDefinitionGenerator
 
 
 class NIMModelDefinitionGenerator(ModelDefinitionGenerator):
     """Model definition generator implementation for NVIDIA NIM runtime variant."""
 
     @override
-    async def generate_model_definition(self, model_revision: ModelRevisionSpec) -> ModelDefinition:
+    async def generate_model_definition(self, context: ModelDefinitionContext) -> ModelDefinition:
         runtime_profile = MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.NIM]
 
         health_check: ModelHealthCheck | None = None
@@ -31,9 +31,9 @@ class NIMModelDefinitionGenerator(ModelDefinitionGenerator):
 
         model = ModelConfig(
             name="nim-model",
-            model_path=model_revision.mounts.model_mount_destination,
+            model_path=context.mounts.model_mount_destination,
             service=ModelServiceConfig(
-                start_command=model_revision.execution.startup_command or "",
+                start_command=context.execution.startup_command or "",
                 port=runtime_profile.port or 8000,
                 health_check=health_check,
             ),

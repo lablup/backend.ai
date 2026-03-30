@@ -25,11 +25,13 @@ def register_auth_routes(handler: AuthHandler, route_deps: RouteDeps) -> RouteRe
 
     # Public endpoints (no auth_required)
     reg.add("POST", "/authorize", handler.authorize)
+    reg.add("POST", "/logout", handler.logout)
     reg.add("POST", "/signup", handler.signup)
     reg.add("POST", "/update-password-no-auth", handler.update_password_no_auth)
 
     # Authenticated endpoints
     reg.add("GET", "/role", handler.get_role, middlewares=[auth_required])
+    reg.add("GET", "/my-ip", handler.get_my_ip, middlewares=[auth_required])
     reg.add("POST", "/signout", handler.signout, middlewares=[auth_required])
     reg.add("POST", "/update-password", handler.update_password, middlewares=[auth_required])
     reg.add("POST", "/update-full-name", handler.update_full_name, middlewares=[auth_required])

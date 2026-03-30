@@ -33,6 +33,7 @@ def mock_config_provider() -> MagicMock:
         password_hash_algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
         password_hash_rounds=100_000,
         password_hash_salt_size=32,
+        login_session_max_age=604800,
     )
     return mock_provider
 
@@ -47,6 +48,7 @@ def auth_service(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
+        valkey_session_client=AsyncMock(),
     )
 
 

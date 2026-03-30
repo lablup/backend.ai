@@ -47,6 +47,7 @@ def _make_processing_input() -> ProcessingInput:
         etcd=MagicMock(),
         valkey_live=MagicMock(),
         valkey_artifact_client=MagicMock(),
+        valkey_session_client=MagicMock(),
         event_fetcher=MagicMock(),
         background_task_manager=MagicMock(),
         error_monitor=MagicMock(),

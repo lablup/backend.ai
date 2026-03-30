@@ -1,0 +1,31 @@
+REDIS_BASE_IMG={{ config.container_image }}
+MASTER_HOSTNAME=redis1
+REDIS_PASSWORD={{ config.password }}
+
+# Cluster node IPs
+{% for node in config.cluster_nodes -%}
+REDIS{{ node.node_number }}_IP={{ node.ip }}
+{% endfor -%}
+
+# Cluster node ports  
+{% for node in config.cluster_nodes -%}
+REDIS{{ node.node_number }}_PORT={{ node.port }}
+{% endfor -%}
+
+REDIS_CLUSTER_NAME={{ config.name }}
+MASTER_SERVICE_PORT={{ master_node.port }}
+
+# Current node configuration
+THIS_REDIS_NODE_NUMBER={{ current_node.node_number }}
+THIS_REDIS_NODE_NAME=redis{{ current_node.node_number }}
+SERVICE_PORT={{ current_node.port }}
+
+# Deployment configuration
+TARGET_HOME_DIR={{ home_dir }}
+TARGET_UNAME={{ target_uname }}
+PIDS_LIMIT_VALUE={{ config.pids_limit }}
+DATA_DIR={{ data_dir }}
+
+# Redis configuration
+MIN_SLAVES_TO_WRITE={{ config.min_slaves_to_write }}
+MIN_SLAVES_MAX_LAG={{ config.min_slaves_max_lag }}

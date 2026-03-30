@@ -18,8 +18,10 @@ from .resolver import (
     admin_user_v2,
     admin_users_v2,
     domain_users_v2,
+    my_client_ip,
     my_user_v2,
     project_users_v2,
+    update_my_allowed_client_ip,
     update_user_v2,
 )
 
@@ -28,6 +30,7 @@ __all__ = [
     "admin_user_v2",
     "admin_users_v2",
     "domain_users_v2",
+    "my_client_ip",
     "my_user_v2",
     "project_users_v2",
     # Mutations
@@ -36,6 +39,7 @@ __all__ = [
     "admin_bulk_update_users_v2",
     "admin_update_user_v2",
     "update_user_v2",
+    "update_my_allowed_client_ip",
     "admin_delete_user_v2",
     "admin_delete_users_v2",
     "admin_purge_user_v2",

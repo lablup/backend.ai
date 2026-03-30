@@ -10,66 +10,86 @@ import enum
 import uuid
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self
+from enum import StrEnum
+from typing import Any, Self, cast
 
 import strawberry
 from strawberry import Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.image.request import (
+    AdminSearchImageAliasesInput,
+    ContainerRegistryScopeInputDTO,
+    ImageAliasFilterInputDTO,
+    ImageAliasNestedFilterInputDTO,
+    ImageAliasOrderByInputDTO,
+    ImageFilterInputDTO,
+    ImageOrderByInputDTO,
+    ImageScopeInputDTO,
+    ImageStatusFilterInputDTO,
+)
+from ai.backend.common.dto.manager.v2.image.response import (
+    ImageAliasNode,
+    ImageIdentityInfoDTO,
+    ImageMetadataInfoDTO,
+    ImageNode,
+    ImagePermissionInfoDTO,
+    ImageRequirementsInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.image.types import (
+    ImageLabelInfo,
+    ImageResourceLimitGQLInfo,
+    ImageTagInfo,
+)
 from ai.backend.common.types import ImageID
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+    encode_cursor,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_added_field,
+    gql_connection_type,
+    gql_enum,
+    gql_field,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.image.types import (
-    ImageAliasData,
-    ImageData,
-    ImageDataWithDetails,
-    ImageStatus,
-    ResourceLimit,
-)
-from ai.backend.manager.models.rbac.permission_defs import ImagePermission
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.image.options import (
-    ImageAliasConditions,
-    ImageAliasOrders,
-    ImageConditions,
-    ImageOrders,
-)
+from ai.backend.manager.models.image.conditions import ImageAliasConditions
 
 # =============================================================================
 # Enums
 # =============================================================================
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Status of an image in the system.",
+    ),
     name="ImageV2Status",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Status of an image in the system.
-    """),
 )
 class ImageV2StatusGQL(enum.Enum):
     ALIVE = "ALIVE"
     DELETED = "DELETED"
 
-    @classmethod
-    def from_data(cls, status: ImageStatus) -> ImageV2StatusGQL:
-        return cls(status.value)
 
-
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Permission types for image operations.",
+    ),
     name="ImageV2Permission",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Permission types for image operations.
-    """),
 )
 class ImageV2PermissionGQL(enum.Enum):
     READ_ATTRIBUTE = "READ_ATTRIBUTE"
@@ -77,89 +97,62 @@ class ImageV2PermissionGQL(enum.Enum):
     CREATE_CONTAINER = "CREATE_CONTAINER"
     FORGET_IMAGE = "FORGET_IMAGE"
 
-    @classmethod
-    def from_data(cls, permission: ImagePermission) -> ImageV2PermissionGQL:
-        return cls(permission.value)
-
 
 # =============================================================================
 # Sub-Info Types (Leaf)
 # =============================================================================
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="A key-value pair representing a Docker label on the image. Labels contain metadata about the image such as maintainer, version, etc.",
+    ),
+    model=ImageLabelInfo,
     name="ImageV2LabelEntry",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    A key-value pair representing a Docker label on the image.
-    Labels contain metadata about the image such as maintainer, version, etc.
-    """),
 )
 class ImageV2LabelEntryGQL:
-    key: str = strawberry.field(description="The label key (e.g., 'maintainer').")
-    value: str = strawberry.field(description="The label value.")
-
-    @classmethod
-    def from_dict_item(cls, key: str, value: str) -> Self:
-        return cls(key=key, value=value)
+    key: strawberry.auto
+    value: strawberry.auto
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Resource limit specification for an image. Defines minimum and maximum values for a resource slot.",
+    ),
+    model=ImageResourceLimitGQLInfo,
     name="ImageV2ResourceLimit",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Resource limit specification for an image.
-    Defines minimum and maximum values for a resource slot.
-    """),
 )
 class ImageV2ResourceLimitGQL:
-    key: str = strawberry.field(
-        description="Resource slot name (e.g., 'cpu', 'mem', 'cuda.shares')."
-    )
-    min: str = strawberry.field(description="Minimum required amount.")
-    max: str = strawberry.field(description="Maximum allowed amount.")
-
-    @classmethod
-    def from_data(cls, data: ResourceLimit) -> Self:
-        return cls(
-            key=data.key,
-            min=str(data.min),
-            max=str(data.max),
-        )
+    key: strawberry.auto
+    min: strawberry.auto
+    max: strawberry.auto
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="A key-value pair representing a parsed tag component. Tags are extracted from the image reference (e.g., py311, cuda12.1).",
+    ),
+    model=ImageTagInfo,
     name="ImageV2TagEntry",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    A key-value pair representing a parsed tag component.
-    Tags are extracted from the image reference (e.g., py311, cuda12.1).
-    """),
 )
 class ImageV2TagEntryGQL:
-    key: str = strawberry.field(description="The tag key (e.g., 'python', 'cuda').")
-    value: str = strawberry.field(description="The tag value (e.g., '3.11', '12.1').")
-
-    @classmethod
-    def from_dict_item(cls, key: str, value: str) -> Self:
-        return cls(key=key, value=value)
+    key: strawberry.auto
+    value: strawberry.auto
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Represents an alias for a container image. Aliases provide alternative names for images.",
+    ),
     name="ImageV2Alias",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Represents an alias for a container image.
-    Aliases provide alternative names for images.
-    """),
 )
-class ImageV2AliasGQL(Node):
+class ImageV2AliasGQL(PydanticNodeMixin[ImageAliasNode]):
     id: NodeID[uuid.UUID]
-    alias: str = strawberry.field(description="The alias string for the image.")
+    alias: str = gql_field(description="The alias string for the image.")
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -172,11 +165,7 @@ class ImageV2AliasGQL(Node):
         results = await info.context.data_loaders.image_alias_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_data(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_data(cls, data: ImageAliasData) -> Self:
-        return cls(id=data.id, alias=data.alias)
+        return cast(list[Self | None], results)
 
 
 # =============================================================================
@@ -184,141 +173,76 @@ class ImageV2AliasGQL(Node):
 # =============================================================================
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Identity information for an image. Contains the canonical name, namespace, and architecture.",
+    ),
+    model=ImageIdentityInfoDTO,
     name="ImageV2IdentityInfo",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Identity information for an image.
-    Contains the canonical name, namespace, and architecture.
-    """),
 )
 class ImageV2IdentityInfoGQL:
-    canonical_name: str = strawberry.field(
-        description="Full canonical name (e.g., 'cr.backend.ai/stable/python:3.9')."
-    )
-    namespace: str = strawberry.field(
-        description="Image namespace/path within the registry (e.g., 'stable/python')."
-    )
-    architecture: str = strawberry.field(
-        description="CPU architecture (e.g., 'x86_64', 'aarch64')."
-    )
-
-    @classmethod
-    def from_data(cls, data: ImageData) -> Self:
-        return cls(
-            canonical_name=str(data.name),
-            namespace=data.image,
-            architecture=data.architecture,
-        )
-
-    @classmethod
-    def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
-        return cls(
-            canonical_name=str(data.name),
-            namespace=data.namespace,
-            architecture=data.architecture,
-        )
+    canonical_name: strawberry.auto
+    namespace: strawberry.auto
+    architecture: strawberry.auto
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Metadata information for an image. Contains tags, labels, digest, size, status, and creation timestamp.",
+    ),
+    model=ImageMetadataInfoDTO,
     name="ImageV2MetadataInfo",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Metadata information for an image.
-    Contains tags, labels, digest, size, status, and creation timestamp.
-    """),
 )
 class ImageV2MetadataInfoGQL:
-    tags: list[ImageV2TagEntryGQL] = strawberry.field(
-        description="Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1)."
-    )
-    labels: list[ImageV2LabelEntryGQL] = strawberry.field(description="Docker labels.")
-    digest: str | None = strawberry.field(
-        description="Config digest (image hash) for verification."
-    )
-    size_bytes: int = strawberry.field(description="Image size in bytes.")
-    status: ImageV2StatusGQL = strawberry.field(description="Image status (ALIVE or DELETED).")
-    created_at: datetime | None = strawberry.field(
+    digest: str | None = gql_field(description="Config digest (image hash) for verification.")
+    size_bytes: int = gql_field(description="Image size in bytes.")
+    created_at: datetime | None = gql_field(
         description="Timestamp when the image was created/registered."
     )
-
-    @classmethod
-    def from_data(cls, data: ImageData) -> Self:
-        return cls(
-            tags=[ImageV2TagEntryGQL.from_dict_item(entry.key, entry.value) for entry in data.tags],
-            labels=[
-                ImageV2LabelEntryGQL.from_dict_item(k, v) for k, v in data.labels.label_data.items()
-            ],
-            digest=data.config_digest,
-            size_bytes=data.size_bytes,
-            status=ImageV2StatusGQL.from_data(data.status),
-            created_at=data.created_at,
-        )
-
-    @classmethod
-    def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
-        return cls(
-            tags=[ImageV2TagEntryGQL.from_dict_item(kv.key, kv.value) for kv in data.tags],
-            labels=[ImageV2LabelEntryGQL.from_dict_item(kv.key, kv.value) for kv in data.labels],
-            digest=data.digest,
-            size_bytes=data.size_bytes,
-            status=ImageV2StatusGQL.from_data(data.status),
-            created_at=data.created_at,
-        )
+    last_used_at: datetime | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0",
+            description="Timestamp of the most recent session created with this image. Returns null if the image has never been used.",
+        ),
+    )
+    tags: list[ImageV2TagEntryGQL] = gql_field(
+        description="Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1)."
+    )
+    labels: list[ImageV2LabelEntryGQL] = gql_field(description="Docker labels.")
+    status: ImageV2StatusGQL = gql_field(description="Image status (ALIVE or DELETED).")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Runtime requirements information for an image. Contains resource limits and supported accelerators.",
+    ),
+    model=ImageRequirementsInfoDTO,
     name="ImageV2RequirementsInfo",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Runtime requirements information for an image.
-    Contains resource limits and supported accelerators.
-    """),
 )
 class ImageV2RequirementsInfoGQL:
-    resource_limits: list[ImageV2ResourceLimitGQL] = strawberry.field(
-        description="Resource slot limits (cpu, memory, accelerators, etc.)."
-    )
-    supported_accelerators: list[str] = strawberry.field(
+    supported_accelerators: list[str] = gql_field(
         description="List of supported accelerator types (e.g., 'cuda', 'rocm')."
     )
-
-    @classmethod
-    def from_data(cls, data: ImageData) -> Self:
-        accelerators = data.accelerators.split(",") if data.accelerators else []
-        return cls(
-            resource_limits=[ImageV2ResourceLimitGQL.from_data(rl) for rl in data.resource_limits],
-            supported_accelerators=[a.strip() for a in accelerators if a.strip()],
-        )
-
-    @classmethod
-    def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
-        return cls(
-            resource_limits=[ImageV2ResourceLimitGQL.from_data(rl) for rl in data.resource_limits],
-            supported_accelerators=[a.strip() for a in data.supported_accelerators if a.strip()],
-        )
-
-
-@strawberry.type(
-    name="ImageV2PermissionInfo",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Permission information for an image.
-    Contains the list of permissions the current user has on this image.
-    """),
-)
-class ImageV2PermissionInfoGQL:
-    permissions: list[ImageV2PermissionGQL] = strawberry.field(
-        description="List of permissions the user has on this image."
+    resource_limits: list[ImageV2ResourceLimitGQL] = gql_field(
+        description="Resource slot limits (cpu, memory, accelerators, etc.)."
     )
 
-    @classmethod
-    def from_permissions(cls, permissions: list[ImagePermission]) -> Self:
-        return cls(permissions=[ImageV2PermissionGQL.from_data(p) for p in permissions])
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Permission information for an image. Contains the list of permissions the current user has on this image.",
+    ),
+    model=ImagePermissionInfoDTO,
+    name="ImageV2PermissionInfo",
+)
+class ImageV2PermissionInfoGQL(PydanticOutputMixin[ImagePermissionInfoDTO]):
+    permissions: list[ImageV2PermissionGQL] = gql_field(
+        description="List of permissions the user has on this image."
+    )
 
 
 # =============================================================================
@@ -326,53 +250,48 @@ class ImageV2PermissionInfoGQL:
 # =============================================================================
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Represents a container image in Backend.AI. Images are container specifications that define the runtime environment for compute sessions. Each image has identity information, metadata, resource requirements, and permission settings. This is the V2 implementation using Strawberry GraphQL with Relay-style connections as part of BEP-1010 migration.",
+    ),
     name="ImageV2",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Represents a container image in Backend.AI.
-
-    Images are container specifications that define the runtime environment
-    for compute sessions. Each image has identity information, metadata,
-    resource requirements, and permission settings.
-
-    This is the V2 implementation using Strawberry GraphQL with Relay-style
-    connections as part of BEP-1010 migration.
-    """),
 )
-class ImageV2GQL(Node):
-    _image_id: strawberry.Private[ImageID]
-
+class ImageV2GQL(PydanticNodeMixin[ImageNode]):
     id: NodeID[uuid.UUID]
 
     # Sub-info types
-    identity: ImageV2IdentityInfoGQL = strawberry.field(
+    identity: ImageV2IdentityInfoGQL = gql_field(
         description="Image identity information (name, architecture)."
     )
-    metadata: ImageV2MetadataInfoGQL = strawberry.field(
+    metadata: ImageV2MetadataInfoGQL = gql_field(
         description="Image metadata (labels, digest, size, status, created_at)."
     )
-    requirements: ImageV2RequirementsInfoGQL = strawberry.field(
+    requirements: ImageV2RequirementsInfoGQL = gql_field(
         description="Runtime requirements (supported_accelerators)."
     )
-    permission: ImageV2PermissionInfoGQL | None = strawberry.field(
-        default=None, description="Permission info for the current user. May be null."
+    permission: ImageV2PermissionInfoGQL | None = gql_field(
+        description="Permission info for the current user. May be null.", default=None
     )
 
     # Registry (ContainerRegistryNode connection to be added later)
-    registry_id: uuid.UUID = strawberry.field(
+    registry_id: uuid.UUID = gql_field(
         description="UUID of the container registry where this image is stored."
     )
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.",
-    )
-    async def last_used(self, info: Info[StrawberryGQLContext]) -> datetime | None:
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0",
+            description="Timestamp of the most recent session created with this image. Returns null if the image has never been used.",
+        )
+    )  # type: ignore[misc]
+    def last_used(self) -> datetime | None:
         """Get the timestamp of the most recent session created with this image."""
-        return await info.context.data_loaders.image_last_used_loader.load(self._image_id)
+        return self.metadata.last_used_at
 
-    @strawberry.field(description="Added in 26.2.0. Aliases for this image.")  # type: ignore[misc]
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.2.0", description="Aliases for this image.")
+    )  # type: ignore[misc]
     async def aliases(
         self,
         info: Info[StrawberryGQLContext],
@@ -384,18 +303,35 @@ class ImageV2GQL(Node):
         last: int | None = None,
     ) -> ImageV2AliasConnectionGQL:
         """Get the aliases for this image with pagination, filtering, and ordering."""
-        from .fetcher import fetch_image_aliases
-
-        base_conditions = [ImageAliasConditions.by_image_ids([self._image_id])]
-        return await fetch_image_aliases(
-            info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
+        base_conditions = [ImageAliasConditions.by_image_ids([ImageID(self.id)])]
+        payload = await info.context.adapters.image.admin_search_image_aliases(
+            AdminSearchImageAliasesInput(
+                filter=pydantic_filter,
+                order=pydantic_orders,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+            ),
             base_conditions=base_conditions,
+        )
+        edges = [
+            ImageV2AliasEdgeGQL(
+                node=ImageV2AliasGQL.from_pydantic(node),
+                cursor=encode_cursor(node.id),
+            )
+            for node in payload.items
+        ]
+        page_info = strawberry.relay.PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        )
+        return ImageV2AliasConnectionGQL(
+            count=payload.total_count, edges=edges, page_info=page_info
         )
 
     @classmethod
@@ -409,78 +345,22 @@ class ImageV2GQL(Node):
         results = await info.context.data_loaders.image_loader.load_many([
             ImageID(uuid.UUID(nid)) for nid in node_ids
         ])
-        return [cls.from_data(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_data(
-        cls,
-        data: ImageData,
-        permissions: list[ImagePermission] | None = None,
-    ) -> Self:
-        """Create ImageV2GQL from ImageData.
-
-        Args:
-            data: The image data.
-            permissions: Optional list of permissions the user has on this image.
-
-        Returns:
-            ImageV2GQL instance.
-        """
-        return cls(
-            id=data.id,
-            _image_id=data.id,
-            identity=ImageV2IdentityInfoGQL.from_data(data),
-            metadata=ImageV2MetadataInfoGQL.from_data(data),
-            requirements=ImageV2RequirementsInfoGQL.from_data(data),
-            permission=ImageV2PermissionInfoGQL.from_permissions(permissions)
-            if permissions
-            else None,
-            registry_id=data.registry_id,
-        )
-
-    @classmethod
-    def from_detailed_data(
-        cls,
-        data: ImageDataWithDetails,
-        permissions: list[ImagePermission] | None = None,
-    ) -> Self:
-        """Create ImageV2GQL from ImageDataWithDetails.
-
-        Args:
-            data: The detailed image data.
-            permissions: Optional list of permissions the user has on this image.
-
-        Returns:
-            ImageV2GQL instance.
-        """
-        return cls(
-            id=data.id,
-            _image_id=data.id,
-            identity=ImageV2IdentityInfoGQL.from_detailed_data(data),
-            metadata=ImageV2MetadataInfoGQL.from_detailed_data(data),
-            requirements=ImageV2RequirementsInfoGQL.from_detailed_data(data),
-            permission=ImageV2PermissionInfoGQL.from_permissions(permissions)
-            if permissions
-            else None,
-            registry_id=data.registry_id,
-        )
+        return cast(list[Self | None], results)
 
 
 # Edge type using strawberry.relay.Edge
 ImageV2EdgeGQL = Edge[ImageV2GQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Relay-style connection for paginated image queries. Includes total count for pagination UI.",
+    ),
     name="ImageV2Connection",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Relay-style connection for paginated image queries.
-    Includes total count for pagination UI.
-    """),
 )
 class ImageV2ConnectionGQL(Connection[ImageV2GQL]):
-    count: int = strawberry.field(description="Total count of images matching the query.")
+    count: int = gql_field(description="Total count of images matching the query.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -492,196 +372,120 @@ class ImageV2ConnectionGQL(Connection[ImageV2GQL]):
 # =============================================================================
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for querying images within a specific container registry.",
+        added_version="26.2.0",
+    ),
     name="ContainerRegistryScope",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Scope for querying images within a specific container registry.
-    """),
 )
-class ContainerRegistryScopeGQL:
-    registry_id: uuid.UUID = strawberry.field(
+class ContainerRegistryScopeGQL(PydanticInputMixin[ContainerRegistryScopeInputDTO]):
+    registry_id: uuid.UUID = gql_field(
         description="UUID of the container registry to scope the query to."
     )
 
 
-@strawberry.input(
-    name="ImageV2Scope",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Scope for querying aliases within a specific image.
-    """),
-)
-class ImageV2ScopeGQL:
-    image_id: uuid.UUID = strawberry.field(description="UUID of the image to scope the query to.")
-
-
-@strawberry.input(
-    name="ImageAliasNestedFilter",
-    description=(
-        "Added in 26.3.0. Nested filter for aliases belonging to an image. "
-        "Filters images that have at least one alias matching all specified conditions."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for querying aliases within a specific image.",
+        added_version="26.2.0",
     ),
+    name="ImageV2Scope",
 )
-class ImageAliasNestedFilterGQL:
+class ImageV2ScopeGQL(PydanticInputMixin[ImageScopeInputDTO]):
+    image_id: uuid.UUID = gql_field(description="UUID of the image to scope the query to.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for aliases belonging to an image. Filters images that have at least one alias matching all specified conditions.",
+        added_version="26.3.0",
+    ),
+    name="ImageAliasNestedFilter",
+)
+class ImageAliasNestedFilterGQL(PydanticInputMixin[ImageAliasNestedFilterInputDTO]):
     """Nested filter for image aliases within an image."""
 
-    alias: StringFilter | None = strawberry.field(
-        default=None,
+    alias: StringFilter | None = gql_field(
         description="Filter by alias string. Supports equals, contains, startsWith, and endsWith.",
+        default=None,
     )
 
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions for alias nested filter."""
-        raw_conditions: list[QueryCondition] = []
-        if self.alias:
-            condition = self.alias.build_query_condition(
-                contains_factory=ImageAliasConditions.by_alias_contains,
-                equals_factory=ImageAliasConditions.by_alias_equals,
-                starts_with_factory=ImageAliasConditions.by_alias_starts_with,
-                ends_with_factory=ImageAliasConditions.by_alias_ends_with,
-            )
-            if condition:
-                raw_conditions.append(condition)
-        return raw_conditions
 
-
-@strawberry.input(
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Filter options for images based on various criteria such as status,
-    name, and architecture.
-
-    Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
-    """)
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for image status with equality and membership operators.",
+        added_version="26.3.0",
+    ),
+    name="ImageV2StatusFilter",
 )
-class ImageV2FilterGQL(GQLFilter):
-    status: list[ImageV2StatusGQL] | None = None
+class ImageV2StatusFilterGQL(PydanticInputMixin[ImageStatusFilterInputDTO]):
+    equals: ImageV2StatusGQL | None = gql_field(
+        description="Matches images with this exact status.", default=None
+    )
+    in_: list[ImageV2StatusGQL] | None = gql_field(
+        description="Matches images whose status is in this list.", name="in", default=None
+    )
+    not_equals: ImageV2StatusGQL | None = gql_field(
+        description="Excludes images with this exact status.", default=None
+    )
+    not_in: list[ImageV2StatusGQL] | None = gql_field(
+        description="Excludes images whose status is in this list.", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter options for images based on various criteria such as status, name, and architecture. Supports logical operations (AND, OR, NOT) for complex filtering scenarios.",
+        added_version="26.2.0",
+    ),
+    name="ImageV2Filter",
+)
+class ImageV2FilterGQL(PydanticInputMixin[ImageFilterInputDTO], GQLFilter):
+    status: ImageV2StatusFilterGQL | None = None
     name: StringFilter | None = None
     architecture: StringFilter | None = None
-    alias: ImageAliasNestedFilterGQL | None = strawberry.field(
+    registry_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.4.0", description="Filter by container registry ID."),
         default=None,
-        description="Added in 26.3.0. Filter by nested alias conditions.",
     )
-    last_used: DateTimeFilter | None = strawberry.field(
+    alias: ImageAliasNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.3.0", description="Filter by nested alias conditions."),
         default=None,
-        description="Added in 26.3.0. Filter by last used datetime (before/after).",
     )
-    AND: list[ImageV2FilterGQL] | None = None
-    OR: list[ImageV2FilterGQL] | None = None
-    NOT: list[ImageV2FilterGQL] | None = None
-
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing QueryConditions that represent
-        all filters with proper logical operators applied.
-        """
-
-        field_conditions: list[QueryCondition] = []
-
-        # Apply status filter
-        if self.status:
-            statuses = [ImageStatus(s.value) for s in self.status]
-            field_conditions.append(ImageConditions.by_statuses(statuses))
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=ImageConditions.by_name_contains,
-                equals_factory=ImageConditions.by_name_equals,
-                starts_with_factory=ImageConditions.by_name_starts_with,
-                ends_with_factory=ImageConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply architecture filter
-        if self.architecture:
-            arch_condition = self.architecture.build_query_condition(
-                contains_factory=ImageConditions.by_architecture_contains,
-                equals_factory=ImageConditions.by_architecture_equals,
-                starts_with_factory=ImageConditions.by_architecture_starts_with,
-                ends_with_factory=ImageConditions.by_architecture_ends_with,
-            )
-            if arch_condition:
-                field_conditions.append(arch_condition)
-
-        # Apply alias filter
-        if self.alias:
-            field_conditions.extend(self.alias.build_conditions())
-
-        # Apply last_used filter
-        if self.last_used:
-            last_used_condition = self.last_used.build_query_condition(
-                before_factory=ImageConditions.by_last_used_before,
-                after_factory=ImageConditions.by_last_used_after,
-            )
-            if last_used_condition:
-                field_conditions.append(last_used_condition)
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    last_used: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0", description="Filter by last used datetime (before/after)."
+        ),
+        default=None,
+    )
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Fields available for ordering image queries.",
+    ),
     name="ImageV2OrderField",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Fields available for ordering image queries.
-    """),
 )
-class ImageV2OrderFieldGQL(enum.Enum):
-    NAME = "NAME"
-    CREATED_AT = "CREATED_AT"
-    LAST_USED = "LAST_USED"
+class ImageV2OrderFieldGQL(StrEnum):
+    NAME = "name"
+    CREATED_AT = "created_at"
+    LAST_USED = "last_used"
 
 
-@strawberry.input(
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Specifies the field and direction for ordering images in queries.
-    """)
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies the field and direction for ordering images in queries.",
+        added_version="26.2.0",
+    ),
 )
-class ImageV2OrderByGQL(GQLOrderBy):
+class ImageV2OrderByGQL(PydanticInputMixin[ImageOrderByInputDTO], GQLOrderBy):
     field: ImageV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ImageV2OrderFieldGQL.NAME:
-                return ImageOrders.name(ascending)
-            case ImageV2OrderFieldGQL.CREATED_AT:
-                return ImageOrders.created_at(ascending)
-            case ImageV2OrderFieldGQL.LAST_USED:
-                return ImageOrders.last_used(ascending)
 
 
 # =============================================================================
@@ -692,77 +496,56 @@ class ImageV2OrderByGQL(GQLOrderBy):
 ImageV2AliasEdgeGQL = Edge[ImageV2AliasGQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Relay-style connection for paginated image alias queries. Includes total count for pagination UI.",
+    ),
     name="ImageV2AliasConnection",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Relay-style connection for paginated image alias queries.
-    Includes total count for pagination UI.
-    """),
 )
 class ImageV2AliasConnectionGQL(Connection[ImageV2AliasGQL]):
-    count: int = strawberry.field(description="Total count of aliases matching the query.")
+    count: int = gql_field(description="Total count of aliases matching the query.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
 
-@strawberry.input(
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Filter options for image aliases.
-    Supports filtering by alias string.
-    """)
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter options for image aliases. Supports filtering by alias string and image ID.",
+        added_version="26.2.0",
+    ),
+    name="ImageV2AliasFilter",
 )
-class ImageV2AliasFilterGQL(GQLFilter):
+class ImageV2AliasFilterGQL(PydanticInputMixin[ImageAliasFilterInputDTO], GQLFilter):
     alias: StringFilter | None = None
+    image_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.4.0", description="Filter by image ID."), default=None
+    )
 
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        field_conditions: list[QueryCondition] = []
-
-        if self.alias:
-            alias_condition = self.alias.build_query_condition(
-                contains_factory=ImageAliasConditions.by_alias_contains,
-                equals_factory=ImageAliasConditions.by_alias_equals,
-                starts_with_factory=ImageAliasConditions.by_alias_starts_with,
-                ends_with_factory=ImageAliasConditions.by_alias_ends_with,
-            )
-            if alias_condition:
-                field_conditions.append(alias_condition)
-
-        return field_conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Fields available for ordering image alias queries.",
+    ),
     name="ImageV2AliasOrderField",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Fields available for ordering image alias queries.
-    """),
 )
-class ImageV2AliasOrderFieldGQL(enum.Enum):
-    ALIAS = "ALIAS"
+class ImageV2AliasOrderFieldGQL(StrEnum):
+    ALIAS = "alias"
 
 
-@strawberry.input(
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Specifies the field and direction for ordering image aliases in queries.
-    """)
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies the field and direction for ordering image aliases in queries.",
+        added_version="26.2.0",
+    ),
 )
-class ImageV2AliasOrderByGQL(GQLOrderBy):
+class ImageV2AliasOrderByGQL(PydanticInputMixin[ImageAliasOrderByInputDTO], GQLOrderBy):
     field: ImageV2AliasOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ImageV2AliasOrderFieldGQL.ALIAS:
-                return ImageAliasOrders.alias(ascending)

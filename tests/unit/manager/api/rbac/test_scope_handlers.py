@@ -13,7 +13,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.api_handlers import BodyParam, PathParam
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.dto.manager.rbac.path import SearchScopesPathParam
 from ai.backend.common.dto.manager.rbac.request import SearchScopesRequest
 from ai.backend.manager.api.rest.rbac.handler import RBACHandler
@@ -65,8 +65,11 @@ def make_test_user_ctx() -> UserContext:
 class TestGetScopeTypesHandler:
     """Tests for get_scope_types handler."""
 
-    # Constants
-    EXPECTED_SCOPE_TYPES_COUNT = len(ScopeType)
+    # Count only RBACElementType members convertible to ScopeType
+    # (the handler filters out non-convertible element types)
+    EXPECTED_SCOPE_TYPES_COUNT = len([
+        et for et in RBACElementType if et.value in {st.value for st in ScopeType}
+    ])
 
     @pytest.fixture
     def mock_permission_controller(self) -> MagicMock:
@@ -83,7 +86,7 @@ class TestGetScopeTypesHandler:
         """Test get_scope_types returns all scope types for superadmin."""
         handler = make_test_handler(mock_permission_controller)
         ctx = make_test_superadmin_ctx()
-        action_result = GetScopeTypesActionResult(scope_types=list(ScopeType))
+        action_result = GetScopeTypesActionResult(element_types=list(RBACElementType))
         mock_permission_controller.get_scope_types.wait_for_complete.return_value = action_result
 
         response = await handler.get_scope_types(ctx=ctx)
@@ -254,7 +257,7 @@ class TestSearchScopesHandler:
         mock_permission_controller.search_scopes.wait_for_complete.assert_called_once()
         call_args = mock_permission_controller.search_scopes.wait_for_complete.call_args
         action = call_args[0][0]
-        assert action.scope_type == self.TEST_SCOPE_TYPE
+        assert action.element_type == self.TEST_SCOPE_TYPE.to_element()
 
     async def test_search_scopes_rejects_non_superadmin(
         self,

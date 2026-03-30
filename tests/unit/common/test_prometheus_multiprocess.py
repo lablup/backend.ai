@@ -151,7 +151,7 @@ class TestCleanupPrometheusMultiprocDir:
 
 class TestDefaultBaseDirUid:
     def test_default_base_dir_is_hardcoded(self) -> None:
-        assert Path("/tmp/backend.ai/prometheus") == mp_mod._DEFAULT_BASE_DIR
+        assert Path("./run/prometheus") == mp_mod._DEFAULT_BASE_DIR
 
     def test_setup_raises_on_permission_error(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture

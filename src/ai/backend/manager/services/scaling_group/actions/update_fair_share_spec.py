@@ -20,7 +20,7 @@ class ResourceWeightInput:
     weight: Decimal | None  # None means delete
 
 
-@dataclass
+@dataclass(frozen=True)
 class UpdateFairShareSpecAction(ScalingGroupAction):
     """Action to update fair share spec for a scaling group.
 
@@ -51,7 +51,7 @@ class UpdateFairShareSpecAction(ScalingGroupAction):
         return self.resource_group
 
 
-@dataclass
+@dataclass(frozen=True)
 class UpdateFairShareSpecActionResult(BaseActionResult):
     """Result of updating fair share spec."""
 

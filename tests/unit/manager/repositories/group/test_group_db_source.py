@@ -25,7 +25,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -82,6 +82,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -255,6 +256,7 @@ class TestGroupDBSourceDeleteEndpoints:
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    current_revision=uuid.uuid4(),
                     resource_slots=ResourceSlot(),
                     cluster_mode="single-node",
                     cluster_size=1,
@@ -318,6 +320,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot(),
                 cluster_mode="single-node",
                 cluster_size=1,
@@ -399,6 +402,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot(),
                 cluster_mode="single-node",
                 cluster_size=1,
@@ -451,6 +455,7 @@ class TestGroupDBSourceDeleteEndpoints:
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    current_revision=uuid.uuid4(),
                     resource_slots=ResourceSlot(),
                     cluster_mode="single-node",
                     cluster_size=1,

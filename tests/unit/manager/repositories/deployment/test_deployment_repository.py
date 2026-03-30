@@ -58,7 +58,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -139,6 +139,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
@@ -567,6 +568,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,  # DESTROYED allows null image
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -734,6 +736,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     url=f"http://test{i}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,  # DESTROYED allows null image
+                    current_revision=uuid.uuid4(),
                     resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 )
                 db_sess.add(endpoint)
@@ -1191,6 +1194,7 @@ class TestDeploymentRevisionOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -1198,6 +1202,7 @@ class TestDeploymentRevisionOperations:
                 ImageRow,
                 EndpointRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
+                AssociationScopesEntitiesRow,  # RBACEntityCreator dependency
                 DeploymentRevisionRow,
                 DeploymentPolicyRow,
             ],
@@ -1393,6 +1398,7 @@ class TestDeploymentRevisionOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.CREATED,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 model_mount_destination="/models",
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
@@ -1455,7 +1461,16 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        return await deployment_repository.create_revision(Creator(spec=spec))
+        return await deployment_repository.create_revision(
+            RBACEntityCreator(
+                spec=spec,
+                element_type=RBACElementType.DEPLOYMENT_REVISION,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(test_endpoint_id),
+                ),
+            )
+        )
 
     @pytest.fixture
     async def test_multiple_revisions(
@@ -1488,7 +1503,16 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revision = await deployment_repository.create_revision(
+                RBACEntityCreator(
+                    spec=spec,
+                    element_type=RBACElementType.DEPLOYMENT_REVISION,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.MODEL_DEPLOYMENT,
+                        element_id=str(test_endpoint_id),
+                    ),
+                )
+            )
             revisions.append(revision)
         return revisions
 
@@ -1523,7 +1547,16 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revision = await deployment_repository.create_revision(
+                RBACEntityCreator(
+                    spec=spec,
+                    element_type=RBACElementType.DEPLOYMENT_REVISION,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.MODEL_DEPLOYMENT,
+                        element_id=str(test_endpoint_id),
+                    ),
+                )
+            )
             revisions.append(revision)
         return revisions
 
@@ -1534,7 +1567,7 @@ class TestDeploymentRevisionOperations:
         test_image_id: uuid.UUID,
         test_scaling_group_name: str,
     ) -> None:
-        """Test creating a deployment revision using Creator."""
+        """Test creating a deployment revision using RBACEntityCreator."""
         spec = DeploymentRevisionCreatorSpec(
             endpoint_id=test_endpoint_id,
             revision_number=1,
@@ -1555,7 +1588,14 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        creator = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.DEPLOYMENT_REVISION,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
 
         result = await deployment_repository.create_revision(creator)
 
@@ -1825,6 +1865,7 @@ class TestDeploymentAutoScalingPolicyOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -1999,6 +2040,7 @@ class TestDeploymentAutoScalingPolicyOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -2203,6 +2245,7 @@ class TestDeploymentPolicyOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -2377,6 +2420,7 @@ class TestDeploymentPolicyOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -2414,7 +2458,6 @@ class TestDeploymentPolicyOperations:
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
-            rollback_on_failure=False,
         )
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
         return result.data
@@ -2429,7 +2472,6 @@ class TestDeploymentPolicyOperations:
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=60),
-            rollback_on_failure=False,
         )
 
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
@@ -2440,7 +2482,6 @@ class TestDeploymentPolicyOperations:
         assert result.data.strategy_spec == BlueGreenSpec(
             auto_promote=True, promote_delay_seconds=60
         )
-        assert result.data.rollback_on_failure is False
         assert result.created is True
 
     async def test_upsert_deployment_policy_update(
@@ -2454,14 +2495,12 @@ class TestDeploymentPolicyOperations:
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
-            rollback_on_failure=True,
         )
 
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
 
         assert result.data.endpoint == test_endpoint_id
         assert result.data.strategy == DeploymentStrategy.BLUE_GREEN
-        assert result.data.rollback_on_failure is True
         assert result.created is False
 
     async def test_get_deployment_policy(
@@ -2541,6 +2580,7 @@ class TestSearchDeploymentPolicies:
                 ResourcePresetRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 GroupRow,
@@ -2698,6 +2738,7 @@ class TestSearchDeploymentPolicies:
                     url=f"http://test-{eid.hex[:8]}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    current_revision=uuid.uuid4(),
                     resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 )
                 db_sess.add(endpoint)
@@ -2726,7 +2767,6 @@ class TestSearchDeploymentPolicies:
                         endpoint_id=eid,
                         strategy=strategy,
                         strategy_spec=spec,
-                        rollback_on_failure=False,
                     )
                 )
             )
@@ -2909,12 +2949,14 @@ class TestRouteOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
                 RoutingRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -3083,6 +3125,7 @@ class TestRouteOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,  # DESTROYED allows null image
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -3127,7 +3170,14 @@ class TestRouteOperations:
             revision_id=None,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
-        creator = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
 
         route_id = await deployment_repository.create_route(creator)
 
@@ -3151,7 +3201,15 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
         )
-        route_id = await deployment_repository.create_route(Creator(spec=spec))
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
+        route_id = await deployment_repository.create_route(creator)
 
         # Update the route status
         updater = Updater(
@@ -3190,7 +3248,15 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
         )
-        route_id = await deployment_repository.create_route(Creator(spec=spec))
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
+        route_id = await deployment_repository.create_route(creator)
 
         # Update the route using unified spec (excluding session to avoid FK constraint)
         updater = Updater(
@@ -3251,6 +3317,7 @@ class TestDeploymentRepositoryDuplicateName:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -3258,6 +3325,7 @@ class TestDeploymentRepositoryDuplicateName:
                 VFolderRow,
                 ImageRow,
                 EndpointRow,
+                DeploymentRevisionRow,
                 AssociationScopesEntitiesRow,
                 DeploymentPolicyRow,
             ],

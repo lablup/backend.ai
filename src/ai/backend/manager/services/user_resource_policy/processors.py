@@ -12,14 +12,35 @@ from ai.backend.manager.services.user_resource_policy.actions.delete_user_resour
     DeleteUserResourcePolicyAction,
     DeleteUserResourcePolicyActionResult,
 )
+from ai.backend.manager.services.user_resource_policy.actions.get_my_user_resource_policy import (
+    GetMyUserResourcePolicyAction,
+    GetMyUserResourcePolicyActionResult,
+)
+from ai.backend.manager.services.user_resource_policy.actions.get_user_resource_policy import (
+    GetUserResourcePolicyAction,
+    GetUserResourcePolicyActionResult,
+)
 from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
     ModifyUserResourcePolicyAction,
     ModifyUserResourcePolicyActionResult,
+)
+from ai.backend.manager.services.user_resource_policy.actions.search_user_resource_policies import (
+    SearchUserResourcePoliciesAction,
+    SearchUserResourcePoliciesActionResult,
 )
 from ai.backend.manager.services.user_resource_policy.service import UserResourcePolicyService
 
 
 class UserResourcePolicyProcessors(AbstractProcessorPackage):
+    get_user_resource_policy: ActionProcessor[
+        GetUserResourcePolicyAction, GetUserResourcePolicyActionResult
+    ]
+    get_my_user_resource_policy: ActionProcessor[
+        GetMyUserResourcePolicyAction, GetMyUserResourcePolicyActionResult
+    ]
+    search_user_resource_policies: ActionProcessor[
+        SearchUserResourcePoliciesAction, SearchUserResourcePoliciesActionResult
+    ]
     create_user_resource_policy: ActionProcessor[
         CreateUserResourcePolicyAction, CreateUserResourcePolicyActionResult
     ]
@@ -36,6 +57,15 @@ class UserResourcePolicyProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
+        self.get_user_resource_policy = ActionProcessor(
+            service.get_user_resource_policy, action_monitors
+        )
+        self.get_my_user_resource_policy = ActionProcessor(
+            service.get_my_user_resource_policy, action_monitors
+        )
+        self.search_user_resource_policies = ActionProcessor(
+            service.search_user_resource_policies, action_monitors
+        )
         self.create_user_resource_policy = ActionProcessor(
             service.create_user_resource_policy, action_monitors
         )
@@ -49,6 +79,9 @@ class UserResourcePolicyProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
+            GetUserResourcePolicyAction.spec(),
+            GetMyUserResourcePolicyAction.spec(),
+            SearchUserResourcePoliciesAction.spec(),
             CreateUserResourcePolicyAction.spec(),
             ModifyUserResourcePolicyAction.spec(),
             DeleteUserResourcePolicyAction.spec(),

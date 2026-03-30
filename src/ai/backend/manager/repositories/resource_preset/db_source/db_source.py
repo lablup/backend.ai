@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
 
@@ -21,7 +22,10 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.data.resource_preset.types import (
+    ResourcePresetData,
+    ResourcePresetSearchResult,
+)
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     InvalidPresetQuery,
@@ -42,6 +46,7 @@ from ai.backend.manager.models.resource_slot import (
 from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.resource_slot.types import (
@@ -182,6 +187,22 @@ class ResourcePresetDBSource:
                 presets.append(row.to_dataclass())
 
         return presets
+
+    async def search_presets(
+        self,
+        querier: BatchQuerier,
+    ) -> ResourcePresetSearchResult:
+        """Search resource presets with filtering, ordering, and pagination."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ResourcePresetRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.ResourcePresetRow.to_dataclass() for row in result.rows]
+            return ResourcePresetSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     async def check_presets_data(
         self,
@@ -347,6 +368,14 @@ class ResourcePresetDBSource:
                     SlotQuantity(row.slot_name, row.total)
                 )
 
+        # Fill missing slot types with zero for each scaling group so callers always
+        # receive a complete list of known slots (not an empty list when no sessions exist).
+        for sg in sgroup_names:
+            existing_slots = {sq.slot_name for sq in per_sgroup_occupancy[sg]}
+            for slot_name in known_slot_types.keys():
+                if str(slot_name) not in existing_slots:
+                    per_sgroup_occupancy[sg].append(SlotQuantity(str(slot_name), Decimal(0)))
+
         return per_sgroup_occupancy
 
     async def _get_agent_available_resources(
@@ -466,7 +495,14 @@ class ResourcePresetDBSource:
         )
 
         result = await db_sess.execute(query)
-        return [SlotQuantity(row.slot_name, row.total) for row in result if row.total is not None]
+        quantities = [
+            SlotQuantity(row.slot_name, row.total) for row in result if row.total is not None
+        ]
+        if not quantities:
+            return [
+                SlotQuantity(str(slot_name), Decimal(0)) for slot_name in known_slot_types.keys()
+            ]
+        return quantities
 
     async def _get_keypair_resource_usage(
         self,

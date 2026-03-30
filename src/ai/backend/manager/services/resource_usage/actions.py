@@ -60,6 +60,8 @@ class SearchDomainUsageBucketsActionResult(BaseActionResult):
 
     items: list[DomainUsageBucketData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> str | None:
@@ -103,6 +105,8 @@ class SearchProjectUsageBucketsActionResult(BaseActionResult):
 
     items: list[ProjectUsageBucketData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> str | None:
@@ -146,6 +150,8 @@ class SearchUserUsageBucketsActionResult(BaseActionResult):
 
     items: list[UserUsageBucketData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> str | None:
@@ -178,6 +184,8 @@ class SearchScopedDomainUsageBucketsActionResult(BaseActionResult):
 
     items: list[DomainUsageBucketData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> str | None:
@@ -207,6 +215,8 @@ class SearchScopedProjectUsageBucketsActionResult(BaseActionResult):
 
     items: list[ProjectUsageBucketData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> str | None:
@@ -236,6 +246,8 @@ class SearchScopedUserUsageBucketsActionResult(BaseActionResult):
 
     items: list[UserUsageBucketData]
     total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
     @override
     def entity_id(self) -> str | None:

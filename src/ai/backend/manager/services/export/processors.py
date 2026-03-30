@@ -14,10 +14,18 @@ from .actions import (
     ExportAuditLogsCSVActionResult,
     ExportKeypairsCSVAction,
     ExportKeypairsCSVActionResult,
+    ExportMyKeypairsCSVAction,
+    ExportMyKeypairsCSVActionResult,
+    ExportMySessionsCSVAction,
+    ExportMySessionsCSVActionResult,
     ExportProjectsCSVAction,
     ExportProjectsCSVActionResult,
+    ExportSessionsByProjectCSVAction,
+    ExportSessionsByProjectCSVActionResult,
     ExportSessionsCSVAction,
     ExportSessionsCSVActionResult,
+    ExportUsersByDomainCSVAction,
+    ExportUsersByDomainCSVActionResult,
     ExportUsersCSVAction,
     ExportUsersCSVActionResult,
     GetReportAction,
@@ -46,6 +54,18 @@ class ExportProcessors(AbstractProcessorPackage):
     export_projects_csv: ActionProcessor[ExportProjectsCSVAction, ExportProjectsCSVActionResult]
     export_keypairs_csv: ActionProcessor[ExportKeypairsCSVAction, ExportKeypairsCSVActionResult]
     export_audit_logs_csv: ActionProcessor[ExportAuditLogsCSVAction, ExportAuditLogsCSVActionResult]
+    export_sessions_by_project_csv: ActionProcessor[
+        ExportSessionsByProjectCSVAction, ExportSessionsByProjectCSVActionResult
+    ]
+    export_users_by_domain_csv: ActionProcessor[
+        ExportUsersByDomainCSVAction, ExportUsersByDomainCSVActionResult
+    ]
+    export_my_sessions_csv: ActionProcessor[
+        ExportMySessionsCSVAction, ExportMySessionsCSVActionResult
+    ]
+    export_my_keypairs_csv: ActionProcessor[
+        ExportMyKeypairsCSVAction, ExportMyKeypairsCSVActionResult
+    ]
 
     def __init__(
         self,
@@ -60,6 +80,18 @@ class ExportProcessors(AbstractProcessorPackage):
         self.export_projects_csv = ActionProcessor(service.export_projects_csv, action_monitors)
         self.export_keypairs_csv = ActionProcessor(service.export_keypairs_csv, action_monitors)
         self.export_audit_logs_csv = ActionProcessor(service.export_audit_logs_csv, action_monitors)
+        self.export_sessions_by_project_csv = ActionProcessor(
+            service.export_sessions_by_project_csv, action_monitors
+        )
+        self.export_users_by_domain_csv = ActionProcessor(
+            service.export_users_by_domain_csv, action_monitors
+        )
+        self.export_my_sessions_csv = ActionProcessor(
+            service.export_my_sessions_csv, action_monitors
+        )
+        self.export_my_keypairs_csv = ActionProcessor(
+            service.export_my_keypairs_csv, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -71,4 +103,8 @@ class ExportProcessors(AbstractProcessorPackage):
             ExportProjectsCSVAction.spec(),
             ExportKeypairsCSVAction.spec(),
             ExportAuditLogsCSVAction.spec(),
+            ExportSessionsByProjectCSVAction.spec(),
+            ExportUsersByDomainCSVAction.spec(),
+            ExportMySessionsCSVAction.spec(),
+            ExportMyKeypairsCSVAction.spec(),
         ]

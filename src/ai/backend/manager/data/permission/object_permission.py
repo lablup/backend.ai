@@ -4,7 +4,6 @@ import uuid
 from dataclasses import dataclass
 
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.types import OptionalState
 
 from .id import ObjectId
 from .status import PermissionStatus
@@ -36,18 +35,6 @@ class ObjectPermissionCreateInput:
     entity_id: str
     operation: OperationType
     status: PermissionStatus = PermissionStatus.ACTIVE
-
-
-@dataclass
-class ObjectPermissionUpdater:
-    id: uuid.UUID
-    status: OptionalState[PermissionStatus]
-
-
-@dataclass
-class ObjectPermissionDeleteInput:
-    id: uuid.UUID
-    _status: PermissionStatus = PermissionStatus.DELETED
 
 
 @dataclass

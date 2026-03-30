@@ -15,17 +15,23 @@ from ai.backend.manager.api.rest.group.handler import GroupHandler
 from ai.backend.manager.api.rest.group.registry import register_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
+from ai.backend.manager.repositories.group.repositories import GroupRepositories
+from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.service.container_registry.harbor import (
     AbstractPerProjectContainerRegistryQuotaService,
 )
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.group.service import GroupService
 
 
 class InMemoryQuotaService:
@@ -77,6 +83,39 @@ def server_module_registries(
             route_deps,
         ),
     ]
+
+
+@pytest.fixture()
+def group_repository(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+    storage_manager: StorageSessionManager,
+    valkey_clients: ValkeyClients,
+) -> GroupRepository:
+    """Provide a GroupRepository backed by the real test database."""
+    return GroupRepository(
+        db=database_engine,
+        config_provider=config_provider,
+        valkey_stat_client=valkey_clients.stat,
+        storage_manager=storage_manager,
+    )
+
+
+@pytest.fixture()
+def group_service(
+    group_repository: GroupRepository,
+    storage_manager: StorageSessionManager,
+    config_provider: ManagerConfigProvider,
+    valkey_clients: ValkeyClients,
+) -> GroupService:
+    """Provide a GroupService backed by the real test database."""
+    group_repositories = GroupRepositories(repository=group_repository)
+    return GroupService(
+        storage_manager=storage_manager,
+        config_provider=config_provider,
+        valkey_stat_client=valkey_clients.stat,
+        group_repositories=group_repositories,
+    )
 
 
 @pytest.fixture()

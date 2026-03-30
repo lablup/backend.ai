@@ -1,0 +1,4 @@
+# ETCD HA Cluster Node Environment
+ETCD_CLUSTER_NODE_NAME={{current_node.hostname if current_node else 'unknown'}}
+ETCD_CLUSTER_NODE_NUMBER={{current_node.node_number if current_node else 'unknown'}}
+ETCD_CLUSTER_INFO={{etcd_cluster_info}}

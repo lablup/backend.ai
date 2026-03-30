@@ -1,0 +1,12 @@
+[
+  {
+    "labels": {
+      "job": "dcgm-exporter"
+    },
+    "targets": [
+{%- for target_host in dcgm_exporter_targets %}
+      "{{ target_host }}:{{ dcgm_exporter_port }}"{% if not loop.last %},{% endif %}
+{%- endfor %}
+    ]
+  }
+]

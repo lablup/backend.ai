@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -14,7 +16,7 @@ from ai.backend.common.exception import (
 from ai.backend.common.plugin.hook import HookResult
 
 
-class URLNotFound(BackendAIError):
+class URLNotFound(BackendAIError, web.HTTPNotFound):
     """Raised when URL path is not found."""
 
     error_type = "https://api.backend.ai/probs/url-not-found"
@@ -28,7 +30,7 @@ class URLNotFound(BackendAIError):
         )
 
 
-class ObjectNotFound(BackendAIError):
+class ObjectNotFound(BackendAIError, web.HTTPNotFound):
     """Raised when requested object is not found."""
 
     error_type = "https://api.backend.ai/probs/object-not-found"
@@ -53,7 +55,7 @@ class ObjectNotFound(BackendAIError):
         )
 
 
-class GenericBadRequest(BackendAIError):
+class GenericBadRequest(BackendAIError, web.HTTPBadRequest):
     """Raised for generic bad request errors."""
 
     error_type = "https://api.backend.ai/probs/generic-bad-request"
@@ -67,7 +69,7 @@ class GenericBadRequest(BackendAIError):
         )
 
 
-class RejectedByHook(BackendAIError):
+class RejectedByHook(BackendAIError, web.HTTPForbidden):
     """Raised when operation is rejected by a hook plugin."""
 
     error_type = "https://api.backend.ai/probs/rejected-by-hook"
@@ -90,7 +92,7 @@ class RejectedByHook(BackendAIError):
         )
 
 
-class InvalidCredentials(BackendAIError):
+class InvalidCredentials(BackendAIError, web.HTTPUnauthorized):
     """Raised when authentication credentials are not valid."""
 
     error_type = "https://api.backend.ai/probs/invalid-credentials"
@@ -104,7 +106,7 @@ class InvalidCredentials(BackendAIError):
         )
 
 
-class GenericForbidden(BackendAIError):
+class GenericForbidden(BackendAIError, web.HTTPForbidden):
     """Raised for generic forbidden operation errors."""
 
     error_type = "https://api.backend.ai/probs/generic-forbidden"
@@ -118,7 +120,7 @@ class GenericForbidden(BackendAIError):
         )
 
 
-class InsufficientPrivilege(BackendAIError):
+class InsufficientPrivilege(BackendAIError, web.HTTPForbidden):
     """Raised when user has insufficient privileges."""
 
     error_type = "https://api.backend.ai/probs/insufficient-privilege"
@@ -133,8 +135,14 @@ class InsufficientPrivilege(BackendAIError):
 
 
 class MethodNotAllowed(BackendAIError):
-    """Raised when HTTP method is not allowed."""
+    """Raised when HTTP method is not allowed.
 
+    Note: Cannot inherit web.HTTPMethodNotAllowed because it requires
+    positional args (method, allowed_methods) that conflict with
+    BackendAIError.__init__. Status code is set explicitly instead.
+    """
+
+    status_code = 405
     error_type = "https://api.backend.ai/probs/method-not-allowed"
     error_title = "HTTP Method Not Allowed."
 
@@ -146,7 +154,7 @@ class MethodNotAllowed(BackendAIError):
         )
 
 
-class InternalServerError(BackendAIError):
+class InternalServerError(BackendAIError, web.HTTPInternalServerError):
     """Raised for internal server errors."""
 
     error_type = "https://api.backend.ai/probs/internal-server-error"
@@ -160,7 +168,7 @@ class InternalServerError(BackendAIError):
         )
 
 
-class ServerMisconfiguredError(BackendAIError):
+class ServerMisconfiguredError(BackendAIError, web.HTTPInternalServerError):
     """Raised when server is misconfigured."""
 
     error_type = "https://api.backend.ai/probs/server-misconfigured"
@@ -174,7 +182,7 @@ class ServerMisconfiguredError(BackendAIError):
         )
 
 
-class ServiceUnavailable(BackendAIError):
+class ServiceUnavailable(BackendAIError, web.HTTPServiceUnavailable):
     """Raised when service is unavailable."""
 
     error_type = "https://api.backend.ai/probs/service-unavailable"
@@ -188,7 +196,7 @@ class ServiceUnavailable(BackendAIError):
         )
 
 
-class QueryNotImplemented(BackendAIError):
+class QueryNotImplemented(BackendAIError, web.HTTPNotImplemented):
     """Raised when API query is not implemented."""
 
     error_type = "https://api.backend.ai/probs/not-implemented"
@@ -202,7 +210,7 @@ class QueryNotImplemented(BackendAIError):
         )
 
 
-class InvalidAuthParameters(BackendAIError):
+class InvalidAuthParameters(BackendAIError, web.HTTPBadRequest):
     """Raised when authorization parameters are missing or invalid."""
 
     error_type = "https://api.backend.ai/probs/invalid-auth-params"
@@ -216,7 +224,7 @@ class InvalidAuthParameters(BackendAIError):
         )
 
 
-class AuthorizationFailed(BackendAIError):
+class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
     """Raised when credential/signature mismatch occurs."""
 
     error_type = "https://api.backend.ai/probs/auth-failed"
@@ -230,7 +238,7 @@ class AuthorizationFailed(BackendAIError):
         )
 
 
-class PasswordExpired(BackendAIError):
+class PasswordExpired(BackendAIError, web.HTTPUnauthorized):
     """Raised when password has expired."""
 
     error_type = "https://api.backend.ai/probs/password-expired"
@@ -244,7 +252,7 @@ class PasswordExpired(BackendAIError):
         )
 
 
-class InvalidAPIParameters(BackendAIError):
+class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     """Raised when API parameters are missing or invalid."""
 
     error_type = "https://api.backend.ai/probs/invalid-api-params"
@@ -258,7 +266,7 @@ class InvalidAPIParameters(BackendAIError):
         )
 
 
-class GraphQLError(BackendAIError):
+class GraphQLError(BackendAIError, web.HTTPBadRequest):
     """Raised for GraphQL-generated errors."""
 
     error_type = "https://api.backend.ai/probs/graphql-error"

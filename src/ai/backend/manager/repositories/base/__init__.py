@@ -42,9 +42,12 @@ from .purger import (
     BatchPurger,
     BatchPurgerResult,
     BatchPurgerSpec,
+    BulkPurgerError,
+    BulkPurgerResultWithFailures,
     Purger,
     PurgerResult,
     execute_batch_purger,
+    execute_bulk_purger_partial,
     execute_purger,
 )
 from .querier import (
@@ -161,6 +164,10 @@ __all__ = [
     "Purger",
     "PurgerResult",
     "execute_purger",
+    # BulkPurger
+    "BulkPurgerError",
+    "BulkPurgerResultWithFailures",
+    "execute_bulk_purger_partial",
     # BatchPurger
     "BatchPurgerSpec",
     "BatchPurger",

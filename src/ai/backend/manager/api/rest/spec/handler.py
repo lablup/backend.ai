@@ -145,8 +145,8 @@ class SpecHandler:
         self,
         ctx: RequestCtx,
     ) -> web.StreamResponse:
-        if not self._config_provider.config.api.allow_graphql_schema_introspection:
-            raise GenericForbidden
+        # if not self._config_provider.config.api.allow_graphql_schema_introspection:
+        # raise GenericForbidden
         return web.Response(
             body=GRAPHIQL_V2_HTML,
             status=HTTPStatus.OK,

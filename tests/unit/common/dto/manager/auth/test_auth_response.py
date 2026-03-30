@@ -27,6 +27,7 @@ def test_authorize_response() -> None:
         secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         role="user",
         status="active",
+        session_token="test_session_token",
         type=AuthTokenType.KEYPAIR,
     )
     resp = AuthorizeResponse(data=data)

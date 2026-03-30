@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from .fetcher import fetch_sessions
-from .resolver import admin_sessions_v2
+from .resolver import admin_sessions_v2, terminate_project_sessions_v2
 from .types import (
+    ProjectSessionScopeGQL,
     SessionV2ConnectionGQL,
     SessionV2EdgeGQL,
     SessionV2FilterGQL,
@@ -18,14 +18,15 @@ from .types import (
     SessionV2RuntimeInfoGQL,
     SessionV2StatusFilterGQL,
     SessionV2StatusGQL,
+    TerminateSessionsPayloadGQL,
 )
 
 __all__ = [
-    # Fetchers
-    "fetch_sessions",
     # Resolvers
     "admin_sessions_v2",
+    "terminate_project_sessions_v2",
     # V2 types
+    "ProjectSessionScopeGQL",
     "SessionV2ConnectionGQL",
     "SessionV2EdgeGQL",
     "SessionV2FilterGQL",
@@ -39,4 +40,5 @@ __all__ = [
     "SessionV2StatusFilterGQL",
     "SessionV2StatusGQL",
     "SessionV2GQL",
+    "TerminateSessionsPayloadGQL",
 ]

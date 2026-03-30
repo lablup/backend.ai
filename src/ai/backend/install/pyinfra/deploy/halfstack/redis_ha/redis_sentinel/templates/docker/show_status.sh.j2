@@ -1,0 +1,90 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+# Load environment variables
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+
+export REDIS_CONTAINER_NAME="{{ config.sentinel_container_name_prefix }}-node{{ current_node.node_number }}"
+export container_id=$(docker ps | grep "$REDIS_CONTAINER_NAME" | awk '{ print $1 }')
+
+echo "=== Redis Sentinel Status ==="
+echo "Cluster Name   : {{ config.name }}"
+echo "Sentinel Port  : {{ config.sentinel_port }}"
+echo "Container Name : $REDIS_CONTAINER_NAME"
+echo ""
+
+# Check Sentinel connection and monitored masters
+echo "=== Sentinel Service Status ==="
+if [ -z "$container_id" ]; then
+    echo "ERROR: Sentinel container not found for $REDIS_CONTAINER_NAME"
+    exit 1
+fi
+if [ ! -z "$container_id" ]; then
+    echo "Container ID   : $container_id"
+    echo "Container Status: $(docker ps --filter "id=$container_id" --format "{{ '{{.Status}}' }}")"
+
+    # Check Sentinel connectivity
+    sentinel_info=$(docker exec $container_id redis-cli -p 26379 -a "$REDIS_PASSWORD" --no-auth-warning PING 2>/dev/null)
+    if [ $? -eq 0 ]; then
+        echo "Sentinel Status: Connected"
+
+        # Get master information
+        echo ""
+        echo "=== Monitored Masters ==="
+        masters=$(docker exec $container_id redis-cli -p 26379 -a "$REDIS_PASSWORD" --no-auth-warning SENTINEL masters 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            echo "Master mymaster:"
+            echo "$masters" | grep -A1 -E "^(ip|port|flags|num-slaves)$" | grep -v "^--$" | paste - - | while read field value; do
+                echo "  $field: $value"
+            done
+        fi
+
+        # Get slaves information
+        echo ""
+        echo "=== Connected Slaves ==="
+        slaves=$(docker exec $container_id redis-cli -p 26379 -a "$REDIS_PASSWORD" --no-auth-warning SENTINEL slaves mymaster 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            slave_count=$(echo "$slaves" | grep -c "^ip$")
+            echo "Slaves for mymaster ($slave_count total):"
+            echo "$slaves" | grep -A1 -E "^(ip|port|flags|master-link-status)$" | grep -v "^--$" | paste - - | while read field value; do
+                if [ "$field" = "ip" ]; then
+                    echo "  Slave: $value"
+                elif [ "$field" = "port" ]; then
+                    echo "    Port: $value"
+                elif [ "$field" = "flags" ]; then
+                    echo "    Status: $value"
+                elif [ "$field" = "master-link-status" ]; then
+                    echo "    Link: $value"
+                    echo ""
+                fi
+            done
+        fi
+
+        # Get sentinels information
+        echo ""
+        echo "=== Other Sentinels ==="
+        sentinels=$(docker exec $container_id redis-cli -p 26379 -a "$REDIS_PASSWORD" --no-auth-warning SENTINEL sentinels mymaster 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            sentinel_count=$(echo "$sentinels" | grep -c "^ip$")
+            echo "Other sentinels monitoring mymaster ($sentinel_count total):"
+            echo "$sentinels" | grep -A1 -E "^(ip|port|flags)$" | grep -v "^--$" | paste - - | while read field value; do
+                if [ "$field" = "ip" ]; then
+                    echo "  Sentinel: $value"
+                elif [ "$field" = "port" ]; then
+                    echo "    Port: $value"
+                elif [ "$field" = "flags" ]; then
+                    echo "    Status: $value"
+                    echo ""
+                fi
+            done
+        fi
+    else
+        echo "Sentinel Status: Connection failed"
+    fi
+else
+    echo "Sentinel Container: Not running"
+fi
+echo ""

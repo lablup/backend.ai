@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
@@ -80,17 +81,26 @@ class DeploymentServiceBaseFixtures:
         return MagicMock(spec=RevisionGeneratorRegistry)
 
     @pytest.fixture
+    def mock_model_definition_generator_registry(self) -> AsyncMock:
+        """Mock ModelDefinitionGeneratorRegistry."""
+        registry = AsyncMock()
+        registry.generate_model_definition.return_value = ModelDefinition()
+        return registry
+
+    @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
         mock_revision_generator_registry: MagicMock,
+        mock_model_definition_generator_registry: AsyncMock,
     ) -> DeploymentService:
         """Create DeploymentService with mock dependencies."""
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
             revision_generator_registry=mock_revision_generator_registry,
+            model_definition_generator_registry=mock_model_definition_generator_registry,
         )
 
     @pytest.fixture
@@ -106,7 +116,6 @@ class DeploymentServiceBaseFixtures:
             endpoint=uuid.uuid4(),
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
-            rollback_on_failure=False,
             created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
             updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
         )
@@ -129,7 +138,6 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
             deployment_id=endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=1),
-            rollback_on_failure=True,
         )
 
     @pytest.fixture
@@ -138,7 +146,6 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
             deployment_id=endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
-            rollback_on_failure=False,
         )
 
     @pytest.fixture
@@ -148,7 +155,6 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
             endpoint=uuid.uuid4(),
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
-            rollback_on_failure=False,
             created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
             updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
         )
@@ -177,7 +183,6 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
         spec = upserter_arg.spec
         assert spec.endpoint_id == endpoint_id
         assert spec.strategy == DeploymentStrategy.ROLLING
-        assert spec.rollback_on_failure is True
 
     async def test_upsert_deployment_policy_update(
         self,
@@ -379,6 +384,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 runtime_variant=RuntimeVariant.VLLM,
                 callback_url=None,
             ),
+            model_definition=ModelDefinition(),
         )
 
     @pytest.fixture
@@ -426,6 +432,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 runtime_variant=RuntimeVariant.VLLM,
                 environ=None,
             ),
+            model_definition=ModelDefinition(),
         )
 
 
@@ -478,7 +485,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
         assert spec.cluster_size == revision_creator.resource_spec.cluster_size
         assert spec.model_mount_destination == revision_creator.mounts.model_mount_destination
         assert spec.model_definition_path == revision_creator.mounts.model_definition_path
-        assert spec.model_definition is None
+        assert spec.model_definition == revision_creator.model_definition
         assert spec.startup_command == revision_creator.execution.startup_command
         assert spec.bootstrap_script == revision_creator.execution.bootstrap_script
         assert spec.environ == revision_creator.execution.environ
@@ -502,6 +509,60 @@ class TestAddModelRevision(ModelRevisionFixtures):
         spec = creator_arg.spec
         assert spec.environ == {}
         assert spec.resource_opts == {}
+
+    @pytest.fixture
+    def sample_model_definition(self) -> ModelDefinition:
+        return ModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "test-model",
+                    "model-path": "/models",
+                    "service": {"start-command": "serve", "port": 8000},
+                }
+            ]
+        })
+
+    @pytest.fixture
+    def revision_creator_with_model_definition(
+        self,
+        image_id: uuid.UUID,
+        model_vfolder_id: uuid.UUID,
+        sample_model_definition: ModelDefinition,
+    ) -> ModelRevisionCreator:
+        return ModelRevisionCreator(
+            image_id=image_id,
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots={"cpu": "4"},
+            ),
+            mounts=VFolderMountsCreator(model_vfolder_id=model_vfolder_id),
+            execution=ExecutionSpec(runtime_variant=RuntimeVariant.VLLM),
+            model_definition=sample_model_definition,
+        )
+
+    async def test_add_model_revision_stores_resolved_model_definition(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        mock_model_definition_generator_registry: AsyncMock,
+        deployment_id: uuid.UUID,
+        revision_creator_with_model_definition: ModelRevisionCreator,
+        sample_model_definition: ModelDefinition,
+    ) -> None:
+        """Resolved model_definition (from generator registry) should be stored in the DB spec."""
+        mock_model_definition_generator_registry.generate_model_definition.return_value = (
+            sample_model_definition
+        )
+
+        action = AddModelRevisionAction(
+            model_deployment_id=deployment_id, adder=revision_creator_with_model_definition
+        )
+        await processors.add_model_revision.wait_for_complete(action)
+
+        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
+        assert spec.model_definition is not None
+        assert spec.model_definition == sample_model_definition
 
 
 class TestServiceDefinitionMerge(ModelRevisionFixtures):

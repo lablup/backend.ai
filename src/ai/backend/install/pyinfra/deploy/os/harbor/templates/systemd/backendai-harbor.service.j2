@@ -1,0 +1,20 @@
+[Unit]
+Description=Harbor
+After=docker.service systemd-networkd.service systemd-resolved.service
+Requires=docker.service
+Documentation=http://github.com/vmware/harbor
+
+[Service]
+Type=forking
+Restart=on-failure
+RestartSec=5
+ExecStart=/bin/bash -c 'cd {{ working_dir }} && docker compose up -d'
+ExecStop=/bin/bash -c 'cd {{ working_dir }} && docker compose down'
+ExecReload=/bin/bash -c 'cd {{ working_dir }} && docker compose restart'
+RemainAfterExit=yes
+TimeoutStartSec=300
+TimeoutStopSec=300
+WorkingDirectory={{ working_dir }}
+
+[Install]
+WantedBy=multi-user.target

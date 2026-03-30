@@ -59,26 +59,28 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.models.fair_share.conditions import (
+    DomainFairShareConditions,
+    ProjectFairShareConditions,
+    RGDomainFairShareConditions,
+    RGProjectFairShareConditions,
+    RGUserFairShareConditions,
+    UserFairShareConditions,
+)
+from ai.backend.manager.models.fair_share.orders import (
+    DomainFairShareOrders,
+    ProjectFairShareOrders,
+    RGDomainFairShareOrders,
+    RGProjectFairShareOrders,
+    RGUserFairShareOrders,
+    UserFairShareOrders,
+)
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-)
-from ai.backend.manager.repositories.fair_share.options import (
-    DomainFairShareConditions,
-    DomainFairShareOrders,
-    ProjectFairShareConditions,
-    ProjectFairShareOrders,
-    RGDomainFairShareConditions,
-    RGDomainFairShareOrders,
-    RGProjectFairShareConditions,
-    RGProjectFairShareOrders,
-    RGUserFairShareConditions,
-    RGUserFairShareOrders,
-    UserFairShareConditions,
-    UserFairShareOrders,
 )
 from ai.backend.manager.repositories.resource_usage_history.options import (
     DomainUsageBucketConditions,

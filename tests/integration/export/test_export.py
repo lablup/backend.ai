@@ -4,9 +4,9 @@ import pytest
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.export import (
-    GetExportReportResponse,
-    ListExportReportsResponse,
+from ai.backend.common.dto.manager.v2.export import (
+    GetExportReportPayload,
+    ListExportReportsPayload,
 )
 
 
@@ -18,12 +18,12 @@ class TestExportLifecycle:
     ) -> None:
         """list_reports -> validate report keys -> get_report(key) for each."""
         list_result = await admin_registry.export.list_reports()
-        assert isinstance(list_result, ListExportReportsResponse)
+        assert isinstance(list_result, ListExportReportsPayload)
         assert len(list_result.reports) > 0
 
         for report_info in list_result.reports:
             detail = await admin_registry.export.get_report(report_info.report_key)
-            assert isinstance(detail, GetExportReportResponse)
+            assert isinstance(detail, GetExportReportPayload)
             assert detail.report.report_key == report_info.report_key
             assert detail.report.name == report_info.name
             assert len(detail.report.fields) > 0

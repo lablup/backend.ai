@@ -1,6 +1,11 @@
 """ProjectV2 GraphQL types package."""
 
-from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
+from ai.backend.manager.api.gql.common_types import (
+    VFolderHostPermissionEntryGQL,
+    VFolderHostPermissionEnum,
+)
+
+from .enums import ProjectTypeEnum
 from .filters import (
     ProjectDomainNestedFilter,
     ProjectUserNestedFilter,
@@ -13,7 +18,6 @@ from .nested import (
     ProjectLifecycleInfoGQL,
     ProjectOrganizationInfoGQL,
     ProjectStorageInfoGQL,
-    VFolderHostPermissionEntryGQL,
 )
 from .node import ProjectV2Connection, ProjectV2Edge, ProjectV2GQL
 from .scopes import DomainProjectScope

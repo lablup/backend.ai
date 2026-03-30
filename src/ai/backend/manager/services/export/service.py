@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.repositories.base.types import QueryCondition
 
 from .actions import (
     GetReportAction,
@@ -16,8 +22,24 @@ from .actions.export_audit_logs_csv import (
     ExportAuditLogsCSVActionResult,
 )
 from .actions.export_keypairs_csv import ExportKeypairsCSVAction, ExportKeypairsCSVActionResult
+from .actions.export_my_keypairs_csv import (
+    ExportMyKeypairsCSVAction,
+    ExportMyKeypairsCSVActionResult,
+)
+from .actions.export_my_sessions_csv import (
+    ExportMySessionsCSVAction,
+    ExportMySessionsCSVActionResult,
+)
 from .actions.export_projects_csv import ExportProjectsCSVAction, ExportProjectsCSVActionResult
+from .actions.export_sessions_by_project_csv import (
+    ExportSessionsByProjectCSVAction,
+    ExportSessionsByProjectCSVActionResult,
+)
 from .actions.export_sessions_csv import ExportSessionsCSVAction, ExportSessionsCSVActionResult
+from .actions.export_users_by_domain_csv import (
+    ExportUsersByDomainCSVAction,
+    ExportUsersByDomainCSVActionResult,
+)
 from .actions.export_users_csv import ExportUsersCSVAction, ExportUsersCSVActionResult
 
 if TYPE_CHECKING:
@@ -195,6 +217,146 @@ class ExportService:
         row_iterator = self._repository.execute_export(action.query)
 
         return ExportAuditLogsCSVActionResult(
+            field_names=field_names,
+            row_iterator=row_iterator,
+            encoding=action.encoding,
+            filename=filename,
+        )
+
+    # ------------------------------------------------------------------
+    # Scoped export methods
+    # ------------------------------------------------------------------
+
+    async def export_sessions_by_project_csv(
+        self, action: ExportSessionsByProjectCSVAction
+    ) -> ExportSessionsByProjectCSVActionResult:
+        """Export session CSV scoped to a specific project.
+
+        Adds a scope condition filtering sessions by project_id (group_id).
+
+        Args:
+            action: Export action with project_id scope and pre-built query
+
+        Returns:
+            Action result containing field names, row iterator, and filename
+        """
+        scope_condition: QueryCondition = lambda: SessionRow.group_id == action.project_id
+        scoped_query = replace(
+            action.query,
+            conditions=[scope_condition, *action.query.conditions],
+        )
+
+        filename = action.filename
+        if filename is None:
+            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
+            filename = f"sessions-project-{timestamp}.csv"
+
+        field_names = [f.name for f in scoped_query.fields]
+        row_iterator = self._repository.execute_export(scoped_query)
+
+        return ExportSessionsByProjectCSVActionResult(
+            field_names=field_names,
+            row_iterator=row_iterator,
+            encoding=action.encoding,
+            filename=filename,
+        )
+
+    async def export_users_by_domain_csv(
+        self, action: ExportUsersByDomainCSVAction
+    ) -> ExportUsersByDomainCSVActionResult:
+        """Export user CSV scoped to a specific domain.
+
+        Adds a scope condition filtering users by domain_name.
+
+        Args:
+            action: Export action with domain_name scope and pre-built query
+
+        Returns:
+            Action result containing field names, row iterator, and filename
+        """
+        scope_condition: QueryCondition = lambda: UserRow.domain_name == action.domain_name
+        scoped_query = replace(
+            action.query,
+            conditions=[scope_condition, *action.query.conditions],
+        )
+
+        filename = action.filename
+        if filename is None:
+            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
+            filename = f"users-domain-{timestamp}.csv"
+
+        field_names = [f.name for f in scoped_query.fields]
+        row_iterator = self._repository.execute_export(scoped_query)
+
+        return ExportUsersByDomainCSVActionResult(
+            field_names=field_names,
+            row_iterator=row_iterator,
+            encoding=action.encoding,
+            filename=filename,
+        )
+
+    async def export_my_sessions_csv(
+        self, action: ExportMySessionsCSVAction
+    ) -> ExportMySessionsCSVActionResult:
+        """Export session CSV scoped to the current user.
+
+        Adds a scope condition filtering sessions by user_uuid.
+
+        Args:
+            action: Export action with user_uuid scope and pre-built query
+
+        Returns:
+            Action result containing field names, row iterator, and filename
+        """
+        scope_condition: QueryCondition = lambda: SessionRow.user_uuid == action.user_uuid
+        scoped_query = replace(
+            action.query,
+            conditions=[scope_condition, *action.query.conditions],
+        )
+
+        filename = action.filename
+        if filename is None:
+            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
+            filename = f"sessions-my-{timestamp}.csv"
+
+        field_names = [f.name for f in scoped_query.fields]
+        row_iterator = self._repository.execute_export(scoped_query)
+
+        return ExportMySessionsCSVActionResult(
+            field_names=field_names,
+            row_iterator=row_iterator,
+            encoding=action.encoding,
+            filename=filename,
+        )
+
+    async def export_my_keypairs_csv(
+        self, action: ExportMyKeypairsCSVAction
+    ) -> ExportMyKeypairsCSVActionResult:
+        """Export keypair CSV scoped to the current user.
+
+        Adds a scope condition filtering keypairs by user UUID.
+
+        Args:
+            action: Export action with user_uuid scope and pre-built query
+
+        Returns:
+            Action result containing field names, row iterator, and filename
+        """
+        scope_condition: QueryCondition = lambda: KeyPairRow.user == action.user_uuid
+        scoped_query = replace(
+            action.query,
+            conditions=[scope_condition, *action.query.conditions],
+        )
+
+        filename = action.filename
+        if filename is None:
+            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
+            filename = f"keypairs-my-{timestamp}.csv"
+
+        field_names = [f.name for f in scoped_query.fields]
+        row_iterator = self._repository.execute_export(scoped_query)
+
+        return ExportMyKeypairsCSVActionResult(
             field_names=field_names,
             row_iterator=row_iterator,
             encoding=action.encoding,

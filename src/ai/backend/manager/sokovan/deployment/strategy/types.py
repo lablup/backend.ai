@@ -12,18 +12,19 @@ from pydantic import BaseModel
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    DeploymentSubStep,
+    DeploymentLifecycleSubStep,
     RouteInfo,
 )
+from ai.backend.manager.models.deployment_policy import DeploymentStrategySpec
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 
 
 @dataclass
 class RouteChanges:
     """Route mutations to apply for a single deployment cycle."""
 
-    rollout_specs: list[Creator[RoutingRow]] = field(default_factory=list)
+    rollout_specs: list[RBACEntityCreator[RoutingRow]] = field(default_factory=list)
     drain_route_ids: list[UUID] = field(default_factory=list)
 
 
@@ -31,11 +32,10 @@ class RouteChanges:
 class StrategyCycleResult:
     """Result of evaluating a single deployment's strategy cycle.
 
-    ``sub_step`` indicates the next state: PROVISIONING, PROGRESSING,
-    ROLLING_BACK, COMPLETED, or ROLLED_BACK.
+    ``sub_step`` indicates the next state: PROVISIONING or COMPLETED.
     """
 
-    sub_step: DeploymentSubStep
+    sub_step: DeploymentLifecycleSubStep
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
 
@@ -52,18 +52,17 @@ class StrategyEvaluationSummary:
     """Aggregate result of evaluating all DEPLOYING deployments.
 
     The evaluator classifies each deployment into a sub_step and records
-    the mapping so the evaluate handler can bulk-update the DB column.
-    All outcomes — including ROLLING_BACK, COMPLETED, and ROLLED_BACK — are expressed
-    as sub_step values and persisted to the DB for their respective handlers.
+    the mapping.  The applier uses COMPLETED assignments to trigger
+    revision swaps.  Sub-step transitions are handled by the coordinator.
     """
 
     # Mapping from endpoint ID to its evaluated sub_step — used to bulk-update the DB.
-    assignments: dict[UUID, DeploymentSubStep] = field(default_factory=dict)
+    assignments: dict[UUID, DeploymentLifecycleSubStep] = field(default_factory=dict)
 
     # Aggregated route mutations from all per-deployment evaluations.
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
-    # Deployments that failed evaluation (no policy, strategy error, etc.)
+    # Deployments that failed evaluation or have failed routes.
     errors: list[EvaluationErrorData] = field(default_factory=list)
 
 
@@ -71,17 +70,15 @@ class AbstractDeploymentStrategy(ABC):
     """Base interface for deployment strategy cycle evaluation.
 
     Each concrete strategy (Blue-Green, Rolling Update) implements this interface.
-    The spec is injected via ``__init__`` — one instance per deployment.
+    The spec is passed per-cycle via ``evaluate_cycle``.
     """
-
-    def __init__(self, spec: BaseModel) -> None:
-        self._spec = spec
 
     @abstractmethod
     def evaluate_cycle(
         self,
         deployment: DeploymentInfo,
         routes: Sequence[RouteInfo],
+        spec: DeploymentStrategySpec,
     ) -> StrategyCycleResult: ...
 
 

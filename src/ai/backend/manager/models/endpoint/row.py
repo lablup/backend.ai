@@ -63,18 +63,14 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    DeploymentLifecycleSubStep,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
-    DeploymentSubStep,
-    ExecutionSpec,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionSpec,
-    MountMetadata,
     ReplicaSpec,
-    ResourceSpec,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
@@ -105,7 +101,6 @@ from ai.backend.manager.types import MountOptionModel, UserScope
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
 __all__ = (
     "EndpointAutoScalingRuleRow",
@@ -314,9 +309,9 @@ class EndpointRow(Base):  # type: ignore[misc]
     deploying_revision: Mapped[UUID | None] = mapped_column(
         "deploying_revision", GUID, nullable=True
     )
-    sub_step: Mapped[DeploymentSubStep | None] = mapped_column(
+    sub_step: Mapped[DeploymentLifecycleSubStep | None] = mapped_column(
         "sub_step",
-        StrEnumType(DeploymentSubStep),
+        StrEnumType(DeploymentLifecycleSubStep),
         nullable=True,
         default=None,
     )
@@ -422,7 +417,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         return row
 
     @classmethod
-    async def list(
+    async def list_endpoint(
         cls,
         session: AsyncSession,
         domain: str | None = None,
@@ -593,7 +588,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         from ai.backend.manager.models.routing import RoutingRow
         from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 
-        endpoint_rows = await EndpointRow.list(
+        endpoint_rows = await EndpointRow.list_endpoint(
             db_session,
             user_uuid=owner_user_uuid,
             load_session_owner=True,
@@ -769,42 +764,27 @@ class EndpointRow(Base):  # type: ignore[misc]
         )
 
     def to_deployment_info(self) -> DeploymentInfo:
-        """
-        Convert EndpointRow to DeploymentInfo dataclass.
-
-        If current_revision is set and revisions are loaded, uses revision data.
-        Otherwise, falls back to endpoint-level fields for legacy compatibility.
-        """
+        """Convert EndpointRow to DeploymentInfo dataclass using revision data."""
         policy_data = None
         if self.deployment_policy is not None:
             policy_data = self.deployment_policy.to_data()
 
-        # Try to use current revision if available
-        if self.current_revision and hasattr(self, "revisions") and self.revisions:
-            current_rev = next(
-                (r for r in self.revisions if r.id == self.current_revision),
-                None,
-            )
-            if current_rev:
-                info = self._to_deployment_info_from_revision(current_rev)
-                info.policy = policy_data
-                return info
+        model_revisions: list[ModelRevisionSpec] = []
+        for rev_row in self.revisions:
+            if rev_row.image_row is None:
+                continue
+            if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
+                model_revisions.append(rev_row.to_model_revision_spec())
 
-        # Fallback: use endpoint-level fields (legacy)
-        info = self._to_deployment_info_legacy()
+        info = self._to_deployment_info_with_revisions(model_revisions)
         info.policy = policy_data
         return info
 
-    def _to_deployment_info_from_revision(
+    def _to_deployment_info_with_revisions(
         self,
-        revision: DeploymentRevisionRow,
+        model_revisions: list[ModelRevisionSpec],
     ) -> DeploymentInfo:
-        """Build DeploymentInfo using revision data."""
-        # Get image identifier from revision's image_row
-        image_identifier = ImageIdentifier(
-            canonical=revision.image_row.name,
-            architecture=revision.image_row.architecture,
-        )
+        """Build DeploymentInfo with pre-built model_revisions dict."""
         return DeploymentInfo(
             id=self.id,
             metadata=DeploymentMetadata(
@@ -830,98 +810,11 @@ class EndpointRow(Base):  # type: ignore[misc]
                 open_to_public=self.open_to_public if self.open_to_public is not None else False,
                 url=self.url,
             ),
-            model_revisions=[
-                ModelRevisionSpec(
-                    image_identifier=image_identifier,
-                    resource_spec=ResourceSpec(
-                        cluster_mode=ClusterMode(revision.cluster_mode),
-                        cluster_size=revision.cluster_size,
-                        resource_slots=revision.resource_slots,
-                        resource_opts=revision.resource_opts,
-                    ),
-                    mounts=MountMetadata(
-                        model_vfolder_id=revision.model or uuid.UUID(int=0),
-                        model_definition_path=revision.model_definition_path,
-                        model_mount_destination=revision.model_mount_destination,
-                        extra_mounts=revision.extra_mounts or [],
-                    ),
-                    execution=ExecutionSpec(
-                        startup_command=revision.startup_command,
-                        bootstrap_script=revision.bootstrap_script,
-                        environ=revision.environ,
-                        runtime_variant=revision.runtime_variant,
-                        callback_url=yarl.URL(revision.callback_url)
-                        if revision.callback_url
-                        else None,
-                    ),
-                ),
-            ],
+            model_revisions=model_revisions,
             current_revision_id=self.current_revision,
             deploying_revision_id=self.deploying_revision,
             sub_step=self.sub_step,
-        )
-
-    def _to_deployment_info_legacy(self) -> DeploymentInfo:
-        """Build DeploymentInfo using endpoint-level fields (legacy fallback)."""
-        # Create ImageIdentifier from endpoint's image_row
-        if self.image_row is None:
-            raise ValueError("image_row is not loaded")
-        image_identifier = ImageIdentifier(
-            canonical=self.image_row.name,
-            architecture=self.image_row.architecture,
-        )
-        return DeploymentInfo(
-            id=self.id,
-            metadata=DeploymentMetadata(
-                name=self.name,
-                domain=self.domain,
-                project=self.project,
-                resource_group=self.resource_group,
-                created_user=self.created_user,
-                session_owner=self.session_owner,
-                created_at=self.created_at,
-                revision_history_limit=self.revision_history_limit,
-                tag=self.tag,
-            ),
-            state=DeploymentState(
-                lifecycle=self.lifecycle_stage,
-                retry_count=self.retries,
-            ),
-            replica_spec=ReplicaSpec(
-                replica_count=self.replicas,
-                desired_replica_count=self.desired_replicas,
-            ),
-            network=DeploymentNetworkSpec(
-                open_to_public=self.open_to_public if self.open_to_public is not None else False,
-                url=self.url,
-            ),
-            model_revisions=[
-                ModelRevisionSpec(
-                    image_identifier=image_identifier,
-                    resource_spec=ResourceSpec(
-                        cluster_mode=ClusterMode(self.cluster_mode),
-                        cluster_size=self.cluster_size,
-                        resource_slots=self.resource_slots,
-                        resource_opts=self.resource_opts,
-                    ),
-                    mounts=MountMetadata(
-                        model_vfolder_id=self.model or uuid.UUID(int=0),
-                        model_definition_path=self.model_definition_path,
-                        model_mount_destination=self.model_mount_destination,
-                        extra_mounts=self.extra_mounts,
-                    ),
-                    execution=ExecutionSpec(
-                        startup_command=self.startup_command,
-                        bootstrap_script=self.bootstrap_script,
-                        environ=self.environ,
-                        runtime_variant=self.runtime_variant,
-                        callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
-                    ),
-                ),
-            ],
-            current_revision_id=self.current_revision,
-            deploying_revision_id=self.deploying_revision,
-            sub_step=self.sub_step,
+            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
         )
 
 

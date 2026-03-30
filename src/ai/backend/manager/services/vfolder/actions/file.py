@@ -87,6 +87,8 @@ class CreateArchiveDownloadSessionAction(VFolderFileAction):
 
     files: list[str]
 
+    filename: str | None = None
+
     @override
     def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)

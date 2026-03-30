@@ -18,6 +18,7 @@ class AuthorizationResult:
     secret_key: str
     role: str
     status: str
+    session_token: str
 
 
 @dataclass

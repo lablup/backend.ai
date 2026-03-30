@@ -1,0 +1,42 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  extra_hosts:
+{%- for node in config.cluster_nodes %}
+    - "redis{{ node.node_number }}:${REDIS{{ node.node_number }}_IP:?error}"
+{%- endfor %}
+  image: ${REDIS_BASE_IMG}
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cpu_count: {{ config.sentinel_cpu_count }}
+  mem_limit: "{{ config.sentinel_memory_limit }}"
+  pids_limit: {{ config.pids_limit }}
+
+services:
+  redis-sentinel:
+    <<: *base
+    container_name: {{ config.sentinel_container_name_prefix }}-node{{ current_node.node_number }}
+    volumes:
+      - ./conf:/redis_sentinel:ro
+    ports:
+      - "${REDIS_SENTINEL_SERVICE_PORT}:26379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cp /redis_sentinel/sentinel.conf /tmp/redis-sentinel.conf
+        sed -i "s/ANNOUNCE_HOST/$THIS_HOST_IP/g" /tmp/redis-sentinel.conf
+        sed -i "s/ANNOUNCE_PORT/$REDIS_SENTINEL_SERVICE_PORT/g" /tmp/redis-sentinel.conf
+        sed -i "s/MASTER_IP/$MASTER_HOSTNAME/g" /tmp/redis-sentinel.conf
+        sed -i "s/REDIS_PASSWORD/$REDIS_PASSWORD/g" /tmp/redis-sentinel.conf
+        sed -i "s/MASTER_PORT/$MASTER_SERVICE_PORT/g" /tmp/redis-sentinel.conf
+        redis-server /tmp/redis-sentinel.conf --sentinel

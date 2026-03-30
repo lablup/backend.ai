@@ -113,6 +113,62 @@ class TestTestGet:
         assert data["echo"] == ""
 
 
+class TestGetMyIp:
+    """Tests for get_my_ip handler (GET /auth/my-ip)."""
+
+    async def test_returns_client_ip_from_x_forwarded_for(
+        self,
+        handler: AuthHandler,
+    ) -> None:
+        """Verify get_my_ip returns IP from X-Forwarded-For header."""
+        mock_request = MagicMock(spec=web.Request)
+        mock_request.headers.get.return_value = "1.2.3.4"
+        request_ctx = RequestCtx(request=mock_request)
+
+        response = await handler.get_my_ip(request_ctx)
+
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert isinstance(data, dict)
+        assert data["client_ip"] == "1.2.3.4"
+
+    async def test_returns_client_ip_from_request_remote(
+        self,
+        handler: AuthHandler,
+    ) -> None:
+        """Verify get_my_ip falls back to request.remote when no X-Forwarded-For header."""
+        mock_request = MagicMock(spec=web.Request)
+        mock_request.headers.get.return_value = None
+        mock_request.remote = "5.6.7.8"
+        request_ctx = RequestCtx(request=mock_request)
+
+        response = await handler.get_my_ip(request_ctx)
+
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert isinstance(data, dict)
+        assert data["client_ip"] == "5.6.7.8"
+
+    async def test_returns_first_ip_from_multiple_x_forwarded_for(
+        self,
+        handler: AuthHandler,
+    ) -> None:
+        """Verify get_my_ip returns the first IP from comma-separated X-Forwarded-For."""
+        mock_request = MagicMock(spec=web.Request)
+        mock_request.headers.get.return_value = "1.2.3.4, 5.6.7.8"
+        request_ctx = RequestCtx(request=mock_request)
+
+        response = await handler.get_my_ip(request_ctx)
+
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert isinstance(data, dict)
+        assert data["client_ip"] == "1.2.3.4"
+
+
 class TestTestPost:
     """Tests for test_post handler (POST /auth)."""
 
@@ -148,6 +204,7 @@ class TestAuthorize:
                 secret_key="TESTSECRET",
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
+                session_token="test_session_token",
             ),
         )
 
@@ -209,6 +266,7 @@ class TestAuthorize:
         assert action.email == email
         assert action.password == password
         assert action.stoken == stoken
+        assert action.otp is None
 
     async def test_stream_response_passthrough(
         self,
@@ -538,8 +596,12 @@ class TestGetSSHKeypair:
     ) -> None:
         """Verify processor is called and public key is returned."""
         public_key = "ssh-rsa AAAAB3...\n"
+        access_key = "AKIAIOSFODNN7EXAMPLE"
         mock_processors.auth.get_ssh_keypair.wait_for_complete = AsyncMock(
-            return_value=GetSSHKeypairActionResult(public_key=public_key)
+            return_value=GetSSHKeypairActionResult(
+                public_key=public_key,
+                access_key=access_key,
+            )
         )
 
         response = await handler.get_ssh_keypair(user_context)
@@ -564,12 +626,14 @@ class TestGenerateSSHKeypair:
         """Verify processor is called and keypair is returned."""
         ssh_public_key = "ssh-rsa NEWPUB...\n"
         ssh_private_key = "-----BEGIN RSA PRIVATE KEY-----\n...\n"
+        user_id = user_context.user_uuid
         mock_processors.auth.generate_ssh_keypair.wait_for_complete = AsyncMock(
             return_value=GenerateSSHKeypairActionResult(
                 ssh_keypair=SSHKeypair(
                     ssh_public_key=ssh_public_key,
                     ssh_private_key=ssh_private_key,
-                )
+                ),
+                user_id=user_id,
             )
         )
 
@@ -599,12 +663,14 @@ class TestUploadSSHKeypair:
             "pubkey": "ssh-rsa AAAAB3...",
             "privkey": "-----BEGIN RSA PRIVATE KEY-----\n...",
         })
+        user_id = user_context.user_uuid
         mock_processors.auth.upload_ssh_keypair.wait_for_complete = AsyncMock(
             return_value=UploadSSHKeypairActionResult(
                 ssh_keypair=SSHKeypair(
                     ssh_public_key="ssh-rsa AAAAB3...\n",
                     ssh_private_key="-----BEGIN RSA PRIVATE KEY-----\n...\n",
-                )
+                ),
+                user_id=user_id,
             )
         )
 

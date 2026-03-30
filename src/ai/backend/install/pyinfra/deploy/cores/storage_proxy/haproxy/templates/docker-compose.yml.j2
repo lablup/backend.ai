@@ -1,0 +1,29 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  extra_hosts:
+{%- for node in storage_proxy_nodes %}
+    - "{{ node.hostname }}:{{ node.ip }}"
+{%- endfor %}
+  image: {{ haproxy_image }}
+  restart: unless-stopped
+
+services:
+  storage-proxy-terminator:
+    <<: *base
+    ports:
+      - "{{ service_port }}:6021"  # storage proxy (client-facing)
+      - "{{ manager_service_port }}:6022"  # storage proxy (manager-facing)
+      - "7905:7999"  # haproxy stats (for operation only)
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - {{ home_dir }}/ssl_cert/current:/etc/web_cert:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:7999/stats || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

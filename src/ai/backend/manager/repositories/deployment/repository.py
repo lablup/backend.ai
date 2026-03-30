@@ -48,10 +48,10 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
+    DeploymentLifecycleSubStep,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
-    DeploymentSubStep,
     DeploymentWithHistory,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -288,7 +288,7 @@ class DeploymentRepository:
     async def get_endpoints_by_statuses(
         self,
         statuses: list[EndpointLifecycle],
-        sub_steps: list[DeploymentSubStep] | None = None,
+        sub_steps: list[DeploymentLifecycleSubStep] | None = None,
     ) -> list[DeploymentInfo]:
         """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
         return await self._db_source.get_endpoints_by_statuses(statuses, sub_steps=sub_steps)
@@ -298,6 +298,7 @@ class DeploymentRepository:
         self,
         statuses: list[EndpointLifecycle],
         handler_name: str,
+        sub_steps: list[DeploymentLifecycleSubStep] | None = None,
     ) -> list[DeploymentWithHistory]:
         """Get deployments for handler execution with history populated.
 
@@ -308,11 +309,14 @@ class DeploymentRepository:
         Args:
             statuses: Endpoint lifecycle statuses to include
             handler_name: Current handler phase name for history matching
+            sub_steps: Optional sub-step filter for deployment handlers
 
         Returns:
             List of DeploymentWithHistory with history fields populated.
         """
-        return await self._db_source.fetch_deployments_for_handler(statuses, handler_name)
+        return await self._db_source.fetch_deployments_for_handler(
+            statuses, handler_name, sub_steps
+        )
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(
@@ -578,7 +582,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def scale_routes(
         self,
-        scale_out_creators: Sequence[Creator[RoutingRow]],
+        scale_out_creators: Sequence[RBACEntityCreator[RoutingRow]],
         scale_in_updater: BatchUpdater[RoutingRow] | None,
     ) -> None:
         await self._db_source.scale_routes(scale_out_creators, scale_in_updater)
@@ -707,16 +711,18 @@ class DeploymentRepository:
     async def fetch_deployment_context(
         self,
         deployment_info: DeploymentInfo,
+        revision_id: UUID,
     ) -> DeploymentContext:
         """Fetch all context data needed for session creation from deployment info.
 
         Args:
             deployment_info: Deployment information
+            revision_id: Revision to use for image resolution.
 
         Returns:
             DeploymentContext: Context data needed for session creation
         """
-        return await self._db_source.fetch_deployment_context(deployment_info)
+        return await self._db_source.fetch_deployment_context(deployment_info, revision_id)
 
     # Auto-scaling operations
 
@@ -1057,7 +1063,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_revision(
         self,
-        creator: Creator[DeploymentRevisionRow],
+        creator: RBACEntityCreator[DeploymentRevisionRow],
     ) -> ModelRevisionData:
         """Create a new deployment revision."""
         return await self._db_source.create_revision(creator)
@@ -1065,7 +1071,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_revision_with_next_number(
         self,
-        creator: Creator[DeploymentRevisionRow],
+        creator: RBACEntityCreator[DeploymentRevisionRow],
         endpoint_id: uuid.UUID,
     ) -> ModelRevisionData:
         """Atomically read the latest revision number and create a new revision.
@@ -1269,7 +1275,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_route(
         self,
-        creator: Creator[RoutingRow],
+        creator: RBACEntityCreator[RoutingRow],
     ) -> uuid.UUID:
         """Create a new route using the provided creator.
 
@@ -1345,12 +1351,12 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_access_token(
         self,
-        creator: Creator[EndpointTokenRow],
+        creator: RBACEntityCreator[EndpointTokenRow],
     ) -> EndpointTokenRow:
         """Create a new access token for a model deployment.
 
         Args:
-            creator: Creator containing the EndpointTokenCreatorSpec.
+            creator: RBACEntityCreator containing the EndpointTokenCreatorSpec.
 
         Returns:
             Created EndpointTokenRow.
@@ -1404,26 +1410,33 @@ class DeploymentRepository:
         """
         return await self._db_source.search_deployment_policies(querier)
 
+    @deployment_repository_resilience.apply()
     async def apply_strategy_mutations(
         self,
-        assignments: Mapping[UUID, DeploymentSubStep],
-        rollout: BulkCreator[RoutingRow],
+        rollout: Sequence[RBACEntityCreator[RoutingRow]],
         drain: BatchUpdater[RoutingRow] | None,
         completed_ids: set[UUID],
-        rolled_back_ids: set[UUID],
     ) -> int:
-        """Apply all DB mutations from a strategy evaluation cycle.
+        """Apply route mutations from a strategy evaluation cycle.
 
-        Performs sub-step updates, route rollout/drain, revision swap,
-        and deploying_revision cleanup in a single transaction.
+        Performs route rollout/drain and revision swap in a single transaction.
+        Sub-step transitions are handled by the coordinator via
+        ``EndpointLifecycleBatchUpdaterSpec``.
 
         Returns:
             Number of deployments whose revision was swapped.
         """
         return await self._db_source.apply_strategy_mutations(
-            assignments=assignments,
             rollout=rollout,
             drain=drain,
             completed_ids=completed_ids,
-            rolled_back_ids=rolled_back_ids,
         )
+
+    @deployment_repository_resilience.apply()
+    async def clear_deploying_revision(self, deployment_ids: set[UUID]) -> None:
+        """Clear deploying_revision and sub_step for rolled-back deployments.
+
+        Called explicitly by ``DeployingRollingBackHandler`` after rollback
+        completes — NOT automatically during strategy mutations.
+        """
+        await self._db_source.clear_deploying_revision(deployment_ids)

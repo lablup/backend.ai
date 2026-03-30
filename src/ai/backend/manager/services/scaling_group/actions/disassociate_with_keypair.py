@@ -11,7 +11,7 @@ from ai.backend.manager.repositories.base.purger import BatchPurger
 from .keypair_base import ScalingGroupKeypairAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class DisassociateScalingGroupWithKeypairsAction(ScalingGroupKeypairAction):
     """Action to disassociate a scaling group from multiple keypairs."""
 
@@ -27,7 +27,7 @@ class DisassociateScalingGroupWithKeypairsAction(ScalingGroupKeypairAction):
         return None
 
 
-@dataclass
+@dataclass(frozen=True)
 class DisassociateScalingGroupWithKeypairsActionResult(BaseActionResult):
     """Result of disassociating a scaling group from keypairs."""
 

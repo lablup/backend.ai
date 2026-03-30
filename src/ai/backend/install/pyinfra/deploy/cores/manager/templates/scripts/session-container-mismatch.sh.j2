@@ -1,0 +1,142 @@
+#!/bin/bash
+# Register this script in crontab if you want to automate running.
+#
+# Requires psql client if you want to run it from the host.
+# - sudo apt install postgresql-client
+# - sudo yum install postgresql
+#
+# To register as a cronjob (every 10 min):
+# - */10 * * * * bash {{ home_dir }}/scripts/session-container-mismatch.sh --fix | tee /tmp/session-container-mismatch.log
+set -e
+
+DB_IP="{{ db_ip }}"
+DB_PORT="{{ db_port }}"
+DB_USER="{{ db_user }}"
+DB_NAME="{{ db_name }}"
+DB_PASSWORD="{{ db_password }}"
+DB_CONTAINER_ID=$(docker ps | grep postgres | awk '{print $1}' | head -n 1)
+
+# Ensure passwordless SSH connection to automate running script.
+SSH_USER="{{ ssh_user }}"
+SSH_PORT="{{ ssh_port }}"
+
+AGENT_IDS=()
+AGENT_IPS=()
+
+fix_mode=false
+
+
+# Option Parsing
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --fix)
+            fix_mode=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+execute_psql_command() {
+    local query="$1"
+    if [[ -n "$DB_CONTAINER_ID" ]]; then
+        docker exec -e PGPASSWORD="$DB_PASSWORD" -t "$DB_CONTAINER_ID" psql -P pager=off -h "$DB_IP" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "$query"
+    else
+        PGPASSWORD="$DB_PASSWORD" psql -P pager=off -h "$DB_IP" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -t -c "$query"
+    fi
+}
+
+# Function to retrieve agent IDs and IP addresses from the database.
+fetch_agents() {
+    readarray -t agents_data < <(execute_psql_command "SELECT id, \
+        substring(addr from strpos(addr, '//') + 2 for strpos(substring(addr, strpos(addr, '//') + 3), ':')) \
+        FROM agents WHERE status = 'ALIVE' ORDER BY \"id\"")
+
+    for line in "${agents_data[@]}"; do
+        read -r agent_id agent_ip <<<"$(echo "$line" | awk '{print $1, $3}')"
+        AGENT_IDS+=("$agent_id")
+        AGENT_IPS+=("$agent_ip")
+    done
+}
+
+# Retrieve kernel information from the database for a given agent
+query_db_for_agent() {
+    local agent_id="$1"
+    execute_psql_command "SELECT substring(k.container_id for 12), k.occupied_slots, k.status, k.status_info, k.image
+                          FROM kernels k JOIN sessions s ON k.session_id = s.id
+                          WHERE k.status IN ('RUNNING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RESTARTING', 'TERMINATING')
+                          AND s.status IN ('RUNNING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RESTARTING', 'TERMINATING')
+                          AND k.agent = '$agent_id';"
+}
+
+# Execute Docker command on the agent via SSH
+execute_docker_command_on_agent() {
+    local agent_ip="$1"
+    agent_ip=$(echo "$agent_ip" | tr -d '\r')
+    timeout 10s ssh -o StrictHostKeyChecking=no -p "$SSH_PORT" "$SSH_USER@$agent_ip" \
+        "docker ps | grep kernel | awk '{print \$1}' | xargs -I{} sh -c 'printf \"{}|\" && docker exec -t {} cat /home/config/resource.txt | grep cuda.shares'"
+    exit_status=$?
+    if [ $exit_status -eq 124 ]; then
+        echo "SSH connection timeout for $agent_ip"
+    fi
+}
+
+
+fetch_agents
+
+for idx in "${!AGENT_IDS[@]}"; do
+    if [[ -z "${AGENT_IDS[idx]}" ]]; then
+        continue
+    fi
+    # if [[ "${AGENT_IDS[idx]}" == *062* ]]; then
+    #     continue
+    # fi
+
+    echo "Querying agent ${AGENT_IDS[idx]} (${AGENT_IPS[idx]}) ..."
+    db_result=$(query_db_for_agent "${AGENT_IDS[idx]}" | sed 's/ //g' | head -n -1 | sort)
+    if echo "$db_result" | grep -q "ERROR:"; then
+        echo "DB query error: $db_result" >&2
+        exit 1
+    fi
+    num_containers_in_db=$(echo "$db_result" | grep -c -v '^$') || true
+
+    agent_result=$(execute_docker_command_on_agent "${AGENT_IPS[idx]}" | sed 's/ //g' | sed 's/SLOTS=//g' | sort)
+    num_containers_in_agent=$(echo "$agent_result" | grep -c -v '^$') || continue
+
+    if [[ "$num_containers_in_db" -ne "$num_containers_in_agent" ]]; then
+        echo "# === ${AGENT_IDS[idx]} ========================================"
+        echo "---- query from DB ($num_containers_in_db)"
+        echo "$db_result"
+        echo "---- docker ps from agent ($num_containers_in_agent)"
+        echo "$agent_result"
+        echo "======================================================"
+
+        if [[ "$fix_mode" == "true" ]]; then
+            # Identify extra containers to be killed
+            agent_container_ids=$(echo "$agent_result" | cut -d '|' -f 1)
+            extra_container_ids=()
+            for cid in $agent_container_ids; do
+                if ! grep -q "$cid" <<< "$db_result"; then  # Compare against DB output
+                    extra_container_ids+=("$cid")
+                fi
+            done
+
+            # Kill extra containers from the remote host
+            {% raw %}
+            if [[ ${#extra_container_ids[@]} -gt 0 ]]; then
+                kill_cmd="docker kill ${extra_container_ids[*]}"
+                agent_ip=$(echo "${AGENT_IPS[idx]}" | tr -d '\r')
+                timeout 10s ssh -o StrictHostKeyChecking=no -p "$SSH_PORT" "$SSH_USER@$agent_ip" "$kill_cmd"
+                echo "Killed extra containers: ${extra_container_ids[*]}"
+            fi
+            {% endraw %}
+        fi
+    else
+        echo "- Number of containers on ${AGENT_IDS[idx]} ($num_containers_in_db) is in sync with DB."
+    fi
+done
+
+echo "done."

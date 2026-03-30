@@ -16,6 +16,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -119,6 +120,16 @@ class GroupRepository:
     async def purge_group(self, group_id: uuid.UUID) -> bool:
         """Completely remove a group and all its associated data."""
         return await self._db_source.purge_group(group_id, self._storage_manager)
+
+    @group_repository_resilience.apply()
+    async def assign_users_to_project(
+        self, project_id: UUID, user_ids: list[UUID]
+    ) -> list[UserData]:
+        """Assign users to a project with domain validation and RBAC scope binding.
+
+        Returns the list of newly assigned users.
+        """
+        return await self._db_source.assign_users_to_project(project_id, user_ids)
 
     @group_repository_resilience.apply()
     async def get_project(self, project_id: UUID) -> GroupData:

@@ -11,7 +11,7 @@ from ai.backend.manager.repositories.base.creator import BulkCreator
 from .keypair_base import ScalingGroupKeypairAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class AssociateScalingGroupWithKeypairsAction(ScalingGroupKeypairAction):
     """Action to associate a scaling group with multiple keypairs."""
 
@@ -27,7 +27,7 @@ class AssociateScalingGroupWithKeypairsAction(ScalingGroupKeypairAction):
         return None
 
 
-@dataclass
+@dataclass(frozen=True)
 class AssociateScalingGroupWithKeypairsActionResult(BaseActionResult):
     """Result of associating a scaling group with keypairs."""
 

@@ -1,0 +1,46 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  extra_hosts:
+{%- for node in config.cluster_nodes %}
+    - "redis{{ node.node_number }}:{{ node.ip }}"
+{%- endfor %}
+  image: ${REDIS_BASE_IMG}
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cpu_count: {{ config.redis_cpu_count }}
+  mem_limit: "{{ config.redis_memory_limit }}"
+  pids_limit: {{ config.pids_limit }}
+  sysctls:
+    - net.ipv4.tcp_fin_timeout=10
+    - net.ipv4.tcp_tw_reuse=1
+
+services:
+  redis:
+    <<: *base
+    container_name: {{ config.container_name_prefix }}-node{{ current_node.node_number }}
+    volumes:
+      - "${DATA_DIR}:/data:rw"
+    ports:
+      - "${SERVICE_PORT}:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --save "3600 1 300 100"
+      --requirepass ${REDIS_PASSWORD}
+      --masterauth ${REDIS_PASSWORD}
+      --replica-announce-ip ${THIS_REDIS_NODE_NAME}
+      --replica-announce-port ${SERVICE_PORT}
+      --min-slaves-to-write ${MIN_SLAVES_TO_WRITE}
+      --min-slaves-max-lag ${MIN_SLAVES_MAX_LAG}{% if is_slave %}
+      --slaveof ${MASTER_HOSTNAME} ${MASTER_SERVICE_PORT}{% endif %}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 1s
+      retries: 5

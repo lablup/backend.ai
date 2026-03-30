@@ -1,0 +1,7 @@
+#!/bin/bash
+
+if command -v sudo >/dev/null 2>&1; then
+    sudo systemctl stop {{ service_name }}.service
+else
+    systemctl stop {{ service_name }}.service
+fi

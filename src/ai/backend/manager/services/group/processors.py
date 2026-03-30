@@ -6,6 +6,10 @@ from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.services.group.actions.assign_users_to_project import (
+    AssignUsersToProjectAction,
+    AssignUsersToProjectActionResult,
+)
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
@@ -57,6 +61,9 @@ class GroupProcessors(AbstractProcessorPackage):
         SearchProjectsByUserAction, ScopedSearchProjectsActionResult
     ]
     get_project: SingleEntityActionProcessor[GetProjectAction, GetProjectActionResult]
+    assign_users_to_project: SingleEntityActionProcessor[
+        AssignUsersToProjectAction, AssignUsersToProjectActionResult
+    ]
 
     def __init__(
         self,
@@ -64,10 +71,20 @@ class GroupProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.create_group = ScopeActionProcessor(group_service.create_group, action_monitors)
-        self.modify_group = SingleEntityActionProcessor(group_service.modify_group, action_monitors)
-        self.delete_group = SingleEntityActionProcessor(group_service.delete_group, action_monitors)
-        self.purge_group = SingleEntityActionProcessor(group_service.purge_group, action_monitors)
+        rbac_scope_validators = [validators.rbac.scope]
+        rbac_single_entity_validators = [validators.rbac.single_entity]
+        self.create_group = ScopeActionProcessor(
+            group_service.create_group, action_monitors, validators=rbac_scope_validators
+        )
+        self.modify_group = SingleEntityActionProcessor(
+            group_service.modify_group, action_monitors, validators=rbac_single_entity_validators
+        )
+        self.delete_group = SingleEntityActionProcessor(
+            group_service.delete_group, action_monitors, validators=rbac_single_entity_validators
+        )
+        self.purge_group = SingleEntityActionProcessor(
+            group_service.purge_group, action_monitors, validators=rbac_single_entity_validators
+        )
         self.usage_per_month = ActionProcessor(group_service.usage_per_month, action_monitors)
         self.usage_per_period = ActionProcessor(group_service.usage_per_period, action_monitors)
         self.search_projects = ActionProcessor(group_service.search_projects, action_monitors)
@@ -77,7 +94,14 @@ class GroupProcessors(AbstractProcessorPackage):
         self.search_projects_by_user = ScopeActionProcessor(
             group_service.search_projects_by_user, action_monitors
         )
-        self.get_project = SingleEntityActionProcessor(group_service.get_project, action_monitors)
+        self.get_project = SingleEntityActionProcessor(
+            group_service.get_project, action_monitors, validators=rbac_single_entity_validators
+        )
+        self.assign_users_to_project = SingleEntityActionProcessor(
+            group_service.assign_users_to_project,
+            action_monitors,
+            validators=rbac_single_entity_validators,
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -92,4 +116,5 @@ class GroupProcessors(AbstractProcessorPackage):
             SearchProjectsByDomainAction.spec(),
             SearchProjectsByUserAction.spec(),
             GetProjectAction.spec(),
+            AssignUsersToProjectAction.spec(),
         ]

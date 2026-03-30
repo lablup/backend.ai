@@ -1,14 +1,16 @@
 """Deployment strategy evaluator — orchestrates per-deployment FSM evaluation (BEP-1049).
 
-Loads policies and routes in bulk, dispatches each deployment to the appropriate
-strategy FSM, and aggregates route mutations.  The evaluate handler is responsible
-for applying the aggregated route changes and updating sub_step in DB.
+Loads policies and non-terminated routes in bulk, dispatches each deployment to
+the appropriate strategy FSM, and aggregates route mutations.  The applier is
+responsible for applying the aggregated route changes and updating sub_step in DB.
 """
 
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from collections.abc import Sequence
+from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.exception import BackendAIError
@@ -17,14 +19,21 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentPolicyData,
     RouteInfo,
+    RouteStatus,
 )
 from ai.backend.manager.errors.deployment import (
     InvalidDeploymentStrategy,
     InvalidDeploymentStrategySpec,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    NoPagination,
+    QueryCondition,
+    combine_conditions_or,
+)
 from ai.backend.manager.repositories.deployment.options import (
     DeploymentPolicyConditions,
+    RouteConditions,
 )
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
@@ -58,7 +67,7 @@ class DeploymentStrategyEvaluator:
         """Evaluate all DEPLOYING deployments in a single cycle.
 
         Steps:
-            1. Bulk-load policies and active routes.
+            1. Bulk-load policies and non-terminated routes.
             2. Per-deployment: dispatch to strategy FSM.
             3. Aggregate route changes and sub_step assignments.
         """
@@ -67,7 +76,7 @@ class DeploymentStrategyEvaluator:
         if not deployments:
             return result
 
-        endpoint_ids = {d.id for d in deployments}
+        endpoint_ids = {deployment.id for deployment in deployments}
 
         # ── 1. Bulk-load policies and routes ──
         policy_search = await self._deployment_repo.search_deployment_policies(
@@ -76,8 +85,39 @@ class DeploymentStrategyEvaluator:
                 conditions=[DeploymentPolicyConditions.by_endpoint_ids(endpoint_ids)],
             )
         )
-        policy_map = {p.endpoint: p for p in policy_search.items}
-        route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(endpoint_ids)
+        policy_map = {policy.endpoint: policy for policy in policy_search.items}
+        # Fetch non-terminated routes + terminated routes belonging to a
+        # deploying revision.  The FSM needs terminated new-revision routes
+        # to count accumulated failures for rollback detection, but old
+        # terminated routes are irrelevant and would bloat the result set.
+        deploying_revision_ids = {
+            deployment.deploying_revision_id
+            for deployment in deployments
+            if deployment.deploying_revision_id is not None
+        }
+        route_conditions: list[QueryCondition] = [
+            RouteConditions.by_endpoint_ids(endpoint_ids),
+        ]
+        if deploying_revision_ids:
+            route_conditions.append(
+                combine_conditions_or([
+                    RouteConditions.exclude_statuses([RouteStatus.TERMINATED]),
+                    RouteConditions.by_revision_ids(deploying_revision_ids),
+                ])
+            )
+        else:
+            route_conditions.append(
+                RouteConditions.exclude_statuses([RouteStatus.TERMINATED]),
+            )
+        route_search = await self._deployment_repo.search_routes(
+            BatchQuerier(
+                pagination=NoPagination(),
+                conditions=route_conditions,
+            )
+        )
+        route_map: defaultdict[UUID, list[RouteInfo]] = defaultdict(list)
+        for route in route_search.items:
+            route_map[route.endpoint_id].append(route)
 
         # ── 2. Per-deployment evaluation ──
         for deployment in deployments:
@@ -93,7 +133,7 @@ class DeploymentStrategyEvaluator:
 
             try:
                 strategy = self._create_strategy(policy.strategy, policy)
-                cycle_result = strategy.evaluate_cycle(deployment, routes)
+                cycle_result = strategy.evaluate_cycle(deployment, routes, policy.strategy_spec)
             except BackendAIError as e:
                 log.warning("deployment {}: evaluation error — {}", deployment.id, e)
                 result.errors.append(EvaluationErrorData(deployment=deployment, reason=str(e)))
@@ -155,4 +195,4 @@ class DeploymentStrategyEvaluator:
                     f" got {type(spec).__name__}"
                 ),
             )
-        return entry.strategy_cls(spec)
+        return entry.strategy_cls()

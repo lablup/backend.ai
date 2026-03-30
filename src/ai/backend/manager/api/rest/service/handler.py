@@ -469,9 +469,9 @@ class ServiceHandler:
             traffic_ratio=params.traffic_ratio,
         )
 
-        result = await self._model_serving.update_route.wait_for_complete(action)
+        await self._model_serving.update_route.wait_for_complete(action)
 
-        resp = SuccessResponseModel(success=result.success)
+        resp = SuccessResponseModel(success=True)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -494,9 +494,9 @@ class ServiceHandler:
             route_id=path_params.route_id,
         )
 
-        result = await self._model_serving.delete_route.wait_for_complete(action)
+        await self._model_serving.delete_route.wait_for_complete(action)
 
-        resp = SuccessResponseModel(success=result.success)
+        resp = SuccessResponseModel(success=True)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -604,7 +604,7 @@ class ServiceHandler:
             requester_uuid=request["user"]["uuid"],
             requester_role=request["user"]["role"],
             requester_domain=request["user"]["domain_name"],
-            keypair_resource_policy=request["user"]["resource_policy"],
+            keypair_resource_policy=request["keypair"]["resource_policy"],
             domain_name=params.domain_name,
             group_name=params.group_name,
             config=ServiceConfig(

@@ -13,11 +13,14 @@ from .permission import (
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
+    EntityOperationCombinationGQL,
+    OperationInfoGQL,
     OperationTypeGQL,
     PermissionConnection,
     PermissionEdge,
     PermissionFilter,
     PermissionGQL,
+    PermissionNestedFilterGQL,
     PermissionOrderBy,
     PermissionOrderField,
     RBACElementTypeGQL,
@@ -51,7 +54,9 @@ from .role import (
     RoleGQL,
     RoleOrderBy,
     RoleOrderField,
+    RoleSourceFilterGQL,
     RoleSourceGQL,
+    RoleStatusFilterGQL,
     RoleStatusGQL,
     UpdateRoleInput,
 )
@@ -64,6 +69,9 @@ __all__ = [
     # Role enums
     "RoleSourceGQL",
     "RoleStatusGQL",
+    # Role filter wrappers
+    "RoleSourceFilterGQL",
+    "RoleStatusFilterGQL",
     "RoleOrderField",
     "RoleAssignmentOrderField",
     # Entity enums
@@ -78,6 +86,7 @@ __all__ = [
     "RoleFilter",
     "RoleAssignmentFilter",
     "RoleAssignmentRoleNestedFilterGQL",
+    "PermissionNestedFilterGQL",
     "EntityFilter",
     # OrderBy
     "PermissionOrderBy",
@@ -117,4 +126,7 @@ __all__ = [
     "EntityConnection",
     # Scope-entity combination
     "ScopeEntityCombinationGQL",
+    # Entity-operation combination
+    "EntityOperationCombinationGQL",
+    "OperationInfoGQL",
 ]

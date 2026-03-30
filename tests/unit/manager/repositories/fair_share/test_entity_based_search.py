@@ -29,9 +29,14 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
+from ai.backend.manager.models.fair_share.conditions import (
+    RGDomainFairShareConditions,
+    RGProjectFairShareConditions,
+    RGUserFairShareConditions,
+)
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -60,11 +65,6 @@ from ai.backend.manager.repositories.fair_share import (
     ProjectFairShareCreatorSpec,
     UserFairShareCreatorSpec,
 )
-from ai.backend.manager.repositories.fair_share.options import (
-    RGDomainFairShareConditions,
-    RGProjectFairShareConditions,
-    RGUserFairShareConditions,
-)
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareSearchScope,
     ProjectFairShareSearchScope,
@@ -90,6 +90,7 @@ class TestSearchDomainFairSharesEntityBased:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -621,6 +622,7 @@ class TestSearchProjectFairSharesEntityBased:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -1001,6 +1003,7 @@ class TestSearchUserFairSharesEntityBased:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,

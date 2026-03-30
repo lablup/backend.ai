@@ -7,6 +7,16 @@ from uuid import UUID
 from ai.backend.common.types import BinarySize, ResourceSlot
 
 
+@dataclass(frozen=True)
+class ResourcePresetSearchResult:
+    """Result of searching resource presets."""
+
+    items: list[ResourcePresetData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
 @dataclass
 class ResourcePresetData:
     id: UUID

@@ -80,6 +80,7 @@ class TestAuthClient:
                     "secret_key": "sktest",
                     "role": "admin",
                     "status": "active",
+                    "session_token": "test_session_token",
                     "type": AuthTokenType.KEYPAIR,
                 },
             }

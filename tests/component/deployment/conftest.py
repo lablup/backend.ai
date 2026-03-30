@@ -4,12 +4,13 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -106,7 +107,14 @@ def deployment_processors(
             revision_generator_registry=revision_generator_registry,
         )
     )
-    service = DeploymentService(deployment_controller, repo, revision_generator_registry)
+    model_definition_generator_registry = AsyncMock()
+    model_definition_generator_registry.generate_model_definition.return_value = ModelDefinition()
+    service = DeploymentService(
+        deployment_controller,
+        repo,
+        revision_generator_registry,
+        model_definition_generator_registry,
+    )
     return DeploymentProcessors(
         service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
     )

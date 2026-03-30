@@ -289,6 +289,7 @@ class TestMatchSessions:
         mock_session_repository: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully matching sessions"""
         mock_session_repository.match_sessions = AsyncMock(return_value=[sample_session_data])
@@ -296,6 +297,7 @@ class TestMatchSessions:
         action = MatchSessionsAction(
             id_or_name_prefix="test",
             owner_access_key=sample_access_key,
+            user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
 
@@ -310,6 +312,7 @@ class TestMatchSessions:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test matching sessions when none found"""
         mock_session_repository.match_sessions = AsyncMock(return_value=[])
@@ -317,6 +320,7 @@ class TestMatchSessions:
         action = MatchSessionsAction(
             id_or_name_prefix="nonexistent",
             owner_access_key=sample_access_key,
+            user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
 
@@ -382,6 +386,7 @@ class TestMatchSessions:
         action = MatchSessionsAction(
             id_or_name_prefix="test",
             owner_access_key=sample_access_key,
+            user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
 
@@ -711,25 +716,19 @@ class TestComplete:
 class TestGetSessionInfo:
     """Test cases for SessionService.get_session_info"""
 
-    async def test_success(
+    @pytest.fixture
+    def mock_running_session(
         self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
-        mock_idle_checker_host: MagicMock,
-        sample_session_data: SessionData,
         sample_session_id: SessionId,
-        sample_access_key: AccessKey,
         sample_user_id: UUID,
         sample_group_id: UUID,
-    ) -> None:
-        """Test successfully getting session info"""
-        # Create a mock session with main_kernel
+        sample_session_data: SessionData,
+    ) -> MagicMock:
         mock_kernel = MagicMock()
         mock_kernel.image = "cr.backend.ai/stable/python:latest"
         mock_kernel.architecture = "x86_64"
         mock_kernel.registry = "cr.backend.ai"
-        mock_kernel.container_id = str(uuid4())
+        mock_kernel.container_id = "a" * 64
         mock_kernel.occupied_slots = ResourceSlot({"cpu": 1, "mem": 1024})
         mock_kernel.occupied_shares = {}
 
@@ -752,9 +751,19 @@ class TestGetSessionInfo:
         mock_session.num_queries = 0
         mock_session.last_stat = None
         mock_session.to_dataclass.return_value = sample_session_data
+        return mock_session
 
-        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
-        mock_idle_checker_host.get_idle_check_report = AsyncMock(return_value={})
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        mock_running_session: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully getting session info"""
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_running_session)
 
         action = GetSessionInfoAction(
             session_name="test-session",
@@ -766,9 +775,32 @@ class TestGetSessionInfo:
         assert result.session_info is not None
         assert result.session_info.domain_name == "default"
         assert result.session_info.image == "cr.backend.ai/stable/python:latest"
+        assert result.session_info.container_id is not None
+        assert result.session_info.container_id == "a" * 64
         assert result.session_data == sample_session_data
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_running_session)
+
+    async def test_success_with_no_container_id(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_running_session: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test getting session info when container_id is None (pre-RUNNING state)"""
+        mock_running_session.main_kernel.container_id = None
+        mock_running_session.status = SessionStatus.PENDING
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_running_session)
+
+        action = GetSessionInfoAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.get_session_info(action)
+
+        assert isinstance(result, GetSessionInfoActionResult)
+        assert result.session_info.container_id is None
 
     async def test_session_not_found(
         self,
@@ -1573,6 +1605,7 @@ class TestSearch:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_session_data: SessionData,
+        sample_user_id: UUID,
     ) -> None:
         """Test searching sessions with querier"""
         mock_session_repository.search = AsyncMock(
@@ -1589,7 +1622,7 @@ class TestSearch:
             conditions=[],
             orders=[],
         )
-        action = SearchSessionsAction(querier=querier)
+        action = SearchSessionsAction(querier=querier, user_id=sample_user_id)
         result = await session_service.search(action)
 
         assert result.data == [sample_session_data]
@@ -1602,6 +1635,7 @@ class TestSearch:
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
+        sample_user_id: UUID,
     ) -> None:
         """Test searching sessions when no results are found"""
         mock_session_repository.search = AsyncMock(
@@ -1618,7 +1652,7 @@ class TestSearch:
             conditions=[],
             orders=[],
         )
-        action = SearchSessionsAction(querier=querier)
+        action = SearchSessionsAction(querier=querier, user_id=sample_user_id)
         result = await session_service.search(action)
 
         assert result.data == []
@@ -1629,6 +1663,7 @@ class TestSearch:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_session_data: SessionData,
+        sample_user_id: UUID,
     ) -> None:
         """Test searching sessions with pagination"""
         mock_session_repository.search = AsyncMock(
@@ -1645,7 +1680,7 @@ class TestSearch:
             conditions=[],
             orders=[],
         )
-        action = SearchSessionsAction(querier=querier)
+        action = SearchSessionsAction(querier=querier, user_id=sample_user_id)
         result = await session_service.search(action)
 
         assert result.total_count == 25
@@ -1756,6 +1791,7 @@ class TestSearchKernels:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_kernel_info: KernelInfo,
+        sample_user_id: UUID,
     ) -> None:
         """Test searching kernels with querier"""
         mock_session_repository.search_kernels = AsyncMock(
@@ -1772,7 +1808,7 @@ class TestSearchKernels:
             conditions=[],
             orders=[],
         )
-        action = SearchKernelsAction(querier=querier)
+        action = SearchKernelsAction(querier=querier, user_id=sample_user_id)
         result = await session_service.search_kernels(action)
 
         assert result.data == [sample_kernel_info]
@@ -1785,6 +1821,7 @@ class TestSearchKernels:
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
+        sample_user_id: UUID,
     ) -> None:
         """Test searching kernels when no results are found"""
         mock_session_repository.search_kernels = AsyncMock(
@@ -1801,7 +1838,7 @@ class TestSearchKernels:
             conditions=[],
             orders=[],
         )
-        action = SearchKernelsAction(querier=querier)
+        action = SearchKernelsAction(querier=querier, user_id=sample_user_id)
         result = await session_service.search_kernels(action)
 
         assert result.data == []
@@ -1812,6 +1849,7 @@ class TestSearchKernels:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_kernel_info: KernelInfo,
+        sample_user_id: UUID,
     ) -> None:
         """Test searching kernels with pagination"""
         mock_session_repository.search_kernels = AsyncMock(
@@ -1828,7 +1866,7 @@ class TestSearchKernels:
             conditions=[],
             orders=[],
         )
-        action = SearchKernelsAction(querier=querier)
+        action = SearchKernelsAction(querier=querier, user_id=sample_user_id)
         result = await session_service.search_kernels(action)
 
         assert result.total_count == 25

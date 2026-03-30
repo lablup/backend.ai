@@ -14,6 +14,7 @@ import pytest
 
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.deployment import (
     AddRevisionRequest,
@@ -76,6 +77,7 @@ class TestCreateDeployment:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         with pytest.raises(Exception):
@@ -116,6 +118,7 @@ class TestCreateDeployment:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         response = await admin_registry.deployment.create_deployment(request)
@@ -184,6 +187,7 @@ class TestUpdateDeployment:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         response = await admin_registry.deployment.create_deployment(request)
@@ -254,6 +258,7 @@ class TestDestroyDeployment:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         response = await admin_registry.deployment.create_deployment(request)
@@ -320,6 +325,7 @@ class TestRevisionManagement:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         response = await admin_registry.deployment.create_deployment(request)
@@ -343,6 +349,7 @@ class TestRevisionManagement:
                         mount_destination="/models",
                         definition_path="model-definition.yaml",
                     ),
+                    model_definition=ModelDefinition(),
                 ),
             ),
         )
@@ -407,6 +414,7 @@ class TestReplicaManagement:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         response = await admin_registry.deployment.create_deployment(request)

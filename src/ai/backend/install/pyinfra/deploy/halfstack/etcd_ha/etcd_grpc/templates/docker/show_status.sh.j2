@@ -1,0 +1,31 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+export ETCD_CONTAINER_NAME="{{ config.grpc_container_name_prefix }}"
+export etcd_docker_id=$(docker ps | grep "$ETCD_CONTAINER_NAME" | awk '{ print $1 }')
+
+if [ -z "$etcd_docker_id" ]; then
+    echo "ERROR: ETCD gRPC proxy container not found for $ETCD_CONTAINER_NAME"
+    exit 1
+fi
+
+# Get cluster endpoints from environment
+CLUSTER_ENDPOINTS="{% for node in etcd_nodes %}http://{{node.client_ip}}:{{node.client_port}}{% if not loop.last %},{% endif %}{% endfor %}"
+
+echo "=== ETCD gRPC Proxy Status ==="
+echo "Proxy listening on: localhost:8120"
+echo "Cluster endpoints: $CLUSTER_ENDPOINTS"
+echo ""
+
+echo "=== gRPC Proxy Health ==="
+if docker exec $etcd_docker_id etcdctl --endpoints=localhost:2379 endpoint health --write-out table; then
+    echo "✓ gRPC proxy is accessible"
+else
+    echo "✗ gRPC proxy is not accessible"
+fi
+echo ""
+
+echo "=== Cluster Status (via proxy) ==="
+docker exec $etcd_docker_id etcdctl --endpoints=localhost:2379 endpoint status --write-out table
+echo ""

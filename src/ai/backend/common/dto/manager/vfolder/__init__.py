@@ -12,6 +12,7 @@ from .request import (
     AcceptInvitationReq,
     ChangeVFolderOwnershipReq,
     CloneVFolderReq,
+    CreateArchiveDownloadSessionReq,
     CreateDownloadSessionReq,
     CreateUploadSessionReq,
     DeleteFilesAsyncBodyParam,
@@ -111,6 +112,7 @@ __all__ = (
     "ListSharedVFoldersQuery",
     "ListVFoldersQuery",
     # Request DTOs - File Operations
+    "CreateArchiveDownloadSessionReq",
     "CreateDownloadSessionReq",
     "CreateUploadSessionReq",
     "DeleteFilesAsyncBodyParam",

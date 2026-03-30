@@ -1,0 +1,49 @@
+#!/bin/bash
+set -e
+
+EXPORTER_URL="http://localhost:{{ exporter_port }}"
+HEALTH_ENDPOINT="/metrics"
+
+echo "=== Blackbox Exporter Status Check ==="
+echo "Endpoint: ${EXPORTER_URL}${HEALTH_ENDPOINT}"
+echo
+
+# Check Docker container status
+echo "1. Container Status:"
+docker compose ps blackbox-exporter 2>/dev/null || echo "  Container not found or not running"
+echo
+
+# Check if exporter endpoint is responding
+echo "2. Endpoint Health:"
+if curl -sf "${EXPORTER_URL}${HEALTH_ENDPOINT}" >/dev/null 2>&1; then
+    echo "  OK - Exporter endpoint is responding"
+else
+    echo "  FAIL - Exporter endpoint is not responding"
+    exit 1
+fi
+
+# Test probe functionality
+echo "3. Probe Health (testing http_2xx module against localhost):"
+probe_response=$(curl -sf "${EXPORTER_URL}/probe?target=localhost:{{ exporter_port }}&module=http_2xx" 2>/dev/null || true)
+if echo "$probe_response" | grep -q "probe_success 1"; then
+    echo "  OK - Probe is functioning correctly"
+elif echo "$probe_response" | grep -q "probe_success 0"; then
+    echo "  WARN - Probe returned failure (target may be unreachable)"
+else
+    echo "  UNKNOWN - Unable to determine probe status"
+    exit 1
+fi
+
+# Show available probe modules
+echo "4. Available Probe Modules:"
+config_response=$(curl -sf "${EXPORTER_URL}/config" 2>/dev/null || true)
+if [ -n "$config_response" ]; then
+    echo "$config_response" | grep -E "^\s+\w+:" | head -10 | while read -r line; do
+        echo "  $line"
+    done
+else
+    echo "  Unable to retrieve configuration"
+fi
+
+echo
+echo "OK - Blackbox Exporter Status: Healthy"

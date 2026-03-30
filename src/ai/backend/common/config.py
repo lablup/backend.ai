@@ -20,6 +20,7 @@ from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import ConfigurationError
 from .types import RedisHelperConfig
+from .utils import deep_merge
 
 __all__ = (
     "ConfigurationError",
@@ -338,6 +339,13 @@ class ModelDefinition(BaseConfigModel):
         default_factory=list,
         description="List of models in the model definition.",
     )
+
+    def merge(self, override: ModelDefinition) -> ModelDefinition:
+        """Deep merge the given override into this definition, returning a new instance."""
+        base_dict = self.model_dump(exclude_none=True, by_alias=True)
+        override_dict = override.model_dump(exclude_none=True, by_alias=True)
+        merged_dict = deep_merge(base_dict, override_dict)
+        return ModelDefinition.model_validate(merged_dict)
 
     def health_check_config(self) -> ModelHealthCheck | None:
         for model in self.models:

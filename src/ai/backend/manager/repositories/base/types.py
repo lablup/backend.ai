@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 # QueryCondition now returns a ColumnElement (whereclause) instead of modifying stmt
 type QueryCondition = Callable[[], sa.sql.expression.ColumnElement[bool]]
 
+
 T = TypeVar("T")
 
 

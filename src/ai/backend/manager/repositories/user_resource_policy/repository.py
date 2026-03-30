@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user_resource_policy.db_source.db_source import (
     UserResourcePolicyDBSource,
@@ -44,6 +47,15 @@ class UserResourcePolicyRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = UserResourcePolicyDBSource(db)
+
+    @user_resource_policy_repository_resilience.apply()
+    async def get_by_user_id(self, user_id: UUID) -> UserResourcePolicyData:
+        """Retrieves the resource policy assigned to a user by their UUID."""
+        return await self._db_source.get_by_user_id(user_id)
+
+    @user_resource_policy_repository_resilience.apply()
+    async def search(self, querier: BatchQuerier) -> SearchResult[UserResourcePolicyData]:
+        return await self._db_source.search(querier)
 
     @user_resource_policy_repository_resilience.apply()
     async def create(self, creator: Creator[UserResourcePolicyRow]) -> UserResourcePolicyData:

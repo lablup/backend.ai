@@ -1,5 +1,9 @@
+from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.repositories.resource_allocation.repository import (
+    ResourceAllocationRepository,
+)
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
@@ -75,6 +79,10 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )
+from ai.backend.manager.services.resource_allocation.processors import (
+    ResourceAllocationProcessors,
+)
+from ai.backend.manager.services.resource_allocation.service import ResourceAllocationService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
@@ -111,6 +119,12 @@ from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingS
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    ModelDefinitionGeneratorRegistry,
+)
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    RegistryArgs as ModelDefinitionRegistryArgs,
+)
 
 
 def create_services(args: ServiceArgs) -> Services:
@@ -264,6 +278,7 @@ def create_services(args: ServiceArgs) -> Services:
             hook_plugin_ctx=args.hook_plugin_ctx,
             auth_repository=repositories.auth.repository,
             config_provider=args.config_provider,
+            valkey_session_client=args.valkey_session_client,
         ),
         notification=NotificationService(
             repository=repositories.notification.repository,
@@ -278,6 +293,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
+            rbac_action_registry=RBAC_ACTION_REGISTRY,
         ),
         vfs_storage=VFSStorageService(
             vfs_storage_repository=repositories.vfs_storage.repository,
@@ -316,6 +332,12 @@ def create_services(args: ServiceArgs) -> Services:
             args.deployment_controller,
             args.deployment_controller._deployment_repository,
             args.revision_generator_registry,
+            ModelDefinitionGeneratorRegistry(
+                ModelDefinitionRegistryArgs(
+                    deployment_repository=args.deployment_controller._deployment_repository,
+                    enable_model_definition_override=args.config_provider.config.deployment.enable_model_definition_override,
+                )
+            ),
         ),
         storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),
         audit_log=AuditLogService(repositories.audit_log.repository),
@@ -323,6 +345,13 @@ def create_services(args: ServiceArgs) -> Services:
         service_catalog=ServiceCatalogService(args.db),
         template=TemplateService(
             repository=repositories.template.repository,
+        ),
+        resource_allocation=ResourceAllocationService(
+            resource_allocation_repository=ResourceAllocationRepository(
+                db=args.db,
+                config_provider=args.config_provider,
+            ),
+            resource_preset_repository=repositories.resource_preset.repository,
         ),
         stream=StreamService(
             repository=repositories.stream.repository,
@@ -424,6 +453,9 @@ def create_processors(
             services.service_catalog, action_monitors, validators
         ),
         template=TemplateProcessors(services.template, action_monitors, validators),
+        resource_allocation=ResourceAllocationProcessors(
+            services.resource_allocation, action_monitors, validators
+        ),
         stream=StreamProcessors(services.stream, action_monitors),
         events=EventsProcessors(
             services.events,

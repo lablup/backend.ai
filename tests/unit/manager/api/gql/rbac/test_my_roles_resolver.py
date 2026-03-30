@@ -10,6 +10,7 @@ import pytest
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.api.gql.rbac.resolver import role as role_resolver
 from ai.backend.manager.api.gql.rbac.types import RoleAssignmentConnection
+from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 
 
@@ -27,24 +28,25 @@ class TestMyRoles:
             domain_name="default",
         )
 
-    async def test_calls_fetch_role_assignments_with_user_condition(
+    async def test_calls_adapter_with_user_condition(
         self,
         user_data: UserData,
     ) -> None:
-        """Should call fetch_role_assignments with base_conditions filtering by user_id."""
+        """Should call adapter with base_conditions filtering by user_id."""
+        mock_search = AsyncMock(
+            return_value=SearchResult(
+                items=[],
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
         info = MagicMock()
-        mock_connection = MagicMock(spec=RoleAssignmentConnection)
+        info.context.adapters.rbac.admin_search_role_assignments_gql = mock_search
 
-        with (
-            patch(
-                "ai.backend.manager.api.gql.rbac.resolver.role.current_user",
-                return_value=user_data,
-            ),
-            patch(
-                "ai.backend.manager.api.gql.rbac.resolver.role.fetch_role_assignments",
-                new_callable=AsyncMock,
-                return_value=mock_connection,
-            ) as mock_fetch,
+        with patch(
+            "ai.backend.manager.api.gql.rbac.resolver.role.current_user",
+            return_value=user_data,
         ):
             resolver_fn = role_resolver.my_roles.base_resolver
             result = await resolver_fn(
@@ -59,14 +61,13 @@ class TestMyRoles:
                 None,  # offset
             )
 
-            assert result == mock_connection
-            mock_fetch.assert_called_once()
-            call_args = mock_fetch.call_args
-            assert call_args[0][0] == info
-            assert call_args.kwargs["first"] == 10
+        assert isinstance(result, RoleAssignmentConnection)
+        mock_search.assert_called_once()
+        call_args = mock_search.call_args
+        assert call_args[0][0].first == 10
 
-            base_conditions = call_args.kwargs["base_conditions"]
-            assert len(base_conditions) == 1
+        base_conditions = call_args.kwargs["base_conditions"]
+        assert len(base_conditions) == 1
 
     async def test_raises_insufficient_privilege_when_not_authenticated(self) -> None:
         """Should raise InsufficientPrivilege when no user is authenticated."""
@@ -94,20 +95,21 @@ class TestMyRoles:
         self,
         user_data: UserData,
     ) -> None:
-        """Should pass all pagination parameters to fetch_role_assignments."""
+        """Should pass all pagination parameters to adapter."""
+        mock_search = AsyncMock(
+            return_value=SearchResult(
+                items=[],
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
         info = MagicMock()
-        mock_connection = MagicMock(spec=RoleAssignmentConnection)
+        info.context.adapters.rbac.admin_search_role_assignments_gql = mock_search
 
-        with (
-            patch(
-                "ai.backend.manager.api.gql.rbac.resolver.role.current_user",
-                return_value=user_data,
-            ),
-            patch(
-                "ai.backend.manager.api.gql.rbac.resolver.role.fetch_role_assignments",
-                new_callable=AsyncMock,
-                return_value=mock_connection,
-            ) as mock_fetch,
+        with patch(
+            "ai.backend.manager.api.gql.rbac.resolver.role.current_user",
+            return_value=user_data,
         ):
             resolver_fn = role_resolver.my_roles.base_resolver
             await resolver_fn(
@@ -122,10 +124,10 @@ class TestMyRoles:
                 10,  # offset
             )
 
-            call_kwargs = mock_fetch.call_args.kwargs
-            assert call_kwargs["before"] == "before_cursor"
-            assert call_kwargs["after"] == "after_cursor"
-            assert call_kwargs["first"] == 5
-            assert call_kwargs["last"] == 3
-            assert call_kwargs["limit"] == 20
-            assert call_kwargs["offset"] == 10
+        input_dto = mock_search.call_args[0][0]
+        assert input_dto.before == "before_cursor"
+        assert input_dto.after == "after_cursor"
+        assert input_dto.first == 5
+        assert input_dto.last == 3
+        assert input_dto.limit == 20
+        assert input_dto.offset == 10

@@ -1,0 +1,83 @@
+scope: {{ config.service_name }}
+namespace: /service/
+name: {{ pg_cluster_info.node_name }}
+
+restapi:
+  listen: 0.0.0.0:8008
+  # This value have to be checked if 127.0.0.1 is accepable or not.
+  # postgres1 have te be one of first, second and third. the original value is 8008
+  # PG_TARGET_HOST=first, second or third
+  connect_address: {{ pg_cluster_info.node_name }}:{{ pg_cluster_info.pg_api_port }}
+
+etcd3:
+  hosts: {% for node in config.cluster_nodes -%}{{ node.hostname }}:{{ node.etcd_client_port }}{% if not loop.last %},{% endif %}{% endfor %}
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        max_connections: '2048'
+        max_worker_processes: '8'
+        deadlock_timeout: '10s'
+        lock_timeout: '60000'
+        idle_in_transaction_session_timeout: '60000'
+{%- if config.shared_preload_libraries %}
+        shared_preload_libraries: '{{ config.shared_preload_libraries }}'
+{%- endif %}
+
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+
+  pg_hba:
+    - host replication {{ config.pg_replicator_id }} 127.0.0.1/32 md5
+    - host replication {{ config.pg_replicator_id }} 0.0.0.0/0 md5
+    - host all all 0.0.0.0/0 md5
+
+  # Post-bootstrap script creates users and databases (Patroni v4.0.0+ requirement)
+  post_bootstrap: /var/lib/postgresql/post_init.sh
+
+postgresql:
+  listen: 0.0.0.0:5432
+  connect_address: {{ pg_cluster_info.node_name }}:{{ pg_cluster_info.pg_sql_port }}
+  # Proxy address is not required this time.
+  # proxy_address: postgres1:6432
+  data_dir: /var/lib/postgresql/{{ config.pg_major_version }}/main
+  bin_dir: /usr/lib/postgresql/{{ config.pg_major_version }}/bin
+  pgpass: /tmp/pgpass
+  use_unix_socket: true
+  authentication:
+    replication:
+      username: {{ config.pg_replicator_id }}
+      password: {{ config.pg_replicator_password }}
+    superuser:
+      username: {{ config.pg_superuser_id }}
+      password: {{ config.pg_superuser_password }}
+    rewind:
+      username: {{ config.pg_rewind_id }}
+      password: {{ config.pg_rewind_password }}
+  parameters:
+    max_connections: '2048'
+    max_worker_processes: '8'
+    deadlock_timeout: '10s'
+    lock_timeout: '60000'
+    idle_in_transaction_session_timeout: '60000'
+{%- if config.shared_preload_libraries %}
+    shared_preload_libraries: '{{ config.shared_preload_libraries }}'
+{%- endif %}
+    unix_socket_directories: '/var/run/postgresql'
+
+tags:
+  nofailover: false
+  noloadbalance: false
+  clonefrom: false
+  nosync: false
+
+watchdog:
+  mode: off

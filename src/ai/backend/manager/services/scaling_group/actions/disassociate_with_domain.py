@@ -13,7 +13,7 @@ from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
 from .domain_base import ScalingGroupDomainAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class DisassociateScalingGroupWithDomainsAction(ScalingGroupDomainAction):
     """Action to disassociate scaling groups from a domain."""
 
@@ -29,7 +29,7 @@ class DisassociateScalingGroupWithDomainsAction(ScalingGroupDomainAction):
         return None
 
 
-@dataclass
+@dataclass(frozen=True)
 class DisassociateScalingGroupWithDomainsActionResult(BaseActionResult):
     """Result of disassociating a scaling group from domains."""
 

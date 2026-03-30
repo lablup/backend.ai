@@ -11,7 +11,7 @@ from ai.backend.manager.repositories.base.rbac.scope_binder import RBACScopeBind
 from .domain_base import ScalingGroupDomainAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class AssociateScalingGroupWithDomainsAction(ScalingGroupDomainAction):
     """Action to associate a scaling group with multiple domains."""
 
@@ -27,7 +27,7 @@ class AssociateScalingGroupWithDomainsAction(ScalingGroupDomainAction):
         return None
 
 
-@dataclass
+@dataclass(frozen=True)
 class AssociateScalingGroupWithDomainsActionResult(BaseActionResult):
     """Result of associating a scaling group with domains."""
 

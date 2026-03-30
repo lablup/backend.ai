@@ -4,32 +4,28 @@ import uuid
 from collections.abc import Sequence
 from typing import Any, Self
 
-import strawberry
 from strawberry import ID
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.artifact_registries.types import (
-    ArtifactRegistryData,
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
-from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
-    GetArtifactRegistryMetasAction,
-)
 
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Represents common metadata for an artifact registry.
-    All artifact registry nodes expose that information regardless of type.
-""")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Represents common metadata for an artifact registry. All artifact registry nodes expose that information regardless of type.",
+    ),
 )
-class ArtifactRegistryMeta(Node):
+class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
     id: NodeID[str]
     name: str
     registry_id: ID
@@ -37,28 +33,16 @@ class ArtifactRegistryMeta(Node):
     url: str
 
     @classmethod
-    def from_dataclass(cls, data: ArtifactRegistryData, url: str) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            registry_id=ID(str(data.registry_id)),
-            type=data.type,
-            url=url,
-        )
-
-    @classmethod
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
     ) -> list[Self]:
         # Get all registry metas in a single batch query
-        registry_metas_action = (
-            await ctx.processors.artifact_registry.get_registry_metas.wait_for_complete(
-                GetArtifactRegistryMetasAction(registry_ids=list(registry_ids))
-            )
+        registry_meta_dtos = await ctx.adapters.artifact_registry.get_registry_metas(
+            list(registry_ids)
         )
 
         # Create a mapping for efficient lookup
-        registry_meta_map = {meta.registry_id: meta for meta in registry_metas_action.result}
+        registry_meta_map = {meta.registry_id: meta for meta in registry_meta_dtos}
 
         registries = []
         for registry_id in registry_ids:
@@ -85,14 +69,27 @@ class ArtifactRegistryMeta(Node):
                         raise ArtifactRegistryNotFoundError
                     url = reservoir_registry.endpoint
 
-            registries.append(cls.from_dataclass(registry_meta, url=url))
+            registries.append(
+                cls(
+                    id=ID(str(registry_meta.id)),
+                    name=registry_meta.name,
+                    registry_id=ID(str(registry_meta.registry_id)),
+                    type=registry_meta.type,
+                    url=url,
+                )
+            )
         return registries
 
 
 ArtifactRegistryMetaEdge = Edge[ArtifactRegistryMeta]
 
 
-@strawberry.type(description="Added in 25.15.0")
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Relay-style connection for paginated artifact registry meta queries.",
+    ),
+)
 class ArtifactRegistryMetaConnection(Connection[ArtifactRegistryMeta]):
     count: int
 

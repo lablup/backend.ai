@@ -5,11 +5,13 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 project_resource_policy_repository_resilience = Resilience(
@@ -36,6 +38,19 @@ class ProjectResourcePolicyRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    @project_resource_policy_repository_resilience.apply()
+    async def search(self, querier: BatchQuerier) -> SearchResult[ProjectResourcePolicyData]:
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ProjectResourcePolicyRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.ProjectResourcePolicyRow.to_dataclass() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     @project_resource_policy_repository_resilience.apply()
     async def create(self, creator: Creator[ProjectResourcePolicyRow]) -> ProjectResourcePolicyData:

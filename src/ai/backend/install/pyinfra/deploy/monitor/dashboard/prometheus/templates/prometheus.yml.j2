@@ -1,0 +1,161 @@
+global:
+  scrape_interval: 20s     # Global scrape interval (default: 1m)
+  evaluation_interval: 1m  # Evaluate interval for rules (default: 1m)
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      # - alertmanager:9093
+
+# Load and evaluate rules with period `evaluation_interval`.
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: prometheus
+    static_configs:
+      - targets:
+        - localhost:9090
+
+  # Backend.AI HTTP Service Discovery
+  - job_name: 'http-sd'
+    scheme: 'http'
+    http_sd_configs:
+      - url: 'http://{{ http_sd_host }}:{{ http_sd_port }}/metrics/service_discovery'
+        refresh_interval: "60s"
+
+  # ETCD Cluster
+  - job_name: 'etcd'
+    scrape_interval: 20s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+{%- if etcd_targets %}
+{%- for target in etcd_targets %}
+        - "{{ target }}"
+{%- endfor %}
+{%- else %}
+        - "{{ etcd_host }}:{{ etcd_port }}"
+{%- endif %}
+
+  # Redis Exporter (multi-target pattern)
+{%- if redis_instances %}
+  - job_name: 'redis-exporter-targets'
+    static_configs:
+      - targets:
+{%- for instance in redis_instances %}
+        - "{{ instance }}"
+{%- endfor %}
+    metrics_path: /scrape
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: {{ redis_exporter_address }}
+{%- else %}
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets:
+        - "{{ redis_exporter_host }}:{{ redis_exporter_port }}"
+{%- endif %}
+
+  # PostgreSQL Exporter
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets:
+{%- if postgres_exporter_targets %}
+{%- for target in postgres_exporter_targets %}
+        - "{{ target }}"
+{%- endfor %}
+{%- else %}
+        - "{{ db_exporter_host }}:{{ db_exporter_port }}"
+{%- endif %}
+
+  # Patroni (PostgreSQL HA cluster manager)
+{%- if patroni_targets %}
+  - job_name: 'patroni'
+    static_configs:
+      - targets:
+{%- for target in patroni_targets %}
+        - "{{ target }}"
+{%- endfor %}
+{%- endif %}
+
+  # Traefik (AppProxy reverse proxy)
+{%- if traefik_targets %}
+  - job_name: 'traefik'
+    static_configs:
+      - targets:
+{%- for target in traefik_targets %}
+        - "{{ target }}"
+{%- endfor %}
+{%- endif %}
+
+  # Blackbox Exporter - HTTP probes
+{%- if blackbox_http_targets %}
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx_insecure]
+    static_configs:
+      - targets:
+{%- for target in blackbox_http_targets %}
+        - "{{ target }}"
+{%- endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: {{ blackbox_exporter_host }}:{{ blackbox_exporter_port }}
+{%- endif %}
+
+  # Blackbox Exporter - TCP probes
+{%- if blackbox_tcp_targets %}
+  - job_name: 'blackbox-tcp'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets:
+{%- for target in blackbox_tcp_targets %}
+        - "{{ target }}"
+{%- endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: {{ blackbox_exporter_host }}:{{ blackbox_exporter_port }}
+{%- endif %}
+
+  # Node Exporter (system metrics) - file-based service discovery
+  # - job_name: 'node-exporter'
+  #   scrape_interval: 30s
+  #   file_sd_configs:
+  #     - files:
+  #       - '/etc/prometheus/targets.json'
+  #   relabel_configs:
+  #     - source_labels: [job]
+  #       regex: 'node-exporter'
+  #       action: keep
+
+  # DCGM Exporter (NVIDIA GPU metrics) - file-based service discovery
+  - job_name: 'dcgm-exporter'
+    scrape_interval: 30s
+    file_sd_configs:
+      - files:
+        - '/etc/prometheus/targets.json'
+    relabel_configs:
+      - source_labels: [job]
+        regex: 'dcgm-exporter'
+        action: keep

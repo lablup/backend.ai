@@ -458,7 +458,13 @@ async def resolve_group_name_or_id(
         case uuid.UUID():
             cond = groups.c.id == value
         case str():
-            cond = groups.c.name == value
+            # Try to parse as UUID first
+            # If successful, query by ID; otherwise treat as group name
+            try:
+                parsed_uuid = uuid.UUID(value)
+                cond = groups.c.id == parsed_uuid
+            except ValueError:
+                cond = groups.c.name == value
         case _:
             raise TypeError("unexpected type for group_name_or_id")
     query = _build_group_query(cond, domain_name)

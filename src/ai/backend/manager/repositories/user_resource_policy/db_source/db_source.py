@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import sqlalchemy as sa
 
@@ -9,9 +10,12 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 if TYPE_CHECKING:
@@ -44,6 +48,38 @@ class UserResourcePolicyDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    @user_resource_policy_db_source_resilience.apply()
+    async def get_by_user_id(self, user_id: UUID) -> UserResourcePolicyData:
+        """Retrieves the resource policy assigned to a user by their UUID."""
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(UserResourcePolicyRow)
+                .join(
+                    UserRow,
+                    UserRow.resource_policy == UserResourcePolicyRow.name,
+                )
+                .where(UserRow.uuid == user_id)
+            )
+            row = await db_sess.scalar(query)
+            if row is None:
+                raise UserResourcePolicyNotFound(
+                    f"User resource policy for user '{user_id}' not found."
+                )
+            return row.to_dataclass()
+
+    @user_resource_policy_db_source_resilience.apply()
+    async def search(self, querier: BatchQuerier) -> SearchResult[UserResourcePolicyData]:
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(UserResourcePolicyRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.UserResourcePolicyRow.to_dataclass() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     @user_resource_policy_db_source_resilience.apply()
     async def create(self, creator: Creator[UserResourcePolicyRow]) -> UserResourcePolicyData:

@@ -36,10 +36,15 @@ class DeploymentExecutionError:
 
 @dataclass
 class DeploymentExecutionResult:
-    """Result of a deployment execution operation."""
+    """Result of a deployment execution operation.
+
+    Follows the session coordinator pattern: handlers report what happened
+    (successes, failures, skipped), and the coordinator applies policy
+    (retry count, timeout) to classify failures into need_retry/expired/give_up.
+    """
 
     successes: list[DeploymentWithHistory] = field(default_factory=list)
-    errors: list[DeploymentExecutionError] = field(default_factory=list)
+    failures: list[DeploymentExecutionError] = field(default_factory=list)
     skipped: list[DeploymentWithHistory] = field(default_factory=list)
 
 

@@ -1,0 +1,34 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+cleanup_old_logs() {
+    local logs_dir="logs"
+    local max_files=10
+    local file_count=$(ls -1 "$logs_dir"/*.log 2>/dev/null | wc -l)
+
+    if [ "$file_count" -gt "$max_files" ]; then
+        local files_to_delete=$((file_count - max_files))
+        echo "Found $file_count log files. Removing $files_to_delete oldest files..."
+        ls -t "$logs_dir"/*.log 2>/dev/null | tail -n "$files_to_delete" | xargs rm -f
+        echo "Cleanup completed. Kept $max_files most recent log files."
+    fi
+}
+
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+elif command_exists "docker-compose"; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+else
+    echo "Error: Neither 'docker compose' nor 'docker-compose' found."
+    exit 1
+fi
+
+mkdir -p logs && $DOCKER_COMPOSE_CMD logs > logs/$(date '+%Y%m%d-%H%M%S').log
+cleanup_old_logs
+
+$DOCKER_COMPOSE_CMD down

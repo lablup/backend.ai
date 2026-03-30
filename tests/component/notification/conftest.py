@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -23,9 +23,12 @@ def notification_processors(
 ) -> NotificationProcessors:
     repo = NotificationRepository(database_engine)
     service = NotificationService(repo, notification_center)
-    return NotificationProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    # Create properly structured ActionValidators mock with async validators
+    validators = MagicMock(spec=ActionValidators)
+    validators.rbac = MagicMock()
+    validators.rbac.scope = AsyncMock()
+    validators.rbac.single_entity = AsyncMock()
+    return NotificationProcessors(service=service, action_monitors=[], validators=validators)
 
 
 @pytest.fixture()

@@ -159,11 +159,12 @@ class TestUpdateRoute:
         self,
         mock_action_monitor: MagicMock,
         model_serving_service: ModelServingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingProcessors:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
-            validators=MagicMock(spec=ActionValidators),
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -243,7 +244,7 @@ class TestUpdateRoute:
                     route_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
                     traffic_ratio=0.7,
                 ),
-                UpdateRouteActionResult(success=True),
+                UpdateRouteActionResult(route_id=uuid.UUID("11111111-1111-1111-1111-111111111111")),
             ),
         ],
     )

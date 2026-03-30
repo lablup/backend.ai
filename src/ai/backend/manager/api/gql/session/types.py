@@ -5,13 +5,53 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.common import (
+    ResourceSlotEntryInput as ResourceSlotEntryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+from ai.backend.common.dto.manager.v2.session.request import (
+    BatchConfigInput as BatchConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
+    EnqueueSessionInput as EnqueueSessionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
+    MountItemInput as MountItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
+    ResourceOptsInput as ResourceOptsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
+    SessionFilter,
+    SessionOrder,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
+    EnqueueSessionPayload as EnqueueSessionPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
+    SessionLifecycleInfoGQLDTO,
+    SessionMetadataInfoGQLDTO,
+    SessionNetworkInfo,
+    SessionNode,
+    SessionResourceInfoGQLDTO,
+    SessionRuntimeInfoGQLDTO,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
+    TerminateSessionsPayload as TerminateSessionsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.session.types import (
+    ProjectSessionScope,
+    SessionStatusFilter,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -19,12 +59,20 @@ from ai.backend.manager.api.gql.common.types import (
     SessionV2ResultGQL,
     SessionV2TypeGQL,
 )
-from ai.backend.manager.api.gql.deployment.types.revision import (
-    EnvironmentVariableEntryGQL,
-    EnvironmentVariablesGQL,
+from ai.backend.manager.api.gql.common_types import BinarySizeInputGQL
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_added_field,
+    gql_connection_type,
+    gql_enum,
+    gql_field,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.deployment.types.revision import EnvironmentVariablesGQL
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
-from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image.types import ImageV2ConnectionGQL
 from ai.backend.manager.api.gql.kernel.types import (
     KernelV2ConnectionGQL,
@@ -33,31 +81,16 @@ from ai.backend.manager.api.gql.kernel.types import (
     ResourceAllocationGQL,
 )
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-from ai.backend.manager.api.gql.resource_group.resolver import (
-    ResourceGroupConnection,
-    ResourceGroupEdge,
-)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-from ai.backend.manager.data.session.types import SessionData, SessionStatus
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    NoPagination,
-    QueryCondition,
-    QueryOrder,
-)
-from ai.backend.manager.repositories.scheduler.options import (
-    KernelConditions,
-    SessionConditions,
-    SessionOrders,
-)
-from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
+from ai.backend.manager.errors.user import UserNotFound
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="Status of a session in its lifecycle."),
     name="SessionV2Status",
-    description="Added in 26.3.0. Status of a session in its lifecycle.",
 )
 class SessionV2StatusGQL(StrEnum):
     """GraphQL enum for session status."""
@@ -73,65 +106,13 @@ class SessionV2StatusGQL(StrEnum):
     TERMINATED = "TERMINATED"
     CANCELLED = "CANCELLED"
 
-    @classmethod
-    def from_internal(cls, internal_status: SessionStatus) -> SessionV2StatusGQL:
-        """Convert internal SessionStatus to GraphQL enum."""
-        match internal_status:
-            case SessionStatus.PENDING:
-                return cls.PENDING
-            case SessionStatus.SCHEDULED:
-                return cls.SCHEDULED
-            case SessionStatus.PREPARING | SessionStatus.PULLING:
-                return cls.PREPARING
-            case SessionStatus.PREPARED:
-                return cls.PREPARED
-            case SessionStatus.CREATING:
-                return cls.CREATING
-            case SessionStatus.RUNNING:
-                return cls.RUNNING
-            case SessionStatus.DEPRIORITIZING:
-                return cls.DEPRIORITIZING
-            case SessionStatus.TERMINATING:
-                return cls.TERMINATING
-            case SessionStatus.TERMINATED:
-                return cls.TERMINATED
-            case SessionStatus.CANCELLED:
-                return cls.CANCELLED
-            case _:
-                # RESTARTING, RUNNING_DEGRADED, ERROR are not exposed via GQL
-                return cls.CANCELLED
-
-    def to_internal(self) -> SessionStatus:
-        """Convert GraphQL enum to internal SessionStatus."""
-        match self:
-            case SessionV2StatusGQL.PENDING:
-                return SessionStatus.PENDING
-            case SessionV2StatusGQL.SCHEDULED:
-                return SessionStatus.SCHEDULED
-            case SessionV2StatusGQL.PREPARING:
-                return SessionStatus.PREPARING
-            case SessionV2StatusGQL.PREPARED:
-                return SessionStatus.PREPARED
-            case SessionV2StatusGQL.CREATING:
-                return SessionStatus.CREATING
-            case SessionV2StatusGQL.RUNNING:
-                return SessionStatus.RUNNING
-            case SessionV2StatusGQL.DEPRIORITIZING:
-                return SessionStatus.DEPRIORITIZING
-            case SessionV2StatusGQL.TERMINATING:
-                return SessionStatus.TERMINATING
-            case SessionV2StatusGQL.TERMINATED:
-                return SessionStatus.TERMINATED
-            case SessionV2StatusGQL.CANCELLED:
-                return SessionStatus.CANCELLED
-
 
 # ========== Order and Filter Types ==========
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="Fields available for ordering sessions."),
     name="SessionV2OrderField",
-    description="Added in 26.3.0. Fields available for ordering sessions.",
 )
 class SessionV2OrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
@@ -141,25 +122,25 @@ class SessionV2OrderFieldGQL(StrEnum):
     NAME = "name"
 
 
-@strawberry.input(
-    name="SessionV2StatusFilter", description="Added in 26.3.0. Filter for session status."
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for session status.", added_version="26.3.0"),
+    name="SessionV2StatusFilter",
 )
-class SessionV2StatusFilterGQL:
-    in_: list[SessionV2StatusGQL] | None = strawberry.field(name="in", default=None)
+class SessionV2StatusFilterGQL(PydanticInputMixin[SessionStatusFilter]):
+    in_: list[SessionV2StatusGQL] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     not_in: list[SessionV2StatusGQL] | None = None
 
-    def build_condition(self) -> QueryCondition | None:
-        if self.in_:
-            return SessionConditions.by_status_in([s.to_internal() for s in self.in_])
-        if self.not_in:
-            return SessionConditions.by_status_not_in([s.to_internal() for s in self.not_in])
-        return None
 
-
-@strawberry.input(
-    name="SessionV2Filter", description="Added in 26.3.0. Filter criteria for querying sessions."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying sessions.",
+        added_version="26.3.0",
+    ),
+    name="SessionV2Filter",
 )
-class SessionV2FilterGQL(GQLFilter):
+class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
     id: UUIDFilter | None = None
     status: SessionV2StatusFilterGQL | None = None
     name: StringFilter | None = None
@@ -167,236 +148,207 @@ class SessionV2FilterGQL(GQLFilter):
     project_id: UUIDFilter | None = None
     user_uuid: UUIDFilter | None = None
 
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if self.id:
-            condition = self.id.build_query_condition(
-                SessionConditions.by_id_filter_equals,
-                SessionConditions.by_id_filter_in,
-            )
-            if condition:
-                conditions.append(condition)
-        if self.status:
-            condition = self.status.build_condition()
-            if condition:
-                conditions.append(condition)
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=SessionConditions.by_name_contains,
-                equals_factory=SessionConditions.by_name_equals,
-                starts_with_factory=SessionConditions.by_name_starts_with,
-                ends_with_factory=SessionConditions.by_name_ends_with,
-            )
-            if name_condition:
-                conditions.append(name_condition)
-        if self.domain_name:
-            domain_condition = self.domain_name.build_query_condition(
-                contains_factory=SessionConditions.by_domain_name_contains,
-                equals_factory=SessionConditions.by_domain_name_equals,
-                starts_with_factory=SessionConditions.by_domain_name_starts_with,
-                ends_with_factory=SessionConditions.by_domain_name_ends_with,
-            )
-            if domain_condition:
-                conditions.append(domain_condition)
-        if self.project_id:
-            condition = self.project_id.build_query_condition(
-                SessionConditions.by_group_id_filter_equals,
-                SessionConditions.by_group_id_filter_in,
-            )
-            if condition:
-                conditions.append(condition)
-        if self.user_uuid:
-            condition = self.user_uuid.build_query_condition(
-                SessionConditions.by_user_uuid_filter_equals,
-                SessionConditions.by_user_uuid_filter_in,
-            )
-            if condition:
-                conditions.append(condition)
-        return conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(
-    name="SessionV2OrderBy", description="Added in 26.3.0. Ordering specification for sessions."
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Ordering specification for sessions.", added_version="26.3.0"),
+    name="SessionV2OrderBy",
 )
-class SessionV2OrderByGQL(GQLOrderBy):
+class SessionV2OrderByGQL(PydanticInputMixin[SessionOrder]):
     field: SessionV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
 
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case SessionV2OrderFieldGQL.CREATED_AT:
-                return SessionOrders.created_at(ascending)
-            case SessionV2OrderFieldGQL.TERMINATED_AT:
-                return SessionOrders.terminated_at(ascending)
-            case SessionV2OrderFieldGQL.STATUS:
-                return SessionOrders.status(ascending)
-            case SessionV2OrderFieldGQL.ID:
-                return SessionOrders.id(ascending)
-            case SessionV2OrderFieldGQL.NAME:
-                return SessionOrders.name(ascending)
-            case _:
-                raise ValueError(f"Unhandled SessionV2OrderFieldGQL value: {self.field!r}")
+
+# ========== Scope Types ==========
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for session operations within a specific project.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ProjectSessionV2Scope",
+)
+class ProjectSessionScopeGQL(PydanticInputMixin[ProjectSessionScope]):
+    """Scope for project-level session operations."""
+
+    project_id: UUID = gql_field(description="Project UUID to scope the session operation.")
 
 
 # ========== Session Info Sub-Types ==========
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Metadata information for a session.",
+    ),
+    model=SessionMetadataInfoGQLDTO,
     name="SessionV2MetadataInfo",
-    description="Added in 26.3.0. Metadata information for a session.",
 )
 class SessionV2MetadataInfoGQL:
-    creation_id: str = strawberry.field(
+    creation_id: str = gql_field(
         description="Server-generated unique token for tracking session creation."
     )
-    name: str = strawberry.field(description="Human-readable name of the session.")
-    session_type: SessionV2TypeGQL = strawberry.field(
+    name: str = gql_field(description="Human-readable name of the session.")
+    session_type: SessionV2TypeGQL = gql_field(
         description="Type of the session (interactive, batch, inference)."
     )
-    access_key: str = strawberry.field(description="Access key used to create this session.")
-    cluster_mode: ClusterModeGQL = strawberry.field(
+    access_key: str = gql_field(description="Access key used to create this session.")
+    cluster_mode: ClusterModeGQL = gql_field(
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )
-    cluster_size: int = strawberry.field(description="Number of nodes in the cluster.")
-    priority: int = strawberry.field(description="Scheduling priority of the session.")
-    is_preemptible: bool = strawberry.field(
+    cluster_size: int = gql_field(description="Number of nodes in the cluster.")
+    priority: int = gql_field(description="Scheduling priority of the session.")
+    is_preemptible: bool = gql_field(
         description="Whether this session is eligible for preemption by higher-priority sessions."
     )
-    tag: str | None = strawberry.field(description="Optional user-provided tag for the session.")
+    tag: str | None = gql_field(description="Optional user-provided tag for the session.")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Resource allocation information for a session.",
+    ),
+    model=SessionResourceInfoGQLDTO,
     name="SessionV2ResourceInfo",
-    description="Added in 26.3.0. Resource allocation information for a session.",
 )
 class SessionV2ResourceInfoGQL:
-    allocation: ResourceAllocationGQL = strawberry.field(
+    allocation: ResourceAllocationGQL = gql_field(
         description="Resource allocation with requested and occupied slots."
     )
-    resource_group_name: str | None = strawberry.field(
+    resource_group_name: str | None = gql_field(
         description="The resource group (scaling group) this session is assigned to."
     )
-    target_resource_group_names: list[str] | None = strawberry.field(
-        description="Candidate resource group names considered during scheduling."
-    )
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Lifecycle status and timestamps for a session.",
+    ),
+    model=SessionLifecycleInfoGQLDTO,
     name="SessionV2LifecycleInfo",
-    description="Added in 26.3.0. Lifecycle status and timestamps for a session.",
 )
 class SessionV2LifecycleInfoGQL:
-    status: SessionV2StatusGQL = strawberry.field(description="Current status of the session.")
-    result: SessionV2ResultGQL = strawberry.field(
+    status: SessionV2StatusGQL = gql_field(description="Current status of the session.")
+    result: SessionV2ResultGQL = gql_field(
         description="Result of the session execution (success, failure, etc.)."
     )
-    created_at: datetime | None = strawberry.field(
-        description="Timestamp when the session was created."
-    )
-    terminated_at: datetime | None = strawberry.field(
+    created_at: datetime | None = gql_field(description="Timestamp when the session was created.")
+    terminated_at: datetime | None = gql_field(
         description="Timestamp when the session was terminated. Null if still active."
     )
-    starts_at: datetime | None = strawberry.field(
+    starts_at: datetime | None = gql_field(
         description="Scheduled start time for the session, if applicable."
     )
-    batch_timeout: int | None = strawberry.field(
+    batch_timeout: int | None = gql_field(
         description="Batch execution timeout in seconds. Applicable to batch sessions."
     )
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Runtime execution configuration for a session.",
+    ),
+    model=SessionRuntimeInfoGQLDTO,
     name="SessionV2RuntimeInfo",
-    description="Added in 26.3.0. Runtime execution configuration for a session.",
 )
 class SessionV2RuntimeInfoGQL:
-    environ: EnvironmentVariablesGQL | None = strawberry.field(
+    environ: EnvironmentVariablesGQL | None = gql_field(
         description="Environment variables for the session."
     )
-    bootstrap_script: str | None = strawberry.field(
+    bootstrap_script: str | None = gql_field(
         description="Bootstrap script to run before the main process."
     )
-    startup_command: str | None = strawberry.field(
+    startup_command: str | None = gql_field(
         description="Startup command to execute when the session starts."
     )
-    callback_url: str | None = strawberry.field(
+    callback_url: str | None = gql_field(
         description="URL to call back when the session completes (e.g., for batch sessions)."
     )
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Network configuration for a session.",
+    ),
+    model=SessionNetworkInfo,
     name="SessionV2NetworkInfo",
-    description="Added in 26.3.0. Network configuration for a session.",
 )
 class SessionV2NetworkInfoGQL:
-    use_host_network: bool = strawberry.field(
-        description="Whether the session uses the host network directly."
-    )
-    network_type: str | None = strawberry.field(description="Type of network used by the session.")
-    network_id: str | None = strawberry.field(description="ID of the network if applicable.")
+    use_host_network: strawberry.auto
+    network_type: strawberry.auto
+    network_id: strawberry.auto
 
 
 # ========== Main Session Type ==========
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Represents a compute session in Backend.AI.",
+    ),
     name="SessionV2",
-    description="Added in 26.3.0. Represents a compute session in Backend.AI.",
 )
-class SessionV2GQL(Node):
+class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     """Session type representing a compute session."""
 
     id: NodeID[str]
 
-    # Private fields for dynamic resolvers
-    _domain_name: strawberry.Private[str]
-    _user_uuid: strawberry.Private[UUID]
-    _group_id: strawberry.Private[UUID]
+    # Fields used as keys for dynamic resolvers
+    domain_name: str
+    user_id: ID
+    project_id: ID
 
-    metadata: SessionV2MetadataInfoGQL = strawberry.field(
+    metadata: SessionV2MetadataInfoGQL = gql_field(
         description="Metadata including domain, project, and user information."
     )
-    resource: SessionV2ResourceInfoGQL = strawberry.field(
+    resource: SessionV2ResourceInfoGQL = gql_field(
         description="Resource allocation and cluster information."
     )
-    lifecycle: SessionV2LifecycleInfoGQL = strawberry.field(
-        description="Lifecycle status and timestamps."
-    )
-    runtime: SessionV2RuntimeInfoGQL = strawberry.field(
-        description="Runtime execution configuration."
-    )
-    network: SessionV2NetworkInfoGQL = strawberry.field(description="Network configuration.")
+    lifecycle: SessionV2LifecycleInfoGQL = gql_field(description="Lifecycle status and timestamps.")
+    runtime: SessionV2RuntimeInfoGQL = gql_field(description="Runtime execution configuration.")
+    network: SessionV2NetworkInfoGQL = gql_field(description="Network configuration.")
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The domain this session belongs to."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.3.0", description="The domain this session belongs to.")
+    )  # type: ignore[misc]
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
-        domain_data = await info.context.data_loaders.domain_loader.load(self._domain_name)
-        if domain_data is None:
-            return None
-        return DomainV2GQL.from_data(domain_data)
+        return await info.context.data_loaders.domain_loader.load(self.domain_name)
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The user who owns this session."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.3.0", description="The user who owns this session.")
+    )  # type: ignore[misc]
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
-        user_data = await info.context.data_loaders.user_loader.load(self._user_uuid)
+        user_data = await info.context.data_loaders.user_loader.load(UUID(str(self.user_id)))
         if user_data is None:
             return None
-        return UserV2GQL.from_data(user_data)
+        return user_data
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The project this session belongs to."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.3.0", description="The project this session belongs to.")
+    )  # type: ignore[misc]
     async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
-        project_data = await info.context.data_loaders.project_loader.load(self._group_id)
+        project_data = await info.context.data_loaders.project_loader.load(
+            UUID(str(self.project_id))
+        )
         if project_data is None:
             return None
-        return ProjectV2GQL.from_data(project_data)
+        return project_data
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The resource group this session is assigned to."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0", description="The resource group this session is assigned to."
+        )
+    )  # type: ignore[misc]
     async def resource_group(self, info: Info[StrawberryGQLContext]) -> ResourceGroupGQL | None:
         if self.resource.resource_group_name is None:
             return None
@@ -405,60 +357,42 @@ class SessionV2GQL(Node):
         )
         if resource_group_data is None:
             return None
-        return ResourceGroupGQL.from_dataclass(resource_group_data)
+        return resource_group_data
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The candidate resource groups considered during scheduling."
-    )
-    async def target_resource_groups(
-        self, info: Info[StrawberryGQLContext]
-    ) -> ResourceGroupConnection | None:
-        names = self.resource.target_resource_group_names
-        if not names:
-            return None
-        results = await info.context.data_loaders.resource_group_loader.load_many(names)
-        nodes = [ResourceGroupGQL.from_dataclass(data) for data in results if data is not None]
-        edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
-        return ResourceGroupConnection(
-            edges=edges,
-            page_info=strawberry.relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
-            count=len(nodes),
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0",
+            description="The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.",
         )
-
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions."
-    )
+    )  # type: ignore[misc]
     async def images(self) -> ImageV2ConnectionGQL:
         raise NotImplementedError
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The kernels belonging to this session."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0", description="The kernels belonging to this session."
+        )
+    )  # type: ignore[misc]
     async def kernels(self, info: Info[StrawberryGQLContext]) -> KernelV2ConnectionGQL:
+        user = current_user()
+        if user is None:
+            raise UserNotFound("User not found in context")
+
         session_id = SessionId(UUID(str(self.id)))
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[KernelConditions.by_session_ids([session_id])],
+        payload = await info.context.adapters.session.search_kernels_by_session(
+            session_id, AdminSearchKernelsInput()
         )
-        action_result = await info.context.processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=querier)
-        )
-        nodes = [KernelV2GQL.from_kernel_info(kernel) for kernel in action_result.data]
+        nodes = [KernelV2GQL.from_pydantic(kernel) for kernel in payload.items]
         edges = [KernelV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
         return KernelV2ConnectionGQL(
             edges=edges,
             page_info=strawberry.relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
                 start_cursor=edges[0].cursor if edges else None,
                 end_cursor=edges[-1].cursor if edges else None,
             ),
-            count=len(nodes),
+            count=payload.total_count,
         )
 
     # TODO: Add `vfolder_mounts` dynamic field (VFolderV2 connection type needed)
@@ -474,67 +408,7 @@ class SessionV2GQL(Node):
         results = await info.context.data_loaders.session_loader.load_many([
             SessionId(UUID(nid)) for nid in node_ids
         ])
-        return [cls.from_data(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_data(cls, data: SessionData) -> Self:
-        """Create SessionV2GQL from SessionData dataclass."""
-        requested_slots = ResourceSlotGQL.from_resource_slot(data.requested_slots)
-        occupying_slots = ResourceSlotGQL.from_resource_slot(data.occupying_slots)
-
-        environ_gql: EnvironmentVariablesGQL | None = None
-        if data.environ:
-            environ_gql = EnvironmentVariablesGQL(
-                entries=[
-                    EnvironmentVariableEntryGQL(name=k, value=str(v))
-                    for k, v in data.environ.items()
-                ]
-            )
-
-        return cls(
-            id=ID(str(data.id)),
-            _domain_name=data.domain_name,
-            _user_uuid=data.user_uuid,
-            _group_id=data.group_id,
-            metadata=SessionV2MetadataInfoGQL(
-                creation_id=data.creation_id or "",
-                name=data.name or "",
-                session_type=SessionV2TypeGQL.from_internal(data.session_type),
-                access_key=str(data.access_key) if data.access_key else "",
-                cluster_mode=ClusterModeGQL.from_internal(data.cluster_mode),
-                cluster_size=data.cluster_size,
-                priority=data.priority,
-                is_preemptible=data.is_preemptible,
-                tag=data.tag,
-            ),
-            resource=SessionV2ResourceInfoGQL(
-                allocation=ResourceAllocationGQL(
-                    requested=requested_slots,
-                    used=occupying_slots,
-                ),
-                resource_group_name=data.scaling_group_name,
-                target_resource_group_names=data.target_sgroup_names,
-            ),
-            lifecycle=SessionV2LifecycleInfoGQL(
-                status=SessionV2StatusGQL.from_internal(data.status),
-                result=SessionV2ResultGQL.from_internal(data.result),
-                created_at=data.created_at,
-                terminated_at=data.terminated_at,
-                starts_at=data.starts_at,
-                batch_timeout=data.batch_timeout,
-            ),
-            runtime=SessionV2RuntimeInfoGQL(
-                environ=environ_gql,
-                bootstrap_script=data.bootstrap_script,
-                startup_command=data.startup_command,
-                callback_url=data.callback_url,
-            ),
-            network=SessionV2NetworkInfoGQL(
-                use_host_network=data.use_host_network,
-                network_type=str(data.network_type) if data.network_type else None,
-                network_id=data.network_id,
-            ),
-        )
+        return cast(list[Self | None], results)
 
 
 # ========== Connection Types ==========
@@ -543,9 +417,12 @@ class SessionV2GQL(Node):
 SessionV2EdgeGQL = Edge[SessionV2GQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Connection type for paginated session results.",
+    ),
     name="SessionV2Connection",
-    description="Added in 26.3.0. Connection type for paginated session results.",
 )
 class SessionV2ConnectionGQL(Connection[SessionV2GQL]):
     count: int
@@ -553,3 +430,160 @@ class SessionV2ConnectionGQL(Connection[SessionV2GQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+# ========== Create Session Input Types ==========
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Session types allowed for user-initiated creation.",
+    ),
+    name="CreateSessionType",
+)
+class CreateSessionTypeGQL(StrEnum):
+    INTERACTIVE = "interactive"
+    BATCH = "batch"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Cluster networking modes for session creation.",
+    ),
+    name="SessionClusterMode",
+)
+class SessionClusterModeGQL(StrEnum):
+    SINGLE_NODE = "single-node"
+    MULTI_NODE = "multi-node"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A single resource slot allocation entry.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionResourceSlotEntryInput",
+)
+class SessionResourceSlotEntryInputGQL(PydanticInputMixin[ResourceSlotEntryInputDTO]):
+    resource_type: str = gql_field(description="Resource type identifier.")
+    quantity: str = gql_field(description="Quantity as a decimal string.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Additional resource options for session creation.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionResourceOptsInput",
+)
+class SessionResourceOptsInputGQL(PydanticInputMixin[ResourceOptsInputDTO]):
+    shmem: BinarySizeInputGQL | None = gql_field(
+        default=None, description="Shared memory size (e.g., '1g')."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A virtual folder mount specification.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionMountItemInput",
+)
+class SessionMountItemInputGQL(PydanticInputMixin[MountItemInputDTO]):
+    vfolder_id: ID = gql_field(description="Virtual folder UUID.")
+    mount_path: str | None = gql_field(default=None, description="Custom mount path.")
+    permission: str | None = gql_field(default=None, description="Mount permission ('rw' or 'ro').")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Batch session specific configuration.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionBatchConfigInput",
+)
+class SessionBatchConfigInputGQL(PydanticInputMixin[BatchConfigInputDTO]):
+    startup_command: str = gql_field(description="Shell command to execute.")
+    starts_at: str | None = gql_field(default=None, description="Scheduled start time (ISO 8601).")
+    batch_timeout: int | None = gql_field(default=None, description="Execution timeout in seconds.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for creating a new compute session.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="EnqueueSessionInput",
+)
+class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
+    session_name: str = gql_field(description="Session name.")
+    session_type: CreateSessionTypeGQL = gql_field(description="Session type.")
+    image_id: ID = gql_field(description="Image UUID.")
+
+    resource_entries: list[SessionResourceSlotEntryInputGQL] = gql_field(
+        description="Resource slot allocations."
+    )
+    resource_group: str | None = gql_field(default=None, description="Scaling group name.")
+    resource_opts: SessionResourceOptsInputGQL | None = gql_field(
+        default=None, description="Additional resource options."
+    )
+    cluster_mode: SessionClusterModeGQL = gql_field(
+        default=SessionClusterModeGQL.SINGLE_NODE, description="Cluster mode."
+    )
+    cluster_size: int = gql_field(default=1, description="Number of containers.")
+
+    mounts: list[SessionMountItemInputGQL] | None = gql_field(
+        default=None, description="Virtual folder mounts."
+    )
+
+    environ: strawberry.scalars.JSON | None = gql_field(
+        default=None, description="Environment variables."
+    )
+    preopen_ports: list[int] | None = gql_field(default=None, description="Ports to pre-open.")
+    bootstrap_script: str | None = gql_field(default=None, description="Bootstrap script.")
+
+    priority: int = gql_field(default=10, description="Scheduling priority (0-100).")
+    is_preemptible: bool = gql_field(default=True, description="Whether preemptible.")
+    dependencies: list[ID] | None = gql_field(default=None, description="Dependent session IDs.")
+    agent_list: list[str] | None = gql_field(default=None, description="Designated agent IDs.")
+    attach_network: ID | None = gql_field(default=None, description="Network UUID to attach.")
+
+    tag: str | None = gql_field(default=None, description="User-defined tag.")
+    callback_url: str | None = gql_field(default=None, description="Webhook URL.")
+
+    batch: SessionBatchConfigInputGQL | None = gql_field(
+        default=None, description="Batch configuration."
+    )
+    project_id: ID | None = gql_field(default=None, description="Project UUID.")
+
+
+# ========== Create Session Payload ==========
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after creating a session.",
+    ),
+    model=EnqueueSessionPayloadDTO,
+    name="EnqueueSessionPayload",
+)
+class EnqueueSessionPayloadGQL:
+    session: SessionV2GQL = gql_field(description="Created session details.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after terminating sessions.",
+    ),
+    model=TerminateSessionsPayloadDTO,
+    name="TerminateSessionsPayload",
+)
+class TerminateSessionsPayloadGQL:
+    cancelled: list[ID] = gql_field(description="Sessions cancelled from PENDING.")
+    terminating: list[ID] = gql_field(description="Sessions marked TERMINATING.")
+    force_terminated: list[ID] = gql_field(description="Sessions force-terminated.")
+    skipped: list[ID] = gql_field(description="Sessions already terminated or not found.")
