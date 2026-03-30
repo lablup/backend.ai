@@ -129,10 +129,10 @@ class UserConditions:
 
         return inner
 
-    # ==================== Integration ID Filters ====================
+    # ==================== Integration Name Filters ====================
 
     @staticmethod
-    def by_integration_id_contains(spec: StringMatchSpec) -> QueryCondition:
+    def by_integration_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = UserRow.integration_id.ilike(f"%{spec.value}%")
@@ -145,7 +145,7 @@ class UserConditions:
         return inner
 
     @staticmethod
-    def by_integration_id_equals(spec: StringMatchSpec) -> QueryCondition:
+    def by_integration_name_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = sa.func.lower(UserRow.integration_id) == spec.value.lower()
@@ -158,7 +158,7 @@ class UserConditions:
         return inner
 
     @staticmethod
-    def by_integration_id_starts_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_integration_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = UserRow.integration_id.ilike(f"{spec.value}%")
@@ -171,7 +171,7 @@ class UserConditions:
         return inner
 
     @staticmethod
-    def by_integration_id_ends_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_integration_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
                 condition = UserRow.integration_id.ilike(f"%{spec.value}")

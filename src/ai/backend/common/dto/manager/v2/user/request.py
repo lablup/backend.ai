@@ -292,7 +292,7 @@ class UserFilter(BaseRequestModel):
     email: StringFilter | None = Field(default=None, description="Filter by email.")
     status: UserStatusFilter | None = Field(default=None, description="Filter by account status.")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name.")
-    integration_id: StringFilter | None = Field(
+    integration_name: StringFilter | None = Field(
         default=None, description="Filter by external integration identifier."
     )
     role: UserRoleFilter | None = Field(default=None, description="Filter by user role.")

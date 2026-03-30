@@ -97,7 +97,7 @@ class UserProjectNestedFilterGQL(PydanticInputMixin[UserProjectFilter]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Filter input for querying users. Supports filtering by UUID, username, email, status, domain, integration_id, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        description="Filter input for querying users. Supports filtering by UUID, username, email, status, domain, integration_name, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
         added_version="26.2.0",
     ),
     name="UserV2Filter",
@@ -110,7 +110,7 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     email: StringFilter | None = None
     status: UserStatusEnumFilterGQL | None = None
     domain_name: StringFilter | None = None
-    integration_id: StringFilter | None = gql_added_field(
+    integration_name: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Filter by external integration identifier.",
