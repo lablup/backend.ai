@@ -113,10 +113,12 @@ from ai.backend.manager.services.vfolder.processors import (
     VFolderProcessors,
     VFolderSharingProcessors,
 )
+from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
@@ -190,6 +192,9 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.vfolder.repository,
             repositories.user.repository,
             args.valkey_stat_client,
+        ),
+        vfolder_admin=VFolderAdminService(
+            vfolder_admin_repository=repositories.vfolder.admin_repository,
         ),
         vfolder_file=VFolderFileService(
             args.config_provider,
@@ -389,6 +394,7 @@ def create_processors(
             services.container_registry, action_monitors, validators
         ),
         vfolder=VFolderProcessors(services.vfolder, action_monitors, validators),
+        vfolder_admin=VFolderAdminProcessors(services.vfolder_admin, action_monitors),
         vfolder_file=VFolderFileProcessors(services.vfolder_file, action_monitors, validators),
         vfolder_invite=VFolderInviteProcessors(
             services.vfolder_invite, action_monitors, validators

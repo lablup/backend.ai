@@ -254,6 +254,9 @@ if TYPE_CHECKING:
         VFolderProcessors,  # pants: no-infer-dep
         VFolderSharingProcessors,  # pants: no-infer-dep
     )
+    from ai.backend.manager.services.vfolder.processors.vfolder_admin import (
+        VFolderAdminProcessors,  # pants: no-infer-dep
+    )
     from ai.backend.manager.services.vfolder.services.file import (
         VFolderFileService,  # pants: no-infer-dep
     )
@@ -265,6 +268,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.vfolder.services.vfolder import (
         VFolderService,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.vfolder.services.vfolder_admin import (
+        VFolderAdminService,  # pants: no-infer-dep
     )
     from ai.backend.manager.services.vfs_storage.processors import (
         VFSStorageProcessors,  # pants: no-infer-dep
@@ -327,6 +333,7 @@ class Services:
     image: ImageService
     container_registry: ContainerRegistryService
     vfolder: VFolderService
+    vfolder_admin: VFolderAdminService
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
     vfolder_sharing: VFolderSharingService
@@ -383,6 +390,7 @@ class Processors(AbstractProcessorPackage):
     user: UserProcessors
     image: ImageProcessors
     vfolder: VFolderProcessors
+    vfolder_admin: VFolderAdminProcessors
     vfolder_invite: VFolderInviteProcessors
     vfolder_sharing: VFolderSharingProcessors
     vfolder_file: VFolderFileProcessors
@@ -434,6 +442,7 @@ class Processors(AbstractProcessorPackage):
             *self.image.supported_actions(),
             *self.container_registry.supported_actions(),
             *self.vfolder.supported_actions(),
+            *self.vfolder_admin.supported_actions(),
             *self.vfolder_file.supported_actions(),
             *self.vfolder_invite.supported_actions(),
             *self.vfolder_sharing.supported_actions(),
