@@ -39,7 +39,7 @@ class DomainBasicInfoGQL:
 
     name: str = gql_field(description="Domain name (primary key).")
     description: str | None = gql_field(description="Optional description of the domain.")
-    integration_id: str | None = gql_field(description="External system integration identifier.")
+    integration_name: str | None = gql_field(description="External system integration identifier.")
 
 
 # ============================================================================

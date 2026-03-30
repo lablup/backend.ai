@@ -104,7 +104,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     domain_name = graphene.String()
     total_resource_slots = graphene.JSONString()
     allowed_vfolder_hosts = graphene.JSONString()
-    integration_id = graphene.String()
+    integration_name = graphene.String()
     resource_policy = graphene.String()
     type = graphene.String(description=f"Added in 24.03.7. One of {[t.name for t in ProjectType]}.")
     container_registry = graphene.JSONString(description="Added in 24.03.7.")
@@ -155,7 +155,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             domain_name=row.domain_name,
             total_resource_slots=row.total_resource_slots.to_json() or {},
             allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
-            integration_id=row.integration_id,
+            integration_name=row.integration_name,
             resource_policy=row.resource_policy,
             type=row.type.name,
             container_registry=row.container_registry,
@@ -352,7 +352,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
     domain_name = graphene.String()
     total_resource_slots = graphene.JSONString()
     allowed_vfolder_hosts = graphene.JSONString()
-    integration_id = graphene.String()
+    integration_name = graphene.String()
     resource_policy = graphene.String()
     type = graphene.String(description="Added in 24.03.0.")
     container_registry = graphene.JSONString(description="Added in 24.03.0.")
@@ -375,7 +375,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
                 row.total_resource_slots.to_json() if row.total_resource_slots is not None else {}
             ),
             allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
-            integration_id=row.integration_id,
+            integration_name=row.integration_name,
             resource_policy=row.resource_policy,
             type=row.type.name,
             container_registry=row.container_registry,
@@ -397,7 +397,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             if dto.total_resource_slots
             else {},
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
-            integration_id=dto.integration_name,  # GroupData uses integration_name
+            integration_name=dto.integration_name,  # GroupData uses integration_name
             resource_policy=dto.resource_policy,
             type=dto.type.name,
             container_registry=dto.container_registry,
@@ -553,7 +553,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
     domain_name = graphene.String(required=True)
     total_resource_slots = graphene.JSONString(required=False, default_value={})
     allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
-    integration_id = graphene.String(required=False, default_value="")
+    integration_name = graphene.String(required=False, default_value="")
     resource_policy = graphene.String(required=False, default_value="default")
     container_registry = graphene.JSONString(
         required=False, default_value={}, description="Added in 24.03.0"
@@ -576,7 +576,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
             if self.allowed_vfolder_hosts is not Undefined
             else None
         )
-        integration_id_val = value_or_none(self.integration_id)
+        integration_name_val = value_or_none(self.integration_name)
         resource_policy_val = value_or_none(self.resource_policy)
         container_registry_val = value_or_none(self.container_registry)
 
@@ -590,7 +590,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
                     is_active=is_active_val,
                     total_resource_slots=total_resource_slots_val,
                     allowed_vfolder_hosts=allowed_vfolder_hosts_val,
-                    integration_name=integration_id_val,
+                    integration_name=integration_name_val,
                     resource_policy=resource_policy_val,
                     container_registry=container_registry_val,
                 )
@@ -608,7 +608,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     user_update_mode = graphene.String(required=False)
     user_uuids = graphene.List(lambda: graphene.String, required=False)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
-    integration_id = graphene.String(required=False)
+    integration_name = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
     container_registry = graphene.JSONString(
         required=False, default_value={}, description="Added in 24.03.0"
@@ -637,7 +637,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 self.allowed_vfolder_hosts,
             ),
             integration_name=OptionalState[str].from_graphql(
-                self.integration_id,
+                self.integration_name,
             ),
             resource_policy=OptionalState[str].from_graphql(
                 self.resource_policy,

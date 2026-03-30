@@ -45,7 +45,7 @@ class GroupDTO(BaseModel):
     created_at: datetime = Field(description="Creation timestamp")
     modified_at: datetime = Field(description="Last modification timestamp")
     domain_name: str = Field(description="Domain name the group belongs to")
-    integration_id: str | None = Field(default=None, description="External integration ID")
+    integration_name: str | None = Field(default=None, description="External integration ID")
     total_resource_slots: dict[str, Any] | None = Field(
         default=None, description="Total resource slot limits"
     )

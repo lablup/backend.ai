@@ -15,7 +15,7 @@ Query Schema
      total_resource_slots: JSONString  # ResourceSlot
      allowed_vfolder_hosts: [String]
      allowed_docker_registries: [String]
-     integration_id: String
+     integration_name: String
      scaling_groups: [String]
    }
 
@@ -35,7 +35,7 @@ Mutation Schema
      total_resource_slots: JSONString  # ResourceSlot
      allowed_vfolder_hosts: [String]
      allowed_docker_registries: [String]
-     integration_id: String
+     integration_name: String
    }
 
    input ModifyDomainInput {
@@ -45,7 +45,7 @@ Mutation Schema
      total_resource_slots: JSONString  # ResourceSlot
      allowed_vfolder_hosts: [String]
      allowed_docker_registries: [String]
-     integration_id: String
+     integration_name: String
    }
 
    type CreateDomain {

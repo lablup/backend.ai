@@ -33,7 +33,7 @@ def make_project_node(project_id: uuid.UUID | None = None) -> ProjectNode:
             name="test-project",
             description="Test project",
             type=ProjectType.GENERAL,
-            integration_id=None,
+            integration_name=None,
         ),
         organization=ProjectOrganizationInfo(
             domain_name="default",
@@ -63,18 +63,18 @@ class TestProjectBasicInfo:
         assert info.name == "project"
         assert info.type == ProjectType.GENERAL
         assert info.description is None
-        assert info.integration_id is None
+        assert info.integration_name is None
 
     def test_creation_with_all_fields(self) -> None:
         info = ProjectBasicInfo(
             name="ml-store",
             description="ML model store",
             type=ProjectType.MODEL_STORE,
-            integration_id="ext-789",
+            integration_name="ext-789",
         )
         assert info.type == ProjectType.MODEL_STORE
         assert info.description == "ML model store"
-        assert info.integration_id == "ext-789"
+        assert info.integration_name == "ext-789"
 
     def test_round_trip(self) -> None:
         info = ProjectBasicInfo(name="p", type=ProjectType.GENERAL, description="Desc")

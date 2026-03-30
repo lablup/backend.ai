@@ -154,7 +154,7 @@ class ProjectAdapter(BaseAdapter):
             name=input.name,
             domain_name=input.domain_name,
             description=input.description,
-            integration_name=input.integration_id,  # DTO uses integration_id
+            integration_name=input.integration_name,
             resource_policy=input.resource_policy,
         )
         result = await self._processors.group.create_group.wait_for_complete(
@@ -184,10 +184,10 @@ class ProjectAdapter(BaseAdapter):
             ),
             integration_name=(
                 OptionalState.nop()
-                if isinstance(input.integration_id, Sentinel)
+                if isinstance(input.integration_name, Sentinel)
                 else OptionalState.nop()
-                if input.integration_id is None
-                else OptionalState.update(input.integration_id)
+                if input.integration_name is None
+                else OptionalState.update(input.integration_name)
             ),
             resource_policy=(
                 OptionalState.update(input.resource_policy)
@@ -482,7 +482,7 @@ class ProjectAdapter(BaseAdapter):
                 name=data.name,
                 description=data.description,
                 type=ProjectType(data.type.value),
-                integration_id=data.integration_name,  # data type uses integration_name, DTO uses integration_id
+                integration_name=data.integration_name,
             ),
             organization=ProjectOrganizationInfo(
                 domain_name=data.domain_name,

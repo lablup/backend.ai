@@ -22,7 +22,7 @@ _default_list_fields = (
     domain_fields["total_resource_slots"],
     domain_fields["allowed_vfolder_hosts"],
     domain_fields["allowed_docker_registries"],
-    domain_fields["integration_id"],
+    domain_fields["integration_name"],
 )
 
 _default_detail_fields = (
@@ -33,7 +33,7 @@ _default_detail_fields = (
     domain_fields["total_resource_slots"],
     domain_fields["allowed_vfolder_hosts"],
     domain_fields["allowed_docker_registries"],
-    domain_fields["integration_id"],
+    domain_fields["integration_name"],
 )
 
 
@@ -103,7 +103,7 @@ class Domain(BaseFunction):
         total_resource_slots: str | Undefined = undefined,
         vfolder_host_perms: str | Undefined = undefined,  # JSON string
         allowed_docker_registries: Sequence[str] | Undefined = undefined,
-        integration_id: str | Undefined = undefined,
+        integration_name: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict[str, Any]:
         """
@@ -127,7 +127,7 @@ class Domain(BaseFunction):
         set_if_set(inputs, "total_resource_slots", total_resource_slots)
         set_if_set(inputs, "allowed_vfolder_hosts", vfolder_host_perms)
         set_if_set(inputs, "allowed_docker_registries", allowed_docker_registries)
-        set_if_set(inputs, "integration_id", integration_id)
+        set_if_set(inputs, "integration_name", integration_name)
         variables = {
             "name": name,
             "input": inputs,
@@ -147,7 +147,7 @@ class Domain(BaseFunction):
         total_resource_slots: str | Undefined = undefined,
         vfolder_host_perms: str | Undefined = undefined,  # JSON string
         allowed_docker_registries: Sequence[str] | Undefined = undefined,
-        integration_id: str | Undefined = undefined,
+        integration_name: str | Undefined = undefined,
         _fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict[str, Any]:
         """
@@ -169,7 +169,7 @@ class Domain(BaseFunction):
         set_if_set(inputs, "total_resource_slots", total_resource_slots)
         set_if_set(inputs, "allowed_vfolder_hosts", vfolder_host_perms)
         set_if_set(inputs, "allowed_docker_registries", allowed_docker_registries)
-        set_if_set(inputs, "integration_id", integration_id)
+        set_if_set(inputs, "integration_name", integration_name)
         variables = {
             "name": name,
             "input": inputs,
