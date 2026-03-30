@@ -311,6 +311,32 @@ class DeploymentDBSource:
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint = rbac_result.row
 
+            # Create the initial deployment revision and link it to the endpoint
+            if spec.image_id is None:
+                raise InvalidAPIParameters("image_id is required for legacy endpoint creation")
+            initial_revision = DeploymentRevisionRow(
+                endpoint=endpoint.id,
+                revision_number=1,
+                image=spec.image_id,
+                model=spec.model,
+                model_mount_destination=spec.model_mount_destination,
+                model_definition_path=spec.model_definition_path,
+                resource_group=spec.resource_group,
+                resource_slots=spec.resource_slots,
+                resource_opts=dict(spec.resource_opts) if spec.resource_opts else {},
+                cluster_mode=spec.cluster_mode.value,
+                cluster_size=spec.cluster_size,
+                startup_command=spec.startup_command,
+                bootstrap_script=spec.bootstrap_script,
+                environ=dict(spec.environ) if spec.environ else {},
+                callback_url=spec.callback_url,
+                runtime_variant=spec.runtime_variant,
+                extra_mounts=list(spec.extra_mounts),
+            )
+            db_sess.add(initial_revision)
+            await db_sess.flush()
+            endpoint.current_revision = initial_revision.id
+
             # Create deployment policy if provided
             if spec.policy is not None:
                 policy_spec = spec.policy
