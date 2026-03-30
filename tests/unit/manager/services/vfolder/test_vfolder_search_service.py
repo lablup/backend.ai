@@ -1,5 +1,5 @@
 """
-Tests for VFolderService.search_vfolders() functionality.
+Tests for VFolderService.admin_search_vfolders() functionality.
 Verifies that service methods correctly delegate to the repository and map results.
 """
 
@@ -21,15 +21,15 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.services.vfolder.actions.search_vfolders import (
-    SearchVFoldersAction,
-    SearchVFoldersActionResult,
+from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
+    AdminSearchVFoldersAction,
+    AdminSearchVFoldersActionResult,
 )
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
 
-class TestVFolderServiceSearchVFolders:
-    """Tests for VFolderService.search_vfolders()"""
+class TestVFolderServiceAdminSearchVFolders:
+    """Tests for VFolderService.admin_search_vfolders()"""
 
     @pytest.fixture
     def mock_vfolder_repository(self) -> MagicMock:
@@ -101,14 +101,14 @@ class TestVFolderServiceSearchVFolders:
             status=VFolderOperationStatus.READY,
         )
 
-    async def test_search_vfolders_delegates_to_repository(
+    async def test_admin_search_vfolders_delegates_to_repository(
         self,
         vfolder_service: VFolderService,
         mock_vfolder_repository: MagicMock,
         vfolder_1: VFolderData,
         vfolder_2: VFolderData,
     ) -> None:
-        """search_vfolders delegates to repository and maps result correctly."""
+        """admin_search_vfolders delegates to repository and maps result correctly."""
         mock_vfolder_repository.search_vfolders = AsyncMock(
             return_value=VFolderSearchResult(
                 items=[vfolder_1, vfolder_2],
@@ -118,11 +118,11 @@ class TestVFolderServiceSearchVFolders:
             )
         )
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
-        action = SearchVFoldersAction(querier=querier)
+        action = AdminSearchVFoldersAction(querier=querier)
 
-        result = await vfolder_service.search_vfolders(action)
+        result = await vfolder_service.admin_search_vfolders(action)
 
-        assert isinstance(result, SearchVFoldersActionResult)
+        assert isinstance(result, AdminSearchVFoldersActionResult)
         assert result.data == [vfolder_1, vfolder_2]
         assert result.total_count == 2
         assert result.has_next_page is False

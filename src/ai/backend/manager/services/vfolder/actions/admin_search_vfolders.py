@@ -11,7 +11,7 @@ from ai.backend.manager.services.vfolder.actions.base import VFolderAction
 
 
 @dataclass
-class SearchVFoldersAction(VFolderAction):
+class AdminSearchVFoldersAction(VFolderAction):
     """Search all vfolders with filtering, ordering, and pagination.
 
     Admin-only action without scope restriction.
@@ -30,8 +30,8 @@ class SearchVFoldersAction(VFolderAction):
 
 
 @dataclass
-class SearchVFoldersActionResult(BaseActionResult):
-    """Result of SearchVFoldersAction."""
+class AdminSearchVFoldersActionResult(BaseActionResult):
+    """Result of AdminSearchVFoldersAction."""
 
     data: list[VFolderData]
     total_count: int
