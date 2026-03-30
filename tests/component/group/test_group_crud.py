@@ -64,7 +64,7 @@ class TestGroupCreateCRUD:
                 description=f"Full group {unique}",
                 resource_policy=resource_policy_fixture,
                 total_resource_slots={"cpu": "4"},
-                integration_name=f"ext-{unique}",
+                integration_id=f"ext-{unique}",
             ),
         )
         assert isinstance(result, CreateGroupResponse)
