@@ -97,6 +97,10 @@ from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
+    SearchUserVFoldersAction,
+    SearchUserVFoldersActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
     ChangeVFolderOwnershipActionResult,
@@ -536,6 +540,21 @@ class VFolderService:
         return SearchVFoldersInProjectActionResult(
             project_id=action.scope.project_id,
             data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_user_vfolders(
+        self, action: SearchUserVFoldersAction
+    ) -> SearchUserVFoldersActionResult:
+        """Search vfolders owned by a specific user."""
+        result = await self._vfolder_repository.search_user_vfolders(
+            querier=action.querier, scope=action.scope
+        )
+        return SearchUserVFoldersActionResult(
+            user_id=action.scope.user_id,
+            items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,

@@ -9,11 +9,16 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
-__all__ = ("ProjectVFolderSearchScope",)
+__all__ = (
+    "ProjectVFolderSearchScope",
+    "UserVFolderSearchScope",
+)
 
 
 @dataclass(frozen=True)
@@ -43,5 +48,36 @@ class ProjectVFolderSearchScope(SearchScope):
                 column=GroupRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(str(self.project_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class UserVFolderSearchScope(SearchScope):
+    """Required scope for searching vfolders owned by a specific user.
+
+    Used for my_vfolders query (current authenticated user).
+    """
+
+    user_id: UUID
+    """Required. The user whose vfolders to search."""
+
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for VFolderRow."""
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.user == user_id
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        """Return existence checks for scope validation."""
+        return [
+            ExistenceCheck(
+                column=UserRow.uuid,
+                value=self.user_id,
+                error=UserNotFound(f"User {self.user_id} not found"),
             ),
         ]

@@ -117,7 +117,10 @@ from ai.backend.manager.repositories.base.rbac.revoker import (
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
-from ai.backend.manager.repositories.vfolder.types import ProjectVFolderSearchScope
+from ai.backend.manager.repositories.vfolder.types import (
+    ProjectVFolderSearchScope,
+    UserVFolderSearchScope,
+)
 
 vfolder_repository_resilience = Resilience(
     policies=[
@@ -1911,6 +1914,40 @@ class VfolderRepository:
         Args:
             querier: BatchQuerier for filtering, ordering, and pagination
             scope: ProjectVFolderSearchScope that filters by project and validates existence
+
+        Returns:
+            VFolderSearchResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(VFolderRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+                scope=scope,
+            )
+
+            items = [row.VFolderRow.to_data() for row in result.rows]
+
+            return VFolderSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @vfolder_repository_resilience.apply()
+    async def search_user_vfolders(
+        self,
+        querier: BatchQuerier,
+        scope: UserVFolderSearchScope,
+    ) -> VFolderSearchResult:
+        """Search vfolders scoped to a user.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+            scope: UserVFolderSearchScope that filters by user and validates existence
 
         Returns:
             VFolderSearchResult with items, total count, and pagination info
