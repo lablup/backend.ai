@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import uuid
 from collections.abc import Sequence
 from functools import lru_cache
@@ -1482,7 +1481,9 @@ class DeploymentAdapter(BaseAdapter):
             ),
             model_mount_config=model_mount_config_dto,
             model_definition=(
-                ModelDefinitionInfoDTO.model_validate(dataclasses.asdict(data.model_definition))
+                ModelDefinitionInfoDTO.model_validate(
+                    data.model_definition.model_dump(by_alias=False)
+                )
                 if data.model_definition is not None
                 else None
             ),

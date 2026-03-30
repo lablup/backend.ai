@@ -5,16 +5,14 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
 from ai.backend.manager.api.adapters.deployment import DeploymentAdapter
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
-    ModelConfigData,
-    ModelDefinitionData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
-    ModelServiceConfigData,
     ResourceConfigData,
 )
 
@@ -42,19 +40,15 @@ class TestRevisionDataToDTO:
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
             ),
-            model_definition=ModelDefinitionData(
+            model_definition=ModelDefinition(
                 models=[
-                    ModelConfigData(
+                    ModelConfig(
                         name="demo-model",
                         model_path="/models/demo",
-                        service=ModelServiceConfigData(
+                        service=ModelServiceConfig(
                             start_command="python serve.py",
                             port=8000,
-                            pre_start_actions=[],
-                            shell="/bin/bash",
-                            health_check=None,
                         ),
-                        metadata=None,
                     ),
                 ],
             ),
