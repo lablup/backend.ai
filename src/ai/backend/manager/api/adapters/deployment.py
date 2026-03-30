@@ -524,6 +524,7 @@ class DeploymentAdapter(BaseAdapter):
             deployment=self._deployment_data_to_dto(action_result.deployment),
             previous_revision_id=action_result.previous_revision_id,
             activated_revision_id=action_result.activated_revision_id,
+            deployment_policy=self._policy_data_to_dto(action_result.deployment_policy),
         )
 
     async def delete(self, input: DeleteDeploymentInput) -> DeleteDeploymentPayload:

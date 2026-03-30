@@ -358,6 +358,9 @@ class ActivateRevisionPayload(BaseResponseModel):
         default=None, description="ID of the previously active revision"
     )
     activated_revision_id: UUID = Field(description="ID of the newly activated revision")
+    deployment_policy: DeploymentPolicyNode = Field(
+        description="The deployment policy applied during activation"
+    )
 
 
 class UpdateRouteTrafficStatusPayload(BaseResponseModel):

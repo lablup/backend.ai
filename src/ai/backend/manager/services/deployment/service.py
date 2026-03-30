@@ -735,13 +735,17 @@ class DeploymentService:
             previous_revision_id,
         )
 
-        # 5. Get updated deployment info
+        # 5. Get updated deployment info and policy
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+        deployment_policy = await self._deployment_controller.get_deployment_policy(
+            action.deployment_id
+        )
 
         return ActivateRevisionActionResult(
             deployment=_convert_deployment_info_to_data(deployment_info),
             previous_revision_id=previous_revision_id,
             activated_revision_id=action.revision_id,
+            deployment_policy=deployment_policy,
         )
 
     # ========== Route Operations ==========

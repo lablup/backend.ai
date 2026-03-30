@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_root_field,
 )
 from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
+from ai.backend.manager.api.gql.deployment.types.policy import DeploymentPolicyGQL
 from ai.backend.manager.api.gql.deployment.types.revision import (
     ActivateRevisionInputGQL,
     ActivateRevisionPayloadGQL,
@@ -160,4 +161,5 @@ async def activate_deployment_revision(
         if payload.previous_revision_id
         else None,
         activated_revision_id=ID(str(payload.activated_revision_id)),
+        deployment_policy=DeploymentPolicyGQL.from_pydantic(payload.deployment_policy),
     )
