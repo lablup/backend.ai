@@ -81,7 +81,7 @@ class VFolderMetadataInfo(BaseResponseModel):
 class VFolderAccessControlInfo(BaseResponseModel):
     """Access control fields for a virtual folder."""
 
-    permission: VFolderPermissionField
+    permission: VFolderPermissionField | None
     ownership_type: VFolderOwnershipTypeField
 
 

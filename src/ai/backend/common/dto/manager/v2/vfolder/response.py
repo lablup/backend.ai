@@ -22,6 +22,7 @@ from .types import (
 )
 
 __all__ = (
+    "AdminSearchVFoldersPayload",
     "CloneVFolderPayload",
     "CreateDownloadSessionPayload",
     "CreateUploadSessionPayload",
@@ -204,3 +205,17 @@ class UnshareVFolderPayload(BaseResponseModel):
     unshared_emails: list[str] = Field(
         description="List of email addresses that were unshared from"
     )
+
+
+# ============================================================
+# Search Payload Models
+# ============================================================
+
+
+class AdminSearchVFoldersPayload(BaseResponseModel):
+    """Payload for admin search of vfolders."""
+
+    items: list[VFolderNode] = Field(description="List of vfolder nodes.")
+    total_count: int = Field(description="Total number of records matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
