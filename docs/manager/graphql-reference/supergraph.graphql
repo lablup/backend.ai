@@ -9091,7 +9091,7 @@ type Mutation
   """
   Added in UNRELEASED. Unassign users from a project. RBAC validates project admin permission.
   """
-  unassignUsersFromProjectV2(projectId: UUID!, input: UnassignUsersFromProjectInputGQL!): UnassignUsersFromProjectPayloadGQL! @join__field(graph: STRAWBERRY)
+  unassignUsersFromProjectV2(projectId: UUID!, input: UnassignUsersFromProjectInput!): UnassignUsersFromProjectPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user
@@ -14497,7 +14497,7 @@ input TrafficStatusFilter
 }
 
 """Added in UNRELEASED. Input for unassigning users from a project."""
-input UnassignUsersFromProjectInputGQL
+input UnassignUsersFromProjectInput
   @join__type(graph: STRAWBERRY)
 {
   """List of user UUIDs to unassign from the project."""
@@ -14505,7 +14505,7 @@ input UnassignUsersFromProjectInputGQL
 }
 
 """Added in UNRELEASED. Payload for user unassignment from project."""
-type UnassignUsersFromProjectPayloadGQL
+type UnassignUsersFromProjectPayload
   @join__type(graph: STRAWBERRY)
 {
   """List of users that were unassigned from the project."""
