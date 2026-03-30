@@ -1,7 +1,7 @@
 """make routings.revision non-nullable
 
 Revision ID: 979bd203db8a
-Revises: 869918e9e95a
+Revises: 930e9f2dd502
 Create Date: 2026-03-26
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "979bd203db8a"
-down_revision = "869918e9e95a"
+down_revision = "930e9f2dd502"
 branch_labels = None
 depends_on = None
 
