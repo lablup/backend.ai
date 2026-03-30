@@ -37,6 +37,7 @@ class _RequestSpec:
     architecture: str | None
     resource_slots: dict[str, Any] | None
     environ: dict[str, str] | None
+    resource_opts: dict[str, Any] | None = None
 
 
 @dataclass
@@ -45,8 +46,9 @@ class _ExpectedResult:
 
     image: str
     architecture: str
-    resource_slots: dict[str, Any]
+    resource_slots: dict[str, Any] | None
     environ: dict[str, str] | None
+    resource_opts: dict[str, Any] | None = None
 
 
 @dataclass
@@ -143,7 +145,10 @@ class TestLoadServiceDefinition:
                     "environ": {
                         "MY_VAR": "default",
                     },
-                    # Variant section (overrides only cpu, adds VLLM_SPECIFIC)
+                    "resource_opts": {
+                        "shmem": "8g",
+                    },
+                    # Variant section (overrides only cpu, adds VLLM_SPECIFIC, overrides shmem)
                     "vllm": {
                         "environment": {
                             "image": "vllm-optimized:latest",
@@ -154,6 +159,9 @@ class TestLoadServiceDefinition:
                         "environ": {
                             "VLLM_SPECIFIC": "true",
                         },
+                        "resource_opts": {
+                            "shmem": "32g",
+                        },
                     },
                 },
                 runtime_variant="vllm",
@@ -162,6 +170,7 @@ class TestLoadServiceDefinition:
                     architecture="x86_64",  # from root
                     resource_slots={"cpu": 8, "mem": "16gb"},  # cpu from vllm, mem from root
                     environ={"MY_VAR": "default", "VLLM_SPECIFIC": "true"},  # merged
+                    resource_opts={"shmem": "32g"},  # from vllm
                 ),
             ),
             _LoadServiceDefinitionTestCase(
@@ -229,6 +238,7 @@ class TestLoadServiceDefinition:
         assert result.environment.architecture == test_case.expected.architecture
         assert result.resource_slots == test_case.expected.resource_slots
         assert result.environ == test_case.expected.environ
+        assert result.resource_opts == test_case.expected.resource_opts
 
     async def test_no_service_definition(
         self,
@@ -312,6 +322,7 @@ class TestMergeRevision:
                     ),
                     resource_slots={"cpu": 4, "mem": "8gb", "cuda.device": 1},
                     environ={"SERVICE_VAR": "service-value"},
+                    resource_opts={"shmem": "16g"},
                 ),
                 request=_RequestSpec(
                     image=None,
@@ -324,6 +335,7 @@ class TestMergeRevision:
                     architecture="x86_64",
                     resource_slots={"cpu": 4, "mem": "8gb", "cuda.device": 1},
                     environ={"SERVICE_VAR": "service-value"},
+                    resource_opts={"shmem": "16g"},
                 ),
             ),
             _MergeRevisionTestCase(
@@ -335,12 +347,14 @@ class TestMergeRevision:
                     ),
                     resource_slots={"cpu": 4, "mem": "8gb"},
                     environ={"SERVICE_VAR": "service-value"},
+                    resource_opts={"shmem": "16g", "gpu_mem_fraction": "0.9"},
                 ),
                 request=_RequestSpec(
                     image="request-image:latest",  # Override
                     architecture=None,  # Use service definition
                     resource_slots={"cpu": 2},  # Override cpu only
                     environ={"REQUEST_VAR": "request-value"},  # Merge with service
+                    resource_opts={"shmem": "32g"},  # Override shmem only
                 ),
                 expected=_ExpectedResult(
                     image="request-image:latest",
@@ -353,6 +367,10 @@ class TestMergeRevision:
                         "SERVICE_VAR": "service-value",
                         "REQUEST_VAR": "request-value",
                     },  # merged
+                    resource_opts={
+                        "shmem": "32g",
+                        "gpu_mem_fraction": "0.9",
+                    },  # shmem from request, gpu_mem_fraction from service
                 ),
             ),
             # default_architecture tests
@@ -492,7 +510,7 @@ class TestMergeRevision:
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
                 resource_slots=test_case.request.resource_slots,
-                resource_opts=None,
+                resource_opts=test_case.request.resource_opts,
             ),
             mounts=base_mount_metadata,
             execution=ExecutionSpec(
@@ -514,6 +532,7 @@ class TestMergeRevision:
         assert result.image_identifier.canonical == test_case.expected.image
         assert result.image_identifier.architecture == test_case.expected.architecture
         assert result.resource_spec.resource_slots == test_case.expected.resource_slots
+        assert result.resource_spec.resource_opts == test_case.expected.resource_opts
         assert result.execution.environ == test_case.expected.environ
 
 
@@ -575,7 +594,10 @@ class TestCompleteOverridePipeline:
                     "environ": {
                         "ROOT_VAR": "root-value",
                     },
-                    # vllm variant (overrides cpu, adds VLLM_VAR)
+                    "resource_opts": {
+                        "shmem": "8g",
+                    },
+                    # vllm variant (overrides cpu, adds VLLM_VAR, overrides shmem)
                     "vllm": {
                         "environment": {
                             "image": "vllm-optimized:latest",
@@ -586,6 +608,9 @@ class TestCompleteOverridePipeline:
                         "environ": {
                             "VLLM_VAR": "vllm-value",
                         },
+                        "resource_opts": {
+                            "shmem": "16g",
+                        },
                     },
                 },
                 runtime_variant="vllm",
@@ -594,6 +619,7 @@ class TestCompleteOverridePipeline:
                     architecture=None,  # Use from service definition
                     resource_slots={"cpu": 2},  # Override vllm's cpu again
                     environ={"REQUEST_VAR": "request-value"},
+                    resource_opts={"shmem": "32g"},  # Override vllm's shmem
                 ),
                 expected=_ExpectedResult(
                     image="request-image:latest",  # from request
@@ -607,6 +633,7 @@ class TestCompleteOverridePipeline:
                         "VLLM_VAR": "vllm-value",
                         "REQUEST_VAR": "request-value",
                     },  # all merged
+                    resource_opts={"shmem": "32g"},  # request > vllm > root
                 ),
             ),
             _CompletePipelineTestCase(
@@ -768,7 +795,7 @@ class TestCompleteOverridePipeline:
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
                 resource_slots=test_case.request.resource_slots,
-                resource_opts=None,
+                resource_opts=test_case.request.resource_opts,
             ),
             mounts=base_mount_metadata,
             execution=ExecutionSpec(
@@ -790,6 +817,7 @@ class TestCompleteOverridePipeline:
         assert result.image_identifier.canonical == test_case.expected.image
         assert result.image_identifier.architecture == test_case.expected.architecture
         assert result.resource_spec.resource_slots == test_case.expected.resource_slots
+        assert result.resource_spec.resource_opts == test_case.expected.resource_opts
         assert result.execution.environ == test_case.expected.environ
 
 
