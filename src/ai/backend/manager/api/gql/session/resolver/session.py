@@ -83,7 +83,7 @@ async def admin_sessions_v2(
         description="List sessions within a specific project. Requires project membership or higher privileges.",
     )
 )  # type: ignore[misc]
-async def sessions_in_project_v2(
+async def project_sessions_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectSessionScopeGQL,
     filter: SessionV2FilterGQL | None = None,

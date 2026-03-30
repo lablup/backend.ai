@@ -328,7 +328,7 @@ from .scheduling_history import (
 from .service_catalog import admin_service_catalogs
 from .session.resolver import (
     admin_sessions_v2,
-    sessions_in_project_v2,
+    project_sessions_v2,
     terminate_project_sessions_v2,
 )
 from .storage_namespace import (
@@ -425,7 +425,7 @@ class Query:
     admin_login_sessions_v2 = admin_login_sessions_v2
     admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
-    sessions_in_project_v2 = sessions_in_project_v2
+    project_sessions_v2 = project_sessions_v2
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases
