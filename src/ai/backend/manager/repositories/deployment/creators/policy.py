@@ -33,7 +33,7 @@ class DeploymentPolicyCreatorSpec(CreatorSpec[DeploymentPolicyRow]):
         return cls(
             endpoint_id=endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
-            strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
+            strategy_spec=RollingUpdateSpec(),
         )
 
     @override

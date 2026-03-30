@@ -26,7 +26,7 @@ def upgrade() -> None:
             uuid_generate_v4(),
             e.id,
             'ROLLING',
-            '{"max_surge": 1, "max_unavailable": 0}'::jsonb,
+            '{"max_surge": {"percent": 0.5}, "max_unavailable": {"percent": 0.0}}'::jsonb,
             NOW(),
             NOW()
         FROM endpoints e
