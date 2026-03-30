@@ -1,10 +1,11 @@
 import platform
-from typing import Final, Mapping
+from collections.abc import Mapping
+from typing import Final
 
 __all__ = (
-    "arch_name_aliases",
     "CURRENT_ARCH",
     "DEFAULT_IMAGE_ARCH",
+    "arch_name_aliases",
 )
 
 

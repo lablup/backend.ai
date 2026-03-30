@@ -1,8 +1,9 @@
 import json
-from typing import Any, Optional
+from typing import Any
 
-from ..auth import encrypt_payload
-from ..request import Request
+from ai.backend.client.auth import encrypt_payload
+from ai.backend.client.request import Request
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Auth",)
@@ -25,12 +26,17 @@ class Auth(BaseFunction):
 
     @api_function
     @classmethod
-    async def login(cls, user_id: str, password: str, otp: Optional[str] = None) -> dict:
+    async def login(cls, user_id: str, password: str, otp: str | None = None) -> dict[str, Any]:
         """
         Log-in into the endpoint with the given user ID and password.
         It creates a server-side web session and return
         a dictionary with ``"authenticated"`` boolean field and
         JSON-encoded raw cookie data.
+
+        This SDK function works when env var BACKEND_ENDPOINT is endpoint of webserver, not manager.
+        If you want to use SDK funcs that send requests to the Manager with login,
+        update the cookie in the session context manager object and save the state with a file.
+        See the example in `src/ai/backend/client/cli/config.py` login function.
         """
         rqst = Request("POST", "/server/login")
         body = {
@@ -41,7 +47,7 @@ class Auth(BaseFunction):
             body["otp"] = otp
         _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
-            data = await resp.json()
+            data: dict[str, Any] = await resp.json()
             data["cookies"] = resp.raw_response.cookies
             data["config"] = {
                 "username": user_id,
@@ -54,6 +60,8 @@ class Auth(BaseFunction):
         """
         Log-out from the endpoint.
         It clears the server-side web session.
+
+        This SDK function works when env var BACKEND_ENDPOINT is endpoint of webserver, not manager.
         """
         rqst = Request("POST", "/server/logout")
         async with rqst.fetch() as resp:
@@ -63,7 +71,7 @@ class Auth(BaseFunction):
     @classmethod
     async def update_password(
         cls, old_password: str, new_password: str, new_password2: str
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update user's password. This API works only for account owner.
         """
@@ -75,13 +83,15 @@ class Auth(BaseFunction):
         }
         _put_secure_body(rqst, body)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
     async def update_password_no_auth(
         cls, domain: str, user_id: str, current_password: str, new_password: str
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update user's password. This is used to update `EXPIRED` password only.
         This function fetch a request to manager.
@@ -96,13 +106,27 @@ class Auth(BaseFunction):
         }
         _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
+
+    @api_function
+    @classmethod
+    async def get_my_ip(cls) -> dict[str, Any]:
+        """
+        Return the client's IP address as seen by the server.
+        Useful for configuring IP whitelists (allowed_client_ip).
+        """
+        rqst = Request("GET", "/auth/my-ip")
+        async with rqst.fetch() as resp:
+            result: dict[str, Any] = await resp.json()
+            return result
 
     @api_function
     @classmethod
     async def update_password_no_auth_in_session(
         cls, user_id: str, current_password: str, new_password: str
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Update user's password. This is used to update `EXPIRED` password only.
         This function fetch a request to webserver.
@@ -116,4 +140,6 @@ class Auth(BaseFunction):
         }
         _put_secure_body(rqst, body)
         async with rqst.fetch(anonymous=True) as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result

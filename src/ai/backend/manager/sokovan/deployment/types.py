@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import TYPE_CHECKING
+from uuid import UUID
+
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    RouteStatus,
+)
+from ai.backend.manager.data.deployment.types import (
+    DeploymentWithHistory as DeploymentWithHistory,
+)
+
+if TYPE_CHECKING:
+    from ai.backend.manager.data.deployment.types import DeploymentInfoWithRoutes, RouteInfo
+
+
+class DeploymentLifecycleType(StrEnum):
+    CHECK_PENDING = "check_pending"
+    CHECK_REPLICA = "check_replica"
+    SCALING = "scaling"
+    RECONCILE = "reconcile"
+    DEPLOYING = "deploying"
+    DESTROYING = "destroying"
+
+
+@dataclass
+class DeploymentExecutionError:
+    deployment_info: DeploymentWithHistory
+    reason: str
+    error_detail: str
+    error_code: str | None = None
+
+
+@dataclass
+class DeploymentExecutionResult:
+    """Result of a deployment execution operation.
+
+    Follows the session coordinator pattern: handlers report what happened
+    (successes, failures, skipped), and the coordinator applies policy
+    (retry count, timeout) to classify failures into need_retry/expired/give_up.
+    """
+
+    successes: list[DeploymentWithHistory] = field(default_factory=list)
+    failures: list[DeploymentExecutionError] = field(default_factory=list)
+    skipped: list[DeploymentWithHistory] = field(default_factory=list)
+
+
+@dataclass
+class AutoScalingDecision:
+    """Decision made by autoscaling evaluation."""
+
+    should_scale: bool
+    new_replica_count: int | None = None
+    triggered_rule_id: UUID | None = None
+    scaling_direction: str | None = None  # "up" or "down"
+    reason: str | None = None
+
+
+@dataclass
+class RouteCreationSpec:
+    """Specification for creating a new route and session."""
+
+    endpoint_id: UUID
+    endpoint_name: str
+    traffic_ratio: float
+    image_id: UUID
+    resource_group: str
+    domain: str
+    project: UUID
+    created_user: UUID
+    session_owner: UUID
+    model_mount_destination: str
+
+    # Extension methods for DeploymentInfo compatibility
+    @staticmethod
+    def get_target_replicas_from_deployment(deployment_info: DeploymentInfo) -> int:
+        """Get the target number of replicas for a DeploymentInfo."""
+        # DeploymentInfo has replica_spec.replica_count
+        return deployment_info.replica_spec.replica_count
+
+    # Extension methods for DeploymentInfoWithRoutes compatibility
+    @staticmethod
+    def get_healthy_route_count_from_deployment(
+        deployment_with_routes: DeploymentInfoWithRoutes,
+    ) -> int:
+        """Get the count of healthy routes."""
+        return sum(
+            1
+            for route in deployment_with_routes.routes
+            if route.status in {RouteStatus.HEALTHY, RouteStatus.PROVISIONING}
+        )
+
+    @staticmethod
+    def get_routes_to_remove_from_deployment(
+        deployment_with_routes: DeploymentInfoWithRoutes, target_count: int
+    ) -> list[RouteInfo]:
+        """Get routes that should be removed to reach target count."""
+        healthy_routes = [
+            r
+            for r in deployment_with_routes.routes
+            if r.status in {RouteStatus.HEALTHY, RouteStatus.PROVISIONING}
+        ]
+        current_count = len(healthy_routes)
+        if current_count <= target_count:
+            return []
+        # Remove routes with lowest traffic ratio first
+        sorted_routes = sorted(healthy_routes, key=lambda r: r.traffic_ratio)
+        return sorted_routes[: current_count - target_count]

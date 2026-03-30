@@ -22,7 +22,8 @@ async def detect_os() -> OSInfo:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
-        assert p.stdout is not None
+        if p.stdout is None:
+            raise RuntimeError("Failed to capture stdout from uname command")
         uname_s_output = (await p.stdout.read()).strip()
         await p.wait()
     except OSError:
@@ -34,18 +35,22 @@ async def detect_os() -> OSInfo:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
-        assert p.stdout is not None
+        if p.stdout is None:
+            raise RuntimeError("Failed to capture stdout from lsb_release command")
         lsb_release_output = (await p.stdout.read()).strip()
         await p.wait()
     except OSError:
         pass
     try:
         issue_output = Path("/etc/issue").read_bytes().strip()
-    except IOError:
+    except OSError:
         issue_output = b""
     release_metadata = lsb_release_output + b"\n" + issue_output
     if uname_s_output == b"Darwin":
-        assert platform_kernel == "darwin"
+        if platform_kernel != "darwin":
+            raise RuntimeError(
+                f"Platform kernel mismatch: expected 'darwin', got '{platform_kernel}'"
+            )
         platform_kernel = "macos"
         distro = "Darwin"
     elif (
@@ -53,7 +58,10 @@ async def detect_os() -> OSInfo:
         or b"Ubuntu" in release_metadata
         or b"Debian" in release_metadata
     ):
-        assert platform_kernel == "linux"
+        if platform_kernel != "linux":
+            raise RuntimeError(
+                f"Platform kernel mismatch for Debian: expected 'linux', got '{platform_kernel}'"
+            )
         distro = "Debian"
     elif (
         Path("/etc/redhat-release").exists()
@@ -62,10 +70,16 @@ async def detect_os() -> OSInfo:
         or b"CentOS" in release_metadata
         or b"Amazon" in release_metadata
     ):
-        assert platform_kernel == "linux"
+        if platform_kernel != "linux":
+            raise RuntimeError(
+                f"Platform kernel mismatch for RedHat: expected 'linux', got '{platform_kernel}'"
+            )
         distro = "RedHat"
     elif Path("/etc/os-release").exists() or b"SUSE" in issue_output:
-        assert platform_kernel == "linux"
+        if platform_kernel != "linux":
+            raise RuntimeError(
+                f"Platform kernel mismatch for SUSE: expected 'linux', got '{platform_kernel}'"
+            )
         distro = "SUSE"
     else:
         raise PrerequisiteError(

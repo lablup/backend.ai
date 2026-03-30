@@ -1,4 +1,5 @@
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import click
 
@@ -163,8 +164,8 @@ START_OPTION = [
 ]
 
 
-def decorator_group(*decs) -> Callable[[Any], Any]:
-    def d(f):
+def decorator_group(*decs: Any) -> Callable[[Any], Any]:
+    def d(f: Any) -> Any:
         for decorator in decs[::-1]:
             f = decorator(f)
         return f

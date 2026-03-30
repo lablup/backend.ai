@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any
 
 import janus
 
@@ -21,8 +22,8 @@ class AsyncFileWriter:
         self,
         target_filename: str | Path,
         access_mode: str,
-        encode: Optional[Callable[[str], bytes]] = None,
-        max_chunks: Optional[int] = None,
+        encode: Callable[[str], bytes] | None = None,
+        max_chunks: int | None = None,
     ) -> None:
         if max_chunks is None:
             max_chunks = 0
@@ -35,13 +36,13 @@ class AsyncFileWriter:
         else:
             self._encode = lambda v: v.encode()  # default encoder
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> AsyncFileWriter:
         loop = current_loop()
         self._fut = loop.run_in_executor(None, self._write)
         return self
 
     def _write(self) -> None:
-        with open(self._target_filename, self._access_mode) as f:
+        with Path(self._target_filename).open(self._access_mode) as f:
             while True:
                 item = self._q.sync_q.get()
                 if item is Sentinel.TOKEN:
@@ -53,7 +54,9 @@ class AsyncFileWriter:
                     f.write(item)
                 self._q.sync_q.task_done()
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: Any
+    ) -> None:
         await self._q.async_q.put(Sentinel.TOKEN)
         try:
             await self._fut
@@ -61,5 +64,5 @@ class AsyncFileWriter:
             self._q.close()
             await self._q.wait_closed()
 
-    async def write(self, item) -> None:
+    async def write(self, item: str | bytes) -> None:
         await self._q.async_q.put(item)

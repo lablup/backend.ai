@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from collections import UserDict
-from typing import TYPE_CHECKING, Any, Callable, Generic, Mapping, Optional, Sequence, TypeVar
+from collections.abc import Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import attr
 
@@ -104,7 +105,7 @@ class FieldSpec:
         return default_output_formatter
 
 
-class FieldSet(UserDict, Mapping[str, FieldSpec]):
+class FieldSet(UserDict[str, FieldSpec], Mapping[str, FieldSpec]):
     def __init__(self, fields: Sequence[FieldSpec]) -> None:
         fields_set = {f.alt_name: f for f in fields}
         fields_set.update({f.field_ref: fields_set[f.alt_name] for f in fields})
@@ -115,14 +116,14 @@ T = TypeVar("T")
 
 
 @attr.define(slots=True)
-class PaginatedResult(Generic[T]):
+class PaginatedResult[T]:
     total_count: int
     items: Sequence[T]
     fields: Sequence[FieldSpec]
 
 
 @attr.define(slots=True)
-class RelayPaginatedResult(Generic[T]):
+class RelayPaginatedResult[T]:
     total_count: int
     items: Sequence[T]
     fields: Sequence[FieldSpec]
@@ -171,7 +172,7 @@ class BaseOutputHandler(metaclass=ABCMeta):
         self,
         fetch_func: Callable[[int, int], PaginatedResult[T]],
         initial_page_offset: int,
-        page_size: Optional[int] = None,
+        page_size: int | None = None,
         plain: bool = False,
     ) -> None:
         raise NotImplementedError
@@ -180,20 +181,20 @@ class BaseOutputHandler(metaclass=ABCMeta):
     def print_mutation_result(
         self,
         item: Mapping[str, Any],
-        item_name: Optional[str] = None,
-        action_name: Optional[str] = None,
-        extra_info: Mapping = {},
+        item_name: str | None = None,
+        action_name: str | None = None,
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         raise NotImplementedError
 
     @abstractmethod
     def print_mutation_error(
         self,
-        error: Optional[Exception] = None,
+        error: Exception | None = None,
         msg: str = "Failed",
-        item_name: Optional[str] = None,
-        action_name: Optional[str] = None,
-        extra_info: Mapping = {},
+        item_name: str | None = None,
+        action_name: str | None = None,
+        extra_info: Mapping[str, Any] = {},
     ) -> None:
         raise NotImplementedError
 

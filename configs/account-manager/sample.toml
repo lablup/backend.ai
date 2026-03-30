@@ -46,6 +46,8 @@ num-proc = 1
 
 # Set the service hostname/port to accept API requests.
 service-addr = { host = "0.0.0.0", port = 8088 }
+# Set the internal hostname/port to accept internal API requests.
+internal-addr = { host = "0.0.0.0", port = 8087 }
 
 # Specify the user/group used for the account-manager daemon,
 # to which the account-manager changes after reading the daemon configuration and SSL certifiactes.
@@ -64,6 +66,12 @@ ssl-enabled = false
 #id = ""
 pid-file = "./account-manager.pid"             # env: BACKEND_PID_FILE
 
+
+[pyroscope]
+enabled = true
+app-name = "backendai-half-account-manager"
+server-addr = "http://localhost:4040"
+sample-rate = 100
 
 [logging]
 level = "INFO"

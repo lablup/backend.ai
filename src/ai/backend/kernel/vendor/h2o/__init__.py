@@ -1,24 +1,25 @@
 import asyncio
 import logging
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import List
+from typing import Any
 
-from ... import BaseRunner
+from ai.backend.kernel import BaseRunner
 
 log = logging.getLogger()
 
-DEFAULT_PYFLAGS: List[str] = []
+DEFAULT_PYFLAGS: list[str] = []
 
 
 class Runner(BaseRunner):
     log_prefix = "h2o-kernel"
     default_runtime_path = "/opt/h2oai/dai/python/bin/python"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    async def init_with_loop(self):
+    async def init_with_loop(self) -> None:
         self.user_input_queue = asyncio.Queue()
 
         # Load H2O Daemon.
@@ -40,9 +41,8 @@ class Runner(BaseRunner):
                 ".",
             ]
             return await self.run_subproc(cmd)
-        else:
-            log.warning('skipping the build phase due to missing "setup.py" file')
-            return 0
+        log.warning('skipping the build phase due to missing "setup.py" file')
+        return 0
 
     async def execute_heuristic(self) -> int:
         if Path("main.py").is_file():
@@ -52,11 +52,10 @@ class Runner(BaseRunner):
                 "main.py",
             ]
             return await self.run_subproc(cmd)
-        else:
-            log.error('cannot find the main script ("main.py").')
-            return 127
+        log.error('cannot find the main script ("main.py").')
+        return 127
 
-    async def start_service(self, service_info):
+    async def start_service(self, service_info: Mapping[str, Any]) -> tuple[list, dict] | None:
         if service_info["name"] in ["jupyter", "jupyterlab"]:
             with tempfile.NamedTemporaryFile(
                 "w", encoding="utf-8", suffix=".py", delete=False
@@ -78,9 +77,9 @@ class Runner(BaseRunner):
                 "--config",
                 config.name,
             ], {}
-        elif "h2o" in service_info["name"]:
+        if "h2o" in service_info["name"]:
             return ["echo", "h2o daemon already started"], {}
-        elif service_info["name"] == "sftp":
+        if service_info["name"] == "sftp":
             return [
                 self.runtime_path,
                 "-m",
@@ -88,3 +87,4 @@ class Runner(BaseRunner):
                 "--port",
                 str(service_info["port"]),
             ], {}
+        return None

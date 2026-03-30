@@ -1,0 +1,10 @@
+[Unit]
+Description=Backend.AI AppProxy Sync Inference Circuits Timer (Every minute)
+
+[Timer]
+OnCalendar=*:*:00
+Persistent=true
+Unit=backendai-appproxy-sync-circuits.service
+
+[Install]
+WantedBy=timers.target

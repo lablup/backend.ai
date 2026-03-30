@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# OTEL Collector Health Check Script
+# Checks OTEL Collector service health via HTTP endpoint
+
+set -euo pipefail
+
+# Load configuration from .env
+if [[ -f .env ]]; then
+    source .env
+fi
+
+OTEL_URL="http://localhost:${OTEL_HEALTH_PORT:-13133}"
+HEALTH_ENDPOINT="/health"
+
+echo "=== OTEL Collector Service Status ==="
+echo
+
+# Check Docker container status
+echo "1. Container Status:"
+if command -v docker-compose >/dev/null 2>&1; then
+    docker-compose ps otel-collector 2>/dev/null || echo "  Container not found or not running"
+else
+    docker compose ps otel-collector 2>/dev/null || echo "  Container not found or not running"
+fi
+echo
+
+# Check OTEL Collector health endpoint
+echo "2. Health Endpoint Check:"
+if ! command -v curl >/dev/null 2>&1; then
+    echo "  ⚠ curl not available, skipping health checks"
+    exit 0
+fi
+
+response=$(curl -s "${OTEL_URL}${HEALTH_ENDPOINT}" 2>/dev/null || echo "error")
+
+if echo "$response" | grep -q '"status":"Server available"'; then
+    echo "  ✓ OTEL Collector is healthy"
+    echo ""
+    echo "✓ OTEL Collector Status: Healthy"
+    exit 0
+else
+    echo "  ✗ OTEL Collector is not healthy"
+    echo ""
+    echo "3. Error Details:"
+    echo "  Response: $response"
+    echo ""
+    echo "4. Container Logs (last 15 lines):"
+    if command -v docker-compose >/dev/null 2>&1; then
+        docker-compose logs --tail=15 otel-collector 2>/dev/null || echo "  Cannot retrieve logs"
+    else
+        docker compose logs --tail=15 otel-collector 2>/dev/null || echo "  Cannot retrieve logs"
+    fi
+
+    exit 1
+fi

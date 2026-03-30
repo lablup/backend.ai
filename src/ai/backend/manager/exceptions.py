@@ -4,10 +4,8 @@ import traceback
 from typing import (
     TYPE_CHECKING,
     Any,
-    List,
+    Literal,
     NotRequired,
-    Optional,
-    Tuple,
     TypedDict,
 )
 
@@ -32,8 +30,8 @@ class RPCError(RuntimeError):
     """
 
     __slots__ = (
-        "agent_id",
         "agent_addr",
+        "agent_id",
         "extra_msg",
     )
 
@@ -70,8 +68,8 @@ class AgentError(RuntimeError):
         agent_id: AgentId,
         exc_name: str,
         exc_repr: str,
-        exc_args: Tuple[Any, ...],
-        exc_tb: Optional[str] = None,
+        exc_args: tuple[Any, ...],
+        exc_tb: str | None = None,
     ) -> None:
         super().__init__(agent_id, exc_name, exc_repr, exc_args, exc_tb)
         self.agent_id = agent_id
@@ -92,7 +90,7 @@ class ErrorDetail(TypedDict):
     name: str
     repr: str
     agent_id: NotRequired[str]
-    collection: NotRequired[List[ErrorDetail]]
+    collection: NotRequired[list[ErrorDetail]]
     traceback: NotRequired[str]
 
 
@@ -101,7 +99,7 @@ class ErrorStatusInfo(TypedDict):
 
 
 def convert_to_status_data(
-    e: Exception,
+    e: BaseException,
     is_debug: bool = False,
     *,
     src: str | None = None,
@@ -143,3 +141,18 @@ def convert_to_status_data(
             if is_debug:
                 data["error"]["traceback"] = "\n".join(traceback.format_tb(e.__traceback__))
             return data
+
+
+class ContainerRegistryProjectEmpty(RuntimeError):
+    def __init__(self, type: str, project: Literal[""] | None) -> None:
+        super().__init__(
+            f"{type} container registry requires project value, but {project} is provided"
+        )
+
+
+class ScanImageError(RuntimeError):
+    pass
+
+
+class ScanTagError(RuntimeError):
+    pass

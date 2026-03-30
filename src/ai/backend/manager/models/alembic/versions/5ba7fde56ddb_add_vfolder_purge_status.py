@@ -22,26 +22,24 @@ depends_on = None
 
 
 DELETING = "deleting"
-enum_name = "vfolderoperationstatus"
+enum_name = "vfolderstatus"
 ERROR = "error"
 DELETE_ONGOING = "delete-ongoing"  # vfolder is moving to trash bin
 DELETE_COMPLETE = "deleted-complete"  # vfolder is in trash bin
-# RECOVER_ONGOING = "recover-ongoing"  # vfolder is being recovered from trash bin
 PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed from trash bin
 
 
-def upgrade():
+def upgrade() -> None:
     op.execute(f"ALTER TYPE {enum_name} RENAME VALUE '{DELETING}' TO '{DELETE_ONGOING}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{ERROR}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{DELETE_COMPLETE}'")
-    # op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{RECOVER_ONGOING}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{PURGE_ONGOING}'")
     op.add_column(
         "vfolders", sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
     )
 
 
-def downgrade():
+def downgrade() -> None:
     connection = op.get_bind()
     metadata = sa.MetaData(naming_convention=convention)
     vfolders = sa.Table(
@@ -89,15 +87,6 @@ def downgrade():
         )"""
         )
     )
-    # op.execute(
-    #     text(
-    #         f"""DELETE FROM pg_enum
-    #     WHERE enumlabel = '{RECOVER_ONGOING}'
-    #     AND enumtypid = (
-    #         SELECT oid FROM pg_type WHERE typname = '{enum_name}'
-    #     )"""
-    #     )
-    # )
     op.execute(
         text(
             f"""DELETE FROM pg_enum

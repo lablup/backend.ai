@@ -1,17 +1,16 @@
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 
 import click
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.session import Session
 
-from ..session import Session
 from .pretty import print_error
 
 
-@main.group()
-def server_logs():
+@click.group()
+def server_logs() -> None:
     """Provides operations related to server logs."""
 
 
@@ -23,7 +22,7 @@ def server_logs():
     "-l", "--page-size", type=int, default=20, help="Number of logs to fetch (from latest log)"
 )
 @click.option("-n", "--page-number", type=int, default=1, help="Page number to fetch.")
-def list(mark_read, page_size, page_number):
+def list(mark_read: bool, page_size: int, page_number: int) -> None:
     """Fetch server (error) logs."""
     with Session() as session:
         try:
@@ -33,7 +32,7 @@ def list(mark_read, page_size, page_number):
             if logs is not None:
                 print("Total log count:", count)
                 for log in logs:
-                    log_time = datetime.utcfromtimestamp(log["created_at"]).strftime(
+                    log_time = datetime.fromtimestamp(log["created_at"], tz=UTC).strftime(
                         "%Y-%m-%d %H:%M:%S"
                     )
                     print("----")

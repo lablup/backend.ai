@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Any, MutableMapping, Self
+from typing import TYPE_CHECKING, Any, Self
+
+if TYPE_CHECKING:
+    from .config import LoggingConfig
 
 
 class AbstractLogger(metaclass=ABCMeta):
-    def __init__(
-        self,
-        logging_config: MutableMapping[str, Any],
-    ) -> None:
-        pass
+    def __init__(self, config: LoggingConfig) -> None: ...
 
     @abstractmethod
     def __enter__(self) -> Self:
         raise NotImplementedError
 
     @abstractmethod
-    def __exit__(self, *exc_info_args) -> bool | None:
+    def __exit__(self, *exc_info_args: Any) -> bool | None:
         raise NotImplementedError

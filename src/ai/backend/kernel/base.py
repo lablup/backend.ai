@@ -14,21 +14,19 @@ import urllib.error
 import urllib.request
 import uuid
 from abc import ABCMeta, abstractmethod
+from collections.abc import Awaitable, Mapping, MutableMapping, Sequence
 from functools import partial
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
-    Awaitable,
     ClassVar,
-    Dict,
-    List,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Sequence,
     TypeVar,
-    Union,
+    cast,
 )
+
+if TYPE_CHECKING:
+    from janus import _AsyncQueueProxy
 
 import janus
 import msgpack
@@ -44,7 +42,7 @@ from .intrinsic import (
     prepare_ttyd_service,
 )
 from .jupyter_client import aexecute_interactive
-from .logging import BraceStyleAdapter, setup_logger
+from .logging import BraceStyleAdapter, setup_logger, setup_logger_basic
 from .service import ServiceParser
 from .utils import TracebackSourceFilter, scan_proc_stats, wait_local_port_open
 
@@ -68,10 +66,16 @@ class HealthStatus(enum.Enum):
     UNDETERMINED = 2
 
 
-async def pipe_output(stream, outsock, target, log_fd):
-    assert target in ("stdout", "stderr")
-    target = target.encode("ascii")
+async def pipe_output(
+    stream: asyncio.StreamReader,
+    outsock: zmq.Socket[Any],
+    target: str,
+    log_fd: int,
+) -> None:
+    if target not in ("stdout", "stderr"):
+        raise ValueError(f"Invalid target: {target}. Must be 'stdout' or 'stderr'")
     console_fd = sys.stdout.fileno() if target == "stdout" else sys.stderr.fileno()
+    target_bytes = target.encode("ascii")
     loop = current_loop()
     try:
         while True:
@@ -81,7 +85,7 @@ async def pipe_output(stream, outsock, target, log_fd):
             await asyncio.gather(
                 loop.run_in_executor(None, os.write, console_fd, data),
                 loop.run_in_executor(None, os.write, log_fd, data),
-                outsock.send_multipart([target, data]),
+                outsock.send_multipart([target_bytes, data]),
                 return_exceptions=True,
             )
     except asyncio.CancelledError:
@@ -90,12 +94,14 @@ async def pipe_output(stream, outsock, target, log_fd):
         log.exception("unexpected error")
 
 
-async def terminate_and_wait(proc: asyncio.subprocess.Process, timeout: float = 2.0) -> None:
+async def terminate_and_wait(
+    proc: asyncio.subprocess.Process, timeout_seconds: float = 2.0
+) -> None:
     try:
         proc.terminate()
         try:
-            await asyncio.wait_for(proc.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
+            await asyncio.wait_for(proc.wait(), timeout=timeout_seconds)
+        except TimeoutError:
             proc.kill()
             await proc.wait()
     except ProcessLookupError:
@@ -121,9 +127,11 @@ def promote_path(path_env: str, path_to_promote: Path | str | None) -> str:
 
 class BaseRunner(metaclass=ABCMeta):
     log_prefix: ClassVar[str] = "generic-kernel"
-    log_queue: janus.Queue[logging.LogRecord]
-    task_queue: asyncio.Queue[Awaitable[None]]
-    default_runtime_path: ClassVar[str | os.PathLike] = "/bin/true"
+    log_queue: janus.Queue[
+        logging.LogRecord
+    ]  # Actually contains tuples due to LogQHandler transformation
+    task_queue: asyncio.Queue[Any]  # Contains partial functions returning Coroutines
+    default_runtime_path: ClassVar[str | os.PathLike[str]] = "/bin/true"
     default_child_env: ClassVar[dict[str, str]] = {
         "LANG": "C.UTF-8",
         "HOME": "/home/work",
@@ -143,28 +151,29 @@ class BaseRunner(metaclass=ABCMeta):
     ])
     default_child_env_shell = "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash"
     jupyter_kspec_name: ClassVar[str] = ""
-    kernel_mgr: Optional[AsyncKernelManager] = None
-    kernel_client: Optional[AsyncKernelClient] = None
+    kernel_mgr: AsyncKernelManager | None = None
+    kernel_client: AsyncKernelClient | None = None
 
     child_env: MutableMapping[str, str]
-    subproc: Optional[asyncio.subprocess.Process]
-    service_parser: Optional[ServiceParser]
+    subproc: asyncio.subprocess.Process | None
+    service_parser: ServiceParser | None
     runtime_path: Path
 
-    services_running: Dict[str, asyncio.subprocess.Process]
+    services_running: dict[str, asyncio.subprocess.Process]
 
     intrinsic_host_ports_mapping: Mapping[str, int]
 
-    _build_success: Optional[bool]
+    _build_success: bool | None
 
     # Set by subclasses.
-    user_input_queue: Optional[asyncio.Queue[str]]
+    user_input_queue: asyncio.Queue[str] | _AsyncQueueProxy[str] | None
 
-    _main_task: asyncio.Task
-    _run_task: asyncio.Task
-    _health_check_task: Optional[asyncio.Task]
+    _main_task: asyncio.Task[Any]
+    _run_task: asyncio.Task[Any]
+    _health_check_task: asyncio.Task[Any] | None
 
     def __init__(self, runtime_path: Path) -> None:
+        setup_logger_basic(self.log_prefix, False)
         self.subproc = None
         self.runtime_path = runtime_path
         self.child_env = {**os.environ, **self.default_child_env}
@@ -184,6 +193,14 @@ class BaseRunner(metaclass=ABCMeta):
             pass
         except Exception:
             log.exception("Reading /home/config/environ.txt failed!")
+
+        work_dir = Path("/home/work")
+        work_dir_owner = work_dir.stat().st_uid
+        process_owner = os.getuid()
+        if work_dir_owner != process_owner:
+            log.warning(
+                f"{work_dir} (uid: {work_dir_owner}) is not owned by the current user {process_owner}!",
+            )
 
         path_env = self.child_env["PATH"]
         if Path("/usr/local/cuda/bin").is_dir():
@@ -212,8 +229,9 @@ class BaseRunner(metaclass=ABCMeta):
         # It will be cancelled gracefully on kernel shutdown.
         self._health_check_task = None
 
-    async def _init(self, cmdargs) -> None:
+    async def _init(self, cmdargs: Any) -> None:
         self.cmdargs = cmdargs
+        setup_logger_basic(self.log_prefix, cmdargs.debug)
         loop = current_loop()
         self._service_lock = asyncio.Lock()
 
@@ -237,10 +255,10 @@ class BaseRunner(metaclass=ABCMeta):
         outsock_port = self.intrinsic_host_ports_mapping.get("replout", "2001")
         self.insock = self.zctx.socket(zmq.PULL)
         self.insock.bind(f"tcp://*:{insock_port}")
-        print(f"binding to tcp://*:{insock_port}")
+        log.debug(f"binding the kernel-runner inbound socket to tcp://*:{insock_port}")
         self.outsock = self.zctx.socket(zmq.PUSH)
         self.outsock.bind(f"tcp://*:{outsock_port}")
-        print(f"binding to tcp://*:{outsock_port}")
+        log.debug(f"binding the kernel-runner outbound socket to tcp://*:{outsock_port}")
 
         self.log_queue = janus.Queue()
         self.task_queue = asyncio.Queue()
@@ -264,7 +282,7 @@ class BaseRunner(metaclass=ABCMeta):
     async def _shutdown(self) -> None:
         try:
             self.insock.close()
-            log.debug("shutting down...")
+            log.info("shutting down...")
             self._run_task.cancel()
             self._main_task.cancel()
             await self._run_task
@@ -272,7 +290,7 @@ class BaseRunner(metaclass=ABCMeta):
             if health_check_task := self._health_check_task:
                 health_check_task.cancel()
                 await health_check_task
-            log.debug("terminating service processes...")
+            log.info("terminating service processes...")
             running_procs = [*self.services_running.values()]
             async with self._service_lock:
                 await asyncio.gather(
@@ -280,7 +298,7 @@ class BaseRunner(metaclass=ABCMeta):
                     return_exceptions=True,
                 )
                 await asyncio.sleep(0.01)
-            log.debug("terminated.")
+            log.info("terminated.")
         finally:
             # allow remaining logs to be flushed.
             await asyncio.sleep(0.1)
@@ -299,44 +317,57 @@ class BaseRunner(metaclass=ABCMeta):
         initialize jupyter kernel.
         """
         # Make inline backend defaults in Matplotlib.
-        kconfigdir = Path("/home/work/.ipython/profile_default/")
-        kconfigdir.mkdir(parents=True, exist_ok=True)
-        kconfig_file = kconfigdir / "ipython_kernel_config.py"
-        kconfig_file.write_text("c.InteractiveShellApp.matplotlib = 'inline'")
+        self.kernel_mgr = None
+        try:
+            kconfigdir = Path("/home/work/.ipython/profile_default/")
+            kconfigdir.mkdir(parents=True, exist_ok=True)
+            kconfig_file = kconfigdir / "ipython_kernel_config.py"
+            kconfig_file.write_text("c.InteractiveShellApp.matplotlib = 'inline'")
 
-        kernelspec_mgr = KernelSpecManager()
-        kernelspec_mgr.ensure_native_kernel = False
-        kspecs = kernelspec_mgr.get_all_specs()
-        for kname in kspecs:
-            if self.jupyter_kspec_name in kname:
-                log.debug("starting " + kname + " kernel...")
-                self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
-                await self.kernel_mgr.start_kernel()
-                if not await self.kernel_mgr.is_alive():
-                    log.error("jupyter query mode is disabled: failed to start jupyter kernel")
-                else:
-                    self.kernel_client = self.kernel_mgr.client()  # type: ignore
-                    assert self.kernel_client is not None
-                    self.kernel_client.start_channels(shell=True, iopub=True, stdin=True, hb=True)
-                    try:
-                        await self.kernel_client.wait_for_ready(timeout=10)
-                        # self.init_jupyter_kernel()
-                    except RuntimeError:
-                        # Clean up for client and kernel will be done in `shutdown`.
-                        log.error("jupyter channel is not active!")
-                        self.kernel_mgr = None
-                break
-        else:
-            log.debug("jupyter query mode is not available: no jupyter kernelspec found")
-            self.kernel_mgr = None
+            kernelspec_mgr = KernelSpecManager()
+            kernelspec_mgr.ensure_native_kernel = False
+            kspecs = kernelspec_mgr.get_all_specs()
+            for kname in kspecs:
+                if self.jupyter_kspec_name in kname:
+                    log.debug("starting " + kname + " kernel...")
+                    self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
+                    await self.kernel_mgr.start_kernel()
+                    if not await self.kernel_mgr.is_alive():
+                        log.error("jupyter query mode is disabled: failed to start jupyter kernel")
+                    else:
+                        self.kernel_client = self.kernel_mgr.client()
+                        if self.kernel_client is None:
+                            raise RuntimeError("Failed to create kernel client")
+                        self.kernel_client.start_channels(
+                            shell=True, iopub=True, stdin=True, hb=True
+                        )
+                        try:
+                            await self.kernel_client.wait_for_ready(timeout=10)
+                            # self.init_jupyter_kernel()
+                        except RuntimeError:
+                            # Clean up for client and kernel will be done in `shutdown`.
+                            log.error("jupyter channel is not active!")
+                            self.kernel_mgr = None
+                    break
+            else:
+                log.warning("jupyter query mode is not available: no jupyter kernelspec found")
+        except OSError:
+            log.exception(
+                "Failed to create the ipython kernel configuration to handle code execution requests."
+            )
+            log.warning(
+                "All query-mode code execution requests will get the exit code 127 immediately."
+            )
 
-    async def _shutdown_jupyter_kernel(self):
+    async def _shutdown_jupyter_kernel(self) -> None:
         if self.kernel_mgr and await self.kernel_mgr.is_alive():
-            assert self.kernel_client is not None
+            if self.kernel_client is None:
+                raise RuntimeError("Kernel client is not initialized")
             log.info("shutting down " + self.jupyter_kspec_name + " kernel...")
             await self.kernel_mgr.shutdown_kernel()
             self.kernel_client.stop_channels()
-            assert not await self.kernel_mgr.is_alive(), "ipykernel failed to shutdown"
+            if await self.kernel_mgr.is_alive():
+                raise RuntimeError("ipykernel failed to shutdown")
 
     async def _handle_exception(
         self, coro: Awaitable[TReturn], help_text: str | None = None
@@ -382,13 +413,13 @@ class BaseRunner(metaclass=ABCMeta):
     async def init_with_loop(self) -> None:
         """Initialize after the event loop is created."""
 
-    async def _clean(self, clean_cmd: Optional[str]) -> None:
+    async def _clean(self, clean_cmd: str | None) -> None:
         ret = 0
         try:
             if clean_cmd is None or clean_cmd == "":
                 # skipped
                 return
-            elif clean_cmd == "*":
+            if clean_cmd == "*":
                 ret = await self.clean_heuristic()
             else:
                 ret = await self.run_subproc(clean_cmd)
@@ -418,13 +449,13 @@ class BaseRunner(metaclass=ABCMeta):
             await asyncio.sleep(0.01)  # extra delay to flush logs
             log.info("The user bootstrap script has exited with code {}", ret)
 
-    async def _build(self, build_cmd: Optional[str]) -> None:
+    async def _build(self, build_cmd: str | None) -> None:
         ret = 0
         try:
             if build_cmd is None or build_cmd == "":
                 # skipped
                 return
-            elif build_cmd == "*":
+            if build_cmd == "*":
                 if Path("Makefile").is_file():
                     ret = await self.run_subproc("make")
                 else:
@@ -452,12 +483,12 @@ class BaseRunner(metaclass=ABCMeta):
             if exec_cmd is None or exec_cmd == "":
                 # skipped
                 return
-            elif exec_cmd == "*":
+            if exec_cmd == "*":
                 ret = await self.execute_heuristic()
             else:
                 ret = await self.run_subproc(exec_cmd, batch=True)
-        except Exception:
-            log.exception("unexpected error")
+        except Exception as e:
+            log.exception("unexpected error: {}", e)
             ret = -1
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
@@ -483,7 +514,7 @@ class BaseRunner(metaclass=ABCMeta):
             }).encode("utf8")
             await self.outsock.send_multipart([b"finished", payload])
 
-    async def query(self, code_text) -> int:
+    async def query(self, code_text: str) -> int:
         """Run user's code in query mode.
 
         The default interface is jupyter kernel. To use different interface,
@@ -493,10 +524,13 @@ class BaseRunner(metaclass=ABCMeta):
             log.error("query mode is disabled: failed to start jupyter kernel")
             return 127
 
-        assert self.kernel_client is not None
+        if self.kernel_client is None:
+            raise RuntimeError("Kernel client is not initialized")
         log.debug("executing in query mode...")
+        exit_code = 0
 
-        async def output_hook(msg):
+        async def output_hook(msg: Mapping[str, Any]) -> None:
+            nonlocal exit_code
             content = msg.get("content", "")
             if msg["msg_type"] == "stream":
                 # content['name'] will be 'stdout' or 'stderr'.
@@ -505,6 +539,16 @@ class BaseRunner(metaclass=ABCMeta):
                     content["text"].encode("utf-8"),
                 ])
             elif msg["msg_type"] == "error":
+                ename = content.get("ename")
+                evalue = content.get("evalue")
+
+                if ename == "SystemExit":
+                    try:
+                        exit_code = int(evalue) if evalue not in (None, "") else 0
+                    except Exception:
+                        exit_code = 1
+                else:
+                    exit_code = 1
                 tbs = "\n".join(content["traceback"])
                 await self.outsock.send_multipart([b"stderr", tbs.encode("utf-8")])
             elif msg["msg_type"] in ["execute_result", "display_data"]:
@@ -539,9 +583,11 @@ class BaseRunner(metaclass=ABCMeta):
                         json.dumps({"type": dtype, "data": dval}).encode("utf8"),
                     ])
 
-        async def stdin_hook(msg):
-            assert self.kernel_client is not None
-            assert self.user_input_queue is not None
+        async def stdin_hook(msg: Mapping[str, Any]) -> None:
+            if self.kernel_client is None:
+                raise RuntimeError("Kernel client is not initialized")
+            if self.user_input_queue is None:
+                raise RuntimeError("User input queue is not initialized")
             if msg["msg_type"] == "input_request":
                 prompt = msg["content"]["prompt"]
                 password = msg["content"]["password"]
@@ -555,13 +601,13 @@ class BaseRunner(metaclass=ABCMeta):
                 self.kernel_client.input(user_input)
 
         # Run jupyter kernel's blocking execution method in an executor pool.
-        allow_stdin = False if self.user_input_queue is None else True
+        allow_stdin = self.user_input_queue is not None
         stdin_hook = None if self.user_input_queue is None else stdin_hook  # type: ignore
         try:
             await aexecute_interactive(
                 self.kernel_client,
                 code_text,
-                timeout=None,
+                timeout_seconds=None,
                 output_hook=output_hook,
                 allow_stdin=allow_stdin,
                 stdin_hook=stdin_hook,
@@ -569,18 +615,21 @@ class BaseRunner(metaclass=ABCMeta):
         except Exception as e:
             log.exception(str(e))
             return 127
-        return 0
+        return exit_code
 
-    async def _complete(self, completion_data) -> Sequence[str]:
+    async def _complete(self, completion_data: Any) -> None:
         result: Sequence[str] = []
         try:
             result = await self.complete(completion_data)
         except Exception:
             log.exception("unexpected error")
         finally:
-            return result
+            await self.outsock.send_multipart([
+                b"completion",
+                json.dumps({"suggestions": result}).encode("utf8"),
+            ])
 
-    async def complete(self, completion_data) -> Sequence[str]:
+    async def complete(self, completion_data: Any) -> Sequence[str]:
         """Return the list of strings to be shown in the auto-complete list.
 
         The default interface is jupyter kernel. To use different interface,
@@ -600,11 +649,11 @@ class BaseRunner(metaclass=ABCMeta):
         #     return []
         return []
 
-    async def _interrupt(self):
+    async def _interrupt(self) -> None:
         try:
             if self.subproc:
                 self.subproc.send_signal(signal.SIGINT)
-                return
+                return None
             return await self.interrupt()
         except Exception:
             log.exception("unexpected error")
@@ -612,7 +661,7 @@ class BaseRunner(metaclass=ABCMeta):
             # this is a unidirectional command -- no explicit finish!
             pass
 
-    async def interrupt(self):
+    async def interrupt(self) -> None:
         """Interrupt the running user code (only called for query-mode).
 
         The default interface is jupyter kernel. To use different interface,
@@ -621,19 +670,19 @@ class BaseRunner(metaclass=ABCMeta):
         if hasattr(self, "kernel_mgr") and self.kernel_mgr is not None:
             await self.kernel_mgr.interrupt_kernel()
 
-    async def log_oom(self):
+    async def log_oom(self) -> None:
         log.warning("Out-of-memory detected!")
         prev_pid_set = {}
         for history in self._pid_set_history:  # merge the history
             prev_pid_set.update(history)
+        terminated_pid_list: list[int] = []
         for _ in range(30):
             current_pid_set = scan_proc_stats()
             terminated_pid_list = sorted(set(prev_pid_set.keys()) - set(current_pid_set.keys()))
             if not terminated_pid_list:
                 await asyncio.sleep(0.5)
                 continue
-            else:
-                break
+            break
         else:
             log.warning("failed to get the information of oom-killed processes")
             return
@@ -665,7 +714,7 @@ class BaseRunner(metaclass=ABCMeta):
                 "\n".join(process_tree),
             )
 
-    async def log_event(self, data):
+    async def log_event(self, data: Mapping[str, Any]) -> None:
         match data["type"]:
             case "oom":
                 await self.log_oom()
@@ -675,7 +724,7 @@ class BaseRunner(metaclass=ABCMeta):
                     data,
                 )
 
-    async def _send_status(self):
+    async def _send_status(self) -> None:
         data = {
             "started_at": self.started_at,
         }
@@ -685,21 +734,31 @@ class BaseRunner(metaclass=ABCMeta):
         ])
 
     @abstractmethod
-    async def start_service(self, service_info):
+    async def start_service(
+        self,
+        service_info: Mapping[str, Any],
+    ) -> (
+        tuple[list[str] | None, dict[str, str]]
+        | tuple[list[str] | None, dict[str, str], str]
+        | None
+    ):
         """Start an application service daemon."""
         return None, {}
 
-    async def start_model_service(self, model_info):
-        assert self.service_parser is not None
+    async def start_model_service(self, model_info: Mapping[str, Any]) -> None:
+        if self.service_parser is None:
+            raise RuntimeError("Service parser is not initialized")
         model_service_info = model_info.get("service")
-        result = {}
+        result: dict[str, Any] = {}
         started = False
         try:
             if model_service_info is None:
                 result = {"status": "failed", "error": "service info not provided"}
                 return
+            # After the None check, narrow the type
+            model_service_info = cast(Mapping[str, Any], model_service_info)
             service_name = f"{model_info['name']}-{model_service_info['port']}"
-            self.service_parser.add_model_service(service_name, model_service_info)
+            self.service_parser.add_model_service(service_name, dict(model_service_info))
             service_info = {
                 "name": service_name,
                 "port": model_service_info["port"],
@@ -708,7 +767,9 @@ class BaseRunner(metaclass=ABCMeta):
                 "options": {},
             }
             result = await self._start_service(
-                service_info, cwd=model_info["model_path"], do_not_wait=True
+                service_info,
+                cwd=model_info["model_path"],
+                launch_timeout=None,  # model service launches may take a long time
             )
             started = result["status"] == "running" or result["status"] == "started"
         finally:
@@ -719,6 +780,10 @@ class BaseRunner(metaclass=ABCMeta):
                 json.dumps(result).encode("utf8"),
             ])
             if started:
+                # If started is True, model_service_info is guaranteed to be non-None
+                if model_service_info is None:
+                    raise RuntimeError("model_service_info is None despite service being started")
+                model_service_info = cast(Mapping[str, Any], model_service_info)
                 if model_service_info.get("health_check"):
                     self._health_check_task = asyncio.create_task(
                         self.check_model_health(model_info["name"], model_service_info)
@@ -731,15 +796,17 @@ class BaseRunner(metaclass=ABCMeta):
                         ),
                     ])
 
-    async def check_model_health(self, model_name, model_service_info):
-        health_check_info = model_service_info.get("health_check")
+    async def check_model_health(
+        self, model_name: str, model_service_info: Mapping[str, Any]
+    ) -> None:
+        health_check_info = cast(Mapping[str, Any], model_service_info.get("health_check"))
         health_check_endpoint = (
             f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
         )
         retries = 0
         current_health_status = HealthStatus.UNDETERMINED
         while True:
-            elapsed_time = 0
+            elapsed_time = 0.0
             start_time = time.monotonic()
             new_health_status = HealthStatus.UNHEALTHY
             try:
@@ -752,7 +819,7 @@ class BaseRunner(metaclass=ABCMeta):
                             new_health_status = HealthStatus.HEALTHY
                     except urllib.error.URLError:
                         pass
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 elapsed_time = health_check_info["max_wait_time"]
                 pass
             finally:
@@ -786,7 +853,7 @@ class BaseRunner(metaclass=ABCMeta):
             if (adjusted_interval := health_check_info["interval"] - elapsed_time) > 0:
                 await asyncio.sleep(adjusted_interval)
 
-    async def _start_service_and_feed_result(self, service_info):
+    async def _start_service_and_feed_result(self, service_info: Mapping[str, Any]) -> None:
         result = await self._start_service(service_info)
         await self.outsock.send_multipart([
             b"service-result",
@@ -795,11 +862,11 @@ class BaseRunner(metaclass=ABCMeta):
 
     async def _start_service(
         self,
-        service_info,
+        service_info: Mapping[str, Any],
         *,
-        cwd: Optional[str] = None,
-        do_not_wait: bool = False,
-    ):
+        cwd: str | None = None,
+        launch_timeout: float | None = 30.0,
+    ) -> dict[str, Any]:
         error_reason = None
         try:
             async with self._service_lock:
@@ -815,7 +882,15 @@ class BaseRunner(metaclass=ABCMeta):
                     _cwd = Path.cwd()
                     if cwd:
                         _cwd = Path(cwd)
-                    cmdargs: Optional[Sequence[Union[str, os.PathLike]]]
+
+                    if not _cwd.exists():
+                        error_reason = f"the model directory does not exist: {_cwd}"
+                        return {
+                            "status": "failed",
+                            "error": error_reason,
+                        }
+
+                    cmdargs: Sequence[str | os.PathLike[str]] | None
                     env: Mapping[str, str]
                     cmdargs, env = None, {}
                     if service_info["name"] == "ttyd":
@@ -835,12 +910,13 @@ class BaseRunner(metaclass=ABCMeta):
                         if start_info is None:
                             cmdargs, env = None, {}
                         elif len(start_info) == 3:
-                            cmdargs, env, _cwd = start_info
+                            cmdargs, env, cwd_str = start_info
+                            _cwd = Path(cwd_str)
                         elif len(start_info) == 2:
                             cmdargs, env = start_info
                     if cmdargs is None:
                         # still not found?
-                        error_reason = "unsupported service: {0}".format(service_info["name"])
+                        error_reason = "unsupported service: {}".format(service_info["name"])
                         return {
                             "status": "failed",
                             "error": error_reason,
@@ -853,6 +929,7 @@ class BaseRunner(metaclass=ABCMeta):
                         )
                     log.debug("cmdargs: {0}", cmdargs)
                     log.debug("env: {0}", service_env)
+                    proc: asyncio.subprocess.Process
                     try:
                         proc = await asyncio.create_subprocess_exec(
                             *map(str, cmdargs),
@@ -861,8 +938,8 @@ class BaseRunner(metaclass=ABCMeta):
                         )
                         self.services_running[service_info["name"]] = proc
                         asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
-                        if not do_not_wait:
-                            async with asyncio.timeout(5.0):
+                        if launch_timeout is not None:
+                            async with asyncio.timeout(launch_timeout):
                                 await wait_local_port_open(service_info["port"])
                         log.info(
                             "Service {} has started (pid: {}, port: {})",
@@ -879,11 +956,12 @@ class BaseRunner(metaclass=ABCMeta):
                             "status": "failed",
                             "error": error_reason,
                         }
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         # Takes too much time to open a local port.
-                        if service_info["name"] in self.services_running:
-                            await terminate_and_wait(proc, timeout=10.0)
-                            self.services_running.pop(service_info["name"], None)
+                        if (
+                            running_proc := self.services_running.pop(service_info["name"], None)
+                        ) is not None:
+                            await terminate_and_wait(running_proc, timeout_seconds=10.0)
                             error_reason = (
                                 f"opening the service port timed out: {service_info['name']}"
                             )
@@ -914,9 +992,7 @@ class BaseRunner(metaclass=ABCMeta):
                     }
         finally:
             if error_reason:
-                log.warning(
-                    "failed to start model service {}: {}", service_info["name"], error_reason
-                )
+                log.warning("failed to start service {}: {}", service_info["name"], error_reason)
 
     async def _wait_service_proc(
         self,
@@ -929,7 +1005,7 @@ class BaseRunner(metaclass=ABCMeta):
         )
         self.services_running.pop(service_name, None)
 
-    async def run_subproc(self, cmd: Union[str, List[str]], batch: bool = False):
+    async def run_subproc(self, cmd: str | list[str], batch: bool = False) -> int:
         """A thin wrapper for an external command."""
         loop = current_loop()
         if Path("/home/work/.logs").is_dir():
@@ -952,7 +1028,8 @@ class BaseRunner(metaclass=ABCMeta):
             pipe_opts: dict[str, Any] = {}
             pipe_opts["stdout"] = asyncio.subprocess.PIPE
             pipe_opts["stderr"] = asyncio.subprocess.PIPE
-            with open(log_path, "ab") as log_out:
+            log_out = await asyncio.to_thread(Path(log_path).open, "ab")
+            try:
                 env = {**self.child_env}
                 if batch:
                     env["_BACKEND_BATCH_MODE"] = "1"
@@ -962,6 +1039,8 @@ class BaseRunner(metaclass=ABCMeta):
                     **pipe_opts,
                 )
                 self.subproc = proc
+                if proc.stdout is None or proc.stderr is None:
+                    raise RuntimeError("Process stdout or stderr is None")
                 pipe_tasks = [
                     loop.create_task(
                         pipe_output(proc.stdout, self.outsock, "stdout", log_out.fileno())
@@ -972,17 +1051,19 @@ class BaseRunner(metaclass=ABCMeta):
                 ]
                 retcode = await proc.wait()
                 await asyncio.gather(*pipe_tasks)
-            return retcode
+                return retcode
+            finally:
+                await asyncio.to_thread(log_out.close)
         except Exception:
             log.exception("unexpected error")
             return -1
         finally:
             self.subproc = None
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         pass
 
-    async def _shutdown_service(self, service_name: str):
+    async def _shutdown_service(self, service_name: str) -> None:
         try:
             async with self._service_lock:
                 if service_name in self.services_running:
@@ -991,7 +1072,9 @@ class BaseRunner(metaclass=ABCMeta):
         except Exception:
             log.exception("unexpected error (shutdown_service)")
 
-    async def handle_user_input(self, reader, writer):
+    async def handle_user_input(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         try:
             if self.user_input_queue is None:
                 writer.write(b"<user-input is unsupported>")
@@ -1004,7 +1087,7 @@ class BaseRunner(metaclass=ABCMeta):
         except Exception:
             log.exception("unexpected error (handle_user_input)")
 
-    async def run_tasks(self):
+    async def run_tasks(self) -> None:
         while True:
             try:
                 coro = await self.task_queue.get()
@@ -1028,19 +1111,19 @@ class BaseRunner(metaclass=ABCMeta):
             except asyncio.CancelledError:
                 break
 
-    async def _handle_logs(self):
+    async def _handle_logs(self) -> None:
         log_queue = self.log_queue.async_q
         try:
             while True:
                 rec = await log_queue.get()
-                await self.outsock.send_multipart(rec)
+                await self.outsock.send_multipart(rec)  # type: ignore[arg-type]
                 log_queue.task_done()
         except asyncio.CancelledError:
             self.log_queue.close()
             await self.log_queue.wait_closed()
 
-    async def _get_apps(self, service_name):
-        result = {"status": "done", "data": []}
+    async def _get_apps(self, service_name: str) -> None:
+        result: dict[str, Any] = {"status": "done", "data": []}
         if self.service_parser is not None:
             if service_name:
                 apps = await self.service_parser.get_apps(selected_service=service_name)
@@ -1052,7 +1135,7 @@ class BaseRunner(metaclass=ABCMeta):
             json.dumps(result).encode("utf8"),
         ])
 
-    async def _monitor_processes(self):
+    async def _monitor_processes(self) -> None:
         while True:
             self._pid_set_history.append(scan_proc_stats())
             if len(self._pid_set_history) > 2:
@@ -1062,7 +1145,7 @@ class BaseRunner(metaclass=ABCMeta):
             except asyncio.CancelledError:
                 return
 
-    async def main_loop(self, cmdargs):
+    async def main_loop(self, cmdargs: Any) -> None:
         log.debug("starting user input server...")
         user_input_server = await asyncio.start_unix_server(
             self.handle_user_input, "/tmp/bai-user-input.sock"
@@ -1077,7 +1160,7 @@ class BaseRunner(metaclass=ABCMeta):
             log.debug("running user bootstrap script...")
             await self._bootstrap(user_bootstrap_path)
 
-        self._pid_set_history = []
+        self._pid_set_history: list[dict[int, dict[str, Any]]] = []
         monitor_proc_task = asyncio.create_task(self._monitor_processes())
 
         log.debug("starting intrinsic services: sshd, ttyd ...")
@@ -1089,6 +1172,7 @@ class BaseRunner(metaclass=ABCMeta):
                     "port": self.intrinsic_host_ports_mapping.get("sshd", 2200),
                     "protocol": "tcp",
                 },
+                launch_timeout=10.0,
             )
         )
         intrinsic_spawn_coros.append(
@@ -1098,6 +1182,7 @@ class BaseRunner(metaclass=ABCMeta):
                     "port": self.intrinsic_host_ports_mapping.get("ttyd", 7681),
                     "protocol": "http",
                 },
+                launch_timeout=10.0,
             )
         )
         results = await asyncio.gather(*intrinsic_spawn_coros, return_exceptions=True)
@@ -1109,6 +1194,7 @@ class BaseRunner(metaclass=ABCMeta):
                 )
 
         log.debug("start serving...")
+        op_type = ""
         while True:
             try:
                 data = await self.insock.recv_multipart()

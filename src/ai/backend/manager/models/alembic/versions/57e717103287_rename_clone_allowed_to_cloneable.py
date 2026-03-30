@@ -15,9 +15,9 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.alter_column("vfolders", "clone_allowed", new_column_name="cloneable")
 
 
-def downgrade():
+def downgrade() -> None:
     op.alter_column("vfolders", "cloneable", new_column_name="clone_allowed")

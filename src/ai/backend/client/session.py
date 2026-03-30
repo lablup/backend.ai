@@ -6,18 +6,12 @@ import inspect
 import queue
 import threading
 import warnings
+from collections.abc import AsyncIterator, Awaitable, Coroutine, Iterator
 from contextvars import Context, ContextVar, copy_context
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
-    Coroutine,
-    Iterator,
     Literal,
-    Optional,
-    Tuple,
     TypeVar,
-    Union,
 )
 
 import aiohttp
@@ -27,14 +21,16 @@ from .config import MIN_API_VERSION, APIConfig, get_config, parse_api_version
 from .exceptions import APIVersionWarning, BackendAPIError, BackendClientError
 from .types import Sentinel, sentinel
 
-__all__ = (
+__all__: tuple[str, ...] = (
+    "AsyncSession",
     "BaseSession",
     "Session",
-    "AsyncSession",
     "api_session",
 )
 
-from ..common.types import SSLContextType
+from contextlib import asynccontextmanager as actxmgr
+
+from ai.backend.common.types import SSLContextType
 
 api_session: ContextVar[BaseSession] = ContextVar("api_session")
 
@@ -42,7 +38,7 @@ api_session: ContextVar[BaseSession] = ContextVar("api_session")
 async def _negotiate_api_version(
     http_session: aiohttp.ClientSession,
     config: APIConfig,
-) -> Tuple[int, str]:
+) -> tuple[int, str]:
     client_version = parse_api_version(config.version)
     try:
         timeout_config = aiohttp.ClientTimeout(
@@ -76,7 +72,7 @@ async def _negotiate_api_version(
                     category=APIVersionWarning,
                 )
             return min(server_version, client_version)
-    except (asyncio.TimeoutError, aiohttp.ClientError):
+    except (TimeoutError, aiohttp.ClientError):
         # fallback to the configured API version
         return client_version
 
@@ -102,14 +98,14 @@ async def _close_aiohttp_session(session: aiohttp.ClientSession) -> None:
                 orig_lost = proto.connection_lost
                 orig_eof_received = proto.eof_received
 
-                def connection_lost(exc):
+                def connection_lost(exc: Exception | None) -> None:
                     orig_lost(exc)
                     nonlocal transports
                     transports -= 1
                     if transports == 0:
                         all_is_lost.set()
 
-                def eof_received():
+                def eof_received() -> None:
                     try:
                         orig_eof_received()
                     except AttributeError:
@@ -129,25 +125,22 @@ _Item = TypeVar("_Item")
 
 class _SyncWorkerThread(threading.Thread):
     work_queue: queue.Queue[
-        Union[
-            Tuple[Union[AsyncIterator, Coroutine], Context],
-            Sentinel,
-        ]
+        tuple[AsyncIterator[Any] | Coroutine[Any, Any, Any], Context] | Sentinel
     ]
-    done_queue: queue.Queue[Union[Any, Exception]]
-    stream_queue: queue.Queue[Union[Any, Exception, Sentinel]]
+    done_queue: queue.Queue[Any | Exception]
+    stream_queue: queue.Queue[Any | Exception | Sentinel]
     stream_block: threading.Event
     agen_shutdown: bool
 
     __slots__ = (
-        "work_queue",
-        "done_queue",
-        "stream_queue",
-        "stream_block",
         "agen_shutdown",
+        "done_queue",
+        "stream_block",
+        "stream_queue",
+        "work_queue",
     )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.work_queue = queue.Queue()
         self.done_queue = queue.Queue()
@@ -169,7 +162,7 @@ class _SyncWorkerThread(threading.Thread):
                 else:
                     try:
                         # FIXME: Once python/mypy#12756 is resolved, remove the type-ignore tag.
-                        result = ctx.run(loop.run_until_complete, coro)  # type: ignore
+                        result = ctx.run(loop.run_until_complete, coro)
                     except Exception as e:
                         self.done_queue.put_nowait(e)
                     else:
@@ -182,7 +175,7 @@ class _SyncWorkerThread(threading.Thread):
             loop.stop()
             loop.close()
 
-    def execute(self, coro: Coroutine) -> Any:
+    def execute(self, coro: Coroutine[Any, Any, Any]) -> Any:
         ctx = copy_context()  # preserve context for the worker thread
         try:
             self.work_queue.put((coro, ctx))
@@ -194,7 +187,7 @@ class _SyncWorkerThread(threading.Thread):
         finally:
             del ctx
 
-    async def agen_wrapper(self, agen):
+    async def agen_wrapper(self, agen: AsyncIterator[Any]) -> None:
         self.agen_shutdown = False
         try:
             async for item in agen:
@@ -228,7 +221,7 @@ class _SyncWorkerThread(threading.Thread):
         finally:
             del ctx
 
-    def interrupt_generator(self):
+    def interrupt_generator(self) -> None:
         self.agen_shutdown = True
         self.stream_block.set()
         self.stream_queue.put(sentinel)
@@ -240,43 +233,52 @@ class BaseSession(metaclass=abc.ABCMeta):
     """
 
     __slots__ = (
-        "_config",
+        "Admin",
+        "Agent",
+        "AgentWatcher",
+        "Auth",
+        "BackgroundTask",
+        "ComputeSession",
+        "ContainerRegistry",
+        "Deployment",
+        "Domain",
+        "Dotfile",
+        "EtcdConfig",
+        "Export",
+        "FairShare",
+        "Group",
+        "Image",
+        "KeyPair",
+        "KeypairResourcePolicy",
+        "Manager",
+        "Model",
+        "Network",
+        "Notification",
+        "Permission",
+        "QuotaScope",
+        "Resource",
+        "ResourceUsage",
+        "ScalingGroup",
+        "SchedulingHistory",
+        "ServerLog",
+        "Service",
+        "ServiceAutoScalingRule",
+        "SessionTemplate",
+        "Storage",
+        "System",
+        "User",
+        "UserResourcePolicy",
+        "VFolder",
         "_closed",
+        "_config",
         "_context_token",
         "_proxy_mode",
         "aiohttp_session",
         "api_version",
-        "System",
-        "Manager",
-        "Admin",
-        "Agent",
-        "AgentWatcher",
-        "ScalingGroup",
-        "Storage",
-        "Image",
-        "ComputeSession",
-        "SessionTemplate",
-        "Domain",
-        "Group",
-        "Auth",
-        "User",
-        "KeyPair",
-        "BackgroundTask",
-        "EtcdConfig",
-        "Resource",
-        "KeypairResourcePolicy",
-        "VFolder",
-        "Dotfile",
-        "ServerLog",
-        "Permission",
-        "Service",
-        "Model",
-        "QuotaScope",
-        "Network",
     )
 
     aiohttp_session: aiohttp.ClientSession
-    api_version: Tuple[int, str]
+    api_version: tuple[int, str]
 
     _closed: bool
     _config: APIConfig
@@ -285,7 +287,7 @@ class BaseSession(metaclass=abc.ABCMeta):
     def __init__(
         self,
         *,
-        config: Optional[APIConfig] = None,
+        config: APIConfig | None = None,
         proxy_mode: bool = False,
     ) -> None:
         self._closed = False
@@ -298,9 +300,13 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.agent import Agent, AgentWatcher
         from .func.auth import Auth
         from .func.bgtask import BackgroundTask
+        from .func.container_registry import ContainerRegistry
+        from .func.deployment import Deployment
         from .func.domain import Domain
         from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
+        from .func.export import Export
+        from .func.fair_share import FairShare
         from .func.group import Group
         from .func.image import Image
         from .func.keypair import KeyPair
@@ -308,17 +314,22 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.manager import Manager
         from .func.model import Model
         from .func.network import Network
+        from .func.notification import Notification
         from .func.quota_scope import QuotaScope
         from .func.resource import Resource
+        from .func.resource_usage import ResourceUsage
         from .func.scaling_group import ScalingGroup
+        from .func.scheduling_history import SchedulingHistory
         from .func.server_log import ServerLog
         from .func.service import Service
+        from .func.service_auto_scaling_rule import ServiceAutoScalingRule
         from .func.session import ComputeSession
         from .func.session_template import SessionTemplate
         from .func.storage import Storage
         from .func.system import System
         from .func.user import User
-        from .func.vfolder import VFolder
+        from .func.user_resource_policy import UserResourcePolicy
+        from .func.vfolder import VFolderByName
 
         self.System = System
         self.Admin = Admin
@@ -327,7 +338,9 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Storage = Storage
         self.Auth = Auth
         self.BackgroundTask = BackgroundTask
+        self.ContainerRegistry = ContainerRegistry
         self.EtcdConfig = EtcdConfig
+        self.Deployment = Deployment
         self.Domain = Domain
         self.Group = Group
         self.Image = Image
@@ -339,14 +352,21 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.User = User
         self.ScalingGroup = ScalingGroup
         self.SessionTemplate = SessionTemplate
-        self.VFolder = VFolder
+        self.VFolder = VFolderByName
         self.Dotfile = Dotfile
         self.ServerLog = ServerLog
         self.Permission = Permission
         self.Service = Service
+        self.ServiceAutoScalingRule = ServiceAutoScalingRule
         self.Model = Model
         self.QuotaScope = QuotaScope
         self.Network = Network
+        self.UserResourcePolicy = UserResourcePolicy
+        self.Notification = Notification
+        self.SchedulingHistory = SchedulingHistory
+        self.Export = Export
+        self.FairShare = FairShare
+        self.ResourceUsage = ResourceUsage
 
     @property
     def proxy_mode(self) -> bool:
@@ -356,14 +376,14 @@ class BaseSession(metaclass=abc.ABCMeta):
         return self._proxy_mode
 
     @abc.abstractmethod
-    def open(self) -> Union[None, Awaitable[None]]:
+    def open(self) -> None | Awaitable[None]:
         """
         Initializes the session and perform version negotiation.
         """
         raise NotImplementedError
 
     @abc.abstractmethod
-    def close(self) -> Union[None, Awaitable[None]]:
+    def close(self) -> None | Awaitable[None]:
         """
         Terminates the session and releases underlying resources.
         """
@@ -386,13 +406,13 @@ class BaseSession(metaclass=abc.ABCMeta):
     def __enter__(self) -> BaseSession:
         raise NotImplementedError
 
-    def __exit__(self, *exc_info) -> Literal[False]:
+    def __exit__(self, *exc_info: Any) -> Literal[False]:
         return False
 
     async def __aenter__(self) -> BaseSession:
         raise NotImplementedError
 
-    async def __aexit__(self, *exc_info) -> Literal[False]:
+    async def __aexit__(self, *exc_info: Any) -> Literal[False]:
         return False
 
 
@@ -408,7 +428,7 @@ class Session(BaseSession):
     def __init__(
         self,
         *,
-        config: Optional[APIConfig] = None,
+        config: APIConfig | None = None,
         proxy_mode: bool = False,
     ) -> None:
         super().__init__(config=config, proxy_mode=proxy_mode)
@@ -448,7 +468,7 @@ class Session(BaseSession):
         api_session.reset(self._context_token)
 
     @property
-    def worker_thread(self):
+    def worker_thread(self) -> _SyncWorkerThread:
         """
         The thread that internally executes the asynchronous implementations
         of the given API functions.
@@ -456,7 +476,8 @@ class Session(BaseSession):
         return self._worker_thread
 
     def __enter__(self) -> Session:
-        assert not self.closed, "Cannot reuse closed session"
+        if self.closed:
+            raise RuntimeError("Cannot reuse closed session")
         self.open()
         if self.config.announcement_handler:
             try:
@@ -468,9 +489,21 @@ class Session(BaseSession):
                 pass
         return self
 
-    def __exit__(self, *exc_info) -> Literal[False]:
+    def __exit__(self, *exc_info: Any) -> Literal[False]:
         self.close()
         return False  # raise up the inner exception
+
+
+def _default_http_client_session(skip_sslcert_validation: bool) -> aiohttp.ClientSession:
+    """
+    Returns a default aiohttp client session with the default configuration.
+    This is used for the API client session when no explicit session is provided.
+    """
+    ssl: SSLContextType = True
+    if skip_sslcert_validation:
+        ssl = False
+    connector = aiohttp.TCPConnector(ssl=ssl)
+    return aiohttp.ClientSession(connector=connector)
 
 
 class AsyncSession(BaseSession):
@@ -483,15 +516,19 @@ class AsyncSession(BaseSession):
     def __init__(
         self,
         *,
-        config: Optional[APIConfig] = None,
+        config: APIConfig | None = None,
         proxy_mode: bool = False,
+        aiohttp_session: aiohttp.ClientSession | None = None,
     ) -> None:
         super().__init__(config=config, proxy_mode=proxy_mode)
-        ssl: SSLContextType = True
-        if self._config.skip_sslcert_validation:
-            ssl = False
-        connector = aiohttp.TCPConnector(ssl=ssl)
-        self.aiohttp_session = aiohttp.ClientSession(connector=connector)
+        if aiohttp_session is not None:
+            self.aiohttp_session = aiohttp_session
+            self._aiohttp_session_injected = True
+        else:
+            self.aiohttp_session = _default_http_client_session(
+                self._config.skip_sslcert_validation
+            )
+            self._aiohttp_session_injected = False
 
     async def _aopen(self) -> None:
         self._context_token = api_session.set(self)
@@ -505,14 +542,16 @@ class AsyncSession(BaseSession):
         if self._closed:
             return
         self._closed = True
-        await _close_aiohttp_session(self.aiohttp_session)
+        if not self._aiohttp_session_injected:
+            await _close_aiohttp_session(self.aiohttp_session)
         api_session.reset(self._context_token)
 
     def close(self) -> Awaitable[None]:
         return self._aclose()
 
     async def __aenter__(self) -> AsyncSession:
-        assert not self.closed, "Cannot reuse closed session"
+        if self.closed:
+            raise RuntimeError("Cannot reuse closed session")
         await self.open()
         if self.config.announcement_handler:
             try:
@@ -524,6 +563,16 @@ class AsyncSession(BaseSession):
                 pass
         return self
 
-    async def __aexit__(self, *exc_info) -> Literal[False]:
+    async def __aexit__(self, *exc_info: Any) -> Literal[False]:
         await self.close()
         return False  # raise up the inner exception
+
+
+# TODO: Remove this after refactoring session management with contextvars
+@actxmgr
+async def set_api_context(session: BaseSession) -> AsyncIterator[None]:
+    token = api_session.set(session)
+    try:
+        yield
+    finally:
+        api_session.reset(token)

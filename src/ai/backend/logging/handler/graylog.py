@@ -3,15 +3,26 @@ from __future__ import annotations
 import logging
 import socket
 import ssl
-from typing import Any, Mapping, Optional
+from typing import Any
 
 import graypy
 
+from ai.backend.logging.config import LoggingConfig
 
-class GELFTLSHandler(graypy.GELFTLSHandler):
+
+class GELFTLSHandler(graypy.GELFTLSHandler):  # type: ignore[misc]
     ssl_ctx: ssl.SSLContext
 
-    def __init__(self, host, port=12204, validate=False, ca_certs=None, **kwargs) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int = 12204,
+        validate: bool = False,
+        ca_certs: str | None = None,
+        certfile: str | None = None,
+        keyfile: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize the GELFTLSHandler
 
         :param host: GELF TLS input host.
@@ -35,7 +46,7 @@ class GELFTLSHandler(graypy.GELFTLSHandler):
             self.ssl_ctx.check_hostname = False
             self.ssl_ctx.verify_mode = ssl.CERT_NONE
 
-    def makeSocket(self, timeout: float = 1):
+    def makeSocket(self, timeout: float = 1) -> ssl.SSLSocket:
         """Create a TLS wrapped socket"""
         plain_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -51,21 +62,23 @@ class GELFTLSHandler(graypy.GELFTLSHandler):
         return wrapped_socket
 
 
-def setup_graylog_handler(config: Mapping[str, Any]) -> Optional[logging.Handler]:
-    drv_config = config["graylog"]
-    graylog_params = {
-        "host": drv_config["host"],
-        "port": drv_config["port"],
-        "validate": drv_config["ssl-verify"],
-        "ca_certs": drv_config["ca-certs"],
-        "keyfile": drv_config["keyfile"],
-        "certfile": drv_config["certfile"],
+def setup_graylog_handler(config: LoggingConfig) -> logging.Handler:
+    drv_config = config.graylog
+    if drv_config is None:
+        raise RuntimeError("Graylog configuration is required but not provided")
+    graylog_params: dict[str, Any] = {
+        "host": drv_config.host,
+        "port": drv_config.port,
+        "validate": drv_config.ssl_verify,
+        "ca_certs": drv_config.ca_certs,
+        "keyfile": drv_config.keyfile,
+        "certfile": drv_config.certfile,
     }
-    if drv_config["localname"]:
-        graylog_params["localname"] = drv_config["localname"]
+    if drv_config.localname:
+        graylog_params["localname"] = drv_config.localname
     else:
-        graylog_params["fqdn"] = drv_config["fqdn"]
+        graylog_params["fqdn"] = drv_config.fqdn
 
     graylog_handler = GELFTLSHandler(**graylog_params)
-    graylog_handler.setLevel(config["level"])
+    graylog_handler.setLevel(config.level)
     return graylog_handler

@@ -1,0 +1,43 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, cast, override
+
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.notification import NotificationRuleData
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
+
+from .base import NotificationAction
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.notification import NotificationRuleRow
+
+
+@dataclass
+class CreateRuleAction(NotificationAction):
+    """Action to create a notification rule."""
+
+    creator: RBACEntityCreator[NotificationRuleRow]
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+    @override
+    def entity_id(self) -> str | None:
+        spec = cast(NotificationRuleCreatorSpec, self.creator.spec)
+        return spec.name
+
+
+@dataclass
+class CreateRuleActionResult(BaseActionResult):
+    """Result of creating a notification rule."""
+
+    rule_data: NotificationRuleData
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.rule_data.id)

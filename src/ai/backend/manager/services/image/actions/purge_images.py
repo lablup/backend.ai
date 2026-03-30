@@ -1,0 +1,110 @@
+from dataclasses import dataclass
+from typing import override
+
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.types import AgentId, ImageID
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.services.image.actions.base import (
+    ImageAction,
+    ImageSingleEntityAction,
+    ImageSingleEntityActionResult,
+)
+from ai.backend.manager.services.image.types import ImageRefData
+
+
+@dataclass
+class PurgeImageAction(ImageAction):
+    image: ImageRefData
+    agent_id: AgentId
+    force: bool
+    noprune: bool
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
+
+
+@dataclass
+class PurgeImageActionResult(BaseActionResult):
+    reserved_bytes: int
+    purged_image: ImageData
+    error: str | None
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.purged_image.id)
+
+
+@dataclass
+class PurgedImagesData:
+    agent_id: AgentId
+    purged_images: list[str]
+
+
+@dataclass
+class PurgeImagesKeyData:
+    agent_id: AgentId
+    images: list[ImageRefData]
+
+
+# TODO: Remove this?
+@dataclass
+class PurgeImagesAction(ImageAction):
+    keys: list[PurgeImagesKeyData]
+    force: bool
+    noprune: bool
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
+
+
+@dataclass
+class PurgeImagesActionResult(BaseActionResult):
+    total_reserved_bytes: int
+    purged_images: list[PurgedImagesData]
+    errors: list[str]
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass
+class PurgeImageByIdAction(ImageSingleEntityAction):
+    image_id: ImageID
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
+
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.image_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.IMAGE, str(self.image_id))
+
+
+@dataclass
+class PurgeImageByIdActionResult(ImageSingleEntityActionResult):
+    image: ImageData
+
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.image.id)

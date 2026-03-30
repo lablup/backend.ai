@@ -1,8 +1,6 @@
 python_sources(
     name="src",
-    sources=[
-        "**/*.py",  # per-lang sources are not auto-inferred
-    ],
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
     ],

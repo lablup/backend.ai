@@ -16,9 +16,9 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column("kernels", sa.Column("container_log", sa.LargeBinary(), nullable=True))
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("kernels", "container_log")

@@ -41,7 +41,7 @@
       "display_unit": "fGPU",
       "number_format": {
         "binary": false,
-        "round_length": 2
+        "round_length": 1
       },
       "display_icon": "nvidia"
     },
@@ -89,7 +89,7 @@
       },
       "display_icon": "rebel"
     },
-    "atom-plus.device" : {
+    "atom-plus.device": {
       "slot_name": "atom-plus.device",
       "description": "ATOM+",
       "human_readable_name": "ATOM+ Device",
@@ -100,7 +100,18 @@
       },
       "display_icon": "rebel"
     },
-    "gaudi2.device" : {
+    "atom-max.device": {
+      "slot_name": "atom-max.device",
+      "description": "ATOM Max",
+      "human_readable_name": "ATOM Max Device",
+      "display_unit": "ATOM Max",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "rebel"
+    },
+    "gaudi2.device": {
       "slot_name": "gaudi2.device",
       "description": "Gaudi 2",
       "human_readable_name": "Gaudi 2 Device",
@@ -143,6 +154,17 @@
         "round_length": 0
       },
       "display_icon": "lpu"
+    },
+    "tt-n300.device": {
+      "slot_name": "tt-n300.device",
+      "description": "Tenstorrent Wormhole™ n300",
+      "human_readable_name": "Tenstorrent Wormhole™ n300 Device",
+      "display_unit": "n300",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "tenstorrent"
     }
   }
 }

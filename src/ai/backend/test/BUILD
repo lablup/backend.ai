@@ -1,9 +1,11 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
         "//:reqs#pytest",
         "//:reqs#pytest-dependency",
+        "src/ai/backend/client:src",
     ],
 )
 

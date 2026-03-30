@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import override
+
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.scaling_group.types import ScalingGroupData
+from ai.backend.manager.repositories.base import BatchQuerier
+
+from .base import ScalingGroupAction
+
+
+@dataclass(frozen=True)
+class SearchScalingGroupsAction(ScalingGroupAction):
+    """Action to search scaling groups."""
+
+    querier: BatchQuerier
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass(frozen=True)
+class SearchScalingGroupsActionResult(BaseActionResult):
+    """Result of searching scaling groups."""
+
+    scaling_groups: list[ScalingGroupData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+    @override
+    def entity_id(self) -> str | None:
+        return None

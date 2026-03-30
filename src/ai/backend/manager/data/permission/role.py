@@ -1,0 +1,219 @@
+from __future__ import annotations
+
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+
+from ai.backend.manager.data.common.types import SearchResult
+
+from .id import ObjectId, ScopeId
+from .object_permission import (
+    ObjectPermissionCreateInput,
+    ObjectPermissionData,
+)
+from .permission import ScopedPermissionCreateInput
+from .status import RoleStatus
+from .types import EntityType, OperationType, RBACElementRef, RoleSource
+
+
+@dataclass(frozen=True)
+class RoleData:
+    """
+    Information about a role.
+    If detailed information is needed, use RoleDetailData.
+    """
+
+    id: uuid.UUID
+    name: str
+    source: RoleSource
+    status: RoleStatus
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: datetime | None
+    description: str | None = None
+
+
+@dataclass(frozen=True)
+class AssignedUserData:
+    """Information about a user assigned to a role."""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+    granted_by: uuid.UUID | None
+    granted_at: datetime
+
+
+@dataclass(frozen=True)
+class RoleDetailData:
+    """
+    Detailed information about a role.
+    It includes permission groups and object permissions.
+    """
+
+    id: uuid.UUID
+    name: str
+    source: RoleSource
+    status: RoleStatus
+
+    object_permissions: list[ObjectPermissionData]
+
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: datetime | None
+    description: str | None = None
+
+
+@dataclass(frozen=True)
+class ScopePermissionCheckInput:
+    user_id: uuid.UUID
+    target_entity_type: EntityType
+    target_scope_id: ScopeId
+    operation: OperationType
+
+
+@dataclass(frozen=True)
+class SingleEntityPermissionCheckInput:
+    user_id: uuid.UUID
+    target_object_id: ObjectId
+    operation: OperationType
+
+
+@dataclass(frozen=True)
+class BatchEntityPermissionCheckInput:
+    user_id: uuid.UUID
+    target_object_ids: list[ObjectId]
+    operation: OperationType
+
+
+@dataclass(frozen=True)
+class ScopeChainPermissionCheckInput:
+    user_id: uuid.UUID
+    target_element_ref: RBACElementRef
+    operation: OperationType
+    permission_entity_type: EntityType | None
+
+
+@dataclass(frozen=True)
+class UserRoleAssignmentInput:
+    """
+    Input to create a new user-role association.
+    """
+
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+    granted_by: uuid.UUID | None = None
+
+
+@dataclass(frozen=True)
+class UserRoleAssignmentData:
+    id: uuid.UUID
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+    granted_by: uuid.UUID | None = None
+
+
+@dataclass(frozen=True)
+class RolePermissionsUpdateInput:
+    """
+    Input for batch updating role permissions.
+
+    Uses scope-based permission management:
+    - Scoped permissions are added using (scope_type, scope_id, entity_type, operation)
+    - System automatically finds or creates permission groups by scope
+    - All operations are performed in a single transaction
+
+    Breaking Change from previous version:
+    - Removed: add_permission_groups, remove_permission_group_ids, add_permissions, remove_permission_ids
+    - Added: add_scoped_permissions, remove_scoped_permission_ids
+    """
+
+    role_id: uuid.UUID
+
+    # Scoped permissions (automatic permission group management)
+    add_scoped_permissions: list[ScopedPermissionCreateInput] = field(default_factory=list)
+    remove_scoped_permission_ids: list[uuid.UUID] = field(default_factory=list)
+
+    # Object permissions
+    add_object_permissions: list[ObjectPermissionCreateInput] = field(default_factory=list)
+    remove_object_permission_ids: list[uuid.UUID] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class UserRoleRevocationInput:
+    """
+    Input to revoke a user-role association.
+    """
+
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class UserRoleRevocationData:
+    user_role_id: uuid.UUID
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class BulkUserRoleAssignmentInput:
+    """Input for bulk assigning a role to multiple users."""
+
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+    granted_by: uuid.UUID | None = None
+
+
+@dataclass(frozen=True)
+class BulkRoleAssignmentFailure:
+    """Failure information for a single user in bulk role assignment."""
+
+    user_id: uuid.UUID
+    message: str
+
+
+@dataclass(frozen=True)
+class BulkRoleAssignmentResultData:
+    """Result of bulk role assignment."""
+
+    successes: list[UserRoleAssignmentData] = field(default_factory=list)
+    failures: list[BulkRoleAssignmentFailure] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class BulkUserRoleRevocationInput:
+    """Input for bulk revoking a role from multiple users."""
+
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+
+
+@dataclass(frozen=True)
+class BulkRoleRevocationFailure:
+    """Failure information for a single user in bulk role revocation."""
+
+    user_id: uuid.UUID
+    message: str
+
+
+@dataclass(frozen=True)
+class BulkRoleRevocationResultData:
+    """Result of bulk role revocation."""
+
+    successes: list[UserRoleRevocationData] = field(default_factory=list)
+    failures: list[BulkRoleRevocationFailure] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RoleListResult(SearchResult[RoleData]):
+    """Result of role search with pagination info."""
+
+    pass
+
+
+@dataclass(frozen=True)
+class AssignedUserListResult(SearchResult[AssignedUserData]):
+    """Result of assigned user search with pagination info."""
+
+    pass

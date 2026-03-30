@@ -1,9 +1,8 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
-        "./configs:src",
-        "./fixtures:src",
     ],
 )
 
@@ -42,10 +41,7 @@ python_distribution(
 
 pex_binary(
     name="backendai-install",
-    extra_build_args=["--scie", "lazy"],
-    tags=["scie", "lazy"],
-    entry_point="ai.backend.cli.__main__",
-    output_path="${target_name_normalized}",
+    **common_scie_config("lazy"),
     dependencies=[
         ":src",
         ":buildscript",
@@ -55,10 +51,7 @@ pex_binary(
 
 pex_binary(
     name="backendai-install-fat",
-    extra_build_args=["--scie", "eager"],
-    tags=["scie", "fat"],
-    entry_point="ai.backend.cli.__main__",
-    output_path="${target_name_normalized}",
+    **common_scie_config("eager"),
     dependencies=[
         ":src",
         ":buildscript",
@@ -86,11 +79,17 @@ resources(
     name="resources",
     dependencies=[
         ":version",
-        "./configs:templates",
-        "./fixtures:resources",
     ],
     sources=[
         "**/py.typed",
         "app.tcss",
+        "configs/**/*.toml",
+        "configs/**/*.yml",
+        "configs/**/*.yaml",
+        "configs/**/*.json",
+        "configs/**/*.conf",
+        "configs/**/*.ini",
+        "configs/**/*.ts",
+        "fixtures/**/*.json",
     ],
 )

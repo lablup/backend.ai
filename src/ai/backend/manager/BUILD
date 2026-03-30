@@ -1,13 +1,8 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
-        "src/ai/backend/manager/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
-        "src/ai/backend/manager/api:src",  # not auto-inferred (due to lazy-loading aiohttp app builder)
-        "src/ai/backend/manager/plugin:src",  # not auto-inferred (due to lazy-loading plugins)
-        "src/ai/backend/manager/scheduler:src",
-        "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
-        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         ":resources",
     ],
 )
@@ -41,7 +36,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "mgr": "ai.backend.manager.cli.__main__:main",
-            "mgr.start-server": "ai.backend.manager.server:main",
+            "mgr.start-server": "ai.backend.manager.cli.start_server:main",
         },
         "backendai_scheduler_v10": {
             "fifo": "ai.backend.manager.scheduler.fifo:FIFOSlotScheduler",
@@ -56,6 +51,9 @@ python_distribution(
         },
         "backendai_error_monitor_v20": {
             "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorMonitor",
+        },
+        "backendai_event_dispatcher_v20": {
+            "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorEventDispatcher",
         },
         "backendai_network_manager_v1": {
             "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
@@ -116,5 +114,8 @@ resources(
     ],
     sources=[
         "**/py.typed",
+        "**/*.yaml",
+        "models/alembic/script.py.mako",
+        "models/alembic/revision_history/*.json",
     ],
 )

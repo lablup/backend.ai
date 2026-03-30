@@ -1,4 +1,7 @@
-from ..request import Request
+from typing import Any, cast
+
+from ai.backend.client.request import Request
+
 from .base import BaseFunction, api_function
 
 __all__ = ("EtcdConfig",)
@@ -16,7 +19,7 @@ class EtcdConfig(BaseFunction):
 
     @api_function
     @classmethod
-    async def get(cls, key: str, prefix: bool = False) -> dict:
+    async def get(cls, key: str, prefix: bool = False) -> dict[str, Any]:
         """
         Get configuration from ETCD with given key.
 
@@ -30,11 +33,11 @@ class EtcdConfig(BaseFunction):
         })
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return data.get("result", None)
+            return cast(dict[str, Any], data.get("result", None))
 
     @api_function
     @classmethod
-    async def set(cls, key: str, value: str) -> dict:
+    async def set(cls, key: str, value: str) -> dict[str, Any]:
         """
         Set configuration into ETCD with given key and value.
 
@@ -47,12 +50,13 @@ class EtcdConfig(BaseFunction):
             "value": value,
         })
         async with rqst.fetch() as resp:
-            data = await resp.json()
-            return data
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
     @classmethod
-    async def delete(cls, key: str, prefix: bool = False) -> dict:
+    async def delete(cls, key: str, prefix: bool = False) -> dict[str, Any]:
         """
         Delete configuration from ETCD with given key.
 
@@ -65,5 +69,6 @@ class EtcdConfig(BaseFunction):
             "prefix": prefix,
         })
         async with rqst.fetch() as resp:
-            data = await resp.json()
-            return data
+            result: dict[str, Any] = await resp.json()
+
+            return result

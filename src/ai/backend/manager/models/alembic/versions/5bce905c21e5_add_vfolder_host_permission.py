@@ -6,14 +6,15 @@ Create Date: 2022-10-13 18:35:21.955941
 
 """
 
-from typing import Dict, List
+from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.sql.expression import bindparam
 
-from ai.backend.manager.models.base import GUID, VFolderHostPermission, metadata
+from ai.backend.common.types import VFolderHostPermission
+from ai.backend.manager.models.base import GUID, metadata
 
 # revision identifiers, used by Alembic.
 revision = "5bce905c21e5"
@@ -48,23 +49,28 @@ def upgrade() -> None:
         sa.Column("allowed_vfolder_hosts", pgsql.ARRAY(sa.String)),
         extend_existing=True,
     )
-    domain_query = sa.select([domains.c.name, domains.c.allowed_vfolder_hosts])
-    group_query = sa.select([groups.c.id, groups.c.allowed_vfolder_hosts])
-    keypair_resource_policies_query = sa.select([
+    domain_query = sa.select(domains.c.name, domains.c.allowed_vfolder_hosts)
+    group_query = sa.select(groups.c.id, groups.c.allowed_vfolder_hosts)
+    keypair_resource_policies_query = sa.select(
         keypair_resource_policies.c.name,
         keypair_resource_policies.c.allowed_vfolder_hosts,
-    ])
+    )
 
     connection = op.get_bind()
     bind_param_pk = "bind_param_pk"
 
-    def get_pk_vfolder_host_maps(query, pk_name) -> List:
+    def get_pk_vfolder_host_maps(
+        query: sa.sql.Select[Any], pk_name: str
+    ) -> list[dict[str, object]]:
         map_list = []
         rows = connection.execute(query).fetchall()
         for row in rows:
-            hosts: List[str] = row["allowed_vfolder_hosts"]
-            all_perms: Dict[str, List[str]] = {host: ALL_HOST_PERMISSIONS for host in hosts}
-            map_list.append({bind_param_pk: row[pk_name], "allowed_vfolder_hosts": all_perms})
+            hosts: list[str] = row.allowed_vfolder_hosts
+            all_perms: dict[str, list[str]] = dict.fromkeys(hosts, ALL_HOST_PERMISSIONS)
+            map_list.append({
+                bind_param_pk: getattr(row, pk_name),
+                "allowed_vfolder_hosts": all_perms,
+            })
         return map_list
 
     domain_list = get_pk_vfolder_host_maps(domain_query, "name")
@@ -125,7 +131,9 @@ def upgrade() -> None:
         extend_existing=True,
     )
 
-    def update_vfolder_host_col(table, cond, row_list):
+    def update_vfolder_host_col(
+        table: sa.Table, cond: sa.ColumnElement[Any], row_list: list[dict[str, object]]
+    ) -> None:
         query = (
             sa.update(table)
             .values({"allowed_vfolder_hosts": bindparam("allowed_vfolder_hosts")})
@@ -170,23 +178,25 @@ def downgrade() -> None:
     connection = op.get_bind()
     bind_param_pk = "bind_param_pk"
 
-    def get_pk_vfolder_host_maps(query, pk_name) -> List:
+    def get_pk_vfolder_host_maps(
+        query: sa.sql.Select[Any], pk_name: str
+    ) -> list[dict[str, object]]:
         map_list = []
         rows = connection.execute(query).fetchall()
         for row in rows:
-            hosts: Dict[str, List[str]] = row["allowed_vfolder_hosts"]
+            hosts: dict[str, list[str]] = row.allowed_vfolder_hosts
             map_list.append({
-                bind_param_pk: row[pk_name],
+                bind_param_pk: getattr(row, pk_name),
                 "allowed_vfolder_hosts": list(hosts.keys()),
             })
         return map_list
 
-    domain_query = sa.select([domains.c.name, domains.c.allowed_vfolder_hosts])
-    group_query = sa.select([groups.c.id, groups.c.allowed_vfolder_hosts])
-    keypair_resource_policies_query = sa.select([
+    domain_query = sa.select(domains.c.name, domains.c.allowed_vfolder_hosts)
+    group_query = sa.select(groups.c.id, groups.c.allowed_vfolder_hosts)
+    keypair_resource_policies_query = sa.select(
         keypair_resource_policies.c.name,
         keypair_resource_policies.c.allowed_vfolder_hosts,
-    ])
+    )
 
     domain_list = get_pk_vfolder_host_maps(domain_query, "name")
     group_list = get_pk_vfolder_host_maps(group_query, "id")
@@ -237,7 +247,9 @@ def downgrade() -> None:
         extend_existing=True,
     )
 
-    def update_vfolder_host_col(table, cond, row_list):
+    def update_vfolder_host_col(
+        table: sa.Table, cond: sa.ColumnElement[Any], row_list: list[dict[str, object]]
+    ) -> None:
         query = (
             sa.update(table)
             .values({"allowed_vfolder_hosts": bindparam("allowed_vfolder_hosts")})

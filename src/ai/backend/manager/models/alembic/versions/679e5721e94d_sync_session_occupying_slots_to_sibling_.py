@@ -31,7 +31,7 @@ Base: Any = mapper_registry.generate_base()
 PAGE_SIZE = 100
 
 
-class SessionRow(Base):
+class SessionRow(Base):  # type: ignore[misc]
     __tablename__ = "sessions"
     __table_args__ = {"extend_existing": True}
 
@@ -39,12 +39,14 @@ class SessionRow(Base):
     cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
     starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
     status_history = sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
-    occupying_slots = sa.Column("occupying_slots", ResourceSlotColumn(), nullable=False)
+    occupying_slots: sa.Column[ResourceSlot] = sa.Column(
+        "occupying_slots", ResourceSlotColumn(), nullable=False
+    )
 
     kernels = relationship("KernelRow")
 
 
-class KernelRow(Base):
+class KernelRow(Base):  # type: ignore[misc]
     __tablename__ = "kernels"
     __table_args__ = {"extend_existing": True}
 
@@ -57,10 +59,12 @@ class KernelRow(Base):
         index=True,
         nullable=False,
     )
-    occupied_slots = sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False)
+    occupied_slots: sa.Column[ResourceSlot] = sa.Column(
+        "occupied_slots", ResourceSlotColumn(), nullable=False
+    )
 
 
-def _sync_single_kernel_cluster_session():
+def _sync_single_kernel_cluster_session() -> None:
     conn = op.get_bind()
     sync_stmt = textwrap.dedent(
         """
@@ -74,7 +78,7 @@ def _sync_single_kernel_cluster_session():
     conn.execute(text(sync_stmt))
 
 
-def _sync_multi_kernel_cluster_session():
+def _sync_multi_kernel_cluster_session() -> None:
     db_sess = Session(op.get_bind())
 
     while True:
@@ -86,7 +90,7 @@ def _sync_multi_kernel_cluster_session():
                 & (SessionRow.status_history.op("?")("RUNNING"))
             )
             .limit(PAGE_SIZE)
-            .options(selectinload(SessionRow.kernels).options(load_only(KernelRow.occupied_slots)))
+            .options(selectinload(SessionRow.kernels).options(load_only("occupied_slots")))  # type: ignore[arg-type]
         )
         session_list = cast(list[SessionRow], db_sess.scalars(select_stmt).all())
         if not session_list:
@@ -104,10 +108,10 @@ def _sync_multi_kernel_cluster_session():
         db_sess.execute(update_stmt, data)
 
 
-def upgrade():
+def upgrade() -> None:
     _sync_single_kernel_cluster_session()
     _sync_multi_kernel_cluster_session()
 
 
-def downgrade():
+def downgrade() -> None:
     pass

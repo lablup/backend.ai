@@ -16,7 +16,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.alter_column(
         "keypairs", "ssh_public_key", existing_type=sa.String(length=750), type_=sa.Text
     )
@@ -25,7 +25,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     print("existing keys will be truncated to 750 (public)/2000 (private) bytes")
     op.alter_column(
         "keypairs", "ssh_public_key", existing_type=sa.Text, type_=sa.String(length=750)

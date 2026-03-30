@@ -6,7 +6,7 @@ import hashlib
 import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn, cast
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
@@ -28,8 +28,8 @@ __all__ = (
 )
 
 
-def parse_version(expr):
-    result = []
+def parse_version(expr: str) -> tuple[int | str, ...]:
+    result: list[int | str] = []
     for part in expr.split("."):
         try:
             result.append(int(part))
@@ -48,13 +48,13 @@ def get_build_root() -> Path:
 
 
 def simple_hash(data: bytes) -> str:
-    h = hashlib.sha1()
+    h = hashlib.sha1(usedforsecurity=False)
     h.update(data)
     # generate a filesystem-safe base64 string
     return base64.b64encode(h.digest()[:12], altchars=b"._").decode()
 
 
-async def detect_snap_docker():
+async def detect_snap_docker() -> str | None:
     if not Path("/run/snapd.socket").is_socket():
         return None
     async with request_unix(
@@ -65,7 +65,29 @@ async def detect_snap_docker():
         response_data = await r.json()
         for pkg_data in response_data["result"]:
             if pkg_data["name"] == "docker":
-                return pkg_data["version"]
+                return cast(str, pkg_data["version"])
+    return None
+
+
+async def wait_for_docker(ctx: Context, max_wait: int = 60) -> None:
+    for attempt in range(max_wait):
+        proc = await asyncio.create_subprocess_exec(
+            *(*ctx.docker_sudo, "docker", "info"),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await proc.wait()
+        if proc.returncode == 0:
+            if attempt > 0:
+                ctx.log.write(f"Docker daemon is ready (waited {attempt}s).")
+            return
+        if attempt == 0:
+            ctx.log.write("Waiting for Docker daemon to start...")
+        await asyncio.sleep(1)
+    raise PrerequisiteError(
+        f"Docker daemon did not become ready within {max_wait} seconds.",
+        instruction="Please check Docker daemon status with 'systemctl status docker'.",
+    )
 
 
 async def detect_system_docker(ctx: Context) -> str:
@@ -79,24 +101,28 @@ async def detect_system_docker(ctx: Context) -> str:
         raise PrerequisiteError(f"Could not find the docker socket ({e})") from e
     ctx.log.write(Text.from_markup(f"[cyan]{connector=}[/]"))
 
+    # Wait for Docker daemon to be ready before checking version.
+    await wait_for_docker(ctx)
+
     # Test a docker command to ensure passwordless sudo.
     proc = await asyncio.create_subprocess_exec(
         *(*ctx.docker_sudo, "docker", "version"),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
-    assert proc.stdout is not None
+    if proc.stdout is None:
+        raise RuntimeError("Failed to capture docker version output")
     stdout = ""
     try:
         async with asyncio.timeout(0.5):
             await proc.communicate()
-    except asyncio.TimeoutError:
+    except TimeoutError as e:
         proc.kill()
         await proc.wait()
         raise PrerequisiteError(
             "sudo requires prompt.",
             instruction="Please make sudo available without password prompts.",
-        )
+        ) from e
 
     if ctx.docker_sudo:
         # Change the docker socket permission (temporarily)
@@ -110,7 +136,8 @@ async def detect_system_docker(ctx: Context) -> str:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
-            assert proc.stdout is not None
+            if proc.stdout is None:
+                raise RuntimeError("Failed to capture chmod output")
             stdout = (await proc.stdout.read()).decode()
             if (await proc.wait()) != 0:
                 raise RuntimeError("Failed to set the docker socket permission", stdout)
@@ -123,31 +150,31 @@ async def detect_system_docker(ctx: Context) -> str:
                     f" {r.status} {r.reason}"
                 )
             response_data = await r.json()
-            return response_data["Version"]
+            return cast(str, response_data["Version"])
 
 
-def fail_with_snap_docker_refresh_request() -> None:
+def fail_with_snap_docker_refresh_request() -> NoReturn:
     raise PrerequisiteError(
         "Please install Docker 20.10.15 or later from the Snap package index.",
         instruction="Try running `sudo snap refresh docker --edge`",
     )
 
 
-def fail_with_system_docker_install_request() -> None:
+def fail_with_system_docker_install_request() -> NoReturn:
     raise PrerequisiteError(
         "Please install Docker for your system.",
         instruction="Check out https://docs.docker.com/engine/install/",
     )
 
 
-def fail_with_compose_install_request() -> None:
+def fail_with_compose_install_request() -> NoReturn:
     raise PrerequisiteError(
         "Please install docker-compose v2 or later.",
         instruction="Check out https://docs.docker.com/compose/install/",
     )
 
 
-async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
+async def get_preferred_pants_local_exec_root(_ctx: Context) -> str:
     docker_version = await detect_snap_docker()
     build_root_path = get_build_root()
     build_root_name = build_root_path.name
@@ -155,9 +182,8 @@ async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
     if docker_version is not None:
         # For Snap-based Docker, use a home directory path
         return str(Path.home() / f".cache/{build_root_name}-{build_root_hash}-pants")
-    else:
-        # Otherwise, use the standard tmp directory
-        return f"/tmp/{build_root_name}-{build_root_hash}-pants"
+    # Otherwise, use the standard tmp directory
+    return f"/tmp/{build_root_name}-{build_root_hash}-pants"
 
 
 async def determine_docker_sudo() -> bool:
@@ -185,17 +211,15 @@ async def check_docker(ctx: Context) -> None:
     else:
         docker_version = await detect_system_docker(ctx)
         ctx.log.write(docker_version)
-        if docker_version is not None:
-            ctx.log.write(f"Detected Docker installation: System package ({docker_version})")
-        else:
-            fail_with_system_docker_install_request()
+        ctx.log.write(f"Detected Docker installation: System package ({docker_version})")
 
     # Compose is not a part of the docker API but a client-side plugin.
     # We need to execute the client command to get information about it.
     proc = await asyncio.create_subprocess_exec(
         *ctx.docker_sudo, "docker", "compose", "version", stdout=asyncio.subprocess.PIPE
     )
-    assert proc.stdout is not None
+    if proc.stdout is None:
+        raise RuntimeError("Failed to capture docker compose version output")
     stdout = await proc.stdout.read()
     exit_code = await proc.wait()
     if exit_code != 0:
@@ -203,11 +227,10 @@ async def check_docker(ctx: Context) -> None:
     m = re.search(r"\d+\.\d+\.\d+", stdout.decode())
     if m is None:
         raise PrerequisiteError("Failed to retrieve the docker-compose version!")
-    else:
-        compose_version = m.group(0)
-        ctx.log.write(f"Detected docker-compose installation ({compose_version})")
-        if parse_version(compose_version) < (2, 0, 0):
-            fail_with_compose_install_request()
+    compose_version = m.group(0)
+    ctx.log.write(f"Detected docker-compose installation ({compose_version})")
+    if parse_version(compose_version) < (2, 0, 0):
+        fail_with_compose_install_request()
 
 
 async def check_docker_desktop_mount(ctx: Context) -> None:

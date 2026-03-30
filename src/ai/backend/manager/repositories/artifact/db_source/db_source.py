@@ -1,0 +1,813 @@
+import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager as actxmgr
+from datetime import UTC, datetime
+from typing import Any, cast
+
+import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.orm import selectinload
+
+from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.storage.registries.types import ModelData
+from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.manager.data.artifact.types import (
+    ArtifactAvailability,
+    ArtifactData,
+    ArtifactDataWithRevisions,
+    ArtifactListResult,
+    ArtifactRemoteStatus,
+    ArtifactRevisionData,
+    ArtifactRevisionListResult,
+    ArtifactStatus,
+    ArtifactType,
+    ArtifactWithRevisionsListResult,
+)
+from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.artifact import (
+    ArtifactAssociationDeletionError,
+    ArtifactAssociationNotFoundError,
+    ArtifactNotFoundError,
+    ArtifactNotVerified,
+    ArtifactRevisionNotFoundError,
+    ArtifactUpdateError,
+)
+from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.artifact.creators import (
+    ArtifactCreatorSpec,
+    ArtifactRevisionCreatorSpec,
+)
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+
+
+class ArtifactDBSource:
+    """Database source for artifact-related operations."""
+
+    _db: ExtendedAsyncSAEngine
+
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+        self._db = db
+
+    async def get_artifact_by_id(self, artifact_id: uuid.UUID) -> ArtifactData:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
+            return row.to_dataclass()
+
+    async def get_artifact_revision_by_id(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactRevisionNotFoundError(
+                    f"Artifact revision with ID {revision_id} not found"
+                )
+            return row.to_dataclass()
+
+    async def get_model_artifact(self, model_id: str, registry_id: uuid.UUID) -> ArtifactData:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(
+                    sa.and_(ArtifactRow.name == model_id, ArtifactRow.registry_id == registry_id)
+                )
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactNotFoundError(
+                    f"Artifact with model ID {model_id} not found under registry {registry_id}"
+                )
+            return row.to_dataclass()
+
+    async def get_artifact_revision(
+        self, artifact_id: uuid.UUID, revision: str
+    ) -> ArtifactRevisionData:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRevisionRow).where(
+                    sa.and_(
+                        ArtifactRevisionRow.artifact_id == artifact_id,
+                        ArtifactRevisionRow.version == revision,
+                    )
+                )
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactRevisionNotFoundError(f"Revision {revision} not found")
+            return row.to_dataclass()
+
+    async def update_artifact(self, updater: Updater[ArtifactRow]) -> ArtifactData:
+        async with self._db.begin_session() as db_sess:
+            # Check if artifact exists and is not deleted
+            check_result = await db_sess.execute(
+                sa.select(ArtifactRow.id).where(
+                    sa.and_(
+                        ArtifactRow.id == updater.pk_value,
+                        ArtifactRow.availability != ArtifactAvailability.DELETED,
+                    )
+                )
+            )
+            if check_result.scalar_one_or_none() is None:
+                raise ArtifactNotFoundError(f"Artifact with ID {updater.pk_value} not found")
+
+            result = await execute_updater(db_sess, updater)
+            if result is None:
+                raise ArtifactNotFoundError(f"Artifact with ID {updater.pk_value} not found")
+            return result.row.to_dataclass()
+
+    async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.artifact_id == artifact_id)
+            )
+            rows = list(result.scalars().all())
+            return [row.to_dataclass() for row in rows]
+
+    # TODO: Refactor using on_conflict_do_update?
+    async def upsert_artifacts(
+        self,
+        artifacts: list[ArtifactData],
+    ) -> list[ArtifactData]:
+        async with self._db.begin_session() as db_sess:
+            result_artifacts: list[ArtifactData] = []
+
+            for artifact_data in artifacts:
+                # Check if artifact exists
+                artifact_query_result = await db_sess.execute(
+                    sa.select(ArtifactRow).where(
+                        sa.and_(
+                            ArtifactRow.name == artifact_data.name,
+                            ArtifactRow.registry_id == artifact_data.registry_id,
+                        )
+                    )
+                )
+                existing_artifact = artifact_query_result.scalar_one_or_none()
+
+                if existing_artifact is None:
+                    # Create new artifact with RBAC scope association
+                    rbac_creator = RBACEntityCreator(
+                        spec=ArtifactCreatorSpec(
+                            name=artifact_data.name,
+                            type=artifact_data.type,
+                            description=artifact_data.description,
+                            registry_id=artifact_data.registry_id,
+                            registry_type=artifact_data.registry_type,
+                            source_registry_id=artifact_data.source_registry_id,
+                            source_registry_type=artifact_data.source_registry_type,
+                            readonly=True,
+                            extra=artifact_data.extra,
+                        ),
+                        element_type=RBACElementType.ARTIFACT,
+                        scope_ref=RBACElementRef(
+                            RBACElementType.ARTIFACT_REGISTRY,
+                            str(artifact_data.registry_id),
+                        ),
+                    )
+                    creator_result = await execute_rbac_entity_creator(db_sess, rbac_creator)
+                    new_artifact = creator_result.row
+                    await db_sess.refresh(
+                        new_artifact, attribute_names=["scanned_at", "updated_at"]
+                    )
+                    result_artifacts.append(new_artifact.to_dataclass())
+                else:
+                    # Update existing artifact
+                    has_changes = (existing_artifact.description != artifact_data.description) or (
+                        existing_artifact.extra != artifact_data.extra
+                    )
+                    if has_changes:
+                        existing_artifact.extra = artifact_data.extra
+                        existing_artifact.description = artifact_data.description
+                        existing_artifact.updated_at = datetime.now(UTC)
+
+                    await db_sess.flush()
+                    await db_sess.refresh(
+                        existing_artifact, attribute_names=["scanned_at", "updated_at"]
+                    )
+                    result_artifacts.append(existing_artifact.to_dataclass())
+
+            return result_artifacts
+
+    async def upsert_artifact_revisions(
+        self,
+        revisions: list[ArtifactRevisionData],
+    ) -> list[ArtifactRevisionData]:
+        async with self._db.begin_session() as db_sess:
+            result_revisions: list[ArtifactRevisionData] = []
+            artifact_ids_to_update: set[uuid.UUID] = set()
+
+            for revision_data in revisions:
+                # Skip failed or rejected revision copy
+                if revision_data.status in [ArtifactStatus.FAILED, ArtifactStatus.REJECTED]:
+                    continue
+
+                # Check if revision exists
+                revision_query_result = await db_sess.execute(
+                    sa.select(ArtifactRevisionRow).where(
+                        sa.and_(
+                            ArtifactRevisionRow.artifact_id == revision_data.artifact_id,
+                            ArtifactRevisionRow.version == revision_data.version,
+                        )
+                    )
+                )
+                existing_revision = revision_query_result.scalar_one_or_none()
+
+                if existing_revision is None:
+                    # Create new revision
+                    verification_result = None
+                    if revision_data.verification_result is not None:
+                        verification_result = revision_data.verification_result.model_dump()
+
+                    creator = RBACEntityCreator(
+                        spec=ArtifactRevisionCreatorSpec(
+                            id=revision_data.id,
+                            artifact_id=revision_data.artifact_id,
+                            version=revision_data.version,
+                            readme=revision_data.readme,
+                            size=revision_data.size,
+                            status=ArtifactStatus.SCANNED,
+                            remote_status=revision_data.remote_status,
+                            created_at=revision_data.created_at,
+                            updated_at=revision_data.updated_at,
+                            digest=revision_data.digest,
+                            verification_result=verification_result,
+                        ),
+                        element_type=RBACElementType.ARTIFACT_REVISION,
+                        scope_ref=RBACElementRef(
+                            RBACElementType.ARTIFACT, str(revision_data.artifact_id)
+                        ),
+                    )
+                    creator_result = await execute_rbac_entity_creator(db_sess, creator)
+                    result_revisions.append(creator_result.row.to_dataclass())
+                    artifact_ids_to_update.add(revision_data.artifact_id)
+                else:
+                    # Update existing revision only if there are changes
+                    verification_result = None
+                    if revision_data.verification_result is not None:
+                        verification_result = revision_data.verification_result.model_dump()
+
+                    has_changes = (
+                        existing_revision.readme != revision_data.readme
+                        or existing_revision.digest != revision_data.digest
+                        or existing_revision.remote_status != revision_data.remote_status
+                        or existing_revision.verification_result != verification_result,
+                    )
+
+                    if has_changes:
+                        existing_revision.readme = revision_data.readme
+                        existing_revision.size = revision_data.size
+                        existing_revision.created_at = revision_data.created_at
+                        existing_revision.updated_at = revision_data.updated_at
+                        existing_revision.digest = revision_data.digest
+                        existing_revision.verification_result = verification_result
+
+                        # This must be done to avoid overwriting local revisions' remote_status with None
+                        if revision_data.remote_status is not None:
+                            existing_revision.remote_status = revision_data.remote_status
+                        artifact_ids_to_update.add(revision_data.artifact_id)
+
+                    await db_sess.flush()
+                    await db_sess.refresh(existing_revision)
+                    result_revisions.append(existing_revision.to_dataclass())
+
+            # Update artifact updated_at timestamp for affected artifacts
+            if artifact_ids_to_update:
+                await db_sess.execute(
+                    sa.update(ArtifactRow)
+                    .where(ArtifactRow.id.in_(artifact_ids_to_update))
+                    .values(updated_at=sa.func.now())
+                )
+
+            return result_revisions
+
+    async def upsert_huggingface_model_artifacts(
+        self,
+        model_list: list[ModelData],
+        registry_id: uuid.UUID,
+    ) -> list[ArtifactDataWithRevisions]:
+        async with self._db.begin_session() as db_sess:
+            # key: artifact_id
+            artifacts_map: dict[uuid.UUID, tuple[ArtifactRow, list[ArtifactRevisionRow]]] = {}
+            artifact_ids_to_update: set[uuid.UUID] = set()
+
+            for model in model_list:
+                # Check if artifact exists within the current session
+                artifact_query_result = await db_sess.execute(
+                    sa.select(ArtifactRow).where(
+                        sa.and_(
+                            ArtifactRow.name == model.id, ArtifactRow.registry_id == registry_id
+                        )
+                    )
+                )
+                artifact_row = artifact_query_result.scalar_one_or_none()
+
+                if artifact_row is None:
+                    # Create new artifact with RBAC scope association
+                    rbac_creator = RBACEntityCreator(
+                        spec=ArtifactCreatorSpec(
+                            name=model.id,
+                            type=ArtifactType.MODEL,
+                            registry_id=registry_id,
+                            registry_type=ArtifactRegistryType.HUGGINGFACE,
+                            source_registry_id=registry_id,
+                            source_registry_type=ArtifactRegistryType.HUGGINGFACE,
+                            readonly=True,
+                            extra=model.extra,
+                        ),
+                        element_type=RBACElementType.ARTIFACT,
+                        scope_ref=RBACElementRef(
+                            RBACElementType.ARTIFACT_REGISTRY,
+                            str(registry_id),
+                        ),
+                    )
+                    creator_result = await execute_rbac_entity_creator(db_sess, rbac_creator)
+                    artifact_row = creator_result.row
+                    await db_sess.refresh(
+                        artifact_row, attribute_names=["scanned_at", "updated_at"]
+                    )
+                else:
+                    # Update existing artifact's extra field if changed
+                    artifact_row.extra = model.extra
+                    artifact_ids_to_update.add(artifact_row.id)
+
+                # Initialize artifact in map if not exists
+                if artifact_row.id not in artifacts_map:
+                    artifacts_map[artifact_row.id] = (artifact_row, [])
+
+                # Check if artifact revision exists
+                revision_query_result = await db_sess.execute(
+                    sa.select(ArtifactRevisionRow).where(
+                        sa.and_(
+                            ArtifactRevisionRow.artifact_id == artifact_row.id,
+                            ArtifactRevisionRow.version == model.revision,
+                        )
+                    )
+                )
+
+                existing_revision = revision_query_result.scalar_one_or_none()
+                if existing_revision is not None:
+                    # Update existing revision only if there are changes
+                    has_changes = existing_revision.digest != model.sha
+
+                    if has_changes:
+                        existing_revision.readme = model.readme
+                        existing_revision.updated_at = model.modified_at
+                        artifact_ids_to_update.add(artifact_row.id)
+
+                    await db_sess.flush()
+                    await db_sess.refresh(existing_revision)
+                    artifacts_map[artifact_row.id][1].append(existing_revision)
+                else:
+                    # Insert new artifact revision
+                    creator = RBACEntityCreator(
+                        spec=ArtifactRevisionCreatorSpec(
+                            artifact_id=artifact_row.id,
+                            version=model.revision,
+                            readme=model.readme,
+                            size=model.size,
+                            status=ArtifactStatus.SCANNED,
+                            remote_status=None,
+                            created_at=model.created_at,
+                            updated_at=model.modified_at,
+                            digest=model.sha,
+                            verification_result=None,
+                        ),
+                        element_type=RBACElementType.ARTIFACT_REVISION,
+                        scope_ref=RBACElementRef(RBACElementType.ARTIFACT, str(artifact_row.id)),
+                    )
+                    creator_result = await execute_rbac_entity_creator(db_sess, creator)
+                    artifacts_map[artifact_row.id][1].append(creator_result.row)
+                    artifact_ids_to_update.add(artifact_row.id)
+
+            # Update artifact updated_at timestamp for affected artifacts
+            if artifact_ids_to_update:
+                await db_sess.execute(
+                    sa.update(ArtifactRow)
+                    .where(ArtifactRow.id.in_(artifact_ids_to_update))
+                    .values(updated_at=sa.func.now())
+                )
+
+                # Refresh updated_at for affected artifacts
+                for artifact_id, (artifact_row, _revs) in artifacts_map.items():
+                    if artifact_id in artifact_ids_to_update:
+                        await db_sess.refresh(artifact_row, attribute_names=["updated_at"])
+
+            # Convert to ArtifactDataWithRevisions format
+            result: list[ArtifactDataWithRevisions] = []
+            for artifact_row, revision_rows in artifacts_map.values():
+                artifact_data = artifact_row.to_dataclass()
+                revision_data_list = [revision.to_dataclass() for revision in revision_rows]
+                result.append(
+                    ArtifactDataWithRevisions.from_dataclasses(
+                        artifact_data=artifact_data, revisions=revision_data_list
+                    )
+                )
+
+        return result
+
+    async def associate_artifact_with_storage(
+        self,
+        artifact_revision_id: uuid.UUID,
+        storage_namespace_id: uuid.UUID,
+        storage_type: ArtifactStorageType,
+    ) -> AssociationArtifactsStoragesData:
+        async with self._db.begin_session() as db_sess:
+            select_stmt = sa.select(AssociationArtifactsStorageRow.id).where(
+                sa.and_(
+                    AssociationArtifactsStorageRow.artifact_revision_id == artifact_revision_id,
+                    AssociationArtifactsStorageRow.storage_namespace_id == storage_namespace_id,
+                )
+            )
+            existing = (await db_sess.execute(select_stmt)).scalar_one_or_none()
+            if existing is not None:
+                return AssociationArtifactsStoragesData(
+                    id=existing,
+                    artifact_revision_id=artifact_revision_id,
+                    storage_namespace_id=storage_namespace_id,
+                )
+
+            insert_stmt = (
+                sa.insert(AssociationArtifactsStorageRow)
+                .values(
+                    artifact_revision_id=artifact_revision_id,
+                    storage_namespace_id=storage_namespace_id,
+                    storage_type=storage_type.value,
+                )
+                .returning(AssociationArtifactsStorageRow.id)
+            )
+
+            result = await db_sess.execute(insert_stmt)
+            existing = result.scalar_one()
+
+            return AssociationArtifactsStoragesData(
+                id=existing,
+                artifact_revision_id=artifact_revision_id,
+                storage_namespace_id=storage_namespace_id,
+            )
+
+    async def disassociate_artifact_with_storage(
+        self, artifact_revision_id: uuid.UUID, storage_namespace_id: uuid.UUID
+    ) -> AssociationArtifactsStoragesData:
+        async with self._db.begin_session() as db_sess:
+            select_result = await db_sess.execute(
+                sa.select(AssociationArtifactsStorageRow).where(
+                    sa.and_(
+                        AssociationArtifactsStorageRow.artifact_revision_id == artifact_revision_id,
+                        AssociationArtifactsStorageRow.storage_namespace_id == storage_namespace_id,
+                    )
+                )
+            )
+            existing_row = select_result.scalar_one_or_none()
+            if existing_row is None:
+                raise ArtifactAssociationNotFoundError(
+                    f"Association between artifact {artifact_revision_id} and storage {storage_namespace_id} does not exist"
+                )
+
+            # Store the data before deletion
+            association_data = AssociationArtifactsStoragesData(
+                id=existing_row.id,
+                artifact_revision_id=existing_row.artifact_revision_id,
+                storage_namespace_id=existing_row.storage_namespace_id,
+            )
+
+            # Delete the association
+            delete_result = await db_sess.execute(
+                sa.delete(AssociationArtifactsStorageRow).where(
+                    sa.and_(
+                        AssociationArtifactsStorageRow.artifact_revision_id == artifact_revision_id,
+                        AssociationArtifactsStorageRow.storage_namespace_id == storage_namespace_id,
+                    )
+                )
+            )
+
+            if cast(CursorResult[Any], delete_result).rowcount == 0:
+                raise ArtifactAssociationDeletionError("Failed to delete association")
+
+            return association_data
+
+    async def approve_artifact(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactRevisionNotFoundError()
+
+            if row.status == ArtifactStatus.AVAILABLE:
+                raise ArtifactNotVerified("Artifacts already approved")
+            if row.status != ArtifactStatus.NEEDS_APPROVAL:
+                raise ArtifactNotVerified("Only verified artifacts could be approved")
+
+            update_stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(
+                    sa.and_(
+                        ArtifactRevisionRow.id == revision_id,
+                        ArtifactRevisionRow.status == ArtifactStatus.NEEDS_APPROVAL,
+                    )
+                )
+                .values(status=ArtifactStatus.AVAILABLE)
+                .returning(ArtifactRevisionRow)
+            )
+
+            result = await db_sess.execute(update_stmt)
+            updated_row = result.scalars().one_or_none()
+            if updated_row is None:
+                raise ArtifactUpdateError()
+
+            return updated_row.to_dataclass()
+
+    async def reject_artifact(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactRevisionNotFoundError()
+
+            update_stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == revision_id)
+                .values(status=ArtifactStatus.REJECTED.value)
+                .returning(ArtifactRevisionRow)
+            )
+
+            result = await db_sess.execute(update_stmt)
+            updated_row = result.scalars().one_or_none()
+            if updated_row is None:
+                raise ArtifactUpdateError()
+
+            return updated_row.to_dataclass()
+
+    async def reset_artifact_revision_status(self, revision_id: uuid.UUID) -> uuid.UUID:
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == revision_id)
+                .values(status=ArtifactStatus.SCANNED)
+            )
+            await db_sess.execute(stmt)
+            return revision_id
+
+    async def update_artifact_revision_status(
+        self, artifact_revision_id: uuid.UUID, status: ArtifactStatus
+    ) -> uuid.UUID:
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(status=status)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    async def update_artifact_revision_remote_status(
+        self, artifact_revision_id: uuid.UUID, remote_status: ArtifactRemoteStatus
+    ) -> uuid.UUID:
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(remote_status=remote_status)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    async def delete_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
+        async with self._db.begin_session() as db_sess:
+            # Update availability to DELETED for the given artifact IDs (only for ALIVE artifacts)
+            await db_sess.execute(
+                sa.update(ArtifactRow)
+                .where(
+                    sa.and_(
+                        ArtifactRow.id.in_(artifact_ids),
+                        ArtifactRow.availability != ArtifactAvailability.DELETED,
+                    )
+                )
+                .values(availability=ArtifactAvailability.DELETED.value)
+            )
+
+            # Fetch and return the updated artifacts
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
+            )
+            rows = list(result.scalars().all())
+            return [row.to_dataclass() for row in rows]
+
+    async def restore_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
+        async with self._db.begin_session() as db_sess:
+            # Update availability to ALIVE for the given artifact IDs (only for DELETED artifacts)
+            await db_sess.execute(
+                sa.update(ArtifactRow)
+                .where(
+                    sa.and_(
+                        ArtifactRow.id.in_(artifact_ids),
+                        ArtifactRow.availability == ArtifactAvailability.DELETED,
+                    )
+                )
+                .values(availability=ArtifactAvailability.ALIVE.value)
+            )
+
+            # Fetch and return the updated artifacts
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
+            )
+            rows = list(result.scalars().all())
+            return [row.to_dataclass() for row in rows]
+
+    async def update_artifact_revision_bytesize(
+        self, artifact_revision_id: uuid.UUID, size: int
+    ) -> uuid.UUID:
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(size=size)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    async def update_artifact_revision_readme(
+        self, artifact_revision_id: uuid.UUID, readme: str
+    ) -> uuid.UUID:
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(readme=readme)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    async def update_artifact_revision_verification_result(
+        self,
+        artifact_revision_id: uuid.UUID,
+        verification_result: VerificationStepResult,
+    ) -> uuid.UUID:
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(verification_result=verification_result.model_dump())
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    async def update_artifact_revision_digest(
+        self, artifact_revision_id: uuid.UUID, digest: str
+    ) -> uuid.UUID:
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(digest=digest)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str | None:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRevisionRow.readme).where(
+                    ArtifactRevisionRow.id == artifact_revision_id
+                )
+            )
+            return result.scalar_one_or_none()
+
+    async def search_artifacts(
+        self,
+        querier: BatchQuerier,
+    ) -> ArtifactListResult:
+        """Search artifacts with querier pattern.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+
+        Returns:
+            ArtifactListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ArtifactRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ArtifactRow.to_dataclass() for row in result.rows]
+
+            return ArtifactListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_artifact_revisions(
+        self,
+        querier: BatchQuerier,
+    ) -> ArtifactRevisionListResult:
+        """Search artifact revisions with querier pattern.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+
+        Returns:
+            ArtifactRevisionListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ArtifactRevisionRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ArtifactRevisionRow.to_dataclass() for row in result.rows]
+
+            return ArtifactRevisionListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_artifacts_with_revisions(
+        self,
+        querier: BatchQuerier,
+    ) -> ArtifactWithRevisionsListResult:
+        """Search artifacts with their revisions using querier pattern.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+
+        Returns:
+            ArtifactWithRevisionsListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            # Build query with eager loading of revisions
+            query = sa.select(ArtifactRow).options(selectinload(ArtifactRow.revision_rows))
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            # Convert to ArtifactDataWithRevisions objects
+            items: list[ArtifactDataWithRevisions] = []
+            for row in result.rows:
+                artifact_data = row.ArtifactRow.to_dataclass()
+                revisions_data = [
+                    revision.to_dataclass() for revision in row.ArtifactRow.revision_rows
+                ]
+                items.append(
+                    ArtifactDataWithRevisions.from_dataclasses(
+                        artifact_data=artifact_data, revisions=revisions_data
+                    )
+                )
+
+            return ArtifactWithRevisionsListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @actxmgr
+    async def _begin_session_read_committed(self) -> AsyncIterator[SASession]:
+        """
+        Begin a read-write session with READ COMMITTED isolation level.
+        """
+        async with self._db.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
+            async with conn_with_isolation.begin():
+                # Configure session factory with the connection
+                sess_factory = async_sessionmaker(
+                    bind=conn_with_isolation,
+                    expire_on_commit=False,
+                )
+                session = sess_factory()
+                yield session
+                await session.commit()

@@ -4,24 +4,17 @@ import asyncio
 import functools
 import json
 import logging
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
     Concatenate,
-    Mapping,
-    Optional,
     ParamSpec,
-    Tuple,
-    TypeAlias,
     TypeVar,
     overload,
 )
-from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
@@ -30,7 +23,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from tenacity import (
     AsyncRetrying,
     AttemptManager,
@@ -40,15 +33,19 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from yarl import URL
 
+from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.defs import LockID
+from ai.backend.manager.errors.resource import DBOperationFailed
+from ai.backend.manager.types import Sentinel
 
 if TYPE_CHECKING:
-    from ..config import LocalConfig
+    from ai.backend.manager.config.bootstrap import BootstrapConfig
+    from ai.backend.manager.config.unified import DatabaseConfig
 
-from ..defs import LockID
-from ..types import Sentinel
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]
@@ -61,7 +58,7 @@ class ExtendedAsyncSAEngine(SAEngine):
     A subclass to add a few more convenience methods to the SQLAlchemy's async engine.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
         self.lock_conn_timeout: float | None = (
             kwargs.pop("_lock_conn_timeout", 0) or None
@@ -69,8 +66,8 @@ class ExtendedAsyncSAEngine(SAEngine):
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
-        self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
-        self._readonly_sess_factory = sessionmaker(self, class_=SASession)
+        self._sess_factory = async_sessionmaker(self, expire_on_commit=False)
+        self._readonly_sess_factory = async_sessionmaker(self)
 
     def _check_generic_txn_cnt(self) -> None:
         if (
@@ -136,24 +133,69 @@ class ExtendedAsyncSAEngine(SAEngine):
     @actxmgr
     async def begin(self, bind: SAConnection | None = None) -> AsyncIterator[SAConnection]:
         if bind is None:
-            async with self.connect() as _bind:
-                async with self._begin(_bind) as conn:
-                    yield conn
+            async with self.connect() as _bind, self._begin(_bind) as conn:
+                yield conn
         else:
             async with self._begin(bind) as conn:
                 yield conn
 
     @actxmgr
+    async def begin_read_committed(self) -> AsyncIterator[SAConnection]:
+        """
+        Begin a read-write connection with READ COMMITTED isolation level.
+        """
+        async with self.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
+            async with conn_with_isolation.begin():
+                yield conn_with_isolation
+
+    async def ping(self) -> None:
+        """
+        Ping the database to check if the connection is alive.
+
+        Raises:
+            DatabaseError: If the ping fails or connection is not available
+        """
+        async with self.begin_readonly_read_committed() as conn:
+            result = await conn.execute(sa.text("SELECT 1"))
+            scalar_result = result.scalar()
+            if scalar_result != 1:
+                raise DatabaseError("Database ping failed: unexpected result")
+
+    @actxmgr
     async def begin_readonly(
-        self, bind: SAConnection | None = None, deferrable: bool = False
+        self,
+        bind: SAConnection | None = None,
+        *,
+        deferrable: bool = False,
+        isolation_level: str | None = None,  # override only when existing conn is not given
     ) -> AsyncIterator[SAConnection]:
         if bind is None:
             async with self.connect() as _bind:
+                if isolation_level is not None:
+                    _bind = await _bind.execution_options(
+                        isolation_level=isolation_level,
+                    )
                 async with self._begin_readonly(_bind, deferrable) as conn:
                     yield conn
         else:
             async with self._begin_readonly(bind, deferrable) as conn:
                 yield conn
+
+    @actxmgr
+    async def begin_readonly_read_committed(self) -> AsyncIterator[SAConnection]:
+        """
+        Begin a read-only connection with READ COMMITTED isolation level.
+        """
+        async with self.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn_with_isolation = await conn.execution_options(
+                isolation_level="READ COMMITTED",
+                postgresql_readonly=True,
+            )
+            async with conn_with_isolation.begin():
+                yield conn_with_isolation
 
     @actxmgr
     async def begin_session(
@@ -172,18 +214,34 @@ class ExtendedAsyncSAEngine(SAEngine):
                     await session.commit()
 
         if bind is None:
-            async with self.connect() as _bind:
-                async with _begin_session(_bind) as sess:
-                    yield sess
+            async with self.connect() as _bind, _begin_session(_bind) as sess:
+                yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
 
     @actxmgr
+    async def begin_session_read_committed(self) -> AsyncIterator[SASession]:
+        """
+        Begin a read-write session with READ COMMITTED isolation level.
+        """
+        async with self.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
+            async with conn_with_isolation.begin():
+                # Configure session factory with the connection
+                self._sess_factory.configure(bind=conn_with_isolation, expire_on_commit=False)
+                session = self._sess_factory()
+                yield session
+                await session.commit()
+
+    @actxmgr
     async def begin_readonly_session(
         self,
         bind: SAConnection | None = None,
+        *,
         deferrable: bool = False,
+        isolation_level: str | None = None,  # override only when existing conn is not given
     ) -> AsyncIterator[SASession]:
         @actxmgr
         async def _begin_session(connection: SAConnection) -> AsyncIterator[SASession]:
@@ -193,12 +251,33 @@ class ExtendedAsyncSAEngine(SAEngine):
                 yield session
 
         if bind is None:
-            async with self.connect() as _conn:
-                async with _begin_session(_conn) as sess:
+            async with self.connect() as _bind:
+                if isolation_level is not None:
+                    _bind = await _bind.execution_options(
+                        isolation_level=isolation_level,
+                    )
+                async with _begin_session(_bind) as sess:
                     yield sess
         else:
             async with _begin_session(bind) as sess:
                 yield sess
+
+    @actxmgr
+    async def begin_readonly_session_read_committed(self) -> AsyncIterator[SASession]:
+        """
+        Begin a read-only session with READ COMMITTED isolation level.
+        """
+        async with self.connect() as conn:
+            # Set isolation level to READ COMMITTED and readonly mode
+            conn_with_isolation = await conn.execution_options(
+                isolation_level="READ COMMITTED",
+                postgresql_readonly=True,
+            )
+            async with conn_with_isolation.begin():
+                # Configure session factory with the connection
+                self._readonly_sess_factory.configure(bind=conn_with_isolation)
+                session = self._readonly_sess_factory()
+                yield session
 
     @actxmgr
     async def advisory_lock(self, lock_id: LockID) -> AsyncIterator[None]:
@@ -221,8 +300,8 @@ class ExtendedAsyncSAEngine(SAEngine):
             except sa.exc.DBAPIError as e:
                 if getattr(e.orig, "pgcode", None) == "55P03":  # lock not available error
                     # This may happen upon shutdown after some time.
-                    raise asyncio.CancelledError()
-                raise
+                    raise asyncio.CancelledError() from e
+                raise e
             except asyncio.CancelledError:
                 raise
             finally:
@@ -254,7 +333,7 @@ async def execute_with_txn_retry(
 # Setting "type ignore" here becuase Mypy deduces all fields and attributes in `sqlalchemy` module to `Any` type
 # including `SASession` and `SAConnection`.
 @overload
-async def execute_with_txn_retry(  # type: ignore[misc]
+async def execute_with_txn_retry(
     txn_func: Callable[Concatenate[SAConnection, P], Awaitable[TQueryResult]],
     begin_trx: Callable[..., AbstractAsyncCtxMgr[SAConnection]],
     connection: SAConnection,
@@ -280,7 +359,7 @@ async def execute_with_txn_retry(
     Reference: https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html
     """
 
-    result: TQueryResult | Sentinel = Sentinel.token
+    result: TQueryResult | Sentinel = Sentinel.TOKEN
     max_attempts = 10
     try:
         async for attempt in AsyncRetrying(
@@ -291,24 +370,25 @@ async def execute_with_txn_retry(
             with attempt:
                 try:
                     async with begin_trx(bind=connection) as session_or_conn:
-                        result = await txn_func(session_or_conn, *args, **kwargs)
+                        result = await txn_func(session_or_conn, *args, **kwargs)  # type: ignore[arg-type]
                 except DBAPIError as e:
                     if is_db_retry_error(e):
-                        raise TryAgain
+                        raise TryAgain from e
                     raise
-    except RetryError:
-        raise asyncio.TimeoutError(
+    except RetryError as e:
+        raise TimeoutError(
             f"DB serialization failed after {max_attempts} retry transactions"
-        )
-    assert result is not Sentinel.token
+        ) from e
+    if result is Sentinel.TOKEN:
+        raise DBOperationFailed("Transaction completed but no result was returned")
     return result
 
 
 def create_async_engine(
-    *args,
+    *args: Any,
     _txn_concurrency_threshold: int = 0,
     _lock_conn_timeout: int = 0,
-    **kwargs,
+    **kwargs: Any,
 ) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
     sync_engine = _create_engine(*args, **kwargs)
@@ -321,84 +401,74 @@ def create_async_engine(
 
 @actxmgr
 async def connect_database(
-    local_config: LocalConfig | Mapping[str, Any],
+    db_config: DatabaseConfig,
     isolation_level: str = "SERIALIZABLE",
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     from .base import pgsql_connect_opts
 
-    username = local_config["db"]["user"]
-    password = local_config["db"]["password"]
-    address = local_config["db"]["addr"]
-    dbname = local_config["db"]["name"]
-    url = f"postgresql+asyncpg://{urlquote(username)}:{urlquote(password)}@{address}/{urlquote(dbname)}"
+    db_url = (
+        URL(f"postgresql+asyncpg://{db_config.addr.host}/{db_config.name}")
+        .with_port(db_config.addr.port)
+        .with_user(db_config.user)
+    )
+    if db_config.password is not None:
+        db_url = db_url.with_password(db_config.password)
 
-    version_check_db = create_async_engine(url)
+    version_check_db = create_async_engine(str(db_url))
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
         version_str = result.scalar()
+        if version_str is None:
+            raise DatabaseError("Failed to retrieve PostgreSQL server version")
         major, minor, *_ = map(int, version_str.partition(" ")[0].split("."))
         if (major, minor) < (11, 0):
             pgsql_connect_opts["server_settings"].pop("jit")
     await version_check_db.dispose()
 
     db = create_async_engine(
-        url,
+        str(db_url),
         connect_args=pgsql_connect_opts,
-        pool_size=local_config["db"]["pool-size"],
-        pool_recycle=local_config["db"]["pool-recycle"],
-        pool_pre_ping=local_config["db"]["pool-pre-ping"],
-        max_overflow=local_config["db"]["max-overflow"],
+        pool_size=db_config.pool_size,
+        pool_recycle=db_config.pool_recycle,
+        pool_pre_ping=db_config.pool_pre_ping,
+        max_overflow=db_config.max_overflow,
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
         isolation_level=isolation_level,
         future=True,
         _txn_concurrency_threshold=max(
-            int(local_config["db"]["pool-size"] + max(0, local_config["db"]["max-overflow"]) * 0.5),
+            int(db_config.pool_size + max(0, db_config.max_overflow) * 0.5),
             2,
         ),
-        _lock_conn_timeout=local_config["db"]["lock-conn-timeout"],
+        _lock_conn_timeout=int(db_config.lock_conn_timeout),
     )
     yield db
     await db.dispose()
 
 
 @actxmgr
-async def reenter_txn(
-    pool: ExtendedAsyncSAEngine,
-    conn: SAConnection,
-    execution_opts: Mapping[str, Any] | None = None,
-) -> AsyncIterator[SAConnection]:
-    if conn is None:
-        async with pool.connect() as conn:
-            if execution_opts:
-                await conn.execution_options(**execution_opts)
-            async with conn.begin():
-                yield conn
-    else:
-        async with conn.begin_nested():
-            yield conn
-
-
-@actxmgr
 async def reenter_txn_session(
     pool: ExtendedAsyncSAEngine,
-    sess: SASession,
+    sess: SASession | None,
     read_only: bool = False,
-) -> AsyncIterator[SAConnection]:
+) -> AsyncIterator[SASession]:
     if sess is None:
         if read_only:
-            async with pool.begin_readonly_session() as sess:
-                yield sess
+            async with pool.begin_readonly_session() as new_sess:
+                yield new_sess
         else:
-            async with pool.begin_session() as sess:
-                yield sess
+            async with pool.begin_session() as new_sess:
+                yield new_sess
     else:
         async with sess.begin_nested():
             yield sess
 
 
-async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) -> TQueryResult:
+# TODO: How to apply the missing execute_with_retry logic?
+async def execute_with_retry[TQueryResult](
+    txn_func: Callable[[], Awaitable[TQueryResult]],
+) -> TQueryResult:
     max_attempts = 20
-    result: TQueryResult | Sentinel = Sentinel.token
+    result: TQueryResult | Sentinel = Sentinel.TOKEN
     try:
         async for attempt in AsyncRetrying(
             wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
@@ -410,11 +480,12 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
                     result = await txn_func()
                 except DBAPIError as e:
                     if is_db_retry_error(e):
-                        raise TryAgain
+                        raise TryAgain from e
                     raise
-    except RetryError:
-        raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
-    assert result is not Sentinel.token
+    except RetryError as e:
+        raise RuntimeError(f"DB serialization failed after {max_attempts} retries") from e
+    if result is Sentinel.TOKEN:
+        raise DBOperationFailed("Transaction completed but no result was returned")
     return result
 
 
@@ -429,20 +500,21 @@ async def retry_txn(max_attempts: int = 20) -> AsyncIterator[AttemptManager]:
             # when yielded because stack frames are switched, we should pass AttemptManager to
             # provide a shared exception handling mechanism like the original execute_with_retry().
             yield attempt
-            assert attempt.retry_state.outcome is not None
+            if attempt.retry_state.outcome is None:
+                raise DBOperationFailed("Retry attempt completed but no outcome was recorded")
             exc = attempt.retry_state.outcome.exception()
             if isinstance(exc, DBAPIError) and not is_db_retry_error(exc):
                 raise exc
-    except RetryError:
-        raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
+    except RetryError as e:
+        raise RuntimeError(f"DB serialization failed after {max_attempts} retries") from e
 
 
-JSONCoalesceExpr: TypeAlias = sa.sql.elements.BinaryExpression
+type JSONCoalesceExpr = sa.sql.elements.ColumnElement[Any]
 
 
 def sql_json_merge(
-    col,
-    key: Tuple[str, ...],
+    col: sa.sql.elements.ColumnElement[Any] | sa.orm.attributes.InstrumentedAttribute[Any],
+    key: tuple[str, ...],
     obj: Mapping[str, Any],
     *,
     _depth: int = 0,
@@ -454,7 +526,7 @@ def sql_json_merge(
 
     Note that the existing value must be also an object, not a primitive value.
     """
-    expr = sa.func.coalesce(
+    return sa.func.coalesce(
         col if _depth == 0 else col[key[:_depth]],
         sa.text("'{}'::jsonb"),
     ).concat(
@@ -463,24 +535,23 @@ def sql_json_merge(
                 key[_depth],
                 (
                     sa.func.coalesce(col[key], sa.text("'{}'::jsonb")).concat(
-                        sa.func.cast(obj, psql.JSONB)
+                        sa.func.cast(sa.literal(obj, type_=psql.JSONB), psql.JSONB)
                     )
                     if _depth == len(key) - 1
                     else sql_json_merge(col, key, obj=obj, _depth=_depth + 1)
                 ),
             )
             if key
-            else sa.func.cast(obj, psql.JSONB)
+            else sa.func.cast(sa.literal(obj, type_=psql.JSONB), psql.JSONB)
         ),
     )
-    return expr
 
 
 def sql_json_increment(
-    col,
-    key: Tuple[str, ...],
+    col: sa.sql.elements.ColumnElement[Any] | sa.orm.attributes.InstrumentedAttribute[Any],
+    key: tuple[str, ...],
     *,
-    parent_updates: Optional[Mapping[str, Any]] = None,
+    parent_updates: Mapping[str, Any] | None = None,
     _depth: int = 0,
 ) -> JSONCoalesceExpr:
     """
@@ -491,7 +562,7 @@ def sql_json_increment(
 
     Note that the existing value of the parent key must be also an object, not a primitive value.
     """
-    expr = sa.func.coalesce(
+    expr: JSONCoalesceExpr = sa.func.coalesce(
         col if _depth == 0 else col[key[:_depth]],
         sa.text("'{}'::jsonb"),
     ).concat(
@@ -505,11 +576,11 @@ def sql_json_increment(
         ),
     )
     if _depth == len(key) - 1 and parent_updates is not None:
-        expr = expr.concat(sa.func.cast(parent_updates, psql.JSONB))
+        expr = expr.concat(sa.func.cast(sa.literal(parent_updates, type_=psql.JSONB), psql.JSONB))
     return expr
 
 
-def _populate_column(column: sa.Column):
+def _populate_column(column: sa.Column[Any]) -> sa.Column[Any]:
     column_attrs = dict(column.__dict__)
     name = column_attrs.pop("name")
     return sa.Column(name, column.type, **{k: column_attrs[k] for k in column_constraints})
@@ -529,12 +600,16 @@ def regenerate_table(table: sa.Table, new_metadata: sa.MetaData) -> sa.Table:
     )
 
 
-def agg_to_str(column: sa.Column) -> sa.sql.functions.Function:
+def agg_to_str(
+    column: sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute[Any],
+) -> sa.sql.functions.Function[Any]:
     # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.aggregate_order_by
     return sa.func.string_agg(column, psql.aggregate_order_by(sa.literal_column("','"), column))
 
 
-def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
+def agg_to_array(
+    column: sa.Column[Any] | sa.orm.attributes.InstrumentedAttribute[Any],
+) -> sa.sql.functions.Function[Any]:
     return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
 
 
@@ -542,10 +617,8 @@ def is_db_retry_error(e: Exception) -> bool:
     return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
 
 
-async def vacuum_db(
-    local_config: LocalConfig | Mapping[str, Any], vacuum_full: bool = False
-) -> None:
-    async with connect_database(local_config, isolation_level="AUTOCOMMIT") as db:
+async def vacuum_db(bootstrap_config: BootstrapConfig, vacuum_full: bool = False) -> None:
+    async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
         async with db.begin() as conn:
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
             log.info(f"Perfoming {vacuum_sql} operation...")

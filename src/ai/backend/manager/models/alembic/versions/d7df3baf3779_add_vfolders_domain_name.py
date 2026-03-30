@@ -16,18 +16,21 @@ down_revision = "5d92c9cc930c"
 branch_labels = None
 depends_on = None
 
+DEFAULT_DOMAIN_NAME = "default"
 
-def upgrade():
+
+def upgrade() -> None:
     conn = op.get_bind()
     op.add_column("vfolders", sa.Column("domain_name", sa.String(length=64), nullable=True))
 
     conn.execute(
         text(
-            """\
+            f"""\
         UPDATE vfolders
         SET domain_name = COALESCE(
             (SELECT domain_name FROM users WHERE vfolders.user = users.uuid),
-            (SELECT domain_name FROM groups WHERE vfolders.group = groups.id)
+            (SELECT domain_name FROM groups WHERE vfolders.group = groups.id),
+            '{DEFAULT_DOMAIN_NAME}'
         )
         WHERE domain_name IS NULL;
     """
@@ -38,6 +41,6 @@ def upgrade():
     op.create_index(op.f("ix_vfolders_domain_name"), "vfolders", ["domain_name"], unique=False)
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_index(op.f("ix_vfolders_domain_name"), table_name="vfolders")
     op.drop_column("vfolders", "domain_name")

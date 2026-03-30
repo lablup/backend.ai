@@ -1,58 +1,43 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import Mapping
 from datetime import datetime
+from typing import Any, cast
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload
 
-from ai.backend.common import redis_helper
-from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionResult, SessionTypes
 from ai.backend.logging import BraceStyleAdapter
-
-from ..models import (
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
-    DomainRow,
-    GroupRow,
     KeyPairResourcePolicyRow,
-    KeyPairRow,
-    SessionDependencyRow,
-    SessionRow,
-    UserRow,
 )
-from ..models.session import SessionStatus
-from ..models.utils import execute_with_retry
+from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.utils import execute_with_retry
+
 from .types import PredicateResult, SchedulingContext
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
-_check_keypair_concurrency_script = """
-local key = KEYS[1]
-local limit = tonumber(ARGV[1])
-local result = {}
-redis.call('SETNX', key, 0)
-local count = tonumber(redis.call('GET', key))
-if limit > 0 and count >= limit then
-    result[1] = 0
-    result[2] = count
-    return result
-end
-redis.call('INCR', key)
-result[1] = 1
-result[2] = count + 1
-return result
-"""
-
 
 async def check_reserved_batch_session(
     db_sess: SASession,
-    sched_ctx: SchedulingContext,
+    _sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     """
     Check if a batch-type session should not be started for a certain amount of time.
     """
-    if sess_ctx.session_type == SessionTypes.BATCH:
+    if SessionTypes(sess_ctx.session_type) == SessionTypes.BATCH:
         query = sa.select(SessionRow.starts_at).where(SessionRow.id == sess_ctx.id)
         starts_at = await db_sess.scalar(query)
         if starts_at is not None and datetime.now(tzutc()) < starts_at:
@@ -80,19 +65,16 @@ async def check_concurrency(
             KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
         )
         result = await db_sess.execute(select_query)
-        return result.scalar()
+        return result.scalar() or 0
 
-    max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions)
+    max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions) or 0
     if sess_ctx.is_private:
         redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
     else:
         redis_key = f"keypair.concurrency_used.{sess_ctx.access_key}"
-    ok, concurrency_used = await redis_helper.execute_script(
-        sched_ctx.registry.redis_stat,
-        "check_keypair_concurrency_used",
-        _check_keypair_concurrency_script,
-        [redis_key],
-        [max_concurrent_sessions],
+    ok, concurrency_used = await sched_ctx.registry.valkey_stat.check_keypair_concurrency(
+        redis_key,
+        max_concurrent_sessions,
     )
     if ok == 0:
         return PredicateResult(
@@ -110,7 +92,7 @@ async def check_concurrency(
 
 async def check_dependencies(
     db_sess: SASession,
-    sched_ctx: SchedulingContext,
+    _sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     j = sa.join(
@@ -132,7 +114,10 @@ async def check_dependencies(
     rows = result.fetchall()
     pending_dependencies = []
     for row in rows:
-        if row.result != SessionResult.SUCCESS or row.status != SessionStatus.TERMINATED:
+        if (
+            SessionResult(row.result) != SessionResult.SUCCESS
+            or SessionStatus(row.status) != SessionStatus.TERMINATED
+        ):
             pending_dependencies.append(row)
     all_success = not pending_dependencies
     if all_success:
@@ -158,15 +143,23 @@ async def check_keypair_resource_limit(
     )
     result = await db_sess.execute(select_query)
     resource_policy = result.scalars().first()
+    if resource_policy is None:
+        return PredicateResult(
+            False,
+            f"Resource policy not found for keypair (ak: {sess_ctx.access_key})",
+        )
     resource_policy_map = {
         "total_resource_slots": resource_policy.total_resource_slots,
         "default_for_unspecified": resource_policy.default_for_unspecified,
     }
     total_keypair_allowed = ResourceSlot.from_policy(
-        resource_policy_map, sched_ctx.known_slot_types
+        resource_policy_map, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
+
+    if sess_ctx.access_key is None:
+        return PredicateResult(False, "Session has no access key")
     key_occupied = await sched_ctx.registry.get_keypair_occupancy(
-        sess_ctx.access_key, db_sess=db_sess
+        AccessKey(sess_ctx.access_key), db_sess=db_sess
     )
     log.debug("keypair:{} current-occupancy: {}", sess_ctx.access_key, key_occupied)
     log.debug("keypair:{} total-allowed: {}", sess_ctx.access_key, total_keypair_allowed)
@@ -177,7 +170,7 @@ async def check_keypair_resource_limit(
                 " ".join(
                     f"{k}={v}"
                     for k, v in total_keypair_allowed.to_humanized(
-                        sched_ctx.known_slot_types
+                        cast(Mapping[str, Any], sched_ctx.known_slot_types)
                     ).items()
                 )
             ),
@@ -211,7 +204,7 @@ async def check_user_resource_limit(
         "default_for_unspecified": resource_policy.default_for_unspecified,
     }
     total_main_keypair_allowed = ResourceSlot.from_policy(
-        resource_policy_map, sched_ctx.known_slot_types
+        resource_policy_map, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
     user_occupied = await sched_ctx.registry.get_user_occupancy(sess_ctx.user_uuid, db_sess=db_sess)
     log.debug("user:{} current-occupancy: {}", sess_ctx.user_uuid, user_occupied)
@@ -223,7 +216,7 @@ async def check_user_resource_limit(
                 " ".join(
                     f"{k}={v}"
                     for k, v in total_main_keypair_allowed.to_humanized(
-                        sched_ctx.known_slot_types
+                        cast(Mapping[str, Any], sched_ctx.known_slot_types)
                     ).items()
                 )
             ),
@@ -243,7 +236,7 @@ async def check_group_resource_limit(
         "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
     }
     total_group_allowed = ResourceSlot.from_policy(
-        group_resource_policy, sched_ctx.known_slot_types
+        group_resource_policy, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
     group_occupied = await sched_ctx.registry.get_group_occupancy(
         sess_ctx.group_id, db_sess=db_sess
@@ -256,7 +249,9 @@ async def check_group_resource_limit(
             "Your group resource quota is exceeded. ({})".format(
                 " ".join(
                     f"{k}={v}"
-                    for k, v in total_group_allowed.to_humanized(sched_ctx.known_slot_types).items()
+                    for k, v in total_group_allowed.to_humanized(
+                        cast(Mapping[str, Any], sched_ctx.known_slot_types)
+                    ).items()
                 )
             ),
         )
@@ -275,7 +270,7 @@ async def check_domain_resource_limit(
         "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
     }
     total_domain_allowed = ResourceSlot.from_policy(
-        domain_resource_policy, sched_ctx.known_slot_types
+        domain_resource_policy, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
     domain_occupied = await sched_ctx.registry.get_domain_occupancy(
         sess_ctx.domain_name, db_sess=db_sess
@@ -289,7 +284,7 @@ async def check_domain_resource_limit(
                 " ".join(
                     f"{k}={v}"
                     for k, v in total_domain_allowed.to_humanized(
-                        sched_ctx.known_slot_types
+                        cast(Mapping[str, Any], sched_ctx.known_slot_types)
                     ).items()
                 )
             ),
@@ -299,7 +294,7 @@ async def check_domain_resource_limit(
 
 async def check_pending_session_count_limit(
     db_sess: SASession,
-    sched_ctx: SchedulingContext,
+    _sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     result = True
@@ -313,7 +308,7 @@ async def check_pending_session_count_limit(
         )
         .options(noload("*"), load_only(SessionRow.requested_slots))
     )
-    pending_sessions: list[SessionRow] = (await db_sess.scalars(query)).all()
+    pending_sessions = list((await db_sess.scalars(query)).all())
 
     # TODO: replace keypair resource policies with user resource policies
     j = sa.join(
@@ -332,7 +327,12 @@ async def check_pending_session_count_limit(
             ),
         )
     )
-    policy: KeyPairResourcePolicyRow = (await db_sess.scalars(policy_stmt)).first()
+    policy = (await db_sess.scalars(policy_stmt)).first()
+    if policy is None:
+        return PredicateResult(
+            False,
+            f"Resource policy not found for keypair (ak: {sess_ctx.access_key})",
+        )
 
     pending_count_limit: int | None = policy.max_pending_session_count
     if pending_count_limit is not None:
@@ -369,7 +369,7 @@ async def check_pending_session_resource_limit(
         )
         .options(noload("*"), load_only(SessionRow.requested_slots))
     )
-    pending_sessions: list[SessionRow] = (await db_sess.scalars(query)).all()
+    pending_sessions = list((await db_sess.scalars(query)).all())
 
     # TODO: replace keypair resource policies with user resource policies
     j = sa.join(
@@ -388,7 +388,12 @@ async def check_pending_session_resource_limit(
             ),
         )
     )
-    policy: KeyPairResourcePolicyRow = (await db_sess.scalars(policy_stmt)).first()
+    policy = (await db_sess.scalars(policy_stmt)).first()
+    if policy is None:
+        return PredicateResult(
+            False,
+            f"Resource policy not found for keypair (ak: {sess_ctx.access_key})",
+        )
 
     pending_resource_limit: ResourceSlot | None = policy.max_pending_session_resource_slots
     if pending_resource_limit is not None and pending_resource_limit:
@@ -401,7 +406,7 @@ async def check_pending_session_resource_limit(
                 " ".join(
                     f"{k}={v}"
                     for k, v in current_pending_session_slots.to_humanized(
-                        sched_ctx.known_slot_types
+                        cast(Mapping[str, Any], sched_ctx.known_slot_types)
                     ).items()
                 )
             )

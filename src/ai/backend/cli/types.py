@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from typing import Dict
+from typing import Any
 
 import attr
 
@@ -13,7 +13,7 @@ __all__ = (
 
 @attr.define(slots=True)
 class CliContextInfo:
-    info: Dict = attr.field()
+    info: dict[str, Any] = attr.field()
 
 
 class ExitCode(enum.IntEnum):

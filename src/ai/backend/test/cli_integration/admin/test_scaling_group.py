@@ -1,12 +1,12 @@
 import json
 from contextlib import closing
+from typing import Any
 
 from ai.backend.common.types import AgentSelectionStrategy
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
-from ...utils.cli import EOF, ClientRunnerFunc
 
-
-def test_add_scaling_group(run_admin: ClientRunnerFunc):
+def test_add_scaling_group(run_admin: ClientRunnerFunc) -> None:
     # Create scaling group
     with closing(
         run_admin([
@@ -27,13 +27,13 @@ def test_add_scaling_group(run_admin: ClientRunnerFunc):
         ])
     ) as p:
         p.expect(EOF)
-        response = json.loads(p.before.decode())
+        response = json.loads(decode(p.before))
         assert response.get("ok") is True, "Test scaling group not created successfully"
 
     # Check if scaling group is created
     with closing(run_admin(["--output=json", "admin", "scaling-group", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         scaling_group_list = loaded.get("items")
         assert isinstance(scaling_group_list, list), "Scaling group list not printed properly"
@@ -46,7 +46,7 @@ def test_add_scaling_group(run_admin: ClientRunnerFunc):
         run_admin(["--output=json", "admin", "scaling-group", "info", "test_group1"])
     ) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         scaling_group_list = loaded.get("items")
         assert isinstance(scaling_group_list, list), "Scaling group info not printed properly"
@@ -68,7 +68,7 @@ def test_add_scaling_group(run_admin: ClientRunnerFunc):
     }, "Scaling group scheduler options mismatch"
 
 
-def test_update_scaling_group(run_admin: ClientRunnerFunc):
+def test_update_scaling_group(run_admin: ClientRunnerFunc) -> None:
     # Update scaling group
     with closing(
         run_admin([
@@ -88,7 +88,7 @@ def test_update_scaling_group(run_admin: ClientRunnerFunc):
         ])
     ) as p:
         p.expect(EOF)
-        response = json.loads(p.before.decode())
+        response = json.loads(decode(p.before))
         assert response.get("ok") is True, "Test scaling group not updated successfully"
 
     # Check if scaling group is updated
@@ -96,7 +96,7 @@ def test_update_scaling_group(run_admin: ClientRunnerFunc):
         run_admin(["--output=json", "admin", "scaling-group", "info", "test_group1"])
     ) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         scaling_group_list = loaded.get("items")
         assert isinstance(scaling_group_list, list), "Scaling group list not printed properly"
@@ -120,25 +120,27 @@ def test_update_scaling_group(run_admin: ClientRunnerFunc):
     }, "Scaling group scheduler options mismatch"
 
 
-def test_delete_scaling_group(run_admin: ClientRunnerFunc):
+def test_delete_scaling_group(run_admin: ClientRunnerFunc) -> None:
     with closing(
         run_admin(["--output=json", "admin", "scaling-group", "delete", "test_group1"])
     ) as p:
         p.expect(EOF)
-        response = json.loads(p.before.decode())
+        response = json.loads(decode(p.before))
         assert response.get("ok") is True, "Test scaling group deletion unsuccessful"
 
 
-def test_list_scaling_group(run_admin: ClientRunnerFunc):
+def test_list_scaling_group(run_admin: ClientRunnerFunc) -> None:
     with closing(run_admin(["--output=json", "admin", "scaling-group", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         scaling_group_list = loaded.get("items")
         assert isinstance(scaling_group_list, list), "Scaling group list not printed properly"
 
 
-def get_scaling_group_from_list(scaling_groups: list, groupname: str) -> dict:
+def get_scaling_group_from_list(
+    scaling_groups: list[dict[str, Any]], groupname: str
+) -> dict[str, Any]:
     for sg in scaling_groups:
         if sg.get("name") == groupname:
             return sg

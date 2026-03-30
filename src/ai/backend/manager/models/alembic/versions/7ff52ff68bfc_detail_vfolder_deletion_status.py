@@ -18,6 +18,8 @@ down_revision = "a5319bfc7d7c"
 branch_labels = None
 depends_on = None
 
+enum_name = "vfolderstatus"
+
 
 class OldVFolderOperationStatus(enum.StrEnum):
     READY = "ready"
@@ -64,7 +66,7 @@ def upgrade() -> None:
     """
         )
     )
-    conn.execute(text("DROP TYPE vfolderoperationstatus;"))
+    conn.execute(text(f"DROP TYPE {enum_name};"))
     op.add_column(
         "vfolders",
         sa.Column(
@@ -114,15 +116,14 @@ def downgrade() -> None:
     )
     conn.execute(
         text(
-            "CREATE TYPE vfolderoperationstatus AS ENUM (%s)"
+            f"CREATE TYPE {enum_name} AS ENUM (%s)"
             % (",".join(f"'{choice.value}'" for choice in OldVFolderOperationStatus))
         )
     )
     conn.execute(text("ALTER TABLE vfolders ALTER COLUMN status DROP DEFAULT;"))
     conn.execute(
         text(
-            "ALTER TABLE vfolders ALTER COLUMN status TYPE vfolderoperationstatus "
-            "USING status::vfolderoperationstatus;"
+            f"ALTER TABLE vfolders ALTER COLUMN status TYPE {enum_name} USING status::{enum_name};"
         )
     )
     conn.execute(text("ALTER TABLE vfolders ALTER COLUMN status SET DEFAULT 'ready';"))

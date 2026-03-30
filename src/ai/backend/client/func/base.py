@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import functools
 import inspect
-from typing import Iterable
+from collections.abc import Callable, Iterable
+from typing import Any
 
-from ..output.types import FieldSet, FieldSpec
-from ..session import AsyncSession, api_session
+from ai.backend.client.output.types import FieldSet, FieldSpec
+from ai.backend.client.session import AsyncSession, Session, api_session
 
 __all__ = (
     "APIFunctionMeta",
@@ -13,9 +16,9 @@ __all__ = (
 )
 
 
-def _wrap_method(cls, orig_name, meth):
+def _wrap_method(cls: type, orig_name: str, meth: Callable[..., Any]) -> Callable[..., Any]:
     @functools.wraps(meth)
-    def _method(*args, **kwargs):
+    def _method(*args: Any, **kwargs: Any) -> Any:
         # We need to keep the original attributes so that they could be correctly
         # bound to the class/instance at runtime.
         func = getattr(cls, orig_name)
@@ -27,20 +30,21 @@ def _wrap_method(cls, orig_name, meth):
             )
         if isinstance(_api_session, AsyncSession):
             return coro
-        else:
-            if inspect.isasyncgen(coro):
-                return _api_session.worker_thread.execute_generator(coro)
-            else:
-                return _api_session.worker_thread.execute(coro)
+        # At this point, _api_session must be a Session (the sync version)
+        if not isinstance(_api_session, Session):
+            raise RuntimeError("API session must be either AsyncSession or Session")
+        if inspect.isasyncgen(coro):
+            return _api_session.worker_thread.execute_generator(coro)
+        return _api_session.worker_thread.execute(coro)
 
     return _method
 
 
-def api_function(meth):
+def api_function[T: Callable[..., Any]](meth: T) -> T:
     """
     Mark the wrapped method as the API function method.
     """
-    setattr(meth, "_backend_api", True)
+    meth._backend_api = True  # type: ignore[attr-defined]
     return meth
 
 
@@ -59,17 +63,16 @@ def resolve_fields(
 def field_resolver(
     base_field_set: FieldSet,
     default_fields: Iterable[FieldSpec],
-):
-    def decorator(meth):
-        def wrapper(*args, **kwargs):
+) -> Callable[..., Any]:
+    def decorator(meth: Callable[..., Any]) -> Callable[..., Any]:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             if fields := kwargs.get("fields", default_fields):
                 resolved_fields = tuple(
                     f.field_ref if isinstance(f, FieldSpec) else base_field_set[f].field_ref
                     for f in fields
                 )
                 kwargs["fields"] = resolved_fields
-            result = meth(*args, **kwargs)
-            return result
+            return meth(*args, **kwargs)
 
         return wrapper
 
@@ -85,7 +88,9 @@ class APIFunctionMeta(type):
 
     _async = True
 
-    def __init__(cls, name, bases, attrs, **kwargs):
+    def __init__(
+        cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any], **kwargs: Any
+    ) -> None:
         super().__init__(name, bases, attrs)
         for attr_name, attr_value in attrs.items():
             if hasattr(attr_value, "_backend_api"):

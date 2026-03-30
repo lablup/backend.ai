@@ -1,0 +1,116 @@
+#!/bin/bash
+set -e
+
+echo "Running post-bootstrap user and database creation..."
+{%- if config.shared_preload_libraries and 'timescaledb' in config.shared_preload_libraries %}
+
+# Enable TimescaleDB extension on template1 so all new databases inherit it
+echo "Creating TimescaleDB extension on template1..."
+psql -U postgres -d template1 -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
+{%- endif %}
+
+{%- if is_controlpanel %}
+# ============================================
+# Control Panel dedicated PostgreSQL
+# Only creates managerhub database
+# ============================================
+
+# managerhub database for Control Panel
+if ! psql -U postgres -lqt | cut -d \| -f 1 | grep -qw managerhub; then
+  echo "Creating database: managerhub"
+  createdb -U postgres managerhub
+else
+  echo "Database managerhub already exists"
+fi
+
+echo "Post-bootstrap complete (Control Panel mode)"
+{%- else %}
+# ============================================
+# Core Backend.AI PostgreSQL
+# Creates backend, appproxy, fasttrack DBs
+# ============================================
+
+# Admin user (always created)
+if ! psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='admin'" | grep -q 1; then
+  echo "Creating user: admin"
+  psql -U postgres -d postgres -c "CREATE USER admin WITH PASSWORD 'admin' CREATEROLE CREATEDB;"
+else
+  echo "User admin already exists"
+fi
+
+# Backend database (always created)
+if ! psql -U postgres -lqt | cut -d \| -f 1 | grep -qw backend; then
+  echo "Creating database: backend"
+  createdb -U postgres backend
+else
+  echo "Database backend already exists"
+fi
+
+{%- if appproxy_config %}
+# AppProxy user and database
+if ! psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ appproxy_config.db_user }}'" | grep -q 1; then
+  echo "Creating user: {{ appproxy_config.db_user }}"
+  psql -U postgres -d postgres -c "CREATE USER {{ appproxy_config.db_user }} WITH PASSWORD '{{ appproxy_config.db_password }}' CREATEDB;"
+else
+  echo "User {{ appproxy_config.db_user }} already exists"
+fi
+
+if ! psql -U postgres -lqt | cut -d \| -f 1 | grep -qw {{ appproxy_config.db_name }}; then
+  echo "Creating database: {{ appproxy_config.db_name }}"
+  createdb -U postgres -O {{ appproxy_config.db_user }} {{ appproxy_config.db_name }}
+  psql -U postgres -d {{ appproxy_config.db_name }} -c "GRANT ALL ON SCHEMA public TO {{ appproxy_config.db_user }};"
+
+  # Grant read-only access to monitoring user if it exists
+  if psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ postgres_readonly_user }}'" | grep -q 1; then
+    echo "Granting read-only access to {{ postgres_readonly_user }} on {{ appproxy_config.db_name }}"
+    psql -U postgres -d {{ appproxy_config.db_name }} -c "GRANT CONNECT ON DATABASE {{ appproxy_config.db_name }} TO {{ postgres_readonly_user }};"
+    psql -U postgres -d {{ appproxy_config.db_name }} -c "GRANT USAGE ON SCHEMA public TO {{ postgres_readonly_user }};"
+    psql -U postgres -d {{ appproxy_config.db_name }} -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ postgres_readonly_user }};"
+    psql -U postgres -d {{ appproxy_config.db_name }} -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ postgres_readonly_user }};"
+  fi
+else
+  echo "Database {{ appproxy_config.db_name }} already exists"
+fi
+{%- endif %}
+
+{%- if fasttrack_config %}
+# FastTrack user and database
+if ! psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ fasttrack_config.postgres_user }}'" | grep -q 1; then
+  echo "Creating user: {{ fasttrack_config.postgres_user }}"
+  psql -U postgres -d postgres -c "CREATE USER {{ fasttrack_config.postgres_user }} WITH PASSWORD '{{ fasttrack_config.postgres_password }}' CREATEDB;"
+else
+  echo "User {{ fasttrack_config.postgres_user }} already exists"
+fi
+
+if ! psql -U postgres -lqt | cut -d \| -f 1 | grep -qw {{ fasttrack_config.postgres_db }}; then
+  echo "Creating database: {{ fasttrack_config.postgres_db }}"
+  createdb -U postgres -O {{ fasttrack_config.postgres_user }} {{ fasttrack_config.postgres_db }}
+  psql -U postgres -d {{ fasttrack_config.postgres_db }} -c "GRANT ALL ON SCHEMA public TO {{ fasttrack_config.postgres_user }};"
+
+  # Grant read-only access to monitoring user if it exists
+  if psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ postgres_readonly_user }}'" | grep -q 1; then
+    echo "Granting read-only access to {{ postgres_readonly_user }} on {{ fasttrack_config.postgres_db }}"
+    psql -U postgres -d {{ fasttrack_config.postgres_db }} -c "GRANT CONNECT ON DATABASE {{ fasttrack_config.postgres_db }} TO {{ postgres_readonly_user }};"
+    psql -U postgres -d {{ fasttrack_config.postgres_db }} -c "GRANT USAGE ON SCHEMA public TO {{ postgres_readonly_user }};"
+    psql -U postgres -d {{ fasttrack_config.postgres_db }} -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ postgres_readonly_user }};"
+    psql -U postgres -d {{ fasttrack_config.postgres_db }} -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ postgres_readonly_user }};"
+  fi
+else
+  echo "Database {{ fasttrack_config.postgres_db }} already exists"
+fi
+{%- endif %}
+
+# Read-only user for monitoring/analytics tools (always created)
+if ! psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ postgres_readonly_user }}'" | grep -q 1; then
+  echo "Creating user: {{ postgres_readonly_user }}"
+  psql -U postgres -d postgres -c "CREATE USER {{ postgres_readonly_user }} WITH PASSWORD '{{ postgres_readonly_password }}';"
+  psql -U postgres -d backend -c "GRANT CONNECT ON DATABASE backend TO {{ postgres_readonly_user }};"
+  psql -U postgres -d backend -c "GRANT USAGE ON SCHEMA public TO {{ postgres_readonly_user }};"
+  psql -U postgres -d backend -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ postgres_readonly_user }};"
+  psql -U postgres -d backend -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ postgres_readonly_user }};"
+else
+  echo "User {{ postgres_readonly_user }} already exists"
+fi
+
+echo "Post-bootstrap complete"
+{%- endif %}

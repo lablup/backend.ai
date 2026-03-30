@@ -4,17 +4,20 @@ import os
 import re
 import secrets
 from collections import namedtuple
+from collections.abc import Callable, Generator, Iterator, Sequence
 from contextlib import closing
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Callable, Generator, Iterator, Sequence, Tuple
+from typing import TYPE_CHECKING, Any
 
-import pexpect
 import pytest
 from faker import Faker
 
 from ai.backend.plugin.entrypoint import find_build_root
 from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, run
+
+if TYPE_CHECKING:
+    from pexpect import spawn
 
 _rx_env_export = re.compile(r"^(export )?(?P<key>\w+)=(?P<val>.*)$")
 
@@ -48,7 +51,7 @@ def make_run_fixture(profile_env: str) -> Callable[[Path], Iterator[ClientRunner
     ) -> Iterator[ClientRunnerFunc]:
         env_from_file = get_env_from_profile(profile_env)
 
-        def run_impl(cmdargs: Sequence[str | Path], *args, **kwargs) -> pexpect.spawn:
+        def run_impl(cmdargs: Sequence[str | Path], *args: Any, **kwargs: Any) -> spawn[str]:
             return run([client_bin, *cmdargs], *args, **kwargs, env={**os.environ, **env_from_file})
 
         yield run_impl
@@ -88,7 +91,7 @@ def temp_domain(domain_name: str, run: ClientRunnerFunc) -> Iterator[str]:
 
 
 @pytest.fixture(scope="module")
-def users(n: int = 3) -> Tuple[User, ...]:
+def users(_n: int = 3) -> tuple[User, ...]:
     fake = Faker()
     return tuple(
         User(
@@ -116,7 +119,7 @@ def gen_fullname() -> Callable[[], str]:
 
 
 @pytest.fixture(scope="module")
-def keypair_options() -> Tuple[KeypairOption, ...]:
+def keypair_options() -> tuple[KeypairOption, ...]:
     return (
         KeypairOption(is_active=False, is_admin=True, rate_limit=25000, resource_policy="default"),
         KeypairOption(is_active=True, is_admin=False, rate_limit=None, resource_policy="default"),
@@ -125,7 +128,7 @@ def keypair_options() -> Tuple[KeypairOption, ...]:
 
 
 @pytest.fixture(scope="module")
-def new_keypair_options() -> Tuple[KeypairOption, ...]:
+def new_keypair_options() -> tuple[KeypairOption, ...]:
     return (
         KeypairOption(is_active=True, is_admin=False, rate_limit=15000, resource_policy="default"),
         KeypairOption(is_active=False, is_admin=True, rate_limit=15000, resource_policy="default"),
@@ -138,17 +141,17 @@ def new_keypair_options() -> Tuple[KeypairOption, ...]:
 @pytest.fixture(scope="module")
 def keypair_resource_policy() -> str:
     fake = Faker()
-    return fake.unique.word()
+    return str(fake.unique.word())
 
 
 @pytest.fixture
 def txt_file() -> Generator[TextIOWrapper, None, None]:
-    filepath = "test.txt"
-    with open(filepath, "w") as f:
+    filepath = Path("test.txt")
+    with filepath.open("w") as f:
         f.write("This file is for testing.")
     yield f
 
-    os.remove(filepath)
+    filepath.unlink()
 
 
 run_user = make_run_fixture("user_file")

@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e
+
+# -- static python
+source {{ home_dir }}/{{ service_name }}/.venv/bin/activate
+
+# -- Ensure the previous processes terminated
+leftover_processes=$(ps aux | grep -v "grep" | grep "backend.ai: {{ service_name }}" | awk '{print $2}')
+if [[ ! -z "$leftover_processes" ]]; then
+  echo "Leftover processes exist. Killing them ..."
+  kill -9 $leftover_processes
+fi
+leftover_processes=$(ps aux | grep -v "grep" | grep "backend.ai: {{ service_name }}" | awk '{print $2}')
+if [[ ! -z "$leftover_processes" ]]; then
+  echo "Leftover processes exist. Cannot kill them. Exiting ..."
+  exit -1
+fi
+
+if [ "$#" -eq 0 ]; then
+  exec python -m ai.backend.web.server -f {{ home_dir }}/.config/backend.ai/{{ service_name }}.toml
+else
+  exec "$@"
+fi

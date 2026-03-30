@@ -1,0 +1,131 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import TYPE_CHECKING, Any
+
+import click
+
+from ai.backend.appproxy.coordinator.errors import MissingDatabaseURLError
+from ai.backend.logging import BraceStyleAdapter
+
+if TYPE_CHECKING:
+    from .context import CLIContext
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@click.group()
+def cli(args: Any) -> None:
+    pass
+
+
+@cli.command()
+@click.option(
+    "-f",
+    "--alembic-config",
+    default="alembic-appproxy.ini",
+    metavar="PATH",
+    help="The path to Alembic config file. [default: alembic-appproxy.ini]",
+)
+@click.pass_obj
+def show(_cli_ctx: CLIContext, alembic_config: str) -> None:
+    """Show the current schema information."""
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy.engine import Connection
+
+    from ai.backend.appproxy.coordinator.models.utils import create_async_engine
+
+    def _get_current_rev_sync(connection: Connection) -> str | None:
+        context = MigrationContext.configure(connection)
+        return context.get_current_revision()
+
+    async def _show(sa_url: str) -> None:
+        engine = create_async_engine(sa_url)
+        async with engine.begin() as connection:
+            current_rev = await connection.run_sync(_get_current_rev_sync)
+        script = ScriptDirectory.from_config(alembic_cfg)
+        heads = script.get_heads()
+        head_rev = heads[0] if len(heads) > 0 else None
+        print(f"Current database revision: {current_rev}")
+        print(f"The head revision of available migrations: {head_rev}")
+
+    alembic_cfg = Config(alembic_config)
+    sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
+    if sa_url is None:
+        raise MissingDatabaseURLError("Database URL is not configured in alembic config")
+    sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
+    asyncio.run(_show(sa_url))
+
+
+@cli.command()
+@click.option(
+    "-f",
+    "--alembic-config",
+    default="alembic-appproxy.ini",
+    type=click.Path(exists=True, dir_okay=False),
+    metavar="PATH",
+    help="The path to Alembic config file. [default: alembic-appproxy.ini]",
+)
+@click.pass_obj
+def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
+    """
+    Set up your database with one-shot schema migration instead of
+    iterating over multiple revisions if there is no existing database.
+    It uses alembic-appproxy.ini to configure database connection.
+
+    Reference: http://alembic.sqlalchemy.org/en/latest/cookbook.html
+               #building-an-up-to-date-database-from-scratch
+    """
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy.engine import Connection, Engine
+
+    from ai.backend.appproxy.coordinator.models.base import metadata_obj as metadata
+    from ai.backend.appproxy.coordinator.models.utils import create_async_engine
+
+    def _get_current_rev_sync(connection: Connection) -> str | None:
+        context = MigrationContext.configure(connection)
+        return context.get_current_revision()
+
+    def _create_all_sync(connection: Connection, engine: Engine) -> None:
+        alembic_cfg.attributes["connection"] = connection
+        metadata.create_all(engine, checkfirst=False)
+        log.info("Stamping alembic version to head...")
+        script = ScriptDirectory.from_config(alembic_cfg)
+        head_rev = script.get_heads()[0]
+        connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
+        connection.exec_driver_sql(f"INSERT INTO alembic_version VALUES('{head_rev}')")
+
+    async def _oneshot(sa_url: str) -> None:
+        engine = create_async_engine(sa_url)
+        async with engine.begin() as connection:
+            await connection.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
+            current_rev = await connection.run_sync(_get_current_rev_sync)
+        if current_rev is None:
+            # For a fresh clean database, create all from scratch.
+            # (it will raise error if tables already exist.)
+            log.info("Detected a fresh new database.")
+            log.info("Creating tables...")
+            async with engine.begin() as connection:
+                await connection.run_sync(_create_all_sync, engine=engine.sync_engine)
+            log.info(
+                "If you don't need old migrations, delete them and set "
+                '"down_revision" value in the earliest migration to "None".'
+            )
+        else:
+            log.info(
+                "Detected an existing database (current revision: {}).",
+                current_rev,
+            )
+            log.info("Use 'alembic upgrade head' to apply pending migrations.")
+
+    alembic_cfg = Config(alembic_config)
+    sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
+    if sa_url is None:
+        raise MissingDatabaseURLError("Database URL is not configured in alembic config")
+    sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
+    asyncio.run(_oneshot(sa_url))

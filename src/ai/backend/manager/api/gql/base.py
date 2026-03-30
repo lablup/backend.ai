@@ -1,0 +1,502 @@
+from __future__ import annotations
+
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import date, datetime
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
+
+import graphene
+import strawberry
+from graphql import StringValueNode
+from graphql.language.ast import ValueNode
+from graphql_relay.utils import base64, unbase64
+from strawberry.relay import Edge, Node
+from strawberry.types import get_object_definition, has_object_definition
+
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.dto.manager.query import DateFilter as DateFilterDTO
+from ai.backend.common.dto.manager.query import DateTimeFilter as DateTimeFilterDTO
+from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
+from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
+from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
+from ai.backend.manager.api.adapters.cursor import decode_cursor as decode_cursor
+from ai.backend.manager.api.adapters.cursor import encode_cursor as encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_enum,
+    gql_field,
+    gql_pydantic_input,
+)
+from ai.backend.manager.data.common.types import SearchResult
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.base import QueryCondition
+    from ai.backend.manager.types import (
+        PaginationOptions,
+    )
+
+
+@strawberry.scalar
+class ByteSize(str):
+    """
+    Custom scalar type for representing byte sizes in GraphQL.
+    """
+
+    @staticmethod
+    def parse_value(value: str) -> str:
+        return value
+
+    @staticmethod
+    def parse_literal(ast: ValueNode) -> str:
+        if not isinstance(ast, StringValueNode):
+            raise ValueError("ByteSize must be provided as a string literal")
+        return ast.value
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for string fields supporting equality, containment, prefix/suffix, and case-insensitive variants.",
+        added_version="24.09.0",
+    ),
+    name="StringFilter",
+)
+class StringFilter(PydanticInputMixin[StringFilterDTO]):
+    # Basic operations
+    contains: str | None = None
+    starts_with: str | None = None
+    ends_with: str | None = None
+    equals: str | None = None
+
+    # NOT operations
+    not_contains: str | None = None
+    not_starts_with: str | None = None
+    not_ends_with: str | None = None
+    not_equals: str | None = None
+
+    # Case-insensitive operations
+    i_contains: str | None = gql_field(
+        description="The i contains field.", name="iContains", default=None
+    )
+    i_starts_with: str | None = gql_field(
+        description="The i starts with field.", name="iStartsWith", default=None
+    )
+    i_ends_with: str | None = gql_field(
+        description="The i ends with field.", name="iEndsWith", default=None
+    )
+    i_equals: str | None = gql_field(
+        description="The i equals field.", name="iEquals", default=None
+    )
+
+    # Case-insensitive NOT operations
+    i_not_contains: str | None = gql_field(
+        description="The i not contains field.", name="iNotContains", default=None
+    )
+    i_not_starts_with: str | None = gql_field(
+        description="The i not starts with field.", name="iNotStartsWith", default=None
+    )
+    i_not_ends_with: str | None = gql_field(
+        description="The i not ends with field.", name="iNotEndsWith", default=None
+    )
+    i_not_equals: str | None = gql_field(
+        description="The i not equals field.", name="iNotEquals", default=None
+    )
+
+    def build_query_condition(
+        self,
+        contains_factory: Callable[[StringMatchSpec], QueryCondition],
+        equals_factory: Callable[[StringMatchSpec], QueryCondition],
+        starts_with_factory: Callable[[StringMatchSpec], QueryCondition],
+        ends_with_factory: Callable[[StringMatchSpec], QueryCondition],
+    ) -> QueryCondition | None:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            contains_factory: Factory for LIKE '%value%' operations
+            equals_factory: Factory for exact match (=) operations
+            starts_with_factory: Factory for LIKE 'value%' operations
+            ends_with_factory: Factory for LIKE '%value' operations
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        # equals operations
+        if self.equals:
+            return equals_factory(
+                StringMatchSpec(self.equals, case_insensitive=False, negated=False)
+            )
+        if self.i_equals:
+            return equals_factory(
+                StringMatchSpec(self.i_equals, case_insensitive=True, negated=False)
+            )
+        if self.not_equals:
+            return equals_factory(
+                StringMatchSpec(self.not_equals, case_insensitive=False, negated=True)
+            )
+        if self.i_not_equals:
+            return equals_factory(
+                StringMatchSpec(self.i_not_equals, case_insensitive=True, negated=True)
+            )
+
+        # contains operations
+        if self.contains:
+            return contains_factory(
+                StringMatchSpec(self.contains, case_insensitive=False, negated=False)
+            )
+        if self.i_contains:
+            return contains_factory(
+                StringMatchSpec(self.i_contains, case_insensitive=True, negated=False)
+            )
+        if self.not_contains:
+            return contains_factory(
+                StringMatchSpec(self.not_contains, case_insensitive=False, negated=True)
+            )
+        if self.i_not_contains:
+            return contains_factory(
+                StringMatchSpec(self.i_not_contains, case_insensitive=True, negated=True)
+            )
+
+        # starts_with operations
+        if self.starts_with:
+            return starts_with_factory(
+                StringMatchSpec(self.starts_with, case_insensitive=False, negated=False)
+            )
+        if self.i_starts_with:
+            return starts_with_factory(
+                StringMatchSpec(self.i_starts_with, case_insensitive=True, negated=False)
+            )
+        if self.not_starts_with:
+            return starts_with_factory(
+                StringMatchSpec(self.not_starts_with, case_insensitive=False, negated=True)
+            )
+        if self.i_not_starts_with:
+            return starts_with_factory(
+                StringMatchSpec(self.i_not_starts_with, case_insensitive=True, negated=True)
+            )
+
+        # ends_with operations
+        if self.ends_with:
+            return ends_with_factory(
+                StringMatchSpec(self.ends_with, case_insensitive=False, negated=False)
+            )
+        if self.i_ends_with:
+            return ends_with_factory(
+                StringMatchSpec(self.i_ends_with, case_insensitive=True, negated=False)
+            )
+        if self.not_ends_with:
+            return ends_with_factory(
+                StringMatchSpec(self.not_ends_with, case_insensitive=False, negated=True)
+            )
+        if self.i_not_ends_with:
+            return ends_with_factory(
+                StringMatchSpec(self.i_not_ends_with, case_insensitive=True, negated=True)
+            )
+
+        return None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for integer fields supporting equality and comparison operations.",
+        added_version="24.09.0",
+    ),
+    name="IntFilter",
+)
+class IntFilter(PydanticInputMixin[IntFilterDTO]):
+    equals: int | None = None
+    not_equals: int | None = None
+    greater_than: int | None = None
+    greater_than_or_equal: int | None = None
+    less_than: int | None = None
+    less_than_or_equal: int | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for UUID fields.", added_version="26.1.0"),
+    name="UUIDFilter",
+)
+class UUIDFilter(PydanticInputMixin[UUIDFilterDTO]):
+    # Basic operations
+    equals: uuid.UUID | None = None
+    in_: list[uuid.UUID] | None = gql_field(description="The in  field.", name="in", default=None)
+
+    # NOT operations
+    not_equals: uuid.UUID | None = None
+    not_in: list[uuid.UUID] | None = None
+
+    def build_query_condition(
+        self,
+        equals_factory: Callable[[UUIDEqualMatchSpec], QueryCondition],
+        in_factory: Callable[[UUIDInMatchSpec], QueryCondition],
+    ) -> QueryCondition | None:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            equals_factory: Factory function for equality operations (=, !=)
+            in_factory: Factory function for IN operations (IN, NOT IN)
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        # Equality operations
+        if self.equals:
+            return equals_factory(
+                UUIDEqualMatchSpec(
+                    value=self.equals,
+                    negated=False,
+                )
+            )
+        if self.not_equals:
+            return equals_factory(
+                UUIDEqualMatchSpec(
+                    value=self.not_equals,
+                    negated=True,
+                )
+            )
+
+        # IN operations
+        if self.in_:
+            return in_factory(
+                UUIDInMatchSpec(
+                    values=self.in_,
+                    negated=False,
+                )
+            )
+        if self.not_in:
+            return in_factory(
+                UUIDInMatchSpec(
+                    values=self.not_in,
+                    negated=True,
+                )
+            )
+
+        return None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for datetime fields supporting range and equality operations.",
+        added_version="24.09.0",
+    ),
+    name="DateTimeFilter",
+)
+class DateTimeFilter(PydanticInputMixin[DateTimeFilterDTO]):
+    before: datetime | None = None
+    after: datetime | None = None
+    equals: datetime | None = None
+    not_equals: datetime | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for date fields (not datetime) supporting range and equality operations.",
+        added_version="24.09.0",
+    ),
+    name="DateFilter",
+)
+class DateFilter(PydanticInputMixin[DateFilterDTO]):
+    before: date | None = None
+    after: date | None = None
+    equals: date | None = None
+    not_equals: date | None = None
+
+    def build_query_condition(
+        self,
+        before_factory: Callable[[date], QueryCondition],
+        after_factory: Callable[[date], QueryCondition],
+        equals_factory: Callable[[date], QueryCondition],
+        not_equals_factory: Callable[[date], QueryCondition],
+    ) -> QueryCondition | None:
+        """Build query condition using factory callables.
+
+        Args:
+            before_factory: Factory function for < comparison
+            after_factory: Factory function for > comparison
+            equals_factory: Factory function for = comparison
+            not_equals_factory: Factory function for != comparison
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        if self.not_equals:
+            return not_equals_factory(self.not_equals)
+        if self.equals:
+            return equals_factory(self.equals)
+        if self.before:
+            return before_factory(self.before)
+        if self.after:
+            return after_factory(self.after)
+        return None
+
+
+@gql_enum(BackendAIGQLMeta(added_version="24.09.0", description="Sort direction for ordering"))
+class OrderDirection(StrEnum):
+    ASC = "ASC"
+    DESC = "DESC"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="24.09.0",
+        description="Sort direction for ordering with null placement control",
+    )
+)
+class Ordering(StrEnum):
+    ASC = "ASC"
+    ASC_NULLS_FIRST = "ASC_NULLS_FIRST"
+    ASC_NULLS_LAST = "ASC_NULLS_LAST"
+    DESC = "DESC"
+    DESC_NULLS_FIRST = "DESC_NULLS_FIRST"
+    DESC_NULLS_LAST = "DESC_NULLS_LAST"
+
+
+def to_global_id(
+    type_: type[Any], local_id: uuid.UUID | str, is_target_graphene_object: bool = False
+) -> str:
+    if is_target_graphene_object:
+        # For compatibility with existing Graphene-based global IDs
+        if not issubclass(type_, graphene.ObjectType):
+            raise TypeError(
+                "type_ must be a graphene ObjectType when is_target_graphene_object is True."
+            )
+        typename = type_.__name__
+        return base64(f"{typename}:{local_id}")
+    if not has_object_definition(type_):
+        raise TypeError("type_ must be a Strawberry object type (Node or Edge).")
+    typename = get_object_definition(type_, strict=True).name
+    return base64(f"{typename}:{local_id}")
+
+
+def resolve_global_id(global_id: str) -> tuple[str, str]:
+    unbased_global_id = unbase64(global_id)
+    type_, _, id_ = unbased_global_id.partition(":")
+    return type_, id_
+
+
+def build_pagination_options(
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> PaginationOptions:
+    from ai.backend.manager.types import (
+        BackwardPaginationOptions,
+        ForwardPaginationOptions,
+        OffsetBasedPaginationOptions,
+        PaginationOptions,
+    )
+
+    """Build pagination options from GraphQL arguments"""
+    pagination = PaginationOptions()
+
+    # Handle offset-based pagination
+    if offset is not None or limit is not None:
+        pagination.offset = OffsetBasedPaginationOptions(offset=offset, limit=limit)
+        return pagination
+
+    # Handle cursor-based pagination
+    if after is not None or first is not None:
+        pagination.forward = ForwardPaginationOptions(after=after, first=first)
+    elif before is not None or last is not None:
+        pagination.backward = BackwardPaginationOptions(before=before, last=last)
+
+    return pagination
+
+
+@dataclass
+class PageInfo:
+    has_next_page: bool
+    has_previous_page: bool
+    start_cursor: str | None = None
+    end_cursor: str | None = None
+
+    def to_strawberry_page_info(self) -> strawberry.relay.PageInfo:
+        return strawberry.relay.PageInfo(
+            has_next_page=self.has_next_page,
+            has_previous_page=self.has_previous_page,
+            start_cursor=self.start_cursor,
+            end_cursor=self.end_cursor,
+        )
+
+
+class HasCursor(Protocol):
+    cursor: str
+
+
+TEdge = TypeVar("TEdge", bound=HasCursor)
+
+
+def build_page_info[TEdge: HasCursor](
+    edges: list[TEdge], total_count: int, pagination_options: PaginationOptions
+) -> PageInfo:
+    """Build PageInfo from edges and pagination options"""
+    has_next_page = False
+    has_previous_page = False
+
+    if pagination_options.offset:
+        # Offset-based pagination
+        offset = pagination_options.offset.offset or 0
+
+        has_previous_page = offset > 0
+        has_next_page = (offset + len(edges)) < total_count
+
+    elif pagination_options.forward:
+        # Forward pagination (after/first)
+        first = pagination_options.forward.first
+        if first is not None:
+            # If we got exactly the requested number and there might be more
+            has_next_page = len(edges) == first
+        else:
+            # If no first specified, check if we have all items
+            has_next_page = len(edges) < total_count
+        has_previous_page = pagination_options.forward.after is not None
+
+    elif pagination_options.backward:
+        # Backward pagination (before/last)
+        last = pagination_options.backward.last
+        if last is not None:
+            # If we got exactly the requested number, there might be more before
+            has_previous_page = len(edges) == last
+        else:
+            # If no last specified, assume there could be previous items
+            has_previous_page = True
+        has_next_page = pagination_options.backward.before is not None
+
+    else:
+        # Default case - assume we have all items if no pagination specified
+        has_next_page = len(edges) < total_count
+        has_previous_page = False
+
+    return PageInfo(
+        has_next_page=has_next_page,
+        has_previous_page=has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+
+
+def build_connection[TData, TNode: Node, TConn](
+    *,
+    result: SearchResult[TData],
+    to_node: Callable[[TData], TNode],
+    id_getter: Callable[[TNode], str],
+    edge_type: type[Edge[TNode]],
+    connection_type: Callable[..., TConn],
+) -> TConn:
+    """Build a relay Connection from a SearchResult."""
+    nodes = [to_node(item) for item in result.items]
+    edges = [edge_type(node=node, cursor=encode_cursor(id_getter(node))) for node in nodes]
+    return connection_type(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
+    )

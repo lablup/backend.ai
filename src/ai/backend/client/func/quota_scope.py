@@ -1,12 +1,13 @@
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any, cast
 
+from ai.backend.client.output.fields import group_fields, quota_scope_fields, user_fields
+from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import dedent as _d
 from ai.backend.common.types import QuotaConfig, QuotaScopeID
 
-from ..output.fields import group_fields, quota_scope_fields, user_fields
-from ..output.types import FieldSpec
-from ..session import api_session
-from ..types import set_if_set
-from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 _default_user_fields = (
@@ -39,7 +40,7 @@ class QuotaScope(BaseFunction):
         domain_name: str,
         email: str,
         fields: Sequence[FieldSpec] = _default_user_fields,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         query = _d("""
             query($domain_name: String!, $email: String!) {
                 user(domain_name: $domain_name, email: $email) { $fields }
@@ -51,7 +52,7 @@ class QuotaScope(BaseFunction):
             "email": email,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["user"]
+        return cast(dict[str, Any] | None, data["user"])
 
     @api_function
     @classmethod
@@ -60,7 +61,7 @@ class QuotaScope(BaseFunction):
         domain_name: str,
         name: str,
         fields: Sequence[FieldSpec] = _default_project_fields,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         query = _d("""
             query($domain_name: String!, $name: String!) {
                 groups_by_name(domain_name: $domain_name, name: $name) { $fields }
@@ -72,7 +73,10 @@ class QuotaScope(BaseFunction):
             "name": name,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["groups_by_name"][0]
+        groups = data["groups_by_name"]
+        if not groups:
+            return None
+        return cast(dict[str, Any], groups[0])
 
     @api_function
     @classmethod
@@ -95,7 +99,7 @@ class QuotaScope(BaseFunction):
             "quota_scope_id": str(qsid),
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["quota_scope"]["details"]
+        return cast(dict[str, Any], data["quota_scope"]["details"])
 
     @api_function
     @classmethod
@@ -122,7 +126,7 @@ class QuotaScope(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["set_quota_scope"]["quota_scope"]
+        return cast(dict[str, Any], data["set_quota_scope"]["quota_scope"])
 
     @api_function
     @classmethod
@@ -145,4 +149,4 @@ class QuotaScope(BaseFunction):
             "quota_scope_id": str(qsid),
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["unset_quota_scope"]["quota_scope"]
+        return cast(dict[str, Any], data["unset_quota_scope"]["quota_scope"])

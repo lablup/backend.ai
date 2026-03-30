@@ -1,0 +1,551 @@
+# Backend.AI AppProxy Coordinator Configuration (PROD Environment)
+#
+# This is a sample configuration file for the Backend.AI AppProxy Coordinator.
+# All configuration options are documented with their descriptions,
+# default values, and environment-specific examples.
+#
+# Generated using BackendAIConfigMeta annotations.
+
+
+# PostgreSQL database configuration for the proxy coordinator. Stores proxy
+# routing rules, circuit states, and session mappings.
+# Added in 25.9.0
+[db]
+  # The type of database backend used by the proxy coordinator. Currently only
+  # PostgreSQL is supported for storing proxy routing and circuit data.
+  # Added in 25.9.0
+  type = "postgresql"
+  # The network address (host:port) of the PostgreSQL database server. In local
+  # development, typically points to localhost. In production, should point to
+  # your PostgreSQL server or cluster endpoint.
+  # Added in 25.9.0
+  addr = { host = "db-server", port = 5432 }
+  # The name of the PostgreSQL database to use for the proxy coordinator. This
+  # database stores proxy routing rules, circuit states, and session mappings.
+  # Ensure this database is created before starting the coordinator.
+  # Added in 25.9.0
+  name = "appproxy"
+  # The PostgreSQL username for database authentication. This user should have
+  # appropriate permissions to read/write to the proxy coordinator database
+  # tables.
+  # Added in 25.9.0
+  user = "backend"
+  # The password for PostgreSQL database authentication. Keep this value secure
+  # and do not expose it in logs or version control.
+  # Added in 25.9.0
+  password = "DB_PASSWORD"
+  # The number of persistent database connections maintained in the connection
+  # pool. Higher values allow more concurrent database operations but consume
+  # more resources. Adjust based on expected load and available database
+  # connections.
+  # Added in 25.9.0
+  pool_size = 32
+  # The maximum number of additional connections allowed beyond pool_size during
+  # peak load. These overflow connections are created on-demand and closed when
+  # no longer needed. Set to -1 for unlimited overflow, or 0 to disable overflow
+  # entirely.
+  # Added in 25.9.0
+  max_overflow = 128
+
+# Redis configuration for the proxy coordinator's internal operations including
+# caching, pub/sub messaging, and distributed locking (when using Redlock).
+# Added in 25.9.0
+[redis]
+  # Address and port number of redis server.
+  # Added in 25.13.0
+  ## addr = { host = "redis-server", port = 6379 }
+  # List of address/port pair of sentinel servers.
+  # Added in 25.13.0
+  ## sentinel = { host = "redis-sentinel:26379,redis-sentinel", port = 26380 }
+  # Redis service name.
+  # Added in 25.13.0
+  ## service_name = "bai-service"
+  # Redis password.
+  # Added in 25.13.0
+  ## password = "REDIS_PASSWORD"
+
+  # Configuration for Redis helper library.
+  # Added in 25.13.0
+  [redis.redis_helper_config]
+    # Timeout in seconds for Redis socket operations.
+    # Added in 25.13.0
+    socket_timeout = 10.0
+    # Timeout in seconds for establishing Redis connections.
+    # Added in 25.13.0
+    socket_connect_timeout = 5.0
+    # Time in seconds to wait between reconnection attempts.
+    # Added in 25.13.0
+    reconnect_poll_timeout = 1.0
+
+# Optional Redis configuration for connecting to the Backend.AI Manager's event
+# bus. Only required when the proxy coordinator uses a different Redis instance
+# than the Manager core. If not specified, the coordinator uses the 'redis'
+# configuration above.
+# Added in 25.9.0
+[core_redis]
+  # Address and port number of redis server.
+  # Added in 25.13.0
+  ## addr = { host = "redis-server", port = 6379 }
+  # List of address/port pair of sentinel servers.
+  # Added in 25.13.0
+  ## sentinel = { host = "redis-sentinel:26379,redis-sentinel", port = 26380 }
+  # Redis service name.
+  # Added in 25.13.0
+  ## service_name = "bai-service"
+  # Redis password.
+  # Added in 25.13.0
+  ## password = "REDIS_PASSWORD"
+
+  # Configuration for Redis helper library.
+  # Added in 25.13.0
+  [core_redis.redis_helper_config]
+    # Timeout in seconds for Redis socket operations.
+    # Added in 25.13.0
+    socket_timeout = 10.0
+    # Timeout in seconds for establishing Redis connections.
+    # Added in 25.13.0
+    socket_connect_timeout = 5.0
+    # Time in seconds to wait between reconnection attempts.
+    # Added in 25.13.0
+    reconnect_poll_timeout = 1.0
+
+# Core proxy coordinator settings including network binding, TLS, distributed
+# locking, and worker management configuration.
+# Added in 25.9.0
+[proxy_coordinator]
+  # The directory path where the proxy coordinator stores temporary UNIX domain
+  # sockets for inter-process communication (IPC). These sockets are used for
+  # internal communication between coordinator components. Ensure the directory
+  # exists and has appropriate permissions.
+  # Added in 25.9.0
+  ipc_base_path = "/var/run/backend.ai/ipc"
+  # The Python async event loop implementation to use. 'asyncio' is the standard
+  # library implementation suitable for development. 'uvloop' provides better
+  # performance and is recommended for production deployments.
+  # Added in 25.9.0
+  event_loop = "asyncio"
+  # The file path where the coordinator writes its process ID (PID). This is
+  # used by process managers (like systemd) to track and manage the service. Set
+  # to /dev/null to disable PID file creation in development environments.
+  # Added in 25.9.0
+  pid_file = "/run/backend.ai/appproxy/coordinator.pid"
+  # A unique identifier for this proxy coordinator instance. Used for logging,
+  # monitoring, and distinguishing between multiple coordinator instances in a
+  # cluster. Defaults to the hostname with 'i-' prefix.
+  # Added in 25.9.0
+  id = "i-coordinator-01"
+  # The UNIX user ID (UID) that the coordinator process should run as. For
+  # security, avoid running as root (UID 0) in production. The process will drop
+  # privileges to this user after startup.
+  # Added in 25.9.0
+  user = 1000
+  # The UNIX group ID (GID) that the coordinator process should run as. Should
+  # be set to a group with appropriate permissions for accessing required files
+  # and sockets.
+  # Added in 25.9.0
+  group = 1000
+  # The network address and port where the coordinator API server listens for
+  # incoming connections. Use '0.0.0.0' to listen on all network interfaces, or
+  # specify a specific IP to restrict access. Port 10200 is the default.
+  # Added in 25.9.0
+  bind_addr = { host = "0.0.0.0", port = 10200 }
+  # The external address that workers and clients should use to connect to this
+  # coordinator. Required when the coordinator is behind a load balancer or NAT,
+  # where the bind address differs from the externally accessible address.
+  # Added in 25.9.0
+  ## advertised_addr = { host = "coordinator.example.com", port = 10200 }
+  # The backend mechanism for distributed locking across multiple coordinator
+  # instances. 'pg_advisory' uses PostgreSQL advisory locks (recommended),
+  # 'redlock' uses Redis-based distributed locks, 'filelock' uses filesystem
+  # locks (single-node only).
+  # Added in 25.9.0
+  distributed_lock = "pg_advisory"
+  # Enable HTTPS/TLS for the coordinator API server. When enabled, the server
+  # will use encrypted connections. Requires tls_cert and tls_privkey to be
+  # configured. Recommended for production deployments to secure communication.
+  # Added in 25.9.0
+  tls_listen = true
+  # The file path to the TLS/SSL certificate in PEM format. Required when
+  # tls_listen is enabled. The certificate should be issued for the domain/IP
+  # used to access the coordinator. For production, use certificates from a
+  # trusted CA.
+  # Added in 25.9.0
+  ## tls_cert = "/etc/backend.ai/tls/cert.pem"
+  # The file path to the TLS/SSL private key in PEM format. Required when
+  # tls_listen is enabled. This file must be kept secure with restricted
+  # permissions (e.g., 0600). Never commit this file to version control.
+  # Added in 25.9.0
+  ## tls_privkey = "/path/to/file"
+  # Set to true when the coordinator is behind a TLS-terminating load balancer
+  # or reverse proxy (e.g., nginx, HAProxy). This tells the coordinator to
+  # advertise HTTPS URLs even though it receives unencrypted traffic from the
+  # proxy.
+  # Added in 25.9.0
+  tls_advertised = true
+  # Allow configuration requests without authentication tokens. WARNING: This is
+  # a security risk and should only be enabled for backward compatibility with
+  # older Backend.AI clusters. Keep this disabled in production environments.
+  # Added in 25.9.0
+  allow_unauthorized_configure_request = false
+  # Enable the experimental Redis-based event dispatcher for real-time event
+  # propagation between coordinator and workers. This feature is under
+  # development and may have stability issues. Use with caution in production.
+  # Added in 25.9.0
+  use_experimental_redis_event_dispatcher = false
+  # Enable Traefik integration as the proxy worker's data plane. When enabled,
+  # the coordinator will manage routing rules through Traefik instead of the
+  # built-in proxy workers. Requires Traefik to be deployed and configured
+  # separately.
+  # Added in 25.9.0
+  enable_traefik = true
+  # The maximum time in seconds a worker can go without sending a heartbeat
+  # before being considered unavailable. Workers that exceed this timeout will
+  # be excluded from proxy scheduling. Increase this value in high-latency
+  # network environments.
+  # Added in 25.9.0
+  worker_heartbeat_timeout = 60.0
+  # The port number for the aiomonitor terminal UI debugging server. Aiomonitor
+  # allows real-time inspection of asyncio tasks and event loop status via a
+  # terminal interface. Useful for debugging async issues. Disable in production
+  # by setting a non-accessible port.
+  # Added in 25.9.0
+  aiomonitor_termui_port = 48500
+  # The port number for the aiomonitor web-based debugging interface. Unlike the
+  # terminal UI, this provides a browser-accessible dashboard for monitoring
+  # asyncio tasks and event loop metrics. Ensure this port is firewalled in
+  # production environments.
+  # Added in 25.9.0
+  aiomonitor_webui_port = 49500
+  # The grace period in seconds before cleaning up inactive proxy circuits.
+  # Circuits that have not reported any network traffic within this time will be
+  # automatically terminated to free resources. Set to 3600 (1 hour) by default.
+  # Does not apply to inference circuits, which have their own lifecycle
+  # management.
+  # Added in 25.9.0
+  unused_circuit_collection_timeout = 3600
+  # CIDR notation specifying which IP addresses can access the /metrics HTTP
+  # endpoint. This endpoint exposes Prometheus-compatible metrics for
+  # monitoring. Restrict access to your monitoring infrastructure network in
+  # production to prevent information disclosure.
+  # Added in 25.9.0
+  metric_access_allowed_hosts = "10.0.0.0/8"
+  # The interval in seconds between health checks for model inference services.
+  # The coordinator periodically verifies that backend model services are
+  # responsive. Lower values detect failures faster but increase network
+  # overhead. Higher values reduce overhead but may delay failure detection.
+  # Added in 25.9.0
+  health_check_timer_interval = 30.0
+  # The address this coordinator announces to the service discovery system (etcd
+  # or Redis). Other components in the cluster use this address to locate and
+  # connect to the coordinator. In containerized or NAT environments, this
+  # should be the externally routable address.
+  # Added in 25.9.0
+  announce_addr = { host = "coordinator.example.com", port = 10200 }
+
+  # Configuration for Redis-based distributed locking (Redlock algorithm). Only
+  # used when distributed_lock is set to 'redlock'. Configures retry intervals
+  # and timeout behavior for lock acquisition.
+  # Added in 25.9.0
+  [proxy_coordinator.redlock_config]
+    # Retry interval in seconds for Redis lock acquisition.
+    # Added in 25.9.0
+    ## lock_retry_interval = 0.5
+
+  # Configuration for Traefik integration when enable_traefik is true. Includes
+  # the etcd connection settings that Traefik uses as its configuration backend.
+  # Required when enable_traefik is enabled.
+  # Added in 25.9.0
+  [proxy_coordinator.traefik]
+
+    # Configuration for the etcd connection used by Traefik integration. Traefik
+    # uses etcd as its configuration backend to dynamically update routing
+    # rules. The namespace should be set to 'traefik' to isolate Traefik's
+    # configuration keys.
+    # Added in 25.9.0
+    [proxy_coordinator.traefik.etcd]
+      # Namespace prefix for etcd keys used by Backend.AI. Allows multiple
+      # Backend.AI clusters to share the same etcd cluster. All Backend.AI
+      # related keys will be stored under this namespace.
+      # Added in 22.03.0
+      namespace = "backend"
+      # Network address of the etcd server. Default is the standard etcd port on
+      # localhost. In production, should point to one or more etcd instance
+      # endpoint(s).
+      # Added in 22.03.0
+      addr = { host = "etcd-cluster", port = 2379 }
+      # Username for authenticating with etcd. Optional if etcd doesn't require
+      # authentication. Should be set along with password for secure
+      # deployments.
+      # Added in 22.03.0
+      ## user = "backend"
+      # Password for authenticating with etcd. Should be kept secret in
+      # production environments. Set together with the user field for
+      # authentication.
+      # Added in 22.03.0
+      ## password = "ETCD_PASSWORD"
+
+# Performance profiling configuration for debugging and optimization. Includes
+# settings for cProfile and Pyroscope continuous profiling.
+# Added in 25.9.0
+[profiling]
+  # Starts a memray live server.
+  # Added in 25.13.0
+  enable_memray = false
+  # Path to store memray allocation captures.
+  # Added in 25.13.0
+  memray_output_destination = "/var/log/backend.ai/memray/proxy-worker.bin"
+  # Allows sending pyroscope telemetry to pyroscope server.
+  # Added in 25.13.0
+  enable_pyroscope = false
+
+  # Pyroscope configuration.
+  # Added in 25.13.0
+  [profiling.pyroscope_config]
+    # Pyroscope application name.
+    # Added in 25.13.0
+    ## application_name = "proxy-worker-prod"
+    # Pyroscope server endpoint.
+    # Added in 25.13.0
+    server_address = "http://pyroscope:4040"
+    # Pyroscope sample rate.
+    # Added in 25.13.0
+    sample_rate = 100
+    # Detect subprocesses started by the main process.
+    # Added in 25.13.0
+    detect_subprocesses = true
+    # Report cpu time only.
+    # Added in 25.13.0
+    oncpu = true
+    # Only include traces for threads that are holding on to the Global
+    # Interpreter Lock.
+    # Added in 25.13.0
+    gil_only = true
+    # Enable logging facility.
+    # Added in 25.13.0
+    enable_logging = false
+
+    # Pyroscope tags.
+    # Added in 25.13.0
+    [profiling.pyroscope_config.tags]
+
+# Secret keys and tokens used for authenticating requests between the
+# coordinator and other Backend.AI components. Must match the secrets configured
+# in Manager.
+# Added in 25.9.0
+[secrets]
+  # String used for creating JWT signature. Must be identical across every nodes
+  # across single AppProxy cluster.
+  # Added in 25.13.0
+  jwt_secret = "JWT_SECRET"
+  # API token used for validating requests from AppProxy worker and Backend.AI
+  # manager.
+  # Added in 25.13.0
+  api_secret = "API_SECRET"
+
+# Configuration for permit hash validation, which verifies the authenticity of
+# proxy configuration requests from the Backend.AI Manager.
+# Added in 25.9.0
+[permit_hash]
+  # Secret string used for creating permit hash.
+  # Added in 25.13.0
+  secret = "PERMIT_HASH_SECRET"
+  # Hash digest method to use.
+  # Added in 25.13.0
+  digest_mod = "SHA256"
+
+# Logging configuration including log levels, output formats, and destinations.
+# Supports console, file, and external log aggregation systems.
+# Added in 25.9.0
+[logging]
+  # The version used by logging.dictConfig().
+  # Added in 24.09.0
+  version = 1
+  # The main log level to filter messages from all loggers.
+  # Added in 24.09.0
+  level = "INFO"
+  # Disable the existing loggers when applying the config.
+  # Added in 24.09.0
+  disable-existing-loggers = false
+  # The mapping of log handler configurations.
+  # Added in 24.09.0
+  handlers = {}
+  # The mapping of per-namespace logger configurations.
+  # Added in 24.09.0
+  loggers = {}
+  # The list of log drivers to activate.
+  # Added in 24.09.0
+  drivers = ["console", "file"]
+  # Override default log level for specific scope of package.
+  # Added in 24.09.0
+  pkg-ns = "{ \"\" = \"WARNING\", \"ai.backend\" = \"INFO\" }"
+
+  # Console logging driver configuration.
+  # Added in 24.09.0
+  [logging.console]
+    # Opt to print colorized log.
+    # Added in 24.09.0
+    ## colored = true
+    # Determine verbosity of log.
+    # Added in 24.09.0
+    format = "verbose"
+
+  # File logging driver configuration.
+  # Added in 24.09.0
+  [logging.file]
+    # Path to store log.
+    # Added in 24.09.0
+    path = "/var/log/backend.ai"
+    # Log file name.
+    # Added in 24.09.0
+    filename = "manager.log"
+    # Number of outdated log files to retain.
+    # Added in 24.09.0
+    backup-count = 10
+    # Maximum size for a single log file.
+    # Added in 24.09.0
+    rotation-size = "100MB"
+    # Determine verbosity of log.
+    # Added in 24.09.0
+    format = "verbose"
+
+  # Logstash logging driver configuration.
+  # Added in 24.09.0
+  [logging.logstash]
+    # Protocol to communicate with logstash server.
+    # Added in 24.09.0
+    protocol = "tcp"
+    # Use TLS to communicate with logstash server.
+    # Added in 24.09.0
+    ssl-enabled = true
+    # Verify validity of TLS certificate when communicating with logstash.
+    # Added in 24.09.0
+    ssl-verify = true
+
+    # Connection information of logstash node.
+    # Added in 24.09.0
+    [logging.logstash.endpoint]
+
+  # Graylog logging driver configuration.
+  # Added in 24.09.0
+  [logging.graylog]
+    # Graylog hostname.
+    # Added in 24.09.0
+    host = "graylog-server"
+    # Graylog server port number.
+    # Added in 24.09.0
+    port = 12201
+    # Log level.
+    # Added in 24.09.0
+    level = "INFO"
+    # The custom source identifier. If not specified, fqdn will be used instead.
+    # Added in 24.09.0
+    ## localname = "prod-manager-01"
+    # The fully qualified domain name of the source.
+    # Added in 24.09.0
+    ## fqdn = "manager.backend.ai"
+    # Verify validity of TLS certificate when communicating with Graylog.
+    # Added in 24.09.0
+    ssl-verify = true
+    # Path to Root CA certificate file.
+    # Added in 24.09.0
+    ## ca-certs = "/etc/ssl/ca.pem"
+    # Path to TLS private key file.
+    # Added in 24.09.0
+    ## keyfile = "/etc/backend.ai/graylog/privkey.pem"
+    # Path to TLS certificate file.
+    # Added in 24.09.0
+    ## certfile = "/etc/backend.ai/graylog/cert.pem"
+
+# Debug mode settings for development and troubleshooting. Enables verbose
+# logging and additional diagnostic features when enabled.
+# Added in 25.9.0
+[debug]
+  # Enable debug mode.
+  # Added in 25.13.0
+  enabled = false
+  # Enable asyncio debug mode.
+  # Added in 25.13.0
+  asyncio = false
+  # Enable enhanced aiomonitor task info.
+  # Added in 25.13.0
+  enhanced_aiomonitor_task_info = false
+  # Enable event logging.
+  # Added in 25.13.0
+  log_events = false
+  # Enable statistics logging.
+  # Added in 25.13.0
+  log_stats = false
+
+# OpenTelemetry configuration for distributed tracing and observability. Exports
+# trace data to OTLP-compatible backends (Jaeger, Zipkin, etc.) for visualizing
+# request flows across Backend.AI components.
+# Added in 25.9.0
+[otel]
+  # Whether to enable OpenTelemetry for tracing or logging. When enabled, traces
+  # or logs will be collected and sent to the configured OTLP endpoint.
+  # Added in 25.7.0
+  enabled = true
+  # Log level for OpenTelemetry. Controls the verbosity of logs generated by
+  # OpenTelemetry. Common levels include 'DEBUG', 'INFO', 'WARN', 'ERROR'.
+  # Added in 25.7.0
+  log-level = "INFO"
+  # OTLP endpoint for sending traces. Should include the host and port of the
+  # OTLP receiver.
+  # Added in 25.7.0
+  endpoint = "http://otel-collector:4317"
+
+# Service discovery configuration for locating other Backend.AI components in
+# the cluster. Supports Redis-based or etcd-based service registration and
+# discovery.
+# Added in 25.9.0
+[service_discovery]
+  # Type of service discovery to use. Supported types are 'etcd' and 'redis'.
+  # Added in 25.9.0
+  type = "redis"
+
+# etcd connection configuration for distributed coordination and configuration
+# management. Used for service discovery (if etcd-based) and Traefik
+# integration.
+# Added in 25.9.0
+[etcd]
+  # Namespace prefix for etcd keys used by Backend.AI. Allows multiple
+  # Backend.AI clusters to share the same etcd cluster. All Backend.AI related
+  # keys will be stored under this namespace.
+  # Added in 22.03.0
+  namespace = "backend"
+  # Network address of the etcd server. Default is the standard etcd port on
+  # localhost. In production, should point to one or more etcd instance
+  # endpoint(s).
+  # Added in 22.03.0
+  addr = { host = "etcd-cluster", port = 2379 }
+  # Username for authenticating with etcd. Optional if etcd doesn't require
+  # authentication. Should be set along with password for secure deployments.
+  # Added in 22.03.0
+  ## user = "backend"
+  # Password for authenticating with etcd. Should be kept secret in production
+  # environments. Set together with the user field for authentication.
+  # Added in 22.03.0
+  ## password = "ETCD_PASSWORD"
+
+# Pyroscope continuous profiling configuration for production performance
+# analysis. Sends CPU and memory profiling data to a Pyroscope server for flame
+# graph visualization.
+# Added in 25.9.0
+[pyroscope]
+  # Whether to enable Pyroscope profiling. When enabled, performance profiling
+  # data will be sent to a Pyroscope server. Useful for debugging performance
+  # issues, but adds some overhead.
+  # Added in 24.12.1
+  enabled = true
+  # Application name to use in Pyroscope. This name will identify this component
+  # instance in Pyroscope UI. Required if Pyroscope is enabled.
+  # Added in 24.12.1
+  ## app-name = "backendai-manager-prod"
+  # Address of the Pyroscope server. Must include the protocol (http or https)
+  # and port if non-standard. Required if Pyroscope is enabled.
+  # Added in 24.12.1
+  ## server-addr = "http://pyroscope:4040"
+  # Sampling rate for Pyroscope profiling. Higher values collect more data but
+  # increase overhead. Balance based on your performance monitoring needs.
+  # Added in 24.12.1
+  ## sample-rate = 100

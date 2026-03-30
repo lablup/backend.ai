@@ -1,0 +1,32 @@
+import uuid
+from dataclasses import dataclass
+from typing import override
+
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.model_serving.types import CompactServiceInfo
+from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
+
+
+@dataclass
+class ListModelServiceAction(ModelServiceAction):
+    session_owener_id: uuid.UUID
+    name: str | None
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+@dataclass
+class ListModelServiceActionResult(BaseActionResult):
+    data: list[CompactServiceInfo]
+
+    @override
+    def entity_id(self) -> str | None:
+        return None

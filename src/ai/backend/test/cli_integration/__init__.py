@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import click
 
-from ..cli.context import CLIContext
+from ai.backend.test.cli.context import CLIContext
 
 
 @click.group()

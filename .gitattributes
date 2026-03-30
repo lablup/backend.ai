@@ -1,6 +1,5 @@
 src/ai/backend/agent/docker/*.tar.gz filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/agent/docker/*.bin filter=lfs diff=lfs merge=lfs -text
-src/ai/backend/agent/kubernetes/*.img.tar.gz filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/*.ttf filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/*.bin filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/*.so filter=lfs diff=lfs merge=lfs -text

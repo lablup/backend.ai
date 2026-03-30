@@ -1,0 +1,194 @@
+{
+  "domains": [
+    {
+      "name": "default",
+      "description": "The default domain",
+      "is_active": true,
+      "total_resource_slots": {},
+      "allowed_vfolder_hosts": {},
+      "allowed_docker_registries": [
+        "bai-repo:7080"
+      ]
+    }
+  ],
+  "user_resource_policies": [
+    {
+      "name": "default",
+      "max_vfolder_count": 10,
+      "max_quota_scope_size": -1,
+      "max_session_count_per_model_session": 5
+    }
+  ],
+  "project_resource_policies": [
+    {
+      "name": "default",
+      "max_vfolder_count": 10,
+      "max_quota_scope_size": -1,
+      "max_network_count": 3
+    }
+  ],
+  "groups": [
+    {
+      "id": "{{ default_project_uuid }}",
+      "name": "default",
+      "description": "The default user project",
+      "is_active": true,
+      "domain_name": "default",
+      "resource_policy": "default",
+      "total_resource_slots": {},
+      "allowed_vfolder_hosts": {},
+      "type": "general"
+    },
+    {
+      "id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+      "name": "model-store",
+      "description": "Model store project",
+      "is_active": true,
+      "domain_name": "default",
+      "resource_policy": "default",
+      "total_resource_slots": {},
+      "allowed_vfolder_hosts": {},
+      "type": "model-store"
+    }
+  ],
+  "scaling_groups": [
+    {
+      "name": "default",
+      "description": "The default agent scaling group",
+      "is_active": true,
+      "is_public": true,
+      "driver": "static",
+      "driver_opts": {},
+      "scheduler": "fifo",
+      "scheduler_opts": {
+        "config": {},
+        "pending_timeout": 0.0,
+        "agent_selector_config": {},
+        "allowed_session_types": ["interactive", "batch", "inference"],
+        "agent_selection_strategy": "concentrated"
+      },
+      "wsproxy_addr": "{{ appproxy_coordinator_scheme }}://{{ appproxy_coordinator_ip }}:{{ appproxy_coordinator_port }}",
+      "wsproxy_api_token": "{{ appproxy_shared_key }}"
+    },
+    {
+      "name": "upload",
+      "description": "The agent scaling group for sFTP upload",
+      "is_active": true,
+      "is_public": true,
+      "driver": "static",
+      "driver_opts": {},
+      "scheduler": "fifo",
+      "scheduler_opts": {
+        "config": {},
+        "pending_timeout": 0.0,
+        "agent_selector_config": {},
+        "allowed_session_types": ["system"],
+        "agent_selection_strategy": "concentrated"
+      },
+      "wsproxy_addr": null,
+      "wsproxy_api_token": null
+    }
+  ],
+  "sgroups_for_domains": [
+    {
+      "scaling_group": "default",
+      "domain": "default"
+    },
+    {
+      "scaling_group": "upload",
+      "domain": "default"
+    }
+  ],
+  "users": [
+    {
+      "uuid": "{{ superadmin_uuid }}",
+      "username": "{{ superadmin_username }}",
+      "email": "{{ superadmin_email }}",
+      "password": "{{ superadmin_password }}",
+      "need_password_change": false,
+      "full_name": "Backend.AI Admin",
+      "description": "Backend.AI Admin Account",
+      "status": "active",
+      "status_info": "admin-requested",
+      "domain_name": "default",
+      "resource_policy": "default",
+      "role": "superadmin",
+      "main_access_key": null
+    },
+    {
+      "uuid": "{{ user_uuid }}",
+      "username": "{{ user_username }}",
+      "email": "{{ user_email }}",
+      "password": "{{ user_password }}",
+      "need_password_change": false,
+      "full_name": "Backend.AI User",
+      "description": "Backend.AI User Account",
+      "status": "active",
+      "status_info": "admin-requested",
+      "domain_name": "default",
+      "resource_policy": "default",
+      "role": "user",
+      "main_access_key": null
+    }
+  ],
+  "association_groups_users": [
+    {
+      "group_id": "{{ default_project_uuid }}",
+      "user_id": "{{ superadmin_uuid }}"
+    },
+    {
+      "group_id": "{{ default_project_uuid }}",
+      "user_id": "{{ user_uuid }}"
+    }
+  ],
+  "keypair_resource_policies": [
+    {
+      "name": "default",
+      "default_for_unspecified": "UNLIMITED",
+      "total_resource_slots": {},
+      "max_session_lifetime": 0,
+      "max_concurrent_sessions": 5,
+      "max_containers_per_session": 2,
+      "idle_timeout": 3600,
+      "allowed_vfolder_hosts": {
+        {%- set volume_names = storageproxy_volume_names.split(',') -%}
+        {%- for volume in volume_names %}
+        "{{ storageproxy_name }}:{{ volume }}": [
+          "create-vfolder",
+          "modify-vfolder",
+          "delete-vfolder",
+          "mount-in-session",
+          "upload-file",
+          "download-file",
+          "invite-others",
+          "set-user-specific-permission"
+        ]{% if not loop.last %},{% endif %}
+        {%- endfor %}
+      }
+    }
+  ],
+  "keypairs": [
+    {
+      "user_id": "{{ superadmin_email }}",
+      "access_key": "{{ superadmin_access_key }}",
+      "secret_key": "{{ superadmin_secret_key }}",
+      "is_active": true,
+      "resource_policy": "default",
+      "rate_limit": 30000,
+      "num_queries": 0,
+      "is_admin": true,
+      "user": "{{ superadmin_uuid }}"
+    },
+    {
+      "user_id": "{{ user_email }}",
+      "access_key": "{{ user_access_key }}",
+      "secret_key": "{{ user_secret_key }}",
+      "is_active": true,
+      "resource_policy": "default",
+      "rate_limit": 30000,
+      "num_queries": 0,
+      "is_admin": false,
+      "user": "{{ user_uuid }}"
+    }
+  ]
+}

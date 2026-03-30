@@ -1,14 +1,59 @@
-schema {
-  query: Queries
-  mutation: Mutations
+extend schema
+	@link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@key", "@shareable"])
+
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo @shareable {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
 }
 
-"""All available GraphQL queries."""
-type Queries {
+type Query {
   node(
     """The ID of the object"""
     id: ID!
   ): Node
+
+  """Added in 25.6.0."""
+  audit_log_schema: AuditLogSchema
+
+  """Added in 25.6.0."""
+  audit_log_nodes(
+    """
+    Specifies the criteria used to narrow down the query results based on certain conditions.
+    """
+    filter: String
+
+    """Specifies the sorting order of the query result."""
+    order: String
+
+    """Specifies how many items to skip before beginning to return result."""
+    offset: Int
+
+    """If this value is provided, the query will be limited to that value."""
+    before: String
+
+    """Queries the `last` number of results from the query result from last."""
+    after: String
+
+    """
+    Queries the `first` number of results from the query result from first.
+    """
+    first: Int
+
+    """If the given value is provided, the query will start from that value."""
+    last: Int
+  ): AuditLogConnection
   agent(agent_id: String!): Agent
   agent_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentList
   agents(scaling_group: String, status: String): [Agent]
@@ -49,6 +94,15 @@ type Queries {
 
     """Added in 24.09.0."""
     order: String
+
+    """Added in 25.3.0. Default is `system`."""
+    scope: ScopeField
+
+    """Added in 25.3.0."""
+    container_registry_scope: ContainerRegistryScopeField
+
+    """Added in 25.3.0. Default is read_attribute."""
+    permission: GroupPermissionField = "read_attribute"
     offset: Int
     before: String
     after: String
@@ -74,7 +128,11 @@ type Queries {
     """Added in 24.03.1"""
     id: String
     reference: String
-    architecture: String = "x86_64"
+
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
+    architecture: String = null
   ): Image
   images(
     """
@@ -82,6 +140,9 @@ type Queries {
     """
     is_installed: Boolean
     is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null.")
+
+    """Added in 25.4.0."""
+    filter_by_statuses: [ImageStatus] = [ALIVE]
 
     """
     Added in 24.03.8. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
@@ -96,6 +157,36 @@ type Queries {
 
   """Added in 24.03.1"""
   customized_images: [ImageNode]
+
+  """Added in 25.3.0."""
+  image_node(
+    id: GlobalIDField!
+    scope_id: ScopeField
+
+    """Default is read_attribute."""
+    permission: ImagePermissionValueField = "read_attribute"
+  ): ImageNode
+
+  """Added in 25.3.0."""
+  image_nodes(
+    scope_id: ScopeField!
+
+    """Default is read_attribute."""
+    permission: ImagePermissionValueField = "read_attribute"
+
+    """Added in 25.4.0."""
+    filter_by_statuses: [ImageStatus] = [ALIVE]
+    filter: String
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): ImageConnection
+
+  """Added in 25.14.2. Returns information about the current user."""
+  viewer: Viewer
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
@@ -116,9 +207,23 @@ type Queries {
   user_resource_policies: [UserResourcePolicy]
   project_resource_policies: [ProjectResourcePolicy]
   resource_preset(name: String): ResourcePreset
-  resource_presets: [ResourcePreset]
+
+  """Added in 25.4.0."""
+  resource_preset_by_id(id: UUID): ResourcePreset
+  resource_presets(
+    """Added in 25.4.0."""
+    filter: String
+
+    """Added in 25.4.0."""
+    order: String
+  ): [ResourcePreset]
   scaling_group(name: String): ScalingGroup
   scaling_groups(name: String, is_active: Boolean): [ScalingGroup]
+
+  """
+  Added in 25.5.0. This query is available for all users. It returns the resource groups(=scaling groups) that the user has access to. Only name, is_active, own_session_occupied_resource_slots and accelerator_quantum_size fields are returned.
+  """
+  accessible_scaling_groups(project_id: UUID!): [ScalingGroup]
   scaling_groups_for_domain(domain: String!, is_active: Boolean): [ScalingGroup]
   scaling_groups_for_user_group(user_group: String!, is_active: Boolean): [ScalingGroup]
   scaling_groups_for_keypair(access_key: String!, is_active: Boolean): [ScalingGroup]
@@ -186,12 +291,51 @@ type Queries {
     first: Int
     last: Int
   ): ComputeSessionConnection
+
+  """Added in 25.13.0."""
+  session_pending_queue(
+    resource_group_id: String!
+
+    """Specifies how many items to skip before beginning to return result."""
+    offset: Int
+
+    """If this value is provided, the query will be limited to that value."""
+    before: String
+
+    """Queries the `last` number of results from the query result from last."""
+    after: String
+
+    """
+    Queries the `first` number of results from the query result from first.
+    """
+    first: Int
+
+    """If the given value is provided, the query will start from that value."""
+    last: Int
+  ): SessionPendingQueueConnection
   compute_session(id: UUID!): ComputeSession
   compute_container(id: UUID!): ComputeContainer
   compute_session_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, access_key: String, status: String): ComputeSessionList
   compute_container_list(limit: Int!, offset: Int!, filter: String, order: String, session_id: ID!, role: String): ComputeContainerList
   legacy_compute_session_list(limit: Int!, offset: Int!, order_key: String, order_asc: Boolean, domain_name: String, group_id: String, access_key: String, status: String): LegacyComputeSessionList
   legacy_compute_session(sess_id: String!, domain_name: String, access_key: String): LegacyComputeSession
+
+  """Added in 25.5.0."""
+  total_resource_slot(
+    """
+    `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'DEPRIORITIZING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
+    Default value is null.
+    """
+    statuses: [String] = null
+
+    """
+    `filter` argument is a string that is parsed into query conditions. It works in the same way as the `filter` argument in the `compute_session` query schema, meaning the values are parsed into an identical SQL query expression.
+    Default value is `null`.
+    """
+    filter: String
+    domain_name: String
+    resource_group_name: String
+  ): TotalResourceSlot
   vfolder_host_permissions: PredefinedAtomicPermission
   endpoint(endpoint_id: UUID!): Endpoint
   endpoint_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, user_uuid: String, project: UUID): EndpointList
@@ -200,8 +344,8 @@ type Queries {
   endpoint_token(token: String!): EndpointToken
   endpoint_token_list(limit: Int!, offset: Int!, filter: String, order: String, endpoint_id: UUID): EndpointTokenList
   quota_scope(storage_host_name: String!, quota_scope_id: String!): QuotaScope
-  container_registry(hostname: String!): ContainerRegistry
-  container_registries: [ContainerRegistry]
+  container_registry(hostname: String!): ContainerRegistry @deprecated(reason: "Deprecated since 24.9.0. use `container_registry_node` instead.")
+  container_registries: [ContainerRegistry] @deprecated(reason: "Deprecated since 24.9.0. use `container_registry_nodes_v2` instead.")
 
   """Added in 24.09.0."""
   container_registry_node(id: String!): ContainerRegistryNode
@@ -220,6 +364,32 @@ type Queries {
 
   """Added in 24.12.0."""
   networks(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): NetworkConnection
+
+  """Added in 25.1.0."""
+  endpoint_auto_scaling_rule_node(id: String!): EndpointAutoScalingRuleNode
+
+  """Added in 25.1.0."""
+  endpoint_auto_scaling_rule_nodes(endpoint: String!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): EndpointAutoScalingRuleConnection
+
+  """Added in 25.6.0."""
+  user_utilization_metric(user_id: UUID!, props: UserUtilizationMetricQueryInput!): UserUtilizationMetric
+
+  """Added in 25.6.0."""
+  container_utilization_metric_metadata: ContainerUtilizationMetricMetadata
+
+  """Added in 25.8.0."""
+  available_service: AvailableServiceNode
+
+  """Added in 25.8.0."""
+  available_services(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): AvailableServiceConnection
+
+  """Added in 25.8.0."""
+  service_config(service: String!): ServiceConfigNode
+
+  """Added in 25.8.0."""
+  service_configs(services: [String]!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ServiceConfigConnection
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
 }
 
 """
@@ -230,6 +400,97 @@ interface Node {
   """The ID of the object"""
   id: ID!
 }
+
+"""
+A schema that contains metadata related to the AuditLogNode.
+It provides a list of values, such as entity_type and status, that can be used in the AuditLog, allowing clients to retrieve them.
+
+Added in 25.6.0.
+"""
+type AuditLogSchema {
+  """
+  Possible values of "AuditLogNode.entity_type"
+  """
+  entity_type_variants: [String]
+
+  """
+  Possible values of "AuditLogNode.status"
+  """
+  status_variants: [String]
+}
+
+"""Added in 25.6.0."""
+type AuditLogConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [AuditLogEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 25.6.0. A Relay edge containing a `AuditLog` and its cursor."""
+type AuditLogEdge {
+  """The item at the end of the edge"""
+  node: AuditLogNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 25.6.0."""
+type AuditLogNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """UUID of the AuditLog row"""
+  row_id: UUID!
+
+  """Added in 25.6.0. UUID of the action"""
+  action_id: UUID!
+
+  """Entity type of the AuditLog"""
+  entity_type: String!
+
+  """Operation type of the AuditLog"""
+  operation: String!
+
+  """Entity ID of the AuditLog"""
+  entity_id: String
+
+  """The time the AuditLog was reported"""
+  created_at: DateTime!
+
+  """Request ID of the AuditLog"""
+  request_id: String
+
+  """Added in 25.12.0, User ID that triggered the action"""
+  triggered_by: String
+
+  """Description of the AuditLog"""
+  description: String!
+
+  """Duration taken to perform the operation"""
+  duration: String
+
+  """Status of the AuditLog"""
+  status: String!
+}
+
+"""
+Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
+in fields, resolvers and input.
+"""
+scalar UUID
+
+"""
+The `DateTime` scalar type represents a DateTime
+value as specified by
+[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
+"""
+scalar DateTime
 
 type Agent implements Item {
   id: ID
@@ -251,6 +512,9 @@ type Agent implements Item {
   auto_terminate_abusing_kernel: Boolean
   local_config: JSONString
   container_count: Int
+
+  """Added in 25.4.0."""
+  gpu_alloc_map: UUIDFloatMap
   mem_slots: Int
   cpu_slots: Float
   gpu_slots: Float
@@ -269,19 +533,18 @@ interface Item {
 }
 
 """
-The `DateTime` scalar type represents a DateTime
-value as specified by
-[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
-"""
-scalar DateTime
-
-"""
 Allows use of a JSON String for input / output from the GraphQL schema.
 
 Use of this type is *not recommended* as you lose the benefits of having a defined, static
 schema (one of the key benefits of GraphQL).
 """
 scalar JSONString
+
+"""
+Added in 25.4.0.
+Verifies that the key is a UUID (represented as a string) and the value is a float.
+"""
+scalar UUIDFloatMap
 
 type ComputeContainer implements Item {
   id: ID
@@ -323,13 +586,7 @@ type ComputeContainer implements Item {
   preopen_ports: [Int]
 }
 
-"""
-Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
-in fields, resolvers and input.
-"""
-scalar UUID
-
-type ImageNode implements Node {
+type ImageNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -359,14 +616,28 @@ type ImageNode implements Node {
   digest: String
   labels: [KVPair]
   size_bytes: BigInt
+
+  """Added in 25.4.0."""
+  status: String
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
 
   """Added in 24.03.4. The array of image aliases."""
   aliases: [String]
+
+  """
+  Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
+  """
+  permissions: [ImagePermissionValueField]
+
+  """Added in 25.11.0. Indicates if the image is installed on any Agent."""
+  installed: Boolean
+
+  """Added in 25.12.0."""
+  type: ImageType
 }
 
-type KVPair {
+type KVPair @shareable {
   key: String
   value: String
 }
@@ -377,10 +648,22 @@ to support integers outside the range of a signed 32-bit integer.
 """
 scalar BigInt
 
-type ResourceLimit {
+type ResourceLimit @shareable {
   key: String
   min: String
-  max: String
+  max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
+}
+
+"""
+Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
+"""
+scalar ImagePermissionValueField
+
+"""Added in 25.12.0."""
+enum ImageType {
+  COMPUTE
+  SYSTEM
+  SERVICE
 }
 
 type AgentList implements PaginatedList {
@@ -410,7 +693,7 @@ type AgentSummaryList implements PaginatedList {
 }
 
 """Added in 24.12.0."""
-type DomainNode implements Node {
+type DomainNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   name: String
@@ -423,45 +706,28 @@ type DomainNode implements Node {
   allowed_docker_registries: [String]
   dotfiles: Bytes
   integration_id: String
-  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalinGroupConnection
+  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalingGroupConnection
 }
 
 """Added in 24.09.1."""
 scalar Bytes
 
 """Added in 24.12.0."""
-type ScalinGroupConnection {
+type ScalingGroupConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
 
   """Contains the nodes in this connection."""
-  edges: [ScalinGroupEdge]!
+  edges: [ScalingGroupEdge]!
 
   """Total count of the GQL nodes of the query."""
   count: Int
 }
 
 """
-The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+Added in 24.12.0. A Relay edge containing a `ScalingGroup` and its cursor.
 """
-type PageInfo {
-  """When paginating forwards, are there more items?"""
-  hasNextPage: Boolean!
-
-  """When paginating backwards, are there more items?"""
-  hasPreviousPage: Boolean!
-
-  """When paginating backwards, the cursor to continue."""
-  startCursor: String
-
-  """When paginating forwards, the cursor to continue."""
-  endCursor: String
-}
-
-"""
-Added in 24.12.0. A Relay edge containing a `ScalinGroup` and its cursor.
-"""
-type ScalinGroupEdge {
+type ScalingGroupEdge {
   """The item at the end of the edge"""
   node: ScalingGroupNode
 
@@ -470,7 +736,7 @@ type ScalinGroupEdge {
 }
 
 """Added in 24.12.0."""
-type ScalingGroupNode implements Node {
+type ScalingGroupNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   name: String
@@ -564,6 +830,9 @@ type AgentNode implements Node {
   auto_terminate_abusing_kernel: Boolean
   local_config: JSONString
   container_count: Int
+
+  """Added in 25.4.0."""
+  gpu_alloc_map: UUIDFloatMap
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
 
   """
@@ -606,6 +875,14 @@ type KernelNode implements Node {
   cluster_hostname: String
   session_id: UUID
   image: ImageNode
+
+  """Added in 25.4.0."""
+  image_reference: String
+
+  """
+  Added in 25.4.0. The architecture that the image of this kernel requires
+  """
+  architecture: String
   status: String
   status_changed: DateTime
   status_info: String
@@ -647,7 +924,7 @@ type Domain {
   scaling_groups: [String]
 }
 
-type GroupNode implements Node {
+type GroupNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -670,6 +947,9 @@ type GroupNode implements Node {
   """Added in 24.03.7."""
   container_registry: JSONString
   scaling_groups: [String]
+
+  """Added in 25.3.0."""
+  registry_quota: BigInt
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
 
@@ -694,7 +974,7 @@ type UserEdge {
   cursor: String!
 }
 
-type UserNode implements Node {
+type UserNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -726,6 +1006,24 @@ type UserNode implements Node {
   totp_activated: Boolean
   totp_activated_at: DateTime
   sudo_session_enabled: Boolean
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
+
+  """Added in 25.5.0."""
+  project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
 }
 
 """Added in 24.03.0"""
@@ -748,6 +1046,14 @@ type GroupEdge {
   """A cursor for use in pagination"""
   cursor: String!
 }
+
+"""Added in 25.3.0."""
+scalar ContainerRegistryScopeField
+
+"""
+Added in 25.3.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_attribute', 'delete_project', 'associate_with_user'].
+"""
+scalar GroupPermissionField
 
 type Group {
   id: UUID
@@ -797,11 +1103,48 @@ type Image {
   labels: [KVPair]
   aliases: [String]
   size_bytes: BigInt
+
+  """Added in 25.4.0."""
+  status: String
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
   installed: Boolean
   installed_agents: [String]
   hash: String
+}
+
+"""Added in 25.4.0."""
+enum ImageStatus {
+  ALIVE
+  DELETED
+}
+
+"""Added in 25.3.0."""
+type ImageConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ImageEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 25.3.0. A Relay edge containing a `Image` and its cursor."""
+type ImageEdge {
+  """The item at the end of the edge"""
+  node: ImageNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 25.14.2."""
+type Viewer {
+  user: UserNode
+  user_id: UUID
+  encoded_user_role: String
 }
 
 type User implements Item {
@@ -829,6 +1172,21 @@ type User implements Item {
   Added in 24.03.0. Used as the default authentication credential for password-based logins and sets the user's total resource usage limit. User's main_access_key cannot be deleted, and only super-admin can replace main_access_key.
   """
   main_access_key: String
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
   groups: [UserGroup]
 }
 
@@ -1037,9 +1395,16 @@ type ProjectResourcePolicy {
 }
 
 type ResourcePreset {
+  """Added in 25.4.0. ID of the resource preset."""
+  id: UUID
   name: String
   resource_slots: JSONString
   shared_memory: BigInt
+
+  """
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
+  """
+  scaling_group_name: String
 }
 
 type ScalingGroup {
@@ -1056,6 +1421,9 @@ type ScalingGroup {
   scheduler_opts: JSONString
   use_host_network: Boolean
 
+  """Added in 25.5.0."""
+  accelerator_quantum_size: Float
+
   """Added in 24.03.7."""
   agent_count_by_status(
     """
@@ -1071,6 +1439,16 @@ type ScalingGroup {
     """
     status: String = "ALIVE"
   ): JSONString
+
+  """
+  Added in 25.6.0. The limit of computing resources that can be allocated to each compute session created within this resource group.
+  """
+  resource_allocation_limit_for_sessions: JSONString
+
+  """
+  Added in 25.4.0. The sum of occupied slots across compute sessions that occupying agent's resources. Only includes sessions owned by the user.
+  """
+  own_session_occupied_resource_slots: JSONString
 }
 
 type StorageVolume implements Item {
@@ -1096,7 +1474,7 @@ type StorageVolumeList implements PaginatedList {
 }
 
 """Added in 24.03.4"""
-type VirtualFolderNode implements Node {
+type VirtualFolderNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -1167,6 +1545,9 @@ type VirtualFolderPermissionList implements PaginatedList {
   total_count: Int!
 }
 
+"""
+Legacy VirtualFolderPermission GraphQL type (renamed to avoid conflict with VFolderPermission enum).
+"""
 type VirtualFolderPermission implements Item {
   id: ID
   permission: String
@@ -1177,7 +1558,7 @@ type VirtualFolderPermission implements Item {
 }
 
 """Added in 24.09.0."""
-type ComputeSessionNode implements Node {
+type ComputeSessionNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -1195,6 +1576,9 @@ type ComputeSessionNode implements Node {
   domain_name: String
   project_id: UUID
   user_id: UUID
+
+  """Added in 25.13.0."""
+  owner: UserNode
   access_key: String
 
   """
@@ -1209,6 +1593,9 @@ type ComputeSessionNode implements Node {
   terminated_at: DateTime
   starts_at: DateTime
   scheduled_at: DateTime
+
+  """Added in 25.13.0."""
+  queue_position: Int
   startup_command: String
   result: String
   commit_status: String
@@ -1221,6 +1608,12 @@ type ComputeSessionNode implements Node {
   vfolder_mounts: [String]
   occupied_slots: JSONString
   requested_slots: JSONString
+
+  """Added in 25.4.0."""
+  image_references: [String]
+
+  """Added in 25.4.0."""
+  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
   num_queries: BigInt
   inference_metrics: JSONString
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
@@ -1256,6 +1649,29 @@ type ComputeSessionConnection {
 Added in 24.09.0. A Relay edge containing a `ComputeSession` and its cursor.
 """
 type ComputeSessionEdge {
+  """The item at the end of the edge"""
+  node: ComputeSessionNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 25.13.0."""
+type SessionPendingQueueConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [SessionPendingQueueEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 25.13.0. A Relay edge containing a `SessionPendingQueue` and its cursor.
+"""
+type SessionPendingQueueEdge {
   """The item at the end of the edge"""
   node: ComputeSessionNode
 
@@ -1329,6 +1745,13 @@ type LegacyComputeSession implements Item {
   io_write_bytes: BigInt
   io_max_scratch_size: BigInt
   io_cur_scratch_size: BigInt
+}
+
+"""Added in 25.5.0."""
+type TotalResourceSlot implements Item {
+  id: ID
+  occupied_slots: JSONString
+  requested_slots: JSONString
 }
 
 type PredefinedAtomicPermission {
@@ -1442,7 +1865,7 @@ type RoutingList implements PaginatedList {
   total_count: Int!
 }
 
-type EndpointToken implements Item {
+type EndpointToken implements Item @key(fields: "token") {
   id: ID
   token: String!
   endpoint_id: UUID!
@@ -1471,6 +1894,7 @@ type QuotaDetails {
   hard_limit_bytes: BigInt
 }
 
+"""Deprecated since 24.09.0. use `ContainerRegistryNode` instead"""
 type ContainerRegistry implements Node {
   """The ID of the object"""
   id: ID!
@@ -1478,6 +1902,7 @@ type ContainerRegistry implements Node {
   config: ContainerRegistryConfig
 }
 
+"""Deprecated since 24.09.0."""
 type ContainerRegistryConfig {
   url: String!
   type: String!
@@ -1525,6 +1950,9 @@ type ContainerRegistryNode implements Node {
 
   """Added in 24.09.3."""
   extra: JSONString
+
+  """Added in 25.3.0."""
+  allowed_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
 }
 
 """Added in 24.09.0."""
@@ -1651,8 +2079,200 @@ type NetworkEdge {
   cursor: String!
 }
 
-"""All available GraphQL mutations."""
-type Mutations {
+"""Added in 25.1.0."""
+type EndpointAutoScalingRuleNode implements Node @key(fields: "id") {
+  """The ID of the object"""
+  id: ID!
+  row_id: UUID!
+  metric_source: AutoScalingMetricSource!
+  metric_name: String!
+  threshold: String!
+  comparator: AutoScalingMetricComparator!
+  step_size: Int!
+  cooldown_seconds: Int!
+  min_replicas: Int
+  max_replicas: Int
+  created_at: DateTime!
+  last_triggered_at: DateTime
+  endpoint: UUID!
+}
+
+"""The source type to fetch metrics. Added in 25.1.0."""
+enum AutoScalingMetricSource {
+  KERNEL
+  INFERENCE_FRAMEWORK
+}
+
+"""
+The comparator used to compare the metric value with the threshold. Added in 25.1.0.
+"""
+enum AutoScalingMetricComparator {
+  LESS_THAN
+  LESS_THAN_OR_EQUAL
+  GREATER_THAN
+  GREATER_THAN_OR_EQUAL
+}
+
+"""Added in 25.1.0."""
+type EndpointAutoScalingRuleConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [EndpointAutoScalingRuleEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 25.1.0. A Relay edge containing a `EndpointAutoScalingRule` and its cursor.
+"""
+type EndpointAutoScalingRuleEdge {
+  """The item at the end of the edge"""
+  node: EndpointAutoScalingRuleNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 25.6.0."""
+type UserUtilizationMetric {
+  user_id: UUID
+  metrics: [ContainerUtilizationMetric]
+}
+
+"""Added in 25.6.0."""
+type ContainerUtilizationMetric {
+  metric_name: String
+
+  """One of 'current', 'capacity'."""
+  value_type: String
+  values: [MetricResultValue]
+
+  """The maximum value of the metric in given time range. null if no data."""
+  max_value: String
+
+  """The average value of the metric in given time range. null if no data."""
+  avg_value: String
+}
+
+"""Added in 25.6.0. A pair of timestamp and value."""
+type MetricResultValue {
+  timestamp: Float
+  value: String
+}
+
+"""Added in 25.6.0."""
+input UserUtilizationMetricQueryInput {
+  """One of 'current', 'capacity'. Default value is 'current'."""
+  value_type: String = "current"
+
+  """metric name of container utilization. For example, 'cpu_util', 'mem'."""
+  metric_name: String!
+
+  """rfc3339 or unix_timestamp."""
+  start: String!
+
+  """rfc3339 or unix_timestamp."""
+  end: String!
+
+  """
+  Query resolution step width in duration format or float number of seconds. For example, '1m', '1h', '1d', '1w'
+  """
+  step: String!
+}
+
+"""Added in 25.6.0."""
+type ContainerUtilizationMetricMetadata {
+  metric_names: [String]
+}
+
+"""Available services for configuration. Added in 25.8.0."""
+type AvailableServiceNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Possible values of "Config.service". Added in 25.8.0."""
+  service_variants: [String]!
+}
+
+"""Added in 25.8.0."""
+type AvailableServiceConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [AvailableServiceEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 25.8.0. A Relay edge containing a `AvailableService` and its cursor.
+"""
+type AvailableServiceEdge {
+  """The item at the end of the edge"""
+  node: AvailableServiceNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Configuration data for a specific service. Added in 25.8.0."""
+type ServiceConfigNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """
+  Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.
+  """
+  service: String!
+
+  """Configuration data. Added in 25.8.0."""
+  configuration: JSONString!
+
+  """JSON schema of the configuration. Added in 25.8.0."""
+  schema: JSONString!
+}
+
+"""Added in 25.8.0."""
+type ServiceConfigConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ServiceConfigEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 25.8.0. A Relay edge containing a `ServiceConfig` and its cursor.
+"""
+type ServiceConfigEdge {
+  """The item at the end of the edge"""
+  node: ServiceConfigNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+union _Entity = ImageNode | DomainNode | ScalingGroupNode | GroupNode | UserNode | VirtualFolderNode | ComputeSessionNode | EndpointToken | EndpointAutoScalingRuleNode
+
+scalar _Any
+
+type _Service {
+  sdl: String
+}
+
+"""
+All available GraphQL mutations.
+Type name changed from 'Mutations' to 'Mutation' in 25.13.0
+"""
+type Mutation {
   modify_agent(id: String!, props: ModifyAgentInput!): ModifyAgent
   create_domain(name: String!, props: DomainInput!): CreateDomain
   modify_domain(name: String!, props: ModifyDomainInput!): ModifyDomain
@@ -1712,23 +2332,70 @@ type Mutations {
   This action cannot be undone.
   """
   purge_user(email: String!, props: PurgeUserInput!): PurgeUser
+
+  """Added in 25.4.0."""
+  rescan_gpu_alloc_maps(
+    """Agent ID to rescan GPU alloc map"""
+    agent_id: String!
+  ): RescanGPUAllocMaps
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
   delete_keypair(access_key: String!): DeleteKeyPair
-  rescan_images(registry: String): RescanImages
+  rescan_images(
+    """Added in 25.1.0."""
+    project: String
+    registry: String
+  ): RescanImages
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
-  modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
+  modify_image(
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
+    architecture: String = null
+    props: ModifyImageInput!
+    target: String!
+  ): ModifyImage
+
+  """Added in 25.6.0"""
+  clear_image_custom_resource_limit(key: ClearImageCustomResourceLimitKey!): ClearImageCustomResourceLimitPayload
 
   """Added in 24.03.0"""
   forget_image_by_id(image_id: String!): ForgetImageById
-  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+
+  """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
+  forget_image(
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
+    architecture: String = null
+    reference: String!
+  ): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+
+  """Added in 25.4.0"""
+  purge_image_by_id(
+    image_id: String!
+
+    """Added in 25.10.0."""
+    options: PurgeImageOptions = {remove_from_registry: false}
+  ): PurgeImageById
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
-  alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
+  alias_image(
+    alias: String!
+
+    """
+    Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+    """
+    architecture: String = null
+    target: String!
+  ): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
+
+  """Added in 25.4.0"""
+  purge_images(keys: [PurgeImagesKey]!, options: PurgeImagesOptions = {force: false, noprune: false}): PurgeImagesPayload
 
   """Added in 24.09.0."""
   modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
@@ -1742,8 +2409,23 @@ type Mutations {
   modify_project_resource_policy(name: String!, props: ModifyProjectResourcePolicyInput!): ModifyProjectResourcePolicy
   delete_project_resource_policy(name: String!): DeleteProjectResourcePolicy
   create_resource_preset(name: String!, props: CreateResourcePresetInput!): CreateResourcePreset
-  modify_resource_preset(name: String!, props: ModifyResourcePresetInput!): ModifyResourcePreset
-  delete_resource_preset(name: String!): DeleteResourcePreset
+  modify_resource_preset(
+    """Added in 25.4.0. ID of the resource preset."""
+    id: UUID = null
+    name: String = null @deprecated(reason: "Deprecated since 25.4.0.")
+    props: ModifyResourcePresetInput!
+  ): ModifyResourcePreset
+  delete_resource_preset(
+    """Added in 25.4.0. ID of the resource preset."""
+    id: UUID = null
+    name: String = null @deprecated(reason: "Deprecated since 25.4.0.")
+  ): DeleteResourcePreset
+
+  """Updates configuration for a given service. Added in 25.8.0."""
+  modify_service_config(
+    """Added in 25.8.0."""
+    input: ModifyServiceConfigNodeInput!
+  ): ModifyServiceConfigNodePayload
   create_scaling_group(name: String!, props: CreateScalingGroupInput!): CreateScalingGroup
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
   delete_scaling_group(name: String!): DeleteScalingGroup
@@ -1797,7 +2479,7 @@ type Mutations {
     ssl_verify: Boolean
 
     """
-    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local').
+    Added in 24.09.0. Container Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local', 'ocp').
     """
     type: ContainerRegistryTypeField!
 
@@ -1806,7 +2488,7 @@ type Mutations {
 
     """Added in 24.09.0."""
     username: String
-  ): CreateContainerRegistryNode
+  ): CreateContainerRegistryNode @deprecated(reason: "Deprecated since 25.3.0. use `create_container_registry_node_v2` instead.")
 
   """Added in 24.09.0."""
   modify_container_registry_node(
@@ -1832,7 +2514,7 @@ type Mutations {
     ssl_verify: Boolean
 
     """
-    Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local'). Added in 24.09.0.
+    Container Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local', 'ocp'). Added in 24.09.0.
     """
     type: ContainerRegistryTypeField
 
@@ -1841,16 +2523,61 @@ type Mutations {
 
     """Added in 24.09.0."""
     username: String
-  ): ModifyContainerRegistryNode
+  ): ModifyContainerRegistryNode @deprecated(reason: "Deprecated since 25.3.0. use `modify_container_registry_node_v2` instead.")
 
   """Added in 24.09.0."""
   delete_container_registry_node(
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
-  ): DeleteContainerRegistryNode
-  create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
-  modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
-  delete_container_registry(hostname: String!): DeleteContainerRegistry
+  ): DeleteContainerRegistryNode @deprecated(reason: "Deprecated since 25.3.0. use `delete_container_registry_node_v2` instead.")
+
+  """Added in 25.3.0."""
+  create_container_registry_node_v2(
+    """Added in 25.3.0."""
+    props: CreateContainerRegistryNodeInputV2!
+  ): CreateContainerRegistryNodeV2
+
+  """Added in 25.3.0."""
+  modify_container_registry_node_v2(
+    """Object id. Can be either global id or object id. Added in 25.3.0."""
+    id: String!
+
+    """Added in 25.3.0."""
+    props: ModifyContainerRegistryNodeInputV2!
+  ): ModifyContainerRegistryNodeV2
+
+  """Added in 25.3.0."""
+  delete_container_registry_node_v2(
+    """Object id. Can be either global id or object id. Added in 25.3.0."""
+    id: String!
+  ): DeleteContainerRegistryNodeV2
+
+  """Added in 25.1.0."""
+  create_endpoint_auto_scaling_rule_node(endpoint: String!, props: EndpointAutoScalingRuleInput!): CreateEndpointAutoScalingRuleNode
+
+  """Added in 25.1.0."""
+  modify_endpoint_auto_scaling_rule_node(id: String!, props: ModifyEndpointAutoScalingRuleInput!): ModifyEndpointAutoScalingRuleNode
+
+  """Added in 25.1.0."""
+  delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
+
+  """Added in 25.3.0."""
+  create_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): CreateContainerRegistryQuota
+
+  """Added in 25.3.0."""
+  update_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): UpdateContainerRegistryQuota
+
+  """Added in 25.3.0."""
+  delete_container_registry_quota(scope_id: ScopeField!): DeleteContainerRegistryQuota
+
+  """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
+  create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `create_container_registry_node_v2` instead.")
+
+  """Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead"""
+  modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `modify_container_registry_node_v2` instead.")
+
+  """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
+  delete_container_registry(hostname: String!): DeleteContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `delete_container_registry_node_v2` instead.")
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
 
   """Added in 24.09.0."""
@@ -2030,6 +2757,9 @@ type CreateUser {
   ok: Boolean
   msg: String
   user: User
+
+  """Added in 25.15.0."""
+  keypair: KeyPair
 }
 
 input UserInput {
@@ -2047,6 +2777,21 @@ input UserInput {
   totp_activated: Boolean = false
   resource_policy: String = "default"
   sudo_session_enabled: Boolean = false
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
 }
 
 type ModifyUser {
@@ -2071,6 +2816,21 @@ input ModifyUserInput {
   resource_policy: String
   sudo_session_enabled: Boolean
   main_access_key: String
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
 }
 
 """
@@ -2104,6 +2864,16 @@ type PurgeUser {
 
 input PurgeUserInput {
   purge_shared_vfolders: Boolean
+
+  """
+  Added in 25.4.0. The default value is `false`. Indicates whether the user's existing endpoints are delegated to the requester.
+  """
+  delegate_endpoint_ownership: Boolean
+}
+
+"""Added in 25.4.0."""
+type RescanGPUAllocMaps {
+  task_id: UUID
 }
 
 type CreateKeyPair {
@@ -2184,7 +2954,22 @@ input KVPairInput {
 input ResourceLimitInput {
   key: String
   min: String
-  max: String
+  max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
+}
+
+"""Added in 25.6.0."""
+type ClearImageCustomResourceLimitPayload {
+  image_node: ImageNode
+}
+
+"""Added in 25.6.0."""
+input ClearImageCustomResourceLimitKey {
+  image_canonical: String!
+
+  """
+  Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.
+  """
+  architecture: String = null
 }
 
 """Added in 24.03.0."""
@@ -2196,6 +2981,7 @@ type ForgetImageById {
   image: ImageNode
 }
 
+"""Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
 type ForgetImage {
   ok: Boolean
   msg: String
@@ -2204,7 +2990,22 @@ type ForgetImage {
   image: ImageNode
 }
 
-"""Added in 24.03.1"""
+"""Added in 25.4.0."""
+type PurgeImageById {
+  image: ImageNode
+}
+
+"""Added in 25.10.0."""
+input PurgeImageOptions {
+  """
+  Untag the deleted image from the registry. Only available in the HarborV2 registry.
+  """
+  remove_from_registry: Boolean = false
+}
+
+"""
+Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead.
+"""
 type UntagImageFromRegistry {
   ok: Boolean
   msg: String
@@ -2226,6 +3027,34 @@ type DealiasImage {
 type ClearImages {
   ok: Boolean
   msg: String
+}
+
+"""Added in 25.6.0."""
+type PurgeImagesPayload {
+  task_id: String
+}
+
+"""Added in 25.6.0."""
+input PurgeImagesKey {
+  agent_id: String!
+  images: [ImageRefType]!
+}
+
+input ImageRefType {
+  name: String!
+  registry: String
+  architecture: String
+}
+
+"""Added in 25.6.0."""
+input PurgeImagesOptions {
+  """
+  Remove the images even if it is being used by stopped containers or has other tags, Added in 25.6.0.
+  """
+  force: Boolean = false
+
+  """Don't delete untagged parent images, Added in 25.6.0."""
+  noprune: Boolean = false
 }
 
 """Added in 24.09.0."""
@@ -2419,6 +3248,11 @@ type CreateResourcePreset {
 input CreateResourcePresetInput {
   resource_slots: JSONString!
   shared_memory: String
+
+  """
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
+  """
+  scaling_group_name: String
 }
 
 type ModifyResourcePreset {
@@ -2427,13 +3261,43 @@ type ModifyResourcePreset {
 }
 
 input ModifyResourcePresetInput {
+  """Added in 25.4.0. A name of resource preset."""
+  name: String
   resource_slots: JSONString
   shared_memory: String
+
+  """
+  Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
+  """
+  scaling_group_name: String
 }
 
 type DeleteResourcePreset {
   ok: Boolean
   msg: String
+}
+
+"""
+Payload for the ModifyServiceConfigNode mutation.
+Added in 25.8.0.
+"""
+type ModifyServiceConfigNodePayload {
+  """ServiceConfiguration Node. Added in 25.8.0."""
+  service_config: ServiceConfigNode!
+}
+
+"""
+Input data for modifying configuration.
+Added in 25.8.0.
+"""
+input ModifyServiceConfigNodeInput {
+  """
+  Service name. See AvailableService.service_variants for possible values. Added in 25.8.0.
+  """
+  service: String!
+
+  """Service configuration data to mutate. Added in 25.8.0."""
+  configuration: JSONString!
 }
 
 type CreateScalingGroup {
@@ -2581,10 +3445,164 @@ type DeleteContainerRegistryNode {
   container_registry: ContainerRegistryNode
 }
 
+"""Added in 25.3.0."""
+type CreateContainerRegistryNodeV2 {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 25.3.0."""
+input CreateContainerRegistryNodeInputV2 {
+  """Added in 25.3.0."""
+  url: String!
+
+  """Added in 25.3.0."""
+  type: ContainerRegistryTypeField!
+
+  """Added in 25.3.0."""
+  registry_name: String!
+
+  """Added in 25.3.0."""
+  is_global: Boolean
+
+  """Added in 25.3.0."""
+  project: String
+
+  """Added in 25.3.0."""
+  username: String
+
+  """Added in 25.3.0."""
+  password: String
+
+  """Added in 25.3.0."""
+  ssl_verify: Boolean
+
+  """Added in 25.3.0."""
+  extra: JSONString
+
+  """Added in 25.3.0."""
+  allowed_groups: AllowedGroups
+}
+
+"""Added in 25.3.0."""
+input AllowedGroups {
+  """List of group_ids to add associations. Added in 25.3.0."""
+  add: [String] = []
+
+  """List of group_ids to remove associations. Added in 25.3.0."""
+  remove: [String] = []
+}
+
+"""Added in 25.3.0."""
+type ModifyContainerRegistryNodeV2 {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 25.3.0."""
+input ModifyContainerRegistryNodeInputV2 {
+  """Added in 25.3.0."""
+  url: String
+
+  """Added in 25.3.0."""
+  type: ContainerRegistryTypeField
+
+  """Added in 25.3.0."""
+  registry_name: String
+
+  """Added in 25.3.0."""
+  is_global: Boolean
+
+  """Added in 25.3.0."""
+  project: String
+
+  """Added in 25.3.0."""
+  username: String
+
+  """Added in 25.3.0."""
+  password: String
+
+  """Added in 25.3.0."""
+  ssl_verify: Boolean
+
+  """Added in 25.3.0."""
+  extra: JSONString
+
+  """Added in 25.3.0."""
+  allowed_groups: AllowedGroups
+}
+
+"""Added in 25.3.0."""
+type DeleteContainerRegistryNodeV2 {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 25.1.0."""
+type CreateEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
+  rule: EndpointAutoScalingRuleNode
+}
+
+"""Added in 25.1.0."""
+input EndpointAutoScalingRuleInput {
+  metric_source: AutoScalingMetricSource!
+  metric_name: String!
+  threshold: String!
+  comparator: AutoScalingMetricComparator!
+  step_size: Int!
+  cooldown_seconds: Int!
+  min_replicas: Int
+  max_replicas: Int
+}
+
+"""Added in 25.1.0."""
+type ModifyEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
+  rule: EndpointAutoScalingRuleNode
+}
+
+"""Added in 25.1.0."""
+input ModifyEndpointAutoScalingRuleInput {
+  metric_source: AutoScalingMetricSource
+  metric_name: String
+  threshold: String
+  comparator: AutoScalingMetricComparator
+  step_size: Int
+  cooldown_seconds: Int
+  min_replicas: Int
+  max_replicas: Int
+}
+
+"""Added in 25.1.0."""
+type DeleteEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 25.3.0."""
+type CreateContainerRegistryQuota {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 25.3.0."""
+type UpdateContainerRegistryQuota {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 25.3.0."""
+type DeleteContainerRegistryQuota {
+  ok: Boolean
+  msg: String
+}
+
+"""Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
 type CreateContainerRegistry {
   container_registry: ContainerRegistry
 }
 
+"""Deprecated since 24.09.0."""
 input CreateContainerRegistryInput {
   url: String!
   type: String!
@@ -2597,10 +3615,12 @@ input CreateContainerRegistryInput {
   is_global: Boolean
 }
 
+"""Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead"""
 type ModifyContainerRegistry {
   container_registry: ContainerRegistry
 }
 
+"""Deprecated since 24.09.0."""
 input ModifyContainerRegistryInput {
   url: String
   type: String
@@ -2613,6 +3633,7 @@ input ModifyContainerRegistryInput {
   is_global: Boolean
 }
 
+"""Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
 type DeleteContainerRegistry {
   container_registry: ContainerRegistry
 }
@@ -2654,12 +3675,6 @@ input ModifyEndpointInput {
 
   """Added in 24.03.5."""
   runtime_variant: String
-}
-
-input ImageRefType {
-  name: String!
-  registry: String
-  architecture: String
 }
 
 """Added in 24.03.4."""
@@ -2714,3 +3729,14 @@ type DeleteNetwork {
   ok: Boolean
   msg: String
 }
+
+"""
+A string-serialized scalar represents a set of fields that's passed to a federated directive, such as @key, @requires, or @provides
+"""
+scalar FieldSet
+
+"""This string-serialized scalar represents a JWT scope"""
+scalar federation__Scope
+
+"""This string-serialized scalar represents an authorization policy."""
+scalar federation__Policy

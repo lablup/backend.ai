@@ -49,7 +49,7 @@ vfolders = sa.Table(
 )
 
 
-def list_chunk(lst, n):
+def list_chunk(lst: list[object], n: int) -> list[list[object]]:
     return [lst[i : i + n] for i in range(0, len(lst), n)]
 
 
@@ -58,7 +58,7 @@ def upgrade() -> None:
 
     batch_size = 100
     known_quota_scopes: dict[UUID, str] = {}
-    query = sa.select([sa.func.count()]).where(
+    query = sa.select(sa.func.count()).where(
         (sessions.c.vfolder_mounts != sa.cast(None, postgresql.JSONB))
         & (sa.func.jsonb_array_length(sessions.c.vfolder_mounts) > 0)
     )
@@ -66,7 +66,7 @@ def upgrade() -> None:
     updated_count = 0
 
     def render_vfolder_id(old_vfid: str) -> str:
-        if "/" in old_vfid and (old_vfid.startswith("user:") or old_vfid.startswith("project:")):
+        if "/" in old_vfid and old_vfid.startswith(("user:", "project:")):
             return old_vfid
 
         if "/" in old_vfid:
@@ -76,13 +76,12 @@ def upgrade() -> None:
 
         if quota_scope_id := known_quota_scopes.get(UUID(v2_id)):
             return f"{quota_scope_id}/{v2_id}"
-        else:
-            return v2_id
+        return v2_id
 
     prev_id = None
     while True:
         query = (
-            sa.select([sessions.c.id, sa.cast(sessions.c.vfolder_mounts, postgresql.JSONB)])
+            sa.select(sessions.c.id, sa.cast(sessions.c.vfolder_mounts, postgresql.JSONB))
             .order_by(sessions.c.id)
             .where(
                 (sessions.c.vfolder_mounts != sa.cast(None, postgresql.JSONB))
@@ -105,7 +104,7 @@ def upgrade() -> None:
                     continue
                 unknown_quota_scopes.add(v2_id)
 
-        query = sa.select([vfolders.c.id, vfolders.c.quota_scope_id]).where(
+        query = sa.select(vfolders.c.id, vfolders.c.quota_scope_id).where(
             vfolders.c.id.in_(unknown_quota_scopes)
         )
         result = connection.execute(query).fetchall()
@@ -120,22 +119,22 @@ def upgrade() -> None:
                 for mount in vfolder_mounts
             ]
             updates.append({"row_id": sess_id, "vfolder_mounts": new_mounts})
-        query = (
+        session_update = (
             sa.update(sessions)
             .values({"vfolder_mounts": bindparam("vfolder_mounts")})
             .where(sessions.c.id == bindparam("row_id"))
         )
         connection.execute(
-            query,
+            session_update,
             updates,
         )
-        query = (
+        kernel_update = (
             sa.update(kernels)
             .values(vfolder_mounts=bindparam("vfolder_mounts"))
             .where(kernels.c.session_id == bindparam("row_id"))
         )
         connection.execute(
-            query,
+            kernel_update,
             updates,
         )
         updated_count += len(rows)
@@ -147,7 +146,7 @@ def downgrade() -> None:
     connection = op.get_bind()
 
     batch_size = 100
-    query = sa.select([sa.func.count()]).where(
+    query = sa.select(sa.func.count()).where(
         (sessions.c.vfolder_mounts != sa.cast(None, postgresql.JSONB))
         & (sa.func.jsonb_array_length(sessions.c.vfolder_mounts) > 0)
     )
@@ -156,7 +155,7 @@ def downgrade() -> None:
     prev_id = None
     while True:
         query = (
-            sa.select([sessions.c.id, sa.cast(sessions.c.vfolder_mounts, postgresql.JSONB)])
+            sa.select(sessions.c.id, sa.cast(sessions.c.vfolder_mounts, postgresql.JSONB))
             .order_by(sessions.c.id)
             .where(
                 (sessions.c.vfolder_mounts != sa.cast(None, postgresql.JSONB))
@@ -177,22 +176,22 @@ def downgrade() -> None:
             ]
             updates.append({"row_id": sess_id, "vfolder_mounts": new_mounts})
 
-        query = (
+        session_update = (
             sa.update(sessions)
             .values({"vfolder_mounts": bindparam("vfolder_mounts")})
             .where(sessions.c.id == bindparam("row_id"))
         )
         connection.execute(
-            query,
+            session_update,
             updates,
         )
-        query = (
+        kernel_update = (
             sa.update(kernels)
             .values(vfolder_mounts=bindparam("vfolder_mounts"))
             .where(kernels.c.session_id == bindparam("row_id"))
         )
         connection.execute(
-            query,
+            kernel_update,
             updates,
         )
         updated_count += len(rows)

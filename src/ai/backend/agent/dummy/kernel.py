@@ -3,15 +3,16 @@ from __future__ import annotations
 import asyncio
 import os
 from collections import OrderedDict
-from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
+from collections.abc import Mapping, MutableMapping, Sequence
+from typing import Any, override
 
+from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
+from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import EventProducer
-from ai.backend.common.types import AgentId, CommitStatus, KernelId, SessionId
-
-from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
-from ..resources import KernelResourceSpec
-from ..types import AgentEventData
+from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.types import CommitStatus, KernelId, SessionId
 
 
 class DummyKernel(AbstractKernel):
@@ -19,9 +20,7 @@ class DummyKernel(AbstractKernel):
 
     def __init__(
         self,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        agent_id: AgentId,
+        ownership_data: KernelOwnershipData,
         network_id: str,
         image: ImageRef,
         version: int,
@@ -30,13 +29,11 @@ class DummyKernel(AbstractKernel):
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
         environ: Mapping[str, Any],
-        data: Dict[str, Any],
+        data: dict[str, Any],
         dummy_config: Mapping[str, Any],
     ) -> None:
         super().__init__(
-            kernel_id,
-            session_id,
-            agent_id,
+            ownership_data,
             network_id,
             image,
             version,
@@ -50,16 +47,18 @@ class DummyKernel(AbstractKernel):
         self.dummy_config = dummy_config
         self.dummy_kernel_cfg = self.dummy_config["kernel"]
 
+    @override
     async def close(self) -> None:
         pass
 
+    @override
     async def create_code_runner(
         self,
         event_producer: EventProducer,
         *,
-        client_features: FrozenSet[str],
+        client_features: frozenset[str],
         api_version: int,
-    ) -> "AbstractCodeRunner":
+    ) -> AbstractCodeRunner:
         if self.dummy_kernel_cfg["use-fake-code-runner"]:
             return await DummyFakeCodeRunner.new(
                 self.kernel_id,
@@ -71,70 +70,83 @@ class DummyKernel(AbstractKernel):
                 exec_timeout=0,
                 client_features=client_features,
             )
-        else:
-            return await DummyCodeRunner.new(
-                self.kernel_id,
-                self.session_id,
-                event_producer,
-                kernel_host=self.data["kernel_host"],
-                repl_in_port=self.data["repl_in_port"],
-                repl_out_port=self.data["repl_out_port"],
-                exec_timeout=0,
-                client_features=client_features,
-            )
+        return await DummyCodeRunner.new(
+            self.kernel_id,
+            self.session_id,
+            event_producer,
+            kernel_host=self.data["kernel_host"],
+            repl_in_port=self.data["repl_in_port"],
+            repl_out_port=self.data["repl_out_port"],
+            exec_timeout=0,
+            client_features=client_features,
+        )
 
-    async def check_status(self):
+    @override
+    async def check_status(self) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["check-status"]
         await asyncio.sleep(delay)
         return {}
 
-    async def get_completions(self, text, opts):
+    @override
+    async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
         delay = self.dummy_kernel_cfg["delay"]["get-completions"]
         await asyncio.sleep(delay)
-        return {"status": "finished", "completions": []}
+        return CodeCompletionResp(result=CodeCompletionResult.success({"suggestions": []}))
 
-    async def get_logs(self):
+    @override
+    async def get_logs(self) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["get-logs"]
         await asyncio.sleep(delay)
         return {"logs": "my logs"}
 
-    async def interrupt_kernel(self):
+    @override
+    async def interrupt_kernel(self) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["interrupt-kernel"]
         await asyncio.sleep(delay)
+        return {}
 
-    async def start_service(self, service, opts):
+    @override
+    async def start_service(self, service: str, opts: Mapping[str, Any]) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["start-service"]
         await asyncio.sleep(delay)
+        return {}
 
-    async def start_model_service(self, model_service: Mapping[str, Any]):
+    @override
+    async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["start-model-service"]
         await asyncio.sleep(delay)
         return {}
 
-    async def shutdown_service(self, service):
+    @override
+    async def shutdown_service(self, service: str) -> None:
         delay = self.dummy_kernel_cfg["delay"]["shutdown-service"]
         await asyncio.sleep(delay)
 
-    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
+    @override
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         if self.is_commiting:
             return CommitStatus.ONGOING
         return CommitStatus.READY
 
+    @override
     async def commit(
         self,
-        kernel_id,
-        subdir,
+        kernel_id: KernelId,
+        subdir: str,
         *,
         canonical: str | None = None,
         filename: str | None = None,
-        extra_labels: dict[str, str] = {},
+        extra_labels: dict[str, str] | None = None,
     ) -> None:
+        if extra_labels is None:
+            extra_labels = {}
         self.is_commiting = True
         delay = self.dummy_kernel_cfg["delay"]["commit"]
         await asyncio.sleep(delay)
         self.is_commiting = False
 
-    async def get_service_apps(self):
+    @override
+    async def get_service_apps(self) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["get-service-apps"]
         await asyncio.sleep(delay)
         return {
@@ -143,29 +155,30 @@ class DummyKernel(AbstractKernel):
         }
 
     @override
-    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
+    async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
         delay = self.dummy_kernel_cfg["delay"]["accept-file"]
         await asyncio.sleep(delay)
 
     @override
-    async def download_file(self, container_path: os.PathLike | str) -> bytes:
+    async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
         delay = self.dummy_kernel_cfg["delay"]["download-file"]
         await asyncio.sleep(delay)
         return b""
 
     @override
-    async def download_single(self, container_path: os.PathLike | str) -> bytes:
+    async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
         delay = self.dummy_kernel_cfg["delay"]["download-single"]
         await asyncio.sleep(delay)
         return b""
 
     @override
-    async def list_files(self, container_path: os.PathLike | str):
+    async def list_files(self, container_path: os.PathLike[str] | str) -> dict[str, Any]:
         delay = self.dummy_kernel_cfg["delay"]["list-files"]
         await asyncio.sleep(delay)
         return {"files": "", "errors": "", "abspath": ""}
 
-    async def notify_event(self, evdata: AgentEventData):
+    @override
+    async def notify_event(self, evdata: AgentEventData) -> None:
         raise NotImplementedError
 
 
@@ -176,15 +189,15 @@ class DummyCodeRunner(AbstractCodeRunner):
 
     def __init__(
         self,
-        kernel_id,
-        session_id,
-        event_producer,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        event_producer: EventProducer,
         *,
-        kernel_host,
-        repl_in_port,
-        repl_out_port,
-        exec_timeout=0,
-        client_features=None,
+        kernel_host: str,
+        repl_in_port: int,
+        repl_out_port: int,
+        exec_timeout: float = 0,
+        client_features: frozenset[str] | None = None,
     ) -> None:
         super().__init__(
             kernel_id,
@@ -197,9 +210,11 @@ class DummyCodeRunner(AbstractCodeRunner):
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
 
+    @override
     async def get_repl_in_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_in_port}"
 
+    @override
     async def get_repl_out_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
@@ -209,21 +224,21 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
     repl_in_port: int
     repl_out_port: int
 
-    input_sock: None  # type: ignore[assignment]
-    output_sock: None  # type: ignore[assignment]
+    input_sock: None
+    output_sock: None
     zctx: None  # type: ignore[assignment]
 
     def __init__(
         self,
-        kernel_id,
-        session_id,
-        event_producer,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        event_producer: EventProducer,
         *,
-        kernel_host,
-        repl_in_port,
-        repl_out_port,
-        exec_timeout=0,
-        client_features=None,
+        kernel_host: str,
+        repl_in_port: int,
+        repl_out_port: int,
+        exec_timeout: float = 0,
+        client_features: frozenset[str] | None = None,
     ) -> None:
         self.zctx = None
         self.input_sock = None
@@ -251,7 +266,7 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
     async def __ainit__(self) -> None:
         return
 
-    def __setstate__(self, props):
+    def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         self.__dict__.update(props)
         self.zctx = None
         self.input_sock = None
@@ -270,52 +285,69 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
         self.watchdog_task = None
         self._closed = False
 
+    @override
     async def get_repl_in_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_in_port}"
 
+    @override
     async def get_repl_out_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
+    @override
     async def close(self) -> None:
         return None
 
-    async def ping_status(self):
+    @override
+    async def ping_status(self) -> None:
         return None
 
-    async def feed_batch(self, opts):
+    @override
+    async def feed_batch(self, opts: Mapping[str, Any]) -> None:
         return None
 
-    async def feed_code(self, text: str):
+    @override
+    async def feed_code(self, text: str) -> None:
         return None
 
-    async def feed_input(self, text: str):
+    @override
+    async def feed_input(self, text: str) -> None:
         return None
 
-    async def feed_interrupt(self):
+    @override
+    async def feed_interrupt(self) -> None:
         return None
 
-    async def feed_and_get_status(self):
+    @override
+    async def feed_and_get_status(self) -> None:
         return None
 
-    async def feed_and_get_completion(self, code_text, opts):
-        return []
+    @override
+    async def feed_and_get_completion(
+        self, code_text: str, opts: Mapping[str, Any]
+    ) -> CodeCompletionResult:
+        return CodeCompletionResult.failure("not-implemented")
 
-    async def feed_start_model_service(self, model_info):
+    @override
+    async def feed_start_model_service(self, model_info: Mapping[str, Any]) -> dict[str, Any]:
         return {"status": "failed", "error": "not-implemented"}
 
-    async def feed_start_service(self, service_info):
+    @override
+    async def feed_start_service(self, service_info: Mapping[str, Any]) -> dict[str, Any]:
         return {"status": "failed", "error": "not-implemented"}
 
-    async def feed_service_apps(self):
+    @override
+    async def feed_service_apps(self) -> dict[str, Any]:
         return {"status": "failed", "error": "not-implemented"}
 
+    @override
     @staticmethod
     def aggregate_console(
         result: NextResult, records: Sequence[ResultRecord], api_ver: int
     ) -> None:
         return
 
-    async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
+    @override
+    async def get_next_result(self, api_ver: int = 2, flush_timeout: float = 2.0) -> NextResult:
         return {
             "runId": self.current_run_id,
             "status": "finished",
@@ -323,18 +355,22 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
             "options": None,
         }
 
+    @override
     async def attach_output_queue(self, run_id: str | None) -> None:
         return
 
+    @override
     def resume_output_queue(self) -> None:
         return
 
+    @override
     def next_output_queue(self) -> None:
         return
 
+    @override
     async def read_output(self) -> None:
         return
 
 
-async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, Sequence[str]]:
+async def prepare_krunner_env(_local_config: Mapping[str, Any]) -> Mapping[str, str]:
     return {}

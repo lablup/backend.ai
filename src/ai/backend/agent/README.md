@@ -1,290 +1,773 @@
 # Backend.AI Agent
 
-The Backend.AI Agent is a small daemon that does:
+## Purpose
 
-* Reports the status and available resource slots of a worker to the manager
-* Routes code execution requests to the designated kernel container
-* Manages the lifecycle of kernel containers (create/monitor/destroy them)
+The Agent is a compute node component responsible for container lifecycle management. It runs computing sessions as containers, monitors resource usage, and reports status to the Manager.
 
-## Package Structure
+## Key Responsibilities
 
-* `ai.backend`
-  - `agent`: The agent package
-    - `docker`: A docker-based backend implementation for the kernel lifecycle interface.
-    - `server`: The agent daemon which communicates with the manager and the Docker daemon
-    - `watcher`: A side-by-side daemon which provides a separate HTTP endpoint for accessing the status
-      information of the agent daemon and manipulation of the agent's systemd service
-  - `helpers`: A utility package that is available as `ai.backend.helpers` *inside* Python-based containers
-  - `kernel`: Language-specific runtimes (mostly ipykernel client adaptor) which run *inside* containers
-  - `runner`: Auxiliary components (usually self-contained binaries) mounted *inside* containers
+### 1. Container Lifecycle Management
+- Create and start containers from session specifications
+- Initialize kernels and execute runtime configuration
+- Monitor container health and status
+- Delete containers upon session termination
+- Handle container restarts and error recovery
+
+### 2. Resource Monitoring
+- Track CPU, memory, GPU usage per container
+- Monitor disk I/O and network traffic
+- Collect accelerator metrics (CUDA, ROCm, TPU)
+- Report resource availability to Manager
+- Enforce resource limits via cgroups
+
+### 3. Local Storage Management
+- Manage scratch storage for temporary files
+- Mount virtual folders (vfolders) to containers
+- Handle file permissions and ownership
+- Clean up storage after session termination
+
+### 4. Service Port Management
+- Expose container service ports (Jupyter, SSH, TensorBoard, etc.)
+- Forward traffic from App Proxy to containers
+- Manage port allocation from configured ranges
+- Handle SSL/TLS termination when needed
+
+### 5. Agent Status Reporting
+- Periodically report agent status to Manager
+- Send heartbeat signals indicating availability
+- Update occupied and available resource slots
+- Report errors and exceptional conditions
+
+## Entry Points
+
+Agent has 4 entry points. The RPC Server handles Manager requests, Event Dispatcher sends and receives events, Background Task Handler performs async tasks, and Internal REST API is used exclusively for metrics exposure.
+
+### 1. RPC Server (Primary Request Handler)
+
+**Framework**: Callosum (ZeroMQ-based RPC, Curve authentication)
+
+**Port**: 6011 (default)
+
+**Key Features**:
+- Only Manager can send RPC requests to Agent (no direct user access)
+
+### 2. Event Dispatcher
+
+**System**: Backend.AI Event Dispatcher
+
+Agent sends Agent and Kernel lifecycle events to Manager.
+
+**Published Events**: Agent and Kernel lifecycle events
+
+**Consumed Events**: Plugin integration events
+
+**Related Documentation**: [Event Dispatcher System](../common/events/README.md)
+
+### 3. Background Task Handler
+
+**System**: Backend.AI Background Task Handler
+
+Handles long-running tasks asynchronously, issues Task IDs, and notifies completion via events.
+
+**Usage Examples**:
+- Image pulling tasks
+- Large-scale container cleanup tasks
+
+**Related Documentation**: [Background Task Handler System](../common/bgtask/README.md)
+
+### 4. Internal REST API (Metrics Only)
+
+**Framework**: aiohttp
+
+**Port**: 6003 (metrics only, separate from RPC port)
+
+**Endpoints**:
+- `GET /metrics` - Expose Prometheus metrics
 
 
-## Installation
+**Key Features**:
+- Metrics exposure only (no service logic triggering)
+- Prometheus scrapes periodically
+- Auto-registered via Manager's Service Discovery
 
-Please visit [the installation guides](https://github.com/lablup/backend.ai/wiki).
+### Entry Point Interactions
 
+Each Entry Point operates independently. However, service logic can coordinate them:
 
-### Kernel/system configuration
+**Background Task Triggering**:
+- Service logic in RPC Server or Event Dispatcher can trigger long-running tasks as Background Tasks.
 
-#### Recommended kernel parameters in the bootloader (e.g., Grub):
+**Event Publishing**:
+- RPC Server or Background Task can publish events via Event Dispatcher after task completion.
+
+**Integrated Architecture**:
 
 ```
-cgroup_enable=memory swapaccount=1
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  RPC Server  │  │Event Dispatch│  │  Background  │
+│   (Callosum) │  │              │  │     Task     │
+│   Port 6011  │  │              │  │              │
+└───────┬──────┘  └───────┬──────┘  └───────┬──────┘
+        │                 │                 │
+        └─────────────────┴─────────────────┘
+                          │
+                ┌─────────▼──────────┐
+                │  Agent Core Logic  │
+                │  - Resource Mgmt   │
+                │  - Kernel Mgmt     │
+                └─────────┬──────────┘
+                          │
+                ┌─────────▼──────────┐
+                │  Container Backend │
+                └────────────────────┘
+
+        ┌──────────────────┐
+        │ Internal REST API│ (Independent, metrics only)
+        │   Port 6003      │
+        └──────────────────┘
 ```
 
-#### Recommended resource limits:
+## Architecture
 
-**`/etc/security/limits.conf`**
 ```
-root hard nofile 512000
-root soft nofile 512000
-root hard nproc 65536
-root soft nproc 65536
-user hard nofile 512000
-user soft nofile 512000
-user hard nproc 65536
-user soft nproc 65536
-```
-
-**sysctl**
-```
-fs.file-max=2048000
-fs.inotify.max_user_watches=524288
-net.core.somaxconn=1024
-net.ipv4.tcp_max_syn_backlog=1024
-net.ipv4.tcp_slow_start_after_idle=0
-net.ipv4.tcp_fin_timeout=10
-net.ipv4.tcp_window_scaling=1
-net.ipv4.tcp_tw_reuse=1
-net.ipv4.tcp_early_retrans=1
-net.ipv4.ip_local_port_range=40000 65000
-net.core.rmem_max=16777216
-net.core.wmem_max=16777216
-net.ipv4.tcp_rmem=4096 12582912 16777216
-net.ipv4.tcp_wmem=4096 12582912 16777216
-net.netfilter.nf_conntrack_max=10485760
-net.netfilter.nf_conntrack_tcp_timeout_established=432000
-net.netfilter.nf_conntrack_tcp_timeout_close_wait=10
-net.netfilter.nf_conntrack_tcp_timeout_fin_wait=10
-net.netfilter.nf_conntrack_tcp_timeout_time_wait=10
+┌────────────────────────────────────────┐
+│         Agent Server (agent.py)        │
+├────────────────────────────────────────┤
+│    Container Backend (docker/)         │  ← Docker
+├────────────────────────────────────────┤
+│      Resource Monitor (stats.py)       │  ← CPU, GPU, Memory
+├────────────────────────────────────────┤
+│   Storage Manager (scratch.py fs.py)   │  ← Local and mounted storage
+├────────────────────────────────────────┤
+│      Plugin System (plugin/)           │  ← Plugin
+└────────────────────────────────────────┘
 ```
 
-The `ip_local_port_range` should not overlap with the container port range pool
-(default: 30000 to 31000).
+## Directory Structure
 
-To apply netfilter settings during the boot time, you may need to add `nf_conntrack` to `/etc/modules`
-so that `sysctl` could set the `net.netfilter.nf_conntrack_*` values.
-
-
-### For development
-
-#### Prerequisites
-
-* Python 3.6 or higher with [pyenv](https://github.com/pyenv/pyenv)
-and [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) (optional but recommneded)
-* Docker 18.03 or later with docker-compose (18.09 or later is recommended)
-
-First, you need **a working manager installation**.
-For the detailed instructions on installing the manager, please refer
-[the manager's README](https://github.com/lablup/backend.ai-manager/blob/master/README.md)
-and come back here again.
-
-#### Preparing working copy
-
-Install and activate [`git-lfs`](https://git-lfs.github.com/) to work with pre-built binaries in
-`src/ai/backend/runner`.
-
-```console
-$ git lfs install
+```
+agent/
+├── docker/              # Docker container backend
+│   ├── agent.py        # Docker-specific agent implementation
+│   └── resources.py    # Docker resource management
+├── watcher/             # Agent watcher
+├── plugin/              # Plugin system
+├── observer/            # Metrics observers
+├── cli/                 # CLI commands
+├── config/              # Configuration
+├── agent.py             # Main agent logic
+├── server.py            # RPC server entry point
+├── kernel.py            # Kernel (container) management
+├── resources.py         # Resource allocation
+├── stats.py             # Statistics aggregation
+├── scratch.py           # Scratch storage management
+└── fs.py                # Filesystem utilities
 ```
 
-Next, prepare the source clone of the agent and install from it as follows.
-`pyenv` is just a recommendation; you may use other virtualenv management tools.
+## Core Concepts
 
-```console
-$ git clone https://github.com/lablup/backend.ai-agent agent
-$ cd agent
-$ pyenv virtualenv venv-agent
-$ pyenv local venv-agent
-$ pip install -U pip setuptools
-$ pip install -U -r requirements/dev.txt
+### Kernels
+Kernels represent running containers executing computing sessions:
+- **Kernel ID**: Unique identifier for the container
+- **Session ID**: Associated session in Manager
+- **Image**: Container image (e.g., `lablup/python:3.11-ubuntu20.04`)
+- **Resources**: Allocated CPU, memory, GPU slots
+- **Status**: PREPARING, RUNNING, RESTARTING, TERMINATING, TERMINATED
+- **Service Ports**: Exposed ports for services (Jupyter, SSH, etc.)
+
+### Container Backend
+The Agent supports multiple container runtimes:
+- **Docker**: Standard Docker containers
+
+The Docker backend implements these interfaces:
+- `create_kernel()`: Create new container
+- `destroy_kernel()`: Remove container
+- `restart_kernel()`: Restart container
+- `get_kernel_status()`: Query container status
+- `execute_code()`: Execute code in container
+
+### Resource Allocation
+Resources are allocated from the agent's capacity:
+- **CPU Slots**: Measured in cores (e.g., 2.0 cores)
+- **Memory Slots**: Measured in bytes (e.g., 4GB)
+- **GPU Slots**: Number of GPU devices (e.g., 1 GPU)
+- **Accelerator Slots**: Custom accelerator resources
+
+The Agent tracks:
+- **Total Capacity**: Maximum available resources
+- **Occupied Slots**: Currently allocated resources
+- **Available Slots**: Remaining resources for new sessions
+
+### Scratch Storage
+Each kernel receives local scratch storage:
+- **Location**: `/scratches/{kernel_id}`
+- **Quota**: Configurable size limit per kernel
+- **Cleanup**: Automatically removed after kernel termination
+
+### Virtual Folder Mounting
+VFolders are mounted to containers at runtime:
+- **Mount Point**: `/home/work/{vfolder_name}`
+- **Permissions**: RO, RW, or RW-DELETE
+- **Backend**: Storage Proxy manages actual storage
+
+## Resource Monitoring
+
+### CPU Monitoring
+- Track per-container CPU usage via cgroups
+- Measure CPU time in user and system modes
+- Calculate CPU utilization percentages
+- Enforce CPU quotas and limits
+
+### Memory Monitoring
+- Track RSS (Resident Set Size) per container
+- Measure cache and swap usage
+- Detect OOM (Out-of-Memory) conditions
+- Enforce memory limits via cgroups
+
+### Shared Memory (shmem)
+Containers can request shared memory (`/dev/shm`) for inter-process communication.
+
+**Docker Memory Architecture**:
+- shm (tmpfs) and app memory share the Memory cgroup space
+- shm has an additional ShmSize limit (tmpfs maximum size)
+- Effective shm limit = `min(ShmSize, Memory cgroup available space)`
+
+**OOM Conditions**:
+| Signal | Exit Code | Condition |
+|--------|-----------|-----------|
+| SIGKILL | 137 | shm + app > Memory cgroup limit |
+| SIGBUS | 135 | shm > ShmSize |
+
+**Configuration**:
+- Set via `resource_opts.shmem` in session specification
+- Docker HostConfig: `ShmSize` parameter
+
+**References**:
+- [Linux Kernel cgroup v1 Memory](https://docs.kernel.org/admin-guide/cgroup-v1/memory.html) - tmpfs/shm charged to cgroup
+- [Linux Kernel cgroup v2](https://docs.kernel.org/admin-guide/cgroup-v2.html) - shmem in memory.stat
+
+### GPU Monitoring
+- Query NVIDIA GPUs via NVML (nvidia-ml-py)
+- Query AMD GPUs via ROCm SMI
+- Track GPU utilization and memory usage
+- Measure GPU temperature and power consumption
+
+### Disk I/O Monitoring
+- Track read/write operations per container
+- Measure I/O bandwidth usage
+- Monitor disk space consumption
+- Enforce I/O throttling when configured
+
+## Plugin System
+
+Agent can uses plugin system for accelerator support:
+
+### CUDA Plugin
+- Detect NVIDIA GPUs via `nvidia-smi`
+- Allocate GPU devices to containers
+- Set `CUDA_VISIBLE_DEVICES` environment variable
+- Monitor GPU metrics via NVML
+
+### ROCm Plugin
+- Detect AMD GPUs via `rocm-smi`
+- Allocate GPU devices to containers
+- Set `HIP_VISIBLE_DEVICES` environment variable
+- Monitor GPU metrics via ROCm
+
+### TPU Plugin
+- Detect Google TPUs
+- Configure TPU access for TensorFlow
+- Monitor TPU utilization
+
+## Communication Protocols
+
+### Manager → Agent (ZeroMQ RPC)
+- **Port**: 6011 (default)
+- **Protocol**: ZeroMQ request-response
+- **Operations**:
+  - `create_kernel`: Create new container
+  - `destroy_kernel`: Terminate container
+  - `restart_kernel`: Restart container
+  - `execute_code`: Execute code in container
+  - `get_status`: Query agent and kernel status
+
+### Agent → Manager (HTTP Watcher API)
+- **Port**: 6009 (default)
+- **Protocol**: HTTP
+- **Operations**:
+  - Heartbeat signals
+  - Resource usage reporting
+  - Kernel status updates
+  - Error notifications
+
+### Agent → Storage Proxy
+- **Protocol**: HTTP
+- **Operations**:
+  - Mount vfolder
+  - Unmount vfolder
+  - Query vfolder metadata
+
+## Container Execution Flow
+
+```
+1. Manager sends create_kernel RPC
+   ↓
+2. Agent validates resource availability
+   ↓
+3. Agent pulls container image (if needed)
+   ↓
+4. Agent creates scratch directory
+   ↓
+5. Agent mounts vfolders via Storage Proxy
+   ↓
+6. Agent creates container with resources
+   ↓
+7. Agent starts container and runs init script
+   ↓
+8. Agent registers service ports
+   ↓
+9. Agent reports kernel status to Manager
+   ↓
+10. Container runs until termination
+   ↓
+11. Agent cleans up resources upon termination
 ```
 
-### Linting
+## Service Ports
 
-We use `flake8` and `mypy` to statically check our code styles and type consistency.
-Enable those linters in your favorite IDE or editor.
+Containers can expose service ports:
+- **Jupyter Notebook**: Port 8080 (HTTP)
+- **Jupyter Lab**: Port 8090 (HTTP)
+- **SSH**: Port 2200 (TCP)
+- **TensorBoard**: Port 6006 (HTTP)
+- **Custom Services**: User-defined ports
 
-### Halfstack (single-node development & testing)
+Service ports are:
+- **Allocated** from configured range (default 30000-31000)
+- **Registered** with App Proxy for external access
+- **Forwarded** from agent host to container
+- **Cleaned up** upon container termination
 
-With the halfstack, you can run the agent simply.
-Note that you need a working manager running with the halfstack already!
+## Configuration
 
-#### Recommended directory structure
+See `configs/agent/halfstack.toml` for configuration file examples.
 
-* `backend.ai-dev`
-  - `manager` (git clone from [the manager repo](https://github.com/lablup/backend.ai-manager))
-  - `agent` (git clone from here)
-  - `common` (git clone from [the common repo](https://github.com/lablup/backend.ai-common))
+### Key Configuration Items
 
-Install `backend.ai-common` as an editable package in the agent (and the manager) virtualenvs
-to keep the codebase up-to-date.
+**Agent Basic Settings**:
+- Agent ID and region information
+- Resource slot definitions
+- Container runtime configuration (Docker)
 
-```console
-$ cd agent
-$ pip install -U -e ../common
+**Storage Settings**:
+- Scratch storage root path
+- Per-session quota
+
+**Service Port Settings**:
+- Container port range
+
+**Resource Monitoring**:
+- Watcher interval settings
+
+## Infrastructure Dependencies
+
+### Required Infrastructure
+
+#### Container Runtime
+- **Purpose**: Container creation and management
+- **Supported Runtimes**: Docker
+
+#### Redis (Event and State Management)
+- **Purpose**:
+  - Send heartbeat events (for Manager registration)
+  - Update agent status
+  - Manage background tasks
+- **Note**: Agent registers with Manager via Redis and receives RPC commands from Manager.
+
+#### Manager Connection
+- **Protocol**: ZeroMQ RPC (6011), HTTP Watcher API (6009)
+- **Purpose**: Receive session commands from Manager, report status
+- **Note**: Agent only receives commands from Manager, not directly from users or other components.
+
+#### etcd (Global Configuration)
+- **Purpose**:
+  - Retrieve global configuration (storage volumes, etc.)
+  - Auto-discover Manager address
+
+### Optional Infrastructure (Observability)
+
+Optional infrastructure for Agent monitoring.
+
+#### Prometheus (Metrics Collection)
+- **Purpose**:
+  - Monitor agent resource utilization
+  - Collect kernel (container) metrics
+  - Track heartbeat and health status
+- **HTTP Service Port**: 6003 (separate from RPC port 6011)
+- **Exposed Endpoint**: `http://localhost:6003/metrics`
+- **Key Metrics**:
+  - `backendai_agent_heartbeat` - Last heartbeat timestamp
+  - `backendai_agent_cpu_usage` - CPU usage percentage
+  - `backendai_agent_mem_usage` - Memory usage (bytes)
+  - `backendai_agent_gpu_usage` - GPU usage percentage
+  - `backendai_kernel_count` - Number of running kernels
+- **Service Discovery**: Automatically registered via Manager's HTTP SD
+  - Agent auto-registers with Manager at startup
+  - Manager provides agent information to Prometheus SD
+
+#### Loki (Log Aggregation)
+- **Purpose**:
+  - Centralized agent log collection
+  - Aggregate kernel execution logs
+  - Track errors and debugging information
+- **Log Transmission Methods**:
+  - Direct HTTP API usage
+  - Use Promtail or Fluent Bit
+- **Log Labels**:
+  - `agent_id` - Agent identifier
+  - `kernel_id` - Kernel identifier
+  - `level` - Log level
+
+#### Container Runtime Metrics
+- **Docker**: Container metrics via cAdvisor or Docker API
+- **cgroups**: Direct cgroups filesystem reading
+
+### Container Runtime Requirements
+
+#### Docker
+- **Minimum Version**: Docker 20.10+
+- **Required Features**:
+  - cgroups v2 support (resource limits)
+  - GPU support (NVIDIA Docker Runtime or CDI)
+
+### Storage Requirements
+
+#### Local Scratch Storage
+- **Purpose**: Temporary files, build cache
+- **Recommended Specifications**:
+  - Fast SSD (NVMe recommended)
+  - Minimum 100GB free space
+  - Configurable per-session quota
+
+#### VFolder Mount
+- **Dependencies**: Storage Proxy or direct storage access
+- **Recommendations**:
+  - High-performance network (10GbE or higher)
+  - Low-latency storage
+
+### Halfstack Configuration
+
+**Recommended**: Use the `./scripts/install-dev.sh` script for development environment setup.
+
+#### Starting Development Environment
+```bash
+# Setup development environment via script (recommended)
+./scripts/install-dev.sh
+
+# Start Agent
+./backend.ai ag start-server
 ```
 
-#### Steps
+#### Observability Integration
+Agent automatically registers with Prometheus via Manager's Service Discovery.
 
-```console
-$ mkdir -p "./scratches"
-$ cp config/halfstack.toml ./agent.toml
+## Metrics and Monitoring
+
+### Prometheus Metrics
+Agent exposes metrics:
+
+#### RPC Related Metrics
+Metrics related to processing RPC commands received from Manager.
+
+**`backendai_rpc_requests`** (Counter)
+- **Description**: Total RPC requests processed by the agent
+- **Labels**:
+  - `method`: RPC method name (e.g., "create_kernel", "destroy_kernel", "execute_code")
+- Tracks processing frequency by Manager command type
+
+**`backendai_rpc_failure_requests`** (Counter)
+- **Description**: Failed RPC request count
+- **Labels**:
+  - `method`: RPC method name that failed
+  - `exception`: Exception class name (e.g., "ContainerNotFound", "ResourceExhausted")
+- Analyzes RPC command processing failure causes
+
+**`backendai_rpc_request_duration_seconds`** (Histogram)
+- **Description**: RPC request processing time in seconds
+- **Labels**:
+  - `method`: RPC method name
+- **Buckets**: [0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30, 60] seconds
+- Measures performance of RPC commands like kernel creation/deletion
+
+#### Resource Utilization Metrics
+Metrics related to container and hardware resource usage.
+
+**`backendai_container_utilization`** (Gauge)
+- **Description**: Container resource utilization per kernel
+- **Labels**:
+  - `container_metric_name`: Metric type (cpu_used, cpu_util, mem, cuda_mem, cuda_util, net_rx, net_tx)
+  - `agent_id`: Agent identifier
+  - `kernel_id`: Kernel identifier (Backend.AI's container wrapper, not the actual container ID)
+  - `session_id`: Session identifier
+  - `user_id`: User UUID who owns the session
+  - `project_id`: Project UUID that the session belongs to
+  - `value_type`: Value interpretation (current, capacity, pct)
+- Tracks resource usage per kernel (CPU, memory, GPU, network, etc.)
+
+**`backendai_device_utilization`** (Gauge)
+- **Description**: Physical device utilization on the agent node
+- **Labels**:
+  - `device_metric_name`: Metric type (cpu_util, mem, cuda_mem, cuda_util, cuda_temp, cuda_power)
+  - `agent_id`: Agent identifier
+  - `device_id`: Hardware device identifier (e.g., GPU index)
+  - `value_type`: Value interpretation (current, capacity, pct)
+- Tracks hardware device usage (GPU, CPU, memory) on the agent node
+
+#### Container Lifecycle Synchronization Metrics
+Metrics related to container state synchronization operations between Manager and Agent.
+
+**`backendai_sync_container_lifecycle_trigger_count`** (Counter)
+- **Description**: Number of times container lifecycle sync was triggered
+- **Labels**:
+  - `agent_id`: Agent identifier
+- Frequency of container state synchronization between Manager and Agent
+
+**`backendai_sync_container_lifecycle_success_count`** (Counter)
+- **Description**: Number of successfully synchronized containers
+- **Labels**:
+  - `agent_id`: Agent identifier
+- Number of successfully synchronized kernels
+
+**`backendai_sync_container_lifecycle_failure_count`** (Counter)
+- **Description**: Number of failed container synchronization attempts
+- **Labels**:
+  - `agent_id`: Agent identifier
+  - `exception`: Exception class name causing the failure
+- Tracks synchronization failure causes
+
+#### Statistics Collection Task Metrics
+Metrics related to node, container, and process level statistics collection.
+
+**`backendai_stat_task_trigger_count`** (Counter)
+- **Description**: Number of times statistics collection was triggered
+- **Labels**:
+  - `agent_id`: Agent identifier
+  - `stat_scope`: Statistics scope (node, container, process)
+- Collection frequency by Node/Container/Process level
+
+**`backendai_stat_task_success_count`** (Counter)
+- **Description**: Number of successful statistics collection operations
+- **Labels**:
+  - `agent_id`: Agent identifier
+  - `stat_scope`: Statistics scope (node, container, process)
+- Tracks statistics collection success rate
+
+**`backendai_stat_task_failure_count`** (Counter)
+- **Description**: Number of failed statistics collection operations
+- **Labels**:
+  - `agent_id`: Agent identifier
+  - `stat_scope`: Statistics scope (node, container, process)
+  - `exception`: Exception class name causing the failure
+- Analyzes statistics collection failure causes
+
+### Prometheus Query Examples
+
+The following examples demonstrate common Prometheus queries for Agent metrics. Note that Counter metrics use the `_total` suffix and Histogram metrics use `_bucket`, `_sum`, `_count` suffixes in actual queries.
+
+**Important Notes:**
+- When using `increase()` or `rate()` functions, the time range must be at least 2-4x longer than your Prometheus scrape interval to get reliable data. If the time range is too short, metrics may not appear or show incomplete data.
+- Default Prometheus scrape interval is typically 15s-30s
+- **Time range selection trade-offs**:
+  - Shorter ranges (e.g., `[1m]`): Detect changes faster with more granular data, but more sensitive to noise and short-term fluctuations
+  - Longer ranges (e.g., `[5m]`): Smoother graphs with reduced noise, better for identifying trends, but slower to detect sudden changes
+  - For real-time alerting: Use shorter ranges like `[1m]` or `[2m]`
+  - For dashboards and trend analysis: Use longer ranges like `[5m]` or `[10m]`
+
+#### RPC Request Monitoring
+
+**RPC Request Rate by Method**
+
+Monitor RPC request rate by method. This shows how frequently the Manager sends commands to agents. Use this to understand agent workload and command distribution.
+
+```promql
+sum(rate(backendai_rpc_requests_total{service_group="$service_groups"}[5m])) by (method)
 ```
 
-If you're running agent under linux, make sure you've set appropriate iptables rule 
-before starting agent. This can be done by executing script `scripts/update-metadata-iptables.sh` 
-before each agent start.
+**RPC Failure Rate by Method**
 
-Then, run it (for debugging, append a `--debug` flag):
+Track RPC failure rate by method and exception type. This helps identify which RPC operations are failing and why.
 
-```console
-$ python -m ai.backend.agent.server
+```promql
+sum(rate(backendai_rpc_failure_requests_total{service_group="$service_groups"}[5m])) by (method, exception)
 ```
 
-To run the agent-watcher:
+**P95 RPC Request Duration**
 
-```console
-$ python -m ai.backend.agent.watcher
+Calculate P95 RPC request duration by method. This shows how long critical operations like kernel creation take. Use this to identify performance bottlenecks in agent operations.
+
+```promql
+histogram_quantile(0.95,
+  sum(rate(backendai_rpc_request_duration_seconds_bucket{service_group="$service_groups"}[5m])) by (le, method)
+)
 ```
 
-The watcher shares the same configuration TOML file with the agent.
-Note that the watcher is only meaningful if the agent is installed as a systemd service
-named `backendai-agent.service`.
+#### Container Resource Utilization
 
-To run tests:
+**Top 5 GPU Memory Usage by Kernel**
 
-```console
-$ python -m flake8 src tests
-$ python -m pytest -m 'not integration' tests
+Monitor GPU memory usage by kernel (top 5). This identifies kernels consuming the most GPU memory. Note: `topk` returns the top N items at each evaluation time. Over multiple time points, you may see more than 5 unique kernels if different kernels appear in the top 5 at different times.
+
+```promql
+topk(5, sum(backendai_container_utilization{container_metric_name="cuda_mem", value_type="current"}) by (kernel_id))
 ```
 
+**Top 5 GPU Utilization by Kernel**
 
-## Deployment
+Monitor GPU utilization by kernel (top 5). This shows which kernels are actively using GPU compute. Note: `topk` returns the top N items at each evaluation time. Over multiple time points, you may see more than 5 unique kernels if different kernels appear in the top 5 at different times.
 
-### Configuration
-
-Put a TOML-formatted agent configuration (see the sample in `config/sample.toml`)
-in one of the following locations:
-
- * `agent.toml` (current working directory)
- * `~/.config/backend.ai/agent.toml` (user-config directory)
- * `/etc/backend.ai/agent.toml` (system-config directory)
-
-Only the first found one is used by the daemon.
-
-The agent reads most other configurations from the etcd v3 server where the cluster
-administrator or the Backend.AI manager stores all the necessary settings.
-
-The etcd address and namespace must match with the manager to make the agent
-paired and activated.
-By specifying distinguished namespaces, you may share a single etcd cluster with multiple
-separate Backend.AI clusters.
-
-By default the agent uses `/var/cache/scratches` directory for making temporary
-home directories used by kernel containers (the `/home/work` volume mounted in
-containers).  Note that the directory must exist in prior and the agent-running
-user must have ownership of it.  You can change the location by
-`scratch-root` option in `agent.toml`.
-
-### Running from a command line
-
-The minimal command to execute:
-
-```sh
-python -m ai.backend.agent.server
-python -m ai.backend.agent.watcher
+```promql
+topk(5, sum(backendai_container_utilization{container_metric_name="cuda_util", value_type="current"}) by (kernel_id))
 ```
 
-For more arguments and options, run the command with `--help` option.
+**Top 5 CPU Utilization Increase by Kernel**
 
-### Example config for systemd
+Track CPU utilization increase rate by kernel (top 5). This shows CPU consumption trends over time. Note: Divided by 1000 to convert from per-mille to percentage. `topk` returns the top N items at each evaluation time. Over multiple time points, you may see more than 5 unique kernels if different kernels appear in the top 5 at different times.
 
-`/etc/systemd/system/backendai-agent.service`:
-
-```dosini
-[Unit]
-Description=Backend.AI Agent
-Requires=docker.service
-After=network.target remote-fs.target docker.service
-
-[Service]
-Type=simple
-User=root
-Group=root
-Environment=HOME=/home/user
-ExecStart=/home/user/backend.ai/agent/run-agent.sh
-WorkingDirectory=/home/user/backend.ai/agent
-KillMode=process
-KillSignal=SIGTERM
-PrivateTmp=false
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
+```promql
+topk(5, sum(increase(backendai_container_utilization{container_metric_name="cpu_util", value_type="current"}[5m])) by (kernel_id)) / 1000
 ```
 
-`/home/user/backend.ai/agent/run-agent.sh`:
+**Network RX Traffic by Kernel**
 
-```sh
-#! /bin/sh
-if [ -z "$PYENV_ROOT" ]; then
-  export PYENV_ROOT="$HOME/.pyenv"
-  export PATH="$PYENV_ROOT/bin:$PATH"
-fi
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
+Monitor network RX (receive) traffic by kernel. This tracks inbound network bandwidth usage per container.
 
-cd /home/user/backend.ai/agent
-if [ "$#" -eq 0 ]; then
-  sh /home/user/backend.ai/agent/scripts/update-metadata-iptables.sh
-  exec python -m ai.backend.agent.server
-else
-  exec "$@"
-fi
+```promql
+sum(increase(backendai_container_utilization{container_metric_name="net_rx", value_type="current"}[5m])) by (kernel_id)
 ```
 
-### Networking
+**Network TX Traffic by Kernel**
 
-The manager and agent should run in the same local network or different
-networks reachable via VPNs, whereas the manager's API service must be exposed to
-the public network or another private network that users have access to.
+Monitor network TX (transmit) traffic by kernel. This tracks outbound network bandwidth usage per container.
 
-The manager must be able to access TCP ports 6001, 6009, and 30000 to 31000 of the agents in default
-configurations.  You can of course change those port numbers and ranges in the configuration.
+```promql
+sum(increase(backendai_container_utilization{container_metric_name="net_tx", value_type="current"}[5m])) by (kernel_id)
+```
 
-| Manager-to-Agent TCP Ports | Usage |
-|:--------------------------:|-------|
-| 6001                       | ZeroMQ-based RPC calls from managers to agents |
-| 6009                       | HTTP watcher API |
-| 30000-31000                | Port pool for in-container services |
+#### Device Utilization (Agent-level)
 
-The operation of agent itself does not require both incoming/outgoing access to
-the public Internet, but if the user's computation programs need the Internet, the docker containers
-should be able to access the public Internet (maybe via some corporate firewalls).
+**GPU Memory Usage by Agent**
 
-| Agent-to-X TCP Ports     | Usage |
-|:------------------------:|-------|
-| manager:5002             | ZeroMQ-based event push from agents to the manager |
-| etcd:2379                | etcd API access |
-| redis:6379               | Redis API access |
-| docker-registry:{80,443} | HTTP watcher API |
-| (Other hosts)            | Depending on user program requirements |
+Monitor GPU memory usage at the agent level. This shows total GPU memory consumption on each agent node.
 
+```promql
+sum(backendai_device_utilization{device_metric_name="cuda_mem", value_type="current"}) by (agent_id)
+```
 
-LICENSES
---------
+**GPU Memory Capacity by Agent**
 
-[GNU Lesser General Public License](https://github.com/lablup/backend.ai-agent/blob/master/LICENSE)
-[Dependencies](https://github.com/lablup/backend.ai-manager/blob/agent/DEPENDENCIES.md)
+Monitor GPU memory capacity. This shows the maximum available GPU memory on each agent.
+
+```promql
+sum(backendai_device_utilization{device_metric_name="cuda_mem", value_type="capacity"}) by (agent_id)
+```
+
+**GPU Utilization Percentage by Agent**
+
+Monitor GPU utilization percentage at the agent level. This shows overall GPU usage across all kernels on the agent.
+
+```promql
+sum(backendai_device_utilization{device_metric_name="cuda_util", value_type="current"}) by (agent_id)
+```
+
+**CPU Utilization Increase by Agent**
+
+Track CPU utilization increase rate at the agent level. This shows agent-wide CPU consumption trends.
+
+```promql
+sum(increase(backendai_device_utilization{device_metric_name="cpu_util", value_type="current"}[5m])) by (agent_id) / 1000
+```
+
+**Network RX Traffic by Agent**
+
+Monitor network RX (receive) traffic at the agent level. This tracks total inbound network bandwidth usage on each agent node.
+
+```promql
+sum(increase(backendai_device_utilization{device_metric_name="net_rx", value_type="current"}[5m])) by (agent_id)
+```
+
+**Network TX Traffic by Agent**
+
+Monitor network TX (transmit) traffic at the agent level. This tracks total outbound network bandwidth usage on each agent node.
+
+```promql
+sum(increase(backendai_device_utilization{device_metric_name="net_tx", value_type="current"}[5m])) by (agent_id)
+```
+
+#### Container Lifecycle Synchronization
+
+**Container Sync Trigger Frequency**
+
+Monitor container sync trigger frequency. This shows how often the agent synchronizes container state with the Manager.
+
+```promql
+sum(rate(backendai_sync_container_lifecycle_trigger_count_total[5m])) by (agent_id)
+```
+
+**Container Sync Success Rate**
+
+Track container sync success rate. This helps ensure containers are properly synchronized.
+
+```promql
+sum(rate(backendai_sync_container_lifecycle_success_count_total[5m])) by (agent_id)
+```
+
+**Container Sync Failure Rate**
+
+Monitor container sync failures. This identifies issues with container state synchronization.
+
+```promql
+sum(rate(backendai_sync_container_lifecycle_failure_count_total[5m])) by (agent_id, exception)
+```
+
+#### Statistics Collection
+
+**Statistics Collection Trigger Rate**
+
+Monitor statistics collection trigger rate by scope. This shows how frequently statistics are collected at different levels.
+
+```promql
+sum(rate(backendai_stat_task_trigger_count_total[5m])) by (agent_id, stat_scope)
+```
+
+**Statistics Collection Success Rate**
+
+Track statistics collection success rate. This ensures statistics collection is working properly.
+
+```promql
+sum(rate(backendai_stat_task_success_count_total[5m])) by (agent_id, stat_scope)
+```
+
+**Statistics Collection Failure Rate**
+
+Monitor statistics collection failures. This identifies issues with resource monitoring.
+
+```promql
+sum(rate(backendai_stat_task_failure_count_total[5m])) by (agent_id, stat_scope, exception)
+```
+
+### Logs
+Agent logs include:
+- Kernel creation and termination events
+- Resource allocation and release
+- Error situations and recovery operations
+- RPC request/response tracking
+
+## Development
+
+See [README.md](./README.md) for development setup instructions.
+
+## Related Documentation
+
+- [Manager Component](../manager/README.md) - Session orchestration
+- [Storage Proxy Component](../storage/README.md) - Virtual folder management
+- [Overall Architecture](../README.md) - System-wide architecture

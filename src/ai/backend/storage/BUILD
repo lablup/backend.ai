@@ -1,8 +1,8 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
-        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
     ],
 )
 
@@ -34,8 +34,8 @@ python_distribution(
     ),
     entry_points={
         "backendai_cli_v10": {
-            "storage": "ai.backend.storage.cli:main",
-            "storage.start-server": "ai.backend.storage.server:main",
+            "storage": "ai.backend.storage.cli.__main__:main",
+            "storage.start-server": "ai.backend.storage.cli.start_server:main",
         },
     },
     generate_setup=True,

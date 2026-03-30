@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 import asyncio
 import os
 import shlex
 import subprocess
 from collections.abc import AsyncGenerator, Sequence
 
+from ai.backend.storage.errors import SubprocessStdoutNotAvailableError
+
 
 async def run(
-    cmdargs: Sequence[str | bytes | os.PathLike],
+    cmdargs: Sequence[str | bytes | os.PathLike[str]],
     *,
-    cwd: os.PathLike | None = None,
+    cwd: os.PathLike[str] | None = None,
 ) -> str:
     proc = await asyncio.create_subprocess_exec(
         *cmdargs,
@@ -29,9 +33,9 @@ async def run(
 
 
 async def spawn_and_watch(
-    cmdargs: Sequence[str | bytes | os.PathLike],
+    cmdargs: Sequence[str | bytes | os.PathLike[str]],
     *,
-    cwd: os.PathLike | None = None,
+    cwd: os.PathLike[str] | None = None,
     tail_length: int = 50,
 ) -> AsyncGenerator[bytes, None]:
     last_lines: list[bytes] = []
@@ -43,7 +47,8 @@ async def spawn_and_watch(
         stderr=asyncio.subprocess.STDOUT,
     )
     try:
-        assert proc.stdout is not None
+        if proc.stdout is None:
+            raise SubprocessStdoutNotAvailableError("Subprocess stdout is not available")
         while True:
             line = await proc.stdout.readline()
             if not line:

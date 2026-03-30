@@ -6,13 +6,14 @@ Create Date: 2023-05-11 12:40:09.197522
 
 """
 
+import enum
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.models.base import GUID, URLColumn
-from ai.backend.manager.models.routing import RouteStatus
 
 # revision identifiers, used by Alembic.
 revision = "85984c98b90f"
@@ -20,11 +21,20 @@ down_revision = "857bdec5abda"
 branch_labels = None
 depends_on = None
 
-routestatus_choices = [v.value for v in RouteStatus]
+
+class LegacyRouteStatus(enum.Enum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    TERMINATING = "unhealthy"
+    PROVISIONING = "provisioning"
+    FAILED_TO_START = "failed_to_start"
+
+
+routestatus_choices = [v.value for v in LegacyRouteStatus]
 routestatus = postgresql.ENUM(*routestatus_choices, name="routestatus")
 
 
-def upgrade():
+def upgrade() -> None:
     routestatus.create(op.get_bind())
     op.add_column(
         "endpoints",
@@ -155,7 +165,7 @@ def upgrade():
     op.alter_column("endpoints", "url", nullable=True)
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("endpoints", "model_mount_destiation")
     op.drop_column("endpoints", "created_user")
     op.drop_column("endpoints", "session_owner")

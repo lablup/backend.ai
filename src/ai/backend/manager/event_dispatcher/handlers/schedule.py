@@ -1,0 +1,119 @@
+import logging
+
+from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
+from ai.backend.common.events.event_types.schedule.anycast import (
+    DoDeploymentLifecycleEvent,
+    DoDeploymentLifecycleIfNeededEvent,
+    DoRouteLifecycleEvent,
+    DoRouteLifecycleIfNeededEvent,
+    DoSokovanProcessIfNeededEvent,
+    DoSokovanProcessScheduleEvent,
+)
+from ai.backend.common.events.event_types.session.anycast import (
+    SessionEnqueuedAnycastEvent,
+    SessionTerminatedAnycastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
+from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.types import AgentId
+from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
+from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
+from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
+from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
+from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
+from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class ScheduleEventHandler:
+    _schedule_coordinator: ScheduleCoordinator
+    _scheduling_controller: SchedulingController
+    _deployment_coordinator: DeploymentCoordinator
+    _route_coordinator: RouteCoordinator
+    _event_hub: EventHub
+
+    def __init__(
+        self,
+        schedule_coordinator: ScheduleCoordinator,
+        scheduling_controller: SchedulingController,
+        deployment_coordinator: DeploymentCoordinator,
+        route_coordinator: RouteCoordinator,
+        event_hub: EventHub,
+    ) -> None:
+        self._schedule_coordinator = schedule_coordinator
+        self._scheduling_controller = scheduling_controller
+        self._deployment_coordinator = deployment_coordinator
+        self._route_coordinator = route_coordinator
+        self._event_hub = event_hub
+
+    async def handle_session_enqueued(
+        self, _context: None, _agent_id: str, _ev: SessionEnqueuedAnycastEvent
+    ) -> None:
+        # Request scheduling for next cycle through SchedulingController
+        await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
+
+    async def handle_session_terminated(
+        self, _context: None, _agent_id: str, _ev: SessionTerminatedAnycastEvent
+    ) -> None:
+        # Request scheduling for next cycle through SchedulingController
+        await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
+
+    async def handle_agent_started(
+        self, _context: None, _agent_id: str, _ev: AgentStartedEvent
+    ) -> None:
+        # Request scheduling for next cycle through SchedulingController
+        await self._scheduling_controller.mark_scheduling_needed([ScheduleType.SCHEDULE])
+
+    async def handle_do_sokovan_process_if_needed(
+        self, _context: None, _agent_id: str, ev: DoSokovanProcessIfNeededEvent
+    ) -> None:
+        """Handle Sokovan process if needed event (checks marks)."""
+        schedule_type = ScheduleType(ev.schedule_type)
+        await self._schedule_coordinator.process_if_needed(schedule_type)
+
+    async def handle_do_sokovan_process_schedule(
+        self, _context: None, _agent_id: str, ev: DoSokovanProcessScheduleEvent
+    ) -> None:
+        """Handle Sokovan process schedule event (unconditional)."""
+        schedule_type = ScheduleType(ev.schedule_type)
+        await self._schedule_coordinator.process_schedule(schedule_type)
+
+    async def handle_scheduling_broadcast(
+        self, _context: None, _source: AgentId, ev: SchedulingBroadcastEvent
+    ) -> None:
+        """Handle scheduling broadcast event (individual)."""
+        await self._event_hub.propagate_event(ev)
+
+    async def handle_do_deployment_lifecycle_if_needed(
+        self, _context: None, _agent_id: str, ev: DoDeploymentLifecycleIfNeededEvent
+    ) -> None:
+        """Handle deployment lifecycle if needed event (checks marks)."""
+        lifecycle_type = DeploymentLifecycleType(ev.lifecycle_type)
+        sub_step = DeploymentLifecycleSubStep(ev.sub_step) if ev.sub_step is not None else None
+        await self._deployment_coordinator.process_if_needed(lifecycle_type, sub_step)
+
+    async def handle_do_deployment_lifecycle(
+        self, _context: None, _agent_id: str, ev: DoDeploymentLifecycleEvent
+    ) -> None:
+        """Handle deployment lifecycle event (unconditional)."""
+        lifecycle_type = DeploymentLifecycleType(ev.lifecycle_type)
+        sub_step = DeploymentLifecycleSubStep(ev.sub_step) if ev.sub_step is not None else None
+        await self._deployment_coordinator.process_deployment_lifecycle(lifecycle_type, sub_step)
+
+    async def handle_do_route_lifecycle_if_needed(
+        self, _context: None, _agent_id: str, ev: DoRouteLifecycleIfNeededEvent
+    ) -> None:
+        """Handle route lifecycle if needed event (checks marks)."""
+        lifecycle_type = RouteLifecycleType(ev.lifecycle_type)
+        await self._route_coordinator.process_if_needed(lifecycle_type)
+
+    async def handle_do_route_lifecycle(
+        self, _context: None, _agent_id: str, ev: DoRouteLifecycleEvent
+    ) -> None:
+        """Handle route lifecycle event (unconditional)."""
+        lifecycle_type = RouteLifecycleType(ev.lifecycle_type)
+        await self._route_coordinator.process_route_lifecycle(lifecycle_type)

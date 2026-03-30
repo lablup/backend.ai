@@ -1,0 +1,116 @@
+name: Import all-smi binary
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to download (e.g., v0.1.0). Leave empty for latest.'
+        required: false
+        type: string
+  repository_dispatch:
+    types: [all-smi-release]
+
+permissions:
+  contents: write
+
+jobs:
+  import-binary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Get release tag
+        id: get-tag
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            TAG="${{ github.event.client_payload.tag }}"
+          elif [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            # Get latest release tag
+            TAG=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/inureyes/all-smi/releases/latest | jq -r .tag_name)
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Using tag: $TAG"
+
+      - name: Download all-smi binaries
+        run: |
+          TAG="${{ steps.get-tag.outputs.tag }}"
+          for ARCH in aarch64 x86_64; do
+            URL="https://github.com/inureyes/all-smi/releases/download/${TAG}/all-smi-linux-${ARCH}-musl.tar.gz"
+            echo "Downloading from: $URL"
+            curl -fL -o all-smi.tar.gz "$URL"
+            tar -xzf all-smi.tar.gz
+            if [ -f "all-smi" ]; then
+              mv all-smi "all-smi.${ARCH}.bin"
+              chmod +x "all-smi.${ARCH}.bin"
+              echo "Binary extracted and renamed to all-smi.${ARCH}.bin"
+            else
+              echo "Error: all-smi binary not found in the archive for $ARCH"
+              exit 1
+            fi
+            rm -f all-smi.tar.gz
+          done
+
+      - name: Move binaries to target location
+        run: |
+          TARGET_DIR="src/ai/backend/runner"
+          mkdir -p "${TARGET_DIR}"
+          # Move executable binaries
+          for ARCH in aarch64 x86_64; do
+            mv "all-smi.${ARCH}.bin" "${TARGET_DIR}/"
+            echo "Binary moved to ${TARGET_DIR}/all-smi.${ARCH}.bin"
+            ls -la "${TARGET_DIR}/all-smi.${ARCH}.bin"
+          done
+          # Move manpages
+          mv all-smi.1 "${TARGET_DIR}/"
+
+      - name: Add news fragment
+        run: |
+          echo "Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}" > changes/.deps.md
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.OCTODOG }}
+          commit-message: "chore: Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}"
+          title: "deps: Update all-smi binaries to ${{ steps.get-tag.outputs.tag }}"
+          author: "Lablup Octodog <mu001@lablup.com>"
+          body: |
+            This PR updates the all-smi binaries (musl variant) for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
+
+            Source: https://github.com/inureyes/all-smi/releases/tag/${{ steps.get-tag.outputs.tag }}
+
+            This update was triggered by:
+            - Event: ${{ github.event_name }}
+            ${{ github.event_name == 'repository_dispatch' && '- Automated trigger from all-smi repository release' || '- Manual workflow dispatch' }}
+          branch: deps/update-all-smi-${{ steps.get-tag.outputs.tag }}
+          delete-branch: true
+
+  setup-webhook:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instructions for automated trigger
+        run: |
+          echo "To enable automated triggers when all-smi releases occur:"
+          echo ""
+          echo "1. Go to https://github.com/inureyes/all-smi/settings/hooks"
+          echo "2. Add a new webhook with:"
+          echo "   - Payload URL: https://api.github.com/repos/${{ github.repository }}/dispatches"
+          echo "   - Content type: application/json"
+          echo "   - Secret: (generate a secure secret)"
+          echo "   - Events: Select 'Releases'"
+          echo ""
+          echo "3. Configure the webhook payload:"
+          echo '   {'
+          echo '     "event_type": "all-smi-release",'
+          echo '     "client_payload": {'
+          echo '       "tag": "{{ .Release.TagName }}"'
+          echo '     }'
+          echo '   }'
+          echo ""
+          echo "4. Add a GitHub Personal Access Token with 'repo' scope as a secret"
+          echo "   in the webhook Authorization header:"
+          echo "   Authorization: token YOUR_GITHUB_TOKEN"

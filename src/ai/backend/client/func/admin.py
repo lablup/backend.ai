@@ -1,8 +1,10 @@
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
-from ..exceptions import BackendAPIError
-from ..request import Request
-from ..session import api_session
+from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.request import Request
+from ai.backend.client.session import api_session
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Admin",)
@@ -24,7 +26,7 @@ class Admin(BaseFunction):
     async def query(
         cls,
         query: str,
-        variables: Optional[Mapping[str, Any]] = None,
+        variables: Mapping[str, Any] | None = None,
     ) -> Any:
         """
         Sends the GraphQL query and returns the response.
@@ -42,7 +44,7 @@ class Admin(BaseFunction):
     async def _query(
         cls,
         query: str,
-        variables: Optional[Mapping[str, Any]] = None,
+        variables: Mapping[str, Any] | None = None,
     ) -> Any:
         """
         Internal async implementation of the query() method,
@@ -68,8 +70,7 @@ class Admin(BaseFunction):
                             "data": errors,
                         },
                     )
-                else:
-                    return response["data"]
+                return response["data"]
         else:
             rqst = Request("POST", "/admin/graphql")
             rqst.set_json(gql_query)

@@ -1,0 +1,39 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  restart: unless-stopped
+  environment:
+    POSTGRES_USER: ${BACKEND_DB_USER}
+    POSTGRES_PASSWORD: ${BACKEND_DB_PASSWORD}
+    POSTGRES_DB: ${BACKEND_DB_NAME}
+    POSTGRES_INITDB_ARGS: "--data-checksums"
+  cpu_count: 4
+  mem_limit: "8g"
+  shm_size: "2g"
+
+services:
+  postgresql:
+    <<: *base
+    image: ${DB_CONTAINER_IMAGE}
+    container_name: ${DB_CONTAINER_NAME}
+    command: >
+      postgres
+      -c 'max_connections=256'
+      -c 'max_worker_processes=4'
+      -c 'deadlock_timeout=10s'
+      -c 'lock_timeout=60000'
+      -c 'idle_in_transaction_session_timeout=60000'
+    volumes:
+      - "{{ data_dir }}:/var/lib/postgresql/data:rw"
+      - "./init_readonly_user.sql:/docker-entrypoint-initdb.d/init_readonly_user.sql:ro"
+    ports:
+      - "${BACKEND_DB_PORT}:5432"
+    healthcheck:
+      test: "pg_isready -h localhost -p 5432 -q -U ${BACKEND_DB_USER}"
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s

@@ -1,11 +1,15 @@
-from typing import Any, Iterable, Sequence
+from __future__ import annotations
 
-from ...cli.types import Undefined, undefined
-from ..output.fields import domain_fields
-from ..output.types import FieldSpec
-from ..session import api_session
-from ..types import set_if_set
-from ..utils import dedent as _d
+from collections.abc import Iterable, Sequence
+from typing import Any, cast
+
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.output.fields import domain_fields
+from ai.backend.client.output.types import FieldSpec
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("Domain",)
@@ -50,7 +54,7 @@ class Domain(BaseFunction):
     async def list(
         cls,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the list of domains.
 
@@ -63,7 +67,7 @@ class Domain(BaseFunction):
         """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(query)
-        return data["domains"]
+        return cast(Sequence[dict[str, Any]], data["domains"])
 
     @api_function
     @classmethod
@@ -71,7 +75,7 @@ class Domain(BaseFunction):
         cls,
         name: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Retrieves the detail of a domain with name.
 
@@ -86,7 +90,7 @@ class Domain(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
-        return data["domain"]
+        return cast(dict[str, Any], data["domain"])
 
     @api_function
     @classmethod
@@ -101,7 +105,7 @@ class Domain(BaseFunction):
         allowed_docker_registries: Sequence[str] | Undefined = undefined,
         integration_id: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new domain with the given options.
 
@@ -129,7 +133,7 @@ class Domain(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["create_domain"]
+        return cast(dict[str, Any], data["create_domain"])
 
     @api_function
     @classmethod
@@ -144,8 +148,8 @@ class Domain(BaseFunction):
         vfolder_host_perms: str | Undefined = undefined,  # JSON string
         allowed_docker_registries: Sequence[str] | Undefined = undefined,
         integration_id: str | Undefined = undefined,
-        fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+        _fields: Iterable[FieldSpec | str] | None = None,
+    ) -> dict[str, Any]:
         """
         Updates an existing domain.
 
@@ -171,11 +175,11 @@ class Domain(BaseFunction):
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_domain"]
+        return cast(dict[str, Any], data["modify_domain"])
 
     @api_function
     @classmethod
-    async def delete(cls, name: str):
+    async def delete(cls, name: str) -> dict[str, Any]:
         """
         Deletes an existing domain.
 
@@ -192,11 +196,11 @@ class Domain(BaseFunction):
         """)
         variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
-        return data["delete_domain"]
+        return cast(dict[str, Any], data["delete_domain"])
 
     @api_function
     @classmethod
-    async def purge(cls, name: str):
+    async def purge(cls, name: str) -> dict[str, Any]:
         """
         Purges an existing domain.
 
@@ -212,4 +216,4 @@ class Domain(BaseFunction):
         """)
         variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
-        return data["purge_domain"]
+        return cast(dict[str, Any], data["purge_domain"])

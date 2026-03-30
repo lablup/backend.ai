@@ -3,15 +3,20 @@ import json
 import logging
 import os
 import shutil
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
+from typing import Any
 
 from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger())
 
+AGENT_HOST_KEY_PATH = Path("/home/config/ssh/dropbear_rsa_host_key")
+# Legacy path where host key is generated inside container
+LEGACY_HOST_KEY_PATH = Path("/tmp/dropbear/dropbear_rsa_host_key")
 
-async def init_sshd_service(child_env):
+
+async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
     if Path("/tmp/dropbear").is_dir():
         shutil.rmtree("/tmp/dropbear")
     Path("/tmp/dropbear").mkdir(parents=True, exist_ok=True)
@@ -64,26 +69,30 @@ async def init_sshd_service(child_env):
                 auth_path.parent.chmod(0o700)
             if (auth_path.stat().st_mode & 0o077) != 0:
                 auth_path.chmod(0o600)
-        except IOError:
+        except OSError:
             log.warning("could not set the permission for /home/work/.ssh")
-    proc = await asyncio.create_subprocess_exec(
-        *[
-            "/opt/kernel/dropbearmulti",
-            "dropbearkey",
-            "-t",
-            "rsa",
-            "-s",
-            "2048",
-            "-f",
-            "/tmp/dropbear/dropbear_rsa_host_key",
-        ],
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=child_env,
-    )
-    stdout, stderr = await proc.communicate()
-    if proc.returncode != 0:
-        raise RuntimeError(f"sshd init error: {stderr.decode('utf8')}")
+    # Check if agent-generated host key exists (mounted read-only from agent)
+    # Generate host key only if agent-generated key is not present
+    agent_host_key_exists = AGENT_HOST_KEY_PATH.is_file()
+    if not agent_host_key_exists:
+        proc = await asyncio.create_subprocess_exec(
+            *[
+                "/opt/kernel/dropbearmulti",
+                "dropbearkey",
+                "-t",
+                "rsa",
+                "-s",
+                "2048",
+                "-f",
+                "/tmp/dropbear/dropbear_rsa_host_key",
+            ],
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=child_env,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(f"sshd init error: {stderr.decode('utf8')}")
 
     cluster_privkey_src_path = Path("/home/config/ssh/id_cluster")
     cluster_ssh_port_mapping_path = Path("/home/config/ssh/port-mapping.json")
@@ -98,13 +107,17 @@ async def init_sshd_service(child_env):
         }
         if cluster_ssh_port_mapping_path.is_file():
             cluster_ssh_port_mapping = json.loads(cluster_ssh_port_mapping_path.read_text())
-            with open(user_ssh_config_path, "a") as f:
-                for host, (hostname, port) in cluster_ssh_port_mapping.items():
-                    f.write(f"\nHost {host}\n")
-                    f.write(f"\tHostName {hostname}\n")
-                    f.write(f"\tPort {port}\n")
-                    f.write("\tStrictHostKeyChecking no\n")
-                    f.write("\tIdentityFile /home/config/ssh/id_cluster\n")
+
+            def _write_ssh_config() -> None:
+                with user_ssh_config_path.open("a") as f:
+                    for host, (hostname, port) in cluster_ssh_port_mapping.items():
+                        f.write(f"\nHost {host}\n")
+                        f.write(f"\tHostName {hostname}\n")
+                        f.write(f"\tPort {port}\n")
+                        f.write("\tStrictHostKeyChecking no\n")
+                        f.write("\tIdentityFile /home/config/ssh/id_cluster\n")
+
+            await asyncio.to_thread(_write_ssh_config)
         else:
             for role_name, role_replica in replicas.items():
                 try:
@@ -113,26 +126,39 @@ async def init_sshd_service(child_env):
                         continue
                 except FileNotFoundError:
                     pass
-                with open(user_ssh_config_path, "a") as f:
-                    f.write(f"\nHost {role_name}*\n")
-                    f.write("\tPort 2200\n")
-                    f.write("\tStrictHostKeyChecking no\n")
-                    f.write("\tIdentityFile /home/config/ssh/id_cluster\n")
+
+                def _write_replica_config() -> None:
+                    with user_ssh_config_path.open("a") as f:
+                        f.write(f"\nHost {role_name}*\n")
+                        f.write("\tPort 2200\n")
+                        f.write("\tStrictHostKeyChecking no\n")
+                        f.write("\tIdentityFile /home/config/ssh/id_cluster\n")
+
+                await asyncio.to_thread(_write_replica_config)
     cluster_pubkey_src_path = Path("/home/config/ssh/id_cluster.pub")
     if cluster_pubkey_src_path.is_file():
         pubkey = cluster_pubkey_src_path.read_bytes()
-        with open(auth_path, "ab") as f:
-            f.write(b"\n")
-            f.write(pubkey)
-            f.write(b"\n")
+
+        def _write_pubkey() -> None:
+            with auth_path.open("ab") as f:
+                f.write(b"\n")
+                f.write(pubkey)
+                f.write(b"\n")
+
+        await asyncio.to_thread(_write_pubkey)
 
 
-async def prepare_sshd_service(service_info):
+async def prepare_sshd_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
+    if AGENT_HOST_KEY_PATH.is_file():
+        host_key_path = str(AGENT_HOST_KEY_PATH)
+    else:
+        host_key_path = str(LEGACY_HOST_KEY_PATH)
+
     cmdargs = [
         "/opt/kernel/dropbearmulti",
         "dropbear",
         "-r",
-        "/tmp/dropbear/dropbear_rsa_host_key",
+        host_key_path,
         "-E",  # show logs in stderr
         "-F",  # run in foreground
         "-g",  # Disable password logins for root
@@ -149,11 +175,11 @@ async def prepare_sshd_service(service_info):
             cmdargs.extend(["-p", f"0.0.0.0:{port}"])
     else:
         cmdargs.extend(["-p", f"0.0.0.0:{port_config}"])
-    env = {}
+    env: dict[str, str] = {}
     return cmdargs, env
 
 
-async def prepare_ttyd_service(service_info):
+async def prepare_ttyd_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
     shell = "sh"
     if Path("/bin/zsh").exists():
         shell = "zsh"
@@ -162,7 +188,7 @@ async def prepare_ttyd_service(service_info):
     elif Path("/bin/ash").exists():
         shell = "ash"
 
-    cmdargs = ["/opt/backend.ai/bin/ttyd", "-p", service_info["port"], f"/bin/{shell}"]
-    if shell != "ash":  # Currently Alpine-based containers are not supported.
+    cmdargs = ["/opt/kernel/ttyd", "-W", "-p", service_info["port"], f"/bin/{shell}"]
+    if shell != "ash":  # Currently prebuilt tmux in Alpine-based containers is not supported.
         cmdargs += ["-c", f"export SHELL=/bin/{shell}; /opt/kernel/tmux -2 attach"]
     return cmdargs, {}

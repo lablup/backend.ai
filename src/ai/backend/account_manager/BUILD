@@ -1,9 +1,8 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
-        "src/ai/backend/account_manager/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
-        "src/ai/backend/account_manager/models/alembic:migrations",  # not auto-inferred
         ":resources",
     ],
 )
@@ -36,7 +35,7 @@ python_distribution(
     entry_points={
         "backendai_cli_v10": {
             "am": "ai.backend.account_manager.cli.__main__:main",
-            "am.start-server": "ai.backend.account_manager.server:main",
+            "am.start-server": "ai.backend.account_manager.cli.start_server:main",
         },
     },
     generate_setup=True,
@@ -83,7 +82,7 @@ resources(
     name="resources",
     dependencies=[
         ":version",
-        ":vendor",
+        # ":vendor",
     ],
     sources=[
         "**/py.typed",

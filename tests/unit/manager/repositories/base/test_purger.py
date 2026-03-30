@@ -1,0 +1,1213 @@
+"""Integration tests for purger with real database."""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
+from uuid import UUID
+
+import pytest
+import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from ai.backend.manager.errors.repository import (
+    ForeignKeyViolationError,
+    RepositoryIntegrityError,
+)
+from ai.backend.manager.models.base import Base
+from ai.backend.manager.repositories.base import (
+    BatchPurger,
+    BatchPurgerResult,
+    BatchPurgerSpec,
+    BulkPurgerError,
+    BulkPurgerResultWithFailures,
+    Purger,
+    PurgerResult,
+    execute_batch_purger,
+    execute_bulk_purger_partial,
+    execute_purger,
+)
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+# Note: This test file uses test-specific ORM models defined here, not application models.
+# Tables are created/dropped per test class, which is appropriate for testing the purger itself.
+
+
+# =============================================================================
+# Single-row Purger Tests
+# =============================================================================
+
+
+class PurgerTestRowInt(Base):  # type: ignore[misc]
+    """ORM model for single-row purger testing with integer PK."""
+
+    __tablename__ = "test_purger_int_pk"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
+
+
+class PurgerTestRowUUID(Base):  # type: ignore[misc]
+    """ORM model for single-row purger testing with UUID PK."""
+
+    __tablename__ = "test_purger_uuid_pk"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
+
+
+class TestPurgerIntPK:
+    """Tests for single-row purger with integer PK."""
+
+    @pytest.fixture
+    async def int_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[PurgerTestRowInt], None]:
+        """Create ORM test table and return row class."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(lambda c: Base.metadata.create_all(c, [PurgerTestRowInt.__table__]))
+
+        yield PurgerTestRowInt
+
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_int_pk CASCADE"))
+
+    @pytest.fixture
+    async def sample_data(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        int_row_class: type[PurgerTestRowInt],
+    ) -> AsyncGenerator[list[int], None]:
+        """Insert sample data and return their IDs."""
+        ids: list[int] = []
+        async with database_connection.begin_session() as db_sess:
+            for i in range(3):
+                row = PurgerTestRowInt(name=f"item-{i}", status="active")
+                db_sess.add(row)
+                await db_sess.flush()
+                ids.append(row.id)
+        yield ids
+
+    async def test_delete_by_int_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        int_row_class: type[PurgerTestRowInt],
+        sample_data: list[int],
+    ) -> None:
+        """Test deleting a single row by integer PK."""
+        async with database_connection.begin_session() as db_sess:
+            target_id = sample_data[0]
+            purger: Purger[PurgerTestRowInt] = Purger(
+                row_class=PurgerTestRowInt,
+                pk_value=target_id,
+            )
+
+            result = await execute_purger(db_sess, purger)
+
+            assert result is not None
+            assert isinstance(result, PurgerResult)
+            assert result.row.id == target_id
+            assert result.row.name == "item-0"
+
+            # Verify row was deleted
+            count_result = await db_sess.execute(
+                sa.select(sa.func.count()).select_from(int_row_class.__table__)
+            )
+            assert count_result.scalar() == 2
+
+    async def test_delete_no_matching_row(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        int_row_class: type[PurgerTestRowInt],
+        sample_data: list[int],
+    ) -> None:
+        """Test deleting when PK doesn't exist."""
+        async with database_connection.begin_session() as db_sess:
+            purger: Purger[PurgerTestRowInt] = Purger(
+                row_class=PurgerTestRowInt,
+                pk_value=99999,
+            )
+
+            result = await execute_purger(db_sess, purger)
+
+            assert result is None
+
+            # Verify no rows were deleted
+            count_result = await db_sess.execute(
+                sa.select(sa.func.count()).select_from(int_row_class.__table__)
+            )
+            assert count_result.scalar() == 3
+
+
+class TestPurgerUUIDPK:
+    """Tests for single-row purger with UUID PK."""
+
+    @pytest.fixture
+    async def uuid_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[PurgerTestRowUUID], None]:
+        """Create ORM test table and return row class."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(c, [PurgerTestRowUUID.__table__])
+            )
+
+        yield PurgerTestRowUUID
+
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_uuid_pk CASCADE"))
+
+    @pytest.fixture
+    async def sample_data(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        uuid_row_class: type[PurgerTestRowUUID],
+    ) -> AsyncGenerator[list[UUID], None]:
+        """Insert sample data and return their UUIDs."""
+        ids: list[UUID] = []
+        async with database_connection.begin_session() as db_sess:
+            for i in range(3):
+                row = PurgerTestRowUUID(id=uuid.uuid4(), name=f"item-{i}", status="active")
+                db_sess.add(row)
+                await db_sess.flush()
+                ids.append(row.id)
+        yield ids
+
+    async def test_delete_by_uuid_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        uuid_row_class: type[PurgerTestRowUUID],
+        sample_data: list[UUID],
+    ) -> None:
+        """Test deleting a single row by UUID PK."""
+        async with database_connection.begin_session() as db_sess:
+            target_id = sample_data[0]
+            purger: Purger[PurgerTestRowUUID] = Purger(
+                row_class=PurgerTestRowUUID,
+                pk_value=target_id,
+            )
+
+            result = await execute_purger(db_sess, purger)
+
+            assert result is not None
+            assert isinstance(result, PurgerResult)
+            assert result.row.id == target_id
+
+    async def test_delete_no_matching_uuid(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        uuid_row_class: type[PurgerTestRowUUID],
+        sample_data: list[UUID],
+    ) -> None:
+        """Test deleting when UUID PK doesn't exist."""
+        async with database_connection.begin_session() as db_sess:
+            purger: Purger[PurgerTestRowUUID] = Purger(
+                row_class=PurgerTestRowUUID,
+                pk_value=uuid.uuid4(),
+            )
+
+            result = await execute_purger(db_sess, purger)
+
+            assert result is None
+
+
+# =============================================================================
+# Batch Purger Tests (renamed from original Purger tests)
+# =============================================================================
+
+
+class SimpleBatchPurgerSpec(BatchPurgerSpec[Base]):
+    """Simple batch purger spec for testing with configurable conditions."""
+
+    def __init__(
+        self,
+        row_class: type[Base],
+        conditions: list[sa.sql.expression.ColumnElement[bool]] | None = None,
+    ) -> None:
+        self._row_class = row_class
+        self._conditions = conditions or []
+
+    def build_subquery(self) -> sa.sql.Select[tuple[Base]]:
+        query = sa.select(self._row_class)
+        for cond in self._conditions:
+            query = query.where(cond)
+        return query
+
+
+class BatchPurgerBasicRow(Base):  # type: ignore[misc]
+    """ORM model for basic batch purger testing."""
+
+    __tablename__ = "test_batch_purger_basic"
+    __table_args__ = {"extend_existing": True}
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(sa.String(50), nullable=False)
+    status = sa.Column(sa.String(20), nullable=False)
+
+
+class BatchPurgerBatchingRow(Base):  # type: ignore[misc]
+    """ORM model for batch purger batching tests."""
+
+    __tablename__ = "test_batch_purger_batching"
+    __table_args__ = {"extend_existing": True}
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(sa.String(50), nullable=False)
+    status = sa.Column(sa.String(20), nullable=False)
+
+
+class BatchPurgerEdgeCaseRow(Base):  # type: ignore[misc]
+    """ORM model for batch purger edge case tests."""
+
+    __tablename__ = "test_batch_purger_empty"
+    __table_args__ = {"extend_existing": True}
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(sa.String(50), nullable=True)
+
+
+class TestBatchPurgerBasic:
+    """Basic tests for batch purger operations."""
+
+    @pytest.fixture
+    async def test_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[BatchPurgerBasicRow], None]:
+        """Create test table structure."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(lambda c: BatchPurgerBasicRow.__table__.create(c, checkfirst=True))
+
+        yield BatchPurgerBasicRow
+
+        async with database_connection.begin() as conn:
+            await conn.run_sync(lambda c: BatchPurgerBasicRow.__table__.drop(c, checkfirst=True))
+
+    @pytest.fixture
+    async def test_rows(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_row_class: type[BatchPurgerBasicRow],
+    ) -> type[BatchPurgerBasicRow]:
+        """Insert 100 test rows (1-50: active, 51-100: inactive)."""
+        async with database_connection.begin_session() as db_sess:
+            for i in range(1, 101):
+                row = BatchPurgerBasicRow(
+                    id=i,
+                    name=f"item-{i:03d}",
+                    status="active" if i <= 50 else "inactive",
+                )
+                db_sess.add(row)
+        return test_row_class
+
+    async def test_delete_with_single_condition(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_rows: type[BatchPurgerBasicRow],
+    ) -> None:
+        """Test deletion with a single condition."""
+        row_class = test_rows
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(
+                row_class=row_class,
+                conditions=[row_class.status == "inactive"],
+            )
+            purger = BatchPurger(spec=spec)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert isinstance(result, BatchPurgerResult)
+            assert result.deleted_count == 50
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
+            assert count_result.scalar() == 50
+
+    async def test_delete_with_multiple_conditions(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_rows: type[BatchPurgerBasicRow],
+    ) -> None:
+        """Test deletion with multiple conditions (AND logic)."""
+        row_class = test_rows
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(
+                row_class=row_class,
+                conditions=[
+                    row_class.status == "active",
+                    row_class.id > 25,
+                ],
+            )
+            purger = BatchPurger(spec=spec)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert result.deleted_count == 25
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
+            assert count_result.scalar() == 75
+
+    async def test_delete_with_no_conditions(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_rows: type[BatchPurgerBasicRow],
+    ) -> None:
+        """Test deletion with no conditions (delete all)."""
+        row_class = test_rows
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(row_class=row_class)
+            purger = BatchPurger(spec=spec)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert result.deleted_count == 100
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
+            assert count_result.scalar() == 0
+
+    async def test_delete_with_no_matching_rows(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_rows: type[BatchPurgerBasicRow],
+    ) -> None:
+        """Test deletion when no rows match the condition."""
+        row_class = test_rows
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(
+                row_class=row_class,
+                conditions=[row_class.status == "deleted"],
+            )
+            purger = BatchPurger(spec=spec)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert result.deleted_count == 0
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
+            assert count_result.scalar() == 100
+
+
+class TestBatchPurgerBatching:
+    """Tests for batched deletion."""
+
+    @pytest.fixture
+    async def test_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[BatchPurgerBatchingRow], None]:
+        """Create test table structure."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: BatchPurgerBatchingRow.__table__.create(c, checkfirst=True)
+            )
+
+        yield BatchPurgerBatchingRow
+
+        async with database_connection.begin() as conn:
+            await conn.run_sync(lambda c: BatchPurgerBatchingRow.__table__.drop(c, checkfirst=True))
+
+    @pytest.fixture
+    async def test_rows(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_row_class: type[BatchPurgerBatchingRow],
+    ) -> type[BatchPurgerBatchingRow]:
+        """Insert 100 test rows (1-50: active, 51-100: inactive)."""
+        async with database_connection.begin_session() as db_sess:
+            for i in range(1, 101):
+                row = BatchPurgerBatchingRow(
+                    id=i,
+                    name=f"item-{i:03d}",
+                    status="active" if i <= 50 else "inactive",
+                )
+                db_sess.add(row)
+        return test_row_class
+
+    async def test_batch_deletion(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_rows: type[BatchPurgerBatchingRow],
+    ) -> None:
+        """Test batched deletion with batch_size."""
+        row_class = test_rows
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(
+                row_class=row_class,
+                conditions=[row_class.status == "inactive"],
+            )
+            purger = BatchPurger(spec=spec, batch_size=10)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert result.deleted_count == 50
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
+            assert count_result.scalar() == 50
+
+    async def test_batch_deletion_exact_batch_size(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_rows: type[BatchPurgerBatchingRow],
+    ) -> None:
+        """Test when total rows to delete equals batch_size exactly."""
+        row_class = test_rows
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(
+                row_class=row_class,
+                conditions=[row_class.id <= 10],
+            )
+            purger = BatchPurger(spec=spec, batch_size=10)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert result.deleted_count == 10
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
+            assert count_result.scalar() == 90
+
+
+class TestBatchPurgerEdgeCases:
+    """Tests for batch purger edge cases."""
+
+    @pytest.fixture
+    async def empty_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[BatchPurgerEdgeCaseRow], None]:
+        """Create empty test table."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: BatchPurgerEdgeCaseRow.__table__.create(c, checkfirst=True)
+            )
+
+        yield BatchPurgerEdgeCaseRow
+
+        async with database_connection.begin() as conn:
+            await conn.run_sync(lambda c: BatchPurgerEdgeCaseRow.__table__.drop(c, checkfirst=True))
+
+    async def test_empty_table(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        empty_row_class: type[BatchPurgerEdgeCaseRow],
+    ) -> None:
+        """Test batch purger on empty table."""
+        row_class = empty_row_class
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(row_class=row_class)
+
+            purger = BatchPurger(spec=spec)
+            result = await execute_batch_purger(db_sess, purger)
+            assert result.deleted_count == 0
+
+            purger = BatchPurger(spec=spec, batch_size=10)
+            result = await execute_batch_purger(db_sess, purger)
+            assert result.deleted_count == 0
+
+
+class BatchPurgerTestRow(Base):  # type: ignore[misc]
+    """ORM model for batch purger testing using declarative mapping."""
+
+    __tablename__ = "test_batch_purger_orm"
+    __table_args__ = {"extend_existing": True}
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(sa.String(50), nullable=False)
+    status = sa.Column(sa.String(20), nullable=False)
+
+
+class ORMBatchPurgerSpec(BatchPurgerSpec[Base]):
+    """Batch purger spec using ORM model class."""
+
+    def __init__(
+        self,
+        row_class: type[Base],
+        conditions: list[sa.sql.expression.ColumnElement[bool]] | None = None,
+    ) -> None:
+        self._row_class = row_class
+        self._conditions = conditions or []
+
+    def build_subquery(self) -> sa.sql.Select[tuple[Base]]:
+        query = sa.select(self._row_class)
+        for cond in self._conditions:
+            query = query.where(cond)
+        return query
+
+
+class TestBatchPurgerWithORMModel:
+    """Tests for batch purger operations using ORM model."""
+
+    @pytest.fixture
+    async def orm_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[BatchPurgerTestRow], None]:
+        """Create ORM model table structure."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(lambda c: BatchPurgerTestRow.__table__.create(c, checkfirst=True))
+
+        yield BatchPurgerTestRow
+
+        async with database_connection.begin() as conn:
+            await conn.run_sync(lambda c: BatchPurgerTestRow.__table__.drop(c, checkfirst=True))
+
+    @pytest.fixture
+    async def orm_rows(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        orm_row_class: type[BatchPurgerTestRow],
+    ) -> type[BatchPurgerTestRow]:
+        """Insert 100 test rows using ORM model (1-50: active, 51-100: inactive)."""
+        async with database_connection.begin_session() as db_sess:
+            for i in range(1, 101):
+                row = BatchPurgerTestRow(
+                    id=i,
+                    name=f"item-{i:03d}",
+                    status="active" if i <= 50 else "inactive",
+                )
+                db_sess.add(row)
+        return orm_row_class
+
+    async def test_delete_with_orm_model(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        orm_rows: type[BatchPurgerTestRow],
+    ) -> None:
+        """Test deletion using ORM model with single condition."""
+        row_class = orm_rows
+
+        async with database_connection.begin_session() as db_sess:
+            spec = ORMBatchPurgerSpec(
+                row_class=row_class,
+                conditions=[row_class.status == "inactive"],
+            )
+            purger = BatchPurger(spec=spec)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert result.deleted_count == 50
+
+            # Verify remaining rows
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
+            assert count_result.scalar() == 50
+
+    async def test_delete_with_orm_model_batched(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        orm_rows: type[BatchPurgerTestRow],
+    ) -> None:
+        """Test batched deletion using ORM model."""
+        row_class = orm_rows
+
+        async with database_connection.begin_session() as db_sess:
+            spec = ORMBatchPurgerSpec(
+                row_class=row_class,
+                conditions=[row_class.status == "inactive"],
+            )
+            purger = BatchPurger(spec=spec, batch_size=10)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert result.deleted_count == 50
+
+            # Verify remaining rows
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
+            assert count_result.scalar() == 50
+
+
+# =============================================================================
+# Batch Purger Composite PK Tests
+# =============================================================================
+
+
+class BatchPurgerCompositePKRow(Base):  # type: ignore[misc]
+    """ORM model for composite PK batch purger testing."""
+
+    __tablename__ = "test_batch_purger_composite_pk"
+    __table_args__ = {"extend_existing": True}
+
+    tenant_id = sa.Column(sa.Integer, primary_key=True)
+    item_id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(sa.String(50), nullable=False)
+    status = sa.Column(sa.String(20), nullable=False)
+
+
+class CompositePKBatchPurgerSpec(BatchPurgerSpec[BatchPurgerCompositePKRow]):
+    """Batch purger spec for composite PK testing."""
+
+    def __init__(
+        self,
+        conditions: list[sa.sql.expression.ColumnElement[bool]] | None = None,
+    ) -> None:
+        self._conditions = conditions or []
+
+    def build_subquery(self) -> sa.sql.Select[tuple[BatchPurgerCompositePKRow]]:
+        query = sa.select(BatchPurgerCompositePKRow)
+        for cond in self._conditions:
+            query = query.where(cond)
+        return query
+
+
+class TestBatchPurgerCompositePK:
+    """Tests for batch purger with composite primary key."""
+
+    @pytest.fixture
+    async def composite_pk_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[BatchPurgerCompositePKRow], None]:
+        """Create test table with composite PK."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: BatchPurgerCompositePKRow.__table__.create(c, checkfirst=True)
+            )
+
+        yield BatchPurgerCompositePKRow
+
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: BatchPurgerCompositePKRow.__table__.drop(c, checkfirst=True)
+            )
+
+    @pytest.fixture
+    async def composite_pk_rows(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        composite_pk_row_class: type[BatchPurgerCompositePKRow],
+    ) -> type[BatchPurgerCompositePKRow]:
+        """Insert test rows with composite PK (3 tenants x 10 items each)."""
+        async with database_connection.begin_session() as db_sess:
+            for tenant_id in range(1, 4):  # 3 tenants
+                for item_id in range(1, 11):  # 10 items each
+                    row = BatchPurgerCompositePKRow(
+                        tenant_id=tenant_id,
+                        item_id=item_id,
+                        name=f"item-{tenant_id}-{item_id}",
+                        status="active" if item_id <= 5 else "inactive",
+                    )
+                    db_sess.add(row)
+        return composite_pk_row_class
+
+    async def test_delete_with_composite_pk(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        composite_pk_rows: type[BatchPurgerCompositePKRow],
+    ) -> None:
+        """Test deletion with composite primary key."""
+        row_class = composite_pk_rows
+
+        async with database_connection.begin_session() as db_sess:
+            # Delete all inactive items (items 6-10 for each tenant = 15 rows)
+            spec = CompositePKBatchPurgerSpec(
+                conditions=[row_class.status == "inactive"],
+            )
+            purger = BatchPurger(spec=spec)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert result.deleted_count == 15  # 3 tenants * 5 inactive items
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
+            assert count_result.scalar() == 15  # 3 tenants * 5 active items
+
+    async def test_delete_with_composite_pk_specific_tenant(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        composite_pk_rows: type[BatchPurgerCompositePKRow],
+    ) -> None:
+        """Test deletion with composite PK filtering by one PK column."""
+        row_class = composite_pk_rows
+
+        async with database_connection.begin_session() as db_sess:
+            # Delete all items for tenant 2
+            spec = CompositePKBatchPurgerSpec(
+                conditions=[row_class.tenant_id == 2],
+            )
+            purger = BatchPurger(spec=spec)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert result.deleted_count == 10  # All 10 items for tenant 2
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
+            assert count_result.scalar() == 20  # Remaining items for tenants 1 and 3
+
+    async def test_delete_with_composite_pk_batched(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        composite_pk_rows: type[BatchPurgerCompositePKRow],
+    ) -> None:
+        """Test batched deletion with composite primary key."""
+        row_class = composite_pk_rows
+
+        async with database_connection.begin_session() as db_sess:
+            # Delete inactive items with small batch size
+            spec = CompositePKBatchPurgerSpec(
+                conditions=[row_class.status == "inactive"],
+            )
+            purger = BatchPurger(spec=spec, batch_size=5)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert result.deleted_count == 15
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
+            assert count_result.scalar() == 15
+
+
+# =============================================================================
+# IntegrityError Handling Tests
+# =============================================================================
+
+
+class PurgerParentRow(Base):  # type: ignore[misc]
+    """Parent ORM model for IntegrityError testing."""
+
+    __tablename__ = "test_purger_ie_parent"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class PurgerChildRow(Base):  # type: ignore[misc]
+    """Child ORM model with FK reference to parent for IntegrityError testing."""
+
+    __tablename__ = "test_purger_ie_child"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    parent_id: Mapped[int] = mapped_column(
+        sa.Integer,
+        sa.ForeignKey("test_purger_ie_parent.id"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class TestPurgerIntegrityError:
+    """Tests for IntegrityError → RepositoryIntegrityError conversion in execute_purger()."""
+
+    @pytest.fixture
+    async def fk_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[tuple[type[PurgerParentRow], type[PurgerChildRow]], None]:
+        """Create parent and child tables with FK constraint."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(
+                    c, [PurgerParentRow.__table__, PurgerChildRow.__table__]
+                )
+            )
+
+        yield PurgerParentRow, PurgerChildRow
+
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_ie_child CASCADE"))
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_ie_parent CASCADE"))
+
+    async def test_delete_with_fk_violation_raises_repository_integrity_error(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """Deleting a parent row referenced by a child raises ForeignKeyViolationError."""
+        parent_cls, child_cls = fk_tables
+
+        # Insert parent first, then child (explicit flush to ensure FK order)
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+            await db_sess.flush()
+            db_sess.add(PurgerChildRow(id=1, parent_id=1, name="child-1"))
+
+        # Attempt to delete parent → FK violation
+        async with database_connection.begin_session() as db_sess:
+            purger: Purger[PurgerParentRow] = Purger(row_class=parent_cls, pk_value=1)
+            with pytest.raises(ForeignKeyViolationError) as exc_info:
+                await execute_purger(db_sess, purger)
+
+            err = exc_info.value
+            assert isinstance(err, RepositoryIntegrityError)
+            assert err.__cause__ is not None
+
+    async def test_delete_without_fk_violation_succeeds(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """Deleting a parent row with no child references succeeds normally."""
+        parent_cls, _ = fk_tables
+
+        # Insert parent only (no child)
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+
+        # Delete parent → should succeed
+        async with database_connection.begin_session() as db_sess:
+            purger: Purger[PurgerParentRow] = Purger(row_class=parent_cls, pk_value=1)
+            result = await execute_purger(db_sess, purger)
+
+            assert result is not None
+            assert isinstance(result, PurgerResult)
+            assert result.row.id == 1
+            assert result.row.name == "parent-1"
+
+
+class TestBatchPurgerIntegrityError:
+    """Tests for IntegrityError → RepositoryIntegrityError conversion in execute_batch_purger()."""
+
+    @pytest.fixture
+    async def fk_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[tuple[type[PurgerParentRow], type[PurgerChildRow]], None]:
+        """Create parent and child tables with FK constraint."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(
+                    c, [PurgerParentRow.__table__, PurgerChildRow.__table__]
+                )
+            )
+
+        yield PurgerParentRow, PurgerChildRow
+
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_ie_child CASCADE"))
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_ie_parent CASCADE"))
+
+    async def test_batch_delete_with_fk_violation_raises_repository_integrity_error(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """Batch-deleting parent rows referenced by children raises ForeignKeyViolationError."""
+        parent_cls, child_cls = fk_tables
+
+        # Insert parents first, then child (explicit flush to ensure FK order)
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+            db_sess.add(PurgerParentRow(id=2, name="parent-2"))
+            await db_sess.flush()
+            db_sess.add(PurgerChildRow(id=1, parent_id=1, name="child-1"))
+
+        # Batch delete all parents → FK violation on parent-1
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(row_class=parent_cls)
+            purger = BatchPurger(spec=spec)
+            with pytest.raises(ForeignKeyViolationError) as exc_info:
+                await execute_batch_purger(db_sess, purger)
+
+            err = exc_info.value
+            assert isinstance(err, RepositoryIntegrityError)
+
+    async def test_batch_delete_without_fk_violation_succeeds(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """Batch-deleting parent rows with no child references succeeds normally."""
+        parent_cls, _ = fk_tables
+
+        # Insert parents only (no children)
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+            db_sess.add(PurgerParentRow(id=2, name="parent-2"))
+
+        # Batch delete all parents → should succeed
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(row_class=parent_cls)
+            purger = BatchPurger(spec=spec)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert isinstance(result, BatchPurgerResult)
+            assert result.deleted_count == 2
+
+
+# =============================================================================
+# Bulk Purger Partial Tests (savepoint-based partial failure support)
+# =============================================================================
+
+
+class BulkPurgerPartialTestRow(Base):  # type: ignore[misc]
+    """ORM model for bulk purger partial testing."""
+
+    __tablename__ = "test_bulk_purger_partial"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class BulkPurgerPartialParentRow(Base):  # type: ignore[misc]
+    """Parent ORM model for FK violation testing in bulk purger partial."""
+
+    __tablename__ = "test_bulk_purger_partial_parent"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class BulkPurgerPartialChildRow(Base):  # type: ignore[misc]
+    """Child ORM model for FK violation testing in bulk purger partial."""
+
+    __tablename__ = "test_bulk_purger_partial_child"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    parent_id: Mapped[int] = mapped_column(
+        sa.Integer,
+        sa.ForeignKey("test_bulk_purger_partial_parent.id"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class TestBulkPurgerPartial:
+    """Tests for execute_bulk_purger_partial with savepoint-based partial failure support."""
+
+    @pytest.fixture
+    async def test_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[BulkPurgerPartialTestRow], None]:
+        """Create test table structure."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: BulkPurgerPartialTestRow.__table__.create(c, checkfirst=True)
+            )
+
+        yield BulkPurgerPartialTestRow
+
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: BulkPurgerPartialTestRow.__table__.drop(c, checkfirst=True)
+            )
+
+    @pytest.fixture
+    async def fk_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[
+        tuple[type[BulkPurgerPartialParentRow], type[BulkPurgerPartialChildRow]], None
+    ]:
+        """Create parent and child tables with FK constraint."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(
+                    c,
+                    [
+                        BulkPurgerPartialParentRow.__table__,
+                        BulkPurgerPartialChildRow.__table__,
+                    ],
+                )
+            )
+
+        yield BulkPurgerPartialParentRow, BulkPurgerPartialChildRow
+
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text("DROP TABLE IF EXISTS test_bulk_purger_partial_child CASCADE")
+            )
+            await conn.execute(
+                sa.text("DROP TABLE IF EXISTS test_bulk_purger_partial_parent CASCADE")
+            )
+
+    async def test_all_purgers_succeed(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_row_class: type[BulkPurgerPartialTestRow],
+    ) -> None:
+        """Test 3 purgers targeting existing rows → all 3 rows deleted, successes has 3 items, errors is empty."""
+        # Insert 3 test rows
+        async with database_connection.begin_session() as db_sess:
+            for i in range(1, 4):
+                db_sess.add(BulkPurgerPartialTestRow(id=i, name=f"item-{i}"))
+
+        # Execute bulk purger partial with 3 purgers
+        async with database_connection.begin_session() as db_sess:
+            purgers = [
+                Purger(row_class=test_row_class, pk_value=1),
+                Purger(row_class=test_row_class, pk_value=2),
+                Purger(row_class=test_row_class, pk_value=3),
+            ]
+            result = await execute_bulk_purger_partial(db_sess, purgers)
+
+            # Verify all 3 succeeded
+            assert isinstance(result, BulkPurgerResultWithFailures)
+            assert result.success_count() == 3
+            assert len(result.successes) == 3
+            assert len(result.errors) == 0
+            assert not result.has_failures()
+
+            # Verify deleted rows content
+            assert result.successes[0].id == 1
+            assert result.successes[0].name == "item-1"
+            assert result.successes[1].id == 2
+            assert result.successes[1].name == "item-2"
+            assert result.successes[2].id == 3
+            assert result.successes[2].name == "item-3"
+
+            # Verify all rows were deleted from database
+            count_result = await db_sess.execute(
+                sa.select(sa.func.count()).select_from(test_row_class)
+            )
+            assert count_result.scalar() == 0
+
+    async def test_partial_failure_with_fk_constraint(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[BulkPurgerPartialParentRow], type[BulkPurgerPartialChildRow]],
+    ) -> None:
+        """Test 3 purgers where 1 targets a row with FK constraint → 2 successes + 1 BulkPurgerError with RepositoryIntegrityError."""
+        parent_cls, child_cls = fk_tables
+
+        # Insert 3 parent rows
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(BulkPurgerPartialParentRow(id=1, name="parent-1"))
+            db_sess.add(BulkPurgerPartialParentRow(id=2, name="parent-2"))
+            db_sess.add(BulkPurgerPartialParentRow(id=3, name="parent-3"))
+            await db_sess.flush()
+
+            # Add child referencing parent-2 (creates FK constraint)
+            db_sess.add(BulkPurgerPartialChildRow(id=1, parent_id=2, name="child-1"))
+
+        # Execute bulk purger partial with 3 purgers
+        async with database_connection.begin_session() as db_sess:
+            purgers = [
+                Purger(row_class=parent_cls, pk_value=1),
+                Purger(row_class=parent_cls, pk_value=2),  # Has FK constraint
+                Purger(row_class=parent_cls, pk_value=3),
+            ]
+            result = await execute_bulk_purger_partial(db_sess, purgers)
+
+            # Verify 2 successes + 1 failure
+            assert isinstance(result, BulkPurgerResultWithFailures)
+            assert result.success_count() == 2
+            assert len(result.successes) == 2
+            assert len(result.errors) == 1
+            assert result.has_failures()
+
+            # Verify successful deletions (parent-1 and parent-3)
+            assert result.successes[0].id == 1
+            assert result.successes[0].name == "parent-1"
+            assert result.successes[1].id == 3
+            assert result.successes[1].name == "parent-3"
+
+            # Verify error (parent-2 with FK constraint)
+            error = result.errors[0]
+            assert isinstance(error, BulkPurgerError)
+            assert error.purger.pk_value == 2
+            assert error.index == 1  # Second purger in the list
+            assert isinstance(error.exception, ForeignKeyViolationError)
+            assert isinstance(error.exception, RepositoryIntegrityError)
+
+            # Verify database state: parent-2 still exists, parent-1 and parent-3 deleted
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(parent_cls))
+            assert count_result.scalar() == 1
+
+            # Verify parent-2 still exists
+            parent_2_result = await db_sess.execute(sa.select(parent_cls).where(parent_cls.id == 2))
+            parent_2 = parent_2_result.scalar_one_or_none()
+            assert parent_2 is not None
+            assert parent_2.name == "parent-2"
+
+    async def test_non_existent_pk_is_skipped(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_row_class: type[BulkPurgerPartialTestRow],
+    ) -> None:
+        """Test 3 purgers where 1 targets non-existent PK → 2 successes + 0 errors (non-existent row is skipped, not an error)."""
+        # Insert only 2 test rows (id 1 and 3)
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(BulkPurgerPartialTestRow(id=1, name="item-1"))
+            db_sess.add(BulkPurgerPartialTestRow(id=3, name="item-3"))
+
+        # Execute bulk purger partial with 3 purgers (one targets non-existent id=2)
+        async with database_connection.begin_session() as db_sess:
+            purgers = [
+                Purger(row_class=test_row_class, pk_value=1),
+                Purger(row_class=test_row_class, pk_value=2),  # Non-existent PK
+                Purger(row_class=test_row_class, pk_value=3),
+            ]
+            result = await execute_bulk_purger_partial(db_sess, purgers)
+
+            # Verify 2 successes + 0 errors (non-existent is skipped)
+            assert isinstance(result, BulkPurgerResultWithFailures)
+            assert result.success_count() == 2
+            assert len(result.successes) == 2
+            assert len(result.errors) == 0
+            assert not result.has_failures()
+
+            # Verify successful deletions
+            assert result.successes[0].id == 1
+            assert result.successes[0].name == "item-1"
+            assert result.successes[1].id == 3
+            assert result.successes[1].name == "item-3"
+
+            # Verify all rows were deleted from database
+            count_result = await db_sess.execute(
+                sa.select(sa.func.count()).select_from(test_row_class)
+            )
+            assert count_result.scalar() == 0
+
+    async def test_empty_purger_list(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_row_class: type[BulkPurgerPartialTestRow],
+    ) -> None:
+        """Test empty purger list → returns BulkPurgerResultWithFailures with empty successes and errors."""
+        async with database_connection.begin_session() as db_sess:
+            purgers: list[Purger[BulkPurgerPartialTestRow]] = []
+            result = await execute_bulk_purger_partial(db_sess, purgers)
+
+            # Verify empty result
+            assert isinstance(result, BulkPurgerResultWithFailures)
+            assert result.success_count() == 0
+            assert len(result.successes) == 0
+            assert len(result.errors) == 0
+            assert not result.has_failures()
+
+    async def test_error_index_tracking(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[BulkPurgerPartialParentRow], type[BulkPurgerPartialChildRow]],
+    ) -> None:
+        """Test error index tracking: BulkPurgerError.index matches the original position in the purger list."""
+        parent_cls, child_cls = fk_tables
+
+        # Insert 5 parent rows
+        async with database_connection.begin_session() as db_sess:
+            for i in range(1, 6):
+                db_sess.add(BulkPurgerPartialParentRow(id=i, name=f"parent-{i}"))
+            await db_sess.flush()
+
+            # Add children referencing parent-2 and parent-4 (creates FK constraints)
+            db_sess.add(BulkPurgerPartialChildRow(id=1, parent_id=2, name="child-1"))
+            db_sess.add(BulkPurgerPartialChildRow(id=2, parent_id=4, name="child-2"))
+
+        # Execute bulk purger partial with 5 purgers
+        async with database_connection.begin_session() as db_sess:
+            purgers = [
+                Purger(row_class=parent_cls, pk_value=1),  # index 0 - success
+                Purger(row_class=parent_cls, pk_value=2),  # index 1 - FK error
+                Purger(row_class=parent_cls, pk_value=3),  # index 2 - success
+                Purger(row_class=parent_cls, pk_value=4),  # index 3 - FK error
+                Purger(row_class=parent_cls, pk_value=5),  # index 4 - success
+            ]
+            result = await execute_bulk_purger_partial(db_sess, purgers)
+
+            # Verify 3 successes + 2 errors
+            assert result.success_count() == 3
+            assert len(result.errors) == 2
+
+            # Verify error indices
+            assert result.errors[0].index == 1  # parent-2
+            assert result.errors[0].purger.pk_value == 2
+            assert result.errors[1].index == 3  # parent-4
+            assert result.errors[1].purger.pk_value == 4

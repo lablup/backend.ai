@@ -1,8 +1,12 @@
+from collections.abc import Mapping
+from functools import cache
 from pathlib import Path
+from typing import Any, cast
 
 import trafaret as t
 
 from ai.backend.common import validators as tx
+from ai.backend.common.config import read_from_file
 
 DEFAULT_CONFIG_PATH = Path.cwd() / "agent.dummy.toml"
 
@@ -16,6 +20,7 @@ dummy_local_config = t.Dict({
             t.Key("scan-image", default=0.1): tx.Delay,
             t.Key("pull-image", default=1.0): tx.Delay,
             t.Key("push-image", default=1.0): tx.Delay,
+            t.Key("purge-images", default=1.0): tx.Delay,
             t.Key("destroy-kernel", default=1.0): tx.Delay,
             t.Key("clean-kernel", default=1.0): tx.Delay,
             t.Key("create-network", default=1.0): tx.Delay,
@@ -64,3 +69,9 @@ dummy_local_config = t.Dict({
         }),
     }),
 }).allow_extra("*")
+
+
+@cache
+def read_dummy_config() -> Mapping[str, Any]:
+    raw_config, _ = read_from_file(DEFAULT_CONFIG_PATH, "dummy")
+    return cast(Mapping[str, Any], dummy_local_config.check(raw_config))

@@ -1,4 +1,6 @@
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from http import HTTPStatus
+from typing import Any
 
 from aiohttp import web
 
@@ -8,7 +10,7 @@ from .plugin import MetadataPlugin, MetadataPluginRoute, NewMetadataPluginRespon
 
 
 class ContainerMetadataPlugin(MetadataPlugin):
-    async def init(self, context):
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -29,9 +31,9 @@ class ContainerMetadataPlugin(MetadataPlugin):
         ]
 
     async def get_envs(self, request: web.Request) -> web.Response:
-        kernel: DockerKernel = request["kernel"]
+        kernel: DockerKernel | None = request["kernel"]
         if kernel is None:
-            return web.Response(status=404)
+            return web.Response(status=HTTPStatus.NOT_FOUND)
         response = dict(kernel.environ)
         return web.json_response(response)
 

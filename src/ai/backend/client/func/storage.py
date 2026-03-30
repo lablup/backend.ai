@@ -1,10 +1,12 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from typing import Any, cast
 
-from ..output.fields import storage_fields
-from ..output.types import FieldSpec, PaginatedResult
-from ..pagination import fetch_paginated_result
-from ..session import api_session
-from ..utils import dedent as _d
+from ai.backend.client.output.fields import storage_fields
+from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.session import api_session
+from ai.backend.client.utils import dedent as _d
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Storage",)
@@ -41,14 +43,14 @@ class Storage(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        status: str = "ALIVE",
+        _status: str = "ALIVE",
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> PaginatedResult[dict]:
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Lists the keypairs.
         You need an admin privilege for this operation.
@@ -70,7 +72,7 @@ class Storage(BaseFunction):
         cls,
         vfolder_host: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> dict:
+    ) -> dict[str, Any]:
         query = _d("""
             query($vfolder_host: String!) {
                 storage_volume(id: $vfolder_host) { $fields }
@@ -79,4 +81,4 @@ class Storage(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"vfolder_host": vfolder_host}
         data = await api_session.get().Admin._query(query, variables)
-        return data["storage_volume"]
+        return cast(dict[str, Any], data["storage_volume"])

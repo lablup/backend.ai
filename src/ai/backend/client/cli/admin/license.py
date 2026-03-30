@@ -4,10 +4,8 @@ import sys
 from tabulate import tabulate
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.pretty import print_done, print_error, print_warn
 
-from ...request import Request
-from ...session import AsyncSession
-from ..pretty import print_done, print_error, print_warn
 from . import admin
 
 
@@ -19,12 +17,14 @@ def license() -> None:
 
 
 @license.command()
-def show():
+def show() -> None:
     """
     Show the license information (enterprise editions only).
     """
+    from ai.backend.client.request import Request
+    from ai.backend.client.session import AsyncSession
 
-    async def _show_license():
+    async def _show_license() -> None:
         async with AsyncSession():
             rqst = Request("GET", "/license")
             async with rqst.fetch() as resp:

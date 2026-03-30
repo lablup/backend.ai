@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+import uuid
+from dataclasses import dataclass
+from typing import override
+
+from ai.backend.common.data.artifact.types import VerificationStepResult
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
+
+
+@dataclass
+class GetArtifactRevisionVerificationResultAction(ArtifactRevisionAction):
+    artifact_revision_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.artifact_revision_id)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+@dataclass
+class GetArtifactRevisionVerificationResultActionResult(BaseActionResult):
+    verification_result: VerificationStepResult | None
+
+    @override
+    def entity_id(self) -> str | None:
+        return None

@@ -1,0 +1,78 @@
+"""CreatorSpec for deployment revision creation."""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
+from typing import Any, override
+
+from ai.backend.common.config import ModelDefinition
+from ai.backend.common.types import (
+    ResourceSlot,
+    RuntimeVariant,
+    VFolderMount,
+)
+from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.repositories.base import CreatorSpec
+
+
+@dataclass
+class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
+    """CreatorSpec for deployment revision creation.
+
+    When using create_revision(), revision_number must be set explicitly.
+    When using create_revision_with_next_number(), revision_number can be
+    left as None — the repository will assign it atomically.
+    """
+
+    endpoint_id: uuid.UUID
+    image_id: uuid.UUID
+    resource_group: str
+    resource_slots: ResourceSlot
+    resource_opts: Mapping[str, Any]
+    cluster_mode: str
+    cluster_size: int
+    model_id: uuid.UUID | None
+    model_mount_destination: str
+    model_definition_path: str | None
+    model_definition: ModelDefinition | None
+    startup_command: str | None
+    bootstrap_script: str | None
+    environ: Mapping[str, Any]
+    callback_url: str | None
+    runtime_variant: RuntimeVariant
+    extra_mounts: Sequence[VFolderMount]
+    revision_number: int | None = None
+
+    def with_revision_number(self, revision_number: int) -> DeploymentRevisionCreatorSpec:
+        """Return a copy with the given revision_number."""
+        return replace(self, revision_number=revision_number)
+
+    @override
+    def build_row(self) -> DeploymentRevisionRow:
+        if self.revision_number is None:
+            raise InternalServerError("revision_number must be set before building a row")
+        return DeploymentRevisionRow(
+            endpoint=self.endpoint_id,
+            revision_number=self.revision_number,
+            image=self.image_id,
+            model=self.model_id,
+            model_mount_destination=self.model_mount_destination,
+            model_definition_path=self.model_definition_path,
+            model_definition=self.model_definition.model_dump(exclude_none=True, by_alias=True)
+            if self.model_definition
+            else None,
+            resource_group=self.resource_group,
+            resource_slots=self.resource_slots,
+            resource_opts=self.resource_opts,
+            cluster_mode=self.cluster_mode,
+            cluster_size=self.cluster_size,
+            startup_command=self.startup_command,
+            bootstrap_script=self.bootstrap_script,
+            environ=self.environ,
+            callback_url=self.callback_url,
+            runtime_variant=self.runtime_variant,
+            extra_mounts=list(self.extra_mounts),
+        )

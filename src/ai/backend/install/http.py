@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from typing import AsyncIterator
+from typing import Any
 
 import aiohttp
 from textual.widgets import ProgressBar
@@ -12,7 +13,7 @@ from textual.widgets import ProgressBar
 async def request(
     method: str,
     url: str,
-    **kwargs,
+    **kwargs: Any,
 ) -> AsyncIterator[aiohttp.ClientResponse]:
     connector = aiohttp.TCPConnector()
     async with aiohttp.ClientSession(connector=connector) as s:
@@ -25,7 +26,7 @@ async def request_unix(
     method: str,
     socket_path: str,
     url: str,
-    **kwargs,
+    **kwargs: Any,
 ) -> AsyncIterator[aiohttp.ClientResponse]:
     connector = aiohttp.UnixConnector(socket_path)
     async with aiohttp.ClientSession(connector=connector) as s:
@@ -40,7 +41,7 @@ async def wget(
 ) -> None:
     chunk_size = 16384
     target_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(target_path, "wb") as out:
+    with target_path.open("wb") as out:
         async with request("GET", url, raise_for_status=True) as r:
             if progress is not None and r.content_length:
                 progress.update(total=r.content_length)

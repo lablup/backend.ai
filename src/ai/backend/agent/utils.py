@@ -1,26 +1,24 @@
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import io
 import ipaddress
-import json
 import logging
 import platform
 import re
+import resource
+from collections.abc import Mapping, MutableMapping
+from contextlib import AbstractAsyncContextManager
 from decimal import Decimal
 from pathlib import Path
 from typing import (
     Any,
-    AsyncContextManager,
-    List,
-    Mapping,
-    MutableMapping,
+    Final,
     NamedTuple,
-    Optional,
     Protocol,
-    Tuple,
-    Type,
+    TypedDict,
     TypeVar,
-    Union,
     overload,
 )
 from uuid import UUID
@@ -28,23 +26,23 @@ from uuid import UUID
 import aiodocker
 import trafaret as t
 from aiodocker.docker import DockerContainer
-from typing_extensions import Final
 
 from ai.backend.common import identity
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import (
     get_cgroup_of_pid,
     get_container_id_of_cgroup,
     get_container_pids,
 )
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import PID, ContainerId, ContainerPID, HostPID, KernelId
-from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
-IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
+IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
 InOtherContainerPID: Final = ContainerPID(PID(-2))
 NotContainerPID: Final = ContainerPID(PID(-1))
@@ -58,7 +56,7 @@ class SupportsAsyncClose(Protocol):
 _SupportsAsyncCloseT = TypeVar("_SupportsAsyncCloseT", bound=SupportsAsyncClose)
 
 
-class closing_async(AsyncContextManager[_SupportsAsyncCloseT]):
+class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
     """
     contextlib.closing calls close(), and aiotools.aclosing() calls aclose().
     This context manager calls close() as a coroutine.
@@ -70,12 +68,12 @@ class closing_async(AsyncContextManager[_SupportsAsyncCloseT]):
     async def __aenter__(self) -> _SupportsAsyncCloseT:
         return self.obj
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         await self.obj.close()
 
 
 def generate_local_instance_id(hint: str) -> str:
-    return hashlib.md5(hint.encode("utf-8")).hexdigest()[:12]
+    return hashlib.md5(hint.encode("utf-8"), usedforsecurity=False).hexdigest()[:12]
 
 
 def get_arch_name() -> str:
@@ -90,22 +88,30 @@ def get_arch_name() -> str:
     return aliases.get(ret, ret)
 
 
-def update_nested_dict(dest: MutableMapping, additions: Mapping) -> None:
+def update_nested_dict(dest: MutableMapping[str, Any], additions: Mapping[str, Any]) -> None:
     for k, v in additions.items():
         if k not in dest:
             dest[k] = v
         else:
             if isinstance(dest[k], MutableMapping):
-                assert isinstance(v, MutableMapping)
+                if not isinstance(v, MutableMapping):
+                    raise TypeError(
+                        f"Cannot merge non-mapping value into mapping for key '{k}': "
+                        f"expected MutableMapping, got {type(v).__name__}."
+                    )
                 update_nested_dict(dest[k], v)
-            elif isinstance(dest[k], List):
-                assert isinstance(v, List)
+            elif isinstance(dest[k], list):
+                if not isinstance(v, list):
+                    raise TypeError(
+                        f"Cannot extend non-list value into list for key '{k}': "
+                        f"expected List, got {type(v).__name__}."
+                    )
                 dest[k].extend(v)
             else:
                 dest[k] = v
 
 
-def numeric_list(s: str) -> List[int]:
+def numeric_list(s: str) -> list[int]:
     return [int(p) for p in s.split()]
 
 
@@ -114,22 +120,22 @@ def remove_exponent(num: Decimal) -> Decimal:
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[bool], default: bool) -> bool: ...
+def read_sysfs(path: str | Path, type_: type[bool], default: bool | None = None) -> bool: ...
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[int], default: int) -> int: ...
+def read_sysfs(path: str | Path, type_: type[int], default: int | None = None) -> int: ...
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[float], default: float) -> float: ...
+def read_sysfs(path: str | Path, type_: type[float], default: float | None = None) -> float: ...
 
 
 @overload
-def read_sysfs(path: Union[str, Path], type_: Type[str], default: str) -> str: ...
+def read_sysfs(path: str | Path, type_: type[str], default: str | None = None) -> str: ...
 
 
-def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Optional[Any] = None) -> Any:
+def read_sysfs(path: str | Path, type_: type[Any], default: Any | None = None) -> Any:
     def_vals: Mapping[Any, Any] = {
         bool: False,
         int: 0,
@@ -144,9 +150,8 @@ def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Optional[Any] 
         raw_str = Path(path).read_text().strip()
         if type_ is bool:
             return t.ToBool().check(raw_str)
-        else:
-            return type_(raw_str)
-    except IOError:
+        return type_(raw_str)
+    except OSError:
         return default
 
 
@@ -154,7 +159,7 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
     file_size = path.stat().st_size
 
     def _read_tail() -> bytes:
-        with open(path, "rb") as f:
+        with path.open("rb") as f:
             f.seek(max(file_size - nbytes, 0), io.SEEK_SET)
             return f.read(nbytes)
 
@@ -162,7 +167,7 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
     return await loop.run_in_executor(None, _read_tail)
 
 
-async def get_kernel_id_from_container(val: Union[str, DockerContainer]) -> Optional[KernelId]:
+async def get_kernel_id_from_container(val: str | DockerContainer) -> KernelId | None:
     if isinstance(val, DockerContainer):
         if "Name" not in val._container:
             await val.show()
@@ -204,7 +209,7 @@ class ProcessInfo(NamedTuple):
 async def get_host_process_table(
     docker: aiodocker.Docker,
     container_id: str,
-) -> List[ProcessInfo]:
+) -> list[ProcessInfo]:
     result = await docker._query_json(f"containers/{container_id}/top", method="GET")
     procs = result["Processes"]
     return [ProcessInfo(int(x[1]), x[7]) for x in procs]
@@ -213,7 +218,7 @@ async def get_host_process_table(
 async def get_container_process_table(
     docker: aiodocker.Docker,
     container_id: str,
-) -> List[ProcessInfo]:
+) -> list[ProcessInfo]:
     # Get process table from inside container (execute 'ps -aux' command from container).
     # Filter processes which have exactly the same COMMAND like above.
     result = await docker._query_json(
@@ -231,7 +236,7 @@ async def get_container_process_table(
         f"exec/{exec_id}/start",
         method="POST",
         headers={"content-type": "application/json"},
-        data=json.dumps({
+        data=dump_json_str({
             "Stream": False,  # get response immediately
             "Detach": False,
             "Tty": False,
@@ -248,8 +253,8 @@ async def get_container_process_table(
 
 async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> ContainerPID:
     kernel_ver = Path("/proc/version").read_text()
-    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):  # noqa
-        kernel_ver_tuple: Tuple[str, str] = m.groups()  # type: ignore
+    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):
+        kernel_ver_tuple: tuple[str, str] = m.groups()  # type: ignore
         if kernel_ver_tuple < ("4", "1"):
             # TODO: this should be deprecated when the minimun supported Linux kernel will be 4.1.
             #
@@ -280,6 +285,7 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
             #    'python', 'mnist.py'],
             #   ... (processes with the same COMMAND)
             # ]
+            docker: aiodocker.Docker | None = None
             try:
                 docker = aiodocker.Docker()
                 # Get process table from host (docker top information). Filter processes which have
@@ -305,7 +311,8 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
             except (IndexError, KeyError, aiodocker.exceptions.DockerError):
                 return NotContainerPID
             finally:
-                await docker.close()
+                if docker is not None:
+                    await docker.close()
 
     try:
         cgroup = get_cgroup_of_pid("pids", host_pid)
@@ -325,10 +332,11 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
 
 async def container_pid_to_host_pid(container_id: str, container_pid: ContainerPID) -> HostPID:
     kernel_ver = Path("/proc/version").read_text()
-    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):  # noqa
-        kernel_ver_tuple: Tuple[str, str] = m.groups()  # type: ignore
+    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):
+        kernel_ver_tuple: tuple[str, str] = m.groups()  # type: ignore
         if kernel_ver_tuple < ("4", "1"):
             # reverse implementation of host_pid_to_container_pid().
+            docker: aiodocker.Docker | None = None
             try:
                 docker = aiodocker.Docker()
                 container_procs = await get_container_process_table(docker, container_id)
@@ -347,7 +355,8 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
             except (IndexError, KeyError, aiodocker.exceptions.DockerError):
                 return NotHostPID
             finally:
-                await docker.close()
+                if docker is not None:
+                    await docker.close()
 
     try:
         cgtasks = await get_container_pids(ContainerId(container_id))
@@ -361,5 +370,67 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
             if nspids[1] == str(container_pid):
                 return HostPID(PID(pid))
         return NotHostPID
-    except (ValueError, KeyError, IOError):
+    except (OSError, ValueError, KeyError):
         return NotHostPID
+
+
+class DockerUlimitEntry(TypedDict):
+    Name: str
+    Soft: int
+    Hard: int
+
+
+def get_safe_ulimit(name: str, desired_soft: int, desired_hard: int) -> DockerUlimitEntry:
+    """
+    Get ulimit values that don't exceed the host's system limits to avoid
+    'operation not permitted' errors from Docker.
+    """
+    try:
+        # Map ulimit names to resource constants
+        ulimit_map = {
+            "nofile": resource.RLIMIT_NOFILE,
+            "memlock": resource.RLIMIT_MEMLOCK,
+            "nproc": resource.RLIMIT_NPROC,
+            "fsize": resource.RLIMIT_FSIZE,
+            "core": resource.RLIMIT_CORE,
+            "stack": resource.RLIMIT_STACK,
+            "data": resource.RLIMIT_DATA,
+            "rss": resource.RLIMIT_RSS,
+        }
+
+        if name not in ulimit_map:
+            # If we don't know how to check this limit, use desired values
+            return {"Name": name, "Soft": desired_soft, "Hard": desired_hard}
+
+        current_soft_limit, current_hard_limit = resource.getrlimit(ulimit_map[name])
+        infinity_val = resource.RLIM_INFINITY
+
+        if desired_soft == -1:
+            safe_soft = current_soft_limit if current_soft_limit != infinity_val else -1
+        else:
+            if current_soft_limit == infinity_val:
+                safe_soft = desired_soft
+            else:
+                safe_soft = min(desired_soft, current_soft_limit)
+
+        if desired_hard == -1:
+            safe_hard = current_hard_limit if current_hard_limit != infinity_val else -1
+        else:
+            if current_hard_limit == infinity_val:
+                safe_hard = desired_hard
+            else:
+                safe_hard = min(desired_hard, current_hard_limit)
+
+        # Log if we had to adjust the limits
+        if safe_soft != desired_soft or safe_hard != desired_hard:
+            log.debug(
+                f"Adjusted ulimit {name}: desired=({desired_soft}, {desired_hard}) "
+                f"-> safe=({safe_soft}, {safe_hard}) (system limits: {current_soft_limit}, {current_hard_limit})"
+            )
+
+        return {"Name": name, "Soft": safe_soft, "Hard": safe_hard}
+
+    except (OSError, ValueError, AttributeError) as e:
+        # If we can't get system limits, log and use desired values
+        log.warning(f"Could not get system ulimit for {name}: {e}")
+        return {"Name": name, "Soft": desired_soft, "Hard": desired_hard}

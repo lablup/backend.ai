@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Generic, Self, TypeVar, override
+from typing import Any, Self, TypedDict, TypeVar, override
 
 import trafaret as t
 
@@ -17,12 +18,13 @@ class CIStrEnum(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         value = value.lower()
         # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
         # members as the official stdlib example suggests.
         for member in cls:
-            if member.value == value:
+            if member.value.lower() == value:
                 return member
         return None
 
@@ -33,36 +35,10 @@ class CIStrEnum(enum.StrEnum):
         return CIStrEnumTrafaret(cls)
 
 
-class CIUpperStrEnum(CIStrEnum):
-    """
-    An StrEnum variant to allow case-insenstive matching of the members while the values are
-    UPPERCASED.
-    """
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
-        value = value.upper()
-        for member in cls:
-            if member.value == value:
-                return member
-        return None
-
-    @override
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values) -> str:
-        return name.upper()
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return CIUpperStrEnumTrafaret(cls)
-
-
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+class CIStrEnumTrafaret[T_enum: enum.Enum](t.Trafaret):
     """
     A case-insensitive version of trafaret to parse StrEnum values.
     """
@@ -78,36 +54,21 @@ class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
             self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
 
 
-class CIUpperStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
-    """
-    A case-insensitive version of trafaret to parse StrEnum values.
-    """
-
-    def __init__(self, enum_cls: type[T_enum]) -> None:
-        self.enum_cls = enum_cls
-
-    def check_and_return(self, value: str) -> T_enum:
-        try:
-            # Assume that the enum values are lowercases.
-            return self.enum_cls(value.upper())
-        except (KeyError, ValueError):
-            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
-
-
-class LogLevel(CIUpperStrEnum):
+class LogLevel(CIStrEnum):
     # The logging stdlib only accepts uppercased loglevel names,
-    # so we subclass `CIUpperStrEnum` here.
-    CRITICAL = enum.auto()
-    ERROR = enum.auto()
-    WARNING = enum.auto()
-    INFO = enum.auto()
-    DEBUG = enum.auto()
-    NOTSET = enum.auto()
+    # so we subclass `CIStrEnum` here.
+    CRITICAL = "CRITICAL"
+    ERROR = "ERROR"
+    WARNING = "WARNING"
+    INFO = "INFO"
+    DEBUG = "DEBUG"
+    TRACE = "TRACE"
+    NOTSET = "NOTSET"
 
 
 class LogFormat(CIStrEnum):
-    SIMPLE = enum.auto()
-    VERBOSE = enum.auto()
+    SIMPLE = "simple"
+    VERBOSE = "verbose"
 
 
 class SimpleBinarySizeTrafaret(t.Trafaret):
@@ -134,6 +95,7 @@ class SimpleBinarySizeTrafaret(t.Trafaret):
         except ValueError:
             value = value.lower()
             dec_expr: Decimal
+            suffix: str = ""
             try:
                 for ending in self.endings:
                     if (stem := value.removesuffix(ending)) != value:
@@ -149,12 +111,12 @@ class SimpleBinarySizeTrafaret(t.Trafaret):
                         # has no suffix and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
-            except ArithmeticError:
-                raise ValueError("Unconvertible value", orig_value)
+            except ArithmeticError as e:
+                raise ValueError("Unconvertible value", orig_value) from e
             try:
                 multiplier = self.suffix_map[suffix]
-            except KeyError:
-                raise ValueError("Unconvertible value", orig_value)
+            except KeyError as e:
+                raise ValueError("Unconvertible value", orig_value) from e
             return int(dec_expr * multiplier)
 
 
@@ -178,3 +140,8 @@ class DirPathTrafaret(t.Trafaret):
             if not p.is_dir():
                 self._failure("value is not a directory", value=value)
             return p
+
+
+class MsgpackOptions(TypedDict):
+    pack_opts: Mapping[str, Any]
+    unpack_opts: Mapping[str, Any]

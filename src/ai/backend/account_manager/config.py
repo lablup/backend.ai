@@ -23,6 +23,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
+from ai.backend.logging import LogLevel
 
 from .types import EventLoopType
 from .utils import config_key_to_snake_case
@@ -47,7 +48,7 @@ class TransactionIsolationLevel(enum.StrEnum):
 
 class BaseSchema(BaseModel):
     model_config = ConfigDict(
-        populate_by_name=True,
+        validate_by_name=True,
         from_attributes=True,
         use_enum_values=True,
         extra="allow",
@@ -64,13 +65,12 @@ class HostPortPair(BaseSchema):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def __getitem__(self, *args) -> int | str:
+    def __getitem__(self, *args: Any) -> int | str:
         if args[0] == 0:
             return self.host
-        elif args[0] == 1:
+        if args[0] == 1:
             return self.port
-        else:
-            raise KeyError(*args)
+        raise KeyError(*args)
 
 
 @dataclass
@@ -83,27 +83,27 @@ class UserID:
         value: int | str | None,
     ) -> int:
         if value is None:
-            assert cls.default_uid, "value is None but default_uid not provided"
+            if not cls.default_uid:
+                raise ValueError("value is None but default_uid not provided")
             return cls.default_uid
-        assert isinstance(value, (int, str)), "value must be an integer"
+        if not isinstance(value, (int, str)):
+            raise TypeError("value must be an integer or string")
         match value:
             case int():
                 if value == -1:
                     return os.getuid()
-                else:
-                    return value
+                return value
             case str():
                 try:
                     _value = int(value)
                     if _value == -1:
                         return os.getuid()
-                    else:
-                        return _value
+                    return _value
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_uid
-                    except KeyError:
-                        assert False, f"no such user {value} in system"
+                    except KeyError as e:
+                        raise ValueError(f"no such user {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -155,26 +155,27 @@ class GroupID:
         value: int | str | None,
     ) -> int:
         if value is None:
-            assert cls.default_gid, "value is None but default_gid not provided"
-        assert isinstance(value, (int, str)), "value must be an integer"
+            if not cls.default_gid:
+                raise ValueError("value is None but default_gid not provided")
+            return cls.default_gid
+        if not isinstance(value, (int, str)):
+            raise TypeError("value must be an integer or string")
         match value:
             case int():
                 if value == -1:
                     return os.getgid()
-                else:
-                    return value
+                return value
             case str():
                 try:
                     _value = int(value)
                     if _value == -1:
                         return os.getgid()
-                    else:
-                        return _value
+                    return _value
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_gid
-                    except KeyError:
-                        assert False, f"no such user {value} in system"
+                    except KeyError as e:
+                        raise ValueError(f"no such user {value} in system") from e
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -294,6 +295,13 @@ class AccountManagerConfig(BaseSchema):
             examples=[HostPortPair(host="127.0.0.1", port=8099)],
         ),
     ]
+    internal_addr: Annotated[
+        HostPortPair,
+        Field(
+            description="Address of account-manager internal service for internal infra communication.",
+            examples=[HostPortPair(host="127.0.0.1", port=18098)],
+        ),
+    ]
     ipc_base_path: Annotated[
         Path,
         Field(
@@ -326,7 +334,7 @@ class AccountManagerConfig(BaseSchema):
     group: Annotated[
         int,
         GroupID(default_gid=_file_perm.st_gid),
-        Field(default=_file_perm.st_uid, description="Process group."),
+        Field(default=_file_perm.st_gid, description="Process group."),
     ]
     ssl_enabled: Annotated[
         bool, Field(description="Use TLS to communicate. Default is false.", default=False)
@@ -356,15 +364,22 @@ class AccountManagerConfig(BaseSchema):
     aiomonitor_termui_port: Annotated[
         int,
         Field(
-            gt=0, lt=65536, description="Port number for aiomonitor termui server.", default=48500
+            gt=0, lt=65536, description="Port number for aiomonitor termui server.", default=38500
         ),
     ]
     aiomonitor_webui_port: Annotated[
         int,
         Field(
-            gt=0, lt=65536, description="Port number for aiomonitor webui server.", default=49500
+            gt=0, lt=65536, description="Port number for aiomonitor webui server.", default=39500
         ),
     ]
+
+
+class PyroscopeConfig(BaseSchema):
+    enabled: Annotated[bool, Field(default=False, description="Enable pyroscope profiler.")]
+    app_name: Annotated[str, Field(default=None, description="Pyroscope app name.")]
+    server_addr: Annotated[str, Field(default=None, description="Pyroscope server address.")]
+    sample_rate: Annotated[int, Field(default=None, description="Pyroscope sample rate.")]
 
 
 class DebugConfig(BaseSchema):
@@ -378,36 +393,37 @@ class ServerConfig(BaseSchema):
     etcd: EtcdConfig
     db: DBConfig
     account_manager: AccountManagerConfig
+    pyroscope: Annotated[PyroscopeConfig, Field(default_factory=PyroscopeConfig)]
     debug: DebugConfig
     # logging
 
 
-def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConfig:
+def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
     # Determine where to read configuration.
     raw_cfg, _ = config.read_from_file(config_path, "account-manager")
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
     try:
         raw_cfg = config_key_to_snake_case(raw_cfg)
-        cfg = ServerConfig(**raw_cfg)
-        if cfg.debug.enabled:
+        server_config = ServerConfig(**raw_cfg)
+        if server_config.debug.enabled:
             print("== Account Manager configuration ==", file=sys.stderr)
-            print(pformat(cfg.model_dump()), file=sys.stderr)
+            print(pformat(server_config.model_dump()), file=sys.stderr)
     except ValidationError as e:
         print(
             "ConfigurationError: Could not read or validate the account manager local config:",
             file=sys.stderr,
         )
         print(pformat(e), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
-        return cfg
+        return server_config
 
 
 class Undefined:
@@ -419,19 +435,23 @@ class UnsupportedTypeError(RuntimeError):
 
 
 def generate_example_json(
-    schema: type[BaseSchema] | types.GenericAlias | types.UnionType, parent: list[str] = []
-) -> dict | list:
+    schema: type[BaseSchema] | types.GenericAlias | types.UnionType,
+    parent: list[str] | None = None,
+) -> dict[str, Any] | list[Any]:
+    if parent is None:
+        parent = []
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
-    elif isinstance(schema, types.GenericAlias):
+    if isinstance(schema, types.GenericAlias):
         if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
-    elif issubclass(schema, BaseSchema):
+    if issubclass(schema, BaseSchema):
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]
-            assert info.annotation
+            if not info.annotation:
+                raise ValueError(f"Field {name} in {schema} has no annotation")
             alternative_example = Undefined
             if info.examples:
                 res[name] = info.examples[0]
@@ -446,5 +466,4 @@ def generate_example_json(
                     else:
                         raise
         return res
-    else:
-        raise UnsupportedTypeError(str(schema))
+    raise UnsupportedTypeError(str(schema))

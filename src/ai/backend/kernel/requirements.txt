@@ -1,5 +1,5 @@
 # copied from https://github.com/lablup/backend.ai-krunner-static-gnu/blob/main/src/ai/backend/krunner/static_gnu/requirements.txt
-pyzmq~=25.1
+pyzmq~=26.4
 uvloop~=0.19
 attrs~=23.2
 janus~=1.0

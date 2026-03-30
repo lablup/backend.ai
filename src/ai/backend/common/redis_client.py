@@ -1,13 +1,15 @@
 import asyncio
 import logging
 import socket
-from typing import Any, AsyncContextManager, Final, Sequence
+from collections.abc import AsyncIterator, Sequence
+from contextlib import AbstractAsyncContextManager
+from typing import Any, Final
 
 import hiredis
 
 from ai.backend.logging import BraceStyleAdapter
 
-from .types import EtcdRedisConfig, aobject
+from .types import RedisTarget, aobject
 
 __all__ = (
     "RedisClient",
@@ -30,7 +32,7 @@ if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
     _keepalive_options[_TCP_KEEPCNT] = 3
 
 
-class Ellipsis(object):
+class Ellipsis:
     pass
 
 
@@ -56,7 +58,7 @@ class RedisClient(aobject):
         self,
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
-        verbose=False,
+        verbose: bool = False,
     ) -> None:
         self.reader = reader
         self.writer = writer
@@ -76,12 +78,28 @@ class RedisClient(aobject):
             )
         )[0]
 
+    async def subscribe_reader(
+        self,
+    ) -> AsyncIterator[Any]:
+        hiredis_reader = hiredis.Reader(notEnoughData=ellipsis)
+        while True:
+            data = await self.reader.read(BUF_SIZE)
+            if not data:
+                break
+            hiredis_reader.feed(data)
+            msg = hiredis_reader.gets()
+            if msg == ellipsis and self.reader.at_eof():
+                raise EOFError
+            if msg is None:
+                continue
+            yield msg
+
     async def pipeline(
         self,
         commands: Sequence[Sequence[str | int | float | bytes | memoryview]],
         *,
         command_timeout: float | None = None,
-        return_exception=False,
+        return_exception: bool = False,
     ) -> Any:
         return await self._send(
             commands,
@@ -94,7 +112,7 @@ class RedisClient(aobject):
         commands: Sequence[Sequence[str | int | float | bytes | memoryview]],
         *,
         command_timeout: float | None = None,
-        return_exception=False,
+        return_exception: bool = False,
     ) -> list[Any]:
         """
         Executes a function that issues Redis commands or returns a pipeline/transaction of commands,
@@ -112,7 +130,7 @@ class RedisClient(aobject):
         while True:
             try:
                 hiredis_reader = hiredis.Reader(notEnoughData=ellipsis)
-                _blobs = bytes()
+                _blobs = b""
                 for command in commands:
                     request_blob = hiredis.pack_command(tuple(command))  # type: ignore[arg-type]
                     self.writer.write(request_blob)
@@ -127,7 +145,7 @@ class RedisClient(aobject):
                 results = []
                 first_result = ellipsis
 
-                _buf = bytes()
+                _buf = b""
 
                 met_unexpected_eof = False
 
@@ -164,7 +182,7 @@ class RedisClient(aobject):
                     results.append(next_result)
 
                 try:
-                    if not len(results) == len(commands):
+                    if len(results) != len(commands):
                         log.warning("requests: {}", commands)
                         log.warning("responses: {}", results)
                         log.warning("raw request: {}", _blobs)
@@ -180,7 +198,7 @@ class RedisClient(aobject):
                     self._prev_buf = _buf
 
                 if self.verbose:
-                    for request, response in zip(commands, results):
+                    for request, response in zip(commands, results, strict=True):
                         log.debug("{} -> {}", request, response)
 
                 return results
@@ -190,47 +208,48 @@ class RedisClient(aobject):
                 await asyncio.sleep(0)
 
 
-class RedisConnection(AsyncContextManager[RedisClient]):
-    redis_config: EtcdRedisConfig
-    db: int
+class RedisConnection(AbstractAsyncContextManager[RedisClient]):
+    _redis_target: RedisTarget
+    _db: int
 
-    socket_timeout: float | None
-    socket_connect_timeout: float | None
+    _socket_timeout: float | None
+    _socket_connect_timeout: float | None
+    _keepalive_options: dict[int, int]
 
     def __init__(
         self,
-        redis_config: EtcdRedisConfig,
+        redis_target: RedisTarget,
         *,
         db: int = 0,
         socket_timeout: float | None = 5.0,
         socket_connect_timeout: float | None = 2.0,
         keepalive_options: dict[int, int] = _keepalive_options,
     ) -> None:
-        self.redis_config = redis_config
-        self.db = db
-        self.hiredis_reader = hiredis.Reader()
+        self._redis_target = redis_target
+        self._db = db
 
-        self.socket_timeout = socket_timeout
-        self.socket_connect_timeout = socket_connect_timeout
-        self.keepalive_options = keepalive_options
+        self._socket_timeout = socket_timeout
+        self._socket_connect_timeout = socket_connect_timeout
+        self._keepalive_options = keepalive_options
 
     async def connect(self) -> RedisClient:
-        if self.redis_config.get("sentinel"):
+        if self._redis_target.sentinel:
             raise RuntimeError("Redis with sentinel not supported for this library")
 
-        redis_url = self.redis_config.get("addr")
-        assert redis_url is not None
+        redis_url = self._redis_target.addr
+        if redis_url is None:
+            raise ValueError("Redis URL is not configured")
 
         host = str(redis_url[0])
         port = redis_url[1]
-        password = self.redis_config.get("password")
+        password = self._redis_target.password
 
-        async with asyncio.timeout(self.socket_connect_timeout):
+        async with asyncio.timeout(self._socket_connect_timeout):
             reader, writer = await asyncio.open_connection(host, port)
             sock: socket.socket = writer.get_extra_info("socket")
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
 
-            for opt, val in self.keepalive_options.items():
+            for opt, val in self._keepalive_options.items():
                 sock.setsockopt(socket.IPPROTO_TCP, opt, val)
 
         self.writer = writer
@@ -241,16 +260,16 @@ class RedisConnection(AsyncContextManager[RedisClient]):
         if password:
             await client.execute(
                 ["AUTH", password],
-                command_timeout=self.socket_timeout,
+                command_timeout=self._socket_timeout,
             )
 
         await client.execute(
             ["HELLO", "3"],
-            command_timeout=self.socket_timeout,
+            command_timeout=self._socket_timeout,
         )
         await client.execute(
-            ["SELECT", self.db],
-            command_timeout=self.socket_timeout,
+            ["SELECT", self._db],
+            command_timeout=self._socket_timeout,
         )
 
         return client
@@ -267,5 +286,5 @@ class RedisConnection(AsyncContextManager[RedisClient]):
                     pass  # there's no more room we can do anything
                 raise e
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         return await self.disconnect()

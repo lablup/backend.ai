@@ -1,0 +1,140 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+elif command_exists "docker-compose"; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+else
+    echo "Error: Neither 'docker compose' nor 'docker-compose' found."
+    exit 1
+fi
+
+{%- if router_type == "apollo" %}
+echo -e "${CYAN}=== Apollo Router Status ===${NC}"
+{%- else %}
+echo -e "${CYAN}=== Hive Gateway Status ===${NC}"
+{%- endif %}
+echo "Service Port     : {{ service_port }}"
+{%- if is_ha_mode %}
+echo "Direct Port      : {{ gateway_port }} (bypasses HAProxy)"
+{%- endif %}
+echo "Manager Endpoint : {{ manager_hostname }}:{{ manager_graphql_port }}"
+{%- if is_ha_mode %}
+echo "Mode             : HA ({{ cluster_nodes | length }} nodes)"
+echo "HAProxy Stats    : http://localhost:7902/stats"
+{%- else %}
+echo "Mode             : Single-node"
+{%- endif %}
+echo ""
+
+echo -e "${CYAN}=== Container Status ===${NC}"
+$DOCKER_COMPOSE_CMD ps
+echo ""
+
+echo -e "${CYAN}=== Health Check ===${NC}"
+
+{%- if router_type == "apollo" %}
+{%- set svc_name = "apollo-router" %}
+{%- set router_label = "Apollo Router" %}
+{%- else %}
+{%- set svc_name = "hive-gateway" %}
+{%- set router_label = "Hive Gateway" %}
+{%- endif %}
+# Check {{ router_label }} health via Docker's built-in health status
+gw_container=$(docker ps --filter "name=bai-{{ svc_name }}" --filter "status=running" --format "{{ '{{.Names}}' }}" | grep -v "lb" | head -1)
+if [ -n "$gw_container" ]; then
+    health=$(docker inspect --format='{{ '{{.State.Health.Status}}' }}' "$gw_container" 2>/dev/null)
+    if [ "$health" = "healthy" ]; then
+        echo -e "{{ router_label }}     : ${GREEN}Healthy${NC}"
+    elif [ "$health" = "starting" ]; then
+        echo -e "{{ router_label }}     : ${YELLOW}Starting${NC}"
+    else
+        echo -e "{{ router_label }}     : ${RED}Unhealthy${NC}"
+    fi
+else
+    echo -e "{{ router_label }}     : ${RED}Not Running${NC}"
+fi
+
+{%- if is_ha_mode %}
+
+# Check HAProxy (HA mode only)
+lb_container=$(docker ps --filter "name=bai-{{ svc_name }}-lb" --filter "status=running" --format "{{ '{{.Names}}' }}" | head -1)
+if [ -n "$lb_container" ]; then
+    if command_exists wget; then
+        stats=$(timeout 5 wget -qO- "http://127.0.0.1:7902/stats" 2>/dev/null | grep -c "HAProxy")
+    elif command_exists curl; then
+        stats=$(timeout 5 curl -sf "http://127.0.0.1:7902/stats" 2>/dev/null | grep -c "HAProxy")
+    fi
+
+    if [ "$stats" -gt 0 ]; then
+        echo -e "HAProxy LB       : ${GREEN}Online${NC}"
+    else
+        echo -e "HAProxy LB       : ${YELLOW}Stats unavailable${NC}"
+    fi
+else
+    echo -e "HAProxy LB       : ${RED}Not Running${NC}"
+fi
+{%- endif %}
+echo ""
+
+echo -e "${CYAN}=== Supergraph Schema ===${NC}"
+if [ -f "./supergraph.graphql" ]; then
+    schema_size=$(wc -c < ./supergraph.graphql | tr -d ' ')
+    schema_lines=$(wc -l < ./supergraph.graphql | tr -d ' ')
+    echo "File             : supergraph.graphql"
+    echo "Size             : ${schema_size} bytes (${schema_lines} lines)"
+
+    # Try to extract version info from schema comments if available
+    version_comment=$(head -5 ./supergraph.graphql | grep -i "version\|backend.ai" || true)
+    if [ -n "$version_comment" ]; then
+        echo "Version Info     : $version_comment"
+    fi
+else
+    echo -e "Schema File      : ${RED}Not Found${NC}"
+fi
+echo ""
+
+echo -e "${CYAN}=== GraphQL Endpoint Test ===${NC}"
+# Quick introspection test (just check if endpoint responds to POST)
+{%- if router_type == "apollo" %}
+{%- set gql_path = "" %}
+{%- else %}
+{%- set gql_path = "/admin/gql" %}
+{%- endif %}
+if command_exists curl; then
+    response=$(timeout 5 curl -sf -X POST "http://127.0.0.1:{{ service_port }}{{ gql_path }}" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"{ __typename }"}' 2>/dev/null)
+
+    if echo "$response" | grep -q "__typename"; then
+        echo -e "GraphQL Endpoint : ${GREEN}Responding${NC} (http://localhost:{{ service_port }}{{ gql_path }})"
+    else
+        echo -e "GraphQL Endpoint : ${YELLOW}No response or error${NC}"
+    fi
+elif command_exists wget; then
+    response=$(timeout 5 wget -qO- --post-data='{"query":"{ __typename }"}' \
+        --header="Content-Type: application/json" \
+        "http://127.0.0.1:{{ service_port }}{{ gql_path }}" 2>/dev/null)
+
+    if echo "$response" | grep -q "__typename"; then
+        echo -e "GraphQL Endpoint : ${GREEN}Responding${NC} (http://localhost:{{ service_port }}{{ gql_path }})"
+    else
+        echo -e "GraphQL Endpoint : ${YELLOW}No response or error${NC}"
+    fi
+else
+    echo "GraphQL Endpoint : (curl/wget not available for test)"
+fi
+echo ""

@@ -7,7 +7,7 @@ Create Date: 2023-12-06 12:20:11.537908
 """
 
 import enum
-from typing import Any
+from typing import Any, cast
 
 import sqlalchemy as sa
 from alembic import op
@@ -93,7 +93,9 @@ def upgrade() -> None:
         __table_args__ = {"extend_existing": True}
 
         uuid = sa.Column("uuid", GUID, primary_key=True)
-        role = sa.Column("role", EnumValueType(UserRole), default=UserRole.USER)
+        role: sa.Column[UserRole] = sa.Column(
+            "role", EnumValueType(UserRole), default=UserRole.USER
+        )
         email = sa.Column("email", sa.String(length=64))
         main_access_key = sa.Column(
             "main_access_key",
@@ -113,9 +115,9 @@ def upgrade() -> None:
             return None
 
     def prepare_keypair(
-        user_email,
-        user_id,
-        user_role,
+        user_email: str,
+        user_id: Any,
+        user_role: UserRole,
     ) -> dict[str, Any]:
         ak, sk = generate_keypair()
         pubkey, privkey = generate_ssh_keypair()
@@ -144,7 +146,7 @@ def upgrade() -> None:
             .limit(PAGE_SIZE)
             .options(selectinload(UserRow.keypairs))
         )
-        user_rows: list[UserRow] = db_session.scalars(user_query).all()
+        user_rows = db_session.scalars(user_query).all()
 
         if not user_rows:
             break
@@ -153,7 +155,7 @@ def upgrade() -> None:
             main_kp = pick_main_keypair(row.keypairs)
             if main_kp is None:
                 # Create new keypair when the user has no keypair
-                kp_data = prepare_keypair(row.email, row.uuid, row.role)
+                kp_data = prepare_keypair(str(row.email), row.uuid, cast(UserRole, row.role))
                 db_session.execute(sa.insert(KeyPairRow).values(**kp_data))
                 user_id_kp_maps.append({
                     "user_id": row.uuid,

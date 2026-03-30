@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
+import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import aiofiles
 import click
-import graphene
 
+from ai.backend.common.json import pretty_json_str
+from ai.backend.manager.api.gql.schema import schema as strawberry_schema
+from ai.backend.manager.api.gql_legacy.schema import graphene_schema
 from ai.backend.manager.openapi import generate
-
-from ..models.gql import Mutations, Queries
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -21,18 +21,100 @@ log = logging.getLogger(__spec__.name)
 
 
 @click.group()
-def cli(args) -> None:
+def cli() -> None:
     pass
 
 
-async def generate_gql_schema(output_path: Path) -> None:
-    schema = graphene.Schema(query=Queries, mutation=Mutations, auto_camelcase=False)
-    if output_path == "-":
-        log.info("======== GraphQL API Schema ========")
-        print(str(schema))
+async def generate_graphene_gql_schema(output_path: Path | None) -> None:
+    if output_path is None:
+        log.info("======== Graphene GraphQL API Schema ========")
+        print(str(graphene_schema))
     else:
         async with aiofiles.open(output_path, "w") as fw:
-            await fw.write(str(schema))
+            await fw.write(str(graphene_schema))
+
+
+async def generate_strawberry_gql_schema(output_path: Path | None) -> None:
+    if output_path is None:
+        log.info("======== Strawberry GraphQL API Schema ========")
+        print(strawberry_schema.as_str())
+    else:
+        async with aiofiles.open(output_path, "w") as fw:
+            await fw.write(strawberry_schema.as_str())
+
+
+def generate_supergraph_schema(
+    supergraph_config_path: str | Path,
+    output_dir: str | Path,
+) -> None:
+    """
+    Post-processes GraphQL schema and generates supergraph.
+
+    Args:
+        schema_file_path: Path to the main schema file (e.g., schema2.graphql)
+        supergraph_config_path: Path to the supergraph.yaml configuration file
+        output_dir: Output directory (defaults to same directory as schema file)
+    """
+    log.info("Generating supergraph schema...")
+
+    config_path = Path(supergraph_config_path)
+
+    # Generate supergraph
+    supergraph_path = Path(output_dir) / "supergraph.graphql"
+    # Find the project root directory (where the supergraph.yaml paths are relative to)
+    project_root = config_path
+    while project_root.parent != project_root:
+        if (project_root / "pyproject.toml").exists() or (project_root / ".git").exists():
+            break
+        project_root = project_root.parent
+
+    result = subprocess.run(
+        ["rover", "supergraph", "compose", "--config", str(config_path)],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    supergraph_path.write_text(result.stdout, encoding="utf-8")
+    print(f"Supergraph generated at: {supergraph_path}")
+
+
+@cli.command()
+@click.pass_obj
+@click.option(
+    "--config",
+    "-c",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    help="Path to the supergraph.yaml configuration file",
+)
+@click.option(
+    "--output-dir",
+    "-o",
+    default="docs/manager/graphql-reference",
+    type=click.Path(file_okay=False, writable=True),
+    help="Output directory for supergraph.graphql (default: same as schema file directory)",
+)
+def generate_supergraph(_cli_ctx: CLIContext, config: Path, output_dir: Path) -> None:
+    """Post-process GraphQL schema and generate supergraph."""
+    try:
+        generate_supergraph_schema(
+            supergraph_config_path=config,
+            output_dir=output_dir,
+        )
+        click.echo("✅ Supergraph generation completed successfully!")
+    except FileNotFoundError as e:
+        click.echo(f"❌ Error: {e}", err=True)
+        raise click.Abort() from e
+    except subprocess.CalledProcessError as e:
+        click.echo(f"❌ Rover command failed: {e}", err=True)
+        if hasattr(e, "stderr") and e.stderr:
+            click.echo(f"Error details: {e.stderr}", err=True)
+        raise click.Abort() from e
+    except Exception as e:
+        click.echo(f"❌ Unexpected error: {e}", err=True)
+        raise click.Abort() from e
 
 
 @cli.command()
@@ -41,11 +123,23 @@ async def generate_gql_schema(output_path: Path) -> None:
     "--output",
     "-o",
     default="-",
-    type=click.Path(dir_okay=False, writable=True),
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
-def dump_gql_schema(cli_ctx: CLIContext, output: Path) -> None:
-    asyncio.run(generate_gql_schema(output))
+@click.option(
+    "--v2",
+    is_flag=True,
+    default=False,  # TODO: Set default to True after v2 migration is complete
+    help="Generate strawberry based v2 GraphQL schema (default: False)",
+)
+def dump_gql_schema(_cli_ctx: CLIContext, output: Path, v2: bool) -> None:
+    """
+    Generates GraphQL schema of Backend.AI API.
+    """
+    if v2:
+        asyncio.run(generate_strawberry_gql_schema(output))
+    else:
+        asyncio.run(generate_graphene_gql_schema(output))
 
 
 @cli.command()
@@ -53,17 +147,17 @@ def dump_gql_schema(cli_ctx: CLIContext, output: Path) -> None:
 @click.option(
     "--output",
     "-o",
-    default="-",
-    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
-def dump_openapi(cli_ctx: CLIContext, output: Path) -> None:
+def dump_openapi(_cli_ctx: CLIContext, output: Path | None) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
     openapi = asyncio.run(generate())
-    if output == "-" or output is None:
-        print(json.dumps(openapi, ensure_ascii=False, indent=2))
+    if output is None:
+        print(pretty_json_str(openapi))
     else:
-        with open(output, mode="w") as fw:
-            fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
+        with output.open(mode="w") as fw:
+            fw.write(pretty_json_str(openapi))

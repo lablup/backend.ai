@@ -1,10 +1,27 @@
+from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Mapping, Optional, Sequence
+from typing import Any
 
 import aiodocker
 
-from ai.backend.agent.types import MountInfo
+from ai.backend.agent import __version__
+from ai.backend.agent.alloc_map import AllocationStrategy
+from ai.backend.agent.resources import (
+    AbstractAllocMap,
+    AbstractComputeDevice,
+    AbstractComputePlugin,
+    DeviceAllocation,
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
+)
+from ai.backend.agent.stats import (
+    ContainerMeasurement,
+    NodeMeasurement,
+    ProcessMeasurement,
+    StatContext,
+)
+from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common.types import (
     AcceleratorMetadata,
     DeviceId,
@@ -13,23 +30,6 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-
-from .. import __version__
-from ..alloc_map import AllocationStrategy
-from ..resources import (
-    AbstractAllocMap,
-    AbstractComputeDevice,
-    AbstractComputePlugin,
-    DeviceSlotInfo,
-    DiscretePropertyAllocMap,
-)
-from ..stats import (
-    ContainerMeasurement,
-    NodeMeasurement,
-    ProcessMeasurement,
-    StatContext,
-)
-from .agent import Container
 
 
 class CPUDevice(AbstractComputeDevice):
@@ -59,7 +59,7 @@ class CPUPlugin(AbstractComputePlugin):
         super().__init__(plugin_config, local_config)
         self.resource_config = dummy_config["agent"]["resource"]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -135,9 +135,9 @@ class CPUPlugin(AbstractComputePlugin):
     async def generate_docker_args(
         self,
         docker: aiodocker.docker.Docker,
-        device_alloc,
+        device_alloc: DeviceAllocation,
     ) -> Mapping[str, Any]:
-        cores = [*map(int, device_alloc["cpu"].keys())]
+        cores = [*map(int, device_alloc[SlotName("cpu")].keys())]
         sorted_core_ids = [*map(str, sorted(cores))]
         return {
             "HostConfig": {
@@ -210,7 +210,7 @@ class MemoryPlugin(AbstractComputePlugin):
         super().__init__(plugin_config, local_config)
         self.resource_config = dummy_config["agent"]["resource"]
 
-    async def init(self, context: Optional[Any] = None) -> None:
+    async def init(self, context: Any | None = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -287,7 +287,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def generate_docker_args(
         self,
         docker: aiodocker.docker.Docker,
-        device_alloc,
+        device_alloc: DeviceAllocation,
     ) -> Mapping[str, Any]:
         return {}
 

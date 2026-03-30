@@ -4,7 +4,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import Any, Optional, override
+from typing import Any, override
 
 import trafaret as t
 
@@ -14,9 +14,10 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.session import SessionRow
 
-from ..models import KernelRow, SessionRow
-from ..models.scaling_group import ScalingGroupOpts
 from .types import AbstractScheduler
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
@@ -45,7 +46,7 @@ class DRFScheduler(AbstractScheduler):
         total_capacity: ResourceSlot,
         pending_sessions: Sequence[SessionRow],
         existing_sessions: Sequence[SessionRow],
-    ) -> Optional[SessionId]:
+    ) -> SessionId | None:
         self.total_capacity = total_capacity
 
         # Calculate the initial dominant shares of all users.
@@ -59,13 +60,18 @@ class DRFScheduler(AbstractScheduler):
                 slot_share = Decimal(value) / slot_cap
                 if dominant_share < slot_share:
                     dominant_share = slot_share
-            if self.per_user_dominant_share[existing_sess.access_key] < dominant_share:
-                self.per_user_dominant_share[existing_sess.access_key] = dominant_share
+            raw_access_key = existing_sess.access_key
+            if raw_access_key is not None:
+                access_key = AccessKey(raw_access_key)
+                if self.per_user_dominant_share[access_key] < dominant_share:
+                    self.per_user_dominant_share[access_key] = dominant_share
         log.debug("per-user dominant share: {}", dict(self.per_user_dominant_share))
 
         # Find who has the least dominant share among the pending session.
         users_with_pending_session: set[AccessKey] = {
-            pending_sess.access_key for pending_sess in pending_sessions
+            AccessKey(pending_sess.access_key)
+            for pending_sess in pending_sessions
+            if pending_sess.access_key is not None
         }
         if not users_with_pending_session:
             return None
@@ -89,8 +95,11 @@ class DRFScheduler(AbstractScheduler):
         scheduled_session_or_kernel: SessionRow | KernelRow,
     ) -> None:
         # In such case, we just skip updating self.per_user_dominant_share state
-        # and the scheduler dispatcher continues to pick another session within the same scaling group.
-        access_key = scheduled_session_or_kernel.access_key
+        # and the scheduler continues to pick another session within the same scaling group.
+        raw_access_key = scheduled_session_or_kernel.access_key
+        if raw_access_key is None:
+            return
+        access_key = AccessKey(raw_access_key)
         requested_slots = scheduled_session_or_kernel.requested_slots
 
         # Update the dominant share.

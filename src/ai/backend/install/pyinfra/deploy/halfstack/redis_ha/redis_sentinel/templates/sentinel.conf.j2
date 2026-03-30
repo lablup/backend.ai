@@ -1,0 +1,11 @@
+sentinel resolve-hostnames yes
+sentinel monitor mymaster MASTER_IP MASTER_PORT {{ config.sentinel_quorum }}
+sentinel auth-pass mymaster REDIS_PASSWORD
+sentinel down-after-milliseconds mymaster {{ config.sentinel_down_after_milliseconds }}
+sentinel failover-timeout mymaster {{ config.sentinel_failover_timeout }}
+sentinel parallel-syncs mymaster {{ config.sentinel_parallel_syncs }}
+protected-mode no
+bind 0.0.0.0
+sentinel announce-ip ANNOUNCE_HOST
+sentinel announce-port ANNOUNCE_PORT
+requirepass REDIS_PASSWORD

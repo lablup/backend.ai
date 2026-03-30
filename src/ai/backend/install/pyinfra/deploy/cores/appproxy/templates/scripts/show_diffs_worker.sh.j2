@@ -1,0 +1,83 @@
+#!/bin/bash
+# Automated diff script for comparing old vs new configurations
+# Generated during appproxy-worker-{{ worker_type }} update
+
+set -e
+
+UPGRADE_DIR="{{ upgrade_dir }}"
+WORKER_DIR="{{ worker_dir }}"
+HOME_DIR="{{ home_dir }}"
+BIN_DIR="bin"
+SERVICE_NAME="{{ service_name }}"
+RUN_SCRIPT_NAME="{{ run_script_name }}"
+
+echo "==================================================================="
+echo "AppProxy Worker ({{ worker_type }}) Configuration Diff Report"
+echo "==================================================================="
+echo ""
+
+# Function to show diff with header
+show_diff() {
+    local old_file="$1"
+    local new_file="$2"
+    local description="$3"
+
+    echo "-------------------------------------------------------------------"
+    echo "$description"
+    echo "-------------------------------------------------------------------"
+
+    if [ ! -f "$old_file" ]; then
+        echo "  ⚠️  Original file not found: $old_file"
+        echo "  ✓  New file available at: $new_file"
+        echo ""
+        return
+    fi
+
+    if diff -q "$old_file" "$new_file" > /dev/null 2>&1; then
+        echo "  ✓ No changes"
+        echo ""
+        return
+    fi
+
+    echo "  📝 Changes detected:"
+    echo ""
+    diff -u "$old_file" "$new_file" || true
+    echo ""
+}
+
+# Compare each file
+show_diff "$WORKER_DIR/app-proxy-worker.toml" \
+          "$UPGRADE_DIR/app-proxy-worker.toml" \
+          "app-proxy-worker.toml"
+
+show_diff "$HOME_DIR/$BIN_DIR/$RUN_SCRIPT_NAME" \
+          "$UPGRADE_DIR/$RUN_SCRIPT_NAME" \
+          "$RUN_SCRIPT_NAME"
+
+show_diff "/etc/systemd/system/backendai-$SERVICE_NAME.service" \
+          "$UPGRADE_DIR/backendai-$SERVICE_NAME.service" \
+          "systemd service"
+
+for script in start stop status show_status; do
+    show_diff "$WORKER_DIR/${script}.sh" \
+              "$UPGRADE_DIR/${script}.sh" \
+              "${script}.sh"
+done
+
+echo "==================================================================="
+echo "Summary"
+echo "==================================================================="
+echo ""
+echo "Next steps:"
+echo "1. Review the diffs above carefully"
+echo "2. Manually merge necessary changes to production configs"
+echo "3. Pay special attention to:"
+echo "   - Coordinator endpoint and port"
+echo "   - Redis endpoints"
+echo "   - JWT secrets and shared keys"
+echo "   - Port ranges for app traffic"
+echo "   - Custom overrides you may have made"
+echo "4. Test after changes: systemctl restart backendai-$SERVICE_NAME"
+echo "5. Monitor logs: journalctl -u backendai-$SERVICE_NAME -f"
+echo ""
+echo "==================================================================="

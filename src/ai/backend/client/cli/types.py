@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 import attr
 
 if TYPE_CHECKING:
-    from ..config import APIConfig
-    from ..output import BaseOutputHandler
+    from ai.backend.client.config import APIConfig
+    from ai.backend.client.output.types import BaseOutputHandler
 
 
 class OutputMode(enum.Enum):

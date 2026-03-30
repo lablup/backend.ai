@@ -1,20 +1,18 @@
 from __future__ import annotations
 
 import sys
-from typing import Optional
+from collections.abc import Callable
 
 import click
 import humanize
 from tabulate import tabulate
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.func.vfolder import _default_list_fields
-from ai.backend.client.session import Session
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.pretty import print_error
+from ai.backend.client.cli.types import CLIContext
+from ai.backend.client.cli.vfolder import vfolder as user_vfolder
 
-from ..extensions import pass_ctx_obj
-from ..pretty import print_error
-from ..types import CLIContext
-from ..vfolder import vfolder as user_vfolder
 from . import admin
 
 
@@ -25,7 +23,7 @@ def vfolder() -> None:
     """
 
 
-def _list_cmd(docs: Optional[str] = None):
+def _list_cmd(docs: str | None = None) -> Callable[..., None]:
     @pass_ctx_obj
     @click.option(
         "-g",
@@ -97,10 +95,20 @@ def _list_cmd(docs: Optional[str] = None):
     )
     @click.option("--offset", default=0, help="The index of the current page start for pagination.")
     @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-    def list(ctx: CLIContext, group, filter_, order, offset, limit) -> None:
+    def list(
+        ctx: CLIContext,
+        group: str | None,
+        filter_: str | None,
+        order: str | None,
+        offset: int,
+        limit: int | None,
+    ) -> None:
         """
         List virtual folders.
         """
+        from ai.backend.client.func.vfolder import _default_list_fields
+        from ai.backend.client.session import Session
+
         try:
             with Session() as session:
                 fetch_func = lambda pg_offset, pg_size: session.VFolder.paginated_list(
@@ -130,11 +138,13 @@ vfolder.command()(_list_cmd())
 
 
 @vfolder.command()
-def list_hosts():
+def list_hosts() -> None:
     """
     List all mounted hosts from virtual folder root.
     (superadmin privilege required)
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.list_all_hosts()
@@ -147,7 +157,7 @@ def list_hosts():
 
 @vfolder.command()
 @click.argument("vfolder_host")
-def perf_metric(vfolder_host):
+def perf_metric(vfolder_host: str) -> None:
     """
     Show the performance statistics of a vfolder host.
     (superadmin privilege required)
@@ -155,6 +165,8 @@ def perf_metric(vfolder_host):
     A vfolder host consists of a string of the storage proxy name and the volume name
     separated by a colon. (e.g., "local:volume1")
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.get_performance_metric(vfolder_host)
@@ -176,13 +188,15 @@ def perf_metric(vfolder_host):
 @click.option(
     "-a", "--agent-id", type=str, default=None, help="Target agent to fetch fstab contents."
 )
-def get_fstab_contents(agent_id):
+def get_fstab_contents(agent_id: str | None) -> None:
     """
     Get contents of fstab file from a node.
     (superadmin privilege required)
 
     If agent-id is not specified, manager's fstab contents will be returned.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.get_fstab_contents(agent_id)
@@ -193,11 +207,13 @@ def get_fstab_contents(agent_id):
 
 
 @vfolder.command()
-def list_mounts():
+def list_mounts() -> None:
     """
     List all mounted hosts in virtual folder root.
     (superadmin privilege required)
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.list_mounts()
@@ -219,7 +235,7 @@ def list_mounts():
 @click.argument("name", type=str)
 @click.option("-o", "--options", type=str, default=None, help="Mount options.")
 @click.option("--edit-fstab", is_flag=True, help="Edit fstab file to mount permanently.")
-def mount_host(fs_location, name, options, edit_fstab):
+def mount_host(fs_location: str, name: str, options: str | None, edit_fstab: bool) -> None:
     """
     Mount a host in virtual folder root.
     (superadmin privilege required)
@@ -228,6 +244,8 @@ def mount_host(fs_location, name, options, edit_fstab):
     FS-LOCATION: Location of file system to be mounted.
     NAME: Name of mounted host.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.mount_host(name, fs_location, options, edit_fstab)
@@ -247,7 +265,7 @@ def mount_host(fs_location, name, options, edit_fstab):
 @vfolder.command()
 @click.argument("name", type=str)
 @click.option("--edit-fstab", is_flag=True, help="Edit fstab file to mount permanently.")
-def umount_host(name, edit_fstab):
+def umount_host(name: str, edit_fstab: bool) -> None:
     """
     Unmount a host from virtual folder root.
     (superadmin privilege required)
@@ -255,6 +273,8 @@ def umount_host(name, edit_fstab):
     \b
     NAME: Name of mounted host.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.umount_host(name, edit_fstab)
@@ -272,30 +292,32 @@ def umount_host(name, edit_fstab):
 
 
 @vfolder.command
-def list_shared_vfolders():
+def list_shared_vfolders() -> None:
     """
     List all shared vfolder.
     (superadmin privilege required)
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.list_shared_vfolders()
             result = resp.get("shared", [])
             for _result in result:
                 print(
-                    'Virtual folder "{0}" (ID: {1})'.format(
+                    'Virtual folder "{}" (ID: {})'.format(
                         _result["vfolder_name"], _result["vfolder_id"]
                     )
                 )
-                print("- Owner: {0}".format(_result["owner"]))
-                print("- Status: {0}".format(_result["status"]))
-                print("- Permission: {0}".format(_result["perm"]))
-                print("- Folder Type: {0}".format(_result["type"]))
+                print("- Owner: {}".format(_result["owner"]))
+                print("- Status: {}".format(_result["status"]))
+                print("- Permission: {}".format(_result["perm"]))
+                print("- Folder Type: {}".format(_result["type"]))
                 shared_to = _result.get("shared_to", {})
                 if shared_to:
                     print("- Shared to:")
                     for k, v in shared_to.items():
-                        print("\t- {0}: {1}\n".format(k, v))
+                        print(f"\t- {k}: {v}\n")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -303,12 +325,14 @@ def list_shared_vfolders():
 
 @vfolder.command
 @click.argument("vfolder_id", type=str)
-def shared_vfolder_info(vfolder_id):
+def shared_vfolder_info(vfolder_id: str) -> None:
     """Show the vfolder permission information of the given virtual folder.
 
     \b
     VFOLDER_ID: ID of a virtual folder.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.shared_vfolder_info(vfolder_id)
@@ -316,19 +340,19 @@ def shared_vfolder_info(vfolder_id):
             if result:
                 _result = result[0]
                 print(
-                    'Virtual folder "{0}" (ID: {1})'.format(
+                    'Virtual folder "{}" (ID: {})'.format(
                         _result["vfolder_name"], _result["vfolder_id"]
                     )
                 )
-                print("- Owner: {0}".format(_result["owner"]))
-                print("- Status: {0}".format(_result["status"]))
-                print("- Permission: {0}".format(_result["perm"]))
-                print("- Folder Type: {0}".format(_result["type"]))
+                print("- Owner: {}".format(_result["owner"]))
+                print("- Status: {}".format(_result["status"]))
+                print("- Permission: {}".format(_result["perm"]))
+                print("- Folder Type: {}".format(_result["type"]))
                 shared_to = _result.get("shared_to", {})
                 if shared_to:
                     print("- Shared to:")
                     for k, v in shared_to.items():
-                        print("\t- {0}: {1}\n".format(k, v))
+                        print(f"\t- {k}: {v}\n")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -340,7 +364,7 @@ def shared_vfolder_info(vfolder_id):
 @click.option(
     "-p", "--permission", type=str, metavar="PERMISSION", help="Folder's innate permission."
 )
-def update_shared_vf_permission(vfolder_id, user_id, permission):
+def update_shared_vf_permission(vfolder_id: str, user_id: str, permission: str) -> None:
     """
     Update permission for shared vfolders.
 
@@ -349,6 +373,8 @@ def update_shared_vf_permission(vfolder_id, user_id, permission):
     USER_ID: ID of user who have been granted access to shared vFolder.
     PERMISSION: Permission to update. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, permission)
@@ -362,7 +388,7 @@ def update_shared_vf_permission(vfolder_id, user_id, permission):
 @vfolder.command()
 @click.argument("vfolder_id", type=str)
 @click.argument("user_id", type=str)
-def remove_shared_vf_permission(vfolder_id, user_id):
+def remove_shared_vf_permission(vfolder_id: str, user_id: str) -> None:
     """
     Remove permission for shared vfolders.
 
@@ -370,6 +396,8 @@ def remove_shared_vf_permission(vfolder_id, user_id):
     VFOLDER_ID: ID of a virtual folder.
     USER_ID: ID of user who have been granted access to shared vFolder.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, None)
@@ -383,7 +411,7 @@ def remove_shared_vf_permission(vfolder_id, user_id):
 @vfolder.command()
 @click.argument("vfolder_id", type=str)
 @click.argument("user_email", type=str)
-def change_vfolder_ownership(vfolder_id, user_email):
+def change_vfolder_ownership(vfolder_id: str, user_email: str) -> None:
     """
     Change the ownership of vfolder
 
@@ -391,9 +419,11 @@ def change_vfolder_ownership(vfolder_id, user_email):
     VFOLDER_ID: ID of a virtual folder.
     USER_EMAIL:  user email to have the ownership of current vfolder
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
-            session.VFolder.change_vfolder_ownership(vfolder_id, user_email)
+            _ = session.VFolder.change_vfolder_ownership(vfolder_id, user_email)
             print(f"Now ownership of VFolder:{vfolder_id} goes to User:{user_email}")
         except Exception as e:
             print_error(e)

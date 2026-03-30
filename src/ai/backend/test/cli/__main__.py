@@ -1,13 +1,27 @@
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
 from .context import CLIContext
 from .utils import CommaSeparatedChoice, CustomUsageArgsCommand
+
+if TYPE_CHECKING:
+    from ai.backend.test.testcases.spec_manager import TestSpecManager
+
+_DEFAULT_CONFIG_PATH = "configs/tester/tester.toml"
+
+
+def _spec_manager() -> TestSpecManager:
+    """
+    Returns the test specification manager for the CLI.
+    """
+    from ai.backend.test.testcases.spec_manager import TestSpecManager
+    from ai.backend.test.testcases.testspecs import ROOT_TEST_SPECS
+
+    return TestSpecManager(specs=ROOT_TEST_SPECS)
 
 
 @click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
@@ -88,6 +102,10 @@ def run_cli(
 
     The command simplifies the process of running CLI-based integration tests for specific packages, allowing customization of the environment and passing additional arguments to pytest.
     """
+    import os
+    import subprocess
+    import sys
+
     pytest_args = ctx.args
     result = subprocess.run(
         [
@@ -106,6 +124,89 @@ def run_cli(
         },
     )
     ctx.exit(result.returncode)
+
+
+@main.command()
+@click.pass_obj
+def get_all_specs(_cli_ctx: CLIContext) -> None:
+    spec_manager = _spec_manager()
+    print("Available test specifications:")
+    print("====================================")
+    for spec in spec_manager.all_specs():
+        print(f"{spec.name}:\n {spec.description}")
+
+
+@click.argument("name", type=str)
+@click.option(
+    "-f",
+    "--config-path",
+    "--config",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
+    default=_DEFAULT_CONFIG_PATH,
+    help="The path to the configuration file for the tester",
+)
+@main.command(help="Run a specific test by its name")
+@click.pass_obj
+def run_test(_cli_ctx: CLIContext, name: str, config_path: str) -> None:
+    import asyncio
+
+    from ai.backend.test.tester.exporter import DefaultExporter
+    from ai.backend.test.tester.tester import Tester
+
+    config_file_path = Path(config_path)
+    spec_manager = _spec_manager()
+    tester = Tester(
+        spec_manager=spec_manager, exporter_type=DefaultExporter, config_file_path=config_file_path
+    )
+    asyncio.run(tester.run_by_name(name))
+
+
+@click.option(
+    "-f",
+    "--config-path",
+    "--config",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
+    default=_DEFAULT_CONFIG_PATH,
+    help="The path to the configuration file for the tester",
+)
+@main.command(help="Run configured tests in the config file")
+@click.pass_obj
+def run(_cli_ctx: CLIContext, config_path: str) -> None:
+    import asyncio
+
+    from ai.backend.test.tester.exporter import DefaultExporter
+    from ai.backend.test.tester.tester import Tester
+
+    config_file_path = Path(config_path)
+    spec_manager = _spec_manager()
+    tester = Tester(
+        spec_manager=spec_manager, exporter_type=DefaultExporter, config_file_path=config_file_path
+    )
+    asyncio.run(tester.run())
+
+
+@click.option(
+    "-f",
+    "--config-path",
+    "--config",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
+    default=_DEFAULT_CONFIG_PATH,
+    help="The path to the configuration file for the tester",
+)
+@main.command(help="Run all tests defined in the test specifications")
+@click.pass_obj
+def run_all(_cli_ctx: CLIContext, config_path: str) -> None:
+    import asyncio
+
+    from ai.backend.test.tester.exporter import DefaultExporter
+    from ai.backend.test.tester.tester import Tester
+
+    spec_manager = _spec_manager()
+    config_file_path = Path(config_path)
+    tester = Tester(
+        spec_manager=spec_manager, exporter_type=DefaultExporter, config_file_path=config_file_path
+    )
+    asyncio.run(tester.run_all())
 
 
 if __name__ == "__main__":

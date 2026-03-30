@@ -1,18 +1,17 @@
 import logging
-from typing import Optional
 
-import click  # noqa: E402
+import click
 
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from .main import main  # noqa: E402
+from .main import main
 
 log = logging.getLogger(__spec__.name)
 
 
 def load_entry_points(
-    allowlist: Optional[set[str]] = None,
-    blocklist: Optional[set[str]] = None,
+    allowlist: set[str] | None = None,
+    blocklist: set[str] | None = None,
 ) -> click.Group:
     entry_prefix = "backendai_cli_v10"
     for entrypoint in scan_entrypoints(entry_prefix, allowlist=allowlist, blocklist=blocklist):

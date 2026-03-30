@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 
@@ -17,7 +18,7 @@ class AbstractNetworkManagerPlugin(AbstractPlugin, metaclass=ABCMeta):
         self,
         *,
         identifier: str | None = None,
-        options: dict[str, Any] = {},
+        options: dict[str, Any] | None = None,
     ) -> NetworkInfo:
         """
         Creates a cross-container network and returns network config which later will be passed to agent.

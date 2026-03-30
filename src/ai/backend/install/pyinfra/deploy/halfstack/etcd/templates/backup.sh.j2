@@ -1,0 +1,28 @@
+#!/bin/bash
+set -euo pipefail
+
+BACKUP_DIR="{{ service_dir }}/backups"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+BACKUP_FILE="/backups/etcd_snapshot_${TIMESTAMP}.db"
+CONTAINER_NAME="{{ container_name }}"
+
+echo "Starting etcd snapshot backup..."
+
+mkdir -p "${BACKUP_DIR}"
+sudo chown $(id -u):$(id -g) "${BACKUP_DIR}"
+if ! docker ps --format "table {{ '{{.Names}}' }}" | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Error: etcd container '${CONTAINER_NAME}' is not running"
+    exit 1
+fi
+
+docker exec "${CONTAINER_NAME}" etcdctl snapshot save "${BACKUP_FILE}"
+sudo chown $(id -u):$(id -g) "${BACKUP_DIR}/etcd_snapshot_${TIMESTAMP}.db"
+gzip "${BACKUP_DIR}/etcd_snapshot_${TIMESTAMP}.db"
+
+echo "Snapshot backup completed successfully!"
+echo "Backup file: ${BACKUP_DIR}/etcd_snapshot_${TIMESTAMP}.db.gz"
+
+echo "Cleaning up old backups (keeping last 7)..."
+find "${BACKUP_DIR}" -name "etcd_snapshot_*.db.gz" -type f | sort -r | tail -n +8 | xargs -r rm -f
+
+echo "Backup process completed!"

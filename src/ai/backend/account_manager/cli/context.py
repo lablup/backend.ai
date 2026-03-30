@@ -1,19 +1,18 @@
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 import click
 
-from ai.backend.logging import AbstractLogger, LocalLogger
-
-from ..config import ServerConfig
-from ..config import load as load_config
+from ai.backend.account_manager.config import ServerConfig
+from ai.backend.account_manager.config import load as load_config
+from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
 
 
 class CLIContext:
     _local_config: ServerConfig | None
     _logger: AbstractLogger
 
-    def __init__(self, config_path: Path, log_level: str) -> None:
+    def __init__(self, config_path: Path, log_level: LogLevel) -> None:
         self.config_path = config_path
         self.log_level = log_level
         self._local_config = None
@@ -31,11 +30,11 @@ class CLIContext:
         # If we duplicate the local logging with it, the process termination may hang.
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
-            self._logger = LocalLogger({})
+            self._logger = LocalLogger(log_level=self.log_level)
             self._logger.__enter__()
         return self
 
-    def __exit__(self, *exc_info) -> None:
+    def __exit__(self, *exc_info: Any) -> None:
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
             self._logger.__exit__()

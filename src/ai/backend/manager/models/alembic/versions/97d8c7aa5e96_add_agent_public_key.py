@@ -16,9 +16,9 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column("agents", sa.Column("public_key", sa.String(length=40), nullable=True))
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("agents", "public_key")

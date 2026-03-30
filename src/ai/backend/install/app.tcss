@@ -56,6 +56,37 @@ ModeMenu Label {
     padding: 1 2;
 }
 
+PackageTypeMenu {
+    width: 1fr;
+    margin: 2 2;
+    align-horizontal: center;
+}
+PackageTypeMenu ListView {
+    layout: horizontal;
+    width: auto;
+    height: auto;
+}
+PackageTypeMenu ListView > ListItem {
+    width: 35;
+    margin: 1 2;
+    height: 14;
+    border: wide $panel;
+}
+PackageTypeMenu ListView > ListItem .mode-item-title {
+    width: 1fr;
+    text-style: bold;
+}
+PackageTypeMenu ListView > ListItem .mode-item-desc {
+    width: 1fr;
+    color: $text-muted;
+}
+PackageTypeMenu ListView > ListItem.--highlight {
+    border: wide $foreground;
+}
+PackageTypeMenu Label {
+    padding: 1 2;
+}
+
 .mode-title {
     width: 1fr;
     padding: 1 2;

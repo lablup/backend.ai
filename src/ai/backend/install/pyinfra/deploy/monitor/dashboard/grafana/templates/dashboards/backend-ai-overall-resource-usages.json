@@ -1,0 +1,2129 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_DB_- CORE",
+      "label": "DB - Core",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "grafana-postgresql-datasource",
+      "pluginName": "PostgreSQL"
+    },
+    {
+      "name": "DS_DB_- CONTROL PANEL",
+      "label": "DB - Control Panel",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "grafana-postgresql-datasource",
+      "pluginName": "PostgreSQL"
+    },
+    {
+      "name": "VAR_TOTAL_GPU_COUNT",
+      "type": "constant",
+      "label": "Total GPU Count",
+      "value": "60",
+      "description": ""
+    },
+    {
+      "name": "VAR_GPU_COUNT_PER_NODE",
+      "type": "constant",
+      "label": "GPU_COUNT_PER_NODE",
+      "value": "4",
+      "description": ""
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.4.11"
+    },
+    {
+      "type": "datasource",
+      "id": "grafana-postgresql-datasource",
+      "name": "PostgreSQL",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CORE}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "10.4.11",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CORE}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COUNT(\"id\") FILTER (WHERE status = 'ALIVE') as \"Alive\",\n  COUNT(\"id\") FILTER (WHERE NOT (status IN ('LOST', 'TERMINATED') AND lost_at < CURRENT_DATE - INTERVAL '1 month')) as \"Total\"\nFROM agents\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "id",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              },
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "table": "agents"
+        }
+      ],
+      "title": "Number of Agents",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CORE}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#EAB839",
+                "value": 10000
+              },
+              {
+                "color": "#EF843C",
+                "value": 20000
+              },
+              {
+                "color": "#E24D42",
+                "value": 50000
+              }
+            ]
+          },
+          "unit": "Sessions"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.11",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CORE}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COUNT(*) FILTER (WHERE status IN ('RUNNING', 'PENDING', 'SCHEDULED', 'PREPARING', 'PULLING', 'TERMINATING')) as \"Active\",\n  COUNT(*) FILTER (WHERE status IN ('TERMINATED', 'CANCELLED', 'ERROR')) as \"Terminated\"\nFROM sessions;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Current Compute Session Counts",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "This panel tracks maximum and average GPU utilization, providing insights into GPU usage patterns. The maximum utilization values indicate periods of high GPU demand, while the average utilization reflects overall usage trends.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Utilization (%)",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "barAlignment": 1,
+            "drawStyle": "bars",
+            "fillOpacity": 30,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CONTROL PANEL}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(time, $__interval),\n  MAX((accel_util->>'current')::float) AS \"Maximum GPU Utilization (%)\",\n  AVG((accel_util->>'current')::float) AS \"Average GPU Utilization (%)\"\nFROM agent_agentmetric\nWHERE $__timeFilter(time)\nGROUP BY 1\nORDER BY 1 DESC\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total GPU Utilization",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 100,
+            "axisSoftMin": 0,
+            "barAlignment": 1,
+            "drawStyle": "bars",
+            "fillOpacity": 30,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "id": 22,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CONTROL PANEL}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(time, $__interval),\n  MAX((accel_mem->>'current')::float) AS \"Maximum GPU Memory\",\n  AVG((accel_mem->>'current')::float) AS \"Average GPU Memory\"\nFROM agent_agentmetric\nWHERE $__timeFilter(time)\nGROUP BY 1\nORDER BY 1 DESC\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total GPU memory occupancy",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CONTROL PANEL}"
+      },
+      "description": "Utilization is 100% if a single device is fully utilized.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Utilization (%)",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "displayName": "${__field.labels.host}",
+          "fieldMinMax": false,
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CONTROL PANEL}"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(time, $__interval),\n  host,\n  AVG((accel_util->>'current')::float)\nFROM agent_agentmetric\nWHERE $__timeFilter(time)\nGROUP BY 1, host\nORDER BY 1, host\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "GPU core utilization per node",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CONTROL PANEL}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "displayName": "${__field.labels.host}",
+          "fieldMinMax": false,
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "id": 21,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CONTROL PANEL}"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(time, $__interval),\n  host,\n  AVG((accel_mem->>'current')::float)\nFROM agent_agentmetric\nWHERE $__timeFilter(time)\nGROUP BY 1, host\nORDER BY 1, host\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "GPU memory utilization per node",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 12,
+      "panels": [],
+      "title": "Original Panels",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CORE}"
+      },
+      "description": "It represents the total number of GPUs allocated during aggregate interval. Even for compute sessions that are created and terminated within the same aggregate interval, the resource allocation will be counted. Therefore, a single resource can be allocated to two different compute sessions in the same interval, and the number of resource allocations can be greater than the total amount of resources available on the server.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CORE}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_series.date,\n  SUM(CASE\n        WHEN session_info.preparing <= date_series.date AND\n             session_info.terminated >= date_series.date\n        THEN (requested_slots->>'cuda.shares')::float\n        ELSE 0\n      END) AS \"Total Allocation\"\nFROM\n  (SELECT generate_series($__timeFrom()::date, $__timeTo()::date,\n     CASE\n       WHEN '$timeAggregation' = 'hour' THEN interval '1 hour'\n       WHEN '$timeAggregation' = 'day' THEN interval '1 day'\n       WHEN '$timeAggregation' = 'week' THEN interval '1 week'\n       WHEN '$timeAggregation' = 'month' THEN interval '1 month'\n     END) as date) as date_series\n  CROSS JOIN LATERAL\n  (SELECT\n     DATE((status_history->>'PREPARING')::timestamp) as preparing,\n     COALESCE(\n       DATE((status_history->>'TERMINATING')::timestamp),\n       DATE(terminated_at),\n       DATE((status_history->>'CANCELLED')::timestamp),\n       CURRENT_DATE\n     ) as terminated,\n     requested_slots\n   FROM\n     sessions\n   WHERE\n     status_history->>'RUNNING' IS NOT NULL AND\n     COALESCE(DATE((status_history->>'TERMINATING')::timestamp), CURRENT_DATE) >= $__timeFrom()::date) AS session_info\nGROUP BY date_series.date\nORDER BY date_series.date\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total GPU Allocation Count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CORE}"
+      },
+      "description": "It represents the total number of active compute sessions in a day. The compute sessions that are created and terminated within the same day will also be counted.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CORE}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_series.date,\n  COUNT(session_times.session_id) AS \"Number of Active Sessions\"\nFROM\n  (SELECT generate_series($__timeFrom()::date, $__timeTo()::date,\n    CASE\n      WHEN '$timeAggregation' = 'hour' THEN interval '1 hour'\n      WHEN '$timeAggregation' = 'day' THEN interval '1 day'\n      WHEN '$timeAggregation' = 'week' THEN interval '1 week'\n      WHEN '$timeAggregation' = 'month' THEN interval '1 month'\n    END) as date) as date_series\n  LEFT JOIN LATERAL\n  (SELECT\n     sessions.id as session_id,\n     DATE((status_history->>'RUNNING')::timestamp) as running_start,\n     COALESCE(\n       DATE((status_history->>'TERMINATING')::timestamp),\n       DATE(terminated_at),\n       DATE((status_history->>'CANCELLED')::timestamp),\n       CURRENT_DATE\n     ) as running_end\n   FROM\n     sessions\n   WHERE\n     status_history->>'RUNNING' IS NOT NULL) AS session_times\n   ON session_times.running_start <= date_series.date\n   AND session_times.running_end >= date_series.date\nGROUP BY\n  date_series.date\nORDER BY\n  date_series.date\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total Active Session Counts",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CORE}"
+      },
+      "description": "It represents the total number of GPUs allocated daily per project. Even for compute sessions that are created and terminated within the same day, the resource allocation will be counted. Therefore, a single resource can be allocated to two different compute sessions in a day, and the number of resource allocations can be greater than the total amount of resources available on the project.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CORE}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_series.date,\n  groups.name AS project_name,\n  SUM(CASE\n        WHEN session_info.preparing <= date_series.date AND\n             session_info.terminated >= date_series.date\n        THEN (requested_slots->>'cuda.shares')::float\n        ELSE 0\n      END) AS \"PRJ\"\nFROM\n  (SELECT generate_series($__timeFrom()::date, $__timeTo()::date,\n    CASE\n      WHEN '$timeAggregation' = 'hour' THEN interval '1 hour'\n      WHEN '$timeAggregation' = 'day' THEN interval '1 day'\n      WHEN '$timeAggregation' = 'week' THEN interval '1 week'\n      WHEN '$timeAggregation' = 'month' THEN interval '1 month'\n    END) as date) as date_series\n  CROSS JOIN LATERAL\n  (SELECT\n     DATE((status_history->>'PREPARING')::timestamp) as preparing,\n     COALESCE(\n       DATE((status_history->>'TERMINATING')::timestamp),\n       DATE(terminated_at),\n       DATE((status_history->>'CANCELLED')::timestamp),\n       CURRENT_DATE\n     ) as terminated,\n     requested_slots,\n     group_id\n   FROM\n     sessions\n   WHERE\n     status_history->>'RUNNING' IS NOT NULL AND\n     COALESCE(DATE((status_history->>'TERMINATING')::timestamp), CURRENT_DATE) >= $__timeFrom()::date) AS session_info\n  JOIN groups ON groups.id = session_info.group_id  -- Join with groups table\nGROUP BY date_series.date, groups.name\nORDER BY date_series.date, groups.name;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total Allocated GPUs per Project",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "multi"
+          }
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CORE}"
+      },
+      "description": "It represents the total number of GPUs allocated daily per resource group. Even for compute sessions that are created and terminated within the same day, the resource allocation will be counted. Therefore, a single resource can be allocated to two different compute sessions in a day, and the number of resource allocations can be greater than the total amount of resources available on the resource group.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CORE}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_series.date,\n  session_info.scaling_group_name,\n  SUM(CASE\n        WHEN session_info.preparing <= date_series.date AND\n             session_info.terminated >= date_series.date\n        THEN (requested_slots->>'cuda.shares')::float\n        ELSE 0\n      END) AS \"RG\"\nFROM\n  (SELECT generate_series($__timeFrom()::date, $__timeTo()::date,\n    CASE\n      WHEN '$timeAggregation' = 'hour' THEN interval '1 hour'\n      WHEN '$timeAggregation' = 'day' THEN interval '1 day'\n      WHEN '$timeAggregation' = 'week' THEN interval '1 week'\n      WHEN '$timeAggregation' = 'month' THEN interval '1 month'\n    END) as date) as date_series\n  CROSS JOIN LATERAL\n  (SELECT\n     DATE((status_history->>'PREPARING')::timestamp) as preparing,\n     COALESCE(\n       DATE((status_history->>'TERMINATING')::timestamp),\n       DATE(terminated_at),\n       DATE((status_history->>'CANCELLED')::timestamp),\n       CURRENT_DATE\n     ) as terminated,\n     requested_slots,\n     scaling_group_name\n   FROM\n     sessions\n   WHERE\n     status_history->>'RUNNING' IS NOT NULL AND\n     COALESCE(DATE((status_history->>'TERMINATING')::timestamp), CURRENT_DATE) >= $__timeFrom()::date) AS session_info\nGROUP BY date_series.date, session_info.scaling_group_name\nORDER BY date_series.date, session_info.scaling_group_name\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total Allocated GPUs per Resource Group",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "multi"
+          }
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 38
+      },
+      "id": 11,
+      "panels": [],
+      "title": "New Panels",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CORE}"
+      },
+      "description": "This metric shows the degree to which a GPU is occupied during the aggregate interval. If a single GPU is continuously allocated during the aggregate interval, the GPU allocation value will be 1.\n\nFor example, if the aggregate interval is set to \"day\" and a single GPU is allocated for 1 hour, the GPU allocation value will be 0.04 (= 1/24 hours). If a single GPU is allocated for 1 hour each in two different compute sessions at different times during the day, the GPU allocation value will be 0.08.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 39
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CORE}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_series.date,\n  SUM(\n    CASE \n      WHEN EXTRACT(EPOCH FROM (\n        LEAST(session_info.terminated, date_series.date + interval '1 $timeAggregation') -\n        GREATEST(session_info.preparing, date_series.date)\n      )) > 0\n      THEN\n        (requested_slots->>'cuda.shares')::float *\n        EXTRACT(EPOCH FROM (\n          LEAST(session_info.terminated, date_series.date + interval '1 $timeAggregation') -\n          GREATEST(session_info.preparing, date_series.date)\n        ))\n        /\n        GREATEST(\n          EXTRACT(EPOCH FROM (\n            interval '1 $timeAggregation'\n          )),\n          1 -- Prevent division by zero\n        )\n        * CASE '$timeAggregation' WHEN 'hour' THEN 1.0 / 24 WHEN 'day' THEN 1 WHEN 'week' THEN 7 WHEN 'month' THEN 30 ELSE 1 END\n      ELSE 0 -- If the condition is not met (i.e., duration is zero), contribute 0 to the sum.\n    END\n  ) AS \"Total GPU Allocation\"\nFROM\n  (SELECT generate_series($__timeFrom()::date, $__timeTo()::date, interval '1 $timeAggregation') as date) as date_series\n  CROSS JOIN LATERAL\n  (SELECT\n     DATE((status_history->>'PREPARING')::timestamp) as preparing,\n     COALESCE(\n       DATE((status_history->>'TERMINATING')::timestamp),\n       DATE(terminated_at),\n       DATE((status_history->>'CANCELLED')::timestamp),\n       CURRENT_DATE + interval '1 $timeAggregation' - interval '1 second' -- just before the next period starts\n     ) as terminated,\n     requested_slots\n   FROM\n     sessions\n   WHERE\n     status_history->>'RUNNING' IS NOT NULL AND\n     COALESCE(DATE((status_history->>'TERMINATING')::timestamp), CURRENT_DATE) >= $__timeFrom()::date) AS session_info\nGROUP BY date_series.date\nORDER BY date_series.date\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total GPU Allocation",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CORE}"
+      },
+      "description": "This metric shows the degree to which a GPU is occupied during the aggregate interval PER PROJECT. If a single GPU is continuously allocated during the aggregate interval, the GPU allocation value will be 1.\n\nFor example, if the aggregate interval is set to \"day\" and a single GPU is allocated for 1 hour, the GPU allocation value will be 0.04 (= 1/24 hours). If a single GPU is allocated for 1 hour each in two different compute sessions at different times during the day, the GPU allocation value will be 0.08.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 39
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CORE}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_series.date,\n  SUM(\n    CASE \n      WHEN EXTRACT(EPOCH FROM (\n        LEAST(session_info.terminated, date_series.date + interval '1 $timeAggregation') -\n        GREATEST(session_info.preparing, date_series.date)\n      )) > 0\n      THEN\n        (requested_slots->>'cuda.shares')::float *\n        EXTRACT(EPOCH FROM (\n          LEAST(session_info.terminated, date_series.date + interval '1 $timeAggregation') -\n          GREATEST(session_info.preparing, date_series.date)\n        ))\n        /\n        GREATEST(\n          EXTRACT(EPOCH FROM (\n            interval '1 $timeAggregation'\n          )),\n          1 -- Prevent division by zero\n        )\n      * CASE '$timeAggregation' WHEN 'hour' THEN 1.0 / 24 WHEN 'day' THEN 1 WHEN 'week' THEN 7 WHEN 'month' THEN 30 ELSE 1 END\n      ELSE 0 -- If the condition is not met (i.e., duration is zero), contribute 0 to the sum.\n    END\n  ) AS \"Total GPU Allocation per Project\"\nFROM\n  (SELECT generate_series($__timeFrom()::date, $__timeTo()::date, interval '1 $timeAggregation') as date) as date_series\n  CROSS JOIN LATERAL\n  (SELECT\n     DATE((status_history->>'PREPARING')::timestamp) as preparing,\n     COALESCE(\n       DATE((status_history->>'TERMINATING')::timestamp),\n       DATE(terminated_at),\n       DATE((status_history->>'CANCELLED')::timestamp),\n       CURRENT_DATE + interval '1 $timeAggregation' - interval '1 second' -- just before the next period starts\n     ) as terminated,\n     requested_slots\n   FROM\n     sessions\n   JOIN groups ON sessions.group_id = groups.id\n   WHERE\n     groups.name = '$bai_project'\n     AND status_history->>'RUNNING' IS NOT NULL\n     AND COALESCE(DATE((status_history->>'TERMINATING')::timestamp), CURRENT_DATE) >= $__timeFrom()::date) AS session_info\nGROUP BY date_series.date\nORDER BY date_series.date\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total GPU Allocation per Project ($bai_project)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CORE}"
+      },
+      "description": "(GPU Allocation / GPU Capacity) * 100",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 100,
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 47
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CORE}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_series.date,\n  SUM(\n    CASE \n      WHEN EXTRACT(EPOCH FROM (\n        LEAST(session_info.terminated, date_series.date + interval '1 $timeAggregation') -\n        GREATEST(session_info.preparing, date_series.date)\n      )) > 0\n      THEN\n        (requested_slots->>'cuda.shares')::float *\n        EXTRACT(EPOCH FROM (\n          LEAST(session_info.terminated, date_series.date + interval '1 $timeAggregation') -\n          GREATEST(session_info.preparing, date_series.date)\n        ))\n        /\n        GREATEST(\n          EXTRACT(EPOCH FROM (\n            interval '1 $timeAggregation'\n          )),\n          1 -- Prevent division by zero\n        )\n      ELSE 0 -- If the condition is not met (i.e., duration is zero), contribute 0 to the sum.\n    END\n  ) / $TOTAL_GPU_COUNT * 100 AS \"Total GPU Allocation (%)\"\nFROM\n  (SELECT generate_series($__timeFrom()::date, $__timeTo()::date, interval '1 $timeAggregation') as date) as date_series\n  CROSS JOIN LATERAL\n  (SELECT\n     DATE((status_history->>'PREPARING')::timestamp) as preparing,\n     COALESCE(\n       DATE((status_history->>'TERMINATING')::timestamp),\n       DATE(terminated_at),\n       DATE((status_history->>'CANCELLED')::timestamp),\n       CURRENT_DATE + interval '1 $timeAggregation' - interval '1 second' -- just before the next period starts\n     ) as terminated,\n     requested_slots\n   FROM\n     sessions\n   WHERE\n     status_history->>'RUNNING' IS NOT NULL AND\n     COALESCE(DATE((status_history->>'TERMINATING')::timestamp), CURRENT_DATE) >= $__timeFrom()::date) AS session_info\nGROUP BY date_series.date\nORDER BY date_series.date\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total GPU Allocation %",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_DB_- CORE}"
+      },
+      "description": "(GPU Allocation / GPU Capacity) * 100",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 100,
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 47
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CORE}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_series.date,\n  SUM(\n    CASE \n      WHEN EXTRACT(EPOCH FROM (\n        LEAST(session_info.terminated, date_series.date + interval '1 $timeAggregation') -\n        GREATEST(session_info.preparing, date_series.date)\n      )) > 0\n      THEN\n        (requested_slots->>'cuda.shares')::float *\n        EXTRACT(EPOCH FROM (\n          LEAST(session_info.terminated, date_series.date + interval '1 $timeAggregation') -\n          GREATEST(session_info.preparing, date_series.date)\n        ))\n        /\n        GREATEST(\n          EXTRACT(EPOCH FROM (\n            interval '1 $timeAggregation'\n          )),\n          1 -- Prevent division by zero\n        )\n      -- * CASE '$timeAggregation' WHEN 'hour' THEN 1.0 / 24 WHEN 'day' THEN 1 WHEN 'week' THEN 7 WHEN 'month' THEN 30 ELSE 1 END\n      ELSE 0 -- If the condition is not met (i.e., duration is zero), contribute 0 to the sum.\n    END\n  ) / $TOTAL_GPU_COUNT * 100 AS \"Total GPU Allocation % per Project\"\nFROM\n  (SELECT generate_series($__timeFrom()::date, $__timeTo()::date, interval '1 $timeAggregation') as date) as date_series\n  CROSS JOIN LATERAL\n  (SELECT\n     DATE((status_history->>'PREPARING')::timestamp) as preparing,\n     COALESCE(\n       DATE((status_history->>'TERMINATING')::timestamp),\n       DATE(terminated_at),\n       DATE((status_history->>'CANCELLED')::timestamp),\n       CURRENT_DATE + interval '1 $timeAggregation' - interval '1 second' -- just before the next period starts\n     ) as terminated,\n     requested_slots\n   FROM\n     sessions\n   JOIN groups ON sessions.group_id = groups.id\n   WHERE\n     groups.name = '$bai_project'\n     AND status_history->>'RUNNING' IS NOT NULL\n     AND COALESCE(DATE((status_history->>'TERMINATING')::timestamp), CURRENT_DATE) >= $__timeFrom()::date) AS session_info\nGROUP BY date_series.date\nORDER BY date_series.date\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total GPU Allocation % per Project ($bai_project)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "This panel tracks average GPU utilization, only for the allocated GPUs. The maximum utilization values indicate periods of high GPU demand, while the average utilization reflects overall usage trends.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 100,
+            "axisSoftMin": 0,
+            "barAlignment": 1,
+            "drawStyle": "bars",
+            "fillOpacity": 30,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 55
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CONTROL PANEL}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_trunc('$timeAggregation', time) AS time_aggregation,\n  AVG((accel_util->>'current')::float / (accel_util->>'capacity')::float * 100) AS \"Average GPU Utilization (%)\"\nFROM session_computesessionmetric\nWHERE time >= to_timestamp($__timeFrom(), 'YYYY-MM-DD H')\n  AND time < to_timestamp($__timeTo(), 'YYYY-MM-DD H')\n  AND accel_util->>'capacity' IS NOT NULL\n  AND (accel_util->>'capacity')::float > 0\nGROUP BY time_aggregation\nORDER BY time_aggregation DESC\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total Allocated GPU Utilization",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "This panel tracks average GPU utilization, only for GPUs allocated to the project. The maximum utilization values indicate periods of high GPU demand, while the average utilization reflects overall usage trends.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMax": 100,
+            "axisSoftMin": 0,
+            "barAlignment": 1,
+            "drawStyle": "bars",
+            "fillOpacity": 30,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 55
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CONTROL PANEL}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  date_trunc('$timeAggregation', time) AS time_aggregation,\n  AVG((accel_util->>'current')::float / (accel_util->>'capacity')::float * 100) AS \"Average GPU Utilization (%)\",\n  session_id\nFROM session_computesessionmetric\nWHERE time >= to_timestamp($__timeFrom(), 'YYYY-MM-DD H')\n  AND time < to_timestamp($__timeTo(), 'YYYY-MM-DD H')\n  AND accel_util->>'capacity' IS NOT NULL\n  AND (accel_util->>'capacity')::float > 0\nGROUP BY time_aggregation, session_id\nORDER BY time_aggregation DESC, session_id\n;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_DB_- CORE}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\n  s.id AS session_id, g.name as project_name\nFROM sessions AS s\nJOIN groups g ON s.group_id = g.id\nWHERE s.created_at <= to_timestamp($__timeTo(), 'YYYY-MM-DD H')\n  AND (s.terminated_at IS NULL OR s.terminated_at >= to_timestamp($__timeFrom(), 'YYYY-MM-DD H'))\n  AND g.name = '$bai_project'\nORDER BY session_id\n;",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Allocated GPU Utilization Per Project ($bai_project)",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "session_id",
+            "mode": "outerTabular"
+          }
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "config": {
+                  "id": "isNotNull",
+                  "options": {}
+                },
+                "fieldName": "time_aggregation"
+              },
+              {
+                "config": {
+                  "id": "isNotNull",
+                  "options": {}
+                },
+                "fieldName": "project_name"
+              }
+            ],
+            "match": "all",
+            "type": "include"
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "Average GPU Utilization (%)": {
+                "aggregations": [
+                  "mean"
+                ],
+                "operation": "aggregate"
+              },
+              "Maximum GPU Utilization (%)": {
+                "aggregations": [
+                  "max"
+                ],
+                "operation": "aggregate"
+              },
+              "per_session_accel_util": {
+                "aggregations": [
+                  "mean"
+                ],
+                "operation": "aggregate"
+              },
+              "time_aggregation": {
+                "aggregations": [],
+                "operation": "groupby"
+              }
+            }
+          }
+        }
+      ],
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "description": "Total GPUs in this server farm.",
+        "hide": 2,
+        "label": "Total GPU Count",
+        "name": "TOTAL_GPU_COUNT",
+        "query": "${VAR_TOTAL_GPU_COUNT}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_TOTAL_GPU_COUNT}",
+          "text": "${VAR_TOTAL_GPU_COUNT}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_TOTAL_GPU_COUNT}",
+            "text": "${VAR_TOTAL_GPU_COUNT}",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "hide": 2,
+        "name": "GPU_COUNT_PER_NODE",
+        "query": "${VAR_GPU_COUNT_PER_NODE}",
+        "skipUrlSync": false,
+        "type": "constant",
+        "current": {
+          "value": "${VAR_GPU_COUNT_PER_NODE}",
+          "text": "${VAR_GPU_COUNT_PER_NODE}",
+          "selected": false
+        },
+        "options": [
+          {
+            "value": "${VAR_GPU_COUNT_PER_NODE}",
+            "text": "${VAR_GPU_COUNT_PER_NODE}",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "day",
+          "value": "day"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Aggregate Interval",
+        "multi": false,
+        "name": "timeAggregation",
+        "options": [
+          {
+            "selected": true,
+            "text": "day",
+            "value": "day"
+          },
+          {
+            "selected": false,
+            "text": "hour",
+            "value": "hour"
+          },
+          {
+            "selected": false,
+            "text": "week",
+            "value": "week"
+          },
+          {
+            "selected": false,
+            "text": "month",
+            "value": "month"
+          }
+        ],
+        "query": "day,hour,week,month",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "${DS_DB_- CORE}"
+        },
+        "definition": "SELECT name FROM groups where is_active = 't';",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Backend.AI Project",
+        "multi": false,
+        "name": "bai_project",
+        "options": [],
+        "query": "SELECT name FROM groups where is_active = 't';",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 5,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Backend.AI Overall Resource Usages",
+  "uid": "af670ce6-7dd2-48d2-871d-c0d6cac1678f",
+  "version": 12,
+  "weekStart": ""
+}

@@ -1,0 +1,13 @@
+import pytest
+
+from ai.backend.client.session import Session
+
+# module-level marker
+pytestmark = pytest.mark.integration
+
+
+async def test_get_manager_status() -> None:
+    with Session() as sess:
+        resp = sess.Manager.status()
+    assert resp["status"] == "running"
+    assert "active_sessions" in resp

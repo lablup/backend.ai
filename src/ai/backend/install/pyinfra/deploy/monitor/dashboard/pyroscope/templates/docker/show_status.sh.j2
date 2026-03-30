@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Pyroscope Health Check Script
+# Checks Pyroscope service readiness via HTTP endpoint
+
+set -euo pipefail
+
+# Load configuration from .env
+if [[ -f .env ]]; then
+    source .env
+fi
+
+PYROSCOPE_URL="http://localhost:${PYROSCOPE_PORT:-4040}"
+METRICS_ENDPOINT="/metrics"
+
+echo "=== Pyroscope Service Status ==="
+echo
+
+# Check Docker container status
+echo "1. Container Status:"
+if command -v docker-compose >/dev/null 2>&1; then
+    docker-compose ps pyroscope 2>/dev/null || echo "  Container not found or not running"
+else
+    docker compose ps pyroscope 2>/dev/null || echo "  Container not found or not running"
+fi
+echo
+
+# Check Pyroscope metrics endpoint
+echo "2. Metrics Endpoint Check:"
+if ! command -v curl >/dev/null 2>&1; then
+    echo "  ⚠ curl not available, skipping health checks"
+    exit 0
+fi
+
+http_code=$(curl -s -o /dev/null -w "%{http_code}" "${PYROSCOPE_URL}${METRICS_ENDPOINT}" 2>/dev/null || echo "000")
+
+if [[ "$http_code" == "200" ]]; then
+    echo "  ✓ Pyroscope is healthy"
+    echo ""
+    echo "✓ Pyroscope Status: Healthy"
+    exit 0
+else
+    echo "  ✗ Pyroscope is not healthy (HTTP $http_code)"
+    echo ""
+    echo "3. Error Details:"
+    echo "  HTTP Code: $http_code"
+    echo ""
+    echo "4. Container Logs (last 15 lines):"
+    if command -v docker-compose >/dev/null 2>&1; then
+        docker-compose logs --tail=15 pyroscope 2>/dev/null || echo "  Cannot retrieve logs"
+    else
+        docker compose logs --tail=15 pyroscope 2>/dev/null || echo "  Cannot retrieve logs"
+    fi
+
+    exit 1
+fi

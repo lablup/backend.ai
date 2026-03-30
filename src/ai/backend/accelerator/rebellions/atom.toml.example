@@ -1,0 +1,4 @@
+[general]
+# Path to rbln-stat executable.
+# Update ownership of executable to root and set SetUID (u+s) bit in order for stat collector to properly work.
+rbln_stat_path = ""

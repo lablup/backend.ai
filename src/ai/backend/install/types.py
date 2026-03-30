@@ -4,7 +4,6 @@ import dataclasses
 import enum
 from datetime import datetime
 from pathlib import Path
-from typing import cast
 
 from pydantic import BaseModel, Field
 from rich.console import ConsoleRenderable, RichCast
@@ -20,6 +19,11 @@ class InstallModes(enum.StrEnum):
     PACKAGE = "PACKAGE"
     MAINTAIN = "MAINTAIN"
     CONFIGURE = "CONFIGURE"
+
+
+class PackageDeploymentType(enum.StrEnum):
+    RELEASE = "release"  # Install using prebuilt release packages
+    PRODUCTION = "production"  # Deploy to production servers via PyInfra
 
 
 class PackageSource(enum.StrEnum):
@@ -46,6 +50,16 @@ class Platform(enum.StrEnum):
     MACOS_X86_64 = "macos-x86_64"
 
 
+class FrontendMode(enum.StrEnum):
+    PORT = "port"
+    WILDCARD = "wildcard"
+
+
+class EndpointProtocol(enum.StrEnum):
+    HTTP = "http"
+    HTTPS = "https"
+
+
 @dataclasses.dataclass()
 class CliArgs:
     mode: InstallModes | None
@@ -53,6 +67,13 @@ class CliArgs:
     show_guide: bool
     non_interactive: bool
     public_facing_address: str
+    accelerator: str | None = None
+    fqdn_prefix: str | None = None
+    tls_advertised: bool = False
+    advertised_port: int = 443
+    endpoint_protocol: EndpointProtocol | None = None
+    frontend_mode: FrontendMode = FrontendMode.PORT
+    use_wildcard_binding: bool = False
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -84,6 +105,13 @@ class DistInfo(BaseModel):
     image_refs: list[str] = Field(default_factory=list)
 
 
+class Accelerator(enum.StrEnum):
+    CUDA = "cuda"
+    CUDA_MOCK = "cuda_mock"
+    CUDA_MIG_MOCK = "cuda_mig_mock"
+    ROCM_MOCK = "rocm_mock"
+
+
 class InstallInfo(BaseModel):
     version: str
     type: InstallType
@@ -91,6 +119,7 @@ class InstallInfo(BaseModel):
     base_path: Path
     halfstack_config: HalfstackConfig
     service_config: ServiceConfig
+    accelerator: Accelerator | None = None
 
 
 @dataclasses.dataclass()
@@ -108,7 +137,7 @@ class OSInfo(RichCast):
 @dataclasses.dataclass()
 class ServerAddr:
     bind: HostPortPair  # the server-bind address (e.g., 0.0.0.0:8080)
-    face: HostPortPair = cast(HostPortPair, None)  # the client-facing address (e.g., 10.1.2.3:9090)
+    face: HostPortPair | None = None  # the client-facing address (e.g., 10.1.2.3:9090)
 
     def __post_init__(self) -> None:
         # Ensure that face is always initialized, while its unspecified value is None.
@@ -161,11 +190,48 @@ class ServiceConfig:
     storage_agent_var_base_path: str
     storage_watcher_addr: ServerAddr
     vfolder_relpath: str
-    wsproxy_hash_key: str
-    wsproxy_jwt_key: str
-    wsproxy_api_token: str
+    appproxy_api_secret: str | None = None
+    appproxy_jwt_secret: str | None = None
+    appproxy_permit_hash_secret: str | None = None
+    appproxy_coordinator_addr: ServerAddr = dataclasses.field(
+        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10200))
+    )
+    appproxy_worker_addr: ServerAddr = dataclasses.field(
+        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10201))
+    )
 
 
 @dataclasses.dataclass
 class InstallVariable:
     public_facing_address: str = "127.0.0.1"
+    accelerator: Accelerator | None = None
+    fqdn_prefix: str | None = None
+    tls_advertised: bool = False
+    advertised_port: int = 443
+    endpoint_protocol: EndpointProtocol | None = None
+    frontend_mode: FrontendMode = FrontendMode.PORT
+    use_wildcard_binding: bool = False
+
+    @property
+    def apphub_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.apphub.backend.ai"
+        return self.public_facing_address
+
+    @property
+    def app_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.app.backend.ai"
+        return self.public_facing_address
+
+    @property
+    def wildcard_domain(self) -> str | None:
+        if self.fqdn_prefix:
+            return f".{self.fqdn_prefix}.app.backend.ai"
+        return None
+
+    @property
+    def storage_public_address(self) -> str:
+        if self.fqdn_prefix:
+            return f"{self.fqdn_prefix}.public.isla-sorna.backend.ai"
+        return self.public_facing_address

@@ -1,0 +1,7 @@
+[Unit]
+Description=Backend.AI Manager Restart Service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart backendai-manager.service
+User=root

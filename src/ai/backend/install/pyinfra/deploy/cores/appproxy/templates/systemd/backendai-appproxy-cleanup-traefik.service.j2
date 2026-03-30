@@ -1,0 +1,10 @@
+[Unit]
+Description=Backend.AI AppProxy Cleanup Traefik Routes
+
+[Service]
+Type=oneshot
+ExecStart={{ home_dir }}/scripts/cleanup_traefik_routers.sh --fix
+User={{ bai_user }}
+WorkingDirectory={{ home_dir }}
+StandardOutput=journal
+StandardError=journal

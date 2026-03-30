@@ -1,0 +1,32 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  restart: unless-stopped
+  cpu_count: 2
+  mem_limit: "4g"
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  otel-collector:
+    <<: *base
+    image: otel/opentelemetry-collector-contrib:${OTEL_IMAGE_TAG}
+    container_name: bai-otel-collector
+    ports:
+      - "${OTEL_GRPC_PORT}:4317"   # OTLP gRPC receiver
+      - "${OTEL_HTTP_PORT}:4318"   # OTLP HTTP receiver
+      - "${OTEL_HEALTH_PORT}:13133"  # Health check endpoint
+    volumes:
+      - "/etc/hosts:/etc/hosts:ro"
+      - "./configs/otel-collector-config.yml:/etc/otel-collector-config.yml:ro"
+    command: ["--config=/etc/otel-collector-config.yml"]
+    # Health check disabled due to minimal container image (no wget in container)
+    # healthcheck:
+    #   test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:13133/health"]
+    #   interval: 15s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 20s

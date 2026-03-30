@@ -2,17 +2,13 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, MutableMapping, Sequence
+from enum import StrEnum
 from typing import (
+    TYPE_CHECKING,
     Any,
     Final,
-    Generic,
-    Mapping,
-    MutableMapping,
-    Optional,
     Self,
-    Sequence,
-    Set,
-    TypeVar,
     override,
 )
 
@@ -31,13 +27,40 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.errors.resource import InvalidSchedulerState
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.session import SessionRow
 
-from ..models import AgentRow, KernelRow, SessionRow
-from ..models.scaling_group import ScalingGroupOpts
-from ..registry import AgentRegistry
+if TYPE_CHECKING:
+    from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
+
+
+class ScheduleType(StrEnum):
+    """Types of scheduling operations that can be triggered."""
+
+    SCHEDULE = "schedule"  # Schedule pending sessions
+    DEPRIORITIZE = "deprioritize"  # Lower priority and return to PENDING
+    SWEEP = "sweep"  # Sweep stale sessions (maintenance operation)
+    CHECK_PRECONDITION = "check_precondition"  # Check preconditions for scheduled sessions
+    START = "start"  # Start prepared sessions
+    TERMINATE = "terminate"  # Terminate sessions
+    CHECK_PULLING_PROGRESS = "check_pulling_progress"  # Check if PULLING sessions can transition
+    CHECK_CREATING_PROGRESS = (
+        "check_creating_progress"  # Check if CREATING sessions can transition to RUNNING
+    )
+    CHECK_TERMINATING_PROGRESS = (
+        "check_terminating_progress"  # Check if TERMINATING sessions can transition to TERMINATED
+    )
+    SWEEP_STALE_KERNELS = "sweep_stale_kernels"  # Sweep kernels with stale presence status
+    DETECT_KERNEL_TERMINATION = (
+        "detect_kernel_termination"  # Detect active sessions with any kernel TERMINATED/CANCELLED
+    )
+    OBSERVE_FAIR_SHARE = "observe_fair_share"  # Observe RUNNING kernels for fair share calculation
 
 
 def merge_resource(
@@ -53,7 +76,7 @@ def merge_resource(
 
 @attrs.define(auto_attribs=True, slots=True)
 class AgentAllocationContext:
-    agent_id: Optional[AgentId]
+    agent_id: AgentId | None
     agent_addr: str
     scaling_group: str
 
@@ -78,13 +101,13 @@ class SchedulingContext:
 class KernelAgentBinding:
     kernel: KernelRow
     agent_alloc_ctx: AgentAllocationContext
-    allocated_host_ports: Set[int]
+    allocated_host_ports: set[int]
 
 
 @attrs.define(auto_attribs=True, slots=True)
 class PredicateResult:
     passed: bool
-    message: Optional[str] = None
+    message: str | None = None
 
 
 class AbstractScheduler(ABC):
@@ -121,7 +144,8 @@ class AbstractScheduler(ABC):
         if not pending_sessions:
             return -1, []
         priorities = {s.priority for s in pending_sessions}
-        assert len(priorities) > 0
+        if len(priorities) == 0:
+            raise InvalidSchedulerState("Priority set is empty despite having pending sessions")
         top_priority = max(priorities)
         return top_priority, [*filter(lambda s: s.priority == top_priority, pending_sessions)]
 
@@ -131,7 +155,7 @@ class AbstractScheduler(ABC):
         total_capacity: ResourceSlot,
         pending_sessions: Sequence[SessionRow],
         existing_sessions: Sequence[SessionRow],
-    ) -> Optional[SessionId]:
+    ) -> SessionId | None:
         """
         Pick a session to try schedule.
         This is where the queueing semantics is implemented such as prioritization.
@@ -178,17 +202,16 @@ class NullAgentSelectorState(AbstractResourceGroupState):
         return cls()
 
 
-T_ResourceGroupState = TypeVar("T_ResourceGroupState", bound=AbstractResourceGroupState)
-
-
-class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
+class AbstractAgentSelector[T_ResourceGroupState: AbstractResourceGroupState](ABC):
     """
     The interface for agent-selection logic to choose one or more agents to map with the given
     scheduled session.
     """
 
     sgroup_opts: ScalingGroupOpts  # sgroup-specific config
-    config: Mapping[str, Any]  # agent-selector-specific config
+    config: Mapping[
+        str, Any
+    ]  # agent-selector-specific config, Do not use this. this will be removed after refactoring.
     agent_selection_resource_priority: list[str]
     state_store: AbstractResourceGroupStateStore[T_ResourceGroupState]
 
@@ -217,13 +240,13 @@ class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
     @classmethod
     @abstractmethod
     def get_state_cls(cls) -> type[T_ResourceGroupState]:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     async def assign_agent_for_session(
         self,
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         """
         Assign an agent for the entire (single-node) session, only considering
         the total requested slots of the session.
@@ -241,7 +264,7 @@ class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
         self,
         agents: Sequence[AgentRow],
         pending_kernel: KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         """
         Assign an agent for a kernel of a multi-node multi-container session.
         This may be called multiple times.
@@ -255,14 +278,14 @@ class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
         self,
         agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> AgentId | None:
         """
         Select an agent for the pending session or kernel.
         """
         raise NotImplementedError
 
 
-class AbstractResourceGroupStateStore(Generic[T_ResourceGroupState], ABC):
+class AbstractResourceGroupStateStore[T_ResourceGroupState: AbstractResourceGroupState](ABC):
     """
     Store and load the state of the pending session scheduler and agent selector for each resource group.
     """
@@ -296,16 +319,20 @@ class AbstractResourceGroupStateStore(Generic[T_ResourceGroupState], ABC):
         raise NotImplementedError
 
 
-class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
+class DefaultResourceGroupStateStore[T_ResourceGroupState: AbstractResourceGroupState](
+    AbstractResourceGroupStateStore[T_ResourceGroupState]
+):
     """
     The default AgentSelector state store using the etcd
     """
 
     base_key: Final[str] = "resource-group-states"
 
-    def __init__(self, state_cls: type[T_ResourceGroupState], shared_config: SharedConfig) -> None:
+    def __init__(
+        self, state_cls: type[T_ResourceGroupState], legacy_etcd_config_loader: LegacyEtcdLoader
+    ) -> None:
         super().__init__(state_cls)
-        self.shared_config = shared_config
+        self.legacy_etcd_config_loader = legacy_etcd_config_loader
 
     @override
     async def load(
@@ -317,7 +344,7 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
             "{}: load resource group state for {}", type(self).__qualname__, resource_group_name
         )
         if (
-            raw_agent_selector_state := await self.shared_config.get_raw(
+            raw_agent_selector_state := await self.legacy_etcd_config_loader.get_raw(
                 f"{self.base_key}/{resource_group_name}/{state_name}",
             )
         ) is not None:
@@ -334,7 +361,7 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
         log.debug(
             "{}: store resource group state for {}", type(self).__qualname__, resource_group_name
         )
-        await self.shared_config.etcd.put(
+        await self.legacy_etcd_config_loader._etcd.put(
             f"{self.base_key}/{resource_group_name}/{state_name}",
             state_value.model_dump_json(),
         )
@@ -348,12 +375,14 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
         log.debug(
             "{}: reset resource group state for {}", type(self).__qualname__, resource_group_name
         )
-        await self.shared_config.etcd.delete_prefix(
+        await self.legacy_etcd_config_loader._etcd.delete_prefix(
             f"{self.base_key}/{resource_group_name}/{state_name}",
         )
 
 
-class InMemoryResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
+class InMemoryResourceGroupStateStore[T_ResourceGroupState: AbstractResourceGroupState](
+    AbstractResourceGroupStateStore[T_ResourceGroupState]
+):
     """
     An in-memory AgentSelector state store to use in test codes.
     This cannot be used for the actual dispatcher loop since the state is NOT preserved whenever the

@@ -1,4 +1,5 @@
-from typing import AsyncContextManager, NamedTuple, Protocol, TypeVar
+from contextlib import AbstractAsyncContextManager
+from typing import NamedTuple, Protocol, TypeVar
 
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId
@@ -61,7 +62,7 @@ class SupportsAsyncClose(Protocol):
 _SupportsAsyncCloseT = TypeVar("_SupportsAsyncCloseT", bound=SupportsAsyncClose)
 
 
-class closing_async(AsyncContextManager[_SupportsAsyncCloseT]):
+class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
     """
     A local copy of ai.backend.agent.utils.closing_async()
     to avoid version compatibility issues

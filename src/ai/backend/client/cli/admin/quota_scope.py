@@ -1,30 +1,26 @@
+from __future__ import annotations
+
 import sys
 import uuid
+from typing import TYPE_CHECKING
 
 import click
 
 from ai.backend.cli.params import ByteSizeParamType
 from ai.backend.cli.types import ExitCode
-from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.types import CLIContext
+from ai.backend.common.types import QuotaScopeType
 
-from ...cli.extensions import pass_ctx_obj
-from ...cli.types import CLIContext
-from ...output.fields import group_fields, quota_scope_fields, user_fields
-from ...session import Session
 from . import admin
 
-_user_query_fields = (
-    user_fields["uuid"],
-    user_fields["username"],
-)
-_project_query_fields = (
-    group_fields["id"],
-    group_fields["name"],
-)
+if TYPE_CHECKING:
+    from ai.backend.client.session import Session
+    from ai.backend.common.types import QuotaScopeID
 
 
 @admin.group()
-def quota_scope():
+def quota_scope() -> None:
     """Quota scope administration commands."""
 
 
@@ -35,6 +31,17 @@ def _get_qsid_from_identifier(
     domain_name: str,
     session: Session,
 ) -> QuotaScopeID | None:
+    from ai.backend.client.output.fields import group_fields, user_fields
+    from ai.backend.common.types import QuotaScopeID
+
+    _user_query_fields = (
+        user_fields["uuid"],
+        user_fields["username"],
+    )
+    _project_query_fields = (
+        group_fields["id"],
+        group_fields["name"],
+    )
     match type_:
         case QuotaScopeType.USER:
             try:
@@ -47,7 +54,7 @@ def _get_qsid_from_identifier(
                     fields=_user_query_fields,
                 )
                 if user_info is None:
-                    return None
+                    return None  # type: ignore[unreachable]
                 user_id = uuid.UUID(user_info["uuid"])
             else:
                 # Use the user_id as-is if it's already a valid uuid.
@@ -64,7 +71,7 @@ def _get_qsid_from_identifier(
                     fields=_project_query_fields,
                 )
                 if project_info is None:
-                    return None
+                    return None  # type: ignore[unreachable]
                 project_id = uuid.UUID(project_info["id"])
             else:
                 # Use the project_id as-is if it's already a valid uuid.
@@ -106,6 +113,9 @@ def get(
     HOST: Name of the vfolder host (storage volume) to query the quota scope.
     IDENTIFIER: ID or email for user, ID or name for project.
     """
+    from ai.backend.client.output.fields import quota_scope_fields
+    from ai.backend.client.session import Session
+
     qs_query_fields = (
         quota_scope_fields["usage_bytes"],
         quota_scope_fields["usage_count"],
@@ -170,6 +180,9 @@ def set_(
     IDENTIFIER: ID or email for user, ID or name for project.
     LIMIT_BYTES: Byte-size to be allocated to quota scope of a user or project. (e.g., 1t, 500g)
     """
+    from ai.backend.client.session import Session
+    from ai.backend.common.types import QuotaConfig
+
     with Session() as session:
         try:
             qsid = _get_qsid_from_identifier(
@@ -181,7 +194,7 @@ def set_(
             if qsid is None:
                 ctx.output.print_fail("Identifier is not valid")
                 sys.exit(ExitCode.INVALID_ARGUMENT)
-            session.QuotaScope.set_quota_scope(
+            _ = session.QuotaScope.set_quota_scope(
                 host=host,
                 qsid=qsid,
                 config=QuotaConfig(limit_bytes=limit_bytes),
@@ -225,6 +238,8 @@ def unset(
     HOST: Name of the vfolder host (storage volume) to unset the given quota scope.
     IDENTIFIER: ID or email for user, ID or name for project.
     """
+    from ai.backend.client.session import Session
+
     with Session() as session:
         try:
             qsid = _get_qsid_from_identifier(
@@ -236,7 +251,7 @@ def unset(
             if qsid is None:
                 ctx.output.print_fail("Identifier is not valid")
                 sys.exit(ExitCode.INVALID_ARGUMENT)
-            session.QuotaScope.unset_quota_scope(
+            _ = session.QuotaScope.unset_quota_scope(
                 host=host,
                 qsid=qsid,
             )

@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Iterator, Optional
+from collections.abc import Iterator
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
-from ai.backend.storage.abc import AbstractVolume
-from ai.backend.storage.api.types import CORSOptions, WebMiddleware
+from ai.backend.storage.data.storage.types import ImportStepContext
+
+if TYPE_CHECKING:
+    from .api.types import CORSOptions, WebMiddleware
+    from .volumes.abc import AbstractVolume
 
 
 class AbstractStoragePlugin(AbstractPlugin, metaclass=ABCMeta):
@@ -18,6 +24,19 @@ class AbstractStoragePlugin(AbstractPlugin, metaclass=ABCMeta):
         raise NotImplementedError
 
 
+@dataclass
+class VerifierPluginResult:
+    scanned_count: int
+    infected_count: int
+    metadata: dict[str, Any]
+
+
+class AbstractArtifactVerifierPlugin(AbstractPlugin, metaclass=ABCMeta):
+    @abstractmethod
+    async def verify(self, artifact_path: Path, context: ImportStepContext) -> VerifierPluginResult:
+        raise NotImplementedError
+
+
 class StoragePluginContext(BasePluginContext[AbstractStoragePlugin]):
     plugin_group = "backendai_storage_v10"
 
@@ -25,9 +44,23 @@ class StoragePluginContext(BasePluginContext[AbstractStoragePlugin]):
     def discover_plugins(
         cls,
         plugin_group: str,
-        allowlist: Optional[set[str]] = None,
-        blocklist: Optional[set[str]] = None,
+        allowlist: set[str] | None = None,
+        blocklist: set[str] | None = None,
     ) -> Iterator[tuple[str, type[AbstractStoragePlugin]]]:
+        scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
+        yield from scanned_plugins
+
+
+class StorageArtifactVerifierPluginContext(BasePluginContext[AbstractArtifactVerifierPlugin]):
+    plugin_group = "backendai_storage_artifact_verifier_v1"
+
+    @classmethod
+    def discover_plugins(
+        cls,
+        plugin_group: str,
+        allowlist: set[str] | None = None,
+        blocklist: set[str] | None = None,
+    ) -> Iterator[tuple[str, type[AbstractArtifactVerifierPlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
         yield from scanned_plugins
 

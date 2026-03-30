@@ -1,6 +1,8 @@
-from typing import Mapping
+from collections.abc import Mapping
+from typing import Any, cast
 
-from ..request import Request
+from ai.backend.client.request import Request
+
 from .base import BaseFunction, api_function
 
 __all__ = ("System",)
@@ -16,20 +18,22 @@ class System(BaseFunction):
     async def get_versions(cls) -> Mapping[str, str]:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            return cast(Mapping[str, str], await resp.json())
 
     @api_function
     @classmethod
     async def get_manager_version(cls) -> str:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
-            ret = await resp.json()
-            return ret["manager"]
+            ret: dict[str, Any] = await resp.json()
+            result: str = ret["manager"]
+            return result
 
     @api_function
     @classmethod
     async def get_api_version(cls) -> str:
         rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
-            ret = await resp.json()
-            return ret["version"]
+            ret: dict[str, Any] = await resp.json()
+            result: str = ret["version"]
+            return result

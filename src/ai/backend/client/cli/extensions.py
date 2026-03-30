@@ -1,6 +1,7 @@
 import warnings
+from collections.abc import Callable, Mapping
 from functools import update_wrapper
-from typing import Callable, Concatenate, Mapping, ParamSpec, TypeVar
+from typing import Any, Concatenate, ParamSpec, TypeVar
 
 from click import get_current_context
 
@@ -10,7 +11,7 @@ from ai.backend.client.config import APIConfig, set_config
 from ai.backend.client.output import get_output_handler
 
 
-def set_client_config(info: Mapping) -> CLIContext:
+def set_client_config(info: Mapping[str, Any]) -> CLIContext:
     from .announcement import announce
 
     skip_sslcert_validation = info.get("skip_sslcert_validation", False)
@@ -38,7 +39,7 @@ T = TypeVar("T")
 P = ParamSpec("P")
 
 
-def pass_ctx_obj(f: Callable[Concatenate[CLIContext, P], T]) -> Callable[P, T]:
+def pass_ctx_obj[**P, T](f: Callable[Concatenate[CLIContext, P], T]) -> Callable[P, T]:
     def new_func(*args: P.args, **kwargs: P.kwargs) -> T:
         obj = get_current_context().obj
         match obj:

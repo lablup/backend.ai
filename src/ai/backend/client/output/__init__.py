@@ -15,7 +15,7 @@ def get_output_handler(cli_ctx: CLIContext, output_mode: OutputMode) -> BaseOutp
         from .json import JsonOutputHandler
 
         return JsonOutputHandler(cli_ctx)
-    elif output_mode == OutputMode.CONSOLE:
+    if output_mode == OutputMode.CONSOLE:
         from .console import ConsoleOutputHandler
 
         return ConsoleOutputHandler(cli_ctx)

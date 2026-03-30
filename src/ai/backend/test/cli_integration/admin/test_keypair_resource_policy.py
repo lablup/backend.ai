@@ -1,10 +1,13 @@
 import json
 from contextlib import closing
+from typing import Any
 
-from ...utils.cli import EOF, ClientRunnerFunc
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc, decode
 
 
-def test_add_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resource_policy: str):
+def test_add_keypair_resource_policy(
+    run_admin: ClientRunnerFunc, keypair_resource_policy: str
+) -> None:
     print("[ Add keypair resource policy ]")
 
     vfolder_volume_name = "local:volume1"
@@ -40,13 +43,13 @@ def test_add_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resour
     ]
     with closing(run_admin(add_arguments)) as p:
         p.expect(EOF)
-        response = json.loads(p.before.decode())
+        response = json.loads(decode(p.before))
         assert response.get("ok") is True, "Keypair resource policy creation not successful"
 
     # Check if keypair resource policy is created
     with closing(run_admin(["--output=json", "admin", "keypair-resource-policy", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         krp_list = loaded.get("items")
         assert isinstance(krp_list, list), "Keypair resource policy list not printed properly"
@@ -81,7 +84,9 @@ def test_add_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resour
     ), "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
-def test_update_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resource_policy: str):
+def test_update_keypair_resource_policy(
+    run_admin: ClientRunnerFunc, keypair_resource_policy: str
+) -> None:
     print("[ Update keypair resource policy ]")
 
     vfolder_volume_name = "local:volume2"
@@ -117,13 +122,13 @@ def test_update_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_res
     ]
     with closing(run_admin(add_arguments)) as p:
         p.expect(EOF)
-        response = json.loads(p.before.decode())
+        response = json.loads(decode(p.before))
         assert response.get("ok") is True, "Keypair resource policy update not successful"
 
     # Check if keypair resource policy is updated
     with closing(run_admin(["--output=json", "admin", "keypair-resource-policy", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         krp_list = loaded.get("items")
         assert isinstance(krp_list, list), "Keypair resource policy list not printed properly"
@@ -157,7 +162,9 @@ def test_update_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_res
     ), "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
-def test_delete_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resource_policy: str):
+def test_delete_keypair_resource_policy(
+    run_admin: ClientRunnerFunc, keypair_resource_policy: str
+) -> None:
     print("[ Delete keypair resource policy ]")
 
     # Delete keypair resource policy
@@ -172,22 +179,22 @@ def test_delete_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_res
     ) as p:
         p.sendline("y")
         p.expect(EOF)
-        before = p.before.decode()
+        before = decode(p.before)
         response = json.loads(before[before.index("{") :])
         assert response.get("ok") is True, "Keypair resource policy deletion failed"
 
 
-def test_list_keypair_resource_policy(run_admin: ClientRunnerFunc):
+def test_list_keypair_resource_policy(run_admin: ClientRunnerFunc) -> None:
     print("[ List keypair resource policy ]")
     with closing(run_admin(["--output=json", "admin", "keypair-resource-policy", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         krp_list = loaded.get("items")
         assert isinstance(krp_list, list), "Keypair resource policy list not printed properly"
 
 
-def get_keypair_resource_policy_from_list(krps: list, name: str) -> dict:
+def get_keypair_resource_policy_from_list(krps: list[dict[str, Any]], name: str) -> dict[str, Any]:
     for krp in krps:
         if krp.get("name") == name:
             return krp

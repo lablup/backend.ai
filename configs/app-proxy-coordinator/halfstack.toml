@@ -1,0 +1,46 @@
+[db]
+type = "postgresql"
+name = "appproxy"
+user = "appproxy"
+password = "develove"
+pool_size = 8
+max_overflow = 64
+addr = { host = "127.0.0.1", port = 8100 }
+
+[redis]
+addr = { host = "127.0.0.1", port = 8110 }
+
+[proxy_coordinator]
+tls_listen = false
+tls_advertised = false
+aiomonitor_termui_port = 48510
+aiomonitor_webui_port = 49510
+allow_unauthorized_configure_request = true
+
+[proxy_coordinator.bind_addr]
+host = "0.0.0.0"
+port = 10200
+
+[proxy_coordinator.advertised_addr]
+# Change `host` and `port` to the actual host and port for user access
+host = "127.0.0.1"
+port = 10200
+
+[secrets]
+api_secret = "some_api_secret"
+jwt_secret = "some_jwt_secret"
+
+[permit_hash]
+secret = "some_permit_hash_secret"
+
+[logging]
+level = "DEBUG"
+drivers = ["console"]
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[debug]
+enabled = true
+log-events = true

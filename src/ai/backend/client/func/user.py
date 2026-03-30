@@ -2,23 +2,26 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import Any, Iterable, Mapping, Sequence, Union
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, cast
 
-from ...cli.types import Undefined, undefined
-from ..auth import AuthToken, AuthTokenTypes
-from ..output.fields import user_fields
-from ..output.types import FieldSpec, PaginatedResult
-from ..pagination import fetch_paginated_result
-from ..request import Request
-from ..session import api_session
-from ..types import set_if_set
-from ..utils import dedent as _d
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.auth import AuthTokenTypes
+from ai.backend.client.output.fields import user_fields
+from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.request import Request
+from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
+from ai.backend.client.utils import dedent as _d
+from ai.backend.common.dto.manager.auth.types import AuthResponse, parse_auth_response
+
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = (
     "User",
-    "UserStatus",
     "UserRole",
+    "UserStatus",
 )
 
 
@@ -94,7 +97,7 @@ class User(BaseFunction):
         *,
         extra_args: Mapping[str, Any] = {},
         token_type: AuthTokenTypes = AuthTokenTypes.KEYPAIR,
-    ) -> AuthToken:
+    ) -> AuthResponse:
         """
         Authorize the given credentials and get the API authentication token.
         This function can be invoked anonymously; i.e., it does not require
@@ -115,10 +118,7 @@ class User(BaseFunction):
         rqst.set_json(body)
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return AuthToken(
-                type=token_type,
-                content=data["data"],
-            )
+            return parse_auth_response(data["data"])
 
     @api_function
     @classmethod
@@ -127,7 +127,7 @@ class User(BaseFunction):
         status: str | None = None,
         group: str | None = None,
         fields: Sequence[FieldSpec] = _default_list_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetches the list of users. Domain admins can only get domain users.
 
@@ -147,7 +147,7 @@ class User(BaseFunction):
             "group": group,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["users"]
+        return cast(Sequence[dict[str, Any]], data["users"])
 
     @api_function
     @classmethod
@@ -161,7 +161,7 @@ class User(BaseFunction):
         page_size: int = 20,
         filter: str | None = None,
         order: str | None = None,
-    ) -> PaginatedResult[dict]:
+    ) -> PaginatedResult[dict[str, Any]]:
         """
         Fetches the list of users. Domain admins can only get domain users.
 
@@ -189,7 +189,7 @@ class User(BaseFunction):
         cls,
         email: str | None = None,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetch information of a user. If email is not specified,
         requester's information will be returned.
@@ -212,15 +212,15 @@ class User(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"email": email}
         data = await api_session.get().Admin._query(query, variables if email is not None else None)
-        return data["user"]
+        return cast(Sequence[dict[str, Any]], data["user"])
 
     @api_function
     @classmethod
     async def detail_by_uuid(
         cls,
-        user_uuid: Union[str, uuid.UUID] | None = None,
+        user_uuid: str | uuid.UUID | None = None,
         fields: Sequence[FieldSpec] = _default_detail_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         """
         Fetch information of a user by user's uuid. If user_uuid is not specified,
         requester's information will be returned.
@@ -245,7 +245,7 @@ class User(BaseFunction):
         data = await api_session.get().Admin._query(
             query, variables if user_uuid is not None else None
         )
-        return data["user_from_uuid"]
+        return cast(Sequence[dict[str, Any]], data["user_from_uuid"])
 
     @api_function
     @classmethod
@@ -265,8 +265,11 @@ class User(BaseFunction):
         totp_activated: bool = False,
         group_ids: Iterable[str] | Undefined = undefined,
         sudo_session_enabled: bool = False,
+        container_uid: int | Undefined = undefined,
+        container_main_gid: int | Undefined = undefined,
+        container_gids: Iterable[int] | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Creates a new user with the given options.
         You need an admin privilege for this operation.
@@ -300,12 +303,15 @@ class User(BaseFunction):
         set_if_set(inputs, "full_name", full_name)
         set_if_set(inputs, "allowed_client_ip", allowed_client_ip)
         set_if_set(inputs, "group_ids", group_ids)
+        set_if_set(inputs, "container_uid", container_uid)
+        set_if_set(inputs, "container_main_gid", container_main_gid)
+        set_if_set(inputs, "container_gids", container_gids)
         variables = {
             "email": email,
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["create_user"]
+        return cast(dict[str, Any], data["create_user"])
 
     @api_function
     @classmethod
@@ -326,8 +332,11 @@ class User(BaseFunction):
         group_ids: Iterable[str] | Undefined = undefined,
         sudo_session_enabled: bool | Undefined = undefined,
         main_access_key: str | Undefined = undefined,
-        fields: Iterable[FieldSpec | str] | None = None,
-    ) -> dict:
+        container_uid: int | None | Undefined = undefined,
+        container_main_gid: int | None | Undefined = undefined,
+        container_gids: Iterable[int] | None | Undefined = undefined,
+        _fields: Iterable[FieldSpec | str] | None = None,
+    ) -> dict[str, Any]:
         """
         Update existing user.
         You need an admin privilege for this operation.
@@ -353,16 +362,19 @@ class User(BaseFunction):
         set_if_set(inputs, "group_ids", group_ids)
         set_if_set(inputs, "sudo_session_enabled", sudo_session_enabled)
         set_if_set(inputs, "main_access_key", main_access_key)
+        set_if_set(inputs, "container_uid", container_uid)
+        set_if_set(inputs, "container_main_gid", container_main_gid)
+        set_if_set(inputs, "container_gids", container_gids)
         variables = {
             "email": email,
             "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_user"]
+        return cast(dict[str, Any], data["modify_user"])
 
     @api_function
     @classmethod
-    async def delete(cls, email: str):
+    async def delete(cls, email: str) -> dict[str, Any]:
         """
         Inactivates an existing user.
         """
@@ -375,11 +387,16 @@ class User(BaseFunction):
         """)
         variables = {"email": email}
         data = await api_session.get().Admin._query(query, variables)
-        return data["delete_user"]
+        return cast(dict[str, Any], data["delete_user"])
 
     @api_function
     @classmethod
-    async def purge(cls, email: str, purge_shared_vfolders=False):
+    async def purge(
+        cls,
+        email: str,
+        purge_shared_vfolders: bool = False,
+        delegate_endpoint_ownership: bool = False,
+    ) -> dict[str, Any]:
         """
         Deletes an existing user.
 
@@ -398,7 +415,8 @@ class User(BaseFunction):
             "email": email,
             "input": {
                 "purge_shared_vfolders": purge_shared_vfolders,
+                "delegate_endpoint_ownership": delegate_endpoint_ownership,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["purge_user"]
+        return cast(dict[str, Any], data["purge_user"])

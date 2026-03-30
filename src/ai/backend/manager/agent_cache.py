@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import AsyncIterator, Callable, Optional
+from typing import Any
 
 import sqlalchemy as sa
 import zmq
@@ -28,36 +29,35 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class PeerInvoker(Peer):
     class _CallStub:
-        _cached_funcs: dict[str, Callable]
-        order_key: ContextVar[Optional[str]]
+        _cached_funcs: dict[str, Callable[..., Any]]
+        order_key: ContextVar[str | None]
 
-        def __init__(self, peer: Peer):
+        def __init__(self, peer: Peer) -> None:
             self._cached_funcs = {}
             self.peer = peer
             self.order_key = ContextVar("order_key", default=None)
 
-        def __getattr__(self, name: str):
+        def __getattr__(self, name: str) -> Callable[..., Any]:
             if f := self._cached_funcs.get(name, None):
                 return f
-            else:
 
-                async def _wrapped(*args, **kwargs):
-                    request_body = {
-                        "args": args,
-                        "kwargs": kwargs,
-                    }
-                    self.peer.last_used = time.monotonic()
-                    ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
-                    self.peer.last_used = time.monotonic()
-                    return ret
+            async def _wrapped(*args: Any, **kwargs: Any) -> Any:
+                request_body = {
+                    "args": args,
+                    "kwargs": kwargs,
+                }
+                self.peer.last_used = time.monotonic()  # type: ignore[attr-defined]
+                ret = await self.peer.invoke(name, request_body, order_key=self.order_key.get())
+                self.peer.last_used = time.monotonic()  # type: ignore[attr-defined]
+                return ret
 
-                self._cached_funcs[name] = _wrapped
-                return _wrapped
+            self._cached_funcs[name] = _wrapped
+            return _wrapped
 
     call: _CallStub
     last_used: float
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.call = self._CallStub(self)
         self.last_used = time.monotonic()
@@ -84,7 +84,7 @@ class AgentRPCCache:
         self,
         agent_id: AgentId,
         agent_addr: str,
-        public_key: Optional[PublicKey],
+        public_key: PublicKey | None,
     ) -> None:
         self._cache[agent_id] = (agent_addr, public_key)
 
@@ -96,10 +96,10 @@ class AgentRPCCache:
         if cached_args:
             return cached_args
 
-        async def _fetch_agent() -> Row:
+        async def _fetch_agent() -> Row[Any] | None:
             async with self.db.begin_readonly() as conn:
                 query = (
-                    sa.select([agents.c.addr, agents.c.public_key])
+                    sa.select(agents.c.addr, agents.c.public_key)
                     .select_from(agents)
                     .where(
                         agents.c.id == agent_id,
@@ -109,15 +109,17 @@ class AgentRPCCache:
                 return result.first()
 
         agent = await execute_with_retry(_fetch_agent)
-        return agent["addr"], agent["public_key"]
+        if agent is None:
+            raise ValueError(f"Agent not found: {agent_id}")
+        return agent.addr, agent.public_key
 
     @actxmgr
     async def rpc_context(
         self,
         agent_id: AgentId,
         *,
-        invoke_timeout: Optional[float] = None,
-        order_key: Optional[str] = None,
+        invoke_timeout: float | None = None,
+        _order_key: str | None = None,
     ) -> AsyncIterator[PeerInvoker]:
         agent_addr, agent_public_key = await self.get_rpc_args(agent_id)
         keepalive_retry_count = 3
@@ -162,17 +164,17 @@ class AgentRPCCache:
                 finally:
                     peer.call.order_key.reset(okey_token)
         except RPCUserError as orig_exc:
-            raise AgentError(agent_id, orig_exc.name, orig_exc.repr, orig_exc.args)
+            raise AgentError(agent_id, orig_exc.name, orig_exc.repr, orig_exc.args) from orig_exc
         except AuthenticationError as orig_exc:
             detail = (
                 "Fail to initate RPC connection. "
                 "This could be caused by a connection delay or an attempt to connect to an invalid address. "
-                f"(repr: {repr(orig_exc)})."
+                f"(repr: {orig_exc!r})."
             )
             raise RPCError(
                 agent_id,
                 agent_addr,
                 detail,
-            )
+            ) from orig_exc
         except Exception:
             raise

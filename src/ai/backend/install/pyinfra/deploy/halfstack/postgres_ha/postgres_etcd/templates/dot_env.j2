@@ -1,0 +1,31 @@
+# ETCD Cluster Configuration
+{% for node in config.cluster_nodes -%}
+{{ node.hostname | upper }}_IP={{ node.ip }}
+{{ node.hostname | upper }}_ETCD_CLIENT_PORT={{ node.etcd_client_port }}
+{{ node.hostname | upper }}_ETCD_PEER_PORT={{ node.etcd_peer_port }}
+{% endfor -%}
+
+# PostgreSQL Configuration
+PG_TARGET_API_PORT={{ pg_cluster_info.get('pg_target_api_port', 8008) }}
+
+# ETCD Port Configuration
+ETCD_CLIENT_PORT={{ pg_cluster_info.etcd_client_port }}
+ETCD_PEER_PORT={{ pg_cluster_info.etcd_peer_port }}
+
+# ETCD Cluster Configuration
+ETCD_CLUSTER_TOKEN=etcd-cluster-token
+ETCD_INITIAL_CLUSTER_STATE=new
+
+# ETCD Environment Variables (will be set dynamically by docker-compose)
+ETCD_NAME=etcd{{ pg_cluster_info.node_number }}
+{% set current_node = config.cluster_nodes | selectattr("node_number", "equalto", pg_cluster_info.node_number) | first -%}
+ETCD_ADVERTISE_CLIENT_URLS=http://{{ current_node.ip }}:{{ pg_cluster_info.etcd_client_port }}
+ETCD_INITIAL_ADVERTISE_PEER_URLS=http://{{ current_node.ip }}:{{ pg_cluster_info.etcd_peer_port }}
+ETCD_INITIAL_CLUSTER={% for node in config.cluster_nodes -%}etcd{{ loop.index }}=http://{{ node.ip }}:{{ node.etcd_peer_port }}{% if not loop.last %},{% endif %}{% endfor %}
+
+# Resource Limits
+PIDS_LIMIT_VALUE=100
+
+# User/Group Configuration
+ETCD_UID={{ uid }}
+ETCD_GID={{ gid }}

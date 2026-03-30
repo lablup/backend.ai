@@ -1,5 +1,5 @@
 import re
-from typing import Iterator, List, Sequence, Set, Type
+from collections.abc import Iterator, Sequence
 
 from .types import ServicePort, ServicePortProtocols
 
@@ -13,17 +13,17 @@ _rx_service_ports = re.compile(
 def parse_service_ports(
     service_ports_label: str | Sequence[str],
     endpoint_ports_label: str | Sequence[str],
-    exception_cls: Type[Exception] = ValueError,
+    exception_cls: type[Exception] = ValueError,
 ) -> Sequence[ServicePort]:
-    items: List[ServicePort] = []
-    used_ports: Set[int] = set()
+    items: list[ServicePort] = []
+    used_ports: set[int] = set()
     inference_apps: Sequence[str]
     if isinstance(endpoint_ports_label, str):
         inference_apps = endpoint_ports_label.split(",")
     else:
         inference_apps = endpoint_ports_label
 
-    def _iter_ports(s: str | Sequence[str]) -> Iterator[re.Match]:
+    def _iter_ports(s: str | Sequence[str]) -> Iterator[re.Match[str]]:
         if isinstance(s, Sequence) and not isinstance(s, str):
             s = list(s)
             while s:
@@ -50,7 +50,7 @@ def parse_service_ports(
         if protocol == "pty":
             # unsupported, skip
             continue
-        if protocol not in ("tcp", "http", "preopen"):
+        if protocol not in ("tcp", "http", "preopen", "vnc", "rdp"):
             raise exception_cls(f"Unsupported service port protocol: {protocol}")
         ports = tuple(map(int, match.group("ports").strip("[]").split(",")))
         for p in ports:

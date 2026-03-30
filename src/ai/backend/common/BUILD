@@ -1,8 +1,10 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
         "stubs/trafaret:stubs",
+        "//:reqs#pycares",  # aiodns runtime dependency - pin version explicitly
     ],
 )
 
@@ -25,9 +27,6 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
-        "src/ai/backend/common/plugin:src",
-        "src/ai/backend/common/auth:src",
-        "src/ai/backend/common/web/session:src",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(

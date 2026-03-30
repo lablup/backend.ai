@@ -1,6 +1,8 @@
-from typing import List, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any, cast
 
-from ..request import Request
+from ai.backend.client.request import Request
+
 from .base import BaseFunction, api_function
 
 __all__ = ("Dotfile",)
@@ -14,9 +16,9 @@ class Dotfile(BaseFunction):
         data: str,
         path: str,
         permission: str,
-        owner_access_key: Optional[str] = None,
-        domain: Optional[str] = None,
-        group: Optional[str] = None,
+        owner_access_key: str | None = None,
+        domain: str | None = None,
+        group: str | None = None,
     ) -> "Dotfile":
         body = {
             "data": data,
@@ -46,10 +48,10 @@ class Dotfile(BaseFunction):
     @classmethod
     async def list_dotfiles(
         cls,
-        owner_access_key: Optional[str] = None,
-        domain: Optional[str] = None,
-        group: Optional[str] = None,
-    ) -> "List[Mapping[str, str]]":
+        owner_access_key: str | None = None,
+        domain: str | None = None,
+        group: str | None = None,
+    ) -> "list[Mapping[str, str]]":
         params = {}
         if group:
             params["group"] = group
@@ -66,15 +68,17 @@ class Dotfile(BaseFunction):
 
         rqst = Request("GET", rqst_endpoint, params=params)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return cast(list[Mapping[str, str]], result)
 
     def __init__(
         self,
         path: str,
-        owner_access_key: Optional[str] = None,
-        group: Optional[str] = None,
-        domain: Optional[str] = None,
-    ):
+        owner_access_key: str | None = None,
+        group: str | None = None,
+        domain: str | None = None,
+    ) -> None:
         self.path = path
         self.owner_access_key = owner_access_key
         self.group = group
@@ -98,10 +102,12 @@ class Dotfile(BaseFunction):
 
         rqst = Request("GET", rqst_endpoint, params=params)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return cast(str, result)
 
     @api_function
-    async def update(self, data: str, permission: str):
+    async def update(self, data: str, permission: str) -> dict[str, Any]:
         body = {
             "data": data,
             "path": self.path,
@@ -123,10 +129,12 @@ class Dotfile(BaseFunction):
         rqst = Request("PATCH", rqst_endpoint)
         rqst.set_json(body)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def delete(self):
+    async def delete(self) -> dict[str, Any]:
         params = {"path": self.path}
         if self.group:
             params["group"] = self.group
@@ -143,4 +151,6 @@ class Dotfile(BaseFunction):
 
         rqst = Request("DELETE", rqst_endpoint, params=params)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result

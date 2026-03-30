@@ -1,0 +1,25 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load environment variables from .env file
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    set -a
+    source "$SCRIPT_DIR/.env"
+    set +a
+else
+    echo "Error: .env file not found in $SCRIPT_DIR"
+    exit 1
+fi
+
+echo "Rescanning container images from registry..."
+if backend.ai admin image rescan; then
+    echo "Successfully rescanned images from registry"
+else
+    echo "Failed to rescan images. Please check:"
+    echo "  - Manager service is running and accessible"
+    echo "  - Registry credentials are configured correctly"
+    echo "  - Images are pushed to the registry"
+    exit 1
+fi

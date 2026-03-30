@@ -1,5 +1,6 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
     ],
@@ -9,7 +10,9 @@ visibility_private_component(
     allowed_dependents=[
         "//src/ai/backend/**",
     ],
-    allowed_dependencies=[],
+    allowed_dependencies=[
+        "//src/ai/backend/common/**",
+    ],
 )
 
 python_distribution(

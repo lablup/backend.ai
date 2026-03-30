@@ -1,4 +1,4 @@
-def visibility_private_component(**kwargs):
+def visibility_private_component(**kwargs: object) -> None:
     """Private package not expected to be imported by anything else than itself."""
     allowed_dependencies = kwargs.get("allowed_dependencies", [])
     allowed_dependents = kwargs.get("allowed_dependents", [])
@@ -25,7 +25,9 @@ def visibility_private_component(**kwargs):
     )
 
 
-def common_scie_config(build_style, *, entry_point="ai.backend.cli.__main__"):
+def common_scie_config(
+    build_style: str, *, entry_point: str = "ai.backend.cli.__main__"
+) -> dict[str, object]:
     build_style_to_tag = {
         "lazy": "lazy",
         "eager": "fat",
@@ -33,9 +35,11 @@ def common_scie_config(build_style, *, entry_point="ai.backend.cli.__main__"):
     return {
         "extra_build_args": [
             f"--scie={build_style}",
+            "--scie-python-version=3.13.7",
+            "--scie-pbs-release=20250818",
             "--scie-pbs-stripped",
             # WARNING: PEX 2.18 or later offers `--scie-name-style` and `--scie-only` option, but we
-            # should use them because Pants expects the PEX subprocess to generate the output file
+            # should NOT use them because Pants expects the PEX subprocess to generate the output file
             # as it configured in the `output_path` field while removing files having other names.
         ],
         "entry_point": entry_point,

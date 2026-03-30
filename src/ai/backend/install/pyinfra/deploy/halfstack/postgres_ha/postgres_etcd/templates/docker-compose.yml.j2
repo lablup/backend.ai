@@ -1,0 +1,63 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  extra_hosts:
+  {%- for node in config.cluster_nodes %}
+    - "{{ node.hostname }}:${{ '{' }}{{ node.hostname | upper }}_IP:?error{{ '}' }}"
+  {%- endfor %}
+  image: {{ config.etcd_container_image }}
+  user: "${ETCD_UID}:${ETCD_GID}"
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+  cpu_count: {{ config.etcd_cpu_count | default(1) }}
+  mem_limit: "{{ config.etcd_memory_limit | default('1g') }}"
+
+services:
+  etcd{{ pg_cluster_info.node_number }}:
+    <<: *base
+    container_name: {{ config.etcd_container_name_prefix }}-{{ pg_cluster_info.node_name }}
+    env_file:
+      - .env
+    volumes:
+      - "{{ data_dir }}:/etcd-data:rw"
+    ports:
+      # listen_client
+      - "${ETCD_CLIENT_PORT:?error}:2379"
+      # listen_peer
+      - "${ETCD_PEER_PORT:?error}:2380"
+    environment:
+      # Cluster Identity
+      - ETCD_NAME=${ETCD_NAME}                                    # Unique node name within cluster
+      - ETCD_DATA_DIR=/etcd-data                                  # Directory where etcd stores data
+
+      # Network Configuration
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379               # What IPs/ports etcd listens on for client requests
+      - ETCD_ADVERTISE_CLIENT_URLS=${ETCD_ADVERTISE_CLIENT_URLS}  # What URL clients should use to connect
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380                 # What IPs/ports etcd listens on for cluster communication
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=${ETCD_INITIAL_ADVERTISE_PEER_URLS}  # What URL other cluster members use to connect
+
+      # Cluster Configuration
+      - ETCD_INITIAL_CLUSTER=${ETCD_INITIAL_CLUSTER}              # All cluster members and their peer URLs
+      - ETCD_INITIAL_CLUSTER_TOKEN=${ETCD_CLUSTER_TOKEN:-etcd-cluster-token}  # Unique token to prevent cross-cluster interference
+      - ETCD_INITIAL_CLUSTER_STATE=${ETCD_INITIAL_CLUSTER_STATE:-new}  # "new" for fresh cluster, "existing" for adding nodes
+
+      # Performance & Resource Settings
+      - ETCD_AUTO_COMPACTION_MODE=periodic                        # Automatic cleanup mode (default: disabled)
+      - ETCD_AUTO_COMPACTION_RETENTION=1h                         # How old data to keep before cleanup
+      - ETCD_QUOTA_BACKEND_BYTES=536870912                        # Maximum database size in bytes (512MB, safe for 1GB container)
+
+      # Logging
+      - ETCD_LOGGER=zap                                           # Log format (default: capnslog - deprecated)
+
+      # Security
+      - ETCD_ENABLE_V2=false                                      # Enable deprecated v2 API (default: true)
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+      start_period: 30s

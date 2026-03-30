@@ -1,0 +1,24 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  restart: unless-stopped
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  blackbox-exporter:
+    <<: *base
+    image: prom/blackbox-exporter:${BLACKBOX_EXPORTER_IMAGE_TAG}
+    container_name: bai-blackbox-exporter
+    ports:
+      - "${BLACKBOX_EXPORTER_PORT}:9115"
+    volumes:
+      - "/etc/hosts:/etc/hosts:ro"
+      - "./blackbox.yml:/config/blackbox.yml:ro"
+    command:
+      - "--config.file=/config/blackbox.yml"
+    cap_add:
+      - NET_RAW

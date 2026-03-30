@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncContextManager, Callable, TypeAlias
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
+from typing import TYPE_CHECKING
 
 import aiohttp_cors
 import attrs
@@ -24,4 +26,4 @@ class RootContext:
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]
+type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]

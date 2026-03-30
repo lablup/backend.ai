@@ -11,8 +11,8 @@ if batch_enabled:
     if sys.version_info.major > 2:
         import builtins
 
-        def _input(prompt=""):
-            sys.stdout.write(prompt)
+        def _input(prompt: object = "") -> str:
+            sys.stdout.write(str(prompt))
             sys.stdout.flush()
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
                 try:
@@ -27,21 +27,23 @@ if batch_enabled:
     else:
         # __builtins__ is an alias dict for __builtin__ in modules other than __main__.
         # Thus, we have to explicitly import __builtin__ module in Python 2.
-        import __builtin__  # pants: no-infer-dep
+        import __builtin__  # type: ignore[import-not-found]  # pants: no-infer-dep
 
         builtins = __builtin__
 
-        def _raw_input(prompt=""):
-            sys.stdout.write(prompt)
+        def _raw_input(prompt: object = "") -> str:
+            sys.stdout.write(str(prompt))
             sys.stdout.flush()
+            sock: socket.socket | None = None
             try:
                 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 sock.connect("/tmp/bai-user-input.sock")
                 userdata = sock.recv(1024)
-            except socket.error:
+            except OSError:
                 userdata = b"<user-input-unavailable>"
             finally:
-                sock.close()
+                if sock is not None:
+                    sock.close()
             return userdata.decode()
 
         builtins._raw_input = builtins.raw_input  # type: ignore

@@ -5,11 +5,11 @@ import sys
 import click
 
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.output.fields import storage_fields
 from ai.backend.client.session import Session
 
-from ..extensions import pass_ctx_obj
-from ..types import CLIContext
 from . import admin
 
 
@@ -55,7 +55,9 @@ def info(ctx: CLIContext, vfolder_host: str) -> None:
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
+def list(
+    ctx: CLIContext, filter_: str | None, order: str | None, offset: int, limit: int | None
+) -> None:
     """
     List storage volumes.
     (super-admin privilege required)

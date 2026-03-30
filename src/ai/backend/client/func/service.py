@@ -1,17 +1,21 @@
-from typing import Any, Literal, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal, cast
 from uuid import UUID
+from warnings import deprecated
 
 from faker import Faker
 
+from ai.backend.client.exceptions import BackendClientError
+from ai.backend.client.output.fields import service_fields
+from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.client.pagination import fetch_paginated_result
+from ai.backend.client.request import Request
+from ai.backend.client.session import api_session
+from ai.backend.client.utils import dedent as _d
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.typed_validators import SESSION_NAME_MAX_LENGTH
+from ai.backend.common.types import RuntimeVariant
 
-from ..exceptions import BackendClientError
-from ..output.fields import service_fields
-from ..output.types import FieldSpec, PaginatedResult
-from ..pagination import fetch_paginated_result
-from ..request import Request
-from ..session import api_session
-from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 __all__ = ("Service",)
@@ -19,9 +23,10 @@ __all__ = ("Service",)
 _default_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
     service_fields["name"],
-    service_fields["image"],
+    service_fields["image_object"],
     service_fields["replicas"],
     service_fields["routings"],
+    service_fields["url"],
     service_fields["session_owner"],
     service_fields["open_to_public"],
 )
@@ -32,14 +37,16 @@ class Service(BaseFunction):
 
     @api_function
     @classmethod
-    async def list(cls, name: Optional[str] = None):
-        """ """
+    @deprecated("Use paginated_list() instead of this method unless you set the name filter.")
+    async def list(cls, name: str | None = None) -> list[dict[str, Any]]:
         params = {}
         if name:
             params["name"] = name
         rqst = Request("GET", "/services", params=params)
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return cast(list[dict[str, Any]], result)
 
     @api_function
     @classmethod
@@ -49,10 +56,9 @@ class Service(BaseFunction):
         fields: Sequence[FieldSpec] = _default_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-    ) -> PaginatedResult:
-        """ """
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> PaginatedResult[dict[str, Any]]:
         return await fetch_paginated_result(
             "endpoint_list",
             {
@@ -70,7 +76,7 @@ class Service(BaseFunction):
         cls,
         service_id: str,
         fields: Sequence[FieldSpec] = _default_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         query = _d("""
             query($endpoint_id: UUID!) {
                 endpoint(endpoint_id: $endpoint_id) { $fields }
@@ -79,7 +85,7 @@ class Service(BaseFunction):
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"endpoint_id": service_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["endpoint"]
+        return cast(Sequence[dict[str, Any]], data["endpoint"])
 
     @api_function
     @classmethod
@@ -89,29 +95,30 @@ class Service(BaseFunction):
         model_id_or_name: str,
         initial_session_count: int,
         *,
-        extra_mounts: Sequence[str] = [],
-        extra_mount_map: Mapping[str, str] = {},
-        extra_mount_options: Mapping[str, Mapping[str, str]] = {},
-        service_name: Optional[str] = None,
-        model_version: Optional[str] = None,
-        dependencies: Optional[Sequence[str]] = None,
-        model_mount_destination: Optional[str] = None,
-        envs: Optional[Mapping[str, str]] = None,
-        startup_command: Optional[str] = None,
-        resources: Optional[Mapping[str, str | int]] = None,
-        resource_opts: Optional[Mapping[str, str | int]] = None,
+        resources: Mapping[str, str | int],
+        resource_opts: Mapping[str, str | int],
+        domain_name: str,
+        group_name: str,
+        scaling_group: str,
+        extra_mounts: Sequence[str] | None = None,
+        extra_mount_map: Mapping[str, str] | None = None,
+        extra_mount_options: Mapping[str, Mapping[str, str]] | None = None,
+        service_name: str | None = None,
+        model_version: str | None = None,
+        _dependencies: Sequence[str] | None = None,
+        model_mount_destination: str | None = None,
+        envs: Mapping[str, str] | None = None,
+        startup_command: str | None = None,
         cluster_size: int = 1,
         cluster_mode: Literal["single-node", "multi-node"] = "single-node",
-        domain_name: Optional[str] = None,
-        group_name: Optional[str] = None,
-        bootstrap_script: Optional[str] = None,
-        tag: Optional[str] = None,
-        architecture: Optional[str] = DEFAULT_IMAGE_ARCH,
-        scaling_group: Optional[str] = None,
-        owner_access_key: Optional[str] = None,
-        model_definition_path: Optional[str] = None,
-        expose_to_public=False,
-    ) -> Any:
+        bootstrap_script: str | None = None,
+        tag: str | None = None,
+        architecture: str | None = DEFAULT_IMAGE_ARCH,
+        owner_access_key: str | None = None,
+        model_definition_path: str | None = None,
+        expose_to_public: bool = False,
+        runtime_variant: RuntimeVariant | None = None,
+    ) -> dict[str, Any]:
         """
         Creates an inference service.
 
@@ -140,12 +147,17 @@ class Service(BaseFunction):
         :param model_definition_path: Relative path to model definition file. Defaults to `model-definition.yaml`.
         :param expose_to_public: Visibility of API Endpoint which serves inference workload.
             If set to true, no authentication will be required to access the endpoint.
+        :param runtime_variant: The runtime variant to use for the service.
 
         :returns: The :class:`ComputeSession` instance.
         """
+        extra_mounts = extra_mounts or []
+        extra_mount_map = extra_mount_map or {}
+        extra_mount_options = extra_mount_options or {}
+
         if service_name is None:
             faker = Faker()
-            service_name = f"bai-serve-{faker.user_name()}"
+            service_name = f"bai-serve-{faker.user_name()}"[:SESSION_NAME_MAX_LENGTH]
 
         extra_mount_body = {}
         if extra_mounts:
@@ -164,14 +176,15 @@ class Service(BaseFunction):
                     vfolder_id = UUID(mount)
                     if vfolder_id not in vfolder_id_to_name:
                         raise BackendClientError(f"VFolder (id: {vfolder_id}) not found")
-                except ValueError:
+                except ValueError as e:
                     if mount not in vfolder_name_to_id:
-                        raise BackendClientError(f"VFolder (name: {vfolder_id}) not found")
+                        raise BackendClientError(f"VFolder (name: {mount}) not found") from e
                     vfolder_id = vfolder_name_to_id[mount]
                 extra_mount_body[str(vfolder_id)] = {
                     "mount_destination": extra_mount_map.get(mount),
-                    "type": extra_mount_options.get(mount, {}).get("type"),
                 }
+                if mount_type := extra_mount_options.get(mount, {}).get("type"):
+                    extra_mount_body[str(vfolder_id)]["type"] = mount_type
         model_config = {
             "model": model_id_or_name,
             "model_mount_destination": model_mount_destination,
@@ -184,8 +197,9 @@ class Service(BaseFunction):
         }
         if model_version:
             model_config["model_version"] = model_version
+        model_config = {k: v for k, v in model_config.items() if v is not None}
         rqst = Request("POST", "/services")
-        rqst.set_json({
+        rqst_body = {
             "name": service_name,
             "replicas": initial_session_count,
             "image": image,
@@ -199,8 +213,11 @@ class Service(BaseFunction):
             "bootstrap_script": bootstrap_script,
             "owner_access_key": owner_access_key,
             "open_to_public": expose_to_public,
+            "runtime_variant": runtime_variant,
             "config": model_config,
-        })
+        }
+        rqst_body = {k: v for k, v in rqst_body.items() if v is not None}
+        rqst.set_json(rqst_body)
         async with rqst.fetch() as resp:
             body = await resp.json()
             return {
@@ -219,25 +236,25 @@ class Service(BaseFunction):
         image: str,
         model_id_or_name: str,
         *,
-        service_name: Optional[str] = None,
-        model_version: Optional[str] = None,
-        dependencies: Optional[Sequence[str]] = None,
-        model_mount_destination: Optional[str] = None,
-        envs: Optional[Mapping[str, str]] = None,
-        startup_command: Optional[str] = None,
-        resources: Optional[Mapping[str, str | int]] = None,
-        resource_opts: Optional[Mapping[str, str | int]] = None,
+        resources: Mapping[str, str | int],
+        resource_opts: Mapping[str, str | int],
+        domain_name: str,
+        group_name: str,
+        scaling_group: str,
+        service_name: str | None = None,
+        model_version: str | None = None,
+        _dependencies: Sequence[str] | None = None,
+        model_mount_destination: str | None = None,
+        envs: Mapping[str, str] | None = None,
+        startup_command: str | None = None,
         cluster_size: int = 1,
         cluster_mode: Literal["single-node", "multi-node"] = "single-node",
-        domain_name: Optional[str] = None,
-        group_name: Optional[str] = None,
-        bootstrap_script: Optional[str] = None,
-        tag: Optional[str] = None,
-        architecture: Optional[str] = DEFAULT_IMAGE_ARCH,
-        scaling_group: Optional[str] = None,
-        owner_access_key: Optional[str] = None,
-        expose_to_public=False,
-    ) -> Any:
+        bootstrap_script: str | None = None,
+        tag: str | None = None,
+        architecture: str | None = DEFAULT_IMAGE_ARCH,
+        owner_access_key: str | None = None,
+        expose_to_public: bool = False,
+    ) -> dict[str, Any]:
         """
         Tries to start an inference session and terminates immediately.
 
@@ -268,7 +285,7 @@ class Service(BaseFunction):
         """
         if service_name is None:
             faker = Faker()
-            service_name = f"bai-serve-{faker.user_name()}"
+            service_name = f"bai-serve-{faker.user_name()}"[:SESSION_NAME_MAX_LENGTH]
 
         rqst = Request("POST", "/services/_/try")
         rqst.set_json({
@@ -307,46 +324,60 @@ class Service(BaseFunction):
         self.id = id if isinstance(id, UUID) else UUID(id)
 
     @api_function
-    async def info(self):
+    async def info(self) -> dict[str, Any]:
         rqst = Request("GET", f"/services/{self.id}")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def delete(self):
+    async def delete(self) -> dict[str, Any]:
         rqst = Request("DELETE", f"/services/{self.id}")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def sync(self):
+    async def sync(self) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/sync")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def scale(self, to: int):
+    async def scale(self, to: int) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/scale")
         rqst.set_json({"to": to})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def generate_api_token(self, duration: str):
+    async def generate_api_token(self, duration: str) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/token")
         rqst.set_json({"duration": duration})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def update_traffic_ratio(self, target_route_id: UUID, new_ratio: float):
+    async def update_traffic_ratio(self, target_route_id: UUID, new_ratio: float) -> dict[str, Any]:
         rqst = Request("PUT", f"/services/{self.id}/routings/{target_route_id}")
         rqst.set_json({"traffic_ratio": new_ratio})
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result
 
     @api_function
-    async def downscale_single_route(self, target_route_id: UUID):
+    async def downscale_single_route(self, target_route_id: UUID) -> dict[str, Any]:
         rqst = Request("DELETE", f"/services/{self.id}/routings/{target_route_id}")
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result: dict[str, Any] = await resp.json()
+
+            return result

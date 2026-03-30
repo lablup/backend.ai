@@ -1,0 +1,10 @@
+[Unit]
+Description=Backend.AI Manager Data Backup Timer (Daily at 4:00 AM)
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+Unit=backendai-manager-data-backup.service
+
+[Install]
+WantedBy=timers.target

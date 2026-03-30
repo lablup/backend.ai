@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import enum
-from typing import Any, Callable, MutableMapping
+from collections.abc import Callable, MutableMapping
+from typing import Any
 
 from ai.backend.cli.types import Undefined, undefined
 

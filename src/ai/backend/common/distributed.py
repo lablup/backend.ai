@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Callable, Final
+from collections.abc import Callable
+from typing import Final
 
 from aiomonitor.task import preserve_termination_log
 
 from ai.backend.logging import BraceStyleAdapter
 
-if TYPE_CHECKING:
-    from .events import AbstractEvent, EventProducer
-    from .lock import AbstractDistributedLock
-
+from .events.dispatcher import EventProducer
+from .events.types import AbstractAnycastEvent
+from .lock import AbstractDistributedLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -28,7 +28,7 @@ class GlobalTimer:
         self,
         dist_lock: AbstractDistributedLock,
         event_producer: EventProducer,
-        event_factory: Callable[[], AbstractEvent],
+        event_factory: Callable[[], AbstractAnycastEvent],
         interval: float = 10.0,
         initial_delay: float = 0.0,
         *,
@@ -42,7 +42,7 @@ class GlobalTimer:
         self.initial_delay = initial_delay
         self.task_name = task_name
 
-    @preserve_termination_log
+    @preserve_termination_log  # type: ignore[misc]
     async def generate_tick(self) -> None:
         try:
             await asyncio.sleep(self.initial_delay)
@@ -51,16 +51,16 @@ class GlobalTimer:
             while True:
                 try:
                     async with self._dist_lock:
-                        if self._stopped:
-                            return
-                        await self._event_producer.produce_event(self._event_factory())
-                        if self._stopped:
-                            return
+                        if self._stopped:  # _stopped can change during await
+                            return  # type: ignore[unreachable]
+                        await self._event_producer.anycast_event(self._event_factory())
+                        if self._stopped:  # _stopped can change during await
+                            return  # type: ignore[unreachable]
                         await asyncio.sleep(self.interval)
-                except asyncio.TimeoutError:  # timeout raised from etcd lock
-                    if self._stopped:
-                        return
-                    log.warning("timeout raised while trying to acquire lock. retrying...")
+                except Exception:
+                    if self._stopped:  # _stopped can change during await
+                        return  # type: ignore[unreachable]
+                    log.debug("timeout raised while trying to acquire lock. retrying...")
         except asyncio.CancelledError:
             pass
 

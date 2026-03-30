@@ -1,0 +1,51 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+export REDIS_CONTAINER_NAME="{{ config.container_name_prefix }}-node{{ current_node.node_number }}"
+export container_id=$(docker ps | grep "$REDIS_CONTAINER_NAME" | awk '{ print $1 }')
+
+echo "=== Redis HA Cluster Status - Node {{ current_node.node_number }} ==="
+echo "Node Name      : {{ current_node.hostname }}"
+echo "Node IP        : {{ current_node.ip }}"
+echo "Node Port      : {{ current_node.port }}"
+echo "Container Name : $REDIS_CONTAINER_NAME"
+echo ""
+
+# Check Redis connection and role
+echo "=== Redis Service Status ==="
+if [ -z "$container_id" ]; then
+    echo "ERROR: Redis container not found for $REDIS_CONTAINER_NAME"
+    exit 1
+fi
+
+if [ ! -z "$container_id" ]; then
+    echo "Container ID   : $container_id"
+    echo "Container Status: $(docker ps --filter "id=$container_id" --format "{{ '{{.Status}}' }}")"
+
+    # Check Redis connectivity and role
+    redis_info=$(docker exec $container_id redis-cli -a "{{ config.password }}" INFO replication 2>/dev/null)
+    if [ $? -eq 0 ]; then
+        echo "Redis Status   : Connected"
+        role=$(echo "$redis_info" | grep "role:" | cut -d: -f2 | tr -d '\r')
+        echo "Redis Role     : $role"
+
+        if [ "$role" = "master" ]; then
+            echo "Connected Slaves:"
+            echo "$redis_info" | grep "^slave[0-9]:" | while read line; do
+                echo "  - $line"
+            done
+        else
+            master_host=$(echo "$redis_info" | grep "master_host:" | cut -d: -f2 | tr -d '\r')
+            master_port=$(echo "$redis_info" | grep "master_port:" | cut -d: -f2 | tr -d '\r')
+            master_link_status=$(echo "$redis_info" | grep "master_link_status:" | cut -d: -f2 | tr -d '\r')
+            echo "Master Host    : $master_host:$master_port"
+            echo "Master Link    : $master_link_status"
+        fi
+    else
+        echo "Redis Status   : Connection failed"
+    fi
+else
+    echo "Redis Container: Not running"
+fi
+echo ""

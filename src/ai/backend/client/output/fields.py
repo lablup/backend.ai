@@ -6,6 +6,7 @@ from .formatters import (
     CustomizedImageOutputFormatter,
     DependencyListFormatter,
     GroupListFormatter,
+    ImageObjectFormatter,
     InlineRoutingFormatter,
     KernelStatFormatter,
     SubFieldOutputFormatter,
@@ -96,6 +97,7 @@ image_fields = FieldSet([
     FieldSpec("digest"),
     FieldSpec("size_bytes", formatter=sizebytes_output_formatter),
     FieldSpec("aliases"),
+    FieldSpec("last_used_at"),
     FieldSpec("labels { key value }", "labels"),
     FieldSpec(
         "labels { key value }",
@@ -147,6 +149,15 @@ keypair_resource_policy_fields = FieldSet([
 ])
 
 
+user_resource_policy_fields = FieldSet([
+    FieldSpec("name"),
+    FieldSpec("max_vfolder_count"),
+    FieldSpec("max_quota_scope_size"),
+    FieldSpec("max_session_count_per_model_session"),
+    FieldSpec("max_customized_image_count"),
+])
+
+
 scaling_group_fields = FieldSet([
     FieldSpec("name"),
     FieldSpec("description"),
@@ -162,6 +173,71 @@ scaling_group_fields = FieldSet([
     FieldSpec("wsproxy_api_token"),
 ])
 
+session_node_fields = FieldSet([
+    FieldSpec(field_ref="row_id", field_name="id", alt_name="id"),
+    FieldSpec("tag"),
+    FieldSpec("name"),
+    FieldSpec("type"),
+    FieldSpec("priority"),
+    FieldSpec("cluster_template"),
+    FieldSpec("cluster_mode"),
+    FieldSpec("cluster_size"),
+    FieldSpec("domain_name"),
+    FieldSpec("project_id"),
+    FieldSpec("user_id"),
+    FieldSpec("access_key"),
+    FieldSpec("permissions"),
+    FieldSpec("status"),
+    FieldSpec("status_info"),
+    FieldSpec("status_data", formatter=nested_dict_formatter),
+    FieldSpec("status_history", formatter=nested_dict_formatter),
+    FieldSpec("created_at"),
+    FieldSpec("terminated_at"),
+    FieldSpec("starts_at"),
+    FieldSpec("scheduled_at"),
+    FieldSpec("startup_command"),
+    FieldSpec("result"),
+    FieldSpec("commit_status"),
+    FieldSpec("abusing_reports"),
+    FieldSpec("idle_checks", formatter=nested_dict_formatter),
+    FieldSpec("agent_ids"),
+    FieldSpec("resource_opts", formatter=nested_dict_formatter),
+    FieldSpec("scaling_group"),
+    FieldSpec("service_ports", formatter=nested_dict_formatter),
+    FieldSpec("vfolder_mounts"),
+    FieldSpec("occupied_slots", formatter=resource_slot_formatter),
+    FieldSpec("requested_slots", formatter=resource_slot_formatter),
+    FieldSpec("image_references"),
+    FieldSpec("num_queries"),
+    FieldSpec("inference_metrics", formatter=nested_dict_formatter),
+])
+
+kernel_node_fields = FieldSet([
+    FieldSpec(field_ref="row_id", field_name="id", alt_name="id"),
+    FieldSpec("cluster_idx"),
+    FieldSpec("local_rank"),
+    FieldSpec("cluster_role"),
+    FieldSpec("cluster_hostname"),
+    FieldSpec("session_id"),
+    FieldSpec("image_reference"),
+    FieldSpec("architecture"),
+    FieldSpec("status"),
+    FieldSpec("status_changed"),
+    FieldSpec("status_info"),
+    FieldSpec("status_data", formatter=nested_dict_formatter),
+    FieldSpec("created_at"),
+    FieldSpec("terminated_at"),
+    FieldSpec("starts_at"),
+    FieldSpec("scheduled_at"),
+    FieldSpec("agent_id"),
+    FieldSpec("agent_addr"),
+    FieldSpec("container_id"),
+    FieldSpec("resource_opts", formatter=nested_dict_formatter),
+    FieldSpec("occupied_slots", formatter=resource_slot_formatter),
+    FieldSpec("live_stat", formatter=nested_dict_formatter),
+    FieldSpec("abusing_report", formatter=nested_dict_formatter),
+    FieldSpec("preopen_ports"),
+])
 
 session_fields = FieldSet([
     FieldSpec("id", "Session ID", alt_name="session_id"),
@@ -300,12 +376,19 @@ permission_fields = FieldSet([
 service_fields = FieldSet([
     FieldSpec("endpoint_id"),
     FieldSpec("image"),
+    FieldSpec(
+        "image_object { name }",
+        "Image",
+        alt_name="image_object",
+        formatter=ImageObjectFormatter(),
+    ),
     FieldSpec("domain"),
     FieldSpec("project"),
     FieldSpec("resource_group"),
     FieldSpec("resource_slots", formatter=nested_dict_formatter),
     FieldSpec("url"),
     FieldSpec("model"),
+    FieldSpec("model_definition_path"),
     FieldSpec("model_mount_destination"),
     FieldSpec("created_user"),
     FieldSpec("session_owner"),
@@ -320,10 +403,16 @@ service_fields = FieldSet([
     FieldSpec("cluster_mode"),
     FieldSpec("cluster_size"),
     FieldSpec("open_to_public"),
+    FieldSpec("runtime_variant"),
+    FieldSpec("created_at"),
+    FieldSpec("destroyed_at"),
     FieldSpec(
         "routings { routing_id session status traffic_ratio }",
         formatter=InlineRoutingFormatter(),
     ),
+    FieldSpec("retries"),
+    FieldSpec("status"),
+    FieldSpec("lifecycle_stage"),
 ])
 
 
@@ -355,4 +444,20 @@ network_fields = FieldSet([
     FieldSpec("options"),
     FieldSpec("created_at"),
     FieldSpec("updated_at", "Last Updated"),
+])
+
+
+service_auto_scaling_rule_fields = FieldSet([
+    FieldSpec(field_ref="row_id", field_name="id", alt_name="id"),
+    FieldSpec("endpoint"),
+    FieldSpec("metric_source"),
+    FieldSpec("metric_name"),
+    FieldSpec("threshold"),
+    FieldSpec("comparator"),
+    FieldSpec("step_size"),
+    FieldSpec("cooldown_seconds"),
+    FieldSpec("min_replicas"),
+    FieldSpec("max_replicas"),
+    FieldSpec("created_at"),
+    FieldSpec("last_triggered_at", "Last Triggered"),
 ])

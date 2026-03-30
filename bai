@@ -1,0 +1,2 @@
+#! /bin/bash
+exec ./py -m ai.backend.cli v2 "$@"
