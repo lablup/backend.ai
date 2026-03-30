@@ -162,7 +162,12 @@ input AddRevisionInput
   """
   modelDefinition: ModelDefinitionInput = null
   extraMounts: [ExtraVFolderMountInput!]
+}
 
+"""Added in 26.4.0. Options for the add_model_revision mutation."""
+input AddRevisionOptions
+  @join__type(graph: STRAWBERRY)
+{
   """
   When true, automatically activate the newly added revision immediately after creation.
   """
@@ -9195,7 +9200,7 @@ type Mutation
   syncReplicas(input: SyncReplicaInput!): SyncReplicaPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.16.0. Add model revision."""
-  addModelRevision(input: AddRevisionInput!): AddRevisionPayload! @join__field(graph: STRAWBERRY)
+  addModelRevision(input: AddRevisionInput!, options: AddRevisionOptions = null): AddRevisionPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Create or update the deployment policy for a given deployment (upsert semantics). If the deployment already has a policy, it is replaced entirely with the new configuration
