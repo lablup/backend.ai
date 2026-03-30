@@ -6209,16 +6209,6 @@ input ProjectSessionV2Scope {
 }
 
 """
-Added in UNRELEASED. Scope for querying sessions within a specific project. Used to restrict session queries to a particular project context.
-"""
-input ProjectSessionV2Scope {
-  """
-  Project UUID to scope the session query. Only sessions belonging to this project will be returned.
-  """
-  projectId: UUID!
-}
-
-"""
 Added in 26.2.0. Project storage configuration. Contains allowed virtual folder hosts and their permissions.
 """
 type ProjectStorageInfo {
