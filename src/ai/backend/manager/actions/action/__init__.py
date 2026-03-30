@@ -25,6 +25,14 @@ from .rbac_model_deployment import (
     ModelDeploymentSearchRBACAction,
     ModelDeploymentUpdateRBACAction,
 )
+from .rbac_project import (
+    ProjectCreateRBACAction,
+    ProjectGetRBACAction,
+    ProjectHardDeleteRBACAction,
+    ProjectSearchRBACAction,
+    ProjectSoftDeleteRBACAction,
+    ProjectUpdateRBACAction,
+)
 from .rbac_session import (
     SessionCreateRBACAction,
     SessionGetRBACAction,
@@ -56,6 +64,12 @@ RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
     ModelDeploymentSearchRBACAction,
     ModelDeploymentUpdateRBACAction,
     ModelDeploymentHardDeleteRBACAction,
+    ProjectCreateRBACAction,
+    ProjectGetRBACAction,
+    ProjectSearchRBACAction,
+    ProjectUpdateRBACAction,
+    ProjectSoftDeleteRBACAction,
+    ProjectHardDeleteRBACAction,
     SessionCreateRBACAction,
     SessionGetRBACAction,
     SessionSearchRBACAction,
