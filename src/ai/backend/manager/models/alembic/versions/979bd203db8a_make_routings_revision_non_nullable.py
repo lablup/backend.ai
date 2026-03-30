@@ -16,8 +16,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Delete orphan routes whose endpoint has no revision
-    # (i.e., endpoints with image IS NULL that could not get a revision row).
+    # Delete all routes with NULL revision.
     op.execute(
         """
         DELETE FROM routings

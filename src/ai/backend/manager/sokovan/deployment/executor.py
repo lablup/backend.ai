@@ -592,6 +592,7 @@ class DeploymentExecutor:
                 target_count = deployment.replica_spec.target_replica_count
                 routes = route_map[deployment.id]
                 if len(routes) < target_count:
+                    # Build creators for scale out
                     new_replica_count = target_count - len(routes)
                     for _ in range(new_replica_count):
                         creator_spec = RouteCreatorSpec(
