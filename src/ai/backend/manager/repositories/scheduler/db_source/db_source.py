@@ -3408,25 +3408,22 @@ class ScheduleDBSource:
         :param scaling_group: Name of the scaling group to query
         :return: TotalResourceData with used, free, and capacity slots
         """
-        ar = AgentResourceRow.__table__
-        ag = AgentRow.__table__
-
-        async with self._begin_readonly_read_committed() as conn:
+        async with self._begin_readonly_session_read_committed() as db_sess:
             stmt = (
                 sa.select(
-                    ar.c.slot_name,
-                    sa.func.sum(ar.c.capacity).label("total_capacity"),
-                    sa.func.sum(ar.c.used).label("total_used"),
+                    AgentResourceRow.slot_name,
+                    sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
+                    sa.func.sum(AgentResourceRow.used).label("total_used"),
                 )
-                .select_from(ar.join(ag, ar.c.agent_id == ag.c.id))
+                .join(AgentRow, AgentResourceRow.agent_id == AgentRow.id)
                 .where(
-                    ag.c.status == AgentStatus.ALIVE,
-                    ag.c.schedulable == sa.true(),
-                    ag.c.scaling_group == scaling_group,
+                    AgentRow.status == AgentStatus.ALIVE,
+                    AgentRow.schedulable == sa.true(),
+                    AgentRow.scaling_group == scaling_group,
                 )
-                .group_by(ar.c.slot_name)
+                .group_by(AgentResourceRow.slot_name)
             )
-            result = await conn.execute(stmt)
+            result = await db_sess.execute(stmt)
 
             capacity: dict[str, Decimal] = {}
             used: dict[str, Decimal] = {}
