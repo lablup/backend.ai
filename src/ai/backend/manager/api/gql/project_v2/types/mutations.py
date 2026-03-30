@@ -129,7 +129,8 @@ class PurgeProjectPayloadGQL(PydanticOutputMixin[PurgeProjectPayloadDTO]):
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description="Input for unassigning users from a project.",
-    )
+    ),
+    name="UnassignUsersFromProjectInput",
 )
 class UnassignUsersFromProjectInputGQL(PydanticInputMixin[UnassignUsersFromProjectInputDTO]):
     """Input for unassigning users from a project."""
@@ -143,6 +144,7 @@ class UnassignUsersFromProjectInputGQL(PydanticInputMixin[UnassignUsersFromProje
         description="Payload for user unassignment from project.",
     ),
     model=UnassignUsersFromProjectPayloadDTO,
+    name="UnassignUsersFromProjectPayload",
 )
 class UnassignUsersFromProjectPayloadGQL(PydanticOutputMixin[UnassignUsersFromProjectPayloadDTO]):
     """Payload for user unassignment from project."""
