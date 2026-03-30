@@ -261,8 +261,8 @@ class DeploymentController:
         if spec.max_surge == 0:
             return
 
-        revision = deployment_info.resolve_revision_spec(revision_id)
-        per_route_slots = ResourceSlot(dict(revision.resource_spec.resource_slots))
+        revision_data = await self._deployment_repository.get_revision(revision_id)
+        per_route_slots = revision_data.resource_config.resource_slot
         surge_slots = ResourceSlot({k: v * spec.max_surge for k, v in per_route_slots.data.items()})
 
         scaling_group = deployment_info.metadata.resource_group

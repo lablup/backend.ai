@@ -17,20 +17,20 @@ import pytest
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.resource.types import TotalResourceData
-from ai.backend.common.types import ClusterMode, ResourceSlot
+from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
+    ClusterConfigData,
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentPolicyData,
     DeploymentState,
-    ExecutionSpec,
-    ModelRevisionSpec,
-    MountMetadata,
+    ModelMountConfigData,
+    ModelRevisionData,
+    ModelRuntimeConfigData,
     ReplicaSpec,
-    ResourceSpec,
+    ResourceConfigData,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     RollingUpdateSpec,
@@ -49,11 +49,9 @@ USER_ID = uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")
 
 def _make_deployment_info(
     *,
-    resource_slots: dict[str, Decimal] | None = None,
     resource_group: str = "default",
 ) -> DeploymentInfo:
-    """Create a DeploymentInfo with a single revision containing the given resource slots."""
-    slots = resource_slots or {"cpu": Decimal("2"), "mem": Decimal("4096")}
+    """Create a DeploymentInfo for testing (revisions are fetched from repository)."""
     return DeploymentInfo(
         id=ENDPOINT_ID,
         metadata=DeploymentMetadata(
@@ -72,20 +70,33 @@ def _make_deployment_info(
         ),
         replica_spec=ReplicaSpec(replica_count=2),
         network=DeploymentNetworkSpec(open_to_public=False),
-        model_revisions=[
-            ModelRevisionSpec(
-                revision_id=REVISION_ID,
-                image_identifier=ImageIdentifier(canonical="test:latest", architecture="x86_64"),
-                resource_spec=ResourceSpec(
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                    resource_slots=slots,
-                ),
-                mounts=MagicMock(spec=MountMetadata),
-                execution=MagicMock(spec=ExecutionSpec),
-            ),
-        ],
+        model_revisions=[],
         current_revision_id=REVISION_ID,
+    )
+
+
+def _make_revision_data(
+    *,
+    resource_slots: dict[str, Decimal] | None = None,
+) -> ModelRevisionData:
+    """Create a ModelRevisionData with the given resource slots."""
+    slots = resource_slots or {"cpu": Decimal("2"), "mem": Decimal("4096")}
+    return ModelRevisionData(
+        id=REVISION_ID,
+        name="v1",
+        cluster_config=ClusterConfigData(mode=ClusterMode.SINGLE_NODE, size=1),
+        resource_config=ResourceConfigData(
+            resource_group_name="default",
+            resource_slot=ResourceSlot(slots),
+        ),
+        model_runtime_config=ModelRuntimeConfigData(runtime_variant=RuntimeVariant.CUSTOM),
+        model_mount_config=ModelMountConfigData(
+            vfolder_id=None,
+            mount_destination="/models",
+            definition_path="model-definition.yaml",
+        ),
+        created_at=datetime.now(UTC),
+        image_id=uuid.uuid4(),
     )
 
 
@@ -184,9 +195,7 @@ class TestValidateRollingUpdateResources:
         mock_scheduling_controller: MagicMock,
     ) -> None:
         """Validation passes when free resources >= surge requirements."""
-        deployment_info = _make_deployment_info(
-            resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-        )
+        deployment_info = _make_deployment_info()
         mock_deployment_repository.get_deployment_policy = AsyncMock(
             return_value=DeploymentPolicyData(
                 id=uuid.uuid4(),
@@ -195,6 +204,11 @@ class TestValidateRollingUpdateResources:
                 strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=0),
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
+            )
+        )
+        mock_deployment_repository.get_revision = AsyncMock(
+            return_value=_make_revision_data(
+                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
             )
         )
         # Surge requires 2 * (2 cpu, 4096 mem) = (4 cpu, 8192 mem)
@@ -216,9 +230,7 @@ class TestValidateRollingUpdateResources:
         mock_scheduling_controller: MagicMock,
     ) -> None:
         """Validation raises InsufficientSurgeResources when free resources < surge."""
-        deployment_info = _make_deployment_info(
-            resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-        )
+        deployment_info = _make_deployment_info()
         mock_deployment_repository.get_deployment_policy = AsyncMock(
             return_value=DeploymentPolicyData(
                 id=uuid.uuid4(),
@@ -227,6 +239,11 @@ class TestValidateRollingUpdateResources:
                 strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=0),
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
+            )
+        )
+        mock_deployment_repository.get_revision = AsyncMock(
+            return_value=_make_revision_data(
+                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
             )
         )
         # Surge requires 2 * (2 cpu, 4096 mem) = (4 cpu, 8192 mem)
@@ -254,9 +271,7 @@ class TestValidateRollingUpdateResources:
         mock_scheduling_controller: MagicMock,
     ) -> None:
         """Validation fails even if only one resource type is insufficient."""
-        deployment_info = _make_deployment_info(
-            resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-        )
+        deployment_info = _make_deployment_info()
         mock_deployment_repository.get_deployment_policy = AsyncMock(
             return_value=DeploymentPolicyData(
                 id=uuid.uuid4(),
@@ -265,6 +280,11 @@ class TestValidateRollingUpdateResources:
                 strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
+            )
+        )
+        mock_deployment_repository.get_revision = AsyncMock(
+            return_value=_make_revision_data(
+                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
             )
         )
         # Surge requires 1 * (2 cpu, 4096 mem) = (2 cpu, 4096 mem)
@@ -293,7 +313,6 @@ class TestValidateRollingUpdateResources:
         """Validation queries the correct scaling group from deployment metadata."""
         deployment_info = _make_deployment_info(
             resource_group="my-gpu-group",
-            resource_slots={"cpu": Decimal("1")},
         )
         mock_deployment_repository.get_deployment_policy = AsyncMock(
             return_value=DeploymentPolicyData(
@@ -303,6 +322,11 @@ class TestValidateRollingUpdateResources:
                 strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
+            )
+        )
+        mock_deployment_repository.get_revision = AsyncMock(
+            return_value=_make_revision_data(
+                resource_slots={"cpu": Decimal("1")},
             )
         )
         mock_scheduling_controller.get_available_resources_for_scaling_group = AsyncMock(
