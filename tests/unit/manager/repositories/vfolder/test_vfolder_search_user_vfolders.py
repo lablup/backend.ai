@@ -1,6 +1,6 @@
 """
 Tests for VfolderRepository.search_user_vfolders() functionality.
-Verifies that user-scoped vfolder search returns only vfolders owned by the target user.
+Verifies that user-scoped vfolder search filters by VFolderRow.user field.
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ class TestVfolderSearchUserVfolders:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
-        """Create two users with vfolders: user_a owns 2 vfolders, user_b owns 1."""
+        """Create two users with vfolders: user_a has 2 vfolders, user_b has 1 (all GROUP-owned)."""
         domain_name = "test-domain"
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
@@ -234,7 +234,7 @@ class TestVfolderSearchUserVfolders:
         vfolder_repository: VfolderRepository,
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        """search_user_vfolders returns only vfolders owned by the specified user."""
+        """search_user_vfolders returns only vfolders where VFolderRow.user matches the target user."""
         scope = UserVFolderSearchScope(user_id=test_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
@@ -254,7 +254,7 @@ class TestVfolderSearchUserVfolders:
         vfolder_repository: VfolderRepository,
         test_data: dict[str, uuid.UUID],
     ) -> None:
-        """search_user_vfolders for user_b returns only its vfolder, not user_a's."""
+        """search_user_vfolders for user_b returns only vfolders with user_b as VFolderRow.user."""
         scope = UserVFolderSearchScope(user_id=test_data["user_b_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
