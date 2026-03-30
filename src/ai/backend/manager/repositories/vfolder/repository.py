@@ -1933,34 +1933,3 @@ class VfolderRepository:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    @vfolder_repository_resilience.apply()
-    async def search_vfolders(
-        self,
-        querier: BatchQuerier,
-    ) -> VFolderSearchResult:
-        """Search all vfolders with pagination and filters (admin, no scope).
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-
-        Returns:
-            VFolderSearchResult with items, total count, and pagination info
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(VFolderRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.VFolderRow.to_data() for row in result.rows]
-
-            return VFolderSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
