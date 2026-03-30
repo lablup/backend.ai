@@ -10466,11 +10466,72 @@ type VFSStorageEdge {
 }
 
 """
+Added in UNRELEASED. Virtual folder entity with structured field groups. Provides comprehensive vfolder information organized into logical categories: metadata (descriptive), permission (access control), and usage (storage statistics). Owner and creator are resolved as Node references.
+"""
+type VFolder implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """
+  Current operation status. READY, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
+  """
+  status: VFolderOperationStatus!
+
+  """Storage host where the virtual folder is physically located."""
+  host: String!
+
+  """
+  Descriptive metadata including name, usage mode, quota scope, timestamps, and clone eligibility.
+  """
+  metadata: VFolderMetadataInfo!
+
+  """Access control including permission level and ownership type."""
+  accessControl: VFolderAccessControlInfo!
+
+  """Path for unmanaged virtual folders."""
+  unmanagedPath: String
+
+  """The user who owns this virtual folder. Null for project-owned folders."""
+  ownerUser: UserV2
+
+  """
+  The project that owns this virtual folder. Null for user-owned folders.
+  """
+  ownerProject: ProjectV2
+
+  """The user who originally created this virtual folder."""
+  creator: UserV2
+}
+
+"""
 Added in UNRELEASED. Access control information for a virtual folder. Includes the mount permission level (read-only, read-write, read-write-delete) and ownership type (user or project).
 """
 type VFolderAccessControlInfo {
   permission: VFolderMountPermission!
   ownershipType: VFolderOwnershipType!
+}
+
+"""
+Added in UNRELEASED. Paginated connection for virtual folder records. Provides relay-style cursor-based pagination for efficient traversal of vfolder data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
+"""
+type VFolderConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [VFolderEdge!]!
+
+  """Total number of virtual folder records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type VFolderEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: VFolder!
 }
 
 """
@@ -10551,67 +10612,6 @@ enum VFolderUsageMode {
   GENERAL
   MODEL
   DATA
-}
-
-"""
-Added in UNRELEASED. Virtual folder entity with structured field groups. Provides comprehensive vfolder information organized into logical categories: metadata (descriptive), permission (access control), and usage (storage statistics). Owner and creator are resolved as Node references.
-"""
-type VFolder implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """
-  Current operation status. READY, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
-  """
-  status: VFolderOperationStatus!
-
-  """Storage host where the virtual folder is physically located."""
-  host: String!
-
-  """
-  Descriptive metadata including name, usage mode, quota scope, timestamps, and clone eligibility.
-  """
-  metadata: VFolderMetadataInfo!
-
-  """Access control including permission level and ownership type."""
-  accessControl: VFolderAccessControlInfo!
-
-  """Path for unmanaged virtual folders."""
-  unmanagedPath: String
-
-  """The user who owns this virtual folder. Null for project-owned folders."""
-  ownerUser: UserV2
-
-  """
-  The project that owns this virtual folder. Null for user-owned folders.
-  """
-  ownerProject: ProjectV2
-
-  """The user who originally created this virtual folder."""
-  creator: UserV2
-}
-
-"""
-Added in UNRELEASED. Paginated connection for virtual folder records. Provides relay-style cursor-based pagination for efficient traversal of vfolder data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
-"""
-type VFolderConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [VFolderEdge!]!
-
-  """Total number of virtual folder records matching the query criteria."""
-  count: Int!
-}
-
-"""An edge in a connection."""
-type VFolderEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: VFolder!
 }
 
 """Added in 24.09.0. Input for validate notification channel mutation"""
