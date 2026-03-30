@@ -537,6 +537,182 @@ class ExtraVFolderMountData:
 
 
 @dataclass
+class ModelHealthCheckData:
+    path: str
+    interval: float
+    max_retries: int
+    max_wait_time: float
+    expected_status_code: int
+    initial_delay: float
+
+
+@dataclass
+class PreStartActionData:
+    action: str
+    args: dict[str, Any]
+
+
+@dataclass
+class ModelServiceConfigData:
+    start_command: str | list[str]
+    port: int
+    pre_start_actions: list[PreStartActionData]
+    shell: str
+    health_check: ModelHealthCheckData | None
+
+
+@dataclass
+class ModelMetadataData:
+    author: str | None
+    title: str | None
+    version: int | str | None
+    created: str | None
+    last_modified: str | None
+    description: str | None
+    task: str | None
+    category: str | None
+    architecture: str | None
+    framework: list[str] | None
+    label: list[str] | None
+    license: str | None
+    min_resource: dict[str, Any] | None
+
+
+@dataclass
+class ModelConfigData:
+    name: str
+    model_path: str
+    service: ModelServiceConfigData | None
+    metadata: ModelMetadataData | None
+
+
+@dataclass
+class ModelDefinitionData:
+    models: list[ModelConfigData]
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> ModelDefinitionData:
+        models: list[ModelConfigData] = []
+        for model_raw in raw.get("models", []):
+            health_check = None
+            service = None
+            metadata = None
+
+            service_raw = model_raw.get("service")
+            if service_raw is not None:
+                health_check_raw = service_raw.get("health_check")
+                if health_check_raw is not None:
+                    health_check = ModelHealthCheckData(
+                        path=health_check_raw["path"],
+                        interval=health_check_raw.get("interval", 10.0),
+                        max_retries=health_check_raw.get("max_retries", 10),
+                        max_wait_time=health_check_raw.get("max_wait_time", 15.0),
+                        expected_status_code=health_check_raw.get("expected_status_code", 200),
+                        initial_delay=health_check_raw.get("initial_delay", 60.0),
+                    )
+                service = ModelServiceConfigData(
+                    start_command=service_raw["start_command"],
+                    port=service_raw["port"],
+                    pre_start_actions=[
+                        PreStartActionData(
+                            action=a["action"],
+                            args=a.get("args", {}),
+                        )
+                        for a in service_raw.get("pre_start_actions", [])
+                    ],
+                    shell=service_raw.get("shell", "/bin/bash"),
+                    health_check=health_check,
+                )
+
+            metadata_raw = model_raw.get("metadata")
+            if metadata_raw is not None:
+                metadata = ModelMetadataData(
+                    author=metadata_raw.get("author"),
+                    title=metadata_raw.get("title"),
+                    version=metadata_raw.get("version"),
+                    created=metadata_raw.get("created"),
+                    last_modified=metadata_raw.get("last_modified"),
+                    description=metadata_raw.get("description"),
+                    task=metadata_raw.get("task"),
+                    category=metadata_raw.get("category"),
+                    architecture=metadata_raw.get("architecture"),
+                    framework=metadata_raw.get("framework"),
+                    label=metadata_raw.get("label"),
+                    license=metadata_raw.get("license"),
+                    min_resource=metadata_raw.get("min_resource"),
+                )
+
+            models.append(
+                ModelConfigData(
+                    name=model_raw["name"],
+                    model_path=model_raw["model_path"],
+                    service=service,
+                    metadata=metadata,
+                )
+            )
+        return cls(models=models)
+
+    @classmethod
+    def from_config(cls, config: ModelDefinition) -> ModelDefinitionData:
+        return cls(
+            models=[
+                ModelConfigData(
+                    name=model_config.name,
+                    model_path=model_config.model_path,
+                    service=(
+                        ModelServiceConfigData(
+                            start_command=model_config.service.start_command,
+                            port=model_config.service.port,
+                            pre_start_actions=[
+                                PreStartActionData(
+                                    action=action.action,
+                                    args=action.args,
+                                )
+                                for action in model_config.service.pre_start_actions
+                            ],
+                            shell=model_config.service.shell,
+                            health_check=(
+                                ModelHealthCheckData(
+                                    path=model_config.service.health_check.path,
+                                    interval=model_config.service.health_check.interval,
+                                    max_retries=model_config.service.health_check.max_retries,
+                                    max_wait_time=model_config.service.health_check.max_wait_time,
+                                    expected_status_code=model_config.service.health_check.expected_status_code,
+                                    initial_delay=model_config.service.health_check.initial_delay,
+                                )
+                                if model_config.service.health_check is not None
+                                else None
+                            ),
+                        )
+                        if model_config.service is not None
+                        else None
+                    ),
+                    metadata=(
+                        ModelMetadataData(
+                            author=model_config.metadata.author,
+                            title=model_config.metadata.title,
+                            version=model_config.metadata.version,
+                            created=model_config.metadata.created,
+                            last_modified=model_config.metadata.last_modified,
+                            description=model_config.metadata.description,
+                            task=model_config.metadata.task,
+                            category=model_config.metadata.category,
+                            architecture=model_config.metadata.architecture,
+                            framework=model_config.metadata.framework,
+                            label=model_config.metadata.label,
+                            license=model_config.metadata.license,
+                            min_resource=model_config.metadata.min_resource,
+                        )
+                        if model_config.metadata is not None
+                        else None
+                    ),
+                )
+                for model_config in config.models
+            ],
+        )
+
+
+@dataclass
 class ModelRevisionData:
     id: UUID
     name: str
@@ -546,7 +722,7 @@ class ModelRevisionData:
     model_mount_config: ModelMountConfigData
     created_at: datetime
     image_id: UUID
-    model_definition: dict[str, Any] | None = None
+    model_definition: ModelDefinitionData | None = None
     extra_vfolder_mounts: list[ExtraVFolderMountData] = field(default_factory=list)
 
 

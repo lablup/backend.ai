@@ -22,6 +22,7 @@ from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     ExecutionSpec,
     ExtraVFolderMountData,
+    ModelDefinitionData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRevisionSpec,
@@ -250,7 +251,11 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             ),
             created_at=self.created_at,
             image_id=self.image,
-            model_definition=self.model_definition,
+            model_definition=(
+                ModelDefinitionData.from_dict(self.model_definition)
+                if self.model_definition is not None
+                else None
+            ),
             extra_vfolder_mounts=[
                 ExtraVFolderMountData(
                     vfolder_id=mount.vfid.folder_id,

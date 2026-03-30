@@ -23,6 +23,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     ExtraVFolderMountData,
+    ModelDefinitionData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
@@ -223,7 +224,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             or info.id,  # Placeholder: actual image_id not in ImageIdentifier
             created_at=info.metadata.created_at or datetime.now(UTC),
             model_definition=(
-                rev.model_definition.model_dump(mode="json")
+                ModelDefinitionData.from_config(rev.model_definition)
                 if rev.model_definition is not None
                 else None
             ),
