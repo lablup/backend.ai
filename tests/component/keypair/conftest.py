@@ -16,7 +16,6 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.adapters.user import UserAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -45,7 +44,7 @@ def user_processors(
     return UserProcessors(
         user_service=user_service,
         action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        validators=MagicMock(),  # Needs unrestricted mock for nested rbac.scope access
     )
 
 
