@@ -85,7 +85,7 @@ def load_v2_config() -> V2ConnectionConfig:
     if endpoint_type == "session" and COOKIE_FILE.exists():
         import aiohttp
 
-        cookie_jar = aiohttp.CookieJar()
+        cookie_jar = aiohttp.CookieJar(unsafe=True)
         cookie_jar.load(COOKIE_FILE)
 
     return V2ConnectionConfig(

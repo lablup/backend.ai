@@ -11,7 +11,7 @@ from ai.backend.manager.data.scaling_group.types import ResourceInfo
 from .base import ScalingGroupAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetResourceInfoAction(ScalingGroupAction):
     """Action to get resource information for a scaling group."""
 
@@ -32,7 +32,7 @@ class GetResourceInfoAction(ScalingGroupAction):
         return self.scaling_group
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetResourceInfoActionResult(BaseActionResult):
     """Result of getting resource information."""
 

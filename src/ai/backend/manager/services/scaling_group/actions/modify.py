@@ -12,7 +12,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from .base import ScalingGroupAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class ModifyScalingGroupAction(ScalingGroupAction):
     """Action to modify a scaling group."""
 
@@ -28,7 +28,7 @@ class ModifyScalingGroupAction(ScalingGroupAction):
         return str(self.updater.pk_value)
 
 
-@dataclass
+@dataclass(frozen=True)
 class ModifyScalingGroupActionResult(BaseActionResult):
     """Result of modifying a scaling group."""
 

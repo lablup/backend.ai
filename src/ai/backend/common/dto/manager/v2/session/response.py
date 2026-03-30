@@ -24,6 +24,7 @@ __all__ = (
     "SearchSessionsPayload",
     "SessionLifecycleInfo",
     "SessionLifecycleInfoGQLDTO",
+    "SessionLogsPayload",
     "SessionMetadataInfo",
     "SessionMetadataInfoGQLDTO",
     "SessionNetworkInfo",
@@ -33,6 +34,9 @@ __all__ = (
     "SessionRuntimeInfo",
     "SessionRuntimeInfoGQLDTO",
     "StartServicePayload",
+    "StartSessionServicePayload",
+    "TerminateSessionsPayload",
+    "UpdateSessionPayload",
 )
 
 
@@ -76,10 +80,6 @@ class SessionResourceInfo(BaseResponseModel):
     scaling_group_name: str | None = Field(
         default=None,
         description="The resource group (scaling group) this session is assigned to.",
-    )
-    target_sgroup_names: list[str] | None = Field(
-        default=None,
-        description="Candidate resource group names considered during scheduling.",
     )
     agent_ids: list[str] | None = Field(
         default=None, description="IDs of agents running this session's kernels."
@@ -171,6 +171,12 @@ class SessionNode(BaseResponseModel):
 # ---------------------------------------------------------------------------
 
 
+class EnqueueSessionPayload(BaseResponseModel):
+    """Payload for session enqueue. Returns the full session node."""
+
+    session: SessionNode = Field(description="Created session details.")
+
+
 class RestartSessionPayload(BaseResponseModel):
     """Payload for session restart action (204 No Content in practice)."""
 
@@ -221,6 +227,42 @@ class AdminSearchSessionsPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
+class TerminateSessionsPayload(BaseResponseModel):
+    """Payload for session termination with per-session outcome."""
+
+    cancelled: list[UUID] = Field(
+        default_factory=list, description="Sessions cancelled from PENDING."
+    )
+    terminating: list[UUID] = Field(
+        default_factory=list, description="Sessions marked TERMINATING."
+    )
+    force_terminated: list[UUID] = Field(
+        default_factory=list, description="Sessions force-terminated."
+    )
+    skipped: list[UUID] = Field(
+        default_factory=list, description="Sessions already terminated or not found."
+    )
+
+
+class StartSessionServicePayload(BaseResponseModel):
+    """Payload for starting a service in a session."""
+
+    token: str = Field(description="WSProxy authentication token.")
+    wsproxy_addr: str = Field(description="WebSocket proxy address for service access.")
+
+
+class SessionLogsPayload(BaseResponseModel):
+    """Payload containing container logs."""
+
+    logs: str = Field(description="Container stdout/stderr log output.")
+
+
+class UpdateSessionPayload(BaseResponseModel):
+    """Payload for session update."""
+
+    session: SessionNode = Field(description="Updated session details.")
+
+
 # ---------------------------------------------------------------------------
 # GQL-specific DTOs (for @strawberry.experimental.pydantic.type conversion)
 # These DTOs use Any for nested GQL type fields and str for enum fields
@@ -269,10 +311,6 @@ class SessionResourceInfoGQLDTO(BaseResponseModel):
     resource_group_name: str | None = Field(
         default=None,
         description="The resource group (scaling group) this session is assigned to.",
-    )
-    target_resource_group_names: list[str] | None = Field(
-        default=None,
-        description="Candidate resource group names considered during scheduling.",
     )
 
 

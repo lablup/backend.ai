@@ -12,7 +12,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from .base import ScalingGroupAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class CreateScalingGroupAction(ScalingGroupAction):
     """Action to create a scaling group."""
 
@@ -28,7 +28,7 @@ class CreateScalingGroupAction(ScalingGroupAction):
         return None
 
 
-@dataclass
+@dataclass(frozen=True)
 class CreateScalingGroupActionResult(BaseActionResult):
     """Result of creating a scaling group."""
 

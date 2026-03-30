@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.config.response import (
     CreateDotfileResponse,
     DeleteDotfileResponse,
     DotfileItem,
+    DotfileListItem,
     GetBootstrapScriptResponse,
     GetDotfileResponse,
     ListDotfilesResponse,
@@ -330,17 +331,17 @@ class TestResponseModels:
 
     def test_list_dotfiles_response(self) -> None:
         items = [
-            DotfileItem(path=".bashrc", perm="644", data="content1"),
-            DotfileItem(path=".vimrc", perm="755", data="content2"),
+            DotfileListItem(path=".bashrc", permission="644", data="content1"),
+            DotfileListItem(path=".vimrc", permission="755", data="content2"),
         ]
-        resp = ListDotfilesResponse(items=items)
-        assert len(resp.items) == 2
-        assert resp.items[0].path == ".bashrc"
-        assert resp.items[1].path == ".vimrc"
+        resp = ListDotfilesResponse(root=items)
+        assert len(resp.root) == 2
+        assert resp.root[0].path == ".bashrc"
+        assert resp.root[1].path == ".vimrc"
 
     def test_get_bootstrap_script_response(self) -> None:
-        resp = GetBootstrapScriptResponse(script="#!/bin/bash\necho hello")
-        assert resp.script == "#!/bin/bash\necho hello"
+        resp = GetBootstrapScriptResponse(root="#!/bin/bash\necho hello")
+        assert resp.root == "#!/bin/bash\necho hello"
 
     def test_update_bootstrap_script_response(self) -> None:
         resp = UpdateBootstrapScriptResponse()
@@ -353,12 +354,12 @@ class TestResponseModels:
         assert restored.success == resp.success
 
     def test_list_dotfiles_response_serialization_roundtrip(self) -> None:
-        items = [DotfileItem(path=".bashrc", perm="644", data="content")]
-        resp = ListDotfilesResponse(items=items)
+        items = [DotfileListItem(path=".bashrc", permission="644", data="content")]
+        resp = ListDotfilesResponse(root=items)
         json_data = resp.model_dump_json()
         restored = ListDotfilesResponse.model_validate_json(json_data)
-        assert len(restored.items) == 1
-        assert restored.items[0].path == ".bashrc"
+        assert len(restored.root) == 1
+        assert restored.root[0].path == ".bashrc"
 
 
 # ---- Field descriptions ----

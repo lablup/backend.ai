@@ -293,6 +293,12 @@ class SessionEventHandler:
             "event": event.event_name().removeprefix("session_"),
             "session_id": str(event.session_id),
             "when": datetime.now(UTC).isoformat(),
+            # Enriched fields — allow the callback receiver to reconstruct
+            # intermediate status transitions with accurate timestamps and
+            # to read the session result/error details without an extra API call.
+            "status_history": dict(session.status_history or {}),
+            "result": session.result.name if session.result is not None else None,
+            "status_data": dict(session.status_data) if session.status_data is not None else None,
         }
 
         self._registry.webhook_ptask_group.create_task(

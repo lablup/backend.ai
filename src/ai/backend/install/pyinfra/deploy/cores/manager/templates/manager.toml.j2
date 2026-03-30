@@ -1,0 +1,241 @@
+[etcd]
+namespace = "local"
+addr = { host = "{{ etcd_ip }}", port = {{ etcd_port }} }
+user = ""
+password = ""
+
+
+[license]
+addr = { host = "{{ licensed_ip }}", port = {{ licensed_port }} }
+
+
+[db]
+type = "postgresql"
+addr = { host = "{{ db_ip }}", port = {{ db_port }} }
+name = "{{ db_name }}"
+user = "{{ db_user }}"
+password = "{{ db_password }}"
+
+# The connection pool's initial size
+# (See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine.params.pool_size)
+pool-size = {{ db_pool_size }}
+
+# The connections for lock lifetime
+# Distribution locks wait for `lock-conn-timeout` seconds and lock context should finish within this time.
+# Default is 0, which means infinite
+# lock-conn-timeout = 30
+
+# This setting causes the pool to recycle connections after the given number of seconds has passed.
+# Default is -1, which means infinite.
+# https://docs.sqlalchemy.org/en/14/core/engines.html#sqlalchemy.create_engine.params.pool_recycle
+# https://docs.sqlalchemy.org/en/14/core/pooling.html#setting-pool-recycle
+pool-recycle = 50
+
+# This setting eliminates DB error due to stale pooled connections by ping at the start of each connection pool checkout.
+# It adds a small overhead to the connection checkout process.
+# https://docs.sqlalchemy.org/en/14/core/pooling.html#disconnect-handling-pessimistic
+# Default is false.
+pool-pre-ping = true
+
+# The maximum allowed overflow of the connection pool
+# (See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine.params.max_overflow)
+# max-overflow = 64
+
+# NOTE: The warning threshold for the number of concurrent transactions in a single manager process
+#       is determined as dividing the addition of the pool-size and max-overflow settings by two
+#       because the threshold applies to both generic and read-only transactions.
+
+# NOTE: Redis settings are configured in etcd as it is shared by both the manager and agents.
+
+{%- if otel_collector_endpoint %}
+
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "{{ otel_collector_endpoint }}"
+{%- endif %}
+
+
+[manager]
+num-proc = {{ manager_num_proc }}
+
+# An arbitrary string used to salt when generating secret tokens (e.g., JWT)
+# Currently only some plugins use this configuration in the manager.
+# secret = "XXXXXXXXXXXXXX"
+
+# user = "nobody"
+# group = "nobody"
+
+service-addr = { host = "0.0.0.0", port = {{ manager_service_port }} }
+# internal-addr: Bind address to accept internal API requests from other managers in HA cluster
+internal-addr = { host = "0.0.0.0", port = {{ manager_internal_port }} }
+# announce-internal-addr: Address broadcasted for service discovery
+announce-internal-addr = { host = "{{ manager_internal_host }}", port = {{ manager_internal_port }} }
+ssl-enabled = false
+# ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"
+# ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"
+
+heartbeat-timeout = 40.0
+# id = "i-manager-01"
+
+# Set the manager's RPC client certificate (public key and secret key).
+# This is a mandatory option even when no agents require authentication.
+# It must be generated for any new setup for security using
+# the backend.ai mgr generate-rpc-keypair command.
+rpc-auth-manager-keypair = "{{ home_dir }}/{{ service_name }}/fixtures/manager.key_secret"
+
+pid-file = "./{{ service_name }}.pid"
+
+# The base directory to put domain sockets for IPC.
+# Normally you don't have to change it.
+# NOTE: If Docker is installed via Snap (https://snapcraft.io/docker),
+#       you must change this to a directory under your *home* directory.
+ipc-base-path = "./tmp/backend.ai/ipc"
+
+# allowed-plugins = []
+disabled-plugins = []
+
+# Hide agent and container IDs from GraphQL results unless the API requester is super-admin.
+hide-agents = true
+
+# The order of agent selection.
+agent-selection-resource-priority = ["cuda", "rocm", "tpu", "atom", "atom-plus", "atom-max", "cpu", "mem"]
+
+# event-loop = "asyncio"
+
+# One of: "filelock", "pg_advisory", "redlock", "etcd"
+# Choose the implementation of distributed lock.
+# "filelock" is the simplest one when the manager is deployed on only one node.
+# "pg_advisory" uses PostgreSQL's session-level advisory lock.
+# "redlock" uses Redis-based distributed lock (Redlock)
+# "etcd" uses etcd-based distributed lock via etcetra.
+distributed-lock = "redlock"
+
+# The maximum size of websocket messages in bytes.
+# max-wsmsg-size = 16777216  # 16 MiB
+
+aiomonitor-termui-port = 28100
+aiomonitor-webui-port = 29100
+
+
+[deployment]
+enable-model-definition-override = true
+
+
+[logging]
+level = "INFO"
+drivers = ["console", "file"]
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "manager.log"
+backup-count = 10
+rotation-size = "10M"
+
+[logging.logstash]
+endpoint = { host = "localhost", port = 9300 }
+protocol = "tcp"
+ssl-enabled = false
+ssl-verify = false
+
+[logging.graylog]
+host = "127.0.0.1"
+port = 12201
+ssl-verify = false
+ca-certs = ""
+keyfile = ""
+certfile = ""
+# If you want the source field in Graylog to display a name that distinguishes between components rather than the hostname, uncomment the lines below and insert a value into localname.
+# fqdn = false
+# localname = "manager"
+
+# Specify additional package namespaces to include in the logs
+# and their individual log levels.
+# Note that the actual logging level applied is the conjunction of the global logging level and the
+# logging levels specified here for each namespace.
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "WARNING"
+"ai.backend" = "INFO"
+"alembic" = "INFO"
+"sqlalchemy" = "WARNING"
+
+
+# [reporter]
+#
+# # Config for the audit log reporter.
+# [[reporter.audit-log]]
+# name = "audit_log"
+#
+# # Config for the SMTP reporter.
+# # This reporter sends an email to the recipients when the trigger policy is met.
+# [[reporter.smtp]]
+# name = "smtp"
+# host = "smtp.example.com"
+# port = 587
+# username = "user@example.com"
+# password = "some_password"
+# sender = "user@example.com"
+# recipients = ["user@example.com", "user2@example.com"]
+# use-tls = true
+# trigger-policy = "ON_ERROR"
+# max-workers = 5
+#
+# template = """{% raw %}
+# Action type: {{ action_type }}
+# Entity ID: {{ entity_id }}
+# Status: {{ status }}
+# Description: {{ description }}
+# Started at: {{ created_at }}
+# Finished at: {{ ended_at }}
+# Duration: {{ duration }} seconds{% endraw %}
+#
+# This email is sent from Backend.AI SMTP Reporter.
+# """
+#
+# # The list of actions to be monitored by the audit log reporter.
+# [[reporter.action-monitors]]
+# subscribed-actions = [
+#     "session:create_from_params",
+#     "session:create_from_template",
+#     "session:create_cluster",
+#     "session:commit",
+#     "session:convert_to_image",
+#     "session:destroy",
+#     "session:destroy_multi",
+#     "container_registry:rescan"
+# ]
+# reporter = "audit_log"
+#
+#
+# # The list of actions to be monitored by the SMTP reporter.
+# [[reporter.action-monitors]]
+# subscribed-actions = [
+#     "session:create_from_params",
+#     "session:create_from_template",
+#     "session:create_cluster",
+#     "session:commit",
+#     "session:convert_to_image",
+#     "session:destroy",
+#     "session:destroy_multi",
+#     "container_registry:rescan"
+# ]
+# reporter = "smtp"
+
+
+[debug]
+enabled = false
+
+# Enable or disable the asyncio debug mode.
+asyncio = false
+
+# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
+enhanced-aiomonitor-task-info = false
+
+# Periodically sync container stat from Redis to the kernels.last_stat column.
+periodic-sync-stats = false

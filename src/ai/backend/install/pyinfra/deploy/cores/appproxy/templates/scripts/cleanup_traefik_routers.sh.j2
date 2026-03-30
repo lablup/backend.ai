@@ -1,0 +1,213 @@
+#!/bin/bash
+set +e
+
+# Configuration
+readonly API_TOKEN="{{ api_token }}"
+readonly COORDINATOR_ENDPOINT="{{ coordinator_endpoint }}"
+readonly TRAEFIK_ETCD_PREFIX="traefik/"
+readonly ETCD_CONTAINER_NAME="{{ etcd_container_name }}"
+DRY_RUN="true"
+
+# Logging functions
+log() {
+    echo -e "\e[32m[$(date '+%Y-%m-%d %H:%M:%S') INFO]\e[0m $*" >&2
+}
+
+log_warn() {
+    echo -e "\e[33m[$(date '+%Y-%m-%d %H:%M:%S') WARN]\e[0m $*" >&2
+}
+
+log_err() {
+    echo -e "\e[31m[$(date '+%Y-%m-%d %H:%M:%S') ERROR]\e[0m $*" >&2
+}
+
+# ETCD command wrapper
+etcdctl() {
+    docker exec "$ETCD_CONTAINER_NAME" etcdctl "$@"
+}
+
+# Execute or dry-run command
+execute_command() {
+    local cmd="$1"
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "$cmd"
+    else
+        log "Executing: $cmd"
+        eval "$cmd"
+    fi
+}
+
+# Delete Traefik records for a specific circuit
+delete_traefik_records() {
+    local etcd_prefix="$1"
+    local circuit_id="$2"
+    local worker_data_file="$3"
+
+    execute_command "docker exec \"$ETCD_CONTAINER_NAME\" etcdctl del --prefix \"$etcd_prefix/routers/bai_router_$circuit_id\""
+    execute_command "docker exec \"$ETCD_CONTAINER_NAME\" etcdctl del --prefix \"$etcd_prefix/services/bai_router_$circuit_id\""
+    execute_command "docker exec \"$ETCD_CONTAINER_NAME\" etcdctl del --prefix \"$etcd_prefix/middlewares/appproxy/plugin/bai_appproxy_plugin_$circuit_id\""
+
+    # Session cleanup - use worker data file to avoid "Argument list too long"
+    grep "$circuit_id" "$worker_data_file" | grep "$TRAEFIK_ETCD_PREFIX.*services/bai_session" | while read -r session_entry; do
+        local session_key
+        session_key=$(echo "$session_entry" | awk '{print $1}')
+        [[ -n "$session_key" ]] && execute_command "docker exec \"$ETCD_CONTAINER_NAME\" etcdctl del \"$session_key\""
+    done
+}
+
+# Pre-filter ETCD data by worker to avoid repeated grep operations
+prefilter_worker_data() {
+    local etcd_dump="$1"
+    local authority="$2"
+    local output_file="$3"
+
+    # Create worker-specific filtered data file
+    echo "$etcd_dump" | grep "worker_$authority" > "$output_file"
+    echo "$output_file"
+}
+
+# Process worker slots with pre-filtered data
+process_worker_with_prefiltered_data() {
+    local worker_json="$1"
+    local worker_data_file="$2"
+
+    local authority frontend_mode
+    authority=$(echo "$worker_json" | jq -r '.authority')
+    frontend_mode=$(echo "$worker_json" | jq -r '.frontend_mode')
+
+    # Skip non-inference workers
+    if [[ "$authority" != *"inference"* ]]; then
+        return 0
+    fi
+
+    log "Processing $authority with pre-filtered data"
+
+    echo "$worker_json" | jq -c '.slots[] | select(.in_use == true)' | while read -r slot; do
+        local circuit_id port subdomain query
+        circuit_id=$(echo "$slot" | jq -r '.circuit_id')
+
+        if [[ "$frontend_mode" == "port" ]]; then
+            port=$(echo "$slot" | jq -r '.port')
+            query="portproxy_$port"
+        else
+            subdomain=$(echo "$slot" | jq -r '.subdomain')
+            query="Host(\`$subdomain"
+        fi
+
+        log "Processing $authority $frontend_mode circuit $circuit_id (query: $query)"
+
+        # Use pre-filtered data file instead of full etcd_dump
+        grep "$query" "$worker_data_file" | while read -r row; do
+            local found_circuit etcd_prefix
+            found_circuit=$(echo "$row" | grep -oP '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+
+            if [[ -n "$found_circuit" && "$found_circuit" != "$circuit_id" ]]; then
+                etcd_prefix=$(echo "$row" | grep -oP "${TRAEFIK_ETCD_PREFIX}"'[^/]+/[^/]+')
+                [[ -n "$etcd_prefix" ]] && {
+                    log_warn "Found stale circuit $found_circuit in $etcd_prefix"
+                    # Pass worker data file to delete function
+                    delete_traefik_records "$etcd_prefix" "$found_circuit" "$worker_data_file"
+                }
+            fi
+        done
+    done
+}
+
+# Parse command line arguments
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --fix)
+                DRY_RUN="false"
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN="true"
+                shift
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            *)
+                log_err "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Show help message
+show_help() {
+    cat << EOF
+Usage: $0 [OPTIONS]
+
+OPTIONS:
+    --fix         Execute deletion commands (default: dry-run mode)
+    --dry-run     Only show commands without executing (default)
+    --help, -h    Show this help message
+
+EXAMPLES:
+    $0                    # Dry-run mode (default)
+    $0 --dry-run         # Explicit dry-run mode
+    $0 --fix             # Actually execute deletion commands
+EOF
+}
+
+# Main execution
+main() {
+    parse_args "$@"
+
+    log "Starting Traefik ETCD cleanup process - DRY_RUN=$DRY_RUN"
+
+    # Fetch data in parallel
+    local etcd_dump_file="/tmp/etcd_dump.$$"
+    local workers_file="/tmp/workers.$$"
+
+    log "Fetching ETCD and worker data in parallel"
+    {
+        etcdctl get --prefix "$TRAEFIK_ETCD_PREFIX" | sed 's/\r$//' | sed 'N;s/\n/ /' > "$etcd_dump_file"
+    } &
+    {
+        curl -sf -H "X-BackendAI-Token: $API_TOKEN" "$COORDINATOR_ENDPOINT/api/worker" > "$workers_file"
+    } &
+    wait
+
+    # Load data
+    local etcd_dump workers_json
+    etcd_dump=$(<"$etcd_dump_file")
+    workers_json=$(<"$workers_file")
+
+    # Process each inference worker with pre-filtered data
+    log "Pre-filtering ETCD data by worker and processing"
+
+    echo "$workers_json" | jq -c '.workers[] | select(.authority | contains("inference"))' | while read -r worker; do
+        local authority worker_data_file
+        authority=$(echo "$worker" | jq -r '.authority')
+
+        # Create temporary file for worker data
+        worker_data_file="/tmp/worker_${authority//[^a-zA-Z0-9]/_}.$$"
+
+        # Pre-filter ETCD data for this specific worker
+        prefilter_worker_data "$etcd_dump" "$authority" "$worker_data_file"
+
+        # Skip if no data for this worker
+        [[ ! -s "$worker_data_file" ]] && { rm -f "$worker_data_file"; continue; }
+
+        # Process worker with pre-filtered data file
+        process_worker_with_prefiltered_data "$worker" "$worker_data_file"
+
+        # Cleanup worker data file
+        rm -f "$worker_data_file"
+    done
+
+    # Cleanup temporary files
+    rm -f "$etcd_dump_file" "$workers_file"
+
+    log "Cleanup script completed"
+}
+
+
+# Execute main function
+main "$@"

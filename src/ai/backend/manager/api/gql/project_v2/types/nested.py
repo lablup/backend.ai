@@ -16,9 +16,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
 from ai.backend.common.dto.manager.v2.group.response import (
     ProjectStorageInfo as ProjectStorageInfoDTO,
 )
-from ai.backend.common.dto.manager.v2.group.response import (
-    VFolderHostPermissionEntry as VFolderHostPermissionEntryDTO,
-)
+from ai.backend.manager.api.gql.common_types import VFolderHostPermissionEntryGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -26,7 +24,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
-from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
+from .enums import ProjectTypeEnum
 
 # ============================================================================
 # Basic Information
@@ -82,26 +80,6 @@ class ProjectOrganizationInfoGQL:
 # ============================================================================
 # Storage Configuration
 # ============================================================================
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version="26.2.0",
-        description=(
-            "Storage host permission configuration. "
-            "Defines what operations are allowed for a specific storage host."
-        ),
-    ),
-    model=VFolderHostPermissionEntryDTO,
-    name="VFolderHostPermissionEntry",
-)
-class VFolderHostPermissionEntryGQL(PydanticOutputMixin[VFolderHostPermissionEntryDTO]):
-    """Storage host permission entry."""
-
-    host: str = gql_field(description="Storage host identifier (e.g., 'default', 'storage-01').")
-    permissions: list[VFolderHostPermissionEnum] = gql_field(
-        description="List of permissions granted for this host. See VFolderHostPermissionV2 enum for available permissions."
-    )
 
 
 @gql_pydantic_type(

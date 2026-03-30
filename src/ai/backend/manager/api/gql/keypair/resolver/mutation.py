@@ -1,4 +1,4 @@
-"""Keypair self-service GraphQL mutation resolvers."""
+"""Keypair GraphQL mutation resolvers (self-service and admin)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,11 @@ from ai.backend.manager.api.gql.decorators import (
     gql_mutation,
 )
 from ai.backend.manager.api.gql.keypair.types import (
+    AdminCreateKeypairInputGQL,
+    AdminCreateKeypairPayloadGQL,
+    AdminDeleteKeypairPayloadGQL,
+    AdminUpdateKeypairInputGQL,
+    AdminUpdateKeypairPayloadGQL,
     IssueMyKeypairPayloadGQL,
     RevokeMyKeypairInputGQL,
     RevokeMyKeypairPayloadGQL,
@@ -23,6 +28,7 @@ from ai.backend.manager.api.gql.keypair.types import (
     UpdateMyKeypairPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 
 
 def _get_current_user_id() -> UUID:
@@ -91,3 +97,51 @@ async def switch_my_main_access_key(
     user_id = _get_current_user_id()
     payload = await info.context.adapters.user.switch_my_main_access_key(user_id, input.access_key)
     return SwitchMyMainAccessKeyPayloadGQL.from_pydantic(payload)
+
+
+# ------------------------------------------------------------------ admin keypair mutations
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Admin creates a keypair for a specified user. The secret_key is only returned at creation time.",
+    )
+)  # type: ignore[misc]
+async def admin_create_keypair_v2(
+    info: Info[StrawberryGQLContext],
+    input: AdminCreateKeypairInputGQL,
+) -> AdminCreateKeypairPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.user.admin_create_keypair(input.to_pydantic())
+    return AdminCreateKeypairPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Admin updates a keypair (e.g. toggle active state, change resource policy).",
+    )
+)  # type: ignore[misc]
+async def admin_update_keypair_v2(
+    info: Info[StrawberryGQLContext],
+    input: AdminUpdateKeypairInputGQL,
+) -> AdminUpdateKeypairPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.user.admin_update_keypair(input.to_pydantic())
+    return AdminUpdateKeypairPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Admin deletes a keypair by access key. Cannot delete a main access key.",
+    )
+)  # type: ignore[misc]
+async def admin_delete_keypair_v2(
+    info: Info[StrawberryGQLContext],
+    access_key: str,
+) -> AdminDeleteKeypairPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.user.admin_delete_keypair(access_key)
+    return AdminDeleteKeypairPayloadGQL.from_pydantic(payload)

@@ -164,7 +164,6 @@ class TestSessionResourceInfo:
         assert info.occupying_slots is None
         assert info.requested_slots is None
         assert info.scaling_group_name is None
-        assert info.target_sgroup_names is None
         assert info.agent_ids is None
         assert info.images is None
 

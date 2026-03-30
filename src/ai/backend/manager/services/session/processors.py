@@ -45,6 +45,10 @@ from ai.backend.manager.services.session.actions.download_files import (
     DownloadFilesAction,
     DownloadFilesActionResult,
 )
+from ai.backend.manager.services.session.actions.enqueue_session import (
+    EnqueueSessionAction,
+    EnqueueSessionActionResult,
+)
 from ai.backend.manager.services.session.actions.execute_session import (
     ExecuteSessionAction,
     ExecuteSessionActionResult,
@@ -105,6 +109,10 @@ from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
 )
+from ai.backend.manager.services.session.actions.search_in_project import (
+    SearchSessionsInProjectAction,
+    SearchSessionsInProjectActionResult,
+)
 from ai.backend.manager.services.session.actions.search_kernel import (
     SearchKernelsAction,
     SearchKernelsActionResult,
@@ -116,6 +124,14 @@ from ai.backend.manager.services.session.actions.shutdown_service import (
 from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
     StartServiceActionResult,
+)
+from ai.backend.manager.services.session.actions.terminate_sessions import (
+    TerminateSessionsAction,
+    TerminateSessionsActionResult,
+)
+from ai.backend.manager.services.session.actions.terminate_sessions_in_project import (
+    TerminateSessionsInProjectAction,
+    TerminateSessionsInProjectActionResult,
 )
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
@@ -139,6 +155,7 @@ class SessionProcessors(AbstractProcessorPackage):
         CreateFromTemplateAction,
         CreateFromTemplateActionResult,
     ]
+    enqueue_session: ActionProcessor[EnqueueSessionAction, EnqueueSessionActionResult]
     destroy_session: ActionProcessor[DestroySessionAction, DestroySessionActionResult]
     download_file: ActionProcessor[DownloadFileAction, DownloadFileActionResult]
     download_files: ActionProcessor[DownloadFilesAction, DownloadFilesActionResult]
@@ -159,8 +176,15 @@ class SessionProcessors(AbstractProcessorPackage):
     restart_session: ActionProcessor[RestartSessionAction, RestartSessionActionResult]
     search_kernels: ActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
     search_sessions: ActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
+    search_sessions_in_project: ActionProcessor[
+        SearchSessionsInProjectAction, SearchSessionsInProjectActionResult
+    ]
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
+    terminate_sessions: ActionProcessor[TerminateSessionsAction, TerminateSessionsActionResult]
+    terminate_sessions_in_project: ActionProcessor[
+        TerminateSessionsInProjectAction, TerminateSessionsInProjectActionResult
+    ]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
     modify_session: ActionProcessor[ModifySessionAction, ModifySessionActionResult]
     check_and_transit_status: ActionProcessor[
@@ -198,6 +222,7 @@ class SessionProcessors(AbstractProcessorPackage):
         self.restart_session = ActionProcessor(service.restart_session, action_monitors)
         self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
         self.start_service = ActionProcessor(service.start_service, action_monitors)
+        self.terminate_sessions = ActionProcessor(service.terminate_sessions, action_monitors)
         self.upload_files = ActionProcessor(service.upload_files, action_monitors)
         self.check_and_transit_status = ActionProcessor(
             service.check_and_transit_status, action_monitors
@@ -206,6 +231,11 @@ class SessionProcessors(AbstractProcessorPackage):
         # Scope actions with RBAC validation
         self.create_cluster = ActionProcessor(
             service.create_cluster,
+            action_monitors,
+            validators=[cast(ActionValidator, scope_validator)],
+        )
+        self.enqueue_session = ActionProcessor(
+            service.enqueue_session,
             action_monitors,
             validators=[cast(ActionValidator, scope_validator)],
         )
@@ -231,6 +261,16 @@ class SessionProcessors(AbstractProcessorPackage):
         )
         self.search_sessions = ActionProcessor(
             service.search, action_monitors, validators=[cast(ActionValidator, scope_validator)]
+        )
+        self.search_sessions_in_project = ActionProcessor(
+            service.search_in_project,
+            action_monitors,
+            validators=[cast(ActionValidator, scope_validator)],
+        )
+        self.terminate_sessions_in_project = ActionProcessor(
+            service.terminate_sessions_in_project,
+            action_monitors,
+            validators=[cast(ActionValidator, scope_validator)],
         )
 
         # Single entity actions with RBAC validation
@@ -262,6 +302,7 @@ class SessionProcessors(AbstractProcessorPackage):
             CompleteAction.spec(),
             ConvertSessionToImageAction.spec(),
             CreateClusterAction.spec(),
+            EnqueueSessionAction.spec(),
             CreateFromParamsAction.spec(),
             CreateFromTemplateAction.spec(),
             DestroySessionAction.spec(),
@@ -282,8 +323,11 @@ class SessionProcessors(AbstractProcessorPackage):
             RestartSessionAction.spec(),
             SearchKernelsAction.spec(),
             SearchSessionsAction.spec(),
+            SearchSessionsInProjectAction.spec(),
             ShutdownServiceAction.spec(),
             StartServiceAction.spec(),
+            TerminateSessionsAction.spec(),
+            TerminateSessionsInProjectAction.spec(),
             UploadFilesAction.spec(),
             ModifySessionAction.spec(),
             CheckAndTransitStatusAction.spec(),

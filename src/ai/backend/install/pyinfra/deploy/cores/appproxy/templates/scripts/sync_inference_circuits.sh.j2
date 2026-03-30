@@ -1,0 +1,90 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Database connection settings
+DB_HOST="{{ wsproxy_db_host }}"
+DB_PORT="{{ wsproxy_db_port }}"
+DB_NAME="{{ wsproxy_db_name }}"
+DB_USER="{{ wsproxy_db_user }}"
+DB_PASSWORD="{{ wsproxy_db_password }}"
+
+# Backend.AI client settings
+CLIENT_DIR="{{ client_dir }}"
+BACKEND_AI_BIN="$CLIENT_DIR/.venv/bin/backend.ai"
+
+# Check if backend.ai client exists
+if [[ ! -f "$BACKEND_AI_BIN" ]]; then
+    echo "Error: backend.ai client not found at $BACKEND_AI_BIN"
+    exit 1
+fi
+
+# Find PostgreSQL image for psql client
+{% raw %}
+POSTGRES_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -i postgres | head -1)
+{% endraw %}
+
+# Function to execute SQL query
+execute_query() {
+    local query="$1"
+
+    if [[ -n "$POSTGRES_IMAGE" ]]; then
+        # Use Docker image if available
+        docker run --rm --network host \
+            -e PGPASSWORD="$DB_PASSWORD" \
+            "$POSTGRES_IMAGE" \
+            psql -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -U "$DB_USER" -t -c "$query"
+    elif command -v psql >/dev/null 2>&1; then
+        # Fallback to system psql if available
+        PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -U "$DB_USER" -t -c "$query"
+    else
+        echo "Error: Neither Docker PostgreSQL image nor psql command found"
+        exit 1
+    fi
+}
+
+# Get endpoint IDs that have app names but empty route_info
+echo "Fetching endpoint IDs with app names but empty route_info..."
+endpoint_ids=$(execute_query "
+    SELECT endpoint_id
+    FROM circuits
+    WHERE app_mode = 'INFERENCE'
+        AND app IS NOT NULL
+        AND app != ''
+        AND (route_info = '\"[]\"' OR route_info IS NULL);
+")
+
+# Check if any endpoints were found
+if [[ -z "$endpoint_ids" ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] No endpoint found with app names but empty route_info"
+    echo "----------------------------------------"
+    exit 0
+fi
+
+echo "Found endpoints to sync:"
+echo "$endpoint_ids"
+echo ""
+
+# Add timestamp to output
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting sync operation"
+
+# Process each endpoint ID
+cd "$CLIENT_DIR"
+for endpoint_id in $endpoint_ids; do
+    # Remove any whitespace
+    endpoint_id=$(echo "$endpoint_id" | xargs)
+
+    if [[ -n "$endpoint_id" ]]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Syncing endpoint: $endpoint_id"
+
+        if "$BACKEND_AI_BIN" service sync "$endpoint_id"; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✓ Successfully synced endpoint: $endpoint_id"
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✗ Failed to sync endpoint: $endpoint_id"
+        fi
+        echo ""
+    fi
+done
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sync operation completed"
+echo "----------------------------------------"

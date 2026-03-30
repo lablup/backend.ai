@@ -50,6 +50,12 @@ from .artifact import (
 from .artifact_registry import default_artifact_registry
 from .audit_log import admin_audit_logs_v2
 from .background_task import background_task_events
+from .container_registry import (
+    admin_container_registries_v2,
+    admin_create_container_registry_v2,
+    admin_delete_container_registry_v2,
+    admin_update_container_registry_v2,
+)
 from .deployment import (
     # Revision
     activate_deployment_revision,
@@ -140,11 +146,23 @@ from .image import (
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .keypair import (
+    admin_create_keypair_v2,
+    admin_delete_keypair_v2,
+    admin_keypair_v2,
+    admin_keypairs_v2,
+    admin_update_keypair_v2,
     issue_my_keypair,
     my_keypairs,
     revoke_my_keypair,
     switch_my_main_access_key,
     update_my_keypair,
+)
+from .login_history import admin_login_history_v2, my_login_history_v2
+from .login_session import (
+    admin_login_sessions_v2,
+    admin_revoke_login_session,
+    my_login_sessions_v2,
+    my_revoke_login_session,
 )
 from .notification import (
     admin_create_notification_channel,
@@ -218,6 +236,7 @@ from .rbac import (
     admin_update_permission,
     admin_update_role,
     my_roles,
+    rbac_entity_operation_combinations,
     rbac_scope_entity_combinations,
 )
 from .reservoir_registry import (
@@ -227,12 +246,58 @@ from .reservoir_registry import (
     reservoir_registry,
     update_reservoir_registry,
 )
+from .resource_allocation import (
+    admin_domain_resource_allocation_v2,
+    admin_effective_resource_allocation_v2,
+    check_preset_availability_v2,
+    effective_resource_allocation_v2,
+    my_keypair_resource_allocation_v2,
+    project_resource_allocation_v2,
+    resource_group_resource_allocation_v2,
+)
 from .resource_group import (
+    admin_allowed_domains_for_resource_group_v2,
+    admin_allowed_projects_for_resource_group_v2,
+    admin_allowed_resource_groups_for_domain_v2,
+    admin_allowed_resource_groups_for_project_v2,
+    admin_create_resource_group_v2,
+    admin_delete_resource_group_v2,
+    admin_resource_group_v2,
     admin_resource_groups,
+    admin_update_allowed_domains_for_resource_group_v2,
+    admin_update_allowed_projects_for_resource_group_v2,
+    admin_update_allowed_resource_groups_for_domain_v2,
+    admin_update_allowed_resource_groups_for_project_v2,
     admin_update_resource_group,
     admin_update_resource_group_fair_share_spec,
     resource_groups,
     update_resource_group_fair_share_spec,
+)
+from .resource_policy_v2 import (
+    admin_create_keypair_resource_policy_v2,
+    admin_create_project_resource_policy_v2,
+    admin_create_user_resource_policy_v2,
+    admin_delete_keypair_resource_policy_v2,
+    admin_delete_project_resource_policy_v2,
+    admin_delete_user_resource_policy_v2,
+    admin_keypair_resource_policies_v2,
+    admin_keypair_resource_policy_v2,
+    admin_project_resource_policies_v2,
+    admin_project_resource_policy_v2,
+    admin_update_keypair_resource_policy_v2,
+    admin_update_project_resource_policy_v2,
+    admin_update_user_resource_policy_v2,
+    admin_user_resource_policies_v2,
+    admin_user_resource_policy_v2,
+    my_keypair_resource_policy_v2,
+    my_user_resource_policy_v2,
+)
+from .resource_preset import (
+    admin_create_resource_preset_v2,
+    admin_delete_resource_preset_v2,
+    admin_resource_preset_v2,
+    admin_resource_presets_v2,
+    admin_update_resource_preset_v2,
 )
 from .resource_slot.resolver import resource_slot_type, resource_slot_types
 from .resource_usage import (
@@ -261,7 +326,7 @@ from .scheduling_history import (
     session_scoped_scheduling_histories,
 )
 from .service_catalog import admin_service_catalogs
-from .session.resolver import admin_sessions_v2
+from .session.resolver import admin_sessions_v2, terminate_project_sessions_v2
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -325,6 +390,11 @@ class Query:
     image_alias = image_alias
     # Admin APIs
     admin_resource_groups = admin_resource_groups
+    admin_resource_group_v2 = admin_resource_group_v2
+    admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
+    admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
+    admin_allowed_domains_for_resource_group_v2 = admin_allowed_domains_for_resource_group_v2
+    admin_allowed_projects_for_resource_group_v2 = admin_allowed_projects_for_resource_group_v2
     admin_service_catalogs = admin_service_catalogs
     admin_session_scheduling_histories = admin_session_scheduling_histories
     admin_deployment_histories = admin_deployment_histories
@@ -346,6 +416,9 @@ class Query:
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
+    admin_container_registries_v2 = admin_container_registries_v2
+    admin_login_sessions_v2 = admin_login_sessions_v2
+    admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
@@ -362,9 +435,16 @@ class Query:
     admin_entities = admin_entities
     # Keypair self-service queries
     my_keypairs = my_keypairs
+    # Keypair admin queries
+    admin_keypair_v2 = admin_keypair_v2
+    admin_keypairs_v2 = admin_keypairs_v2
+    # Login session/history self-service queries
+    my_login_sessions_v2 = my_login_sessions_v2
+    my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
+    rbac_entity_operation_combinations = rbac_entity_operation_combinations
     # Session Scoped APIs
     session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs
@@ -425,6 +505,26 @@ class Query:
     admin_projects_v2 = admin_projects_v2
     domain_projects_v2 = domain_projects_v2
     project_domain_v2 = project_domain_v2
+    # Resource Policy V2 APIs
+    admin_keypair_resource_policy_v2 = admin_keypair_resource_policy_v2
+    admin_keypair_resource_policies_v2 = admin_keypair_resource_policies_v2
+    admin_user_resource_policy_v2 = admin_user_resource_policy_v2
+    admin_user_resource_policies_v2 = admin_user_resource_policies_v2
+    admin_project_resource_policy_v2 = admin_project_resource_policy_v2
+    admin_project_resource_policies_v2 = admin_project_resource_policies_v2
+    my_keypair_resource_policy_v2 = my_keypair_resource_policy_v2
+    my_user_resource_policy_v2 = my_user_resource_policy_v2
+    # Resource Preset V2 APIs
+    admin_resource_presets_v2 = admin_resource_presets_v2
+    admin_resource_preset_v2 = admin_resource_preset_v2
+    # Resource Allocation V2 APIs
+    my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
+    project_resource_allocation_v2 = project_resource_allocation_v2
+    admin_domain_resource_allocation_v2 = admin_domain_resource_allocation_v2
+    resource_group_resource_allocation_v2 = resource_group_resource_allocation_v2
+    effective_resource_allocation_v2 = effective_resource_allocation_v2
+    admin_effective_resource_allocation_v2 = admin_effective_resource_allocation_v2
+    check_preset_availability_v2 = check_preset_availability_v2
 
 
 @strawberry.type
@@ -441,6 +541,10 @@ class Mutation:
     restore_artifacts = restore_artifacts
     cleanup_artifact_revisions = cleanup_artifact_revisions
     cancel_import_artifact = cancel_import_artifact
+    # Container Registry V2 APIs
+    admin_create_container_registry_v2 = admin_create_container_registry_v2
+    admin_update_container_registry_v2 = admin_update_container_registry_v2
+    admin_delete_container_registry_v2 = admin_delete_container_registry_v2
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
@@ -512,6 +616,20 @@ class Mutation:
     # Resource Group - Admin APIs
     admin_update_resource_group_fair_share_spec = admin_update_resource_group_fair_share_spec
     admin_update_resource_group = admin_update_resource_group
+    admin_create_resource_group_v2 = admin_create_resource_group_v2
+    admin_delete_resource_group_v2 = admin_delete_resource_group_v2
+    admin_update_allowed_resource_groups_for_domain_v2 = (
+        admin_update_allowed_resource_groups_for_domain_v2
+    )
+    admin_update_allowed_resource_groups_for_project_v2 = (
+        admin_update_allowed_resource_groups_for_project_v2
+    )
+    admin_update_allowed_domains_for_resource_group_v2 = (
+        admin_update_allowed_domains_for_resource_group_v2
+    )
+    admin_update_allowed_projects_for_resource_group_v2 = (
+        admin_update_allowed_projects_for_resource_group_v2
+    )
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
     # Domain V2 APIs
@@ -539,6 +657,13 @@ class Mutation:
     revoke_my_keypair = revoke_my_keypair
     switch_my_main_access_key = switch_my_main_access_key
     update_my_keypair = update_my_keypair
+    # Keypair admin mutations
+    admin_create_keypair_v2 = admin_create_keypair_v2
+    admin_update_keypair_v2 = admin_update_keypair_v2
+    admin_delete_keypair_v2 = admin_delete_keypair_v2
+    # Login session mutations
+    admin_revoke_login_session = admin_revoke_login_session
+    my_revoke_login_session = my_revoke_login_session
     # IP allowlist self-service mutation
     update_my_allowed_client_ip = update_my_allowed_client_ip
     # Prometheus Query Preset - Admin APIs
@@ -557,6 +682,22 @@ class Mutation:
     admin_revoke_role = admin_revoke_role
     admin_bulk_assign_role = admin_bulk_assign_role
     admin_bulk_revoke_role = admin_bulk_revoke_role
+    # Resource Policy V2 APIs
+    admin_create_keypair_resource_policy_v2 = admin_create_keypair_resource_policy_v2
+    admin_update_keypair_resource_policy_v2 = admin_update_keypair_resource_policy_v2
+    admin_delete_keypair_resource_policy_v2 = admin_delete_keypair_resource_policy_v2
+    admin_create_user_resource_policy_v2 = admin_create_user_resource_policy_v2
+    admin_update_user_resource_policy_v2 = admin_update_user_resource_policy_v2
+    admin_delete_user_resource_policy_v2 = admin_delete_user_resource_policy_v2
+    admin_create_project_resource_policy_v2 = admin_create_project_resource_policy_v2
+    admin_update_project_resource_policy_v2 = admin_update_project_resource_policy_v2
+    admin_delete_project_resource_policy_v2 = admin_delete_project_resource_policy_v2
+    # Resource Preset V2 APIs
+    admin_create_resource_preset_v2 = admin_create_resource_preset_v2
+    admin_update_resource_preset_v2 = admin_update_resource_preset_v2
+    admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
+    # Session V2 mutations
+    terminate_project_sessions_v2 = terminate_project_sessions_v2
 
 
 @strawberry.type

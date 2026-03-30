@@ -24,6 +24,9 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 
 __all__ = (
     "AdminSearchResourceGroupsPayload",
+    "AllowedDomainsPayload",
+    "AllowedProjectsPayload",
+    "AllowedResourceGroupsPayload",
     "CreateResourceGroupPayload",
     "DeleteResourceGroupPayload",
     "FairShareScalingGroupSpecInfo",
@@ -219,3 +222,21 @@ class ResourceInfoNode(BaseResponseModel):
     capacity: ResourceSlotInfo = Field(description="Total available resources")
     used: ResourceSlotInfo = Field(description="Currently occupied resources")
     free: ResourceSlotInfo = Field(description="Available resources (capacity - used)")
+
+
+class AllowedResourceGroupsPayload(BaseResponseModel):
+    """Payload containing a list of allowed resource group names."""
+
+    items: list[str] = Field(description="Allowed resource group names.")
+
+
+class AllowedDomainsPayload(BaseResponseModel):
+    """Payload containing a list of allowed domain names."""
+
+    items: list[str] = Field(description="Allowed domain names.")
+
+
+class AllowedProjectsPayload(BaseResponseModel):
+    """Payload containing a list of allowed project IDs."""
+
+    items: list[UUID] = Field(description="Allowed project IDs.")

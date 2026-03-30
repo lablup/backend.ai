@@ -423,6 +423,10 @@ class Context(metaclass=ABCMeta):
             "ai.backend.install.fixtures", "example-resource-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        with self.resource_path(
+            "ai.backend.install.fixtures", "example-prometheus-query-presets.json"
+        ) as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()

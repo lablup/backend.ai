@@ -1,0 +1,10 @@
+[Unit]
+Description=Backend.AI AppProxy Cleanup Traefik Routes Timer (Every 2 minutes)
+
+[Timer]
+OnCalendar=*:0/2:00
+Persistent=true
+Unit=backendai-appproxy-cleanup-traefik.service
+
+[Install]
+WantedBy=timers.target

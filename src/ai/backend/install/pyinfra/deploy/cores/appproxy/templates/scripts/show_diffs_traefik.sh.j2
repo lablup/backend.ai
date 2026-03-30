@@ -1,0 +1,163 @@
+#!/bin/bash
+# Automated diff script for comparing old vs new Traefik configurations
+# Generated during traefik update
+
+set -e
+
+UPGRADE_DIR="{{ upgrade_dir }}"
+TRAEFIK_DIR="{{ traefik_dir }}"
+HOME_DIR="{{ home_dir }}"
+BIN_DIR="bin"
+WORKER_TYPES=({{ worker_types | join(' ') }})
+
+echo "==================================================================="
+echo "Traefik Configuration Diff Report"
+echo "==================================================================="
+echo ""
+
+# Function to show diff with header
+show_diff() {
+    local old_file="$1"
+    local new_file="$2"
+    local description="$3"
+
+    echo "-------------------------------------------------------------------"
+    echo "$description"
+    echo "-------------------------------------------------------------------"
+
+    if [ ! -f "$old_file" ]; then
+        echo "  ⚠️  Original file not found: $old_file"
+        echo "  ✓  New file available at: $new_file"
+        echo ""
+        return
+    fi
+
+    if diff -q "$old_file" "$new_file" > /dev/null 2>&1; then
+        echo "  ✓ No changes"
+        echo ""
+        return
+    fi
+
+    echo "  📝 Changes detected:"
+    echo ""
+    diff -u "$old_file" "$new_file" || true
+    echo ""
+}
+
+# Check Traefik binary version
+echo "-------------------------------------------------------------------"
+echo "Traefik Binary"
+echo "-------------------------------------------------------------------"
+if [ -f "$UPGRADE_DIR/traefik" ]; then
+    echo "  📦 New binary available at: $UPGRADE_DIR/traefik"
+    if [ -f "$TRAEFIK_DIR/traefik" ]; then
+        OLD_VERSION=$("$TRAEFIK_DIR/traefik" version 2>/dev/null | head -1 || echo "Unable to determine version")
+        NEW_VERSION=$("$UPGRADE_DIR/traefik" version 2>/dev/null | head -1 || echo "Unable to determine version")
+        echo "  Current version: $OLD_VERSION"
+        echo "  New version: $NEW_VERSION"
+    else
+        echo "  ⚠️  Current binary not found"
+    fi
+else
+    echo "  ⚠️  New binary not found"
+fi
+echo ""
+
+# Check plugins
+echo "-------------------------------------------------------------------"
+echo "Traefik Plugins"
+echo "-------------------------------------------------------------------"
+if [ -d "$UPGRADE_DIR/plugins" ]; then
+    echo "  📦 New plugins available at: $UPGRADE_DIR/plugins/"
+    echo "  Plugin list:"
+    ls -1 "$UPGRADE_DIR/plugins/" 2>/dev/null | sed 's/^/    - /' || echo "    Unable to list plugins"
+else
+    echo "  ⚠️  New plugins directory not found"
+fi
+echo ""
+
+# Compare shared files
+echo ""
+echo "==================================================================="
+echo "Shared Traefik Files"
+echo "==================================================================="
+echo ""
+
+show_diff "$TRAEFIK_DIR/tls.yml" \
+          "$UPGRADE_DIR/tls.yml" \
+          "tls.yml"
+
+show_diff "$TRAEFIK_DIR/generate_traefik_entrypoints.py" \
+          "$UPGRADE_DIR/generate_traefik_entrypoints.py" \
+          "generate_traefik_entrypoints.py"
+
+# Compare configurations for each worker type
+for worker_type in "${WORKER_TYPES[@]}"; do
+    echo ""
+    echo "==================================================================="
+    echo "Worker Type: $worker_type"
+    echo "==================================================================="
+    echo ""
+
+    show_diff "$TRAEFIK_DIR/config-${worker_type}.yml" \
+              "$UPGRADE_DIR/config-${worker_type}.yml" \
+              "config-${worker_type}.yml"
+
+    show_diff "$HOME_DIR/$BIN_DIR/run-traefik-${worker_type}.sh" \
+              "$UPGRADE_DIR/bin/run-traefik-${worker_type}.sh" \
+              "run-traefik-${worker_type}.sh"
+
+    show_diff "/etc/systemd/system/backendai-appproxy-traefik-${worker_type}.service" \
+              "$UPGRADE_DIR/backendai-appproxy-traefik-${worker_type}.service" \
+              "systemd service (traefik-${worker_type})"
+
+    for script in start stop show_logs show_status; do
+        show_diff "$TRAEFIK_DIR/${script}_${worker_type}.sh" \
+                  "$UPGRADE_DIR/${script}_${worker_type}.sh" \
+                  "${script}_${worker_type}.sh"
+    done
+done
+
+echo ""
+echo "==================================================================="
+echo "Summary"
+echo "==================================================================="
+echo ""
+echo "Next steps:"
+echo "1. Review the diffs above carefully"
+echo ""
+echo "2. Update Traefik binary, plugins, and shared files:"
+echo "   - Stop services: systemctl stop backendai-appproxy-traefik-*"
+echo "   - Backup current: cp $TRAEFIK_DIR/traefik $TRAEFIK_DIR/traefik.backup"
+echo "   - Copy new binary: cp $UPGRADE_DIR/traefik $TRAEFIK_DIR/"
+echo "   - Copy new plugins: cp -r $UPGRADE_DIR/plugins $TRAEFIK_DIR/"
+echo "   - Copy TLS config: cp $UPGRADE_DIR/tls.yml $TRAEFIK_DIR/"
+echo "   - Copy helper script: cp $UPGRADE_DIR/generate_traefik_entrypoints.py $TRAEFIK_DIR/"
+echo "   - Set permissions: chmod +x $TRAEFIK_DIR/traefik"
+echo ""
+echo "3. Manually merge necessary configuration changes"
+echo "   Pay special attention to:"
+echo "   - ETCD endpoints and ports"
+echo "   - Port ranges for each worker type"
+echo "   - API port configurations"
+echo "   - Authority settings"
+echo "   - Custom overrides you may have made"
+echo ""
+echo "4. Update systemd service files if needed:"
+echo "   - cp $UPGRADE_DIR/backendai-appproxy-traefik-*.service /etc/systemd/system/"
+echo "   - systemctl daemon-reload"
+echo ""
+echo "5. Update run scripts if needed:"
+echo "   - cp $UPGRADE_DIR/bin/run-traefik-*.sh $HOME_DIR/bin/"
+echo ""
+echo "6. Test after changes:"
+echo "   - systemctl restart backendai-appproxy-traefik-inference"
+echo "   - systemctl restart backendai-appproxy-traefik-interactive"
+echo "   - systemctl restart backendai-appproxy-traefik-tcp"
+echo ""
+echo "7. Monitor logs for errors:"
+echo "   - journalctl -u backendai-appproxy-traefik-inference -f"
+echo "   - journalctl -u backendai-appproxy-traefik-interactive -f"
+echo "   - journalctl -u backendai-appproxy-traefik-tcp -f"
+echo ""
+echo "==================================================================="

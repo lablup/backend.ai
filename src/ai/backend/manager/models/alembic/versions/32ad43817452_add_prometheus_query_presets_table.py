@@ -1,7 +1,7 @@
 """add_prometheus_query_presets_table
 
 Revision ID: 32ad43817452
-Revises: ffcf0ed13a26
+Revises: 1cc9b47e0a8e
 Create Date: 2026-02-24 00:00:00.000000
 
 """
@@ -14,7 +14,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "32ad43817452"
-down_revision = "ffcf0ed13a26"
+down_revision = "1cc9b47e0a8e"
 branch_labels = None
 depends_on = None
 

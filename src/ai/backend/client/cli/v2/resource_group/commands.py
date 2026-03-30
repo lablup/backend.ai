@@ -159,3 +159,197 @@ def resource_info(name: str) -> None:
             await registry.close()
 
     asyncio.run(_run())
+
+
+# Allow / Disallow commands
+
+
+@resource_group.command(name="allowed-for-domain")
+@click.argument("domain_name", type=str)
+def allowed_for_domain(domain_name: str) -> None:
+    """Get allowed resource groups for a domain."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_group.get_allowed_resource_groups_for_domain(
+                domain_name
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@resource_group.command(name="allow-for-domain")
+@click.argument("domain_name", type=str)
+@click.option("--add", multiple=True, help="Resource group names to allow.")
+@click.option("--remove", multiple=True, help="Resource group names to disallow.")
+def allow_for_domain(domain_name: str, add: tuple[str, ...], remove: tuple[str, ...]) -> None:
+    """Update allowed resource groups for a domain."""
+    from ai.backend.common.dto.manager.v2.resource_group.request import (
+        UpdateAllowedResourceGroupsForDomainInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_group.update_allowed_resource_groups_for_domain(
+                domain_name,
+                UpdateAllowedResourceGroupsForDomainInput(
+                    domain_name=domain_name,
+                    add=list(add) or None,
+                    remove=list(remove) or None,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@resource_group.command(name="allowed-for-project")
+@click.argument("project_id", type=str)
+def allowed_for_project(project_id: str) -> None:
+    """Get allowed resource groups for a project."""
+    from uuid import UUID
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_group.get_allowed_resource_groups_for_project(
+                UUID(project_id)
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@resource_group.command(name="allow-for-project")
+@click.argument("project_id", type=str)
+@click.option("--add", multiple=True, help="Resource group names to allow.")
+@click.option("--remove", multiple=True, help="Resource group names to disallow.")
+def allow_for_project(project_id: str, add: tuple[str, ...], remove: tuple[str, ...]) -> None:
+    """Update allowed resource groups for a project."""
+    from uuid import UUID
+
+    from ai.backend.common.dto.manager.v2.resource_group.request import (
+        UpdateAllowedResourceGroupsForProjectInput,
+    )
+
+    pid = UUID(project_id)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_group.update_allowed_resource_groups_for_project(
+                pid,
+                UpdateAllowedResourceGroupsForProjectInput(
+                    project_id=pid,
+                    add=list(add) or None,
+                    remove=list(remove) or None,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@resource_group.command(name="allowed-domains")
+@click.argument("resource_group_name", type=str)
+def allowed_domains(resource_group_name: str) -> None:
+    """Get allowed domains for a resource group."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_group.get_allowed_domains_for_resource_group(
+                resource_group_name
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@resource_group.command(name="allow-domains")
+@click.argument("resource_group_name", type=str)
+@click.option("--add", multiple=True, help="Domain names to allow.")
+@click.option("--remove", multiple=True, help="Domain names to disallow.")
+def allow_domains(resource_group_name: str, add: tuple[str, ...], remove: tuple[str, ...]) -> None:
+    """Update allowed domains for a resource group."""
+    from ai.backend.common.dto.manager.v2.resource_group.request import (
+        UpdateAllowedDomainsForResourceGroupInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_group.update_allowed_domains_for_resource_group(
+                resource_group_name,
+                UpdateAllowedDomainsForResourceGroupInput(
+                    resource_group_name=resource_group_name,
+                    add=list(add) or None,
+                    remove=list(remove) or None,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@resource_group.command(name="allowed-projects")
+@click.argument("resource_group_name", type=str)
+def allowed_projects(resource_group_name: str) -> None:
+    """Get allowed projects for a resource group."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_group.get_allowed_projects_for_resource_group(
+                resource_group_name
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@resource_group.command(name="allow-projects")
+@click.argument("resource_group_name", type=str)
+@click.option("--add", multiple=True, help="Project UUIDs to allow.")
+@click.option("--remove", multiple=True, help="Project UUIDs to disallow.")
+def allow_projects(resource_group_name: str, add: tuple[str, ...], remove: tuple[str, ...]) -> None:
+    """Update allowed projects for a resource group."""
+    from uuid import UUID
+
+    from ai.backend.common.dto.manager.v2.resource_group.request import (
+        UpdateAllowedProjectsForResourceGroupInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_group.update_allowed_projects_for_resource_group(
+                resource_group_name,
+                UpdateAllowedProjectsForResourceGroupInput(
+                    resource_group_name=resource_group_name,
+                    add=[UUID(x) for x in add] or None,
+                    remove=[UUID(x) for x in remove] or None,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())

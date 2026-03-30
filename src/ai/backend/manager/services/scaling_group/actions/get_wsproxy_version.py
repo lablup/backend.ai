@@ -9,7 +9,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from .base import ScalingGroupAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetWsproxyVersionAction(ScalingGroupAction):
     """Action to get wsproxy version for a scaling group."""
 
@@ -28,7 +28,7 @@ class GetWsproxyVersionAction(ScalingGroupAction):
         return self.scaling_group_name
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetWsproxyVersionActionResult(BaseActionResult):
     """Result of getting wsproxy version."""
 

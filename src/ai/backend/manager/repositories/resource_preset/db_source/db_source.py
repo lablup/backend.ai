@@ -22,7 +22,10 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.data.resource_preset.types import (
+    ResourcePresetData,
+    ResourcePresetSearchResult,
+)
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     InvalidPresetQuery,
@@ -43,6 +46,7 @@ from ai.backend.manager.models.resource_slot import (
 from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.resource_slot.types import (
@@ -183,6 +187,22 @@ class ResourcePresetDBSource:
                 presets.append(row.to_dataclass())
 
         return presets
+
+    async def search_presets(
+        self,
+        querier: BatchQuerier,
+    ) -> ResourcePresetSearchResult:
+        """Search resource presets with filtering, ordering, and pagination."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ResourcePresetRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.ResourcePresetRow.to_dataclass() for row in result.rows]
+            return ResourcePresetSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     async def check_presets_data(
         self,

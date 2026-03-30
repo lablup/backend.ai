@@ -93,6 +93,10 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.search_in_project import (
+    SearchVFoldersInProjectAction,
+    SearchVFoldersInProjectActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
     ChangeVFolderOwnershipActionResult,
@@ -522,6 +526,19 @@ class VFolderService:
             vfolders=vfolders,
             _scope_type=action.scope_type(),
             _scope_id=action.scope_id(),
+        )
+
+    async def search_in_project(
+        self, action: SearchVFoldersInProjectAction
+    ) -> SearchVFoldersInProjectActionResult:
+        """Search vfolders scoped to a project."""
+        result = await self._vfolder_repository.search_in_project(action.querier, action.scope)
+        return SearchVFoldersInProjectActionResult(
+            project_id=action.scope.project_id,
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def move_to_trash(

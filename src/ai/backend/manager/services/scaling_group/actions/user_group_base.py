@@ -5,7 +5,7 @@ from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.services.scaling_group.actions.base import ScalingGroupAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class ScalingGroupUserGroupAction(ScalingGroupAction):
     @override
     @classmethod

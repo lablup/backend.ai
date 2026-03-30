@@ -308,6 +308,7 @@ class TestSearchAutoScalingRulesValidated:
                 model_mount_destination="/models",
                 runtime_variant=RuntimeVariant.CUSTOM,
                 lifecycle_stage=EndpointLifecycle.CREATED,
+                current_revision=uuid.uuid4(),
                 replicas=1,
                 resource_slots=ResourceSlot({"cpu": "1", "mem": "1g"}),
                 cluster_mode=ClusterMode.SINGLE_NODE,

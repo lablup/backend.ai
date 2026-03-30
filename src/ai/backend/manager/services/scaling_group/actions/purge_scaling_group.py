@@ -11,7 +11,7 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.services.scaling_group.actions.base import ScalingGroupAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class PurgeScalingGroupAction(ScalingGroupAction):
     """Action to purge a scaling group by name, including all related sessions and routes."""
 
@@ -27,7 +27,7 @@ class PurgeScalingGroupAction(ScalingGroupAction):
         return str(self.purger.pk_value)
 
 
-@dataclass
+@dataclass(frozen=True)
 class PurgeScalingGroupActionResult(BaseActionResult):
     """Result of purging a scaling group."""
 

@@ -1,0 +1,387 @@
+#!/bin/bash
+set -e
+
+REGISTRY_URL="{{ registry_url }}"
+REGISTRY_PROJECT="{{ registry_project }}"
+REGISTRY_USERNAME="{{ registry_username }}"
+REGISTRY_PASSWORD="{{ registry_password }}"
+SOURCE="{{ source }}"
+
+echo "=== Harbor Kernel Images Loader ==="
+echo "Registry: $REGISTRY_URL"
+echo "Project: $REGISTRY_PROJECT"
+echo "Source: $SOURCE"
+echo ""
+
+# Check for performance optimization tools
+USE_SKOPEO=false
+USE_PIGZ=false
+HAS_JQ=false
+
+# Check if skopeo is available
+if command -v skopeo &> /dev/null; then
+    USE_SKOPEO=true
+    echo "✓ Using skopeo (faster direct registry copy)"
+else
+    echo "○ skopeo not found - using docker load/push (slower but reliable)"
+fi
+
+# Check if pigz is available
+if command -v pigz &> /dev/null; then
+    USE_PIGZ=true
+    echo "✓ Using pigz (parallel decompression)"
+else
+    echo "○ pigz not found - using standard gzip (slower decompression)"
+fi
+
+# Check if jq is available (needed for extracting image metadata from archives)
+if command -v jq &> /dev/null; then
+    HAS_JQ=true
+    echo "✓ Using jq (archive metadata extraction)"
+else
+    echo "⚠ jq not found - falling back to filename-based image name parsing"
+    echo "  Install jq for reliable image name/tag detection: apt install jq -y"
+fi
+
+echo ""
+
+# Cleanup function - handles both HTTP downloads and temporary tar files
+cleanup() {
+    # Clean up HTTP download directory
+    if [ "$IS_HTTP" = true ] && [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
+        echo ""
+        echo "Cleaning up temporary directory: $WORK_DIR"
+        rm -rf "$WORK_DIR"
+    fi
+
+    # Clean up any remaining temporary tar files from this process
+    temp_files=$(find /tmp -maxdepth 1 -name "*_$$.tar" 2>/dev/null || true)
+    if [ -n "$temp_files" ]; then
+        echo "Cleaning up temporary tar files..."
+        rm -f $temp_files 2>/dev/null || true
+    fi
+}
+
+# Set trap for cleanup on exit (success, failure, or interruption)
+trap cleanup EXIT INT TERM
+
+# Clean up old temporary tar files from previous runs (older than 1 day)
+find /tmp -maxdepth 1 -name "*_*.tar" -mtime +1 -type f -exec rm -f {} + 2>/dev/null || true
+
+# Determine if source is HTTP URL or local path
+if [[ "$SOURCE" =~ ^https?:// ]]; then
+    echo "Source is HTTP URL - will download files"
+    IS_HTTP=true
+    WORK_DIR="/tmp/kernel_images_$$"
+
+    # Clean up any old kernel_images directories in /tmp
+    echo "Cleaning up old temporary directories..."
+    find /tmp -maxdepth 1 -name "kernel_images_*" -type d -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+
+    mkdir -p "$WORK_DIR"
+    SEARCH_PATH="$WORK_DIR"
+
+    # Download directory listing and extract tar/tar.gz file links
+    echo "Fetching file list from $SOURCE..."
+    file_list=$(curl -s "$SOURCE" | grep -oP '(?<=href=")[^"]*\.tar(\.gz)?' || true)
+
+    if [ -z "$file_list" ]; then
+        echo "No kernel image files found at $SOURCE"
+        rm -rf "$WORK_DIR"
+        exit 0
+    fi
+
+    # Download each file
+    echo "Downloading kernel image files..."
+    download_count=0
+    for filename in $file_list; do
+        file_url="${SOURCE%/}/$filename"
+        echo "  Downloading: $filename"
+        if wget -q -P "$WORK_DIR" "$file_url"; then
+            download_count=$((download_count + 1))
+        else
+            echo "  Warning: Failed to download $filename"
+        fi
+    done
+
+    if [ $download_count -eq 0 ]; then
+        echo "Failed to download any kernel image files"
+        rm -rf "$WORK_DIR"
+        exit 1
+    fi
+
+    echo "Downloaded $download_count files"
+    echo ""
+else
+    echo "Source is local filesystem path"
+    IS_HTTP=false
+    SEARCH_PATH="$SOURCE"
+fi
+
+# Find all tar and tar.gz files
+echo "Finding kernel image files in $SEARCH_PATH..."
+image_files=()
+while IFS= read -r file; do
+    image_files+=("$file")
+done < <(find "$SEARCH_PATH" -name '*.tar' -o -name '*.tar.gz' 2>/dev/null | sort)
+
+if [ {% raw %}${#image_files[@]}{% endraw %} -eq 0 ]; then
+    echo "No kernel image files (*.tar, *.tar.gz) found"
+    [ "$IS_HTTP" = true ] && rm -rf "$WORK_DIR"
+    exit 0
+fi
+
+echo "Found {% raw %}${#image_files[@]}{% endraw %} kernel image files:"
+for file in "${image_files[@]}"; do
+    echo "  - $(basename "$file")"
+done
+echo ""
+
+# Docker login to Harbor
+echo "Logging into Harbor registry..."
+echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_URL" -u "$REGISTRY_USERNAME" --password-stdin
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to login to Harbor registry"
+    exit 1
+fi
+echo "Successfully logged into Harbor registry"
+echo ""
+
+# Function to get image size in MB
+get_file_size() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        local size_bytes=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
+        local size_mb=$((size_bytes / 1024 / 1024))
+        echo "${size_mb}MB"
+    else
+        echo "Unknown"
+    fi
+}
+
+# Function to extract image name and tag from docker load output
+parse_loaded_image() {
+    local output="$1"
+    echo "$output" | grep "Loaded image:" | sed 's/Loaded image: //' | head -1
+}
+
+# Function to clean up images
+cleanup_image() {
+    local original_image="$1"
+    local tagged_image="$2"
+
+    echo "  Cleaning up images..."
+    if [ -n "$original_image" ]; then
+        docker rmi "$original_image" >/dev/null 2>&1 || true
+    fi
+    if [ -n "$tagged_image" ]; then
+        docker rmi "$tagged_image" >/dev/null 2>&1 || true
+    fi
+}
+
+# Load and push each image
+success_count=0
+error_count=0
+start_time=$(date +%s)
+
+for i in "${!image_files[@]}"; do
+    image_file="${image_files[i]}"
+    image_filename=$(basename "$image_file")
+    file_size=$(get_file_size "$image_file")
+
+    echo "[$((i+1))/{% raw %}${#image_files[@]}{% endraw %}] Processing: $image_filename ($file_size)"
+
+    # If skopeo is available, use it for direct registry copy (much faster!)
+    if [ "$USE_SKOPEO" = true ]; then
+        echo "  Using skopeo for direct registry copy..."
+
+        base_name=$(basename "$image_file" .tar.gz)
+        base_name=$(basename "$base_name" .tar)
+
+        # Decompress .tar.gz to temporary .tar file if needed
+        skopeo_input="$image_file"
+        temp_tar=""
+        if [[ "$image_file" == *.gz ]]; then
+            echo "  Decompressing .tar.gz for skopeo..."
+            temp_tar="/tmp/${base_name}_$$.tar"
+
+            if [ "$USE_PIGZ" = true ]; then
+                pigz -dc "$image_file" > "$temp_tar"
+            else
+                gunzip -c "$image_file" > "$temp_tar"
+            fi
+
+            skopeo_input="$temp_tar"
+        fi
+
+        # Extract image name and tag from archive metadata (RepoTags in manifest.json)
+        image_name=""
+        image_tag=""
+        if [ "$HAS_JQ" = true ]; then
+            repo_tag=$(tar -xf "$skopeo_input" manifest.json -O 2>/dev/null | jq -r '.[0].RepoTags[0] // empty' 2>/dev/null || true)
+        else
+            repo_tag=""
+        fi
+        if [[ -n "$repo_tag" && "$repo_tag" == *":"* ]]; then
+            full_ref="${repo_tag%:*}"
+            image_name="${full_ref##*/}"
+            image_tag="${repo_tag##*:}"
+            echo "  Extracted from archive metadata: $image_name:$image_tag"
+        fi
+
+        # Fallback: parse from filename (format: name_tag.tar.gz or name:tag.tar.gz)
+        if [[ -z "$image_name" ]]; then
+            if [[ "$base_name" =~ ^(.+)[_:]([^_:]+)$ ]]; then
+                image_name="${BASH_REMATCH[1]}"
+                image_tag="${BASH_REMATCH[2]}"
+            else
+                image_name="$base_name"
+                image_tag="latest"
+            fi
+            echo "  Parsed from filename: $image_name:$image_tag"
+        fi
+
+        target_image="$REGISTRY_URL/$REGISTRY_PROJECT/$image_name:$image_tag"
+
+        # Try skopeo copy
+        set +e
+        skopeo_output=$(skopeo copy \
+            --dest-creds "$REGISTRY_USERNAME:$REGISTRY_PASSWORD" \
+            --dest-tls-verify=false \
+            --insecure-policy \
+            docker-archive:"$skopeo_input" \
+            docker://"$target_image" 2>&1)
+        skopeo_status=$?
+        set -e
+
+        # Clean up temporary tar file immediately
+        if [ -n "$temp_tar" ] && [ -f "$temp_tar" ]; then
+            rm -f "$temp_tar"
+            echo "  Cleaned up temporary file"
+        fi
+
+        if [ $skopeo_status -eq 0 ]; then
+            echo "  ✓ Successfully copied to Harbor: $target_image"
+            success_count=$((success_count + 1))
+            echo ""
+            continue
+        else
+            echo "  ⚠ Skopeo failed, falling back to docker load/push"
+            echo "  Error: $skopeo_output"
+        fi
+    fi
+
+    # Standard docker load/push method (with optional pigz optimization)
+    echo "  Loading image from $image_filename..."
+
+    set +e  # Temporarily disable exit on error
+    if [ "$USE_PIGZ" = true ] && [[ "$image_file" == *.gz ]]; then
+        # Use pigz for parallel decompression
+        load_output=$(pigz -dc "$image_file" | docker load 2>&1)
+    else
+        # Use standard docker load
+        load_output=$(docker load -i "$image_file" 2>&1)
+    fi
+    load_status=$?
+    set -e  # Re-enable exit on error
+
+    if [ $load_status -ne 0 ]; then
+        echo "  Error loading image from $image_filename: $load_output"
+        error_count=$((error_count + 1))
+        echo ""
+        continue
+    fi
+
+    # Parse the loaded image name
+    original_image=$(parse_loaded_image "$load_output")
+    if [ -z "$original_image" ]; then
+        echo "  Error: Could not parse loaded image name from: $load_output"
+        error_count=$((error_count + 1))
+        echo ""
+        continue
+    fi
+
+    echo "  Loaded image: $original_image"
+
+    # Check if image is already in Harbor format
+    if [[ "$original_image" == "$REGISTRY_URL/$REGISTRY_PROJECT/"* ]]; then
+        echo "  Image already in Harbor format"
+        target_image="$original_image"
+        need_cleanup_original=false
+    else
+        # Extract image name and tag for retagging
+        image_name_tag=$(echo "$original_image" | sed 's|.*/||')  # Remove registry/namespace
+        if [[ "$image_name_tag" == *":"* ]]; then
+            image_name=$(echo "$image_name_tag" | cut -d':' -f1)
+            image_tag=$(echo "$image_name_tag" | cut -d':' -f2)
+        else
+            image_name="$image_name_tag"
+            image_tag="latest"
+        fi
+
+        # Create new tag for Harbor
+        target_image="$REGISTRY_URL/$REGISTRY_PROJECT/$image_name:$image_tag"
+        echo "  Tagging as: $target_image"
+
+        # Tag the image
+        docker tag "$original_image" "$target_image"
+        if [ $? -ne 0 ]; then
+            echo "  Error tagging image"
+            cleanup_image "$original_image" ""
+            error_count=$((error_count + 1))
+            echo ""
+            continue
+        fi
+        need_cleanup_original=true
+    fi
+
+    # Push to Harbor
+    echo "  Pushing to Harbor..."
+    set +e  # Temporarily disable exit on error
+    push_output=$(docker push "$target_image" 2>&1)
+    push_status=$?
+    set -e  # Re-enable exit on error
+    if [ $push_status -ne 0 ]; then
+        echo "  Error pushing image: $push_output"
+        if [ "$need_cleanup_original" = true ]; then
+            cleanup_image "$original_image" "$target_image"
+        else
+            cleanup_image "$target_image" ""
+        fi
+        error_count=$((error_count + 1))
+        echo ""
+        continue
+    fi
+
+    echo "  Successfully pushed: $target_image"
+
+    # Clean up
+    if [ "$need_cleanup_original" = true ]; then
+        cleanup_image "$original_image" "$target_image"
+    else
+        cleanup_image "$target_image" ""
+    fi
+
+    success_count=$((success_count + 1))
+    echo "  ✓ Completed"
+    echo ""
+done
+
+end_time=$(date +%s)
+duration=$((end_time - start_time))
+minutes=$((duration / 60))
+seconds=$((duration % 60))
+
+echo "=== Summary ==="
+echo "Successfully loaded: $success_count images"
+echo "Failed: $error_count images"
+echo "Total time: ${minutes}m ${seconds}s"
+
+if [ $error_count -gt 0 ]; then
+    echo "Some images failed to load. Please check the logs above."
+    exit 1
+else
+    echo "All kernel images loaded successfully!"
+fi
+
+# Note: Cleanup will be handled automatically by trap EXIT

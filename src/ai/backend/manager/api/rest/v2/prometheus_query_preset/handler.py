@@ -10,8 +10,13 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
+    ExecuteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
     SearchQueryDefinitionsInput,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    ExecuteQueryDefinitionPayload,
+    QueryDefinitionExecuteDataInfo,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import PresetIdPathParam
@@ -60,6 +65,27 @@ class V2PrometheusQueryPresetHandler:
         """Update an existing query definition."""
         result = await self._adapter.update(path.parsed.preset_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def execute(
+        self,
+        path: PathParam[PresetIdPathParam],
+        body: BodyParam[ExecuteQueryDefinitionInput],
+    ) -> APIResponse:
+        """Execute a prometheus query definition."""
+        result = await self._adapter.execute_preset(
+            path.parsed.preset_id,
+            body.parsed.options,
+            body.parsed.time_window,
+            body.parsed.time_range,
+        )
+        payload = ExecuteQueryDefinitionPayload(
+            status=result.status,
+            data=QueryDefinitionExecuteDataInfo(
+                result_type=result.result_type,
+                result=result.result,
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
     async def delete(
         self,

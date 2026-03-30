@@ -1,0 +1,59 @@
+#!/bin/bash
+set -e
+
+# -- static python
+source {{ home_dir }}/{{ service_name }}/.venv/bin/activate
+
+# -- Ensure the previous processes terminated
+leftover_processes=$(ps aux | grep -v "grep" | grep "backend.ai: {{ service_name }}" | awk '{print $2}')
+if [[ ! -z "$leftover_processes" ]]; then
+    echo "Leftover processes exist. Killing them ..."
+    kill -9 $leftover_processes
+fi
+leftover_processes=$(ps aux | grep -v "grep" | grep "backend.ai: {{ service_name }}" | awk '{print $2}')
+if [[ ! -z "$leftover_processes" ]]; then
+  echo "Leftover processes exist. Cannot kill them. Exiting ..."
+  exit -1
+fi
+
+# -- Wait for services
+{%- if redis_sentinels %}
+# Wait for Redis Sentinels (at least one should be available)
+sentinel_available=false
+while [ "$sentinel_available" = false ]; do
+{%- for sentinel in redis_sentinels %}
+  if nc -vz {{ sentinel.hostname }} {{ sentinel.port }} 2>/dev/null; then
+    echo "Redis Sentinel available at {{ sentinel.hostname }}:{{ sentinel.port }}"
+    sentinel_available=true
+    break
+  fi
+{%- endfor %}
+
+  if [ "$sentinel_available" = false ]; then
+    echo "Waiting for Redis Sentinels..."
+{%- for sentinel in redis_sentinels %}
+    echo "  Checking {{ sentinel.hostname }}:{{ sentinel.port }}"
+{%- endfor %}
+    sleep 2
+  fi
+done
+{%- else %}
+# Fallback to direct Redis connection
+while ! nc -vz {{ redis_ip }} {{ redis_port }}
+do
+  echo "Wait for redis( {{ redis_ip }}:{{ redis_port }} )"
+  sleep 1
+done
+{%- endif %}
+
+while ! curl -sf {{ etcd_ip }}:{{ etcd_port }}/health > /dev/null; do
+  echo "Wait for etcd( {{ etcd_ip }}:{{ etcd_port }} )"
+  sleep 2
+done
+
+# -- Run service
+if [ "$#" -eq 0 ]; then
+    exec python -m ai.backend.{{ service_name }}.server
+else
+    exec "$@"
+fi

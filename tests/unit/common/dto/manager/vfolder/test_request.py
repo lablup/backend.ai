@@ -3,12 +3,14 @@
 import uuid
 
 import pytest
+from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder.request import (
     AcceptInvitationReq,
     ChangeVFolderOwnershipReq,
     CloneVFolderReq,
+    CreateArchiveDownloadSessionReq,
     CreateDownloadSessionReq,
     CreateUploadSessionReq,
     DeleteFilesAsyncBodyParam,
@@ -221,6 +223,21 @@ class TestMkdirReq:
     def test_list_paths(self) -> None:
         req = MkdirReq(path=["/a", "/b"])
         assert req.path == ["/a", "/b"]
+
+
+class TestCreateArchiveDownloadSessionReq:
+    def test_basic(self) -> None:
+        req = CreateArchiveDownloadSessionReq(files=["a.txt", "b.txt"])
+        assert req.files == ["a.txt", "b.txt"]
+        assert req.filename is None
+
+    def test_with_filename(self) -> None:
+        req = CreateArchiveDownloadSessionReq(files=["a.txt"], filename="archive.zip")
+        assert req.filename == "archive.zip"
+
+    def test_empty_files_raises_validation_error(self) -> None:
+        with pytest.raises(ValidationError, match="files"):
+            CreateArchiveDownloadSessionReq(files=[])
 
 
 class TestCreateDownloadSessionReq:

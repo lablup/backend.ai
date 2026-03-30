@@ -21,6 +21,8 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     ShareVFolderInput,
     UnshareVFolderInput,
     UpdateVFolderInput,
+    VFolderV2Filter,
+    VFolderV2Order,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     CloneVFolderPayload,
@@ -52,8 +54,10 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderOwnershipTypeField,
     VFolderPermissionField,
     VFolderPermissionInfo,
+    VFolderStatusFilter,
     VFolderUsageInfo,
     VFolderUsageMode,
+    VFolderUsageModeFilter,
 )
 
 __all__ = (
@@ -67,8 +71,10 @@ __all__ = (
     "VFolderOwnershipTypeField",
     "VFolderPermissionField",
     "VFolderPermissionInfo",
+    "VFolderStatusFilter",
     "VFolderUsageInfo",
     "VFolderUsageMode",
+    "VFolderUsageModeFilter",
     # Input models (request)
     "AcceptInvitationInput",
     "CloneVFolderInput",
@@ -88,6 +94,8 @@ __all__ = (
     "ShareVFolderInput",
     "UnshareVFolderInput",
     "UpdateVFolderInput",
+    "VFolderV2Filter",
+    "VFolderV2Order",
     # Node and Payload models (response)
     "CloneVFolderPayload",
     "CreateDownloadSessionPayload",

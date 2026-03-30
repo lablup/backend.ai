@@ -149,7 +149,10 @@ class RouteHistoryOrderField(StrEnum):
         description="Sub-step result in scheduling history.",
     ),
     model=SubStepResultInfo,
-    name="SubStepResult",
+    # Keep the original GQL type name to avoid breaking existing clients.
+    # Before the Pydantic migration (34af67f180), @strawberry.type without
+    # an explicit name exposed the class name "SubStepResultGQL" as-is.
+    name="SubStepResultGQL",
 )
 class SubStepResultGQL(PydanticOutputMixin[SubStepResultInfo]):
     step: str

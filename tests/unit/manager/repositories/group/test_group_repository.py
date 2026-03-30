@@ -635,6 +635,7 @@ class TestGroupRepository:
                 project=group_id,
                 resource_group=test_scaling_group,
                 lifecycle_stage=EndpointLifecycle.CREATED,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot(),
                 cluster_mode="single-node",
                 cluster_size=1,

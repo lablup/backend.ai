@@ -230,7 +230,8 @@ async def exception_middleware(
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
             raise MethodNotAllowed(
-                method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
+                extra_msg=f"Method {concrete_ex.method} not allowed",
+                extra_data={"allowed_methods": list(concrete_ex.allowed_methods)},
             ) from ex
         log.warning("Bad request: {0!r}", ex)
         raise GenericBadRequest from ex

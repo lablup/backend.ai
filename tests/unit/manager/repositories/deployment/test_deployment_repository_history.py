@@ -393,6 +393,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.PENDING,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -808,6 +809,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.READY,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -1116,6 +1118,7 @@ class TestDeploymentHistoryMergeLogic:
                     url="http://test.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.PENDING,
+                    current_revision=uuid.uuid4(),
                     resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 )
             )
@@ -1444,6 +1447,7 @@ class TestRouteHistoryMergeLogic:
                     url="http://test.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.READY,
+                    current_revision=uuid.uuid4(),
                     resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 )
             )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     OrderDirection,
     VFolderBasicInfo,
@@ -188,12 +189,23 @@ class TestVFolderUsageInfo:
     """Tests for VFolderUsageInfo sub-model."""
 
     def test_creation(self) -> None:
-        info = VFolderUsageInfo(num_files=10, used_bytes=1024, max_size=None, max_files=1000)
+        info = VFolderUsageInfo(
+            num_files=10,
+            used_bytes=BinarySizeInfo(value=1024, display="1024"),
+            max_size=None,
+            max_files=1000,
+        )
         assert info.num_files == 10
         assert info.max_size is None
 
     def test_round_trip(self) -> None:
-        info = VFolderUsageInfo(num_files=5, used_bytes=512, max_size=1048576, max_files=500)
+        info = VFolderUsageInfo(
+            num_files=5,
+            used_bytes=BinarySizeInfo(value=512, display="512"),
+            max_size=BinarySizeInfo(value=1048576, display="1m"),
+            max_files=500,
+        )
         restored = VFolderUsageInfo.model_validate_json(info.model_dump_json())
         assert restored.num_files == 5
-        assert restored.max_size == 1048576
+        assert restored.max_size is not None
+        assert restored.max_size.value == 1048576

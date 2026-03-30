@@ -33,6 +33,11 @@ never Processors or Services directly. Adapters are shared with the GQL layer.
 - `{scope}_search_*`: non-admin, scope parameter required — queries within the given scope only.
 - There is NO "search everything without scope" for non-admin users.
 
+**Scoped search REST URL pattern:**
+- Pattern: `/v2/{entity}/{scope_type}/{scope_id}/search`
+- Scope is expressed as nested resource path segments, NOT as `search-by-{scope}`.
+- Example: `/v2/sessions/projects/{project_id}/search` (not `/v2/sessions/search-by-project/{id}`).
+
 **create / update / get / delete / purge — when to separate `admin_` vs non-admin:**
 - **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` endpoint.
 - **Both admin and users, behavior differs** (e.g., admin sets more fields): separate `admin_` and non-admin endpoints with different DTOs.

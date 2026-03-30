@@ -8,6 +8,7 @@ from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
+    ExecuteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
     SearchQueryDefinitionsInput,
 )
@@ -15,6 +16,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     AdminSearchQueryDefinitionsPayload,
     CreateQueryDefinitionPayload,
     DeleteQueryDefinitionPayload,
+    ExecuteQueryDefinitionPayload,
     GetQueryDefinitionPayload,
     ModifyQueryDefinitionPayload,
 )
@@ -71,4 +73,15 @@ class V2PrometheusQueryPresetClient(BaseDomainClient):
             f"{_PATH}/delete",
             request=request,
             response_model=DeleteQueryDefinitionPayload,
+        )
+
+    async def execute(
+        self, preset_id: UUID, request: ExecuteQueryDefinitionInput
+    ) -> ExecuteQueryDefinitionPayload:
+        """Execute a prometheus query definition."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{preset_id}/execute",
+            request=request,
+            response_model=ExecuteQueryDefinitionPayload,
         )

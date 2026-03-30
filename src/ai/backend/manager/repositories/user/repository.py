@@ -20,7 +20,7 @@ from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairData
+from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -324,6 +324,38 @@ class UserRepository:
             SearchResult with matching keypairs and pagination info.
         """
         return await self._db_source.search_my_keypairs(scope, querier)
+
+    # ------------------------------------------------------------------ admin keypair operations
+
+    @user_repository_resilience.apply()
+    async def admin_create_keypair(
+        self, user_id: UUID, creator: KeyPairCreator
+    ) -> GeneratedKeyPairData:
+        """Admin creates a keypair for a given user."""
+        return await self._db_source.admin_create_keypair(user_id, creator)
+
+    @user_repository_resilience.apply()
+    async def admin_update_keypair(self, updater: Updater[KeyPairRow]) -> KeyPairData:
+        """Admin updates any keypair by access key."""
+        return await self._db_source.admin_update_keypair(updater)
+
+    @user_repository_resilience.apply()
+    async def admin_delete_keypair(self, access_key: str) -> None:
+        """Admin deletes any keypair by access key."""
+        await self._db_source.admin_delete_keypair(access_key)
+
+    @user_repository_resilience.apply()
+    async def admin_search_keypairs(
+        self,
+        querier: BatchQuerier,
+    ) -> SearchResult[KeyPairData]:
+        """Admin search all keypairs without scope restriction."""
+        return await self._db_source.admin_search_keypairs(querier)
+
+    @user_repository_resilience.apply()
+    async def admin_get_keypair(self, access_key: str) -> KeyPairData:
+        """Admin retrieves a single keypair by access key."""
+        return await self._db_source.admin_get_keypair(access_key)
 
     async def _get_time_binned_monthly_stats(
         self,

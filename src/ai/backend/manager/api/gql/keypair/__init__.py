@@ -1,6 +1,11 @@
 """Keypair GraphQL API package."""
 
 from .resolver import (
+    admin_create_keypair_v2,
+    admin_delete_keypair_v2,
+    admin_keypair_v2,
+    admin_keypairs_v2,
+    admin_update_keypair_v2,
     issue_my_keypair,
     my_keypairs,
     revoke_my_keypair,
@@ -9,6 +14,11 @@ from .resolver import (
 )
 
 __all__ = [
+    "admin_create_keypair_v2",
+    "admin_delete_keypair_v2",
+    "admin_keypair_v2",
+    "admin_keypairs_v2",
+    "admin_update_keypair_v2",
     "issue_my_keypair",
     "my_keypairs",
     "revoke_my_keypair",

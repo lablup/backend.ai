@@ -1,0 +1,79 @@
+{
+  "prometheus_query_presets": [
+    {
+      "name": "container_gauge",
+      "metric_name": "backendai_container_utilization",
+      "query_template": "sum by ({group_by})(backendai_container_utilization{{{labels}}})",
+      "time_window": null,
+      "options": {
+        "filter_labels": [
+          "container_metric_name",
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ],
+        "group_labels": [
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ]
+      }
+    },
+    {
+      "name": "container_rate",
+      "metric_name": "backendai_container_utilization",
+      "query_template": "sum by ({group_by})(rate(backendai_container_utilization{{{labels}}}[{window}])) / 5.0",
+      "time_window": "5m",
+      "options": {
+        "filter_labels": [
+          "container_metric_name",
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ],
+        "group_labels": [
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ]
+      }
+    },
+    {
+      "name": "container_diff",
+      "metric_name": "backendai_container_utilization",
+      "query_template": "sum by ({group_by})(rate(backendai_container_utilization{{{labels}}}[{window}]))",
+      "time_window": "5m",
+      "options": {
+        "filter_labels": [
+          "container_metric_name",
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ],
+        "group_labels": [
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ]
+      }
+    }
+  ]
+}

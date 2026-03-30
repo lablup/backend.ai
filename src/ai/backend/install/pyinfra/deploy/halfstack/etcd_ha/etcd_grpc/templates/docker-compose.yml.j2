@@ -1,0 +1,37 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  extra_hosts:
+  {%- for node in etcd_nodes %}
+    - "etcd{{node.node_number}}:${ETCD{{node.node_number}}_IP:?error}"
+  {%- endfor %}
+  image: {{ config.grpc_container_image }}
+  user: "${ETCD_UID}:${ETCD_GID}"
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cpu_count: 1
+  mem_limit: "1g"
+
+services:
+  etcd-grpc:
+    <<: *base
+    container_name: {{ config.grpc_container_name_prefix }}
+    ports:
+      - "${ETCD_GRPC_PORT}:2379"
+    command:
+      - etcd
+      - grpc-proxy
+      - start
+      - --endpoints={% for node in etcd_nodes %}etcd{{node.node_number}}:${ETCD{{node.node_number}}_CLIENT_PORT:?error}{% if not loop.last %},{% endif %}{% endfor %}
+      - --advertise-client-url=${ETCD_GRPC_ADVERTISE_CLIENT_IP}:${ETCD_GRPC_PORT}
+      - --listen-addr=0.0.0.0:2379
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=localhost:2379", "endpoint", "health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

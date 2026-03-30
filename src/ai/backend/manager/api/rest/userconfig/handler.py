@@ -23,7 +23,7 @@ from ai.backend.common.dto.manager.config.request import (
 from ai.backend.common.dto.manager.config.response import (
     CreateDotfileResponse,
     DeleteDotfileResponse,
-    DotfileItem,
+    DotfileListItem,
     GetBootstrapScriptResponse,
     GetDotfileResponse,
     ListDotfilesResponse,
@@ -126,8 +126,10 @@ class UserConfigHandler:
                 HTTPStatus.OK,
                 GetDotfileResponse(path=entry.path, perm=entry.perm, data=entry.data),
             )
-        items = [DotfileItem(path=e.path, perm=e.perm, data=e.data) for e in result.entries]
-        return APIResponse.build(HTTPStatus.OK, ListDotfilesResponse(items=items))
+        items = [
+            DotfileListItem(path=e.path, permission=e.perm, data=e.data) for e in result.entries
+        ]
+        return APIResponse.build(HTTPStatus.OK, ListDotfilesResponse(root=items))
 
     async def update(
         self,
@@ -216,5 +218,5 @@ class UserConfigHandler:
         result = await self._dotfile.get_bootstrap.wait_for_complete(action)
         return APIResponse.build(
             HTTPStatus.OK,
-            GetBootstrapScriptResponse(script=result.script),
+            GetBootstrapScriptResponse(root=result.script),
         )

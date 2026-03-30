@@ -1,11 +1,10 @@
-"""Tests for login session force option in credential verification."""
+"""Tests for login session force option in verify_credential + create_login_session."""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
 
 import pytest
 import sqlalchemy as sa
@@ -41,7 +40,7 @@ class SampleUserData:
 
 
 class TestLoginSessionForce:
-    """Tests for force option in verify_credential_with_migration."""
+    """Tests for verify_credential and create_login_session with force option."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -163,18 +162,19 @@ class TestLoginSessionForce:
         db: ExtendedAsyncSAEngine,
         user_id: uuid.UUID,
         access_key: str,
-    ) -> None:
-        """Insert an active login session for the user."""
+    ) -> str:
+        """Insert an active login session for the user and return the session token."""
+        session_token = uuid.uuid4().hex
         async with db.begin() as conn:
             await conn.execute(
                 sa.insert(LoginSessionRow.__table__).values(
                     user_id=user_id,
                     access_key=access_key,
-                    session_token=uuid.uuid4().hex,
+                    session_token=session_token,
                     status=LoginSessionStatus.ACTIVE,
-                    expires_at=datetime.now(UTC) + timedelta(hours=1),
                 )
             )
+        return session_token
 
     async def _count_login_history(
         self,
@@ -210,7 +210,7 @@ class TestLoginSessionForce:
             )
             return await conn.scalar(query) or 0
 
-    # --- Scenario 1: no active session + force=false → success ---
+    # --- Scenario 1: no active session + no force → success ---
 
     async def test_login_no_active_session_without_force(
         self,
@@ -218,13 +218,24 @@ class TestLoginSessionForce:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user: SampleUserData,
     ) -> None:
-        result = await auth_db_source.verify_credential_with_migration(
+        # Step 1: verify credentials
+        cred_result = await auth_db_source.verify_credential(
             domain_name=sample_user.domain_name,
             email=sample_user.email,
             target_password_info=self._make_password_info(),
-            force=False,
         )
-        assert result.user.uuid == sample_user.user_id
+        assert cred_result.user["uuid"] == sample_user.user_id
+        assert len(cred_result.active_sessions) == 0
+
+        # Step 2: create login session
+        session_result = await auth_db_source.create_login_session(
+            user_id=sample_user.user_id,
+            access_key=sample_user.access_key,
+            domain_name=sample_user.domain_name,
+        )
+        assert session_result.session_token
+
+        # Success history recorded by create_login_session
         success_count = await self._count_login_history(
             db_with_cleanup,
             sample_user.user_id,
@@ -232,7 +243,7 @@ class TestLoginSessionForce:
         )
         assert success_count == 1
 
-    # --- Scenario 2: no active session + force=true → success ---
+    # --- Scenario 2: no active session + force → success ---
 
     async def test_login_no_active_session_with_force(
         self,
@@ -240,13 +251,24 @@ class TestLoginSessionForce:
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user: SampleUserData,
     ) -> None:
-        result = await auth_db_source.verify_credential_with_migration(
+        # Step 1: verify credentials
+        cred_result = await auth_db_source.verify_credential(
             domain_name=sample_user.domain_name,
             email=sample_user.email,
             target_password_info=self._make_password_info(),
-            force=True,
         )
-        assert result.user.uuid == sample_user.user_id
+        assert cred_result.user["uuid"] == sample_user.user_id
+        assert len(cred_result.active_sessions) == 0
+
+        # Step 2: create login session (no tokens to invalidate since no active sessions)
+        session_result = await auth_db_source.create_login_session(
+            user_id=sample_user.user_id,
+            access_key=sample_user.access_key,
+            domain_name=sample_user.domain_name,
+            tokens_to_invalidate=[],
+        )
+        assert session_result.session_token
+
         success_count = await self._count_login_history(
             db_with_cleanup,
             sample_user.user_id,
@@ -254,7 +276,7 @@ class TestLoginSessionForce:
         )
         assert success_count == 1
 
-    # --- Scenario 3: active session + force=true → invalidate + success ---
+    # --- Scenario 3: active session + force → invalidate + success ---
 
     async def test_login_active_session_with_force_invalidates_existing(
         self,
@@ -267,18 +289,27 @@ class TestLoginSessionForce:
         await self._insert_active_session(db_with_cleanup, user_id, access_key)
         assert await self._count_active_sessions(db_with_cleanup, user_id) == 1
 
-        result = await auth_db_source.verify_credential_with_migration(
+        # Step 1: verify credentials — returns active sessions
+        cred_result = await auth_db_source.verify_credential(
             domain_name=sample_user.domain_name,
             email=sample_user.email,
             target_password_info=self._make_password_info(),
-            force=True,
         )
-        assert result.user.uuid == user_id
+        assert cred_result.user["uuid"] == user_id
+        assert len(cred_result.active_sessions) == 1
 
-        # Old session invalidated, new session created → 1 active
+        # Step 2: create login session with force (invalidate existing tokens)
+        tokens_to_invalidate = [s.session_token for s in cred_result.active_sessions]
+        session_result = await auth_db_source.create_login_session(
+            user_id=user_id,
+            access_key=access_key,
+            domain_name=sample_user.domain_name,
+            tokens_to_invalidate=tokens_to_invalidate,
+        )
+        assert session_result.session_token
+
+        # Old session invalidated, new session created -> 1 active
         assert await self._count_active_sessions(db_with_cleanup, user_id) == 1
-        # The new session_token should differ from the original
-        assert result.session_token
         # History should show SUCCESS
         success_count = await self._count_login_history(
             db_with_cleanup,
@@ -287,7 +318,7 @@ class TestLoginSessionForce:
         )
         assert success_count == 1
 
-    # --- Scenario 4: active session + force=false → fail ---
+    # --- Scenario 4: active session + no force → fail ---
 
     async def test_login_active_session_without_force_fails(
         self,
@@ -298,57 +329,31 @@ class TestLoginSessionForce:
         user_id = sample_user.user_id
         access_key = sample_user.access_key
         await self._insert_active_session(db_with_cleanup, user_id, access_key)
-        with pytest.raises(ActiveLoginSessionExistsError):
-            await auth_db_source.verify_credential_with_migration(
-                domain_name=sample_user.domain_name,
-                email=sample_user.email,
-                target_password_info=self._make_password_info(),
-                force=False,
-            )
 
-        # History should record FAILED_SESSION_ALREADY_EXISTS
-        fail_count = await self._count_login_history(
-            db_with_cleanup,
-            user_id,
-            LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
-        )
-        assert fail_count == 1
-
-    # --- Scenario 5: expired session should not block login ---
-
-    async def test_login_expired_session_does_not_block(
-        self,
-        auth_db_source: AuthDBSource,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_user: SampleUserData,
-    ) -> None:
-        """A session with status=ACTIVE but expires_at in the past should not block login."""
-        async with db_with_cleanup.begin() as conn:
-            await conn.execute(
-                sa.insert(LoginSessionRow.__table__).values(
-                    user_id=sample_user.user_id,
-                    access_key=sample_user.access_key,
-                    session_token=uuid.uuid4().hex,
-                    status=LoginSessionStatus.ACTIVE,
-                    expires_at=datetime.now(UTC) - timedelta(hours=1),
-                )
-            )
-
-        # Should succeed without force — expired session is ignored
-        result = await auth_db_source.verify_credential_with_migration(
+        # Step 1: verify credentials — returns active sessions
+        cred_result = await auth_db_source.verify_credential(
             domain_name=sample_user.domain_name,
             email=sample_user.email,
             target_password_info=self._make_password_info(),
-            force=False,
         )
-        assert result.user.uuid == sample_user.user_id
+        assert len(cred_result.active_sessions) == 1
 
-        success_count = await self._count_login_history(
-            db_with_cleanup, sample_user.user_id, LoginAttemptResult.SUCCESS
+        # Step 2: create_login_session without force raises ActiveLoginSessionExistsError
+        with pytest.raises(ActiveLoginSessionExistsError):
+            await auth_db_source.create_login_session(
+                user_id=user_id,
+                access_key=access_key,
+                domain_name=sample_user.domain_name,
+            )
+
+        # No history recorded because create_login_session rolls back on failure
+        history_count = await self._count_login_history(
+            db_with_cleanup,
+            user_id,
         )
-        assert success_count == 1
+        assert history_count == 0
 
-    # --- Scenario 6: invalid credentials → still fails regardless of force ---
+    # --- Scenario 5: invalid credentials → still fails regardless of force ---
 
     async def test_login_invalid_credentials_still_fails(
         self,
@@ -357,21 +362,20 @@ class TestLoginSessionForce:
         sample_user: SampleUserData,
     ) -> None:
         with pytest.raises(AuthorizationFailed):
-            await auth_db_source.verify_credential_with_migration(
+            await auth_db_source.verify_credential(
                 domain_name=sample_user.domain_name,
                 email=sample_user.email,
                 target_password_info=self._make_password_info("wrong_password"),
-                force=False,
             )
 
-        fail_count = await self._count_login_history(
+        # verify_credential does NOT record login history
+        history_count = await self._count_login_history(
             db_with_cleanup,
             sample_user.user_id,
-            LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
         )
-        assert fail_count == 1
+        assert history_count == 0
 
-    # --- Scenario 7: login → logout → re-login without force succeeds ---
+    # --- Scenario 6: login → logout → re-login without force succeeds ---
 
     async def test_login_logout_relogin_succeeds(
         self,
@@ -380,11 +384,16 @@ class TestLoginSessionForce:
         sample_user: SampleUserData,
     ) -> None:
         """After logout (session invalidated), re-login should succeed without force."""
-        # First login
-        result1 = await auth_db_source.verify_credential_with_migration(
+        # First login: verify + create
+        await auth_db_source.verify_credential(
             domain_name=sample_user.domain_name,
             email=sample_user.email,
             target_password_info=self._make_password_info(),
+        )
+        result1 = await auth_db_source.create_login_session(
+            user_id=sample_user.user_id,
+            access_key=sample_user.access_key,
+            domain_name=sample_user.domain_name,
         )
         assert result1.session_token
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
@@ -394,12 +403,18 @@ class TestLoginSessionForce:
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
 
         # Re-login without force should succeed
-        result2 = await auth_db_source.verify_credential_with_migration(
+        cred_result = await auth_db_source.verify_credential(
             domain_name=sample_user.domain_name,
             email=sample_user.email,
             target_password_info=self._make_password_info(),
-            force=False,
         )
-        assert result2.user.uuid == sample_user.user_id
+        assert cred_result.user["uuid"] == sample_user.user_id
+        assert len(cred_result.active_sessions) == 0
+
+        result2 = await auth_db_source.create_login_session(
+            user_id=sample_user.user_id,
+            access_key=sample_user.access_key,
+            domain_name=sample_user.domain_name,
+        )
         assert result2.session_token != result1.session_token
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1

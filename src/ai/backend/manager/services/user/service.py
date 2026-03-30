@@ -38,6 +38,16 @@ from ai.backend.manager.services.user.actions.get_user import (
     GetUserActionResult,
 )
 from ai.backend.manager.services.user.actions.keypair_ops import (
+    AdminCreateKeypairAction,
+    AdminCreateKeypairActionResult,
+    AdminDeleteKeypairAction,
+    AdminDeleteKeypairActionResult,
+    AdminGetKeypairAction,
+    AdminGetKeypairActionResult,
+    AdminSearchKeypairsAction,
+    AdminSearchKeypairsActionResult,
+    AdminUpdateKeypairAction,
+    AdminUpdateKeypairActionResult,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
@@ -460,3 +470,42 @@ class UserService:
             scope=action.scope, querier=action.querier
         )
         return SearchMyKeypairsActionResult(result=result)
+
+    # ------------------------------------------------------------------ admin keypair operations
+
+    async def admin_create_keypair(
+        self, action: AdminCreateKeypairAction
+    ) -> AdminCreateKeypairActionResult:
+        """Admin creates a keypair for a given user."""
+        generated = await self._user_repository.admin_create_keypair(
+            user_id=action.user_id, creator=action.creator
+        )
+        return AdminCreateKeypairActionResult(generated_data=generated)
+
+    async def admin_update_keypair(
+        self, action: AdminUpdateKeypairAction
+    ) -> AdminUpdateKeypairActionResult:
+        """Admin updates any keypair."""
+        keypair_data = await self._user_repository.admin_update_keypair(
+            updater=action.updater,
+        )
+        return AdminUpdateKeypairActionResult(keypair=keypair_data)
+
+    async def admin_delete_keypair(
+        self, action: AdminDeleteKeypairAction
+    ) -> AdminDeleteKeypairActionResult:
+        """Admin deletes any keypair."""
+        await self._user_repository.admin_delete_keypair(access_key=action.access_key)
+        return AdminDeleteKeypairActionResult(access_key=action.access_key)
+
+    async def admin_search_keypairs(
+        self, action: AdminSearchKeypairsAction
+    ) -> AdminSearchKeypairsActionResult:
+        """Admin search all keypairs."""
+        result = await self._user_repository.admin_search_keypairs(querier=action.querier)
+        return AdminSearchKeypairsActionResult(result=result)
+
+    async def admin_get_keypair(self, action: AdminGetKeypairAction) -> AdminGetKeypairActionResult:
+        """Admin retrieves a single keypair by access key."""
+        keypair_data = await self._user_repository.admin_get_keypair(access_key=action.access_key)
+        return AdminGetKeypairActionResult(keypair=keypair_data)

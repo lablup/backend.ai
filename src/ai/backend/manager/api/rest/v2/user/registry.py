@@ -26,19 +26,19 @@ def register_v2_user_routes(
     reg.add("POST", "/delete", handler.delete_user, middlewares=[superadmin_required])
     reg.add(
         "POST",
-        "/search-by-domain/{domain_name}",
+        "/domains/{domain_name}/search",
         handler.domain_search,
         middlewares=[auth_required],
     )
     reg.add(
         "POST",
-        "/search-by-project/{project_id}",
+        "/projects/{project_id}/search",
         handler.project_search,
         middlewares=[auth_required],
     )
     reg.add(
         "POST",
-        "/search-by-role/{role_id}",
+        "/roles/{role_id}/search",
         handler.role_search,
         middlewares=[auth_required],
     )

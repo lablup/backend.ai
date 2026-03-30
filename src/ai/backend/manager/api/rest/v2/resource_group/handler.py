@@ -10,6 +10,10 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
+    UpdateAllowedDomainsForResourceGroupInput,
+    UpdateAllowedProjectsForResourceGroupInput,
+    UpdateAllowedResourceGroupsForDomainInput,
+    UpdateAllowedResourceGroupsForProjectInput,
     UpdateResourceGroupConfigInput,
     UpdateResourceGroupFairShareSpecInput,
     UpdateResourceGroupInput,
@@ -18,7 +22,11 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     AdminSearchResourceGroupsPayload,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.rest.v2.path_params import ResourceGroupNamePathParam
+from ai.backend.manager.api.rest.v2.path_params import (
+    DomainNamePathParam,
+    ProjectIdPathParam,
+    ResourceGroupNamePathParam,
+)
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 
 if TYPE_CHECKING:
@@ -113,4 +121,86 @@ class V2ResourceGroupHandler:
             update={"resource_group_name": path.parsed.name},
         )
         result = await self._adapter.update_config(merged_input)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    # Allow / Disallow endpoints
+
+    async def get_allowed_rgs_for_domain(
+        self,
+        path: PathParam[DomainNamePathParam],
+    ) -> APIResponse:
+        """Get allowed resource groups for a domain."""
+        result = await self._adapter.get_allowed_resource_groups_for_domain(path.parsed.domain_name)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def update_allowed_rgs_for_domain(
+        self,
+        path: PathParam[DomainNamePathParam],
+        body: BodyParam[UpdateAllowedResourceGroupsForDomainInput],
+    ) -> APIResponse:
+        """Update allowed resource groups for a domain."""
+        merged_input = body.parsed.model_copy(
+            update={"domain_name": path.parsed.domain_name},
+        )
+        result = await self._adapter.update_allowed_resource_groups_for_domain(merged_input)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def get_allowed_rgs_for_project(
+        self,
+        path: PathParam[ProjectIdPathParam],
+    ) -> APIResponse:
+        """Get allowed resource groups for a project."""
+        result = await self._adapter.get_allowed_resource_groups_for_project(path.parsed.project_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def update_allowed_rgs_for_project(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[UpdateAllowedResourceGroupsForProjectInput],
+    ) -> APIResponse:
+        """Update allowed resource groups for a project."""
+        merged_input = body.parsed.model_copy(
+            update={"project_id": path.parsed.project_id},
+        )
+        result = await self._adapter.update_allowed_resource_groups_for_project(merged_input)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def get_allowed_domains_for_rg(
+        self,
+        path: PathParam[ResourceGroupNamePathParam],
+    ) -> APIResponse:
+        """Get allowed domains for a resource group."""
+        result = await self._adapter.get_allowed_domains_for_resource_group(path.parsed.name)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def update_allowed_domains_for_rg(
+        self,
+        path: PathParam[ResourceGroupNamePathParam],
+        body: BodyParam[UpdateAllowedDomainsForResourceGroupInput],
+    ) -> APIResponse:
+        """Update allowed domains for a resource group."""
+        merged_input = body.parsed.model_copy(
+            update={"resource_group_name": path.parsed.name},
+        )
+        result = await self._adapter.update_allowed_domains_for_resource_group(merged_input)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def get_allowed_projects_for_rg(
+        self,
+        path: PathParam[ResourceGroupNamePathParam],
+    ) -> APIResponse:
+        """Get allowed projects for a resource group."""
+        result = await self._adapter.get_allowed_projects_for_resource_group(path.parsed.name)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def update_allowed_projects_for_rg(
+        self,
+        path: PathParam[ResourceGroupNamePathParam],
+        body: BodyParam[UpdateAllowedProjectsForResourceGroupInput],
+    ) -> APIResponse:
+        """Update allowed projects for a resource group."""
+        merged_input = body.parsed.model_copy(
+            update={"resource_group_name": path.parsed.name},
+        )
+        result = await self._adapter.update_allowed_projects_for_resource_group(merged_input)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

@@ -9,7 +9,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from .base import ScalingGroupAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class ListAllowedScalingGroupsAction(ScalingGroupAction):
     """Action to list scaling groups allowed for a user."""
 
@@ -28,7 +28,7 @@ class ListAllowedScalingGroupsAction(ScalingGroupAction):
         return None
 
 
-@dataclass
+@dataclass(frozen=True)
 class ListAllowedScalingGroupsActionResult(BaseActionResult):
     """Result of listing allowed scaling groups."""
 

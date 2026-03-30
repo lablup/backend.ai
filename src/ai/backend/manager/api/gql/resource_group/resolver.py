@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import Connection, Edge, PageInfo
 
 from ai.backend.common.dto.manager.v2.resource_group.request import AdminSearchResourceGroupsInput
+from ai.backend.common.dto.manager.v2.resource_group.response import DeleteResourceGroupPayload
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -19,9 +22,19 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 from .types import (
+    AllowedDomainsPayloadGQL,
+    AllowedProjectsPayloadGQL,
+    AllowedResourceGroupsPayloadGQL,
+    CreateResourceGroupInputGQL,
+    CreateResourceGroupPayloadGQL,
+    DeleteResourceGroupPayloadGQL,
     ResourceGroupFilterGQL,
     ResourceGroupGQL,
     ResourceGroupOrderByGQL,
+    UpdateAllowedDomainsForResourceGroupInputGQL,
+    UpdateAllowedProjectsForResourceGroupInputGQL,
+    UpdateAllowedResourceGroupsForDomainInputGQL,
+    UpdateAllowedResourceGroupsForProjectInputGQL,
     UpdateResourceGroupFairShareSpecInput,
     UpdateResourceGroupFairShareSpecPayload,
     UpdateResourceGroupInput,
@@ -203,3 +216,191 @@ async def admin_update_resource_group(
     payload_dto = await info.context.adapters.resource_group.update_config(dto)
 
     return UpdateResourceGroupPayload.from_pydantic(payload_dto)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get a single resource group by name (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_resource_group_v2(
+    info: Info[StrawberryGQLContext],
+    name: str,
+) -> ResourceGroupGQL | None:
+    check_admin_only()
+    node = await info.context.adapters.resource_group.get(name)
+    return ResourceGroupGQL.from_pydantic(node)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Create a new resource group (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_create_resource_group_v2(
+    info: Info[StrawberryGQLContext],
+    input: CreateResourceGroupInputGQL,
+) -> CreateResourceGroupPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.resource_group.create(input.to_pydantic())
+    return CreateResourceGroupPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Delete a resource group (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_delete_resource_group_v2(
+    info: Info[StrawberryGQLContext],
+    name: str,
+) -> DeleteResourceGroupPayloadGQL:
+    check_admin_only()
+    result = await info.context.adapters.resource_group.purge(name)
+    payload = DeleteResourceGroupPayload(id=result.id)
+    return DeleteResourceGroupPayloadGQL.from_pydantic(payload)
+
+
+# Allow / Disallow queries
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get allowed resource groups for a domain (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_allowed_resource_groups_for_domain_v2(
+    info: Info[StrawberryGQLContext],
+    domain_name: str,
+) -> AllowedResourceGroupsPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.resource_group.get_allowed_resource_groups_for_domain(
+        domain_name
+    )
+    return AllowedResourceGroupsPayloadGQL.from_pydantic(payload)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get allowed resource groups for a project (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_allowed_resource_groups_for_project_v2(
+    info: Info[StrawberryGQLContext],
+    project_id: UUID,
+) -> AllowedResourceGroupsPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.resource_group.get_allowed_resource_groups_for_project(
+        project_id
+    )
+    return AllowedResourceGroupsPayloadGQL.from_pydantic(payload)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get allowed domains for a resource group (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_allowed_domains_for_resource_group_v2(
+    info: Info[StrawberryGQLContext],
+    resource_group_name: str,
+) -> AllowedDomainsPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.resource_group.get_allowed_domains_for_resource_group(
+        resource_group_name
+    )
+    return AllowedDomainsPayloadGQL.from_pydantic(payload)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get allowed projects for a resource group (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_allowed_projects_for_resource_group_v2(
+    info: Info[StrawberryGQLContext],
+    resource_group_name: str,
+) -> AllowedProjectsPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.resource_group.get_allowed_projects_for_resource_group(
+        resource_group_name
+    )
+    return AllowedProjectsPayloadGQL.from_pydantic(payload)
+
+
+# Allow / Disallow mutations
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update allowed resource groups for a domain (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_update_allowed_resource_groups_for_domain_v2(
+    info: Info[StrawberryGQLContext],
+    input: UpdateAllowedResourceGroupsForDomainInputGQL,
+) -> AllowedResourceGroupsPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.resource_group.update_allowed_resource_groups_for_domain(
+        input.to_pydantic()
+    )
+    return AllowedResourceGroupsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update allowed resource groups for a project (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_update_allowed_resource_groups_for_project_v2(
+    info: Info[StrawberryGQLContext],
+    input: UpdateAllowedResourceGroupsForProjectInputGQL,
+) -> AllowedResourceGroupsPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.resource_group.update_allowed_resource_groups_for_project(
+        input.to_pydantic()
+    )
+    return AllowedResourceGroupsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update allowed domains for a resource group (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_update_allowed_domains_for_resource_group_v2(
+    info: Info[StrawberryGQLContext],
+    input: UpdateAllowedDomainsForResourceGroupInputGQL,
+) -> AllowedDomainsPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.resource_group.update_allowed_domains_for_resource_group(
+        input.to_pydantic()
+    )
+    return AllowedDomainsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update allowed projects for a resource group (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_update_allowed_projects_for_resource_group_v2(
+    info: Info[StrawberryGQLContext],
+    input: UpdateAllowedProjectsForResourceGroupInputGQL,
+) -> AllowedProjectsPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.resource_group.update_allowed_projects_for_resource_group(
+        input.to_pydantic()
+    )
+    return AllowedProjectsPayloadGQL.from_pydantic(payload)

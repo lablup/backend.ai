@@ -357,6 +357,13 @@ module = [
 ]
 disable_error_code = ["union-attr", "misc"]
 
+# PyInfra is an optional dependency for production deployment
+# Skip import checking when pyinfra is not installed
+[[tool.mypy.overrides]]
+module = "ai.backend.install.pyinfra.*"
+disable_error_code = ["import-not-found", "no-any-return", "attr-defined", "arg-type", "return-value", "type-arg", "func-returns-value"]
+follow_imports = "skip"
+
 # gql_enum() function-call results are valid types at runtime (strawberry handles them)
 # but mypy cannot recognise dynamically-wrapped enum variables as types
 [[tool.mypy.overrides]]

@@ -19,3 +19,47 @@ def my() -> None:
 @my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.keypair:keypair")
 def keypair() -> None:
     """My keypair commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.login_history:login_history",
+)
+def login_history() -> None:
+    """My login history commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.login_session:login_session",
+)
+def login_session() -> None:
+    """My login session commands."""
+
+
+@my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.export:export")
+def export() -> None:
+    """My export commands."""
+
+
+@my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.session:session")
+def session() -> None:
+    """My session commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.resource_allocation:resource_allocation",
+    name="resource-allocation",
+)
+def resource_allocation() -> None:
+    """My resource allocation commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.resource_policy:resource_policy",
+    name="resource-policy",
+)
+def resource_policy() -> None:
+    """My resource policy commands."""

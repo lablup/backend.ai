@@ -32,6 +32,22 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_gr
     DisassociateScalingGroupWithUserGroupsAction,
     DisassociateScalingGroupWithUserGroupsActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.get_allowed_domains_for_rg import (
+    GetAllowedDomainsForResourceGroupAction,
+    GetAllowedDomainsForResourceGroupActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.get_allowed_projects_for_rg import (
+    GetAllowedProjectsForResourceGroupAction,
+    GetAllowedProjectsForResourceGroupActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.get_allowed_rgs_for_domain import (
+    GetAllowedResourceGroupsForDomainAction,
+    GetAllowedResourceGroupsForDomainActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.get_allowed_rgs_for_project import (
+    GetAllowedResourceGroupsForProjectAction,
+    GetAllowedResourceGroupsForProjectActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
     GetResourceInfoAction,
     GetResourceInfoActionResult,
@@ -55,6 +71,22 @@ from ai.backend.manager.services.scaling_group.actions.modify import (
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
     PurgeScalingGroupActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
+    UpdateAllowedDomainsForResourceGroupAction,
+    UpdateAllowedDomainsForResourceGroupActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.update_allowed_projects_for_rg import (
+    UpdateAllowedProjectsForResourceGroupAction,
+    UpdateAllowedProjectsForResourceGroupActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.update_allowed_rgs_for_domain import (
+    UpdateAllowedResourceGroupsForDomainAction,
+    UpdateAllowedResourceGroupsForDomainActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.update_allowed_rgs_for_project import (
+    UpdateAllowedResourceGroupsForProjectAction,
+    UpdateAllowedResourceGroupsForProjectActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec import (
     UpdateFairShareSpecAction,
@@ -97,6 +129,38 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         DisassociateScalingGroupWithUserGroupsAction,
         DisassociateScalingGroupWithUserGroupsActionResult,
     ]
+    update_allowed_rgs_for_domain: ActionProcessor[
+        UpdateAllowedResourceGroupsForDomainAction,
+        UpdateAllowedResourceGroupsForDomainActionResult,
+    ]
+    update_allowed_rgs_for_project: ActionProcessor[
+        UpdateAllowedResourceGroupsForProjectAction,
+        UpdateAllowedResourceGroupsForProjectActionResult,
+    ]
+    update_allowed_domains_for_rg: ActionProcessor[
+        UpdateAllowedDomainsForResourceGroupAction,
+        UpdateAllowedDomainsForResourceGroupActionResult,
+    ]
+    update_allowed_projects_for_rg: ActionProcessor[
+        UpdateAllowedProjectsForResourceGroupAction,
+        UpdateAllowedProjectsForResourceGroupActionResult,
+    ]
+    get_allowed_rgs_for_domain: ActionProcessor[
+        GetAllowedResourceGroupsForDomainAction,
+        GetAllowedResourceGroupsForDomainActionResult,
+    ]
+    get_allowed_rgs_for_project: ActionProcessor[
+        GetAllowedResourceGroupsForProjectAction,
+        GetAllowedResourceGroupsForProjectActionResult,
+    ]
+    get_allowed_domains_for_rg: ActionProcessor[
+        GetAllowedDomainsForResourceGroupAction,
+        GetAllowedDomainsForResourceGroupActionResult,
+    ]
+    get_allowed_projects_for_rg: ActionProcessor[
+        GetAllowedProjectsForResourceGroupAction,
+        GetAllowedProjectsForResourceGroupActionResult,
+    ]
 
     def __init__(
         self,
@@ -132,6 +196,30 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.disassociate_scaling_group_with_user_groups = ActionProcessor(
             service.disassociate_scaling_group_with_user_groups, action_monitors
         )
+        self.update_allowed_rgs_for_domain = ActionProcessor(
+            service.update_allowed_resource_groups_for_domain, action_monitors
+        )
+        self.update_allowed_rgs_for_project = ActionProcessor(
+            service.update_allowed_resource_groups_for_project, action_monitors
+        )
+        self.update_allowed_domains_for_rg = ActionProcessor(
+            service.update_allowed_domains_for_resource_group, action_monitors
+        )
+        self.update_allowed_projects_for_rg = ActionProcessor(
+            service.update_allowed_projects_for_resource_group, action_monitors
+        )
+        self.get_allowed_rgs_for_domain = ActionProcessor(
+            service.get_allowed_resource_groups_for_domain, action_monitors
+        )
+        self.get_allowed_rgs_for_project = ActionProcessor(
+            service.get_allowed_resource_groups_for_project, action_monitors
+        )
+        self.get_allowed_domains_for_rg = ActionProcessor(
+            service.get_allowed_domains_for_resource_group, action_monitors
+        )
+        self.get_allowed_projects_for_rg = ActionProcessor(
+            service.get_allowed_projects_for_resource_group, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -150,4 +238,12 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             DisassociateScalingGroupWithKeypairsAction.spec(),
             AssociateScalingGroupWithUserGroupsAction.spec(),
             DisassociateScalingGroupWithUserGroupsAction.spec(),
+            UpdateAllowedResourceGroupsForDomainAction.spec(),
+            UpdateAllowedResourceGroupsForProjectAction.spec(),
+            UpdateAllowedDomainsForResourceGroupAction.spec(),
+            UpdateAllowedProjectsForResourceGroupAction.spec(),
+            GetAllowedResourceGroupsForDomainAction.spec(),
+            GetAllowedResourceGroupsForProjectAction.spec(),
+            GetAllowedDomainsForResourceGroupAction.spec(),
+            GetAllowedProjectsForResourceGroupAction.spec(),
         ]

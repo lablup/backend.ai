@@ -1,0 +1,64 @@
+#!/bin/bash
+set -e
+
+cd "$(dirname "$0")"
+
+EXPORTER_URL="http://localhost:{{ exporter_port }}"
+METRICS_ENDPOINT="/metrics"
+
+echo "=== DCGM Exporter Status Check ==="
+echo "Endpoint: ${EXPORTER_URL}${METRICS_ENDPOINT}"
+echo
+
+# Check Docker container status
+echo "1. Container Status:"
+docker compose ps dcgm-exporter 2>/dev/null || echo "  Container not found or not running"
+echo
+
+# Check if exporter endpoint is responding
+echo "2. Endpoint Health:"
+if curl -sf "${EXPORTER_URL}${METRICS_ENDPOINT}" >/dev/null 2>&1; then
+    echo "  OK  Exporter endpoint is responding"
+else
+    echo "  FAIL  Exporter endpoint is not responding"
+    echo
+    echo "  DCGM Exporter container logs (last 10 lines):"
+    docker compose logs --tail=10 dcgm-exporter 2>/dev/null || echo "    Cannot retrieve logs"
+    exit 1
+fi
+
+# Check NVIDIA GPU availability on host
+echo "3. NVIDIA GPU Status:"
+if command -v nvidia-smi >/dev/null 2>&1; then
+    gpu_count=$(nvidia-smi --query-gpu=count --format=csv,noheader,nounits | head -1)
+    echo "  ${gpu_count} GPU(s) detected"
+    nvidia-smi --query-gpu=name,temperature.gpu,utilization.gpu,memory.used,memory.total --format=csv,noheader | while IFS=',' read -r name temp util mem_used mem_total; do
+        echo "    - ${name}: ${temp}C, ${util} util, ${mem_used}/${mem_total} memory"
+    done
+else
+    echo "  nvidia-smi not available on host"
+fi
+
+# Show key DCGM metrics
+echo "4. Key DCGM Metrics:"
+metrics_found=false
+response=$(curl -s "${EXPORTER_URL}${METRICS_ENDPOINT}" 2>/dev/null || true)
+if [ -n "$response" ]; then
+    if echo "$response" | grep -qE "^DCGM_FI_DEV_"; then
+        echo "$response" | grep -E "^(DCGM_FI_DEV_GPU_UTIL|DCGM_FI_DEV_MEM_COPY_UTIL|DCGM_FI_DEV_GPU_TEMP|DCGM_FI_DEV_POWER_USAGE|DCGM_FI_DEV_FB_USED)" | head -10 | while read -r line; do
+            echo "  $line"
+        done || true
+        metrics_found=true
+    else
+        echo "  No DCGM metrics found in response"
+    fi
+else
+    echo "  No metrics available"
+fi
+
+echo
+if [ "$metrics_found" = true ]; then
+    echo "DCGM Exporter Status: Healthy"
+else
+    echo "DCGM Exporter Status: Degraded (endpoint up but no metrics)"
+fi

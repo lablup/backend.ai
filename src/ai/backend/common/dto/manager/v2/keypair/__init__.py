@@ -3,6 +3,10 @@ Keypair DTOs v2 for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.keypair.request import (
+    AdminCreateKeypairInput,
+    AdminDeleteKeypairInput,
+    AdminSearchKeypairsInput,
+    AdminUpdateKeypairInput,
     KeypairFilter,
     KeypairOrderBy,
     RevokeMyKeypairInput,
@@ -11,6 +15,10 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
     UpdateMyKeypairInput,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
+    AdminCreateKeypairPayload,
+    AdminDeleteKeypairPayload,
+    AdminSearchKeypairsPayload,
+    AdminUpdateKeypairPayload,
     IssueMyKeypairPayload,
     KeypairNode,
     RevokeMyKeypairPayload,
@@ -21,6 +29,14 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 from ai.backend.common.dto.manager.v2.keypair.types import KeypairOrderField
 
 __all__ = (
+    "AdminCreateKeypairInput",
+    "AdminCreateKeypairPayload",
+    "AdminDeleteKeypairInput",
+    "AdminDeleteKeypairPayload",
+    "AdminSearchKeypairsInput",
+    "AdminSearchKeypairsPayload",
+    "AdminUpdateKeypairInput",
+    "AdminUpdateKeypairPayload",
     "IssueMyKeypairPayload",
     "KeypairFilter",
     "KeypairNode",

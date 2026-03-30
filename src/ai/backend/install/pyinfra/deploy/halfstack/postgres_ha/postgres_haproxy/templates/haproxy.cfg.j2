@@ -1,0 +1,39 @@
+global
+    log 127.0.0.1   local2
+
+defaults
+    mode                    tcp
+    log                     global
+    option                  tcplog
+    retries                 3
+    timeout queue           1m
+    timeout connect         10s
+    timeout client          5m
+    timeout server          5m
+    timeout check           10s
+    maxconn                 600
+
+listen stats
+    mode http
+    bind *:{{ config.haproxy_stat_port }}
+    stats enable
+    stats uri /stats
+
+listen primary
+    bind *:{{ config.pg_active_port }}
+    option httpchk OPTIONS /master
+    http-check expect status 200
+    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
+{%- for node in config.cluster_nodes %}
+    server postgres{{ loop.index }} {{ node.hostname }}:{{ node.pg_sql_port }} maxconn 600 check port {{ node.pg_api_port }}
+{%- endfor %}
+
+listen replicas
+    bind *:{{ config.pg_standby_port }}
+    balance roundrobin
+    option httpchk OPTIONS /replica
+    http-check expect status 200
+    default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
+{%- for node in config.cluster_nodes %}
+    server postgres{{ loop.index }} {{ node.hostname }}:{{ node.pg_sql_port }} maxconn 600 check port {{ node.pg_api_port }}
+{%- endfor %}

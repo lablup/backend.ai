@@ -31,6 +31,37 @@ class RBACRequiredPermission:
     operation: OperationType
 
 
+def build_operation_description(
+    action_name: RBACActionName,
+    element_type: RBACElementType,
+) -> str:
+    """Build a human-readable description from action name and element type."""
+    entity = element_type.value.replace("_", " ")
+    match action_name:
+        case RBACActionName.CREATE:
+            return f"Create a new {entity}"
+        case RBACActionName.GET:
+            return f"Get {entity} details"
+        case RBACActionName.SEARCH:
+            return f"Search {entity} list"
+        case RBACActionName.UPDATE:
+            return f"Update {entity}"
+        case RBACActionName.SOFT_DELETE:
+            return f"Soft-delete {entity}"
+        case RBACActionName.HARD_DELETE:
+            return f"Hard-delete {entity}"
+        case RBACActionName.GRANT_ALL:
+            return f"Grant all permissions for {entity}"
+        case RBACActionName.GRANT_READ:
+            return f"Grant read permission for {entity}"
+        case RBACActionName.GRANT_UPDATE:
+            return f"Grant update permission for {entity}"
+        case RBACActionName.GRANT_SOFT_DELETE:
+            return f"Grant soft-delete permission for {entity}"
+        case RBACActionName.GRANT_HARD_DELETE:
+            return f"Grant hard-delete permission for {entity}"
+
+
 class BaseRBACAction(ABC):
     """
     Abstract base class for RBAC actions.

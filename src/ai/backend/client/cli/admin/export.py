@@ -112,13 +112,13 @@ def export_users(
     Export users as CSV.
     """
     from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.export import (
+    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+    from ai.backend.common.dto.manager.v2.export import (
         OrderDirection,
         UserExportFilter,
         UserExportOrder,
         UserExportOrderField,
     )
-    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
 
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
@@ -250,13 +250,13 @@ def export_sessions(
     Export sessions as CSV.
     """
     from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.export import (
+    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+    from ai.backend.common.dto.manager.v2.export import (
         OrderDirection,
         SessionExportFilter,
         SessionExportOrder,
         SessionExportOrderField,
     )
-    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
 
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
@@ -471,14 +471,14 @@ def export_projects(
     Export projects as CSV.
     """
     from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.export import (
+    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+    from ai.backend.common.dto.manager.v2.export import (
         BooleanFilter,
         OrderDirection,
         ProjectExportFilter,
         ProjectExportOrder,
         ProjectExportOrderField,
     )
-    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
 
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
@@ -597,13 +597,13 @@ def export_audit_logs(
     Export audit logs as CSV.
     """
     from ai.backend.client.session import Session
-    from ai.backend.common.dto.manager.export import (
+    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+    from ai.backend.common.dto.manager.v2.export import (
         AuditLogExportFilter,
         AuditLogExportOrder,
         AuditLogExportOrderField,
         OrderDirection,
     )
-    from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
 
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 

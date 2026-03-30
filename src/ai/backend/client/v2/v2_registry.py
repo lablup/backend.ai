@@ -23,17 +23,24 @@ if TYPE_CHECKING:
     from .domains_v2.container_registry import V2ContainerRegistryClient
     from .domains_v2.deployment import V2DeploymentClient
     from .domains_v2.domain import V2DomainClient
+    from .domains_v2.export import V2ExportClient
     from .domains_v2.fair_share import V2FairShareClient
+    from .domains_v2.gql import V2GQLClient
     from .domains_v2.huggingface_registry import V2HuggingFaceRegistryClient
     from .domains_v2.image import V2ImageClient
     from .domains_v2.keypair import V2KeypairClient
+    from .domains_v2.login_history import V2LoginHistoryClient
+    from .domains_v2.login_session import V2LoginSessionClient
     from .domains_v2.notification import V2NotificationClient
     from .domains_v2.object_storage import V2ObjectStorageClient
     from .domains_v2.project import V2ProjectClient
     from .domains_v2.prometheus_query_preset import V2PrometheusQueryPresetClient
     from .domains_v2.rbac import V2RBACClient
     from .domains_v2.reservoir_registry import V2ReservoirRegistryClient
+    from .domains_v2.resource_allocation import V2ResourceAllocationClient
     from .domains_v2.resource_group import V2ResourceGroupClient
+    from .domains_v2.resource_policy import V2ResourcePolicyClient
+    from .domains_v2.resource_preset import V2ResourcePresetClient
     from .domains_v2.resource_slot import V2ResourceSlotClient
     from .domains_v2.resource_usage import V2ResourceUsageClient
     from .domains_v2.scheduling_history import V2SchedulingHistoryClient
@@ -115,10 +122,22 @@ class V2ClientRegistry:
         return V2DomainClient(self._client)
 
     @cached_property
+    def export(self) -> V2ExportClient:
+        from .domains_v2.export import V2ExportClient
+
+        return V2ExportClient(self._client)
+
+    @cached_property
     def fair_share(self) -> V2FairShareClient:
         from .domains_v2.fair_share import V2FairShareClient
 
         return V2FairShareClient(self._client)
+
+    @cached_property
+    def gql(self) -> V2GQLClient:
+        from .domains_v2.gql import V2GQLClient
+
+        return V2GQLClient(self._client)
 
     @cached_property
     def huggingface_registry(self) -> V2HuggingFaceRegistryClient:
@@ -137,6 +156,18 @@ class V2ClientRegistry:
         from .domains_v2.keypair import V2KeypairClient
 
         return V2KeypairClient(self._client)
+
+    @cached_property
+    def login_history(self) -> V2LoginHistoryClient:
+        from .domains_v2.login_history import V2LoginHistoryClient
+
+        return V2LoginHistoryClient(self._client)
+
+    @cached_property
+    def login_session(self) -> V2LoginSessionClient:
+        from .domains_v2.login_session import V2LoginSessionClient
+
+        return V2LoginSessionClient(self._client)
 
     @cached_property
     def notification(self) -> V2NotificationClient:
@@ -175,10 +206,28 @@ class V2ClientRegistry:
         return V2ReservoirRegistryClient(self._client)
 
     @cached_property
+    def resource_allocation(self) -> V2ResourceAllocationClient:
+        from .domains_v2.resource_allocation import V2ResourceAllocationClient
+
+        return V2ResourceAllocationClient(self._client)
+
+    @cached_property
+    def resource_policy(self) -> V2ResourcePolicyClient:
+        from .domains_v2.resource_policy import V2ResourcePolicyClient
+
+        return V2ResourcePolicyClient(self._client)
+
+    @cached_property
     def resource_group(self) -> V2ResourceGroupClient:
         from .domains_v2.resource_group import V2ResourceGroupClient
 
         return V2ResourceGroupClient(self._client)
+
+    @cached_property
+    def resource_preset(self) -> V2ResourcePresetClient:
+        from .domains_v2.resource_preset import V2ResourcePresetClient
+
+        return V2ResourcePresetClient(self._client)
 
     @cached_property
     def resource_slot(self) -> V2ResourceSlotClient:

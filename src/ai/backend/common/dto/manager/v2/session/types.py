@@ -5,12 +5,18 @@ Common types for Session DTO v2.
 from __future__ import annotations
 
 from enum import StrEnum
+from uuid import UUID
+
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
+    "ClusterModeEnum",
+    "CreateSessionTypeEnum",
     "OrderDirection",
+    "ProjectSessionScope",
     "SessionOrderField",
     "SessionResultEnum",
     "SessionStatusEnum",
@@ -66,8 +72,28 @@ class SessionOrderField(StrEnum):
     NAME = "name"
 
 
+class CreateSessionTypeEnum(StrEnum):
+    """Session types allowed for user-initiated creation."""
+
+    INTERACTIVE = "interactive"
+    BATCH = "batch"
+
+
+class ClusterModeEnum(StrEnum):
+    """Cluster networking modes."""
+
+    SINGLE_NODE = "single-node"
+    MULTI_NODE = "multi-node"
+
+
 class SessionStatusFilter(BaseRequestModel):
     """Filter for session status values."""
 
     in_: list[SessionStatusEnum] | None = None
     not_in: list[SessionStatusEnum] | None = None
+
+
+class ProjectSessionScope(BaseRequestModel):
+    """Scope for project-level session operations."""
+
+    project_id: UUID = Field(description="Project UUID to scope the operation.")

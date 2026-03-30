@@ -11,7 +11,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from .base import ScalingGroupAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class SearchScalingGroupsAction(ScalingGroupAction):
     """Action to search scaling groups."""
 
@@ -27,7 +27,7 @@ class SearchScalingGroupsAction(ScalingGroupAction):
         return None
 
 
-@dataclass
+@dataclass(frozen=True)
 class SearchScalingGroupsActionResult(BaseActionResult):
     """Result of searching scaling groups."""
 

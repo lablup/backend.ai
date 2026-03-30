@@ -61,6 +61,10 @@ class ResourceGroupNamePathParam(BaseRequestModel):
     name: str = Field(description="Resource group name")
 
 
+class ResourcePolicyNamePathParam(BaseRequestModel):
+    name: str = Field(description="Resource policy name")
+
+
 class ChannelIdPathParam(BaseRequestModel):
     channel_id: UUID = Field(description="Channel UUID")
 
@@ -79,3 +83,7 @@ class ReplicaIdPathParam(BaseRequestModel):
 
 class RouteIdPathParam(BaseRequestModel):
     route_id: UUID = Field(description="Route UUID")
+
+
+class AccessKeyPathParam(BaseRequestModel):
+    access_key: str = Field(description="Access key string")

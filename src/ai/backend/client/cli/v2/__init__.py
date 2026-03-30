@@ -15,6 +15,7 @@ from ai.backend.common.cli import LazyGroup
 
 from .admin import admin
 from .config_cmd import config
+from .gql_cmd import gql
 from .login_cmd import login, logout
 from .my import my
 
@@ -28,6 +29,7 @@ def v2() -> None:
 v2.add_command(config)
 v2.add_command(login)
 v2.add_command(logout)
+v2.add_command(gql)
 
 # Admin group — contains admin-only commands per entity
 v2.add_command(admin)
@@ -152,6 +154,15 @@ def rbac() -> None:
     """RBAC commands."""
 
 
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.resource_allocation:resource_allocation",
+    name="resource-allocation",
+)
+def resource_allocation() -> None:
+    """Resource allocation commands."""
+
+
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.resource_group:resource_group")
 def resource_group() -> None:
     """Resource group commands."""
@@ -201,6 +212,7 @@ def app_config() -> None:
 @v2.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.prometheus_query_preset:prometheus_query_preset",
+    name="prometheus-query-definition",
 )
 def prometheus_query_preset() -> None:
-    """Prometheus query preset commands."""
+    """Prometheus query definition commands."""

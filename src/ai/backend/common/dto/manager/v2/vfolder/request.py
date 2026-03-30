@@ -9,9 +9,17 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.typed_validators import VFolderName
 
-from .types import VFolderPermissionField, VFolderUsageMode
+from .types import (
+    OrderDirection,
+    VFolderOrderField,
+    VFolderPermissionField,
+    VFolderStatusFilter,
+    VFolderUsageMode,
+    VFolderUsageModeFilter,
+)
 
 __all__ = (
     "AcceptInvitationInput",
@@ -32,6 +40,8 @@ __all__ = (
     "ShareVFolderInput",
     "UnshareVFolderInput",
     "UpdateVFolderInput",
+    "VFolderV2Filter",
+    "VFolderV2Order",
 )
 
 
@@ -229,3 +239,35 @@ class DeleteInvitationInput(BaseRequestModel):
     """Input for deleting a virtual folder invitation."""
 
     invitation_id: UUID = Field(description="Invitation ID to delete")
+
+
+# ============================================================
+# Search / Filter / Order
+# ============================================================
+
+
+class VFolderV2Filter(BaseRequestModel):
+    """Filter criteria for searching virtual folders."""
+
+    name: StringFilter | None = Field(default=None, description="Filter by vfolder name.")
+    host: StringFilter | None = Field(default=None, description="Filter by storage host.")
+    status: VFolderStatusFilter | None = Field(
+        default=None, description="Filter by operation status."
+    )
+    usage_mode: VFolderUsageModeFilter | None = Field(
+        default=None, description="Filter by usage mode."
+    )
+    created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
+    AND: list[VFolderV2Filter] | None = Field(default=None, description="AND logical combinator.")
+    OR: list[VFolderV2Filter] | None = Field(default=None, description="OR logical combinator.")
+    NOT: list[VFolderV2Filter] | None = Field(default=None, description="NOT logical combinator.")
+
+
+VFolderV2Filter.model_rebuild()
+
+
+class VFolderV2Order(BaseRequestModel):
+    """Order specification for virtual folder search results."""
+
+    field: VFolderOrderField
+    direction: OrderDirection

@@ -1,0 +1,77 @@
+{
+  "system": {
+    "timezone": "UTC"
+  },
+{%- if prometheus_addr %}
+  "metric": {
+    "addr": "{{ prometheus_addr }}",
+    "timewindow": "2m"
+  },
+{%- endif %}
+{%- if otel_collector_endpoint %}
+  "otel": {
+    "enabled": true,
+    "log-level": "INFO",
+    "endpoint": "{{ otel_collector_endpoint }}"
+  },
+{%- endif %}
+  "docker": {
+    "image": {
+      "auto_pull": "tag"
+    }
+  },
+  "idle": {
+    "app-streaming-packet-timeout": "300",
+    "checkers": {
+      "network_timeout": {
+        "threshold": "86400"
+      },
+      "utilization": {
+        "initial-grace-period": "0",
+        "resource-thresholds": {
+          "cpu_util": {
+            "average": "1"
+          },
+          "cuda_util": {
+            "average": "1"
+          }
+        },
+        "thresholds-check-operator": "and",
+        "time-window": "172800"
+      }
+    },
+    "enabled": "utilization"
+  },
+  "plugins": {
+    "accelerator": {
+      "cuda": {
+        "expose_real_gpu_name": true,
+        "allocation_mode": "fractional",
+        "reserved_memory": "50331648",
+        "unit_mem": "85899345920",
+        "unit_proc": "108",
+        "quantum_size": 0.1
+      }
+    },
+    "scheduler": {
+      "fifo": {
+        "num_retries_to_skip": "3"
+      }
+    }
+  },
+  "redis": {
+{%- if redis_ha_config %}
+    "sentinel": "{% for node in redis_ha_config.cluster_nodes %}{{ node.hostname }}:{{ redis_ha_config.sentinel_port }}{% if not loop.last %},{% endif %}{% endfor %}",
+{%- else %}
+    "addr": "{{ redis_ip }}:{{ redis_port }}",
+{%- endif %}
+    "password": "{{ redis_password }}",
+    "service_name": "mymaster"
+  },
+  "agent": {
+    "max-container-count": "60",
+    "api": {
+      "pull-timeout": 7200
+    }
+  }
+}
