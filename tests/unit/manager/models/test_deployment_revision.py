@@ -265,8 +265,7 @@ class TestDeploymentRevisionRow:
         test_image: ImageRow,
         test_scaling_group: ScalingGroupRow,
     ) -> AsyncGenerator[EndpointRow, None]:
-        """Create test endpoint with an initial deployment revision."""
-        revision_id = uuid.uuid4()
+        """Create test endpoint without an initial deployment revision."""
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
@@ -287,29 +286,8 @@ class TestDeploymentRevisionRow:
                 environ={},
                 resource_opts={},
                 extra_mounts=[],
-                current_revision=revision_id,
             )
             db_sess.add(endpoint)
-            await db_sess.flush()
-
-            # Create the initial revision that current_revision points to
-            initial_revision = DeploymentRevisionRow(
-                id=revision_id,
-                endpoint=endpoint.id,
-                revision_number=1,
-                image=test_image.id,
-                model=None,
-                model_mount_destination="/models",
-                resource_group=test_scaling_group.name,
-                resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
-                resource_opts={},
-                cluster_mode=ClusterMode.SINGLE_NODE.name,
-                cluster_size=1,
-                runtime_variant=RuntimeVariant.CUSTOM,
-                environ={},
-                extra_mounts=[],
-            )
-            db_sess.add(initial_revision)
             await db_sess.flush()
 
         yield endpoint
@@ -324,7 +302,7 @@ class TestDeploymentRevisionRow:
         async with db_with_cleanup.begin_session() as db_sess:
             revision = DeploymentRevisionRow(
                 endpoint=test_endpoint.id,
-                revision_number=2,
+                revision_number=1,
                 image=test_image.id,
                 model=None,
                 model_mount_destination="/models",
@@ -342,7 +320,7 @@ class TestDeploymentRevisionRow:
 
             assert revision.id is not None
             assert revision.endpoint == test_endpoint.id
-            assert revision.revision_number == 2
+            assert revision.revision_number == 1
 
     async def test_to_data(
         self,
@@ -355,7 +333,7 @@ class TestDeploymentRevisionRow:
         async with db_with_cleanup.begin_session() as db_sess:
             revision = DeploymentRevisionRow(
                 endpoint=test_endpoint.id,
-                revision_number=2,
+                revision_number=1,
                 image=test_image.id,
                 model=model_id,
                 model_mount_destination="/models",
@@ -380,7 +358,7 @@ class TestDeploymentRevisionRow:
             data = revision.to_data()
             assert isinstance(data, ModelRevisionData)
             assert data.id == revision.id
-            assert data.name == "revision-2"
+            assert data.name == "revision-1"
             assert data.cluster_config.mode == ClusterMode.SINGLE_NODE
             assert data.cluster_config.size == 1
             assert data.resource_config.resource_group_name == "default"
@@ -401,7 +379,7 @@ class TestDeploymentRevisionRow:
         async with db_with_cleanup.begin_session() as db_sess:
             revision1 = DeploymentRevisionRow(
                 endpoint=test_endpoint.id,
-                revision_number=2,
+                revision_number=1,
                 image=test_image.id,
                 model=None,
                 model_mount_destination="/models",
@@ -420,7 +398,7 @@ class TestDeploymentRevisionRow:
             # Try to create another revision with same endpoint + revision_number
             revision2 = DeploymentRevisionRow(
                 endpoint=test_endpoint.id,
-                revision_number=2,  # Same as revision1
+                revision_number=1,  # Same as revision1
                 image=test_image.id,
                 model=None,
                 model_mount_destination="/models",
