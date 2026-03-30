@@ -286,6 +286,181 @@ class TestVfolderSearchUserVfolders:
         assert result.has_next_page is False
         assert result.has_previous_page is False
 
+    @pytest.fixture
+    async def mixed_ownership_data(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
+        """Create a user with both USER-owned and GROUP-owned vfolders."""
+        domain_name = "test-domain"
+        user_id = uuid.uuid4()
+        project_id = uuid.uuid4()
+        user_vfolder_id = uuid.uuid4()
+        group_vfolder_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="Test domain",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                    max_network_count=3,
+                )
+            )
+            db_sess.add(
+                KeyPairResourcePolicyRow(
+                    name="default",
+                    total_resource_slots=ResourceSlot(),
+                    max_session_lifetime=0,
+                    max_concurrent_sessions=10,
+                    max_concurrent_sftp_sessions=5,
+                    max_containers_per_session=1,
+                    idle_timeout=3600,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                UserRow(
+                    uuid=user_id,
+                    username="testuser",
+                    email="test@example.com",
+                    password=None,
+                    need_password_change=False,
+                    status=UserStatus.ACTIVE,
+                    status_info="active",
+                    domain_name=domain_name,
+                    role=UserRole.USER,
+                    resource_policy="default",
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                KeyPairRow(
+                    user_id="test@example.com",
+                    user=user_id,
+                    access_key="TESTKEY0000000M",
+                    secret_key="test-secret-m",
+                    is_active=True,
+                    is_admin=False,
+                    resource_policy="default",
+                    rate_limit=1000,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name="project-mixed",
+                    domain_name=domain_name,
+                    description="Test project",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy="default",
+                    type=ProjectType.GENERAL,
+                )
+            )
+            await db_sess.flush()
+
+            # USER-owned vfolder
+            db_sess.add(
+                VFolderRow(
+                    id=user_vfolder_id,
+                    name="my-personal-vfolder",
+                    host="local:volume1",
+                    domain_name=domain_name,
+                    quota_scope_id=f"user:{user_id}",
+                    usage_mode=VFolderUsageMode.GENERAL,
+                    permission=VFolderMountPermission.READ_WRITE,
+                    max_files=0,
+                    max_size=None,
+                    num_files=0,
+                    cur_size=0,
+                    creator="test@example.com",
+                    unmanaged_path=None,
+                    ownership_type=VFolderOwnershipType.USER,
+                    user=user_id,
+                    group=None,
+                    cloneable=False,
+                    status=VFolderOperationStatus.READY,
+                )
+            )
+            # GROUP-owned vfolder with same user
+            db_sess.add(
+                VFolderRow(
+                    id=group_vfolder_id,
+                    name="project-shared-vfolder",
+                    host="local:volume1",
+                    domain_name=domain_name,
+                    quota_scope_id=f"project:{project_id}",
+                    usage_mode=VFolderUsageMode.GENERAL,
+                    permission=VFolderMountPermission.READ_WRITE,
+                    max_files=0,
+                    max_size=None,
+                    num_files=0,
+                    cur_size=0,
+                    creator="test@example.com",
+                    unmanaged_path=None,
+                    ownership_type=VFolderOwnershipType.GROUP,
+                    user=user_id,
+                    group=project_id,
+                    cloneable=False,
+                    status=VFolderOperationStatus.READY,
+                )
+            )
+            await db_sess.flush()
+
+        yield {
+            "user_id": user_id,
+            "user_vfolder_id": user_vfolder_id,
+            "group_vfolder_id": group_vfolder_id,
+        }
+
+    async def test_returns_vfolders_regardless_of_ownership_type(
+        self,
+        vfolder_repository: VfolderRepository,
+        mixed_ownership_data: dict[str, uuid.UUID],
+    ) -> None:
+        """search_user_vfolders returns both USER-owned and GROUP-owned vfolders
+        as long as VFolderRow.user matches, regardless of ownership_type."""
+        scope = UserVFolderSearchScope(user_id=mixed_ownership_data["user_id"])
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await vfolder_repository.search_user_vfolders(querier, scope)
+
+        assert result.total_count == 2
+        returned_ids = {item.id for item in result.items}
+        assert returned_ids == {
+            mixed_ownership_data["user_vfolder_id"],
+            mixed_ownership_data["group_vfolder_id"],
+        }
+
     async def test_nonexistent_user_raises_error(
         self,
         vfolder_repository: VfolderRepository,
