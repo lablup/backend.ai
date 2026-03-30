@@ -205,7 +205,7 @@ class TestVFolderServiceSearchUserVFolders:
 
         assert isinstance(result, SearchUserVFoldersActionResult)
         assert result.user_id == user_id
-        assert result.items == [vfolder_1]
+        assert result.data == [vfolder_1]
         assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False

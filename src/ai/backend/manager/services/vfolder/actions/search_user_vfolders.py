@@ -55,7 +55,7 @@ class SearchUserVFoldersAction(VFolderScopeAction):
 @dataclass
 class SearchUserVFoldersActionResult(VFolderScopeActionResult):
     user_id: uuid.UUID
-    items: list[VFolderData]
+    data: list[VFolderData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
