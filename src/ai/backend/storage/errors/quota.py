@@ -99,6 +99,20 @@ class InvalidQuotaFormatError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class QuotaScopeCreationFailedError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when creating a quota scope fails."""
+
+    error_type = "https://api.backend.ai/probs/storage/quota/scope/creation-failed"
+    error_title = "Quota Scope Creation Failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.QUOTA_SCOPE,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class QuotaTreeNotFoundError(BackendAIError, web.HTTPNotFound):
     """Raised when a quota tree (e.g., XFS project) is not found."""
 

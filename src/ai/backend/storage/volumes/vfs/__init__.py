@@ -26,6 +26,8 @@ from ai.backend.storage.errors import (
     MetadataTooLargeError,
     ProcessExecutionError,
     QuotaDirectoryNotEmptyError,
+    QuotaScopeAlreadyExists,
+    QuotaScopeCreationFailedError,
     QuotaScopeNotFoundError,
 )
 from ai.backend.storage.subproc import run
@@ -95,10 +97,15 @@ class BaseQuotaModel(AbstractQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
-        )
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
+            )
+        except FileExistsError as e:
+            raise QuotaScopeAlreadyExists(
+                f"Quota scope '{quota_scope_id}' already exists"
+            ) from e
 
     async def describe_quota_scope(
         self,
@@ -155,10 +162,15 @@ class SetGIDQuotaModel(BaseQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
-        )
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
+            )
+        except FileExistsError as e:
+            raise QuotaScopeAlreadyExists(
+                f"Quota scope '{quota_scope_id}' already exists"
+            ) from e
         # TODO: setgid impl.
 
     async def describe_quota_scope(
@@ -460,7 +472,15 @@ class BaseVolume(AbstractVolume):
         if not self.quota_model.mangle_qspath(dst_vfid).exists():
             if dst_vfid.quota_scope_id is None:
                 raise QuotaScopeNotFoundError
-            await self.quota_model.create_quota_scope(dst_vfid.quota_scope_id)
+            try:
+                await self.quota_model.create_quota_scope(dst_vfid.quota_scope_id)
+            except QuotaScopeAlreadyExists:
+                pass
+            except Exception as e:
+                raise QuotaScopeCreationFailedError(
+                    f"Failed to create quota scope '{dst_vfid.quota_scope_id}' "
+                    f"for clone destination: {e}"
+                ) from e
         await self.create_vfolder(dst_vfid)
         dst_vfpath = self.mangle_vfpath(dst_vfid)
 
