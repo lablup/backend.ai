@@ -70,8 +70,6 @@ input ActivateRevisionInput {
 
 """Added in 25.19.0. Result of activating a revision."""
 type ActivateRevisionPayload {
-  deploymentPolicy: DeploymentPolicy!
-
   """The deployment with the activated revision"""
   deployment: ModelDeployment!
 
@@ -80,6 +78,9 @@ type ActivateRevisionPayload {
 
   """ID of the newly activated revision"""
   activatedRevisionId: ID!
+
+  """The deployment policy applied during activation"""
+  deploymentPolicy: DeploymentPolicy!
 }
 
 """

@@ -104,8 +104,6 @@ input ActivateRevisionInput
 type ActivateRevisionPayload
   @join__type(graph: STRAWBERRY)
 {
-  deploymentPolicy: DeploymentPolicy!
-
   """The deployment with the activated revision"""
   deployment: ModelDeployment!
 
@@ -114,6 +112,9 @@ type ActivateRevisionPayload
 
   """ID of the newly activated revision"""
   activatedRevisionId: ID!
+
+  """The deployment policy applied during activation"""
+  deploymentPolicy: DeploymentPolicy!
 }
 
 """
