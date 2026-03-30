@@ -515,7 +515,7 @@ class HealthCheckEngine:
         except Exception as e:
             log.error(
                 "Failed to propagate route updates for circuit {} to workers: {}",
-                fresh_circuit.id,
+                circuit.id,
                 e,
             )
             # Don't re-raise here as this is a propagation failure, not a health check failure
