@@ -84,7 +84,6 @@ class CircuitManager:
     traefik_etcd: TraefikEtcd | None
     local_config: ServerConfig
     _circuit_locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
-    _unloaded_circuits: set[UUID] = field(default_factory=set)
 
     def _get_lock(self, circuit_id: UUID) -> asyncio.Lock:
         if circuit_id not in self._circuit_locks:
@@ -163,9 +162,6 @@ class CircuitManager:
 
     async def update_circuit_routes(self, circuit: Circuit, old_routes: list[RouteInfo]) -> None:
         async with self._get_lock(circuit.id):
-            if circuit.id in self._unloaded_circuits:
-                log.debug("Circuit {} already unloaded, skipping route update", circuit.id)
-                return
             log.debug("Acquired lock for circuit {} in update_circuit_routes", circuit.id)
             if self.local_config.proxy_coordinator.enable_traefik:
                 await self.update_traefik_circuit_routes(circuit, old_routes)
@@ -236,7 +232,7 @@ class CircuitManager:
                 async with self._get_lock(circuit.id):
                     log.debug("Acquired lock for circuit {} in unload_circuits", circuit.id)
                     await self.unload_traefik_circuit(circuit)
-                    self._unloaded_circuits.add(circuit.id)
+                self._circuit_locks.pop(circuit.id, None)
         else:
             await self.unload_legacy_circuits(circuits)
 
