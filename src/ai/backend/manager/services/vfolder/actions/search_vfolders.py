@@ -33,7 +33,7 @@ class SearchVFoldersAction(VFolderAction):
 class SearchVFoldersActionResult(BaseActionResult):
     """Result of SearchVFoldersAction."""
 
-    items: list[VFolderData]
+    data: list[VFolderData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

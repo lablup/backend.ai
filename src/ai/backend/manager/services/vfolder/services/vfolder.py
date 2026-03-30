@@ -549,7 +549,7 @@ class VFolderService:
         """Search all vfolders without scope restriction (admin-only)."""
         result = await self._vfolder_repository.search_vfolders(querier=action.querier)
         return SearchVFoldersActionResult(
-            items=result.items,
+            data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,

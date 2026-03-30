@@ -123,7 +123,7 @@ class TestVFolderServiceSearchVFolders:
         result = await vfolder_service.search_vfolders(action)
 
         assert isinstance(result, SearchVFoldersActionResult)
-        assert result.items == [vfolder_1, vfolder_2]
+        assert result.data == [vfolder_1, vfolder_2]
         assert result.total_count == 2
         assert result.has_next_page is False
         assert result.has_previous_page is False
