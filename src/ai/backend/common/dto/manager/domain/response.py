@@ -38,7 +38,7 @@ class DomainDTO(BaseModel):
         description="Allowed vfolder hosts with permissions"
     )
     allowed_docker_registries: list[str] = Field(description="Allowed docker registries")
-    integration_name: str | None = Field(default=None, description="External integration name")
+    integration_id: str | None = Field(default=None, description="External integration name")
 
 
 class CreateDomainResponse(BaseResponseModel):

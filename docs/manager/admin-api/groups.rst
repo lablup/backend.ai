@@ -16,7 +16,7 @@ Query Schema
      domain_name: String
      total_resource_slots: JSONString  # ResourceSlot
      allowed_vfolder_hosts: [String]
-     integration_name: String
+     integration_id: String
      scaling_groups: [String]
    }
 
@@ -36,7 +36,7 @@ Mutation Schema
      domain_name: String!
      total_resource_slots: JSONString  # ResourceSlot
      allowed_vfolder_hosts: [String]
-     integration_name: String
+     integration_id: String
    }
 
    input ModifyGroupInput {
@@ -48,7 +48,7 @@ Mutation Schema
      user_update_mode: String
      user_uuids: [String]
      allowed_vfolder_hosts: [String]
-     integration_name: String
+     integration_id: String
    }
 
    type CreateGroup {

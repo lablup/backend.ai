@@ -48,7 +48,7 @@ class DomainAdapter(BaseFilterAdapter):
             total_resource_slots=dict(data.total_resource_slots),
             allowed_vfolder_hosts=dict(data.allowed_vfolder_hosts),
             allowed_docker_registries=data.allowed_docker_registries,
-            integration_name=data.integration_name,
+            integration_id=data.integration_name,  # data type uses integration_name, DTO uses integration_id
         )
 
     def build_updater(self, request: UpdateDomainRequest, domain_name: str) -> Updater[DomainRow]:
@@ -73,8 +73,8 @@ class DomainAdapter(BaseFilterAdapter):
             allowed_vfolder_hosts = OptionalState.update(request.allowed_vfolder_hosts)
         if request.allowed_docker_registries is not None:
             allowed_docker_registries = OptionalState.update(request.allowed_docker_registries)
-        if request.integration_name is not None:
-            integration_name = TriState.update(request.integration_name)
+        if request.integration_id is not None:
+            integration_name = TriState.update(request.integration_id)
 
         updater_spec = DomainUpdaterSpec(
             name=name,

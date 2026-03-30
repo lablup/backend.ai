@@ -705,7 +705,7 @@ type DomainNode implements Node @key(fields: "id") {
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
   dotfiles: Bytes
-  integration_name: String
+  integration_id: String
   scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalingGroupConnection
 }
 
@@ -920,7 +920,7 @@ type Domain {
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
-  integration_name: String
+  integration_id: String
   scaling_groups: [String]
 }
 
@@ -938,7 +938,7 @@ type GroupNode implements Node @key(fields: "id") {
   domain_name: String
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
-  integration_name: String
+  integration_id: String
   resource_policy: String
 
   """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
@@ -1065,7 +1065,7 @@ type Group {
   domain_name: String
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
-  integration_name: String
+  integration_id: String
   resource_policy: String
 
   """Added in 24.03.0."""
@@ -2615,7 +2615,7 @@ input DomainInput {
   total_resource_slots: JSONString = "{}"
   allowed_vfolder_hosts: JSONString = "{}"
   allowed_docker_registries: [String] = []
-  integration_name: String = null
+  integration_id: String = null
 }
 
 type ModifyDomain {
@@ -2631,7 +2631,7 @@ input ModifyDomainInput {
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
-  integration_name: String
+  integration_id: String
 }
 
 """Instead of deleting the domain, just mark it as inactive."""
@@ -2666,7 +2666,7 @@ input CreateDomainNodeInput {
   total_resource_slots: JSONString = "{}"
   allowed_vfolder_hosts: JSONString = "{}"
   allowed_docker_registries: [String] = []
-  integration_name: String = null
+  integration_id: String = null
   dotfiles: Bytes = "90"
   scaling_groups: [String]
 }
@@ -2685,7 +2685,7 @@ input ModifyDomainNodeInput {
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
-  integration_name: String
+  integration_id: String
   dotfiles: Bytes
   sgroups_to_add: [String]
   sgroups_to_remove: [String]
@@ -2706,7 +2706,7 @@ input GroupInput {
   domain_name: String!
   total_resource_slots: JSONString = "{}"
   allowed_vfolder_hosts: JSONString = "{}"
-  integration_name: String = ""
+  integration_id: String = ""
   resource_policy: String = "default"
 
   """Added in 24.03.0"""
@@ -2728,7 +2728,7 @@ input ModifyGroupInput {
   user_update_mode: String
   user_uuids: [String]
   allowed_vfolder_hosts: JSONString
-  integration_name: String
+  integration_id: String
   resource_policy: String
 
   """Added in 24.03.0"""

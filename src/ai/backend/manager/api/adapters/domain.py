@@ -165,7 +165,7 @@ class DomainAdapter(BaseAdapter):
             description=input.description,
             is_active=input.is_active,
             allowed_docker_registries=input.allowed_docker_registries,
-            integration_name=input.integration_name,
+            integration_name=input.integration_id,  # DTO uses integration_id, data type uses integration_name
         )
         result = await self._processors.domain.create_domain_node.wait_for_complete(
             CreateDomainNodeAction(
@@ -204,10 +204,10 @@ class DomainAdapter(BaseAdapter):
             ),
             integration_name=(
                 TriState.nop()
-                if isinstance(input.integration_name, Sentinel)
+                if isinstance(input.integration_id, Sentinel)
                 else TriState.nullify()
-                if input.integration_name is None
-                else TriState.update(input.integration_name)
+                if input.integration_id is None
+                else TriState.update(input.integration_id)
             ),
         )
         updater: Updater[DomainRow] = Updater(spec=spec, pk_value=domain_name)
@@ -360,7 +360,7 @@ class DomainAdapter(BaseAdapter):
             basic_info=DomainBasicInfo(
                 name=data.name,
                 description=data.description,
-                integration_name=data.integration_name,
+                integration_id=data.integration_name,  # data type uses integration_name, DTO uses integration_id
             ),
             registry=DomainRegistryInfo(
                 allowed_docker_registries=data.allowed_docker_registries,

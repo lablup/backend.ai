@@ -39,7 +39,7 @@ class CreateDomainRequest(BaseRequestModel):
     allowed_docker_registries: list[str] | None = Field(
         default=None, description="Allowed docker registries"
     )
-    integration_name: str | None = Field(default=None, description="External integration name")
+    integration_id: str | None = Field(default=None, description="External integration name")
 
 
 class UpdateDomainRequest(BaseRequestModel):
@@ -57,7 +57,7 @@ class UpdateDomainRequest(BaseRequestModel):
     allowed_docker_registries: list[str] | None = Field(
         default=None, description="Updated allowed docker registries"
     )
-    integration_name: str | None = Field(default=None, description="Updated integration name")
+    integration_id: str | None = Field(default=None, description="Updated integration name")
 
 
 class DomainFilter(BaseRequestModel):

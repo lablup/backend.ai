@@ -88,7 +88,7 @@ _SAMPLE_GROUP_DTO: dict[str, Any] = {
     "created_at": "2025-01-01T00:00:00",
     "modified_at": "2025-01-01T00:00:00",
     "domain_name": "default",
-    "integration_name": None,
+    "integration_id": None,
     "total_resource_slots": None,
     "allowed_vfolder_hosts": None,
     "resource_policy": None,

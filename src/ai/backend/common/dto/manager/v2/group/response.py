@@ -42,7 +42,7 @@ class ProjectBasicInfo(BaseModel):
     type: ProjectType = Field(
         description="Project type determining its purpose. See ProjectType enum.",
     )
-    integration_name: str | None = Field(
+    integration_id: str | None = Field(
         default=None,
         description="External system integration name.",
     )
