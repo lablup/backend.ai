@@ -7293,6 +7293,18 @@ type ModelCardEdge
 }
 
 """
+Added in UNRELEASED. Configuration for a single model in the model definition.
+"""
+type ModelConfig
+  @join__type(graph: STRAWBERRY)
+{
+  name: String!
+  modelPath: String!
+  service: ModelServiceConfig
+  metadata: ModelMetadata
+}
+
+"""
 Added in 26.4.0. Configuration for a single model within a model definition.
 """
 input ModelConfigInput
@@ -7309,6 +7321,15 @@ input ModelConfigInput
 
   """Metadata about the model."""
   metadata: ModelMetadataInput = null
+}
+
+"""
+Added in UNRELEASED. Model definition containing one or more model entries.
+"""
+type ModelDefinition
+  @join__type(graph: STRAWBERRY)
+{
+  models: [ModelConfig!]!
 }
 
 """
@@ -7428,6 +7449,18 @@ input ModelDeploymentNetworkAccessInput
   openToPublic: Boolean! = false
 }
 
+"""Added in UNRELEASED. Health check configuration for a model service."""
+type ModelHealthCheck
+  @join__type(graph: STRAWBERRY)
+{
+  interval: Float!
+  path: String!
+  maxRetries: Int!
+  maxWaitTime: Float!
+  expectedStatusCode: Int!
+  initialDelay: Float!
+}
+
 """Added in 26.4.0. Health check configuration for a model service."""
 input ModelHealthCheckInput
   @join__type(graph: STRAWBERRY)
@@ -7449,6 +7482,25 @@ input ModelHealthCheckInput
 
   """Initial delay in seconds before the first health check."""
   initialDelay: Float! = 60
+}
+
+"""Added in UNRELEASED. Metadata describing a model entry."""
+type ModelMetadata
+  @join__type(graph: STRAWBERRY)
+{
+  author: String
+  title: String
+  version: JSON
+  created: String
+  lastModified: String
+  description: String
+  task: String
+  category: String
+  architecture: String
+  framework: [String!]
+  label: [String!]
+  license: String
+  minResource: JSON
 }
 
 """
@@ -7609,7 +7661,7 @@ type ModelRevision implements Node
   """
   Added in UNRELEASED. Resolved model definition stored for this revision.
   """
-  modelDefinition: JSON
+  modelDefinition: ModelDefinition
 
   """Additional volume folder mounts."""
   extraMounts: [ExtraVFolderMountInfoGQL!]!
@@ -7691,6 +7743,17 @@ input ModelRuntimeConfigInput
 
   """Environment variables for the service."""
   environ: EnvironmentVariablesInput = null
+}
+
+"""Added in UNRELEASED. Service configuration for a model entry."""
+type ModelServiceConfig
+  @join__type(graph: STRAWBERRY)
+{
+  preStartActions: [PreStartAction!]!
+  startCommand: JSON!
+  shell: String!
+  port: Int!
+  healthCheck: ModelHealthCheck
 }
 
 """
@@ -9721,6 +9784,16 @@ type PresetAvailabilityV2
 
   """Whether this preset can be used for session creation."""
   available: Boolean!
+}
+
+"""
+Added in UNRELEASED. A pre-start action to execute before starting the model service.
+"""
+type PreStartAction
+  @join__type(graph: STRAWBERRY)
+{
+  action: String!
+  args: JSON!
 }
 
 """

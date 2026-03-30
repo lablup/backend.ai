@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentPolicyInfo,
     DeploymentStrategyInfoDTO,
     ExtraVFolderMountGQLDTO,
+    ModelDefinitionInfoDTO,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
     ReplicaStateInfo,
@@ -91,7 +92,7 @@ class RevisionNode(BaseResponseModel):
     model_mount_config: ModelMountConfigInfoDTO | None = Field(
         default=None, description="Model mount configuration"
     )
-    model_definition: dict[str, Any] | None = Field(
+    model_definition: ModelDefinitionInfoDTO | None = Field(
         default=None, description="Model definition configuration"
     )
     created_at: datetime = Field(description="Creation timestamp")

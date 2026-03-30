@@ -81,6 +81,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
     ExtraVFolderMountGQLDTO,
+    ModelDefinitionInfoDTO,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
     OrderDirection,
@@ -1479,9 +1480,11 @@ class DeploymentAdapter(BaseAdapter):
                 environ=environ_dto,
             ),
             model_mount_config=model_mount_config_dto,
-            model_definition=dict(data.model_definition)
-            if data.model_definition is not None
-            else None,
+            model_definition=(
+                ModelDefinitionInfoDTO.model_validate(data.model_definition)
+                if data.model_definition is not None
+                else None
+            ),
             created_at=data.created_at,
             extra_mounts=[
                 ExtraVFolderMountGQLDTO(

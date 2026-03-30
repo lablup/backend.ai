@@ -44,11 +44,17 @@ __all__ = (
     "EnvironmentVariableEntryInfoDTO",
     "EnvironmentVariablesInfoDTO",
     "ExtraVFolderMountGQLDTO",
+    "ModelConfigInfoDTO",
     "ModelDeploymentStatus",
+    "ModelDefinitionInfoDTO",
+    "ModelHealthCheckInfoDTO",
     "ModelMountConfigInfoDTO",
+    "ModelMetadataInfoDTO",
     "ModelRuntimeConfigInfoDTO",
+    "ModelServiceConfigInfoDTO",
     "NetworkConfigInfo",
     "OrderDirection",
+    "PreStartActionInfoDTO",
     "ReplicaOrderField",
     "ReplicaStateInfo",
     "ResourceConfigInfoDTO",
@@ -241,6 +247,67 @@ class EnvironmentVariablesInfoDTO(BaseResponseModel):
     """A collection of environment variable entries."""
 
     entries: list[EnvironmentVariableEntryInfoDTO]
+
+
+class PreStartActionInfoDTO(BaseResponseModel):
+    """Output DTO for a pre-start action in model definition."""
+
+    action: str
+    args: dict[str, Any] = Field(default_factory=dict)
+
+
+class ModelHealthCheckInfoDTO(BaseResponseModel):
+    """Output DTO for model health check configuration."""
+
+    interval: float
+    path: str
+    max_retries: int
+    max_wait_time: float
+    expected_status_code: int
+    initial_delay: float
+
+
+class ModelServiceConfigInfoDTO(BaseResponseModel):
+    """Output DTO for model service configuration."""
+
+    pre_start_actions: list[PreStartActionInfoDTO] = Field(default_factory=list)
+    start_command: str | list[str]
+    shell: str = "/bin/bash"
+    port: int
+    health_check: ModelHealthCheckInfoDTO | None = None
+
+
+class ModelMetadataInfoDTO(BaseResponseModel):
+    """Output DTO for model metadata."""
+
+    author: str | None = None
+    title: str | None = None
+    version: int | str | None = None
+    created: str | None = None
+    last_modified: str | None = None
+    description: str | None = None
+    task: str | None = None
+    category: str | None = None
+    architecture: str | None = None
+    framework: list[str] | None = None
+    label: list[str] | None = None
+    license: str | None = None
+    min_resource: dict[str, Any] | None = None
+
+
+class ModelConfigInfoDTO(BaseResponseModel):
+    """Output DTO for a single model entry in model definition."""
+
+    name: str
+    model_path: str
+    service: ModelServiceConfigInfoDTO | None = None
+    metadata: ModelMetadataInfoDTO | None = None
+
+
+class ModelDefinitionInfoDTO(BaseResponseModel):
+    """Output DTO for model definition."""
+
+    models: list[ModelConfigInfoDTO]
 
 
 class ClusterConfigInfoDTO(BaseResponseModel):

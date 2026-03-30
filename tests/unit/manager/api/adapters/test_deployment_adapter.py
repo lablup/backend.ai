@@ -59,5 +59,6 @@ class TestRevisionDataToDTO:
         dto = DeploymentAdapter._revision_data_to_dto(revision)
 
         assert dto.model_definition is not None
-        assert dto.model_definition["models"][0]["name"] == "demo-model"
-        assert dto.model_definition["models"][0]["service"]["port"] == 8000
+        assert dto.model_definition.models[0].name == "demo-model"
+        assert dto.model_definition.models[0].service is not None
+        assert dto.model_definition.models[0].service.port == 8000

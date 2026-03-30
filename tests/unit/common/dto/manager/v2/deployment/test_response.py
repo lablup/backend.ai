@@ -248,8 +248,9 @@ class TestRevisionNode:
         node = _make_revision_node(model_definition=model_definition)
 
         assert node.model_definition is not None
-        assert node.model_definition["models"][0]["name"] == "sample-model"
-        assert node.model_definition["models"][0]["service"]["port"] == 8000
+        assert node.model_definition.models[0].name == "sample-model"
+        assert node.model_definition.models[0].service is not None
+        assert node.model_definition.models[0].service.port == 8000
 
     def test_round_trip(self) -> None:
         revision_id = uuid.uuid4()
@@ -263,7 +264,7 @@ class TestRevisionNode:
         assert restored.id == revision_id
         assert restored.name == "v2"
         assert restored.model_definition is not None
-        assert restored.model_definition["models"][0]["name"] == "v2-model"
+        assert restored.model_definition.models[0].name == "v2-model"
 
 
 class TestDeploymentNode:
