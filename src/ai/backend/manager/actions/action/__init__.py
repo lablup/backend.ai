@@ -36,6 +36,14 @@ from .rbac_session import (
     SessionSearchRBACAction,
     SessionUpdateRBACAction,
 )
+from .rbac_user import (
+    UserCreateRBACAction,
+    UserGetRBACAction,
+    UserHardDeleteRBACAction,
+    UserSearchRBACAction,
+    UserSoftDeleteRBACAction,
+    UserUpdateRBACAction,
+)
 from .rbac_vfolder import (
     VFolderCreateRBACAction,
     VFolderGetRBACAction,
@@ -65,6 +73,12 @@ RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
     SessionGrantReadRBACAction,
     SessionGrantUpdateRBACAction,
     SessionGrantHardDeleteRBACAction,
+    UserCreateRBACAction,
+    UserGetRBACAction,
+    UserSearchRBACAction,
+    UserUpdateRBACAction,
+    UserSoftDeleteRBACAction,
+    UserHardDeleteRBACAction,
     VFolderCreateRBACAction,
     VFolderGetRBACAction,
     VFolderSearchRBACAction,
