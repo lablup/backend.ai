@@ -346,7 +346,7 @@ from .user import (
     update_my_allowed_client_ip,
     update_user_v2,
 )
-from .vfolder_v2 import project_vfolders_v2
+from .vfolder_v2 import project_vfolders
 from .vfs_storage import (
     create_vfs_storage,
     delete_vfs_storage,
@@ -518,8 +518,8 @@ class Query:
     effective_resource_allocation_v2 = effective_resource_allocation_v2
     admin_effective_resource_allocation_v2 = admin_effective_resource_allocation_v2
     check_preset_availability_v2 = check_preset_availability_v2
-    # VFolder V2 APIs
-    project_vfolders_v2 = project_vfolders_v2
+    # VFolder APIs
+    project_vfolders = project_vfolders
 
 
 @strawberry.type

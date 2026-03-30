@@ -1,7 +1,7 @@
 """VFolder GraphQL resolver package."""
 
-from .query import project_vfolders_v2
+from .query import project_vfolders
 
 __all__ = [
-    "project_vfolders_v2",
+    "project_vfolders",
 ]

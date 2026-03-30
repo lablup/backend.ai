@@ -24,7 +24,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types import (
         description="List virtual folders within a specific project.",
     )
 )  # type: ignore[misc]
-async def project_vfolders_v2(
+async def project_vfolders(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
     before: str | None = None,
