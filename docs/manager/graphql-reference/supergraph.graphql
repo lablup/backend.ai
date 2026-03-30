@@ -2539,8 +2539,8 @@ input CreateDomainInputGQL
   """Allowed Docker registry URLs."""
   allowedDockerRegistries: [String!] = null
 
-  """External integration identifier."""
-  integrationId: String = null
+  """External integration name."""
+  integrationName: String = null
 }
 
 """Added in 24.12.0."""
@@ -2562,7 +2562,7 @@ input CreateDomainNodeInput
   total_resource_slots: JSONString = "{}"
   allowed_vfolder_hosts: JSONString = "{}"
   allowed_docker_registries: [String] = []
-  integration_id: String = null
+  integration_name: String = null
   dotfiles: Bytes = "90"
   scaling_groups: [String]
 }
@@ -2733,8 +2733,8 @@ input CreateProjectInputGQL
   """Optional description."""
   description: String = null
 
-  """External integration identifier."""
-  integrationId: String = null
+  """External integration name."""
+  integrationName: String = null
 
   """Name of the resource policy to apply."""
   resourcePolicy: String = null
@@ -3782,7 +3782,7 @@ type Domain
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
-  integration_id: String
+  integration_name: String
   scaling_groups: [String]
 }
 
@@ -3798,8 +3798,8 @@ type DomainBasicInfo
   """Optional description of the domain."""
   description: String
 
-  """External system integration identifier."""
-  integrationId: String
+  """External system integration name."""
+  integrationName: String
 }
 
 """Added in 24.12.0"""
@@ -3983,7 +3983,7 @@ input DomainInput
   total_resource_slots: JSONString = "{}"
   allowed_vfolder_hosts: JSONString = "{}"
   allowed_docker_registries: [String] = []
-  integration_id: String = null
+  integration_name: String = null
 }
 
 """
@@ -4021,7 +4021,7 @@ type DomainNode implements Node
   allowed_vfolder_hosts: JSONString @join__field(graph: GRAPHENE)
   allowed_docker_registries: [String] @join__field(graph: GRAPHENE)
   dotfiles: Bytes @join__field(graph: GRAPHENE)
-  integration_id: String @join__field(graph: GRAPHENE)
+  integration_name: String @join__field(graph: GRAPHENE)
   scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalingGroupConnection @join__field(graph: GRAPHENE)
 }
 
@@ -4891,7 +4891,7 @@ type Group
   domain_name: String
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
-  integration_id: String
+  integration_name: String
   resource_policy: String
 
   """Added in 24.03.0."""
@@ -4937,7 +4937,7 @@ input GroupInput
   domain_name: String!
   total_resource_slots: JSONString = "{}"
   allowed_vfolder_hosts: JSONString = "{}"
-  integration_id: String = ""
+  integration_name: String = ""
   resource_policy: String = "default"
 
   """Added in 24.03.0"""
@@ -4962,7 +4962,7 @@ type GroupNode implements Node
   domain_name: String @join__field(graph: GRAPHENE)
   total_resource_slots: JSONString @join__field(graph: GRAPHENE)
   allowed_vfolder_hosts: JSONString @join__field(graph: GRAPHENE)
-  integration_id: String @join__field(graph: GRAPHENE)
+  integration_name: String @join__field(graph: GRAPHENE)
   resource_policy: String @join__field(graph: GRAPHENE)
 
   """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
@@ -7162,7 +7162,7 @@ input ModifyDomainInput
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
-  integration_id: String
+  integration_name: String
 }
 
 """Added in 24.12.0."""
@@ -7183,7 +7183,7 @@ input ModifyDomainNodeInput
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
-  integration_id: String
+  integration_name: String
   dotfiles: Bytes
   sgroups_to_add: [String]
   sgroups_to_remove: [String]
@@ -7275,7 +7275,7 @@ input ModifyGroupInput
   user_update_mode: String
   user_uuids: [String]
   allowed_vfolder_hosts: JSONString
-  integration_id: String
+  integration_name: String
   resource_policy: String
 
   """Added in 24.03.0"""
@@ -8928,8 +8928,8 @@ type ProjectBasicInfo
   """Project type determining its purpose. See ProjectType enum."""
   type: ProjectTypeV2!
 
-  """External system integration identifier."""
-  integrationId: String
+  """External system integration name."""
+  integrationName: String
 }
 
 """
@@ -13330,8 +13330,8 @@ input UpdateDomainInputGQL
   """New allowed Docker registry URLs."""
   allowedDockerRegistries: [String!] = null
 
-  """New external integration identifier."""
-  integrationId: String = null
+  """New external integration name."""
+  integrationName: String = null
 }
 
 """Added in 25.14.0. """
@@ -13487,8 +13487,8 @@ input UpdateProjectInputGQL
   """Updated active status."""
   isActive: Boolean = null
 
-  """New external integration identifier."""
-  integrationId: String = null
+  """New external integration name."""
+  integrationName: String = null
 
   """New resource policy name."""
   resourcePolicy: String = null
