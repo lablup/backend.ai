@@ -12,7 +12,7 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 __all__ = (
@@ -63,11 +63,21 @@ class UserVFolderSearchScope(SearchScope):
     """Required. The user whose vfolders to search."""
 
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for VFolderRow."""
+        """Convert scope to a query condition for VFolderRow.
+
+        Returns vfolders where the user is the owner (VFolderRow.user)
+        OR has been granted permission (via VFolderPermissionRow).
+        """
         user_id = self.user_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return VFolderRow.user == user_id
+            permitted_vfolder_ids = sa.select(VFolderPermissionRow.vfolder).where(
+                VFolderPermissionRow.user == user_id
+            )
+            return sa.or_(
+                VFolderRow.user == user_id,
+                VFolderRow.id.in_(permitted_vfolder_ids),
+            )
 
         return inner
 
