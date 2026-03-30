@@ -445,10 +445,24 @@ class HealthCheckEngine:
             old_routes: Previous route information for comparison
         """
         try:
-            # Re-read the circuit from DB to get fresh route_info and detect deletion
+            # Re-read the circuit and endpoint from DB in a single session
+            # to get fresh route_info, detect deletion, and ensure consistent snapshot
+            endpoint = None
             try:
                 async with self.db.begin_readonly_session() as sess:
-                    fresh_circuit = await Circuit.get(sess, circuit.id)
+                    fresh_circuit = await Circuit.get(
+                        sess, circuit.id, load_worker=True, load_endpoint=True
+                    )
+                    if fresh_circuit.endpoint_id:
+                        try:
+                            endpoint = await Endpoint.get(sess, fresh_circuit.endpoint_id)
+                        except Exception as e:
+                            log.warning(
+                                "Failed to get endpoint {} for circuit {}: {}",
+                                fresh_circuit.endpoint_id,
+                                fresh_circuit.id,
+                                e,
+                            )
             except ObjectNotFound:
                 log.info(
                     "Circuit {} was deleted, skipping route propagation",
@@ -457,23 +471,10 @@ class HealthCheckEngine:
                 return
 
             log.debug(
-                "Re-read circuit {} from DB for route propagation",
+                "Re-read circuit {} from DB for route propagation ({} routes)",
                 fresh_circuit.id,
+                len(fresh_circuit.route_info),
             )
-
-            # Get the endpoint to check if health checking is enabled
-            endpoint = None
-            if fresh_circuit.endpoint_id:
-                try:
-                    async with self.db.begin_readonly_session() as sess:
-                        endpoint = await Endpoint.get(sess, fresh_circuit.endpoint_id)
-                except Exception as e:
-                    log.warning(
-                        "Failed to get endpoint {} for circuit {}: {}",
-                        fresh_circuit.endpoint_id,
-                        fresh_circuit.id,
-                        e,
-                    )
 
             # Determine if health checking is enabled for this endpoint
             health_check_enabled = (
