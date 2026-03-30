@@ -104,12 +104,16 @@ def deployment_processors(
         "cpu": Decimal("1000"),
         "mem": Decimal("1099511627776"),  # 1 TiB
     })
-    scheduling_controller.get_available_resources_for_scaling_group = AsyncMock(
-        return_value=TotalResourceData(
-            total_used_slots=ResourceSlot({}),
-            total_free_slots=mock_available_slots,
-            total_capacity_slots=mock_available_slots,
-        )
+    object.__setattr__(
+        scheduling_controller,
+        "get_available_resources_for_scaling_group",
+        AsyncMock(
+            return_value=TotalResourceData(
+                total_used_slots=ResourceSlot({}),
+                total_free_slots=mock_available_slots,
+                total_capacity_slots=mock_available_slots,
+            )
+        ),
     )
     deployment_controller = DeploymentController(
         DeploymentControllerArgs(
