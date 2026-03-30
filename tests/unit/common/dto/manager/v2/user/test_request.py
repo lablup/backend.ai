@@ -68,7 +68,6 @@ class TestCreateUserInput:
         assert req.container_uid is None
         assert req.container_main_gid is None
         assert req.container_gids is None
-        assert req.integration_id is None
 
     def test_valid_creation_with_all_fields(self) -> None:
         group_id = uuid.uuid4()
@@ -90,7 +89,6 @@ class TestCreateUserInput:
             container_uid=1000,
             container_main_gid=1000,
             container_gids=[100, 200],
-            integration_id="ext-abc",
         )
         assert req.full_name == "Admin User"
         assert req.description == "An admin account"
@@ -99,7 +97,6 @@ class TestCreateUserInput:
         assert req.container_uid == 1000
         assert req.container_main_gid == 1000
         assert req.container_gids == [100, 200]
-        assert req.integration_id == "ext-abc"
 
     def test_missing_required_email_raises(self) -> None:
         with pytest.raises(ValidationError):
@@ -175,7 +172,6 @@ class TestUpdateUserInput:
         assert req.container_uid is SENTINEL
         assert req.container_main_gid is SENTINEL
         assert req.container_gids is SENTINEL
-        assert req.integration_id is SENTINEL
 
     def test_non_sentinel_fields_default_to_none(self) -> None:
         req = UpdateUserInput()

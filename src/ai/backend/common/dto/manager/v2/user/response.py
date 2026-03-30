@@ -59,10 +59,6 @@ class UserBasicInfo(BaseModel):
         default=None,
         description="Optional description or notes about the user.",
     )
-    integration_id: str | None = Field(
-        default=None,
-        description="External system integration identifier.",
-    )
 
 
 class UserStatusInfo(BaseModel):
