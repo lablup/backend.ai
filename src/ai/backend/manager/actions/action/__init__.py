@@ -29,6 +29,19 @@ from .rbac_session import (
     SessionSearchRBACAction,
     SessionUpdateRBACAction,
 )
+from .rbac_vfolder import (
+    VFolderCreateRBACAction,
+    VFolderGetRBACAction,
+    VFolderGrantAllRBACAction,
+    VFolderGrantHardDeleteRBACAction,
+    VFolderGrantReadRBACAction,
+    VFolderGrantSoftDeleteRBACAction,
+    VFolderGrantUpdateRBACAction,
+    VFolderHardDeleteRBACAction,
+    VFolderSearchRBACAction,
+    VFolderSoftDeleteRBACAction,
+    VFolderUpdateRBACAction,
+)
 
 RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
     SessionCreateRBACAction,
@@ -40,6 +53,17 @@ RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
     SessionGrantReadRBACAction,
     SessionGrantUpdateRBACAction,
     SessionGrantHardDeleteRBACAction,
+    VFolderCreateRBACAction,
+    VFolderGetRBACAction,
+    VFolderSearchRBACAction,
+    VFolderUpdateRBACAction,
+    VFolderSoftDeleteRBACAction,
+    VFolderHardDeleteRBACAction,
+    VFolderGrantAllRBACAction,
+    VFolderGrantReadRBACAction,
+    VFolderGrantUpdateRBACAction,
+    VFolderGrantSoftDeleteRBACAction,
+    VFolderGrantHardDeleteRBACAction,
 )
 
 __all__ = (
