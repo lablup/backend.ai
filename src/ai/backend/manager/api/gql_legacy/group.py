@@ -155,7 +155,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             domain_name=row.domain_name,
             total_resource_slots=row.total_resource_slots.to_json() or {},
             allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
-            integration_id=row.integration_id,  # DB column is integration_id
+            integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             type=row.type.name,
             container_registry=row.container_registry,
@@ -375,7 +375,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
                 row.total_resource_slots.to_json() if row.total_resource_slots is not None else {}
             ),
             allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
-            integration_id=row.integration_id,  # DB column is integration_id
+            integration_id=row.integration_id,
             resource_policy=row.resource_policy,
             type=row.type.name,
             container_registry=row.container_registry,
@@ -397,7 +397,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             if dto.total_resource_slots
             else {},
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
-            integration_id=dto.integration_name,
+            integration_id=dto.integration_name,  # GroupData uses integration_name
             resource_policy=dto.resource_policy,
             type=dto.type.name,
             container_registry=dto.container_registry,

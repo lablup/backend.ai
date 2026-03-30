@@ -56,7 +56,7 @@ class CreateResourceGroupInput(BaseRequestModel):
     )
     integration_id: str | None = Field(
         default=None,
-        description="External integration name associated with this resource group.",
+        description="External integration ID associated with this resource group.",
     )
     resource_policy: str | None = Field(
         default=None,
@@ -104,7 +104,7 @@ class UpdateResourceGroupInput(BaseRequestModel):
     integration_id: str | Sentinel | None = Field(
         default=SENTINEL,
         description=(
-            "Updated external integration name. Use SENTINEL to clear, null to keep existing value."
+            "Updated external integration ID. Use SENTINEL to clear, null to keep existing value."
         ),
     )
     resource_policy: str | Sentinel | None = Field(

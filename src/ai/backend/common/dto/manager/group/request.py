@@ -62,7 +62,7 @@ class CreateGroupRequest(BaseRequestModel):
     allowed_vfolder_hosts: dict[str, Any] | None = Field(
         default=None, description="Allowed vfolder host permissions"
     )
-    integration_id: str | None = Field(default=None, description="External integration name")
+    integration_id: str | None = Field(default=None, description="External integration ID")
     resource_policy: str | None = Field(default=None, description="Resource policy name")
 
 
@@ -78,9 +78,7 @@ class UpdateGroupRequest(BaseRequestModel):
     allowed_vfolder_hosts: dict[str, Any] | None = Field(
         default=None, description="Updated allowed vfolder host permissions"
     )
-    integration_id: str | None = Field(
-        default=None, description="Updated external integration name"
-    )
+    integration_id: str | None = Field(default=None, description="Updated external integration ID")
     resource_policy: str | None = Field(default=None, description="Updated resource policy name")
 
 

@@ -44,7 +44,7 @@ class ProjectBasicInfo(BaseModel):
     )
     integration_id: str | None = Field(
         default=None,
-        description="External system integration name.",
+        description="External system integration identifier.",
     )
 
 

@@ -48,7 +48,7 @@ class CreateGroupInput(BaseRequestModel):
     )
     integration_id: str | None = Field(
         default=None,
-        description="External system integration name for the group.",
+        description="External system integration identifier for the group.",
     )
     resource_policy: str | None = Field(
         default=None,
@@ -74,7 +74,7 @@ class UpdateGroupInput(BaseRequestModel):
     )
     integration_id: str | Sentinel | None = Field(
         default=SENTINEL,
-        description="New external integration name. Set to null to clear.",
+        description="New external integration identifier. Set to null to clear.",
     )
     resource_policy: str | None = Field(
         default=None,

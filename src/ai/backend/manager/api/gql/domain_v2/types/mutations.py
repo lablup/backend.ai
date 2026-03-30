@@ -48,7 +48,9 @@ class CreateDomainInputGQL(PydanticInputMixin[CreateDomainInputDTO]):
     allowed_docker_registries: list[str] | None = gql_field(
         default=UNSET, description="Allowed Docker registry URLs."
     )
-    integration_id: str | None = gql_field(default=UNSET, description="External integration name.")
+    integration_id: str | None = gql_field(
+        default=UNSET, description="External integration identifier."
+    )
 
 
 @gql_pydantic_input(
@@ -67,7 +69,7 @@ class UpdateDomainInputGQL(PydanticInputMixin[UpdateDomainInputDTO]):
         default=UNSET, description="New allowed Docker registry URLs."
     )
     integration_id: str | None = gql_field(
-        default=UNSET, description="New external integration name."
+        default=UNSET, description="New external integration identifier."
     )
 
 

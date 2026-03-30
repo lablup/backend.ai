@@ -176,7 +176,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             ),
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
-            integration_id=obj.integration_name,
+            integration_id=obj.integration_name,  # RBACModel uses integration_name
         )
 
     @classmethod
@@ -198,7 +198,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             ),
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
-            integration_id=obj.integration_id,  # DB column is integration_id
+            integration_id=obj.integration_id,
         )
 
     @classmethod
@@ -214,7 +214,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=dto.allowed_docker_registries,
             dotfiles=dto.dotfiles,
-            integration_id=dto.integration_name,
+            integration_id=dto.integration_name,  # DomainData uses integration_name
         )
 
     async def resolve_scaling_groups(
@@ -574,7 +574,7 @@ class Domain(graphene.ObjectType):  # type: ignore[misc]
             ),
             allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=row.allowed_docker_registries,
-            integration_id=row.integration_id,  # DB column is integration_id
+            integration_id=row.integration_id,
         )
 
     @classmethod
@@ -590,7 +590,7 @@ class Domain(graphene.ObjectType):  # type: ignore[misc]
             else {},
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=dto.allowed_docker_registries,
-            integration_id=dto.integration_name,
+            integration_id=dto.integration_name,  # DomainData uses integration_name
         )
 
     @classmethod

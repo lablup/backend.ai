@@ -50,7 +50,7 @@ class CreateDomainInput(BaseRequestModel):
     )
     integration_id: str | None = Field(
         default=None,
-        description="External integration name for the domain.",
+        description="External integration identifier for the domain.",
     )
 
 
@@ -76,7 +76,7 @@ class UpdateDomainInput(BaseRequestModel):
     )
     integration_id: str | Sentinel | None = Field(
         default=SENTINEL,
-        description="New external integration name. Set to null to clear.",
+        description="New external integration identifier. Set to null to clear.",
     )
 
 

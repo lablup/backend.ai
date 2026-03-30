@@ -45,7 +45,9 @@ class CreateProjectInputGQL(PydanticInputMixin[CreateGroupInputDTO]):
     name: str = gql_field(description="Project name. Must be unique within the domain.")
     domain_name: str = gql_field(description="Name of the domain this project belongs to.")
     description: str | None = gql_field(default=UNSET, description="Optional description.")
-    integration_id: str | None = gql_field(default=UNSET, description="External integration name.")
+    integration_id: str | None = gql_field(
+        default=UNSET, description="External integration identifier."
+    )
     resource_policy: str | None = gql_field(
         default=UNSET, description="Name of the resource policy to apply."
     )
@@ -64,7 +66,7 @@ class UpdateProjectInputGQL(PydanticInputMixin[UpdateGroupInputDTO]):
     description: str | None = gql_field(default=UNSET, description="New description.")
     is_active: bool | None = gql_field(default=UNSET, description="Updated active status.")
     integration_id: str | None = gql_field(
-        default=UNSET, description="New external integration name."
+        default=UNSET, description="New external integration identifier."
     )
     resource_policy: str | None = gql_field(default=UNSET, description="New resource policy name.")
 

@@ -62,7 +62,7 @@ class ResourceGroupNode(BaseResponseModel):
     )
     integration_id: str | None = Field(
         default=None,
-        description="External integration name associated with this resource group.",
+        description="External integration ID associated with this resource group.",
     )
     resource_policy: str | None = Field(
         default=None,
