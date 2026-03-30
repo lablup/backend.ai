@@ -3399,37 +3399,25 @@ class ScheduleDBSource:
         self, scaling_group: str
     ) -> TotalResourceData:
         """
-        Calculate resource slots for a specific scaling group from the
-        normalized agent_resources table.
+        Calculate resource slots for a specific scaling group.
 
-        Only considers agents that are ALIVE and schedulable within the
-        given scaling group.
+        Capacity comes from ``agent_resources``; used slots are computed from
+        actual kernel allocations (ground truth).  Only considers agents that
+        are ALIVE and schedulable.
 
         :param scaling_group: Name of the scaling group to query
         :return: TotalResourceData with used, free, and capacity slots
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            stmt = (
-                sa.select(
-                    AgentResourceRow.slot_name,
-                    sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
-                    sa.func.sum(AgentResourceRow.used).label("total_used"),
-                )
-                .join(AgentRow, AgentResourceRow.agent_id == AgentRow.id)
-                .where(
-                    AgentRow.status == AgentStatus.ALIVE,
-                    AgentRow.schedulable == sa.true(),
-                    AgentRow.scaling_group == scaling_group,
-                )
-                .group_by(AgentResourceRow.slot_name)
+            capacity_result = await db_sess.execute(
+                self._build_capacity_query_for_scaling_group(scaling_group)
             )
-            result = await db_sess.execute(stmt)
+            capacity = {row.slot_name: row.total_capacity for row in capacity_result}
 
-            capacity: dict[str, Decimal] = {}
-            used: dict[str, Decimal] = {}
-            for row in result:
-                capacity[row.slot_name] = row.total_capacity
-                used[row.slot_name] = row.total_used
+            used_result = await db_sess.execute(
+                self._build_actual_used_query_for_scaling_group(scaling_group)
+            )
+            used = {row.slot_name: row.total_used for row in used_result}
 
         total_capacity_slots = ResourceSlot(capacity)
         total_used_slots = ResourceSlot(used)
@@ -4719,3 +4707,59 @@ class ScheduleDBSource:
         """
         result = await db_sess.execute(sa.select(sa.func.now()))
         return result.scalar_one()
+
+    # =========================================================================
+    # Private query builders
+    # =========================================================================
+
+    @staticmethod
+    def _build_capacity_query_for_scaling_group(
+        scaling_group: str,
+    ) -> sa.Select[tuple[str, Decimal]]:
+        """Build query to sum agent capacity per slot for a scaling group."""
+        return (
+            sa.select(
+                AgentResourceRow.slot_name,
+                sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
+            )
+            .join(AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+            .where(
+                AgentRow.status == AgentStatus.ALIVE,
+                AgentRow.schedulable == sa.true(),
+                AgentRow.scaling_group == scaling_group,
+            )
+            .group_by(AgentResourceRow.slot_name)
+        )
+
+    @staticmethod
+    def _build_actual_used_query_for_scaling_group(
+        scaling_group: str,
+    ) -> sa.Select[tuple[str, Decimal]]:
+        """Build query to sum actual kernel allocation usage per slot for a scaling group.
+
+        Computes ground-truth usage from ``resource_allocations`` joined with
+        ``kernels`` and ``agents``, which is more accurate than the cached
+        ``agent_resources.used`` column.
+        """
+        all_resource_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        effective_amount = sa.func.coalesce(
+            ResourceAllocationRow.used, ResourceAllocationRow.requested
+        )
+        return (
+            sa.select(
+                ResourceAllocationRow.slot_name,
+                sa.func.sum(effective_amount).label("total_used"),
+            )
+            .join(KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id)
+            .join(AgentRow, KernelRow.agent == AgentRow.id)
+            .where(
+                AgentRow.status == AgentStatus.ALIVE,
+                AgentRow.schedulable == sa.true(),
+                AgentRow.scaling_group == scaling_group,
+                KernelRow.status.in_(all_resource_statuses),
+                ResourceAllocationRow.free_at.is_(None),
+            )
+            .group_by(ResourceAllocationRow.slot_name)
+        )

@@ -243,6 +243,10 @@ class DeploymentController:
         defined in the revision spec.  This method checks that the scaling group has
         enough free resources to accommodate the surge.
 
+        This is called once at the start of a rolling update (in ``activate_revision``)
+        as a pre-flight check.  The underlying query computes actual resource usage
+        from kernel allocations, which is relatively expensive.
+
         Args:
             deployment_info: Current deployment information
             revision_id: ID of the revision being activated
