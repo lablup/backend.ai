@@ -600,23 +600,24 @@ class GroupDBSource:
         async with self._db.begin_session_read_committed() as session:
             # Find assignable users in a single query:
             # same domain as the project and not already assigned
+            # TODO: This pre-filtering can be removed once execute_rbac_scope_binder_partial
+            # is implemented (BA-5488), which handles unique constraint conflicts via
+            # per-row savepoints instead of requiring callers to filter duplicates.
             project_domain_subq = (
-                sa.select(groups.c.domain_name).where(groups.c.id == project_id).scalar_subquery()
-            )
-            j = sa.outerjoin(
-                UserRow,
-                association_groups_users,
-                (UserRow.uuid == association_groups_users.c.user_id)
-                & (association_groups_users.c.group_id == project_id),
+                sa.select(GroupRow.domain_name).where(GroupRow.id == project_id).scalar_subquery()
             )
             new_user_rows = (
                 await session.scalars(
                     sa.select(UserRow)
-                    .select_from(j)
+                    .outerjoin(
+                        AssocGroupUserRow,
+                        (UserRow.uuid == AssocGroupUserRow.user_id)
+                        & (AssocGroupUserRow.group_id == project_id),
+                    )
                     .where(
                         UserRow.uuid.in_(user_ids)
                         & (UserRow.domain_name == project_domain_subq)
-                        & association_groups_users.c.user_id.is_(None)
+                        & AssocGroupUserRow.user_id.is_(None)
                     )
                 )
             ).all()
