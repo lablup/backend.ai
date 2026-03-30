@@ -2,6 +2,7 @@
 
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -569,6 +570,10 @@ class DeploymentService:
                 **revision_creator.resource_spec.resource_slots,
             }
 
+        execution_updates: dict[str, Any] = {"environ": merged_environ}
+        if service_def.runtime_variant is not None:
+            execution_updates["runtime_variant"] = service_def.runtime_variant
+
         return ModelRevisionCreator(
             image_id=revision_creator.image_id,
             resource_spec=revision_creator.resource_spec.model_copy(
@@ -576,7 +581,7 @@ class DeploymentService:
             ),
             mounts=revision_creator.mounts,
             execution=revision_creator.execution.model_copy(
-                update={"environ": merged_environ},
+                update=execution_updates,
             ),
             model_definition=revision_creator.model_definition,
         )

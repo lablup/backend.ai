@@ -209,6 +209,40 @@ class TestLoadDeploymentConfig:
                     environ=None,
                 ),
             ),
+            _LoadDeploymentConfigTestCase(
+                id="forced_runtime_variant_overrides_api_variant",
+                deployment_config_dict={
+                    # Root level with forced runtime_variant
+                    "runtime_variant": "vllm",
+                    "environment": {
+                        "image": "default-image:latest",
+                        "architecture": "x86_64",
+                    },
+                    "resource_slots": {
+                        "cpu": 4,
+                        "mem": "16gb",
+                    },
+                    # vllm variant (should be applied because of forced runtime_variant)
+                    "vllm": {
+                        "resource_slots": {
+                            "cpu": 8,
+                        },
+                    },
+                    # custom variant (user requested, but should be ignored)
+                    "custom": {
+                        "resource_slots": {
+                            "cpu": 2,
+                        },
+                    },
+                },
+                runtime_variant="custom",  # API request says custom
+                expected=_ExpectedResult(
+                    image="default-image:latest",
+                    architecture="x86_64",
+                    resource_slots={"cpu": 8, "mem": "16gb"},  # from vllm, not custom
+                    environ=None,
+                ),
+            ),
         ],
         ids=lambda tc: tc.id,
     )
@@ -239,6 +273,32 @@ class TestLoadDeploymentConfig:
         assert result.resource_slots == test_case.expected.resource_slots
         assert result.environ == test_case.expected.environ
         assert result.resource_opts == test_case.expected.resource_opts
+
+    async def test_forced_runtime_variant_is_preserved_in_result(
+        self,
+        base_generator: BaseRevisionGenerator,
+        mock_deployment_repository: MagicMock,
+        vfolder_id: UUID,
+    ) -> None:
+        """When runtime_variant is specified in the definition, it should be preserved in the result."""
+        mock_deployment_repository.fetch_deployment_config = AsyncMock(
+            return_value={
+                "runtime_variant": "vllm",
+                "environment": {
+                    "image": "default-image:latest",
+                    "architecture": "x86_64",
+                },
+                "resource_slots": {"cpu": 4},
+            }
+        )
+
+        result = await base_generator.load_deployment_config(
+            vfolder_id=vfolder_id,
+            runtime_variant="custom",  # API says custom
+        )
+
+        assert result is not None
+        assert result.runtime_variant == RuntimeVariant.VLLM
 
     async def test_no_deployment_config(
         self,
@@ -534,6 +594,77 @@ class TestMergeRevision:
         assert result.resource_spec.resource_slots == test_case.expected.resource_slots
         assert result.resource_spec.resource_opts == test_case.expected.resource_opts
         assert result.execution.environ == test_case.expected.environ
+
+    def test_forced_runtime_variant_overrides_draft(
+        self,
+        base_generator: BaseRevisionGenerator,
+        base_mount_metadata: MountMetadata,
+    ) -> None:
+        """When service definition has runtime_variant, it overrides the draft's runtime_variant."""
+        deployment_config = DeploymentConfig(
+            runtime_variant=RuntimeVariant.VLLM,
+            environment=ImageEnvironment(
+                image="vllm-image:latest",
+                architecture="x86_64",
+            ),
+            resource_slots={"cpu": 8},
+        )
+        draft_revision = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
+                canonical=None,
+                architecture=None,
+            ),
+            resource_spec=ResourceSpecDraft(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots=None,
+                resource_opts=None,
+            ),
+            mounts=base_mount_metadata,
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.CUSTOM,  # API says custom
+                startup_command=None,
+            ),
+        )
+
+        result = base_generator.merge_revision(draft_revision, deployment_config)
+
+        assert result.execution.runtime_variant == RuntimeVariant.VLLM
+
+    def test_no_forced_runtime_variant_keeps_draft(
+        self,
+        base_generator: BaseRevisionGenerator,
+        base_mount_metadata: MountMetadata,
+    ) -> None:
+        """When service definition has no runtime_variant, the draft's value is kept."""
+        deployment_config = DeploymentConfig(
+            environment=ImageEnvironment(
+                image="some-image:latest",
+                architecture="x86_64",
+            ),
+            resource_slots={"cpu": 4},
+        )
+        draft_revision = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
+                canonical=None,
+                architecture=None,
+            ),
+            resource_spec=ResourceSpecDraft(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots=None,
+                resource_opts=None,
+            ),
+            mounts=base_mount_metadata,
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.CUSTOM,
+                startup_command=None,
+            ),
+        )
+
+        result = base_generator.merge_revision(draft_revision, deployment_config)
+
+        assert result.execution.runtime_variant == RuntimeVariant.CUSTOM
 
 
 @dataclass

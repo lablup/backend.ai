@@ -61,6 +61,18 @@ class ImageEnvironment(BaseModel):
 
 
 class DeploymentConfig(BaseModel):
+    runtime_variant: RuntimeVariant | None = Field(
+        default=None,
+        description="""
+        Runtime variant to force for this model service.
+        When specified, the deployment is forced to use this runtime variant
+        regardless of what the user provides via the API request.
+        """,
+        examples=[
+            "vllm",
+            "huggingface-tgi",
+        ],
+    )
     environment: ImageEnvironment | None = Field(
         default=None,
         description="""
