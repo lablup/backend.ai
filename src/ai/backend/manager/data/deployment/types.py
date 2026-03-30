@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
     from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
-from ai.backend.common.config import ModelDefinition
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
