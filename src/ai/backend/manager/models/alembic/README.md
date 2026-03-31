@@ -26,6 +26,9 @@ The same strategy applies to all components:
    an existing migration that has already been released. Editing `down_revision` is
    allowed only when inserting a backport migration into the main branch chain before
    the change is merged (see Step 2 below).
+4. **Linear chain** -- The migration chain must always remain linear (single head).
+   Never create merge migrations. If multiple heads appear after inserting a backport,
+   fix the `down_revision` pointers instead.
 
 ### Backport Procedure
 
@@ -58,15 +61,6 @@ a  -->  d  -->  b  -->  c  -->  d'
 - `d'` — A new migration file with a fresh revision ID, `down_revision = c`, that
   performs the **same schema change** as `d` but written idempotently so it is a no-op
   on databases that already applied `d`.
-
-#### Step 3: Merge the head if necessary
-
-After inserting `d` into the chain, run `alembic heads` on main. If there are multiple
-heads, create a merge migration:
-
-```bash
-alembic merge heads -m "merge backport head"
-```
 
 ### Release Version Comment
 
