@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import multiprocessing
 import os
 import platform
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
@@ -47,7 +45,6 @@ from ai.backend.agent.utils import read_sysfs
 from ai.backend.agent.vendor.linux import libnuma
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.json import dump_json
-from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     ClusterInfo,
@@ -83,37 +80,31 @@ pruned_disk_types = frozenset([
 ])
 
 
-def netstat_ns_work(ns_path: Path) -> dict[str, Any]:
-    with nsenter(ns_path):
-        return psutil.net_io_counters(pernic=True)
+def read_proc_net_dev(container_pid: int) -> tuple[int, int]:
+    """Read network stats from /proc/[pid]/net/dev for the given container PID.
 
+    Parses the kernel's net/dev format directly from the container's proc entry,
+    avoiding the need for namespace switching (setns) which is unreliable in
+    threaded Python processes.
 
-async def netstat_ns(ns_path: Path) -> dict[str, Any]:
-    loop = asyncio.get_running_loop()
-    # Linux namespace is per-thread state. Therefore we need to ensure
-    # IO is executed in the same thread where we switched the namespace.
-    # Go provides runtime.LockOSThread() to do this.
-    #
-    # Unfortunately, CPython drops GIL while running IO and does not
-    # provide any similar functionality. Therefore we execute namespace
-    # dependent operation in the new process.
-
-    # Check if we're already in a daemon process
-    current_process = multiprocessing.current_process()
-    try:
-        is_daemon = current_process.daemon
-    except AttributeError:
-        is_daemon = False
-
-    if is_daemon:
-        return await loop.run_in_executor(None, netstat_ns_work, ns_path)
-    try:
-        with ProcessPoolExecutor(max_workers=1) as executor:
-            result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
-    except AssertionError:
-        # We're in a daemon process, run directly in thread pool
-        result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
-    return result
+    Returns a tuple of (rx_bytes, tx_bytes) summed across all non-loopback interfaces.
+    """
+    net_dev_path = Path(f"/proc/{container_pid}/net/dev")
+    rx_bytes = 0
+    tx_bytes = 0
+    for line in net_dev_path.read_text().splitlines():
+        # Skip header lines (first two lines: "Inter-|..." and " face |...")
+        if ":" not in line:
+            continue
+        iface, _, stats_str = line.partition(":")
+        iface = iface.strip()
+        if iface == "lo":
+            continue
+        fields = stats_str.split()
+        # fields[0] = rx_bytes, fields[8] = tx_bytes
+        rx_bytes += int(fields[0])
+        tx_bytes += int(fields[8])
+    return rx_bytes, tx_bytes
 
 
 async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
@@ -716,7 +707,7 @@ class MemoryPlugin(AbstractComputePlugin):
             try:
                 async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
                     data = await container.show()
-                    sandbox_key = data["NetworkSettings"]["SandboxKey"]
+                    container_pid: int = data["State"]["Pid"]
             except TimeoutError:
                 log.warning(
                     "MemoryPlugin: timeout reading container info for container {0}",
@@ -725,43 +716,27 @@ class MemoryPlugin(AbstractComputePlugin):
                 return None
             net_rx_bytes = 0
             net_tx_bytes = 0
-            if not sandbox_key:
+            if container_pid == 0:
                 log.warning(
-                    "MemoryPlugin: empty SandboxKey for container {0},"
+                    "MemoryPlugin: container {0} is not running (PID=0),"
                     " skipping net stat collection",
                     container_id[:7],
                 )
             else:
-                ns_path = Path(sandbox_key)
-                if not ns_path.exists():
-                    log.warning(
-                        "MemoryPlugin: network namespace path does not exist for container"
-                        " {0} (sandbox_key={1!r}), skipping net stat collection",
-                        container_id[:7],
-                        sandbox_key,
+                loop = current_loop()
+                try:
+                    net_rx_bytes, net_tx_bytes = await loop.run_in_executor(
+                        None, read_proc_net_dev, container_pid
                     )
-                else:
-                    try:
-                        async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
-                            nstat = await netstat_ns(ns_path)
-                    except TimeoutError:
-                        log.warning(
-                            "MemoryPlugin: timeout reading net stats for container {0}",
-                            container_id[:7],
-                        )
-                        return None
-                    except OSError as e:
-                        log.warning(
-                            "MemoryPlugin: cannot read net stats for container {0}: {1!r}",
-                            container_id[:7],
-                            e,
-                        )
-                        return None
-                    for name, net_stat in nstat.items():
-                        if name == "lo":
-                            continue
-                        net_rx_bytes += net_stat.bytes_recv
-                        net_tx_bytes += net_stat.bytes_sent
+                except OSError as e:
+                    log.warning(
+                        "MemoryPlugin: cannot read net stats for container {0} (pid={1}): {2!r}",
+                        container_id[:7],
+                        container_pid,
+                        e,
+                    )
+                    net_rx_bytes = 0
+                    net_tx_bytes = 0
             loop = current_loop()
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
             return (
