@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
@@ -24,7 +25,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.types import BinarySize, VFolderUsageMode
+from ai.backend.common.types import BinarySize, VFolderHostPermission, VFolderUsageMode
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -124,7 +125,9 @@ class VFolderAdapter(BaseAdapter):
         input: SearchVFoldersInput,
     ) -> SearchVFoldersPayload:
         """Admin search for VFolders with system scope."""
-        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
+        conditions = (
+            self._convert_vfolder_filter(input.filter, requester=None) if input.filter else []
+        )
         orders = self._convert_vfolder_orders(input.order) if input.order else []
         querier = self._build_querier(
             conditions=conditions,
@@ -161,7 +164,9 @@ class VFolderAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         scope = UserVFolderSearchScope(user_id=me.user_id)
-        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
+        conditions = (
+            self._convert_vfolder_filter(input.filter, requester=me) if input.filter else []
+        )
         orders = self._convert_vfolder_orders(input.order) if input.order else []
         querier = self._build_querier(
             conditions=conditions,
@@ -221,7 +226,12 @@ class VFolderAdapter(BaseAdapter):
     # Filter / Order conversion
     # -------------------------------------------------------------------------
 
-    def _convert_vfolder_filter(self, f: VFolderFilter) -> list[QueryCondition]:
+    def _convert_vfolder_filter(
+        self,
+        f: VFolderFilter,
+        *,
+        requester: UserData | None,
+    ) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.name is not None:
             c = self.convert_string_filter(
@@ -267,19 +277,30 @@ class VFolderAdapter(BaseAdapter):
                 conditions.append(c)
         if f.cloneable is not None:
             conditions.append(VFolderConditions.by_cloneable(f.cloneable))
+        if f.host_permission is not None and requester is not None:
+            if f.host_permission.in_ is not None:
+                perms = [VFolderHostPermission(p) for p in f.host_permission.in_]
+                conditions.append(
+                    VFolderConditions.by_host_permission(requester, permissions=perms, negate=False)
+                )
+            if f.host_permission.not_in is not None:
+                perms = [VFolderHostPermission(p) for p in f.host_permission.not_in]
+                conditions.append(
+                    VFolderConditions.by_host_permission(requester, permissions=perms, negate=True)
+                )
         if f.AND:
             for sub in f.AND:
-                conditions.extend(self._convert_vfolder_filter(sub))
+                conditions.extend(self._convert_vfolder_filter(sub, requester=requester))
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_vfolder_filter(sub))
+                or_conditions.extend(self._convert_vfolder_filter(sub, requester=requester))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
             not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_vfolder_filter(sub))
+                not_conditions.extend(self._convert_vfolder_filter(sub, requester=requester))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions

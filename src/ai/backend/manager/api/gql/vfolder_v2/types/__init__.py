@@ -1,12 +1,14 @@
 """VFolder GraphQL types package."""
 
 from .enum import (
+    VFolderHostPermissionGQL,
     VFolderMountPermissionGQL,
     VFolderOperationStatusGQL,
     VFolderOwnershipTypeGQL,
     VFolderUsageModeGQL,
 )
 from .filters import (
+    HostPermissionFilterGQL,
     VFolderFilterGQL,
     VFolderOperationStatusFilterGQL,
     VFolderOrderByGQL,
@@ -26,9 +28,11 @@ __all__ = [
     "VFolderMountPermissionGQL",
     "VFolderOwnershipTypeGQL",
     "VFolderOperationStatusGQL",
+    "VFolderHostPermissionGQL",
     # Enum filters
     "VFolderOperationStatusFilterGQL",
     "VFolderUsageModeFilterGQL",
+    "HostPermissionFilterGQL",
     # Filter and OrderBy
     "VFolderFilterGQL",
     "VFolderOrderByGQL",

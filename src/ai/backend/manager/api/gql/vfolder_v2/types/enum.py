@@ -60,3 +60,31 @@ class VFolderOperationStatusGQL(StrEnum):
     DELETE_ONGOING = "delete-ongoing"
     DELETE_COMPLETE = "delete-complete"
     DELETE_ERROR = "delete-error"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Host-level permission for virtual folder storage hosts. "
+            "CREATE: Create new vfolders on the host. "
+            "MODIFY: Rename or update vfolder options. "
+            "DELETE: Delete vfolders from the host. "
+            "MOUNT_IN_SESSION: Mount vfolders in compute sessions. "
+            "UPLOAD_FILE: Upload files to vfolders. "
+            "DOWNLOAD_FILE: Download files from vfolders. "
+            "INVITE_OTHERS: Invite other users to user-type vfolders. "
+            "SET_USER_PERM: Override permission of group-type vfolders."
+        ),
+    ),
+    name="VFolderHostPermission",
+)
+class VFolderHostPermissionGQL(StrEnum):
+    CREATE = "create-vfolder"
+    MODIFY = "modify-vfolder"
+    DELETE = "delete-vfolder"
+    MOUNT_IN_SESSION = "mount-in-session"
+    UPLOAD_FILE = "upload-file"
+    DOWNLOAD_FILE = "download-file"
+    INVITE_OTHERS = "invite-others"
+    SET_USER_PERM = "set-user-specific-permission"
