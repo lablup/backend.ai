@@ -735,7 +735,6 @@ class EndpointRow(Base):  # type: ignore[misc]
             replicas=creator.replica_spec.replica_count,
             domain=creator.metadata.domain,
             project=creator.metadata.project,
-            resource_group=creator.metadata.resource_group,
             tag=creator.metadata.tag,
             open_to_public=creator.network.open_to_public,
             url=creator.network.url,

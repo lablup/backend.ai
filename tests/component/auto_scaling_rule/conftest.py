@@ -146,7 +146,6 @@ async def model_deployment_fixture(
                 session_owner=str(admin_user_fixture.user_uuid),
                 domain=domain_fixture,
                 project=str(group_fixture),
-                resource_group=scaling_group_fixture,
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 url=None,
             )

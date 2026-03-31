@@ -291,7 +291,6 @@ class TestGroupPurgersIntegration:
                     session_owner=sample_user.uuid,
                     domain=sample_domain,
                     project=sample_group.id,
-                    resource_group=sample_scaling_group,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
                     current_revision=uuid.uuid4(),
                     replicas=0,

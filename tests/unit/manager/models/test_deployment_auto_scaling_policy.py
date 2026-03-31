@@ -281,7 +281,6 @@ class TestDeploymentAutoScalingPolicyRow:
                 replicas=1,
                 domain=test_domain.name,
                 project=test_group.id,
-                resource_group=test_scaling_group.name,
                 url=f"https://test-{uuid.uuid4().hex[:8]}.example.com",
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 current_revision=uuid.uuid4(),

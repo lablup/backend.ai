@@ -253,7 +253,6 @@ class TestGroupDBSourceDeleteEndpoints:
                     desired_replicas=1,
                     domain=test_domain,
                     project=test_group,
-                    resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
                     current_revision=uuid.uuid4(),
                 )
@@ -314,7 +313,6 @@ class TestGroupDBSourceDeleteEndpoints:
                 desired_replicas=1,
                 domain=test_domain,
                 project=test_group,
-                resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
                 current_revision=uuid.uuid4(),
             )
@@ -392,7 +390,6 @@ class TestGroupDBSourceDeleteEndpoints:
                 desired_replicas=1,
                 domain=test_domain,
                 project=test_group,
-                resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 current_revision=uuid.uuid4(),
             )
@@ -441,7 +438,6 @@ class TestGroupDBSourceDeleteEndpoints:
                     desired_replicas=1,
                     domain=test_domain,
                     project=test_group,
-                    resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
                     current_revision=uuid.uuid4(),
                 )
