@@ -122,7 +122,14 @@ def deployment_processors(
         model_definition_generator_registry,
     )
     return DeploymentProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(
+                scope=MagicMock(spec=ScopeActionRBACValidator),
+                single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+            ),
+        ),
     )
 
 
