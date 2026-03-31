@@ -124,13 +124,13 @@ class GroupRepository:
 
     @group_repository_resilience.apply()
     async def assign_users_to_project(
-        self, project_id: UUID, user_ids: list[UUID]
+        self, project_id: UUID, user_ids: list[UUID], role_id: UUID
     ) -> list[UserData]:
         """Assign users to a project with domain validation and RBAC scope binding.
 
         Returns the list of newly assigned users.
         """
-        return await self._db_source.assign_users_to_project(project_id, user_ids)
+        return await self._db_source.assign_users_to_project(project_id, user_ids, role_id)
 
     @group_repository_resilience.apply()
     async def unassign_users_from_project(

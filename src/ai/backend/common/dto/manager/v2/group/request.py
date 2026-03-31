@@ -176,6 +176,7 @@ class AssignUsersToProjectInput(BaseRequestModel):
     """Input for assigning users to a project."""
 
     user_ids: list[UUID] = Field(description="List of user UUIDs to assign to the project.")
+    role_id: UUID = Field(description="UUID of the project role to assign to the users.")
 
 
 class UnassignUsersFromProjectInput(BaseRequestModel):

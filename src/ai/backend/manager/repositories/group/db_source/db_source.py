@@ -45,6 +45,7 @@ from ai.backend.manager.models.kernel import (
     KernelRow,
     kernels,
 )
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_policy import project_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
@@ -59,7 +60,7 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator, Creator, execute_bulk_creator
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
@@ -92,6 +93,7 @@ from ai.backend.manager.repositories.group.types import (
     GroupSearchResult,
     UserProjectSearchScope,
 )
+from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -588,13 +590,14 @@ class GroupDBSource:
             )
 
     async def assign_users_to_project(
-        self, project_id: UUID, user_ids: list[UUID]
+        self, project_id: UUID, user_ids: list[UUID], role_id: UUID
     ) -> list[UserData]:
         """Assign users to a project with domain validation and RBAC scope binding.
 
         Validates that the project exists, users are in the same domain and active,
         and filters out already-assigned users. Creates both the business association
         (association_groups_users) and the RBAC scope association atomically.
+        Also creates user-role mappings for the specified role.
 
         Returns the list of newly assigned users.
         """
@@ -602,6 +605,12 @@ class GroupDBSource:
             return []
 
         async with self._db.begin_session_read_committed() as session:
+            # TODO: https://github.com/lablup/backend.ai/issues/10687
+            # Validate role exists
+            role_exists = await session.scalar(sa.select(sa.exists().where(RoleRow.id == role_id)))
+            if not role_exists:
+                raise InvalidAPIParameters(f"Role not found: {role_id}")
+
             # Find assignable users in a single query:
             # same domain as the project and not already assigned
             # TODO: This pre-filtering can be removed once execute_rbac_scope_binder_partial
@@ -640,6 +649,12 @@ class GroupDBSource:
                 for row in new_user_rows
             ]
             await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=pairs))
+
+            # Create user-role mappings for the assigned users
+            user_role_specs = [
+                UserRoleCreatorSpec(user_id=row.uuid, role_id=role_id) for row in new_user_rows
+            ]
+            await execute_bulk_creator(session, BulkCreator(specs=user_role_specs))
 
             return [row.to_data() for row in new_user_rows]
 

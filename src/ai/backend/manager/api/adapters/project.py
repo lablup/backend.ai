@@ -324,7 +324,9 @@ class ProjectAdapter(BaseAdapter):
     ) -> AssignUsersToProjectPayload:
         """Assign users to a project."""
         result = await self._processors.group.assign_users_to_project.wait_for_complete(
-            AssignUsersToProjectAction(project_id=project_id, user_ids=input.user_ids)
+            AssignUsersToProjectAction(
+                project_id=project_id, user_ids=input.user_ids, role_id=input.role_id
+            )
         )
         return AssignUsersToProjectPayload(
             items=[UserAdapter._user_data_to_node(u) for u in result.assigned_users],
