@@ -487,7 +487,15 @@ class DeploymentRepository:
         if filename.endswith(".toml"):
             return tomli.loads(raw_bytes.decode("utf-8"))
         yaml = YAML()
-        return cast(dict[str, Any], yaml.load(raw_bytes))
+        loaded = yaml.load(raw_bytes)
+        if loaded is None:
+            return None
+        if not isinstance(loaded, Mapping):
+            raise InvalidAPIParameters(
+                f"Invalid deployment config in '{filename}': "
+                "top-level YAML value must be a mapping."
+            )
+        return dict(loaded)
 
     @deployment_repository_resilience.apply()
     async def fetch_deployment_config(

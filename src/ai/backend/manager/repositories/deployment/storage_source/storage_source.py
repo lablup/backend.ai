@@ -1,12 +1,6 @@
 """Storage source implementation for deployment repository."""
 
-from typing import Any, cast
-
-import tomli
-from ruamel.yaml import YAML
-
 from ai.backend.common.types import VFolderID
-from ai.backend.manager.data.deployment.types import DeploymentConfig
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -19,57 +13,6 @@ class DeploymentStorageSource:
 
     def __init__(self, storage_manager: StorageSessionManager) -> None:
         self._storage_manager = storage_manager
-
-    async def _try_fetch_config_file(
-        self,
-        model_vfolder: VFolderLocation,
-        filename: str,
-    ) -> DeploymentConfig | None:
-        try:
-            vfid = VFolderID(model_vfolder.quota_scope_id, model_vfolder.id)
-            folder_host = model_vfolder.host
-
-            proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host)
-            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-
-            chunks = await manager_client.fetch_file_content(
-                volume_name,
-                str(vfid),
-                f"./{filename}",
-            )
-            if not chunks:
-                return None
-            if filename.endswith(".toml"):
-                parsed = tomli.loads(chunks.decode("utf-8"))
-            else:
-                yaml = YAML()
-                parsed = cast(dict[str, Any], yaml.load(chunks))
-            return DeploymentConfig(**parsed)
-        except Exception:
-            return None
-
-    async def fetch_deployment_config(
-        self,
-        model_vfolder: VFolderLocation,
-    ) -> DeploymentConfig | None:
-        """
-        Fetch and parse deployment config from model vfolder.
-
-        Tries ``deployment-config.yaml`` first. Falls back to the legacy
-        ``service-definition.toml`` for backward compatibility.
-
-        Args:
-            model_vfolder: The model vfolder location information
-
-        Returns:
-            Parsed deployment config as DeploymentConfig, or None if not found
-        """
-        # Try deployment-config.yaml first (new format)
-        config = await self._try_fetch_config_file(model_vfolder, "deployment-config.yaml")
-        if config is not None:
-            return config
-        # Fall back to legacy service-definition.toml
-        return await self._try_fetch_config_file(model_vfolder, "service-definition.toml")
 
     async def fetch_definition_file(
         self,
