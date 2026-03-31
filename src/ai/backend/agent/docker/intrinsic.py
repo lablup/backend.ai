@@ -71,6 +71,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # checking /proc/filesystems so we don't have to put all the details virtual filesystems like
 # "sockfs", "debugfs", etc.
 _CONTAINER_STAT_TIMEOUT: float = 2.0
+_INVALID_PID: int = 0
 
 # The list of pruned fstype when checking the filesystem usage statistics.
 pruned_disk_types = frozenset([
@@ -730,7 +731,7 @@ class MemoryPlugin(AbstractComputePlugin):
             try:
                 async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
                     data = await container.show()
-                    container_pid: int = data["State"]["Pid"]
+                    container_pid: int = data.get("State", {}).get("Pid", _INVALID_PID)
             except TimeoutError:
                 log.warning(
                     "MemoryPlugin: timeout reading container info for container {0}",
