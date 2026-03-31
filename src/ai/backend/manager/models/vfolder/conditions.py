@@ -247,7 +247,7 @@ class VFolderConditions:
             domain_pairs = _build_source_query(
                 DomainRow.allowed_vfolder_hosts,
                 DomainRow.__table__,
-                (DomainRow.name == requester.domain_name) & (DomainRow.is_active),
+                (DomainRow.name == requester.domain_name) & (DomainRow.is_active.is_(True)),
             )
 
             # 2. User's group hosts
@@ -260,7 +260,7 @@ class VFolderConditions:
                 group_from,
                 (AssocGroupUserRow.user_id == requester.user_id)
                 & (GroupRow.domain_name == requester.domain_name)
-                & (GroupRow.is_active),
+                & (GroupRow.is_active.is_(True)),
             )
 
             # 3. Keypair resource policy hosts
@@ -271,7 +271,7 @@ class VFolderConditions:
             keypair_pairs = _build_source_query(
                 KeyPairResourcePolicyRow.allowed_vfolder_hosts,
                 krp_from,
-                KeyPairRow.user == requester.user_id,
+                (KeyPairRow.user == requester.user_id) & (KeyPairRow.is_active.is_(True)),
             )
 
             # UNION ALL (host, perm) from all sources, then GROUP BY host

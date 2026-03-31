@@ -80,7 +80,10 @@ class HostPermissionFilterGQL(PydanticInputMixin[HostPermissionFilter]):
         default=None,
     )
     not_in: list[VFolderHostPermissionGQL] | None = gql_field(
-        description="Include only vfolders on hosts where the user LACKS the listed permissions.",
+        description=(
+            "Include only vfolders on hosts where the user does NOT have all of the listed "
+            "permissions (i.e., lacks at least one of them)."
+        ),
         default=None,
     )
 

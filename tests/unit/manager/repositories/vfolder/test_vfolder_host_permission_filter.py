@@ -73,6 +73,9 @@ class HostPermissionTestData:
     # VFolder owned by User C
     vf_alpha_c2_id: uuid.UUID  # host="host-c"
 
+    # VFolder on keypair resource policy host
+    vf_alpha_krp_id: uuid.UUID  # host="host-krp" (from keypair resource policy)
+
     # Shared vfolders (owned by B/C, shared to A via VFolderPermissionRow)
     vf_shared_to_a_id: uuid.UUID  # owned by B, host="host-shared", shared to A
     vf_shared_on_c_id: uuid.UUID  # owned by C, host="host-c", shared to A
@@ -175,6 +178,7 @@ class TestVFolderHostPermissionFilter:
         vf_beta_a_id = uuid.uuid4()
         vf_alpha_c2_id = uuid.uuid4()
         vf_shared_to_a_id = uuid.uuid4()
+        vf_alpha_krp_id = uuid.uuid4()
         vf_shared_on_c_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -233,6 +237,9 @@ class TestVFolderHostPermissionFilter:
                     max_concurrent_sftp_sessions=5,
                     max_containers_per_session=1,
                     idle_timeout=3600,
+                    allowed_vfolder_hosts={
+                        "host-krp": ["create-vfolder", "mount-in-session"],
+                    },
                 )
             )
             await db_sess.flush()
@@ -363,6 +370,7 @@ class TestVFolderHostPermissionFilter:
                 (vf_alpha_b_id, "vf-alpha-b", "host-b"),
                 (vf_alpha_c_id, "vf-alpha-c", "host-c"),
                 (vf_alpha_orphan_id, "vf-alpha-orphan", "host-nowhere"),
+                (vf_alpha_krp_id, "vf-alpha-krp", "host-krp"),
             ]:
                 db_sess.add(_make_vfolder(vid, name, host, "alpha", user_a_id))
 
@@ -413,6 +421,7 @@ class TestVFolderHostPermissionFilter:
             vf_alpha_b_id=vf_alpha_b_id,
             vf_alpha_c_id=vf_alpha_c_id,
             vf_alpha_orphan_id=vf_alpha_orphan_id,
+            vf_alpha_krp_id=vf_alpha_krp_id,
             vf_beta_shared_id=vf_beta_shared_id,
             vf_beta_x_id=vf_beta_x_id,
             vf_beta_y_id=vf_beta_y_id,
@@ -438,6 +447,7 @@ class TestVFolderHostPermissionFilter:
                         "vf_alpha_shared_id",
                         "vf_alpha_a_id",
                         "vf_alpha_b_id",
+                        "vf_alpha_krp_id",
                         "vf_shared_to_a_id",
                     },
                 ),
@@ -511,6 +521,7 @@ class TestVFolderHostPermissionFilter:
                         "vf_alpha_shared_id",
                         "vf_alpha_a_id",
                         "vf_alpha_b_id",
+                        "vf_alpha_krp_id",
                         "vf_shared_to_a_id",
                     },
                     excluded_vf_keys={"vf_shared_on_c_id"},
@@ -531,6 +542,7 @@ class TestVFolderHostPermissionFilter:
                         "vf_alpha_shared_id",
                         "vf_alpha_a_id",  # CREATE from domain + MOUNT from group (cross-source)
                         "vf_alpha_b_id",
+                        "vf_alpha_krp_id",  # both CREATE + MOUNT from keypair policy
                         "vf_shared_to_a_id",
                     },
                 ),
@@ -550,6 +562,7 @@ class TestVFolderHostPermissionFilter:
                         "vf_alpha_shared_id",
                         "vf_alpha_a_id",
                         "vf_alpha_b_id",
+                        "vf_alpha_krp_id",
                         "vf_shared_to_a_id",
                     },
                     excluded_vf_keys={
@@ -558,6 +571,23 @@ class TestVFolderHostPermissionFilter:
                     },
                 ),
                 id="cross-source-union",
+            ),
+            pytest.param(
+                HostPermFilterCase(
+                    description="keypair resource policy host included in filter results",
+                    user_id_field="user_a_id",
+                    domain_name="alpha",
+                    permissions=[VFolderHostPermission.CREATE],
+                    negate=False,
+                    expected_vf_keys={
+                        "vf_alpha_shared_id",
+                        "vf_alpha_a_id",
+                        "vf_alpha_b_id",
+                        "vf_alpha_krp_id",  # from keypair resource policy
+                        "vf_shared_to_a_id",
+                    },
+                ),
+                id="keypair-source",
             ),
         ],
     )
@@ -612,8 +642,8 @@ class TestVFolderHostPermissionFilter:
 
         result = await vfolder_repository.search_user_vfolders(querier, scope)
 
-        # User A owns 5 vfolders + 2 shared = 7
-        assert result.total_count == 7
+        # User A owns 6 vfolders + 2 shared = 8
+        assert result.total_count == 8
 
     # ── H-12: pagination compatibility ──
 
@@ -645,7 +675,7 @@ class TestVFolderHostPermissionFilter:
 
         result = await vfolder_repository.search_user_vfolders(querier, scope)
 
-        assert result.total_count == 4
+        assert result.total_count == 5
         assert len(result.items) == 2
         assert result.has_next_page is True
 
