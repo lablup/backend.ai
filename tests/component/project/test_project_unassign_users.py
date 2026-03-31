@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.v2.group.request import UnassignUsersFromProjectInput
-from ai.backend.manager.models.group import association_groups_users
+from ai.backend.manager.models.group.row import AssocGroupUserRow
 
 
 class TestUnassignUsersFromProject:
@@ -39,13 +39,9 @@ class TestUnassignUsersFromProject:
         async with db_engine.begin() as conn:
             rows = (
                 await conn.execute(
-                    sa.select(association_groups_users.c.user_id).where(
-                        (association_groups_users.c.group_id == str(group_fixture))
-                        & (
-                            association_groups_users.c.user_id.in_([
-                                str(uid) for uid in assigned_users
-                            ])
-                        )
+                    sa.select(AssocGroupUserRow.user_id).where(
+                        (AssocGroupUserRow.group_id == group_fixture)
+                        & (AssocGroupUserRow.user_id.in_(assigned_users))
                     )
                 )
             ).all()
@@ -91,13 +87,9 @@ class TestUnassignUsersFromProject:
         async with db_engine.begin() as conn:
             remaining = (
                 await conn.execute(
-                    sa.select(association_groups_users.c.user_id).where(
-                        (association_groups_users.c.group_id == str(group_fixture))
-                        & (
-                            association_groups_users.c.user_id.in_([
-                                str(uid) for uid in assigned_users[1:]
-                            ])
-                        )
+                    sa.select(AssocGroupUserRow.user_id).where(
+                        (AssocGroupUserRow.group_id == group_fixture)
+                        & (AssocGroupUserRow.user_id.in_(assigned_users[1:]))
                     )
                 )
             ).all()

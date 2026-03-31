@@ -14,7 +14,7 @@ from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow, association_groups_users
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.group.row import AssocGroupUserRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -250,9 +250,7 @@ class TestUnassignUsersFromProject:
         async with db_with_cleanup.begin_readonly_session() as session:
             remaining = (
                 await session.execute(
-                    sa.select(association_groups_users).where(
-                        association_groups_users.c.group_id == test_project
-                    )
+                    sa.select(AssocGroupUserRow).where(AssocGroupUserRow.group_id == test_project)
                 )
             ).all()
             assert len(remaining) == 0
@@ -278,9 +276,7 @@ class TestUnassignUsersFromProject:
         async with db_with_cleanup.begin_readonly_session() as session:
             remaining = (
                 await session.execute(
-                    sa.select(association_groups_users).where(
-                        association_groups_users.c.group_id == test_project
-                    )
+                    sa.select(AssocGroupUserRow).where(AssocGroupUserRow.group_id == test_project)
                 )
             ).all()
             assert len(remaining) == 3
