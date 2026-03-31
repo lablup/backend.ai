@@ -21,6 +21,11 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant, SessionId
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.data.deployment.creator import (
+    ModelRevisionCreator,
+    NewDeploymentCreator,
+    VFolderMountsCreator,
+)
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     ClusterConfigData,
@@ -28,12 +33,14 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
+    ExecutionSpec,
     ModelDeploymentAccessTokenData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
     ReplicaSpec,
     ResourceConfigData,
+    ResourceSpec,
     RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
@@ -44,6 +51,9 @@ from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
+)
+from ai.backend.manager.services.deployment.actions.create_deployment import (
+    CreateDeploymentAction,
 )
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
@@ -140,6 +150,92 @@ class DeploymentCRUDBaseFixtures:
             conditions=[],
             orders=[],
         )
+
+
+class TestCreateDeployment(DeploymentCRUDBaseFixtures):
+    """Tests for DeploymentService.create_deployment"""
+
+    async def test_create_deployment_without_initial_revision(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        mock_deployment_controller: MagicMock,
+        endpoint_info: DeploymentInfo,
+    ) -> None:
+        """Creating a deployment without initial_revision succeeds."""
+        mock_deployment_repository.create_endpoint = AsyncMock(return_value=endpoint_info)
+        mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
+
+        creator = NewDeploymentCreator(
+            metadata=DeploymentMetadata(
+                name="test-no-revision",
+                domain="default",
+                project=uuid.uuid4(),
+                created_user=uuid.uuid4(),
+                session_owner=uuid.uuid4(),
+                created_at=None,
+                revision_history_limit=10,
+            ),
+            replica_spec=ReplicaSpec(replica_count=1),
+            network=DeploymentNetworkSpec(open_to_public=False),
+            model_revision=None,
+        )
+        action = CreateDeploymentAction(creator=creator)
+        result = await processors.create_deployment.wait_for_complete(action)
+
+        assert result.data.id == endpoint_info.id
+        mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
+            DeploymentLifecycleType.CHECK_PENDING
+        )
+
+    async def test_create_deployment_with_initial_revision(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        mock_deployment_controller: MagicMock,
+        endpoint_info: DeploymentInfo,
+    ) -> None:
+        """Creating a deployment with initial_revision passes revision to repository."""
+        mock_deployment_repository.create_endpoint = AsyncMock(return_value=endpoint_info)
+        mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
+
+        creator = NewDeploymentCreator(
+            metadata=DeploymentMetadata(
+                name="test-with-revision",
+                domain="default",
+                project=uuid.uuid4(),
+                created_user=uuid.uuid4(),
+                session_owner=uuid.uuid4(),
+                created_at=None,
+                revision_history_limit=10,
+            ),
+            replica_spec=ReplicaSpec(replica_count=1),
+            network=DeploymentNetworkSpec(open_to_public=False),
+            model_revision=ModelRevisionCreator(
+                image_id=uuid.uuid4(),
+                resource_group="default",
+                resource_spec=ResourceSpec(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                    resource_slots={"cpu": "4", "mem": "8g"},
+                ),
+                mounts=VFolderMountsCreator(
+                    model_vfolder_id=uuid.uuid4(),
+                ),
+                execution=ExecutionSpec(
+                    runtime_variant=RuntimeVariant.CUSTOM,
+                ),
+                model_definition=None,
+            ),
+        )
+        action = CreateDeploymentAction(creator=creator)
+        result = await processors.create_deployment.wait_for_complete(action)
+
+        assert result.data.id == endpoint_info.id
+        create_call = mock_deployment_repository.create_endpoint
+        create_call.assert_called_once()
+        spec = create_call.call_args[0][0].spec
+        assert spec.revision is not None
 
 
 class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
