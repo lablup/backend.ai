@@ -4,7 +4,7 @@ Based on BEP-1033 test scenarios for route executor testing.
 
 Test Scenarios:
 - RP-001 ~ RP-004: Route Provisioning
-- RH-001 ~ RH-004: Route Health Check
+- RH-001 ~ RH-008: Route Health Check (direct HTTP)
 - RR-001 ~ RR-004: Running Route Check
 - RE-001 ~ RE-003: Route Eviction
 - RT-001 ~ RT-003: Route Termination
@@ -14,11 +14,16 @@ Test Scenarios:
 from __future__ import annotations
 
 import dataclasses
-from unittest.mock import AsyncMock, MagicMock
+import time
+from collections.abc import Callable
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+from ai.backend.common.clients.valkey_client.valkey_schedule import HealthStatus
 from ai.backend.common.types import SessionId
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.repositories.deployment.types import RouteData, RouteServiceDiscoveryInfo
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 
@@ -158,119 +163,270 @@ class TestProvisionRoutes:
 
 
 class TestCheckRouteHealth:
-    """Tests for check_route_health functionality.
+    """Tests for check_route_health with direct HTTP health checks.
 
-    Verifies the executor correctly checks route health via Valkey.
+    Verifies the executor performs HTTP readiness checks and classifies routes.
     """
 
-    async def test_healthy_route_in_successes(
+    @patch.object(RouteExecutor, "_perform_http_health_check", new_callable=AsyncMock)
+    async def test_http_check_pass_route_is_healthy(
         self,
+        mock_http_check: AsyncMock,
         route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
-        healthy_route: RouteData,
-        health_status_healthy: MagicMock,
+        health_check_ready_route: RouteData,
+        create_deployment_with_health_check: Callable[..., MagicMock],
+        create_discovery_info: Callable[..., RouteServiceDiscoveryInfo],
+        create_health_status: Callable[..., HealthStatus],
     ) -> None:
-        """RH-001: Healthy route is in successes.
-
-        Given: Route with HEALTHY status in Valkey
-        When: Check route health
-        Then: Route in successes list
-        """
-        # Arrange
-        route_id_str = str(healthy_route.route_id)
+        """RH-001: HTTP health check passes → route is HEALTHY."""
+        deployment = create_deployment_with_health_check(health_check_ready_route.endpoint_id)
+        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
+        mock_deployment_repo.fetch_route_service_discovery_info.return_value = [
+            create_discovery_info(
+                health_check_ready_route.route_id, health_check_ready_route.endpoint_id
+            ),
+        ]
         mock_valkey_schedule.check_route_health_status.return_value = {
-            route_id_str: health_status_healthy
+            str(health_check_ready_route.route_id): create_health_status(),
         }
+        mock_valkey_schedule.apply_readiness_check_results.return_value = {}
+        mock_http_check.return_value = True
 
-        entity_ids = [healthy_route.route_id]
+        entity_ids = [health_check_ready_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await route_executor.check_route_health([healthy_route])
+            result = await route_executor.check_route_health([health_check_ready_route])
 
-        # Assert
         assert len(result.successes) == 1
         assert len(result.errors) == 0
         assert len(result.stale) == 0
+        mock_valkey_schedule.apply_readiness_check_results.assert_called_once()
 
-    async def test_unhealthy_route_in_errors(
+    @patch.object(RouteExecutor, "_perform_http_health_check", new_callable=AsyncMock)
+    async def test_http_check_fail_exceeds_max_retries(
         self,
+        mock_http_check: AsyncMock,
         route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
-        healthy_route: RouteData,
-        health_status_unhealthy: MagicMock,
+        health_check_ready_route: RouteData,
+        create_deployment_with_health_check: Callable[..., MagicMock],
+        create_discovery_info: Callable[..., RouteServiceDiscoveryInfo],
+        create_health_status: Callable[..., HealthStatus],
     ) -> None:
-        """RH-002: Unhealthy route is in errors.
-
-        Given: Route with UNHEALTHY status in Valkey
-        When: Check route health
-        Then: Route in errors list
-        """
-        # Arrange
-        route_id_str = str(healthy_route.route_id)
+        """RH-002: HTTP check fails and consecutive_failures > max_retries → UNHEALTHY."""
+        deployment = create_deployment_with_health_check(health_check_ready_route.endpoint_id)
+        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
+        mock_deployment_repo.fetch_route_service_discovery_info.return_value = [
+            create_discovery_info(
+                health_check_ready_route.route_id, health_check_ready_route.endpoint_id
+            ),
+        ]
         mock_valkey_schedule.check_route_health_status.return_value = {
-            route_id_str: health_status_unhealthy
+            str(health_check_ready_route.route_id): create_health_status(consecutive_failures=3),
         }
+        mock_valkey_schedule.apply_readiness_check_results.return_value = {
+            str(health_check_ready_route.route_id): 4,
+        }
+        mock_http_check.return_value = False
 
-        entity_ids = [healthy_route.route_id]
+        entity_ids = [health_check_ready_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await route_executor.check_route_health([healthy_route])
+            result = await route_executor.check_route_health([health_check_ready_route])
 
-        # Assert
         assert len(result.successes) == 0
         assert len(result.errors) == 1
         assert len(result.stale) == 0
 
-    async def test_stale_route_in_stale_list(
+    @patch.object(RouteExecutor, "_perform_http_health_check", new_callable=AsyncMock)
+    async def test_http_check_fail_within_retries_is_degraded(
         self,
+        mock_http_check: AsyncMock,
         route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
-        healthy_route: RouteData,
-        health_status_stale: MagicMock,
+        health_check_ready_route: RouteData,
+        create_deployment_with_health_check: Callable[..., MagicMock],
+        create_discovery_info: Callable[..., RouteServiceDiscoveryInfo],
+        create_health_status: Callable[..., HealthStatus],
     ) -> None:
-        """RH-003: Stale route is in stale list.
-
-        Given: Route with STALE status in Valkey
-        When: Check route health
-        Then: Route in stale list
-        """
-        # Arrange
-        route_id_str = str(healthy_route.route_id)
+        """RH-003: HTTP check fails but within max_retries → DEGRADED (stale)."""
+        deployment = create_deployment_with_health_check(health_check_ready_route.endpoint_id)
+        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
+        mock_deployment_repo.fetch_route_service_discovery_info.return_value = [
+            create_discovery_info(
+                health_check_ready_route.route_id, health_check_ready_route.endpoint_id
+            ),
+        ]
         mock_valkey_schedule.check_route_health_status.return_value = {
-            route_id_str: health_status_stale
+            str(health_check_ready_route.route_id): create_health_status(consecutive_failures=1),
         }
+        mock_valkey_schedule.apply_readiness_check_results.return_value = {
+            str(health_check_ready_route.route_id): 2,
+        }
+        mock_http_check.return_value = False
 
-        entity_ids = [healthy_route.route_id]
+        entity_ids = [health_check_ready_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await route_executor.check_route_health([healthy_route])
+            result = await route_executor.check_route_health([health_check_ready_route])
 
-        # Assert
         assert len(result.successes) == 0
         assert len(result.errors) == 0
         assert len(result.stale) == 1
 
-    async def test_missing_health_data_treated_as_stale(
+    async def test_no_discovery_info_is_stale(
         self,
         route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
         mock_valkey_schedule: AsyncMock,
-        healthy_route: RouteData,
+        health_check_ready_route: RouteData,
+        create_deployment_with_health_check: Callable[..., MagicMock],
+        create_health_status: Callable[..., HealthStatus],
     ) -> None:
-        """RH-004: Missing health data is treated as stale.
+        """RH-004: No service discovery info → route is stale."""
+        deployment = create_deployment_with_health_check(health_check_ready_route.endpoint_id)
+        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
+        mock_deployment_repo.fetch_route_service_discovery_info.return_value = []
+        mock_valkey_schedule.check_route_health_status.return_value = {
+            str(health_check_ready_route.route_id): create_health_status(),
+        }
+        mock_valkey_schedule.apply_readiness_check_results.return_value = {}
 
-        Given: Route with no health data in Valkey
-        When: Check route health
-        Then: Route in stale list
-        """
-        # Arrange - Empty health status response
-        mock_valkey_schedule.check_route_health_status.return_value = {}
-
-        entity_ids = [healthy_route.route_id]
+        entity_ids = [health_check_ready_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await route_executor.check_route_health([healthy_route])
+            result = await route_executor.check_route_health([health_check_ready_route])
 
-        # Assert
+        assert len(result.successes) == 0
+        assert len(result.errors) == 0
+        assert len(result.stale) == 1
+
+    async def test_no_deployment_config_is_stale(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        health_check_ready_route: RouteData,
+        create_health_status: Callable[..., HealthStatus],
+    ) -> None:
+        """RH-005: No deployment found → route is stale."""
+        mock_deployment_repo.get_endpoints_by_ids.return_value = []
+        mock_deployment_repo.fetch_route_service_discovery_info.return_value = []
+        mock_valkey_schedule.check_route_health_status.return_value = {
+            str(health_check_ready_route.route_id): create_health_status(),
+        }
+        mock_valkey_schedule.apply_readiness_check_results.return_value = {}
+
+        entity_ids = [health_check_ready_route.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            result = await route_executor.check_route_health([health_check_ready_route])
+
+        assert len(result.successes) == 0
+        assert len(result.errors) == 0
+        assert len(result.stale) == 1
+
+    async def test_within_initial_delay_is_stale(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        create_deployment_with_health_check: Callable[..., MagicMock],
+        create_discovery_info: Callable[..., RouteServiceDiscoveryInfo],
+        create_health_status: Callable[..., HealthStatus],
+    ) -> None:
+        """RH-006: Route within initial_delay → stale (skipped)."""
+        # Arrange: route created 1 second ago, initial_delay=5.0
+        route = RouteData(
+            route_id=uuid4(),
+            endpoint_id=uuid4(),
+            session_id=SessionId(uuid4()),
+            status=RouteStatus.HEALTHY,
+            traffic_ratio=1.0,
+            created_at=datetime.now(UTC),
+        )
+        deployment = create_deployment_with_health_check(route.endpoint_id)
+        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
+        mock_deployment_repo.fetch_route_service_discovery_info.return_value = [
+            create_discovery_info(route.route_id, route.endpoint_id),
+        ]
+        mock_valkey_schedule.check_route_health_status.return_value = {
+            str(route.route_id): create_health_status(),
+        }
+        mock_valkey_schedule.apply_readiness_check_results.return_value = {}
+
+        entity_ids = [route.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            result = await route_executor.check_route_health([route])
+
+        assert len(result.successes) == 0
+        assert len(result.errors) == 0
+        assert len(result.stale) == 1
+
+    async def test_within_interval_is_skipped(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        health_check_ready_route: RouteData,
+        create_deployment_with_health_check: Callable[..., MagicMock],
+        create_discovery_info: Callable[..., RouteServiceDiscoveryInfo],
+        create_health_status: Callable[..., HealthStatus],
+    ) -> None:
+        """RH-007: last_readiness within interval → skip (stale)."""
+        deployment = create_deployment_with_health_check(health_check_ready_route.endpoint_id)
+        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
+        mock_deployment_repo.fetch_route_service_discovery_info.return_value = [
+            create_discovery_info(
+                health_check_ready_route.route_id, health_check_ready_route.endpoint_id
+            ),
+        ]
+        mock_valkey_schedule.check_route_health_status.return_value = {
+            str(health_check_ready_route.route_id): create_health_status(
+                last_readiness=int(time.time()) - 1,
+            ),
+        }
+        mock_valkey_schedule.apply_readiness_check_results.return_value = {}
+
+        entity_ids = [health_check_ready_route.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            result = await route_executor.check_route_health([health_check_ready_route])
+
+        assert len(result.successes) == 0
+        assert len(result.errors) == 0
+        assert len(result.stale) == 1
+
+    @patch.object(RouteExecutor, "_perform_http_health_check", new_callable=AsyncMock)
+    async def test_http_timeout_is_failure(
+        self,
+        mock_http_check: AsyncMock,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        health_check_ready_route: RouteData,
+        create_deployment_with_health_check: Callable[..., MagicMock],
+        create_discovery_info: Callable[..., RouteServiceDiscoveryInfo],
+        create_health_status: Callable[..., HealthStatus],
+    ) -> None:
+        """RH-008: HTTP timeout → treated as failure."""
+        deployment = create_deployment_with_health_check(health_check_ready_route.endpoint_id)
+        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
+        mock_deployment_repo.fetch_route_service_discovery_info.return_value = [
+            create_discovery_info(
+                health_check_ready_route.route_id, health_check_ready_route.endpoint_id
+            ),
+        ]
+        mock_valkey_schedule.check_route_health_status.return_value = {
+            str(health_check_ready_route.route_id): create_health_status(),
+        }
+        mock_valkey_schedule.apply_readiness_check_results.return_value = {
+            str(health_check_ready_route.route_id): 1,
+        }
+        mock_http_check.return_value = False
+
+        entity_ids = [health_check_ready_route.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            result = await route_executor.check_route_health([health_check_ready_route])
+
         assert len(result.successes) == 0
         assert len(result.errors) == 0
         assert len(result.stale) == 1

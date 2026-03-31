@@ -34,6 +34,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaStateData,
     ResourceConfigData,
     RouteInfo,
+    RouteStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
@@ -255,18 +256,29 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
     )
 
 
-def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
-    """Convert RouteInfo to ModelReplicaData.
+_ROUTE_STATUS_TO_READINESS: dict[RouteStatus, ReadinessStatus] = {
+    RouteStatus.HEALTHY: ReadinessStatus.HEALTHY,
+    RouteStatus.UNHEALTHY: ReadinessStatus.UNHEALTHY,
+    RouteStatus.PROVISIONING: ReadinessStatus.NOT_CHECKED,
+    RouteStatus.DEGRADED: ReadinessStatus.NOT_CHECKED,
+    RouteStatus.TERMINATING: ReadinessStatus.NOT_CHECKED,
+    RouteStatus.TERMINATED: ReadinessStatus.NOT_CHECKED,
+    RouteStatus.FAILED_TO_START: ReadinessStatus.UNHEALTHY,
+}
 
-    Note: Some fields are set to defaults as RouteInfo doesn't have all the data.
-    """
+
+def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
+    """Convert RouteInfo to ModelReplicaData."""
     return ModelReplicaData(
         id=route.route_id,
         revision_id=route.revision_id
         or route.endpoint_id,  # Fallback to endpoint_id if no revision
         session_id=route.session_id or route.route_id,
-        readiness_status=ReadinessStatus.HEALTHY,  # Derived from route status
-        liveness_status=LivenessStatus.HEALTHY,  # Default
+        readiness_status=_ROUTE_STATUS_TO_READINESS.get(
+            route.status,
+            ReadinessStatus.NOT_CHECKED,
+        ),
+        liveness_status=LivenessStatus.HEALTHY,  # TODO: populate from agent liveness check
         activeness_status=ActivenessStatus.ACTIVE
         if route.traffic_ratio > 0
         else ActivenessStatus.INACTIVE,

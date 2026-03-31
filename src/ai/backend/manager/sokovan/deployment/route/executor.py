@@ -1,19 +1,27 @@
 """Route executor for handling route lifecycle operations."""
 
+import asyncio
 import logging
+import time
 from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.clients.http_client.client_pool import ClientPool
+import aiohttp
+
+from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
-    HealthCheckStatus,
+    HealthStatus,
     ValkeyScheduleClient,
 )
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
+    SessionId,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
@@ -21,10 +29,12 @@ from ai.backend.manager.errors.deployment import (
     EndpointNotFound,
     RouteSessionNotFound,
     RouteSessionTerminated,
-    RouteUnhealthy,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.repositories.deployment.types import (
+    RouteData,
+    RouteServiceDiscoveryInfo,
+)
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 from ai.backend.manager.sokovan.deployment.route.types import (
@@ -34,6 +44,9 @@ from ai.backend.manager.sokovan.deployment.route.types import (
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+
+HEALTH_CHECK_SEMAPHORE_SIZE = 100
+HEALTH_CHECK_CONNECT_TIMEOUT = 5.0
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -194,50 +207,116 @@ class RouteExecutor:
 
     async def check_route_health(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """
-        Check health status of routes using Redis health data.
+        Perform direct HTTP readiness checks on route endpoints.
 
         Classifies routes into three states:
-        - HEALTHY: readiness check passes and data is fresh (successes)
-        - UNHEALTHY: readiness check fails (errors)
-        - DEGRADED: health data is stale or missing (stale)
+        - HEALTHY: readiness check passes (successes)
+        - UNHEALTHY: consecutive failures exceed max_retries (errors)
+        - DEGRADED: check skipped, within initial_delay, or failures within threshold (stale)
 
         Args:
             routes: Routes to check health for
 
         Returns:
-            Result containing:
-            - successes: healthy routes
-            - errors: unhealthy routes
-            - stale: degraded routes
+            Result containing successes, errors, and stale routes
         """
-        # Phase 1: Load health status
-        with RouteRecorderContext.shared_phase("load_health_status"):
-            with RouteRecorderContext.shared_step("query_health_check_results"):
-                # Get health status for all routes from Redis
-                route_ids = [str(route.route_id) for route in routes]
-                health_statuses = await self._valkey_schedule.check_route_health_status(route_ids)
+        # Phase 1: Load configuration and current state
+        with RouteRecorderContext.shared_phase("load_health_config"):
+            with RouteRecorderContext.shared_step("load_endpoint_config"):
+                endpoint_ids = {route.endpoint_id for route in routes}
+                deployments = await self._deployment_repo.get_endpoints_by_ids(endpoint_ids)
+                deployment_map = {dep.id: dep for dep in deployments}
 
+            with RouteRecorderContext.shared_step("load_service_discovery_info"):
+                route_ids_set = {route.route_id for route in routes}
+                discovery_infos = await self._deployment_repo.fetch_route_service_discovery_info(
+                    route_ids_set
+                )
+                discovery_map: dict[UUID, RouteServiceDiscoveryInfo] = {
+                    info.route_id: info for info in discovery_infos
+                }
+
+            with RouteRecorderContext.shared_step("load_current_health_status"):
+                route_id_strs = [str(route.route_id) for route in routes]
+                health_statuses = await self._valkey_schedule.check_route_health_status(
+                    route_id_strs
+                )
+
+        # Phase 2: Perform HTTP health checks
+        semaphore = asyncio.Semaphore(HEALTH_CHECK_SEMAPHORE_SIZE)
+        now = time.time()
+        check_results: dict[UUID, bool | None] = {}  # True=pass, False=fail, None=skip
+
+        async def _check_one(route: RouteData) -> None:
+            async with semaphore:
+                result = await self._check_single_route_health(
+                    route,
+                    deployment_map,
+                    discovery_map,
+                    health_statuses,
+                    now,
+                )
+                check_results[route.route_id] = result
+
+        with RouteRecorderContext.shared_phase("perform_health_checks"):
+            with RouteRecorderContext.shared_step("http_health_checks"):
+                lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
+                cycle_timeout = lock_lifetime * 0.8
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*[_check_one(route) for route in routes]),
+                        timeout=cycle_timeout,
+                    )
+                except TimeoutError:
+                    log.warning(
+                        "Health check cycle timed out after {:.1f}s, {}/{} routes checked",
+                        cycle_timeout,
+                        len(check_results),
+                        len(routes),
+                    )
+
+        # Phase 3: Apply results to Redis and classify
+        with RouteRecorderContext.shared_phase("apply_results"):
+            with RouteRecorderContext.shared_step("update_redis_and_classify"):
+                passed_ids = [str(rid) for rid, result in check_results.items() if result is True]
+                failed_ids = [str(rid) for rid, result in check_results.items() if result is False]
+
+                failure_counts = await self._valkey_schedule.apply_readiness_check_results(
+                    successes=passed_ids,
+                    failures=failed_ids,
+                )
+
+        # Phase 4: Build execution result
         successes: list[RouteData] = []
         errors: list[RouteExecutionError] = []
         stale: list[RouteData] = []
 
-        # Phase 2: Classify health state (per-route)
         for route in routes:
-            try:
-                is_healthy = self._classify_route_health(route, health_statuses)
-                if is_healthy:
-                    successes.append(route)
+            result = check_results.get(route.route_id)
+            if result is True:
+                successes.append(route)
+            elif result is False:
+                route_id_str = str(route.route_id)
+                new_failures = failure_counts.get(route_id_str, 0)
+                config = self._resolve_health_check_config(
+                    deployment_map.get(route.endpoint_id),
+                    route,
+                )
+                max_retries = config.max_retries if config else 10
+                if new_failures > max_retries:
+                    errors.append(
+                        RouteExecutionError(
+                            route_info=route,
+                            reason="Readiness check failed",
+                            error_detail=(f"Consecutive failures: {new_failures} > {max_retries}"),
+                            error_code=None,
+                        )
+                    )
                 else:
                     stale.append(route)
-            except RouteUnhealthy as e:
-                errors.append(
-                    RouteExecutionError(
-                        route_info=route,
-                        reason=e.error_title,
-                        error_detail=str(e),
-                        error_code=_extract_error_code(e),
-                    )
-                )
+            else:
+                # None = skipped (initial_delay, interval, no config, no discovery)
+                stale.append(route)
 
         return RouteExecutionResult(
             successes=successes,
@@ -433,34 +512,102 @@ class RouteExecutor:
                 if session_status.is_terminal():
                     raise RouteSessionTerminated(session_status.value)
 
-    def _classify_route_health(
+    async def _check_single_route_health(
         self,
         route: RouteData,
-        health_statuses: Mapping[str, Any],
+        deployment_map: Mapping[UUID, DeploymentInfo],
+        discovery_map: Mapping[UUID, RouteServiceDiscoveryInfo],
+        health_statuses: Mapping[str, HealthStatus | None],
+        now: float,
+    ) -> bool | None:
+        """Check health of a single route. Returns True=pass, False=fail, None=skip."""
+        deployment = deployment_map.get(route.endpoint_id)
+        config = self._resolve_health_check_config(deployment, route)
+        if config is None:
+            return None
+
+        discovery = discovery_map.get(route.route_id)
+        if discovery is None:
+            return None
+
+        route_age = now - route.created_at.timestamp()
+        if route_age < config.initial_delay:
+            return None
+
+        route_id_str = str(route.route_id)
+        health_status = health_statuses.get(route_id_str)
+        if health_status and health_status.last_readiness is not None:
+            elapsed = now - health_status.last_readiness
+            if elapsed < config.interval:
+                return None
+
+        return await self._perform_http_health_check(
+            discovery.kernel_host,
+            discovery.kernel_port,
+            config,
+        )
+
+    def _resolve_health_check_config(
+        self,
+        deployment: DeploymentInfo | None,
+        route: RouteData,
+    ) -> ModelHealthCheck | None:
+        """Extract health check config from deployment's current revision."""
+        if deployment is None:
+            return None
+
+        revision_id = route.revision_id or deployment.current_revision_id
+        if revision_id is None:
+            return None
+
+        try:
+            revision = deployment.resolve_revision_spec(revision_id)
+        except Exception:
+            return None
+
+        if revision.model_definition is not None:
+            config = revision.model_definition.health_check_config()
+            if config is not None:
+                return config
+
+        runtime_variant = revision.execution.runtime_variant
+        profile = MODEL_SERVICE_RUNTIME_PROFILES.get(runtime_variant)
+        if profile and profile.health_check_endpoint:
+            return ModelHealthCheck(path=profile.health_check_endpoint)
+
+        return None
+
+    async def _perform_http_health_check(
+        self,
+        kernel_host: str,
+        kernel_port: int,
+        config: ModelHealthCheck,
     ) -> bool:
-        """Classify route health status. Returns True for healthy, False for stale, raises for unhealthy."""
-        pool = RouteRecorderContext.current_pool()
-        recorder = pool.recorder(route.route_id)
-
-        with recorder.phase("classify_health"):
-            with recorder.step("determine_health_state"):
-                route_id_str = str(route.route_id)
-                health_status = health_statuses.get(route_id_str, None)
-
-                if not health_status:
-                    # No health data - Redis TTL expired, mark as stale
-                    return False
-
-                status = health_status.get_status()
-                match status:
-                    case HealthCheckStatus.HEALTHY:
-                        return True
-                    case HealthCheckStatus.STALE:
-                        return False
-                    case HealthCheckStatus.UNHEALTHY:
-                        raise RouteUnhealthy("Route health check failed")
-
-        return False  # Default to stale for unexpected cases
+        """Perform a single HTTP health check request."""
+        endpoint = f"http://{kernel_host}:{kernel_port}"
+        path = config.path if config.path.startswith("/") else f"/{config.path}"
+        timeout = aiohttp.ClientTimeout(
+            total=config.max_wait_time,
+            connect=HEALTH_CHECK_CONNECT_TIMEOUT,
+        )
+        try:
+            session = self._client_pool.load_client_session(
+                ClientKey(endpoint=endpoint, domain="health-check")
+            )
+            async with session.get(path, timeout=timeout) as response:
+                return response.status == config.expected_status_code
+        except TimeoutError:
+            return False
+        except aiohttp.ClientError:
+            return False
+        except Exception:
+            log.warning(
+                "Unexpected error during health check for {}:{}",
+                kernel_host,
+                kernel_port,
+                exc_info=True,
+            )
+            return False
 
     def _check_route_cleanup_eligibility(
         self,

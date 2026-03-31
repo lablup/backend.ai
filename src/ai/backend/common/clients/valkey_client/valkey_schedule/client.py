@@ -64,7 +64,9 @@ class HealthStatus:
     readiness: HealthCheckStatus | None  # None if never checked
     liveness: HealthCheckStatus | None  # None if never checked
     last_check: int | None  # Unix timestamp of last check by manager, None if never checked
+    last_readiness: int | None  # Unix timestamp of last readiness update, None if never checked
     created_at: int  # Unix timestamp when route was initialized
+    readiness_consecutive_failures: int  # Number of consecutive readiness check failures
 
     def get_status(self) -> HealthCheckStatus | None:
         """
@@ -499,11 +501,16 @@ class ValkeyScheduleClient:
         last_check = int(data["last_check"]) if "last_check" in data else None
         created_at = int(data.get("created_at", "0"))
 
+        last_readiness = int(data["last_readiness"]) if "last_readiness" in data else None
+        readiness_consecutive_failures = int(data.get("readiness_consecutive_failures", "0"))
+
         return HealthStatus(
             readiness=readiness,
             liveness=liveness,
             last_check=last_check,
+            last_readiness=last_readiness,
             created_at=created_at,
+            readiness_consecutive_failures=readiness_consecutive_failures,
         )
 
     @valkey_schedule_resilience.apply()
@@ -528,6 +535,7 @@ class ValkeyScheduleClient:
                 "liveness": "0",
                 "last_check": current_time,
                 "created_at": current_time,
+                "readiness_consecutive_failures": "0",
                 # last_readiness and last_liveness are not set until first health check
             }
             batch.hset(key, data)
@@ -631,7 +639,9 @@ class ValkeyScheduleClient:
                 readiness=readiness_status,
                 liveness=liveness_status,
                 last_check=int(data["last_check"]) if "last_check" in data else None,
+                last_readiness=int(data["last_readiness"]) if "last_readiness" in data else None,
                 created_at=int(data.get("created_at", "0")),
+                readiness_consecutive_failures=int(data.get("readiness_consecutive_failures", "0")),
             )
 
         return health_statuses
@@ -659,6 +669,70 @@ class ValkeyScheduleClient:
             batch.expire(key, ROUTE_HEALTH_TTL_SEC)
 
         await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_schedule_resilience.apply()
+    async def apply_readiness_check_results(
+        self,
+        successes: Sequence[str],
+        failures: Sequence[str],
+    ) -> Mapping[str, int]:
+        """
+        Apply readiness health check results atomically.
+
+        For successes: set readiness=1, reset readiness_consecutive_failures=0.
+        For failures: set readiness=0, HINCRBY readiness_consecutive_failures 1.
+
+        :param successes: Route IDs that passed health check
+        :param failures: Route IDs that failed health check
+        :return: Mapping of failed route ID to new consecutive failure count
+        """
+        if not successes and not failures:
+            return {}
+
+        current_time = str(await self._get_redis_time())
+        batch = Batch(is_atomic=False)
+
+        # Track positions of HINCRBY results for failures
+        result_positions: dict[str, int] = {}
+        op_index = 0
+
+        for route_id in successes:
+            key = self._get_route_health_key(route_id)
+            batch.hset(
+                key,
+                {
+                    "readiness": "1",
+                    "last_readiness": current_time,
+                    "readiness_consecutive_failures": "0",
+                },
+            )
+            batch.expire(key, ROUTE_HEALTH_TTL_SEC)
+            op_index += 2  # hset + expire
+
+        for route_id in failures:
+            key = self._get_route_health_key(route_id)
+            batch.hset(
+                key,
+                {
+                    "readiness": "0",
+                    "last_readiness": current_time,
+                },
+            )
+            op_index += 1  # hset
+            batch.hincrby(key, "readiness_consecutive_failures", 1)
+            result_positions[route_id] = op_index
+            op_index += 1  # hincrby
+            batch.expire(key, ROUTE_HEALTH_TTL_SEC)
+            op_index += 1  # expire
+
+        results = await self._client.client.exec(batch, raise_on_error=True)
+
+        # Extract new failure counts from HINCRBY results
+        failure_counts: dict[str, int] = {}
+        if results is not None:
+            for route_id, pos in result_positions.items():
+                failure_counts[route_id] = int(results[pos])
+        return failure_counts
 
     @valkey_schedule_resilience.apply()
     async def close(self) -> None:

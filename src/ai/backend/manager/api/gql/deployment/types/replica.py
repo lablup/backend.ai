@@ -171,6 +171,12 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     activeness_status: ActivenessStatus = gql_field(
         description="Whether the replica is currently active and able to serve requests."
     )
+    available: bool = gql_field(
+        description=(
+            "Whether this replica can receive traffic. "
+            "True only when readiness, liveness, and activeness are all satisfied."
+        ),
+    )
     weight: int = gql_field(description="Traffic weight for load balancing between replicas.")
     created_at: datetime = gql_field(description="Timestamp when the replica was created.")
 

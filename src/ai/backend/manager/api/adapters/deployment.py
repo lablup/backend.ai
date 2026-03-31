@@ -10,7 +10,10 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.model_deployment.types import (
+    ActivenessStatus,
     DeploymentStrategy,
+    LivenessStatus,
+    ReadinessStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -1571,6 +1574,11 @@ class DeploymentAdapter(BaseAdapter):
             readiness_status=data.readiness_status,
             liveness_status=data.liveness_status,
             activeness_status=data.activeness_status,
+            available=(
+                data.readiness_status == ReadinessStatus.HEALTHY
+                and data.liveness_status == LivenessStatus.HEALTHY
+                and data.activeness_status == ActivenessStatus.ACTIVE
+            ),
             weight=data.weight,
             created_at=data.created_at,
         )

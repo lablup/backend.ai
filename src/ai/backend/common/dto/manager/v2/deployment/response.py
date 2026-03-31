@@ -329,6 +329,12 @@ class ReplicaNode(BaseResponseModel):
     readiness_status: ReadinessStatus = Field(description="Readiness status")
     liveness_status: LivenessStatus = Field(description="Liveness status")
     activeness_status: ActivenessStatus = Field(description="Activeness status")
+    available: bool = Field(
+        description=(
+            "Whether this replica can receive traffic. "
+            "True only when readiness, liveness, and activeness are all satisfied."
+        ),
+    )
     weight: int = Field(description="Traffic weight for load balancing")
     created_at: datetime = Field(description="Creation timestamp")
 

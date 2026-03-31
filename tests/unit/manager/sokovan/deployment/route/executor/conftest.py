@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from collections.abc import Callable
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
+from ai.backend.common.clients.valkey_client.valkey_schedule import (
+    HealthCheckStatus,
+    HealthStatus,
+)
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
@@ -20,7 +25,10 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
     RouteStatus,
 )
-from ai.backend.manager.repositories.deployment.types import RouteData
+from ai.backend.manager.repositories.deployment.types import (
+    RouteData,
+    RouteServiceDiscoveryInfo,
+)
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 
 # =============================================================================
@@ -38,6 +46,7 @@ def mock_deployment_repo() -> AsyncMock:
     repo.fetch_route_service_discovery_info = AsyncMock(return_value=[])
     repo.get_scaling_group_cleanup_configs = AsyncMock(return_value={})
     repo.fetch_deployment_context = AsyncMock(return_value=MagicMock())
+    repo.get_endpoint_health_check_config = AsyncMock(return_value=None)
     return repo
 
 
@@ -53,7 +62,9 @@ def mock_scheduling_controller() -> AsyncMock:
 @pytest.fixture
 def mock_config_provider() -> MagicMock:
     """Mock ManagerConfigProvider."""
-    return MagicMock()
+    provider = MagicMock()
+    provider.config.manager.session_schedule_lock_lifetime = 30.0
+    return provider
 
 
 @pytest.fixture
@@ -67,6 +78,7 @@ def mock_valkey_schedule() -> AsyncMock:
     """Mock ValkeyScheduleClient."""
     client = AsyncMock()
     client.check_route_health_status = AsyncMock(return_value={})
+    client.apply_readiness_check_results = AsyncMock(return_value={})
     return client
 
 
@@ -150,6 +162,8 @@ def _create_route_data(
     endpoint_id: UUID | None = None,
     session_id: SessionId | None = None,
     status: RouteStatus = RouteStatus.PROVISIONING,
+    revision_id: UUID | None = None,
+    created_at: datetime | None = None,
 ) -> RouteData:
     """Create RouteData for tests."""
     return RouteData(
@@ -158,8 +172,8 @@ def _create_route_data(
         session_id=session_id,
         status=status,
         traffic_ratio=1.0,
-        created_at=datetime.now(tzutc()),
-        revision_id=uuid4(),
+        created_at=created_at or datetime.now(tzutc()),
+        revision_id=revision_id,
     )
 
 
@@ -358,3 +372,106 @@ def cleanup_config_unhealthy_and_degraded() -> MagicMock:
     config = MagicMock()
     config.cleanup_target_statuses = [RouteStatus.UNHEALTHY, RouteStatus.DEGRADED]
     return config
+
+
+# =============================================================================
+# Health Check Config & Discovery Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def health_check_ready_route() -> RouteData:
+    """HEALTHY route created long ago (past initial_delay)."""
+    return _create_route_data(
+        status=RouteStatus.HEALTHY,
+        session_id=SessionId(uuid4()),
+        created_at=datetime.now(tzutc()) - timedelta(minutes=10),
+    )
+
+
+@pytest.fixture
+def default_health_check_config() -> ModelHealthCheck:
+    """Default health check configuration."""
+    return ModelHealthCheck(
+        path="/health",
+        interval=10.0,
+        max_retries=3,
+        max_wait_time=15.0,
+        expected_status_code=200,
+        initial_delay=5.0,
+    )
+
+
+@pytest.fixture
+def create_deployment_with_health_check() -> Callable[..., MagicMock]:
+    """Factory fixture to create DeploymentInfo with health check config."""
+
+    def _factory(
+        endpoint_id: UUID,
+        health_check_path: str = "/health",
+    ) -> MagicMock:
+        revision = MagicMock()
+        revision.model_definition = MagicMock()
+        revision.model_definition.health_check_config.return_value = ModelHealthCheck(
+            path=health_check_path,
+            interval=10.0,
+            max_retries=3,
+            max_wait_time=15.0,
+            expected_status_code=200,
+            initial_delay=5.0,
+        )
+        revision.execution.runtime_variant = "custom"
+
+        dep = MagicMock()
+        dep.id = endpoint_id
+        dep.current_revision_id = uuid4()
+        dep.resolve_revision_spec.return_value = revision
+        return dep
+
+    return _factory
+
+
+@pytest.fixture
+def create_discovery_info() -> Callable[..., RouteServiceDiscoveryInfo]:
+    """Factory fixture to create RouteServiceDiscoveryInfo."""
+
+    def _factory(
+        route_id: UUID,
+        endpoint_id: UUID,
+        kernel_host: str = "10.0.0.1",
+        kernel_port: int = 8080,
+    ) -> RouteServiceDiscoveryInfo:
+        return RouteServiceDiscoveryInfo(
+            route_id=route_id,
+            endpoint_id=endpoint_id,
+            endpoint_name="test-endpoint",
+            runtime_variant="custom",
+            kernel_host=kernel_host,
+            kernel_port=kernel_port,
+            session_owner=uuid4(),
+            project=uuid4(),
+        )
+
+    return _factory
+
+
+@pytest.fixture
+def create_health_status() -> Callable[..., HealthStatus]:
+    """Factory fixture to create HealthStatus."""
+
+    def _factory(
+        readiness: HealthCheckStatus | None = None,
+        last_readiness: int | None = None,
+        consecutive_failures: int = 0,
+        created_at: int = 0,
+    ) -> HealthStatus:
+        return HealthStatus(
+            readiness=readiness,
+            liveness=None,
+            last_check=None,
+            last_readiness=last_readiness,
+            created_at=created_at,
+            readiness_consecutive_failures=consecutive_failures,
+        )
+
+    return _factory
