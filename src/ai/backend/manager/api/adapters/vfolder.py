@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -47,9 +49,15 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
+from ai.backend.manager.repositories.vfolder.types import (
+    ProjectVFolderSearchScope,
+    UserVFolderSearchScope,
+)
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     AdminSearchVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.search_in_project import (
+    SearchVFoldersInProjectAction,
 )
 from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
     SearchUserVFoldersAction,
@@ -168,6 +176,39 @@ class VFolderAdapter(BaseAdapter):
         )
         action_result = await self._processors.vfolder.search_user_vfolders.wait_for_complete(
             SearchUserVFoldersAction(scope=scope, querier=querier)
+        )
+        return SearchVFoldersPayload(
+            items=[self._vfolder_data_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def project_search(
+        self,
+        project_id: UUID,
+        input: SearchVFoldersInput,
+    ) -> SearchVFoldersPayload:
+        """Search vfolders within a project scope.
+
+        Used for the project admin page.
+        """
+        scope = ProjectVFolderSearchScope(project_id=project_id)
+        conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
+        orders = self._convert_vfolder_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_VFOLDER_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.vfolder.search_vfolders_in_project.wait_for_complete(
+            SearchVFoldersInProjectAction(scope=scope, querier=querier)
         )
         return SearchVFoldersPayload(
             items=[self._vfolder_data_to_node(item) for item in action_result.data],

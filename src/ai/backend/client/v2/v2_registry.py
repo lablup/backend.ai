@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from .domains_v2.session import V2SessionClient
     from .domains_v2.storage_namespace import V2StorageNamespaceClient
     from .domains_v2.user import V2UserClient
+    from .domains_v2.vfolder import V2VFolderClient
     from .domains_v2.vfs_storage import V2VFSStorageClient
 
 
@@ -270,6 +271,12 @@ class V2ClientRegistry:
         from .domains_v2.user import V2UserClient
 
         return V2UserClient(self._client)
+
+    @cached_property
+    def vfolder(self) -> V2VFolderClient:
+        from .domains_v2.vfolder import V2VFolderClient
+
+        return V2VFolderClient(self._client)
 
     @cached_property
     def vfs_storage(self) -> V2VFSStorageClient:

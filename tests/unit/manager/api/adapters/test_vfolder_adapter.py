@@ -1,7 +1,8 @@
-"""Unit tests for v2 VFolderAdapter.my_search."""
+"""Unit tests for v2 VFolderAdapter."""
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -19,6 +20,9 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.services.vfolder.actions.search_in_project import (
+    SearchVFoldersInProjectActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
     SearchUserVFoldersActionResult,
 )
@@ -115,6 +119,96 @@ class TestVFolderAdapterMySearch:
             return_value=user_data,
         ):
             result = await adapter.my_search(input_dto)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
+
+
+class TestVFolderAdapterProjectSearch:
+    """Tests for VFolderAdapter.project_search()."""
+
+    @pytest.fixture
+    def project_id(self) -> uuid.UUID:
+        return uuid4()
+
+    @pytest.fixture
+    def vfolder_data(self) -> VFolderData:
+        group_id = uuid4()
+        return VFolderData(
+            id=uuid4(),
+            name="project-vfolder",
+            host="local:volume1",
+            quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
+            usage_mode=VFolderUsageMode.GENERAL,
+            permission=VFolderMountPermission.READ_WRITE,
+            max_files=0,
+            max_size=None,
+            num_files=0,
+            cur_size=0,
+            creator="test@example.com",
+            unmanaged_path=None,
+            ownership_type=VFolderOwnershipType.GROUP,
+            user=uuid4(),
+            group=group_id,
+            cloneable=False,
+            status=VFolderOperationStatus.READY,
+            created_at=datetime.now(tz=UTC),
+            last_used=None,
+            domain_name="default",
+        )
+
+    @pytest.fixture
+    def mock_processors(
+        self,
+        vfolder_data: VFolderData,
+        project_id: uuid.UUID,
+    ) -> MagicMock:
+        processors = MagicMock()
+        result = SearchVFoldersInProjectActionResult(
+            project_id=project_id,
+            data=[vfolder_data],
+            total_count=1,
+            has_next_page=False,
+            has_previous_page=False,
+        )
+        processors.vfolder.search_vfolders_in_project.wait_for_complete = AsyncMock(
+            return_value=result,
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, mock_processors: MagicMock) -> VFolderAdapter:
+        return VFolderAdapter(mock_processors)
+
+    async def test_project_search_calls_processor_with_project_scope(
+        self,
+        adapter: VFolderAdapter,
+        mock_processors: MagicMock,
+        project_id: uuid.UUID,
+    ) -> None:
+        """project_search should call search_vfolders_in_project with correct scope."""
+        input_dto = SearchVFoldersInput(limit=10, offset=0)
+
+        await adapter.project_search(project_id, input_dto)
+
+        mock_processors.vfolder.search_vfolders_in_project.wait_for_complete.assert_called_once()
+        action = mock_processors.vfolder.search_vfolders_in_project.wait_for_complete.call_args[0][
+            0
+        ]
+        assert action.scope.project_id == project_id
+
+    async def test_project_search_returns_payload(
+        self,
+        adapter: VFolderAdapter,
+        mock_processors: MagicMock,
+        project_id: uuid.UUID,
+    ) -> None:
+        """project_search should return SearchVFoldersPayload with items."""
+        input_dto = SearchVFoldersInput(limit=10, offset=0)
+
+        result = await adapter.project_search(project_id, input_dto)
 
         assert result.total_count == 1
         assert len(result.items) == 1
