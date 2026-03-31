@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
     ProjectStorageInfo,
     PurgeProjectPayload,
     SearchProjectsPayload,
+    UnassignUserError,
     UnassignUsersFromProjectPayload,
     VFolderHostPermissionEntry,
 )
@@ -72,5 +73,6 @@ __all__ = (
     "SearchProjectsPayload",
     "DeleteProjectPayload",
     "PurgeProjectPayload",
+    "UnassignUserError",
     "UnassignUsersFromProjectPayload",
 )

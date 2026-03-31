@@ -9246,10 +9246,22 @@ input UnassignUsersFromProjectInput {
   userIds: [UUID!]!
 }
 
+"""Added in UNRELEASED. Error information for a user that failed to be unassigned."""
+type UnassignUserError {
+  """UUID of the user that failed to be unassigned."""
+  userId: UUID!
+
+  """Error message describing the failure reason."""
+  message: String!
+}
+
 """Added in UNRELEASED. Payload for user unassignment from project."""
 type UnassignUsersFromProjectPayload {
   """List of users that were unassigned from the project."""
-  items: [UserV2!]!
+  unassignedUsers: [UserV2!]!
+
+  """List of errors for users that could not be unassigned."""
+  failed: [UnassignUserError!]!
 }
 
 """Added in 25.15.0. Input type for unregistering a storage namespace."""

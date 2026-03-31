@@ -26,14 +26,15 @@ class TestUnassignUsersFromProject:
         rbac_permission_fixture: uuid.UUID,
         db_engine: SAEngine,
     ) -> None:
-        """Unassigning assigned users returns unassigned=True and user info."""
+        """Unassigning assigned users returns unassigned user info and no failures."""
         result = await admin_v2_registry.project.unassign_users(
             group_fixture,
             UnassignUsersFromProjectInput(user_ids=assigned_users),
         )
 
-        returned_ids = {u.id for u in result.items}
+        returned_ids = {u.id for u in result.unassigned_users}
         assert returned_ids == set(assigned_users)
+        assert result.failed == []
 
         # Verify rows removed from association_groups_users
         async with db_engine.begin() as conn:
@@ -47,13 +48,13 @@ class TestUnassignUsersFromProject:
             ).all()
             assert len(rows) == 0
 
-    async def test_unassign_nonexistent_users_returns_empty(
+    async def test_unassign_nonexistent_users_reports_failures(
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
         rbac_permission_fixture: uuid.UUID,
     ) -> None:
-        """Unassigning user IDs not in the project returns unassigned=True with empty list."""
+        """Unassigning non-existent user IDs returns failures with appropriate messages."""
         fake_ids = [uuid.uuid4(), uuid.uuid4()]
 
         result = await admin_v2_registry.project.unassign_users(
@@ -61,7 +62,10 @@ class TestUnassignUsersFromProject:
             UnassignUsersFromProjectInput(user_ids=fake_ids),
         )
 
-        assert result.items == []
+        assert result.unassigned_users == []
+        assert len(result.failed) == 2
+        failed_ids = {f.user_id for f in result.failed}
+        assert failed_ids == set(fake_ids)
 
     async def test_unassign_partial_users(
         self,
@@ -71,7 +75,7 @@ class TestUnassignUsersFromProject:
         rbac_permission_fixture: uuid.UUID,
         db_engine: SAEngine,
     ) -> None:
-        """When only some user IDs are assigned, only those are returned."""
+        """When only some user IDs are assigned, successful and failed are separated."""
         fake_id = uuid.uuid4()
         mixed_ids = [assigned_users[0], fake_id]
 
@@ -80,8 +84,10 @@ class TestUnassignUsersFromProject:
             UnassignUsersFromProjectInput(user_ids=mixed_ids),
         )
 
-        returned_ids = {u.id for u in result.items}
+        returned_ids = {u.id for u in result.unassigned_users}
         assert returned_ids == {assigned_users[0]}
+        assert len(result.failed) == 1
+        assert result.failed[0].user_id == fake_id
 
         # The other assigned users should still be in the association
         async with db_engine.begin() as conn:

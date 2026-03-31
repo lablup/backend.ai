@@ -22,7 +22,7 @@ from ai.backend.common.types import SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.group.types import GroupData, UnassignUserFailure, UnassignUsersResult
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
@@ -645,13 +645,21 @@ class GroupDBSource:
 
     async def unassign_users_from_project(
         self, unbinder: UserProjectEntityUnbinder
-    ) -> list[UserData]:
-        """Remove users from a project and return the unassigned users' data.
+    ) -> UnassignUsersResult:
+        """Remove users from a project and return unassigned users and failures.
 
         Deletes both the business N:N mapping (association_groups_users) and
         RBAC scope associations (AssociationScopesEntitiesRow) atomically.
+        Also reports which requested user IDs could not be unassigned and why.
         """
         async with self._db.begin_session_read_committed() as session:
+            requested_ids = set(unbinder.user_uuids)
+
+            # Find which requested UUIDs actually exist in the system
+            existing_query = sa.select(UserRow.uuid).where(UserRow.uuid.in_(unbinder.user_uuids))
+            existing_result = await session.scalars(existing_query)
+            existing_ids = set(existing_result.all())
+
             # Fetch users that are actually associated before removing
             actual_assoc_query = (
                 sa.select(UserRow)
@@ -665,10 +673,26 @@ class GroupDBSource:
                 )
             )
             result = await session.scalars(actual_assoc_query)
-            unassigned_users = [row.to_data() for row in result.all()]
+            assigned_rows = result.all()
+            assigned_ids = {row.uuid for row in assigned_rows}
+            unassigned_users = [row.to_data() for row in assigned_rows]
+
             # Delete business N:N rows and RBAC scope associations
             await execute_rbac_scope_entity_unbinder(session, unbinder)
-            return unassigned_users
+
+            # Compute failures
+            failures: list[UnassignUserFailure] = []
+            for uid in requested_ids - existing_ids:
+                failures.append(UnassignUserFailure(user_id=uid, reason="User does not exist."))
+            for uid in existing_ids - assigned_ids:
+                failures.append(
+                    UnassignUserFailure(user_id=uid, reason="User is not assigned to this project.")
+                )
+
+            return UnassignUsersResult(
+                unassigned_users=unassigned_users,
+                failures=failures,
+            )
 
     async def get_project(self, project_id: UUID) -> GroupData:
         """Get a single project by UUID.

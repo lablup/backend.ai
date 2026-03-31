@@ -242,9 +242,10 @@ class TestUnassignUsersFromProject:
         )
         result = await group_db_source.unassign_users_from_project(unbinder)
 
-        assert len(result) == 3
-        result_uuids = {u.uuid for u in result}
+        assert len(result.unassigned_users) == 3
+        result_uuids = {u.uuid for u in result.unassigned_users}
         assert result_uuids == set(assigned_users)
+        assert result.failures == []
 
         # Verify association rows removed
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -255,14 +256,14 @@ class TestUnassignUsersFromProject:
             ).all()
             assert len(remaining) == 0
 
-    async def test_unassign_nonexistent_users_returns_empty(
+    async def test_unassign_nonexistent_users_reports_failures(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
         test_project: uuid.UUID,
         assigned_users: list[uuid.UUID],
     ) -> None:
-        """Non-assigned user IDs are silently skipped; assigned users remain."""
+        """Non-existent user IDs are reported as failures."""
         fake_ids = [uuid.uuid4(), uuid.uuid4()]
         unbinder = UserProjectEntityUnbinder(
             user_uuids=fake_ids,
@@ -270,7 +271,12 @@ class TestUnassignUsersFromProject:
         )
         result = await group_db_source.unassign_users_from_project(unbinder)
 
-        assert result == []
+        assert result.unassigned_users == []
+        assert len(result.failures) == 2
+        failure_ids = {f.user_id for f in result.failures}
+        assert failure_ids == set(fake_ids)
+        for f in result.failures:
+            assert "does not exist" in f.reason
 
         # Verify original assignments are untouched
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -280,3 +286,58 @@ class TestUnassignUsersFromProject:
                 )
             ).all()
             assert len(remaining) == 3
+
+    async def test_unassign_existing_but_not_assigned_users_reports_failures(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: GroupDBSource,
+        test_domain: str,
+        user_resource_policy: str,
+        test_password_info: PasswordInfo,
+        test_project: uuid.UUID,
+        assigned_users: list[uuid.UUID],
+    ) -> None:
+        """Users that exist but are not assigned to the project are reported as failures."""
+        unassigned_user_id = await self._create_user(
+            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+        )
+        unbinder = UserProjectEntityUnbinder(
+            user_uuids=[unassigned_user_id],
+            project_id=test_project,
+        )
+        result = await group_db_source.unassign_users_from_project(unbinder)
+
+        assert result.unassigned_users == []
+        assert len(result.failures) == 1
+        assert result.failures[0].user_id == unassigned_user_id
+        assert "not assigned" in result.failures[0].reason
+
+    async def test_unassign_mixed_success_and_failures(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: GroupDBSource,
+        test_domain: str,
+        user_resource_policy: str,
+        test_password_info: PasswordInfo,
+        test_project: uuid.UUID,
+        assigned_users: list[uuid.UUID],
+    ) -> None:
+        """Mixed request: assigned users are unassigned, others reported as failures."""
+        fake_id = uuid.uuid4()
+        unassigned_user_id = await self._create_user(
+            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+        )
+        mixed_ids = [assigned_users[0], fake_id, unassigned_user_id]
+
+        unbinder = UserProjectEntityUnbinder(
+            user_uuids=mixed_ids,
+            project_id=test_project,
+        )
+        result = await group_db_source.unassign_users_from_project(unbinder)
+
+        assert len(result.unassigned_users) == 1
+        assert result.unassigned_users[0].uuid == assigned_users[0]
+        assert len(result.failures) == 2
+        failure_map = {f.user_id: f.reason for f in result.failures}
+        assert "does not exist" in failure_map[fake_id]
+        assert "not assigned" in failure_map[unassigned_user_id]

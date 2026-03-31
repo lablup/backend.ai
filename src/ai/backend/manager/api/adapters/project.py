@@ -30,6 +30,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
     ProjectPayload,
     ProjectStorageInfo,
     PurgeProjectPayload,
+    UnassignUserError,
     UnassignUsersFromProjectPayload,
     VFolderHostPermissionEntry,
 )
@@ -241,8 +242,11 @@ class ProjectAdapter(BaseAdapter):
             )
         )
         return UnassignUsersFromProjectPayload(
-            items=[
+            unassigned_users=[
                 UserAdapter._user_data_to_node(user_data) for user_data in result.unassigned_users
+            ],
+            failed=[
+                UnassignUserError(user_id=f.user_id, message=f.reason) for f in result.failures
             ],
         )
 
