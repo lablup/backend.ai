@@ -2,6 +2,7 @@
 Tests for BaseRevisionGenerator implementation.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -10,7 +11,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.types import ClusterMode, RuntimeVariant, Sentinel
 from ai.backend.manager.data.deployment.types import (
     DeploymentConfig,
     ExecutionSpec,
@@ -26,6 +27,7 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.errors.deployment import (
     DefinitionFileNotFound,
     RuntimeVariantNotAllowed,
+    RuntimeVariantNotSpecified,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.revision_generator.base import BaseRevisionGenerator
@@ -657,253 +659,128 @@ class TestMergeRevision:
         assert result.resource_spec.resource_opts == test_case.expected.resource_opts
         assert result.execution.environ == test_case.expected.environ
 
-    def test_single_runtime_variant_used_when_unset(
+    @pytest.fixture
+    def make_draft_with_variant(
+        self, base_mount_metadata: MountMetadata
+    ) -> Callable[[RuntimeVariant | Sentinel], ModelRevisionSpecDraft]:
+        """Factory to create a draft revision with a specific runtime_variant."""
+
+        def _make(variant: RuntimeVariant | Sentinel = Sentinel.TOKEN) -> ModelRevisionSpecDraft:
+            execution = (
+                ExecutionSpec(runtime_variant=variant, startup_command=None)
+                if isinstance(variant, RuntimeVariant)
+                else ExecutionSpec(startup_command=None)
+            )
+            return ModelRevisionSpecDraft(
+                image_identifier=ImageIdentifierDraft(canonical=None, architecture=None),
+                resource_spec=ResourceSpecDraft(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                    resource_slots=None,
+                    resource_opts=None,
+                ),
+                mounts=base_mount_metadata,
+                execution=execution,
+            )
+
+        return _make
+
+    @pytest.mark.parametrize(
+        ("runtime_variants", "requested_variant", "expected_variant"),
+        [
+            pytest.param(
+                [RuntimeVariant.VLLM],
+                Sentinel.TOKEN,
+                RuntimeVariant.VLLM,
+                id="single_variant_used_when_unset",
+            ),
+            pytest.param(
+                [RuntimeVariant.VLLM],
+                RuntimeVariant.VLLM,
+                RuntimeVariant.VLLM,
+                id="user_choice_matches_single_variant",
+            ),
+            pytest.param(
+                [RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
+                RuntimeVariant.SGLANG,
+                RuntimeVariant.SGLANG,
+                id="multiple_variants_valid_choice",
+            ),
+            pytest.param(
+                None,
+                RuntimeVariant.CUSTOM,
+                RuntimeVariant.CUSTOM,
+                id="no_constraint_keeps_user_choice",
+            ),
+            pytest.param(
+                None,
+                Sentinel.TOKEN,
+                RuntimeVariant.CUSTOM,
+                id="no_constraint_unset_defaults_to_custom",
+            ),
+        ],
+    )
+    def test_resolve_runtime_variant_success(
         self,
         base_generator: BaseRevisionGenerator,
-        base_mount_metadata: MountMetadata,
+        make_draft_with_variant: Callable[[RuntimeVariant | Sentinel], ModelRevisionSpecDraft],
+        runtime_variants: list[RuntimeVariant] | None,
+        requested_variant: RuntimeVariant | Sentinel,
+        expected_variant: RuntimeVariant,
     ) -> None:
-        """When user does not specify (sentinel default) and single variant in list, use it."""
+        """Test successful runtime variant resolution through merge_revision."""
         deployment_config = DeploymentConfig(
-            runtime_variants=[RuntimeVariant.VLLM],
-            environment=ImageEnvironment(
-                image="vllm-image:latest",
-                architecture="x86_64",
-            ),
-            resource_slots={"cpu": 8},
-        )
-        draft_revision = ModelRevisionSpecDraft(
-            image_identifier=ImageIdentifierDraft(
-                canonical=None,
-                architecture=None,
-            ),
-            resource_spec=ResourceSpecDraft(
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-                resource_slots=None,
-                resource_opts=None,
-            ),
-            mounts=base_mount_metadata,
-            execution=ExecutionSpec(
-                # runtime_variant defaults to Sentinel.TOKEN (user did not specify)
-                startup_command=None,
-            ),
-        )
-
-        result = base_generator.merge_revision(draft_revision, deployment_config)
-
-        assert result.execution.runtime_variant == RuntimeVariant.VLLM
-
-    def test_user_specified_variant_overrides_single_runtime_variant(
-        self,
-        base_generator: BaseRevisionGenerator,
-        base_mount_metadata: MountMetadata,
-    ) -> None:
-        """When user explicitly specifies a variant, it takes priority over single-variant list."""
-        deployment_config = DeploymentConfig(
-            runtime_variants=[RuntimeVariant.VLLM],
-            environment=ImageEnvironment(
-                image="vllm-image:latest",
-                architecture="x86_64",
-            ),
-            resource_slots={"cpu": 8},
-        )
-        draft_revision = ModelRevisionSpecDraft(
-            image_identifier=ImageIdentifierDraft(
-                canonical=None,
-                architecture=None,
-            ),
-            resource_spec=ResourceSpecDraft(
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-                resource_slots=None,
-                resource_opts=None,
-            ),
-            mounts=base_mount_metadata,
-            execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.VLLM,  # User explicitly chose vllm
-                startup_command=None,
-            ),
-        )
-
-        result = base_generator.merge_revision(draft_revision, deployment_config)
-
-        assert result.execution.runtime_variant == RuntimeVariant.VLLM
-
-    def test_user_specified_variant_rejected_when_not_in_list(
-        self,
-        base_generator: BaseRevisionGenerator,
-        base_mount_metadata: MountMetadata,
-    ) -> None:
-        """When user explicitly specifies a variant not in the list, raise error."""
-        deployment_config = DeploymentConfig(
-            runtime_variants=[RuntimeVariant.VLLM],
-            environment=ImageEnvironment(
-                image="vllm-image:latest",
-                architecture="x86_64",
-            ),
-            resource_slots={"cpu": 8},
-        )
-        draft_revision = ModelRevisionSpecDraft(
-            image_identifier=ImageIdentifierDraft(
-                canonical=None,
-                architecture=None,
-            ),
-            resource_spec=ResourceSpecDraft(
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-                resource_slots=None,
-                resource_opts=None,
-            ),
-            mounts=base_mount_metadata,
-            execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.SGLANG,  # Not in [vllm]
-                startup_command=None,
-            ),
-        )
-
-        with pytest.raises(RuntimeVariantNotAllowed):
-            base_generator.merge_revision(draft_revision, deployment_config)
-
-    def test_multiple_runtime_variants_allows_valid_choice(
-        self,
-        base_generator: BaseRevisionGenerator,
-        base_mount_metadata: MountMetadata,
-    ) -> None:
-        """When service definition has multiple runtime_variants and API picks a valid one, it succeeds."""
-        deployment_config = DeploymentConfig(
-            runtime_variants=[RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
-            environment=ImageEnvironment(
-                image="some-image:latest",
-                architecture="x86_64",
-            ),
+            runtime_variants=runtime_variants,
+            environment=ImageEnvironment(image="img:latest", architecture="x86_64"),
             resource_slots={"cpu": 4},
         )
-        draft_revision = ModelRevisionSpecDraft(
-            image_identifier=ImageIdentifierDraft(
-                canonical=None,
-                architecture=None,
-            ),
-            resource_spec=ResourceSpecDraft(
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-                resource_slots=None,
-                resource_opts=None,
-            ),
-            mounts=base_mount_metadata,
-            execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.SGLANG,
-                startup_command=None,
-            ),
-        )
+        draft = make_draft_with_variant(requested_variant)
 
-        result = base_generator.merge_revision(draft_revision, deployment_config)
+        result = base_generator.merge_revision(draft, deployment_config)
 
-        assert result.execution.runtime_variant == RuntimeVariant.SGLANG
+        assert result.execution.runtime_variant == expected_variant
 
-    def test_multiple_runtime_variants_rejects_invalid_choice(
+    @pytest.mark.parametrize(
+        ("runtime_variants", "requested_variant", "expected_error"),
+        [
+            pytest.param(
+                [RuntimeVariant.VLLM],
+                RuntimeVariant.SGLANG,
+                RuntimeVariantNotAllowed,
+                id="user_choice_not_in_single_variant_list",
+            ),
+            pytest.param(
+                [RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
+                RuntimeVariant.NIM,
+                RuntimeVariantNotAllowed,
+                id="user_choice_not_in_multi_variant_list",
+            ),
+            pytest.param(
+                [RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
+                Sentinel.TOKEN,
+                RuntimeVariantNotSpecified,
+                id="multi_variant_unset_requires_selection",
+            ),
+        ],
+    )
+    def test_resolve_runtime_variant_error(
         self,
         base_generator: BaseRevisionGenerator,
-        base_mount_metadata: MountMetadata,
+        make_draft_with_variant: Callable[[RuntimeVariant | Sentinel], ModelRevisionSpecDraft],
+        runtime_variants: list[RuntimeVariant],
+        requested_variant: RuntimeVariant | Sentinel,
+        expected_error: type[Exception],
     ) -> None:
-        """When multiple runtime_variants exist and user picks one not in the list, reject it."""
+        """Test runtime variant resolution errors through merge_revision."""
         deployment_config = DeploymentConfig(
-            runtime_variants=[RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
-            environment=ImageEnvironment(
-                image="some-image:latest",
-                architecture="x86_64",
-            ),
+            runtime_variants=runtime_variants,
+            environment=ImageEnvironment(image="img:latest", architecture="x86_64"),
             resource_slots={"cpu": 4},
         )
-        draft_revision = ModelRevisionSpecDraft(
-            image_identifier=ImageIdentifierDraft(
-                canonical=None,
-                architecture=None,
-            ),
-            resource_spec=ResourceSpecDraft(
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-                resource_slots=None,
-                resource_opts=None,
-            ),
-            mounts=base_mount_metadata,
-            execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.NIM,  # Explicitly chosen but not in allowed list
-                startup_command=None,
-            ),
-        )
+        draft = make_draft_with_variant(requested_variant)
 
-        with pytest.raises(RuntimeVariantNotAllowed):
-            base_generator.merge_revision(draft_revision, deployment_config)
-
-    def test_no_runtime_variants_keeps_draft(
-        self,
-        base_generator: BaseRevisionGenerator,
-        base_mount_metadata: MountMetadata,
-    ) -> None:
-        """When service definition has no runtime_variants, the draft's value is kept."""
-        deployment_config = DeploymentConfig(
-            environment=ImageEnvironment(
-                image="some-image:latest",
-                architecture="x86_64",
-            ),
-            resource_slots={"cpu": 4},
-        )
-        draft_revision = ModelRevisionSpecDraft(
-            image_identifier=ImageIdentifierDraft(
-                canonical=None,
-                architecture=None,
-            ),
-            resource_spec=ResourceSpecDraft(
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-                resource_slots=None,
-                resource_opts=None,
-            ),
-            mounts=base_mount_metadata,
-            execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.CUSTOM,
-                startup_command=None,
-            ),
-        )
-
-        result = base_generator.merge_revision(draft_revision, deployment_config)
-
-        assert result.execution.runtime_variant == RuntimeVariant.CUSTOM
-
-    def test_no_runtime_variants_unset_defaults_to_custom(
-        self,
-        base_generator: BaseRevisionGenerator,
-        base_mount_metadata: MountMetadata,
-    ) -> None:
-        """When no runtime_variants and user did not specify, default to CUSTOM."""
-        deployment_config = DeploymentConfig(
-            environment=ImageEnvironment(
-                image="some-image:latest",
-                architecture="x86_64",
-            ),
-            resource_slots={"cpu": 4},
-        )
-        draft_revision = ModelRevisionSpecDraft(
-            image_identifier=ImageIdentifierDraft(
-                canonical=None,
-                architecture=None,
-            ),
-            resource_spec=ResourceSpecDraft(
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-                resource_slots=None,
-                resource_opts=None,
-            ),
-            mounts=base_mount_metadata,
-            execution=ExecutionSpec(
-                # runtime_variant defaults to Sentinel.TOKEN
-                startup_command=None,
-            ),
-        )
-
-        result = base_generator.merge_revision(draft_revision, deployment_config)
-
-        assert result.execution.runtime_variant == RuntimeVariant.CUSTOM
+        with pytest.raises(expected_error):
+            base_generator.merge_revision(draft, deployment_config)
 
 
 @dataclass

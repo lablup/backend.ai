@@ -133,11 +133,6 @@ class DeploymentConfig(BaseModel):
     )
 
     @property
-    def _has_variant_constraint(self) -> bool:
-        """Whether the service definition restricts which variants are allowed."""
-        return bool(self.runtime_variants)
-
-    @property
     def _has_single_variant(self) -> bool:
         """Whether exactly one variant is specified, enabling auto-selection."""
         return self.runtime_variants is not None and len(self.runtime_variants) == 1
