@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING, Annotated
+from uuid import UUID
+
+import strawberry
+from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderAccessControlInfo as VFolderAccessControlInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderMetadataInfo as VFolderMetadataInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.types import (
+    VFolderOwnershipInfo as VFolderOwnershipInfoDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
@@ -21,6 +29,11 @@ from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
     VFolderOwnershipTypeGQL,
     VFolderUsageModeGQL,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.types import StrawberryGQLContext
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 
 @gql_pydantic_type(
@@ -75,3 +88,73 @@ class VFolderAccessControlInfoGQL:
     ownership_type: VFolderOwnershipTypeGQL = gql_field(
         description="Ownership type: USER (personal folder) or GROUP (project-shared folder)."
     )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Ownership context for a virtual folder. "
+            "Provides both scalar IDs (userId, projectId, creatorEmail) for lightweight access "
+            "and full node resolvers (user, project, creator) for detailed entity information."
+        ),
+    ),
+    model=VFolderOwnershipInfoDTO,
+    name="VFolderOwnershipInfo",
+)
+class VFolderOwnershipInfoGQL:
+    """Ownership context with scalar IDs and node resolvers."""
+
+    user_id: UUID | None = gql_field(
+        description="UUID of the user who owns this virtual folder. Null for project-owned folders.",
+    )
+    project_id: UUID | None = gql_field(
+        description="UUID of the project that owns this virtual folder. Null for user-owned folders.",
+    )
+    creator_email: str | None = gql_field(
+        description="Email of the user who originally created this virtual folder.",
+    )
+
+    @gql_field(description="The user who owns this virtual folder. Null for project-owned folders.")  # type: ignore[misc]
+    async def user(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        # Defer to data loader when wired; stub returns None for now.
+        return None
+
+    @gql_field(
+        description="The project that owns this virtual folder. Null for user-owned folders."
+    )  # type: ignore[misc]
+    async def project(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ProjectV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+        ]
+        | None
+    ):
+        # Defer to data loader when wired; stub returns None for now.
+        return None
+
+    @gql_field(description="The user who originally created this virtual folder.")  # type: ignore[misc]
+    async def creator(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        # Defer to data loader when wired; stub returns None for now.
+        return None
