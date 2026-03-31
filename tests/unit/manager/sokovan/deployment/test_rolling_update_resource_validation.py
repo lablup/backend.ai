@@ -79,13 +79,14 @@ def _make_deployment_info(
 def _make_revision_data(
     *,
     resource_slots: dict[str, Decimal] | None = None,
+    cluster_size: int = 1,
 ) -> ModelRevisionData:
     """Create a ModelRevisionData with the given resource slots."""
     slots = resource_slots or {"cpu": Decimal("2"), "mem": Decimal("4096")}
     return ModelRevisionData(
         id=REVISION_ID,
         name="v1",
-        cluster_config=ClusterConfigData(mode=ClusterMode.SINGLE_NODE, size=1),
+        cluster_config=ClusterConfigData(mode=ClusterMode.SINGLE_NODE, size=cluster_size),
         resource_config=ResourceConfigData(
             resource_group_name="default",
             resource_slot=ResourceSlot(slots),
@@ -398,3 +399,74 @@ class TestValidateDeploymentSurgeResources:
         await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
 
         mock_scaling_group_repository.get_resource_info.assert_called_once_with("my-gpu-group")
+
+    async def test_cluster_size_multiplies_surge_resource_requirement(
+        self,
+        controller: DeploymentController,
+        mock_deployment_repository: MagicMock,
+        mock_scaling_group_repository: MagicMock,
+    ) -> None:
+        """Surge resources must account for cluster_size > 1."""
+        deployment_info = _make_deployment_info()  # replica_count=2
+        mock_deployment_repository.get_deployment_policy = AsyncMock(
+            return_value=DeploymentPolicyData(
+                id=uuid.uuid4(),
+                endpoint=ENDPOINT_ID,
+                strategy=DeploymentStrategy.ROLLING,
+                strategy_spec=RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
+                ),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+        )
+        # cluster_size=2: each surge route needs 2 kernels
+        # surge_count=1 (max_surge) * cluster_size=2 = 2 total kernels
+        # per_route_slots: cpu=4 → total surge = 4 * 2 = 8 cpu
+        mock_deployment_repository.get_revision = AsyncMock(
+            return_value=_make_revision_data(
+                resource_slots={"cpu": Decimal("4")},
+                cluster_size=2,
+            )
+        )
+        # Only 6 cpu free — insufficient for 8 cpu surge requirement
+        mock_scaling_group_repository.get_resource_info = AsyncMock(
+            return_value=_make_resource_info({"cpu": Decimal("6")})
+        )
+
+        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        assert result.sufficient is False
+
+    async def test_cluster_size_pass_when_resources_cover_multiplied_surge(
+        self,
+        controller: DeploymentController,
+        mock_deployment_repository: MagicMock,
+        mock_scaling_group_repository: MagicMock,
+    ) -> None:
+        """Sufficient resources when free slots cover surge * cluster_size."""
+        deployment_info = _make_deployment_info()  # replica_count=2
+        mock_deployment_repository.get_deployment_policy = AsyncMock(
+            return_value=DeploymentPolicyData(
+                id=uuid.uuid4(),
+                endpoint=ENDPOINT_ID,
+                strategy=DeploymentStrategy.ROLLING,
+                strategy_spec=RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
+                ),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+        )
+        mock_deployment_repository.get_revision = AsyncMock(
+            return_value=_make_revision_data(
+                resource_slots={"cpu": Decimal("4")},
+                cluster_size=2,
+            )
+        )
+        # surge_count=1 * cluster_size=2 * cpu=4 = 8 cpu needed, 10 available
+        mock_scaling_group_repository.get_resource_info = AsyncMock(
+            return_value=_make_resource_info({"cpu": Decimal("10")})
+        )
+
+        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        assert result.sufficient is True

@@ -281,7 +281,10 @@ class DeploymentController:
             SurgeResourceCheckResult with ``sufficient=True`` when resources are adequate,
             or ``sufficient=False`` with detail fields populated otherwise.
         """
-        policy = await self._deployment_repository.get_deployment_policy(deployment_info.id)
+        if deployment_info.policy is not None:
+            policy = deployment_info.policy
+        else:
+            policy = await self._deployment_repository.get_deployment_policy(deployment_info.id)
         spec = policy.strategy_spec
 
         desired_replicas = deployment_info.replica_spec.target_replica_count
@@ -291,7 +294,9 @@ class DeploymentController:
 
         revision_data = await self._deployment_repository.get_revision(revision_id)
         per_route_slots = revision_data.resource_config.resource_slot
-        surge_slots = ResourceSlot({k: v * surge_count for k, v in per_route_slots.data.items()})
+        cluster_size = revision_data.cluster_config.size
+        total_surge = surge_count * cluster_size
+        surge_slots = ResourceSlot({k: v * total_surge for k, v in per_route_slots.data.items()})
 
         scaling_group = deployment_info.metadata.resource_group
         resource_info = await self._scaling_group_repository.get_resource_info(scaling_group)
