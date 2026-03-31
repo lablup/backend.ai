@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Annotated, Any
+from uuid import UUID
 
 import strawberry
 from strawberry import Info
@@ -65,6 +66,18 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         description="Access control including permission level and ownership type."
     )
     unmanaged_path: str | None = gql_field(description="Path for unmanaged virtual folders.")
+    owner_user_id: UUID | None = gql_field(
+        default=None,
+        description="UUID of the user who owns this virtual folder. Null for project-owned folders.",
+    )
+    owner_project_id: UUID | None = gql_field(
+        default=None,
+        description="UUID of the project that owns this virtual folder. Null for user-owned folders.",
+    )
+    creator_email: str | None = gql_field(
+        default=None,
+        description="Email of the user who originally created this virtual folder.",
+    )
 
     @gql_field(description="The user who owns this virtual folder. Null for project-owned folders.")  # type: ignore[misc]
     async def owner_user(
