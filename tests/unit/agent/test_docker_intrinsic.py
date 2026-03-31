@@ -294,9 +294,7 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
         ):
             mock_read_proc_net_dev.return_value = (4096, 8192)
 
-            async def run_in_executor_impl(
-                executor: Any, fn: Any, *args: Any
-            ) -> Any:
+            async def run_in_executor_impl(executor: Any, fn: Any, *args: Any) -> Any:
                 return fn(*args)
 
             mock_container_instance = AsyncMock()
@@ -369,7 +367,7 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
 class _SysfsMocks:
     ctx: MagicMock
     container: AsyncMock
-    netstat_ns: MagicMock
+    read_proc_net_dev: MagicMock
     loop: MagicMock
     container_data: dict[str, Any]
 
@@ -385,9 +383,7 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         return plugin
 
     @pytest.fixture
-    def sysfs_mocks(
-        self, cgroup_stat_context: MagicMock, tmp_path: Path
-    ) -> Generator[_SysfsMocks, None, None]:
+    def sysfs_mocks(self, cgroup_stat_context: MagicMock) -> Generator[_SysfsMocks, None, None]:
         """Fully patched sysfs_impl environment with default happy-path behavior.
 
         Tests override specific mock side_effects before calling the target function.
@@ -405,10 +401,8 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         io_path.__truediv__ = MagicMock(return_value=io_stat)
         ctx.agent.get_cgroup_path = lambda subsys, cid: mem_path if subsys == "memory" else io_path
 
-        fake_ns = tmp_path / "fake_netns"
-        fake_ns.touch()
         container_data: dict[str, Any] = {
-            "NetworkSettings": {"SandboxKey": str(fake_ns)},
+            "State": {"Pid": 12345},
         }
 
         with (
@@ -416,18 +410,27 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
                 "ai.backend.agent.docker.intrinsic.DockerContainer",
             ) as mock_container_cls,
             patch("ai.backend.agent.docker.intrinsic.read_sysfs", return_value=1048576),
-            patch("ai.backend.agent.docker.intrinsic.netstat_ns", return_value={}) as mock_netstat,
+            patch(
+                "ai.backend.agent.docker.intrinsic.read_proc_net_dev",
+                return_value=(0, 0),
+            ) as mock_read_proc_net_dev,
             patch("ai.backend.agent.docker.intrinsic.current_loop") as mock_loop,
         ):
             mock_container = AsyncMock()
             mock_container.show.return_value = container_data
             mock_container_cls.return_value = mock_container
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
+
+            async def default_run_in_executor(executor: Any, fn: Any, *args: Any) -> Any:
+                return fn(*args)
+
+            mock_loop.return_value.run_in_executor = AsyncMock(
+                side_effect=default_run_in_executor,
+            )
 
             yield _SysfsMocks(
                 ctx=ctx,
                 container=mock_container,
-                netstat_ns=mock_netstat,
+                read_proc_net_dev=mock_read_proc_net_dev,
                 loop=mock_loop,
                 container_data=container_data,
             )
@@ -457,23 +460,25 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         assert "slow_container" not in results[0].per_container
         assert "normal_container" in results[0].per_container
 
-    async def test_slow_netstat_ns_times_out(
+    async def test_slow_container_show_for_net_stats_times_out(
         self,
         memory_plugin: MemoryPlugin,
         sysfs_mocks: _SysfsMocks,
     ) -> None:
-        """When netstat_ns() hangs, the call times out and returns None
-        for that container while other containers succeed."""
+        """When container.show() hangs during net stat collection,
+        the call times out and returns None for that container
+        while other containers succeed."""
         call_count = 0
 
-        async def slow_netstat_for_first(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        async def slow_show_on_second_call(*args: Any, **kwargs: Any) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
+            # First call succeeds quickly, second call hangs
             if call_count == 1:
                 await asyncio.sleep(10)
-            return {}
+            return sysfs_mocks.container_data
 
-        sysfs_mocks.netstat_ns.side_effect = slow_netstat_for_first
+        sysfs_mocks.container.show.side_effect = slow_show_on_second_call
 
         results = await memory_plugin.gather_container_measures(
             sysfs_mocks.ctx, ["slow_container", "normal_container"]
@@ -495,10 +500,10 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         branch in the results loop.
         """
 
-        async def selective_run_in_executor(executor: Any, fn: Any, *args: Any) -> int:
+        async def selective_run_in_executor(executor: Any, fn: Any, *args: Any) -> Any:
             if args and args[0] == "broken_container":
                 raise RuntimeError("unexpected executor failure")
-            return 0
+            return fn(*args)
 
         sysfs_mocks.loop.return_value.run_in_executor = selective_run_in_executor
 
@@ -518,10 +523,10 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         Exception), it must propagate instead of being silently skipped.
         This ensures shutdown signals are not swallowed by return_exceptions=True."""
 
-        async def cancel_on_first(executor: Any, fn: Any, *args: Any) -> int:
+        async def cancel_on_first(executor: Any, fn: Any, *args: Any) -> Any:
             if args and args[0] == "cancelled_container":
                 raise asyncio.CancelledError()
-            return 0
+            return fn(*args)
 
         sysfs_mocks.loop.return_value.run_in_executor = cancel_on_first
 
@@ -529,3 +534,79 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
             await memory_plugin.gather_container_measures(
                 sysfs_mocks.ctx, ["cancelled_container", "healthy_container"]
             )
+
+
+class TestReadProcNetDev:
+    """Tests for read_proc_net_dev() parsing /proc/[pid]/net/dev format."""
+
+    SAMPLE_NET_DEV = (
+        "Inter-|   Receive                                                |  Transmit\n"
+        " face |bytes    packets errs drop fifo frame compressed multicast"
+        "|bytes    packets errs drop fifo colls carrier compressed\n"
+        "    lo:    1234       10    0    0    0     0          0         0"
+        "        5678       10    0    0    0     0       0          0\n"
+        "  eth0:   50000      100    0    0    0     0          0         0"
+        "       80000      200    0    0    0     0       0          0\n"
+    )
+
+    MULTI_IFACE_NET_DEV = (
+        "Inter-|   Receive                                                |  Transmit\n"
+        " face |bytes    packets errs drop fifo frame compressed multicast"
+        "|bytes    packets errs drop fifo colls carrier compressed\n"
+        "    lo:       0        0    0    0    0     0          0         0"
+        "           0        0    0    0    0     0       0          0\n"
+        "  eth0:   10000       50    0    0    0     0          0         0"
+        "       20000      100    0    0    0     0       0          0\n"
+        "  eth1:   30000       70    0    0    0     0          0         0"
+        "       40000      150    0    0    0     0       0          0\n"
+    )
+
+    LO_ONLY_NET_DEV = (
+        "Inter-|   Receive                                                |  Transmit\n"
+        " face |bytes    packets errs drop fifo frame compressed multicast"
+        "|bytes    packets errs drop fifo colls carrier compressed\n"
+        "    lo:    9999       10    0    0    0     0          0         0"
+        "        8888       10    0    0    0     0       0          0\n"
+    )
+
+    def test_parses_standard_format(self, tmp_path: Path) -> None:
+        """Parses standard /proc/net/dev format: skips headers, excludes lo,
+        returns correct rx/tx sums."""
+        net_dev = tmp_path / "net_dev"
+        net_dev.write_text(self.SAMPLE_NET_DEV)
+        with patch(
+            "ai.backend.agent.docker.intrinsic.Path",
+            return_value=net_dev,
+        ):
+            rx, tx = read_proc_net_dev(42)
+        assert rx == 50000
+        assert tx == 80000
+
+    def test_sums_multiple_interfaces(self, tmp_path: Path) -> None:
+        """Sums rx/tx bytes across all non-loopback interfaces."""
+        net_dev = tmp_path / "net_dev"
+        net_dev.write_text(self.MULTI_IFACE_NET_DEV)
+        with patch(
+            "ai.backend.agent.docker.intrinsic.Path",
+            return_value=net_dev,
+        ):
+            rx, tx = read_proc_net_dev(42)
+        assert rx == 40000  # 10000 + 30000
+        assert tx == 60000  # 20000 + 40000
+
+    def test_loopback_only_returns_zero(self, tmp_path: Path) -> None:
+        """When only loopback is present, returns (0, 0)."""
+        net_dev = tmp_path / "net_dev"
+        net_dev.write_text(self.LO_ONLY_NET_DEV)
+        with patch(
+            "ai.backend.agent.docker.intrinsic.Path",
+            return_value=net_dev,
+        ):
+            rx, tx = read_proc_net_dev(42)
+        assert rx == 0
+        assert tx == 0
+
+    def test_raises_oserror_for_nonexistent_pid(self) -> None:
+        """Raises OSError when /proc/[pid]/net/dev does not exist."""
+        with pytest.raises(OSError):
+            read_proc_net_dev(999999999)
