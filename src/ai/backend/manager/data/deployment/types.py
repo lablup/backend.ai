@@ -36,6 +36,7 @@ from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
     RuntimeVariant,
+    Sentinel,
     SessionId,
     VFolderMount,
 )
@@ -130,23 +131,33 @@ class DeploymentConfig(BaseModel):
         ],
     )
 
-    def resolve_runtime_variant(self, requested: RuntimeVariant) -> RuntimeVariant:
-        """Resolve the effective runtime variant against the allowed list.
+    def resolve_runtime_variant(self, requested: RuntimeVariant | Sentinel) -> RuntimeVariant:
+        """Resolve the effective runtime variant.
 
-        - No constraints (runtime_variants is None/empty): return requested as-is.
-        - Single variant: force it regardless of requested.
-        - Multiple variants: validate requested is in the allowed list.
+        Priority: user request > runtime_variants list > CUSTOM default.
+
+        - User specified (RuntimeVariant): use it, validate against the list if present.
+        - User did not specify (Sentinel.TOKEN): fall back to runtime_variants list.
+          - Single variant in list: use it.
+          - Multiple variants: raise RuntimeVariantNotAllowed (user must choose).
+          - No list: fall back to CUSTOM.
         """
-        if not self.runtime_variants:
+        if isinstance(requested, RuntimeVariant):
+            if self.runtime_variants and requested not in self.runtime_variants:
+                raise RuntimeVariantNotAllowed(
+                    runtime_variant=str(requested),
+                    allowed_variants=[v.value for v in self.runtime_variants],
+                )
             return requested
+        # User did not specify — fall back to runtime_variants list.
+        if not self.runtime_variants:
+            return RuntimeVariant.CUSTOM
         if len(self.runtime_variants) == 1:
             return self.runtime_variants[0]
-        if requested not in self.runtime_variants:
-            raise RuntimeVariantNotAllowed(
-                runtime_variant=str(requested),
-                allowed_variants=[v.value for v in self.runtime_variants],
-            )
-        return requested
+        raise RuntimeVariantNotAllowed(
+            runtime_variant="(not specified)",
+            allowed_variants=[v.value for v in self.runtime_variants],
+        )
 
 
 class RouteStatus(enum.Enum):
@@ -373,7 +384,7 @@ class ExecutionSpec(ConfiguredModel):
     startup_command: str | None = None
     bootstrap_script: str | None = None
     environ: dict[str, str] | None = None
-    runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
+    runtime_variant: RuntimeVariant | Sentinel = Sentinel.TOKEN
     callback_url: yarl.URL | None = None
     inference_runtime_config: Mapping[str, Any] | None = None
 

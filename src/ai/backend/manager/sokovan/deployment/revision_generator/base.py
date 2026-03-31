@@ -39,7 +39,9 @@ class BaseRevisionGenerator(RevisionGenerator):
         """
         deployment_config = await self.load_deployment_config(
             vfolder_id=vfolder_id,
-            runtime_variant=draft_revision.execution.runtime_variant.value,
+            runtime_variant=draft_revision.execution.runtime_variant.value
+            if isinstance(draft_revision.execution.runtime_variant, RuntimeVariant)
+            else RuntimeVariant.CUSTOM.value,
         )
         revision = self.merge_revision(draft_revision, deployment_config, default_architecture)
         await self.validate_revision(revision)

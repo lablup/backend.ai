@@ -657,12 +657,12 @@ class TestMergeRevision:
         assert result.resource_spec.resource_opts == test_case.expected.resource_opts
         assert result.execution.environ == test_case.expected.environ
 
-    def test_single_runtime_variant_forces_draft(
+    def test_single_runtime_variant_used_when_unset(
         self,
         base_generator: BaseRevisionGenerator,
         base_mount_metadata: MountMetadata,
     ) -> None:
-        """When service definition has a single runtime_variant, it overrides the draft's runtime_variant."""
+        """When user does not specify (sentinel default) and single variant in list, use it."""
         deployment_config = DeploymentConfig(
             runtime_variants=[RuntimeVariant.VLLM],
             environment=ImageEnvironment(
@@ -684,7 +684,7 @@ class TestMergeRevision:
             ),
             mounts=base_mount_metadata,
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.CUSTOM,  # API says custom
+                # runtime_variant defaults to Sentinel.TOKEN (user did not specify)
                 startup_command=None,
             ),
         )
@@ -692,6 +692,77 @@ class TestMergeRevision:
         result = base_generator.merge_revision(draft_revision, deployment_config)
 
         assert result.execution.runtime_variant == RuntimeVariant.VLLM
+
+    def test_user_specified_variant_overrides_single_runtime_variant(
+        self,
+        base_generator: BaseRevisionGenerator,
+        base_mount_metadata: MountMetadata,
+    ) -> None:
+        """When user explicitly specifies a variant, it takes priority over single-variant list."""
+        deployment_config = DeploymentConfig(
+            runtime_variants=[RuntimeVariant.VLLM],
+            environment=ImageEnvironment(
+                image="vllm-image:latest",
+                architecture="x86_64",
+            ),
+            resource_slots={"cpu": 8},
+        )
+        draft_revision = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
+                canonical=None,
+                architecture=None,
+            ),
+            resource_spec=ResourceSpecDraft(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots=None,
+                resource_opts=None,
+            ),
+            mounts=base_mount_metadata,
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.VLLM,  # User explicitly chose vllm
+                startup_command=None,
+            ),
+        )
+
+        result = base_generator.merge_revision(draft_revision, deployment_config)
+
+        assert result.execution.runtime_variant == RuntimeVariant.VLLM
+
+    def test_user_specified_variant_rejected_when_not_in_list(
+        self,
+        base_generator: BaseRevisionGenerator,
+        base_mount_metadata: MountMetadata,
+    ) -> None:
+        """When user explicitly specifies a variant not in the list, raise error."""
+        deployment_config = DeploymentConfig(
+            runtime_variants=[RuntimeVariant.VLLM],
+            environment=ImageEnvironment(
+                image="vllm-image:latest",
+                architecture="x86_64",
+            ),
+            resource_slots={"cpu": 8},
+        )
+        draft_revision = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
+                canonical=None,
+                architecture=None,
+            ),
+            resource_spec=ResourceSpecDraft(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots=None,
+                resource_opts=None,
+            ),
+            mounts=base_mount_metadata,
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.SGLANG,  # Not in [vllm]
+                startup_command=None,
+            ),
+        )
+
+        with pytest.raises(RuntimeVariantNotAllowed):
+            base_generator.merge_revision(draft_revision, deployment_config)
 
     def test_multiple_runtime_variants_allows_valid_choice(
         self,
@@ -791,6 +862,41 @@ class TestMergeRevision:
             mounts=base_mount_metadata,
             execution=ExecutionSpec(
                 runtime_variant=RuntimeVariant.CUSTOM,
+                startup_command=None,
+            ),
+        )
+
+        result = base_generator.merge_revision(draft_revision, deployment_config)
+
+        assert result.execution.runtime_variant == RuntimeVariant.CUSTOM
+
+    def test_no_runtime_variants_unset_defaults_to_custom(
+        self,
+        base_generator: BaseRevisionGenerator,
+        base_mount_metadata: MountMetadata,
+    ) -> None:
+        """When no runtime_variants and user did not specify, default to CUSTOM."""
+        deployment_config = DeploymentConfig(
+            environment=ImageEnvironment(
+                image="some-image:latest",
+                architecture="x86_64",
+            ),
+            resource_slots={"cpu": 4},
+        )
+        draft_revision = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
+                canonical=None,
+                architecture=None,
+            ),
+            resource_spec=ResourceSpecDraft(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots=None,
+                resource_opts=None,
+            ),
+            mounts=base_mount_metadata,
+            execution=ExecutionSpec(
+                # runtime_variant defaults to Sentinel.TOKEN
                 startup_command=None,
             ),
         )

@@ -16,6 +16,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import (
     ResourceSlot,
+    RuntimeVariant,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
@@ -538,13 +539,17 @@ class DeploymentService:
         If loading the deployment config fails (e.g. network error, malformed file),
         the creator is returned as-is since deployment configs are optional defaults.
         """
-        generator = self._revision_generator_registry.get(
-            revision_creator.execution.runtime_variant
+        requested_variant = revision_creator.execution.runtime_variant
+        effective_variant = (
+            requested_variant
+            if isinstance(requested_variant, RuntimeVariant)
+            else RuntimeVariant.CUSTOM
         )
+        generator = self._revision_generator_registry.get(effective_variant)
         try:
             deployment_config = await generator.load_deployment_config(
                 vfolder_id=revision_creator.mounts.model_vfolder_id,
-                runtime_variant=revision_creator.execution.runtime_variant.value,
+                runtime_variant=effective_variant.value,
             )
         except Exception:
             log.warning(
@@ -570,12 +575,13 @@ class DeploymentService:
                 **revision_creator.resource_spec.resource_slots,
             }
 
-        execution_updates: dict[str, Any] = {"environ": merged_environ}
         resolved_variant = service_def.resolve_runtime_variant(
             revision_creator.execution.runtime_variant,
         )
-        if resolved_variant != revision_creator.execution.runtime_variant:
-            execution_updates["runtime_variant"] = resolved_variant
+        execution_updates: dict[str, Any] = {
+            "environ": merged_environ,
+            "runtime_variant": resolved_variant,
+        }
 
         return ModelRevisionCreator(
             image_id=revision_creator.image_id,
