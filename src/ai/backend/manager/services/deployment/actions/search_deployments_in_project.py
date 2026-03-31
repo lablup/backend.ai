@@ -9,7 +9,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.deployment.types import ProjectEndpointSearchScope
+from ai.backend.manager.repositories.deployment.types import ProjectDeploymentSearchScope
 from ai.backend.manager.services.deployment.actions.base import DeploymentScopeAction
 
 
@@ -21,7 +21,7 @@ class SearchDeploymentsInProjectAction(DeploymentScopeAction):
     Used for project admin page.
     """
 
-    scope: ProjectEndpointSearchScope
+    scope: ProjectDeploymentSearchScope
     querier: BatchQuerier
 
     @override

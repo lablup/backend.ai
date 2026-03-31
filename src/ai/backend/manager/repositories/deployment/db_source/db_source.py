@@ -1225,7 +1225,7 @@ class DeploymentDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_endpoints_in_project(
+    async def search_deployments_in_project(
         self,
         querier: BatchQuerier,
         scope: SearchScope,

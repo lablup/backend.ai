@@ -89,7 +89,7 @@ class RouteServiceDiscoveryInfo:
 
 
 @dataclass(frozen=True)
-class ProjectEndpointSearchScope(SearchScope):
+class ProjectDeploymentSearchScope(SearchScope):
     """Required scope for searching endpoints within a project.
 
     Used for project-scoped deployment search (project admin).

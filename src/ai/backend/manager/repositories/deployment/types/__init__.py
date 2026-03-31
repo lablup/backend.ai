@@ -4,7 +4,7 @@ from .auto_scaling import AutoScalingRuleData
 from .endpoint import (
     EndpointCreationArgs,
     EndpointData,
-    ProjectEndpointSearchScope,
+    ProjectDeploymentSearchScope,
     RouteData,
     RouteServiceDiscoveryInfo,
 )
@@ -13,7 +13,7 @@ __all__ = [
     "AutoScalingRuleData",
     "EndpointCreationArgs",
     "EndpointData",
-    "ProjectEndpointSearchScope",
+    "ProjectDeploymentSearchScope",
     "RouteData",
     "RouteServiceDiscoveryInfo",
 ]

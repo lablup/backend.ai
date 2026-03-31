@@ -1,4 +1,4 @@
-"""Tests for search_endpoints_in_project functionality in DeploymentRepository."""
+"""Tests for search_deployments_in_project functionality in DeploymentRepository."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import ProjectEndpointSearchScope
+from ai.backend.manager.repositories.deployment.types import ProjectDeploymentSearchScope
 from ai.backend.testutils.db import with_tables
 
 
@@ -57,7 +57,7 @@ class TestData:
 
 
 class TestEndpointSearchInProject:
-    """Test cases for search_endpoints_in_project in DeploymentRepository."""
+    """Test cases for search_deployments_in_project in DeploymentRepository."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -302,9 +302,9 @@ class TestEndpointSearchInProject:
             conditions=[],
             orders=[],
         )
-        scope = ProjectEndpointSearchScope(project_id=test_data.project_a_id)
+        scope = ProjectDeploymentSearchScope(project_id=test_data.project_a_id)
 
-        result = await deployment_repository.search_endpoints_in_project(querier, scope)
+        result = await deployment_repository.search_deployments_in_project(querier, scope)
 
         assert isinstance(result, DeploymentInfoSearchResult)
         assert result.total_count == 2
@@ -322,9 +322,9 @@ class TestEndpointSearchInProject:
             conditions=[],
             orders=[],
         )
-        scope = ProjectEndpointSearchScope(project_id=test_data.project_b_id)
+        scope = ProjectDeploymentSearchScope(project_id=test_data.project_b_id)
 
-        result = await deployment_repository.search_endpoints_in_project(querier, scope)
+        result = await deployment_repository.search_deployments_in_project(querier, scope)
 
         assert result.total_count == 1
         assert len(result.items) == 1
@@ -341,9 +341,9 @@ class TestEndpointSearchInProject:
             conditions=[],
             orders=[],
         )
-        scope = ProjectEndpointSearchScope(project_id=test_data.project_a_id)
+        scope = ProjectDeploymentSearchScope(project_id=test_data.project_a_id)
 
-        result = await deployment_repository.search_endpoints_in_project(querier, scope)
+        result = await deployment_repository.search_deployments_in_project(querier, scope)
 
         assert result.has_next_page is False
         assert result.has_previous_page is False

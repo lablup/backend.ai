@@ -501,7 +501,7 @@ class DeploymentService:
         self, action: SearchDeploymentsInProjectAction
     ) -> SearchDeploymentsInProjectActionResult:
         """Search deployments within a project scope."""
-        result = await self._deployment_repository.search_endpoints_in_project(
+        result = await self._deployment_repository.search_deployments_in_project(
             action.querier, action.scope
         )
         deployments = [_convert_deployment_info_to_data(info) for info in result.items]
