@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import os
 import platform
@@ -81,8 +82,14 @@ pruned_disk_types = frozenset([
 ])
 
 
-def _parse_proc_net_dev(content: str) -> tuple[int, int]:
-    """Parse /proc/net/dev content and return (rx_bytes, tx_bytes) for non-lo interfaces."""
+@dataclasses.dataclass(frozen=True)
+class ContainerNetStat:
+    rx_bytes: int
+    tx_bytes: int
+
+
+def _parse_proc_net_dev(content: str) -> ContainerNetStat:
+    """Parse /proc/net/dev content and return stats for non-lo interfaces."""
     rx_bytes = 0
     tx_bytes = 0
     for line in content.splitlines():
@@ -96,23 +103,21 @@ def _parse_proc_net_dev(content: str) -> tuple[int, int]:
         # fields[0] = rx_bytes, fields[8] = tx_bytes
         rx_bytes += int(fields[0])
         tx_bytes += int(fields[8])
-    return rx_bytes, tx_bytes
+    return ContainerNetStat(rx_bytes=rx_bytes, tx_bytes=tx_bytes)
 
 
-def read_proc_net_dev(container_pid: int) -> tuple[int, int]:
+def read_proc_net_dev(container_pid: int) -> ContainerNetStat:
     """Read network stats from /proc/[pid]/net/dev for the given container PID.
 
     Parses the kernel's net/dev format directly from the container's proc entry,
     avoiding the need for namespace switching (setns) which is unreliable in
     threaded Python processes.
-
-    Returns a tuple of (rx_bytes, tx_bytes) summed across all non-loopback interfaces.
     """
     content = Path(f"/proc/{container_pid}/net/dev").read_text()
     return _parse_proc_net_dev(content)
 
 
-def read_netns_net_dev(ns_path: Path) -> tuple[int, int]:
+def read_netns_net_dev(ns_path: Path) -> ContainerNetStat:
     """Read network stats by switching into the given network namespace.
 
     Uses setns() to enter the namespace, then reads /proc/thread-self/net/dev
@@ -732,14 +737,11 @@ class MemoryPlugin(AbstractComputePlugin):
                     container_id[:7],
                 )
                 return None
-            net_rx_bytes = 0
-            net_tx_bytes = 0
+            net_stat = ContainerNetStat(rx_bytes=0, tx_bytes=0)
             loop = current_loop()
             if container_pid > 0:
                 try:
-                    net_rx_bytes, net_tx_bytes = await loop.run_in_executor(
-                        None, read_proc_net_dev, container_pid
-                    )
+                    net_stat = await loop.run_in_executor(None, read_proc_net_dev, container_pid)
                 except OSError as e:
                     log.warning(
                         "MemoryPlugin: cannot read net stats for container {0} (pid={1}): {2!r}",
@@ -752,9 +754,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 ns_path = Path(sandbox_key) if sandbox_key else None
                 if ns_path and ns_path.exists():
                     try:
-                        net_rx_bytes, net_tx_bytes = await loop.run_in_executor(
-                            None, read_netns_net_dev, ns_path
-                        )
+                        net_stat = await loop.run_in_executor(None, read_netns_net_dev, ns_path)
                     except OSError as e:
                         log.warning(
                             "MemoryPlugin: cannot read net stats via netns for"
@@ -776,8 +776,8 @@ class MemoryPlugin(AbstractComputePlugin):
                 mem_max_bytes,
                 io_read_bytes,
                 io_write_bytes,
-                net_rx_bytes,
-                net_tx_bytes,
+                net_stat.rx_bytes,
+                net_stat.tx_bytes,
                 scratch_sz,
             )
 
