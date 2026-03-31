@@ -1,7 +1,7 @@
 """remove revision columns from endpoints table
 
 Revision ID: 7e58b3cdc8a6
-Revises: 930e9f2dd502
+Revises: 979bd203db8a
 Create Date: 2026-03-31
 
 """
@@ -12,18 +12,22 @@ from sqlalchemy.dialects import postgresql as pgsql
 
 # revision identifiers, used by Alembic.
 revision = "7e58b3cdc8a6"
-down_revision = "930e9f2dd502"
+down_revision = "979bd203db8a"
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    # Remove check constraint
-    op.drop_constraint("ck_image_required_unless_destroyed", "endpoints", type_="check")
+    # Remove check constraint (use raw SQL because alembic auto-prefixes constraint names)
+    op.execute(
+        "ALTER TABLE endpoints DROP CONSTRAINT IF EXISTS ck_endpoints_ck_image_required_unless_destroyed"
+    )
 
     # Remove foreign key constraints
-    op.drop_constraint("endpoints_resource_group_fkey", "endpoints", type_="foreignkey")
-    op.drop_constraint("endpoints_model_fkey", "endpoints", type_="foreignkey")
+    op.drop_constraint(
+        "fk_endpoints_resource_group_scaling_groups", "endpoints", type_="foreignkey"
+    )
+    op.drop_constraint("fk_endpoints_model_vfolders", "endpoints", type_="foreignkey")
 
     # Remove index on resource_group
     op.drop_index("ix_endpoints_resource_group", table_name="endpoints")
@@ -47,20 +51,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Re-add revision-related columns
-    op.add_column(
-        "endpoints",
-        sa.Column("image", sa.dialects.postgresql.UUID(), nullable=True),
-    )
-    op.add_column(
-        "endpoints",
-        sa.Column(
-            "model",
-            sa.dialects.postgresql.UUID(),
-            sa.ForeignKey("vfolders.id", ondelete="SET NULL"),
-            nullable=True,
-        ),
-    )
+    # Re-add revision-related columns (nullable to allow endpoints without revision)
+    op.add_column("endpoints", sa.Column("image", pgsql.UUID(), nullable=True))
+    op.add_column("endpoints", sa.Column("model", pgsql.UUID(), nullable=True))
     op.add_column(
         "endpoints",
         sa.Column(
@@ -71,73 +64,39 @@ def downgrade() -> None:
         ),
     )
     op.add_column(
-        "endpoints",
-        sa.Column("model_definition_path", sa.String(length=128), nullable=True),
+        "endpoints", sa.Column("model_definition_path", sa.String(length=128), nullable=True)
+    )
+    op.add_column("endpoints", sa.Column("resource_group", sa.String(), nullable=True))
+    op.add_column("endpoints", sa.Column("resource_slots", pgsql.JSONB(), nullable=True))
+    op.add_column(
+        "endpoints", sa.Column("resource_opts", pgsql.JSONB(), nullable=True, server_default="{}")
     )
     op.add_column(
         "endpoints",
         sa.Column(
-            "resource_group",
-            sa.String(),
-            sa.ForeignKey("scaling_groups.name", ondelete="RESTRICT"),
-            nullable=True,
+            "cluster_mode", sa.String(length=16), nullable=False, server_default="SINGLE_NODE"
         ),
     )
     op.add_column(
-        "endpoints",
-        sa.Column("resource_slots", pgsql.JSONB(), nullable=True),
+        "endpoints", sa.Column("cluster_size", sa.Integer(), nullable=False, server_default="1")
+    )
+    op.add_column("endpoints", sa.Column("startup_command", sa.Text(), nullable=True))
+    op.add_column(
+        "endpoints", sa.Column("bootstrap_script", sa.String(length=16384), nullable=True)
+    )
+    op.add_column("endpoints", sa.Column("callback_url", sa.String(), nullable=True))
+    op.add_column(
+        "endpoints", sa.Column("environ", pgsql.JSONB(), nullable=True, server_default="{}")
     )
     op.add_column(
         "endpoints",
-        sa.Column("resource_opts", pgsql.JSONB(), nullable=True, server_default="{}"),
+        sa.Column("runtime_variant", sa.String(length=64), nullable=False, server_default="CUSTOM"),
     )
     op.add_column(
-        "endpoints",
-        sa.Column(
-            "cluster_mode",
-            sa.String(length=16),
-            nullable=False,
-            server_default="SINGLE_NODE",
-        ),
-    )
-    op.add_column(
-        "endpoints",
-        sa.Column("cluster_size", sa.Integer(), nullable=False, server_default="1"),
-    )
-    op.add_column(
-        "endpoints",
-        sa.Column("startup_command", sa.Text(), nullable=True),
-    )
-    op.add_column(
-        "endpoints",
-        sa.Column("bootstrap_script", sa.String(length=16384), nullable=True),
-    )
-    op.add_column(
-        "endpoints",
-        sa.Column("callback_url", sa.String(), nullable=True),
-    )
-    op.add_column(
-        "endpoints",
-        sa.Column("environ", pgsql.JSONB(), nullable=True, server_default="{}"),
-    )
-    op.add_column(
-        "endpoints",
-        sa.Column(
-            "runtime_variant",
-            sa.String(length=64),
-            nullable=False,
-            server_default="CUSTOM",
-        ),
-    )
-    op.add_column(
-        "endpoints",
-        sa.Column("extra_mounts", pgsql.JSONB(), nullable=False, server_default="[]"),
+        "endpoints", sa.Column("extra_mounts", pgsql.JSONB(), nullable=False, server_default="[]")
     )
 
-    # Re-create index
-    op.create_index("ix_endpoints_resource_group", "endpoints", ["resource_group"])
-
-    # Repopulate from deployment_revisions
+    # Repopulate from deployment_revisions (only for endpoints that have a current_revision)
     op.execute("""
         UPDATE endpoints e
         SET
@@ -160,9 +119,30 @@ def downgrade() -> None:
         WHERE e.current_revision = dr.id
     """)
 
-    # Re-add check constraint
-    op.create_check_constraint(
-        "ck_image_required_unless_destroyed",
+    # Re-create foreign key constraints
+    op.create_foreign_key(
+        "fk_endpoints_model_vfolders",
         "endpoints",
-        "lifecycle_stage = 'destroyed' OR image IS NOT NULL",
+        "vfolders",
+        ["model"],
+        ["id"],
+        ondelete="SET NULL",
     )
+    op.create_foreign_key(
+        "fk_endpoints_resource_group_scaling_groups",
+        "endpoints",
+        "scaling_groups",
+        ["resource_group"],
+        ["name"],
+        ondelete="RESTRICT",
+    )
+
+    # Re-create index
+    op.create_index("ix_endpoints_resource_group", "endpoints", ["resource_group"])
+
+    # Re-add check constraint (only applies to endpoints that have revision data)
+    op.execute("""
+        ALTER TABLE endpoints
+        ADD CONSTRAINT ck_endpoints_ck_image_required_unless_destroyed
+        CHECK (lifecycle_stage = 'destroyed' OR current_revision IS NULL OR image IS NOT NULL)
+    """)
