@@ -841,12 +841,9 @@ class DeploymentService:
             deployment_info, action.revision_id
         )
         if not surge_check.sufficient:
-            raise InsufficientSurgeResources(
-                f"{surge_check.surge_description} requires additional resources "
-                f"that exceed the available capacity in scaling group "
-                f"'{surge_check.scaling_group}'. "
-                f"Insufficient resources: {', '.join(surge_check.insufficient_details or [])}"
-            )
+            if surge_check.shortfall is None:
+                raise RuntimeError("Unreachable")
+            raise InsufficientSurgeResources(surge_check.shortfall.error_message)
 
         # 4. Set deploying_revision and transition to DEPLOYING lifecycle.
         # The DB WHERE clause includes ``deploying_revision IS NULL`` to guard

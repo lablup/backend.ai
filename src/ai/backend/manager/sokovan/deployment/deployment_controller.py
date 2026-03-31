@@ -50,14 +50,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
-class SurgeResourceCheckResult:
-    """Result of a deployment surge resource availability check."""
+class SurgeShortfallDetail:
+    """Diagnostic detail when surge resources are insufficient."""
 
-    sufficient: bool
-    strategy: DeploymentStrategy | None = None
-    surge_count: int = 0
-    scaling_group: str = ""
-    insufficient_details: list[str] | None = None
+    strategy: DeploymentStrategy
+    surge_count: int
+    scaling_group: str
+    insufficient_slots: list[str]
 
     @property
     def surge_description(self) -> str:
@@ -66,8 +65,23 @@ class SurgeResourceCheckResult:
                 return f"Rolling update max_surge={self.surge_count}"
             case DeploymentStrategy.BLUE_GREEN:
                 return f"Blue-green deployment replica_count={self.surge_count}"
-            case _:
-                return f"Deployment surge_count={self.surge_count}"
+
+    @property
+    def error_message(self) -> str:
+        return (
+            f"{self.surge_description} requires additional resources "
+            f"that exceed the available capacity in scaling group "
+            f"'{self.scaling_group}'. "
+            f"Insufficient resources: {', '.join(self.insufficient_slots)}"
+        )
+
+
+@dataclass(frozen=True)
+class SurgeResourceCheckResult:
+    """Result of a deployment surge resource availability check."""
+
+    sufficient: bool
+    shortfall: SurgeShortfallDetail | None = None
 
 
 @dataclass
@@ -305,20 +319,22 @@ class DeploymentController:
         if surge_slots <= free_slots:
             return SurgeResourceCheckResult(sufficient=True)
 
-        insufficient_details = []
+        insufficient_slots = []
         for slot_name in surge_slots.keys():
             required = surge_slots.get(slot_name, Decimal(0))
             available = free_slots.get(slot_name, Decimal(0))
             if required > available:
-                insufficient_details.append(
+                insufficient_slots.append(
                     f"{slot_name}: required={required}, available={available}"
                 )
         return SurgeResourceCheckResult(
             sufficient=False,
-            strategy=policy.strategy,
-            surge_count=surge_count,
-            scaling_group=scaling_group,
-            insufficient_details=insufficient_details,
+            shortfall=SurgeShortfallDetail(
+                strategy=policy.strategy,
+                surge_count=surge_count,
+                scaling_group=scaling_group,
+                insufficient_slots=insufficient_slots,
+            ),
         )
 
     @staticmethod

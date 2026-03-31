@@ -212,11 +212,11 @@ class TestValidateDeploymentSurgeResources:
 
         result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
         assert result.sufficient is False
-        assert result.strategy == DeploymentStrategy.BLUE_GREEN
-        assert result.surge_count == 2
-        assert result.insufficient_details is not None
-        assert any("cpu" in d for d in result.insufficient_details)
-        assert any("mem" in d for d in result.insufficient_details)
+        assert result.shortfall is not None
+        assert result.shortfall.strategy == DeploymentStrategy.BLUE_GREEN
+        assert result.shortfall.surge_count == 2
+        assert any("cpu" in d for d in result.shortfall.insufficient_slots)
+        assert any("mem" in d for d in result.shortfall.insufficient_slots)
 
     async def test_skip_validation_when_max_surge_is_zero(
         self,
@@ -317,12 +317,12 @@ class TestValidateDeploymentSurgeResources:
 
         result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
         assert result.sufficient is False
-        assert result.strategy == DeploymentStrategy.ROLLING
-        assert result.surge_count == 2
-        assert result.scaling_group == "default"
-        assert result.insufficient_details is not None
-        assert any("cpu" in d for d in result.insufficient_details)
-        assert any("mem" in d for d in result.insufficient_details)
+        assert result.shortfall is not None
+        assert result.shortfall.strategy == DeploymentStrategy.ROLLING
+        assert result.shortfall.surge_count == 2
+        assert result.shortfall.scaling_group == "default"
+        assert any("cpu" in d for d in result.shortfall.insufficient_slots)
+        assert any("mem" in d for d in result.shortfall.insufficient_slots)
 
     async def test_fail_when_single_resource_is_insufficient(
         self,
@@ -360,10 +360,10 @@ class TestValidateDeploymentSurgeResources:
 
         result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
         assert result.sufficient is False
-        assert result.insufficient_details is not None
-        assert any("mem" in d for d in result.insufficient_details)
+        assert result.shortfall is not None
+        assert any("mem" in d for d in result.shortfall.insufficient_slots)
         # CPU should NOT be in insufficient details since it's sufficient
-        assert not any("cpu" in d for d in result.insufficient_details)
+        assert not any("cpu" in d for d in result.shortfall.insufficient_slots)
 
     async def test_correct_scaling_group_is_queried(
         self,
