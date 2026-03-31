@@ -10,6 +10,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
@@ -28,6 +29,7 @@ class DeploymentControllerInput:
 
     scheduling_controller: SchedulingController
     deployment_repository: DeploymentRepository
+    scaling_group_repository: ScalingGroupRepository
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
     event_producer: EventProducer
@@ -60,6 +62,7 @@ class DeploymentControllerDependency(
             DeploymentControllerArgs(
                 scheduling_controller=setup_input.scheduling_controller,
                 deployment_repository=setup_input.deployment_repository,
+                scaling_group_repository=setup_input.scaling_group_repository,
                 config_provider=setup_input.config_provider,
                 storage_manager=setup_input.storage_manager,
                 event_producer=setup_input.event_producer,

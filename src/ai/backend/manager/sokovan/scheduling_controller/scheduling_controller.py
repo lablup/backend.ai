@@ -12,7 +12,6 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -429,19 +428,6 @@ class SchedulingController:
         await self._repository.check_available_image(
             spec.image_identifier, user.domain_name, user.user_id
         )
-
-    async def get_available_resources_for_scaling_group(
-        self, scaling_group: str
-    ) -> TotalResourceData:
-        """Get available resource slots for a specific scaling group.
-
-        Args:
-            scaling_group: Name of the scaling group (resource group)
-
-        Returns:
-            TotalResourceData with used, free, and capacity slots
-        """
-        return await self._repository.get_resource_slots_for_scaling_group(scaling_group)
 
 
 def _verify_vfolder_name(folder: str) -> bool:

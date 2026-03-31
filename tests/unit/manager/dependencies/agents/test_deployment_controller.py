@@ -25,6 +25,7 @@ class TestDeploymentControllerDependency:
         setup_input = DeploymentControllerInput(
             scheduling_controller=MagicMock(),
             deployment_repository=MagicMock(),
+            scaling_group_repository=MagicMock(),
             config_provider=MagicMock(),
             storage_manager=MagicMock(),
             event_producer=MagicMock(),

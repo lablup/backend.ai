@@ -19,6 +19,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
@@ -61,6 +62,7 @@ class AgentsInput:
     network_plugin_ctx: NetworkPluginContext
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
+    scaling_group_repository: ScalingGroupRepository
 
 
 @dataclass
@@ -141,6 +143,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
             DeploymentControllerInput(
                 scheduling_controller=scheduling_controller,
                 deployment_repository=setup_input.deployment_repository,
+                scaling_group_repository=setup_input.scaling_group_repository,
                 config_provider=setup_input.config_provider,
                 storage_manager=setup_input.storage_manager,
                 event_producer=setup_input.event_producer,

@@ -37,6 +37,7 @@ from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentUpdaterSpec,
     RouteUpdaterSpec,
 )
+from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.sokovan.deployment.exceptions import InsufficientSurgeResources
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
@@ -55,6 +56,7 @@ class DeploymentControllerArgs:
 
     scheduling_controller: SchedulingController
     deployment_repository: DeploymentRepository
+    scaling_group_repository: ScalingGroupRepository
     config_provider: ManagerConfigProvider
     storage_manager: StorageSessionManager
     event_producer: EventProducer
@@ -67,6 +69,7 @@ class DeploymentController:
 
     _scheduling_controller: SchedulingController
     _deployment_repository: DeploymentRepository
+    _scaling_group_repository: ScalingGroupRepository
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
     _event_producer: EventProducer
@@ -77,6 +80,7 @@ class DeploymentController:
         """Initialize the deployment controller with required services."""
         self._scheduling_controller = args.scheduling_controller
         self._deployment_repository = args.deployment_repository
+        self._scaling_group_repository = args.scaling_group_repository
         self._config_provider = args.config_provider
         self._storage_manager = args.storage_manager
         self._event_producer = args.event_producer
@@ -270,12 +274,8 @@ class DeploymentController:
         surge_slots = ResourceSlot({k: v * spec.max_surge for k, v in per_route_slots.data.items()})
 
         scaling_group = deployment_info.metadata.resource_group
-        available_resources = (
-            await self._scheduling_controller.get_available_resources_for_scaling_group(
-                scaling_group
-            )
-        )
-        free_slots = available_resources.total_free_slots
+        resource_info = await self._scaling_group_repository.get_resource_info(scaling_group)
+        free_slots = ResourceSlot({sq.slot_name: sq.quantity for sq in resource_info.free})
 
         if not (surge_slots <= free_slots):
             insufficient_details = []

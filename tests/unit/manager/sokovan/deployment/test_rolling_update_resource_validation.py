@@ -16,8 +16,7 @@ import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.resource.types import TotalResourceData
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant, SlotQuantity
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
@@ -31,6 +30,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
     ResourceConfigData,
 )
+from ai.backend.manager.data.scaling_group.types import ResourceInfo
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     RollingUpdateSpec,
@@ -100,16 +100,16 @@ def _make_revision_data(
     )
 
 
-def _make_total_resource_data(
+def _make_resource_info(
     free_slots: dict[str, Decimal],
-) -> TotalResourceData:
-    """Create TotalResourceData with the given free slots."""
+) -> ResourceInfo:
+    """Create ResourceInfo with the given free slots."""
     capacity = {k: v * 10 for k, v in free_slots.items()}
     used = {k: capacity[k] - v for k, v in free_slots.items()}
-    return TotalResourceData(
-        total_used_slots=ResourceSlot(used),
-        total_free_slots=ResourceSlot(free_slots),
-        total_capacity_slots=ResourceSlot(capacity),
+    return ResourceInfo(
+        capacity=[SlotQuantity(k, v) for k, v in capacity.items()],
+        used=[SlotQuantity(k, v) for k, v in used.items()],
+        free=[SlotQuantity(k, v) for k, v in free_slots.items()],
     )
 
 
@@ -121,18 +121,19 @@ class TestValidateRollingUpdateResources:
         return MagicMock()
 
     @pytest.fixture
-    def mock_scheduling_controller(self) -> MagicMock:
+    def mock_scaling_group_repository(self) -> MagicMock:
         return MagicMock()
 
     @pytest.fixture
     def controller(
         self,
         mock_deployment_repository: MagicMock,
-        mock_scheduling_controller: MagicMock,
+        mock_scaling_group_repository: MagicMock,
     ) -> DeploymentController:
         args = MagicMock(spec=DeploymentControllerArgs)
-        args.scheduling_controller = mock_scheduling_controller
+        args.scheduling_controller = MagicMock()
         args.deployment_repository = mock_deployment_repository
+        args.scaling_group_repository = mock_scaling_group_repository
         args.config_provider = MagicMock()
         args.storage_manager = MagicMock()
         args.event_producer = MagicMock()
@@ -144,7 +145,7 @@ class TestValidateRollingUpdateResources:
         self,
         controller: DeploymentController,
         mock_deployment_repository: MagicMock,
-        mock_scheduling_controller: MagicMock,
+        mock_scaling_group_repository: MagicMock,
     ) -> None:
         """Blue-green deployments should not be validated for surge resources."""
         deployment_info = _make_deployment_info()
@@ -163,13 +164,13 @@ class TestValidateRollingUpdateResources:
         await controller.validate_rolling_update_resources(deployment_info, REVISION_ID)
 
         # Should not check resources
-        mock_scheduling_controller.get_available_resources_for_scaling_group.assert_not_called()
+        mock_scaling_group_repository.get_resource_info.assert_not_called()
 
     async def test_skip_validation_when_max_surge_is_zero(
         self,
         controller: DeploymentController,
         mock_deployment_repository: MagicMock,
-        mock_scheduling_controller: MagicMock,
+        mock_scaling_group_repository: MagicMock,
     ) -> None:
         """Rolling update with max_surge=0 needs no surge resources."""
         deployment_info = _make_deployment_info()
@@ -186,13 +187,13 @@ class TestValidateRollingUpdateResources:
 
         await controller.validate_rolling_update_resources(deployment_info, REVISION_ID)
 
-        mock_scheduling_controller.get_available_resources_for_scaling_group.assert_not_called()
+        mock_scaling_group_repository.get_resource_info.assert_not_called()
 
     async def test_pass_when_resources_are_sufficient(
         self,
         controller: DeploymentController,
         mock_deployment_repository: MagicMock,
-        mock_scheduling_controller: MagicMock,
+        mock_scaling_group_repository: MagicMock,
     ) -> None:
         """Validation passes when free resources >= surge requirements."""
         deployment_info = _make_deployment_info()
@@ -213,8 +214,8 @@ class TestValidateRollingUpdateResources:
         )
         # Surge requires 2 * (2 cpu, 4096 mem) = (4 cpu, 8192 mem)
         # Free resources are (8 cpu, 16384 mem) — sufficient
-        mock_scheduling_controller.get_available_resources_for_scaling_group = AsyncMock(
-            return_value=_make_total_resource_data({
+        mock_scaling_group_repository.get_resource_info = AsyncMock(
+            return_value=_make_resource_info({
                 "cpu": Decimal("8"),
                 "mem": Decimal("16384"),
             })
@@ -227,7 +228,7 @@ class TestValidateRollingUpdateResources:
         self,
         controller: DeploymentController,
         mock_deployment_repository: MagicMock,
-        mock_scheduling_controller: MagicMock,
+        mock_scaling_group_repository: MagicMock,
     ) -> None:
         """Validation raises InsufficientSurgeResources when free resources < surge."""
         deployment_info = _make_deployment_info()
@@ -248,8 +249,8 @@ class TestValidateRollingUpdateResources:
         )
         # Surge requires 2 * (2 cpu, 4096 mem) = (4 cpu, 8192 mem)
         # Free resources are (1 cpu, 2048 mem) — insufficient
-        mock_scheduling_controller.get_available_resources_for_scaling_group = AsyncMock(
-            return_value=_make_total_resource_data({
+        mock_scaling_group_repository.get_resource_info = AsyncMock(
+            return_value=_make_resource_info({
                 "cpu": Decimal("1"),
                 "mem": Decimal("2048"),
             })
@@ -268,7 +269,7 @@ class TestValidateRollingUpdateResources:
         self,
         controller: DeploymentController,
         mock_deployment_repository: MagicMock,
-        mock_scheduling_controller: MagicMock,
+        mock_scaling_group_repository: MagicMock,
     ) -> None:
         """Validation fails even if only one resource type is insufficient."""
         deployment_info = _make_deployment_info()
@@ -289,8 +290,8 @@ class TestValidateRollingUpdateResources:
         )
         # Surge requires 1 * (2 cpu, 4096 mem) = (2 cpu, 4096 mem)
         # CPU is sufficient (10) but mem is insufficient (2048)
-        mock_scheduling_controller.get_available_resources_for_scaling_group = AsyncMock(
-            return_value=_make_total_resource_data({
+        mock_scaling_group_repository.get_resource_info = AsyncMock(
+            return_value=_make_resource_info({
                 "cpu": Decimal("10"),
                 "mem": Decimal("2048"),
             })
@@ -308,7 +309,7 @@ class TestValidateRollingUpdateResources:
         self,
         controller: DeploymentController,
         mock_deployment_repository: MagicMock,
-        mock_scheduling_controller: MagicMock,
+        mock_scaling_group_repository: MagicMock,
     ) -> None:
         """Validation queries the correct scaling group from deployment metadata."""
         deployment_info = _make_deployment_info(
@@ -329,12 +330,10 @@ class TestValidateRollingUpdateResources:
                 resource_slots={"cpu": Decimal("1")},
             )
         )
-        mock_scheduling_controller.get_available_resources_for_scaling_group = AsyncMock(
-            return_value=_make_total_resource_data({"cpu": Decimal("100")})
+        mock_scaling_group_repository.get_resource_info = AsyncMock(
+            return_value=_make_resource_info({"cpu": Decimal("100")})
         )
 
         await controller.validate_rolling_update_resources(deployment_info, REVISION_ID)
 
-        mock_scheduling_controller.get_available_resources_for_scaling_group.assert_called_once_with(
-            "my-gpu-group"
-        )
+        mock_scaling_group_repository.get_resource_info.assert_called_once_with("my-gpu-group")

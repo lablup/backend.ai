@@ -241,6 +241,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 network_plugin_ctx=plugins.network_plugin_ctx,
                 scheduler_repository=domain.repositories.scheduler.repository,
                 deployment_repository=domain.repositories.deployment.repository,
+                scaling_group_repository=domain.repositories.scaling_group.repository,
             ),
         )
 

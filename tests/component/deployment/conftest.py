@@ -15,8 +15,13 @@ from ai.backend.common.config import ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.resource.types import TotalResourceData
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    ResourceSlot,
+    SlotQuantity,
+    VFolderUsageMode,
+)
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
@@ -25,6 +30,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.data.scaling_group.types import ResourceInfo
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -104,21 +110,19 @@ def deployment_processors(
         "cpu": Decimal("1000"),
         "mem": Decimal("1099511627776"),  # 1 TiB
     })
-    object.__setattr__(
-        scheduling_controller,
-        "get_available_resources_for_scaling_group",
-        AsyncMock(
-            return_value=TotalResourceData(
-                total_used_slots=ResourceSlot({}),
-                total_free_slots=mock_available_slots,
-                total_capacity_slots=mock_available_slots,
-            )
-        ),
+    mock_scaling_group_repository = MagicMock()
+    mock_scaling_group_repository.get_resource_info = AsyncMock(
+        return_value=ResourceInfo(
+            capacity=[SlotQuantity(k, v) for k, v in mock_available_slots.items()],
+            used=[SlotQuantity(k, Decimal(0)) for k in mock_available_slots],
+            free=[SlotQuantity(k, v) for k, v in mock_available_slots.items()],
+        )
     )
     deployment_controller = DeploymentController(
         DeploymentControllerArgs(
             scheduling_controller=scheduling_controller,
             deployment_repository=repo,
+            scaling_group_repository=mock_scaling_group_repository,
             config_provider=config_provider,
             storage_manager=storage_manager,
             event_producer=event_producer,
