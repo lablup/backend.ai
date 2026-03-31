@@ -4665,6 +4665,11 @@ type ModelReplica implements Node {
   """Whether the replica is currently active and able to serve requests."""
   activenessStatus: ActivenessStatus!
 
+  """
+  Whether this replica can receive traffic. True only when readiness, liveness, and activeness are all satisfied.
+  """
+  available: Boolean!
+
   """Traffic weight for load balancing between replicas."""
   weight: Int!
 
