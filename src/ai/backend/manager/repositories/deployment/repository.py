@@ -96,6 +96,9 @@ from .types import RouteData, RouteServiceDiscoveryInfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
+_DEPLOYMENT_CONFIG_FILENAME = "deployment-config.yaml"
+_LEGACY_SERVICE_DEFINITION_FILENAME = "service-definition.toml"
+
 
 @dataclass
 class AutoScalingMetricsData:
@@ -520,17 +523,20 @@ class DeploymentRepository:
             )
 
         # Try deployment-config.yaml first (new format)
-        config = await self._try_fetch_config_file(vfolder_location, "deployment-config.yaml")
+        config = await self._try_fetch_config_file(vfolder_location, _DEPLOYMENT_CONFIG_FILENAME)
         if config is not None:
             return config
 
         # Fall back to legacy service-definition.toml
-        config = await self._try_fetch_config_file(vfolder_location, "service-definition.toml")
+        config = await self._try_fetch_config_file(
+            vfolder_location, _LEGACY_SERVICE_DEFINITION_FILENAME
+        )
         if config is not None:
             log.info(
-                "Found legacy service-definition.toml in vfolder {}. "
-                "Please rename it to deployment-config.yaml.",
+                "Found legacy {} in vfolder {}. Please rename it to {}.",
+                _LEGACY_SERVICE_DEFINITION_FILENAME,
                 vfolder_id,
+                _DEPLOYMENT_CONFIG_FILENAME,
             )
             return config
 
