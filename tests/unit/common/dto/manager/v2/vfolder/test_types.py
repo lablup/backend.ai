@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderMetadataInfo,
     VFolderOperationStatusField,
     VFolderOrderField,
-    VFolderOwnerInfo,
+    VFolderOwnershipInfo,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
     VFolderUsageInfo,
@@ -162,20 +162,20 @@ class TestVFolderAccessControlInfo:
         assert restored.ownership_type == VFolderOwnershipTypeField.GROUP
 
 
-class TestVFolderOwnerInfo:
-    """Tests for VFolderOwnerInfo sub-model."""
+class TestVFolderOwnershipInfo:
+    """Tests for VFolderOwnershipInfo sub-model."""
 
     def test_creation_with_all_none(self) -> None:
-        info = VFolderOwnerInfo(user=None, group=None, creator=None)
-        assert info.user is None
-        assert info.group is None
-        assert info.creator is None
+        info = VFolderOwnershipInfo(user_id=None, project_id=None, creator_email=None)
+        assert info.user_id is None
+        assert info.project_id is None
+        assert info.creator_email is None
 
     def test_creation_with_values(self) -> None:
         uid = uuid4()
-        info = VFolderOwnerInfo(user=uid, group=None, creator="user@example.com")
-        assert info.user == uid
-        assert info.creator == "user@example.com"
+        info = VFolderOwnershipInfo(user_id=uid, project_id=None, creator_email="user@example.com")
+        assert info.user_id == uid
+        assert info.creator_email == "user@example.com"
 
 
 class TestVFolderUsageInfo:

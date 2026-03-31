@@ -32,7 +32,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderInvitationState,
     VFolderMetadataInfo,
     VFolderOperationStatusField,
-    VFolderOwnerInfo,
+    VFolderOwnershipInfo,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
     VFolderUsageInfo,
@@ -58,8 +58,10 @@ def _make_access_control_info() -> VFolderAccessControlInfo:
     )
 
 
-def _make_owner_info() -> VFolderOwnerInfo:
-    return VFolderOwnerInfo(user=uuid.uuid4(), group=None, creator="owner@example.com")
+def _make_owner_info() -> VFolderOwnershipInfo:
+    return VFolderOwnershipInfo(
+        user_id=uuid.uuid4(), project_id=None, creator_email="owner@example.com"
+    )
 
 
 def _make_usage_info() -> VFolderUsageInfo:
@@ -81,7 +83,7 @@ class TestVFolderNodeCreation:
             host="nfs01",
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
-            owner=_make_owner_info(),
+            ownership=_make_owner_info(),
             usage=_make_usage_info(),
         )
         assert node.usage is not None
@@ -94,7 +96,7 @@ class TestVFolderNodeCreation:
             host="nfs01",
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
-            owner=_make_owner_info(),
+            ownership=_make_owner_info(),
         )
         assert node.usage is None
 
@@ -105,7 +107,7 @@ class TestVFolderNodeCreation:
             host="nfs01",
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
-            owner=_make_owner_info(),
+            ownership=_make_owner_info(),
             usage=_make_usage_info(),
         )
         restored = VFolderNode.model_validate_json(node.model_dump_json())
@@ -121,7 +123,7 @@ class TestVFolderNodeCreation:
             host="nfs01",
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
-            owner=_make_owner_info(),
+            ownership=_make_owner_info(),
         )
         restored = VFolderNode.model_validate_json(node.model_dump_json())
         assert restored.usage is None
@@ -133,12 +135,12 @@ class TestVFolderNodeCreation:
             host="nfs01",
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
-            owner=_make_owner_info(),
+            ownership=_make_owner_info(),
         )
         data = json.loads(node.model_dump_json())
         assert "metadata" in data
         assert "access_control" in data
-        assert "owner" in data
+        assert "ownership" in data
         assert "name" in data["metadata"]
         assert "status" in data
         assert "host" in data
@@ -209,7 +211,7 @@ class TestPayloadModels:
             host="nfs01",
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
-            owner=_make_owner_info(),
+            ownership=_make_owner_info(),
         )
         payload = CreateVFolderPayload(vfolder=node)
         assert payload.vfolder.metadata.name == "test-folder"
@@ -221,7 +223,7 @@ class TestPayloadModels:
             host="nfs01",
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
-            owner=_make_owner_info(),
+            ownership=_make_owner_info(),
         )
         payload = UpdateVFolderPayload(vfolder=node)
         assert payload.vfolder is not None
@@ -248,7 +250,7 @@ class TestPayloadModels:
             host="nfs01",
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
-            owner=_make_owner_info(),
+            ownership=_make_owner_info(),
         )
         payload = CloneVFolderPayload(vfolder=node, bgtask_id="task-123")
         assert payload.bgtask_id == "task-123"
@@ -306,7 +308,7 @@ class TestPayloadModels:
             host="nfs01",
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
-            owner=_make_owner_info(),
+            ownership=_make_owner_info(),
         )
         payload = CreateVFolderPayload(vfolder=node)
         restored = CreateVFolderPayload.model_validate_json(payload.model_dump_json())
