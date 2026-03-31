@@ -4,7 +4,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from contextlib import AbstractAsyncContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import (
     Annotated,
     Any,
@@ -83,6 +83,12 @@ class CircuitManager:
     event_producer: EventProducer
     traefik_etcd: TraefikEtcd | None
     local_config: ServerConfig
+    _circuit_locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
+
+    def _get_lock(self, circuit_id: UUID) -> asyncio.Lock:
+        if circuit_id not in self._circuit_locks:
+            self._circuit_locks[circuit_id] = asyncio.Lock()
+        return self._circuit_locks[circuit_id]
 
     async def initialize_circuits(self, circuits: Sequence[Circuit]) -> None:
         if self.local_config.proxy_coordinator.enable_traefik:
@@ -155,10 +161,11 @@ class CircuitManager:
         self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
     async def update_circuit_routes(self, circuit: Circuit, old_routes: list[RouteInfo]) -> None:
-        if self.local_config.proxy_coordinator.enable_traefik:
-            await self.update_traefik_circuit_routes(circuit, old_routes)
-        else:
-            await self.update_legacy_circuit_routes(circuit, old_routes)
+        async with self._get_lock(circuit.id):
+            if self.local_config.proxy_coordinator.enable_traefik:
+                await self.update_traefik_circuit_routes(circuit, old_routes)
+            else:
+                await self.update_legacy_circuit_routes(circuit, old_routes)
 
     async def update_traefik_circuit_routes(
         self, circuit: Circuit, old_routes: list[RouteInfo]
@@ -221,7 +228,9 @@ class CircuitManager:
     async def unload_circuits(self, circuits: Sequence[Circuit]) -> None:
         if self.local_config.proxy_coordinator.enable_traefik:
             for circuit in circuits:
-                await self.unload_traefik_circuit(circuit)
+                async with self._get_lock(circuit.id):
+                    await self.unload_traefik_circuit(circuit)
+                self._circuit_locks.pop(circuit.id, None)
         else:
             await self.unload_legacy_circuits(circuits)
 
