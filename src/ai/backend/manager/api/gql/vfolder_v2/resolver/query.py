@@ -61,7 +61,7 @@ async def project_vfolders(
         description="Search virtual folders accessible to the current user with pagination and filtering.",
     )
 )  # type: ignore[misc]
-async def my_vfolders_v2(
+async def my_vfolders(
     info: Info[StrawberryGQLContext],
     filter: VFolderFilterGQL | None = None,
     order_by: list[VFolderOrderByGQL] | None = None,

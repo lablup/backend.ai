@@ -4,7 +4,7 @@ Provides structured vfolder management API with typed fields
 replacing JSON scalars and organized into logical field groups.
 """
 
-from .resolver import my_vfolders_v2, project_vfolders
+from .resolver import my_vfolders, project_vfolders
 from .types import (
     VFolderAccessControlInfoGQL,
     VFolderConnection,
@@ -22,7 +22,7 @@ from .types import (
 
 __all__ = [
     # Queries
-    "my_vfolders_v2",
+    "my_vfolders",
     "project_vfolders",
     # Enum types
     "VFolderOperationStatusGQL",
