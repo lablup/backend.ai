@@ -116,8 +116,8 @@ class BaseRevisionGenerator(RevisionGenerator):
             if single_variant is not None:
                 runtime_variants_raw = [single_variant]
 
-        # When exactly one variant is specified, force its section.
-        # Otherwise fall back to the API-provided variant.
+        # When exactly one variant is listed and user didn't specify, use its section.
+        # Otherwise use the API-provided variant to select the section.
         if runtime_variants_raw is not None and len(runtime_variants_raw) == 1:
             effective_variant = runtime_variants_raw[0]
         else:

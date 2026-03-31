@@ -70,9 +70,9 @@ class DeploymentConfig(BaseModel):
         default=None,
         description="""
         Allowed runtime variants for this model service.
-        When a single variant is specified, the deployment is forced to use it
-        regardless of what the user provides via the API request.
-        When multiple variants are specified, the user must choose one from the list.
+        The user's explicit choice always takes priority.
+        When the user does not specify and a single variant is listed, it is used automatically.
+        When multiple variants are listed and the user does not specify, an error is raised.
         """,
         examples=[
             ["vllm"],

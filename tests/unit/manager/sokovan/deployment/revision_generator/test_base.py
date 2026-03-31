@@ -213,9 +213,9 @@ class TestLoadDeploymentConfig:
                 ),
             ),
             _LoadDeploymentConfigTestCase(
-                id="forced_runtime_variant_overrides_api_variant",
+                id="single_runtime_variant_selects_its_section",
                 deployment_config_dict={
-                    # Root level with forced runtime_variant
+                    # Root level with single runtime_variant (legacy format)
                     "runtime_variant": "vllm",
                     "environment": {
                         "image": "default-image:latest",
@@ -225,13 +225,13 @@ class TestLoadDeploymentConfig:
                         "cpu": 4,
                         "mem": "16gb",
                     },
-                    # vllm variant (should be applied because of forced runtime_variant)
+                    # vllm variant section (selected because single variant in list)
                     "vllm": {
                         "resource_slots": {
                             "cpu": 8,
                         },
                     },
-                    # custom variant (user requested, but should be ignored)
+                    # custom variant section (not selected)
                     "custom": {
                         "resource_slots": {
                             "cpu": 2,
@@ -242,7 +242,7 @@ class TestLoadDeploymentConfig:
                 expected=_ExpectedResult(
                     image="default-image:latest",
                     architecture="x86_64",
-                    resource_slots={"cpu": 8, "mem": "16gb"},  # from vllm, not custom
+                    resource_slots={"cpu": 8, "mem": "16gb"},  # from vllm section
                     environ=None,
                 ),
             ),
@@ -277,13 +277,13 @@ class TestLoadDeploymentConfig:
         assert result.environ == test_case.expected.environ
         assert result.resource_opts == test_case.expected.resource_opts
 
-    async def test_forced_runtime_variant_is_preserved_in_result(
+    async def test_single_runtime_variant_is_normalized_to_list(
         self,
         base_generator: BaseRevisionGenerator,
         mock_deployment_repository: MagicMock,
         vfolder_id: UUID,
     ) -> None:
-        """When runtime_variant is specified in the definition, it should be preserved in the result."""
+        """Legacy runtime_variant (single string) is normalized to runtime_variants list."""
         mock_deployment_repository.fetch_deployment_config = AsyncMock(
             return_value={
                 "runtime_variant": "vllm",
