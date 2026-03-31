@@ -123,20 +123,20 @@ Definition Generators transform finalized model revisions into runtime-specific 
 
 ## Revision Generators
 
-Revision Generators process draft model revisions from API requests and produce validated, deployment-ready model revision specifications. They handle the integration of service definitions stored in vfolders with user-provided parameters, implementing a sophisticated override mechanism.
+Revision Generators process draft model revisions from API requests and produce validated, deployment-ready model revision specifications. They handle the integration of deployment configs stored in vfolders with user-provided parameters, implementing a sophisticated override mechanism.
 
 **Key Responsibilities:**
-- Load and parse service definition files from vfolders
-- Merge service definitions with API request parameters
+- Load and parse deployment config files from vfolders
+- Merge deployment configs with API request parameters
 - Validate final revision specifications
 - Support variant-specific validation rules
 
-**Service Definition Override Mechanism:**
+**Deployment Config Override Mechanism:**
 
-Service definitions are TOML files stored in model vfolders that provide default configurations for deployments. The override priority follows a three-level hierarchy:
+Deployment configs are YAML files (`deployment-config.yaml`) stored in model vfolders that provide default configurations for deployments. The legacy `service-definition.toml` (TOML) format is also supported as a fallback but is deprecated. The override priority follows a three-level hierarchy:
 
 ```
-1. Root-level service definition (lowest priority, base configuration)
+1. Root-level deployment config (lowest priority, base configuration)
    ↓
 2. Runtime variant-specific section (field-level override)
    ↓
@@ -205,7 +205,7 @@ If the API request specifies `resource_slots.gpu = 4`, the final value will be `
 4. Return validated ModelRevisionSpec
 ```
 
-> **Note**: Service definition files are optional. If no service definition exists, the API request must provide all required configuration. When a service definition is present, it serves as a template that users can selectively override through API parameters, reducing repetitive configuration for commonly deployed models.
+> **Note**: Deployment config files are optional. If no deployment config exists, the API request must provide all required configuration. When a deployment config is present, it serves as a template that users can selectively override through API parameters, reducing repetitive configuration for commonly deployed models.
 
 ## State-Specific Handlers
 
