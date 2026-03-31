@@ -30,6 +30,9 @@ from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 
@@ -70,13 +73,14 @@ def deployment_processors(
         revision_generator_registry,
         model_definition_generator_registry,
     )
+    permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=MagicMock(spec=ScopeActionRBACValidator),
-                single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                scope=ScopeActionRBACValidator(permission_controller_repo),
+                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
             ),
         ),
     )
