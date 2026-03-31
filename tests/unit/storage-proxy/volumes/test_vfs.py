@@ -5,11 +5,12 @@ import uuid
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
+from ai.backend.storage.errors import QuotaScopeCreationFailedError
 from ai.backend.storage.types import VFolderID
 from ai.backend.storage.volumes.vfs import BaseVolume
 
@@ -77,8 +78,14 @@ class TestBaseVolume:
         dst_qsid = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
         dst_vfid = VFolderID(dst_qsid, uuid.uuid4())
         yield dst_vfid
-        await base_volume.delete_vfolder(dst_vfid)
-        await base_volume.quota_model.delete_quota_scope(dst_qsid)
+        try:
+            await base_volume.delete_vfolder(dst_vfid)
+        except FileNotFoundError:
+            pass
+        try:
+            await base_volume.quota_model.delete_quota_scope(dst_qsid)
+        except FileNotFoundError:
+            pass
 
     async def test_add_file_writes_content_correctly(
         self,
@@ -171,3 +178,15 @@ class TestBaseVolume:
 
         dst_vfpath = base_volume.mangle_vfpath(dst_vfolder_id)
         assert (dst_vfpath / file_name).read_text() == file_content
+
+    async def test_clone_vfolder_raises_creation_failed_on_quota_scope_error(
+        self,
+        base_volume: BaseVolume,
+        sample_vfolder: VFolderID,
+        dst_vfolder_id: VFolderID,
+    ) -> None:
+        """clone_vfolder raises QuotaScopeCreationFailedError when create_quota_scope fails."""
+        mock_create = AsyncMock(side_effect=OSError("disk full"))
+        with patch.object(base_volume.quota_model, "create_quota_scope", mock_create):
+            with pytest.raises(QuotaScopeCreationFailedError):
+                await base_volume.clone_vfolder(sample_vfolder, dst_vfolder_id)
