@@ -7143,11 +7143,6 @@ type Query {
 
   """Added in UNRELEASED. List virtual folders within a specific project."""
   projectVfolders(projectId: UUID!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
-
-  """
-  Added in UNRELEASED. Search virtual folders accessible to the current user with pagination and filtering.
-  """
-  myVfolders(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
 }
 
 """
@@ -10764,29 +10759,6 @@ type VFolderAccessControlInfo {
 }
 
 """
-Added in UNRELEASED. Ownership context for a virtual folder. Provides both scalar IDs (userId, projectId, creatorEmail) for lightweight access and full node resolvers (user, project, creator) for detailed entity information.
-"""
-type VFolderOwnershipInfo {
-  """UUID of the user who owns this virtual folder. Null for project-owned folders."""
-  userId: UUID
-
-  """UUID of the project that owns this virtual folder. Null for user-owned folders."""
-  projectId: UUID
-
-  """Email of the user who originally created this virtual folder."""
-  creatorEmail: String
-
-  """The user who owns this virtual folder. Null for project-owned folders."""
-  user: UserV2
-
-  """The project that owns this virtual folder. Null for user-owned folders."""
-  project: ProjectV2
-
-  """The user who originally created this virtual folder."""
-  creator: UserV2
-}
-
-"""
 Added in UNRELEASED. Paginated connection for virtual folder records. Provides relay-style cursor-based pagination for efficient traversal of vfolder data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
 """
 type VFolderConnection {
@@ -10807,20 +10779,6 @@ type VFolderEdge {
 
   """The item at the end of the edge"""
   node: VFolder!
-}
-
-"""
-Added in UNRELEASED. Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
-"""
-input VFolderFilter {
-  name: StringFilter = null
-  host: StringFilter = null
-  status: VFolderOperationStatusFilter = null
-  usageMode: VFolderUsageModeFilter = null
-  createdAt: DateTimeFilter = null
-  AND: [VFolderFilter!] = null
-  OR: [VFolderFilter!] = null
-  NOT: [VFolderFilter!] = null
 }
 
 """
@@ -10887,33 +10845,22 @@ enum VFolderOperationStatus {
 }
 
 """
-Added in UNRELEASED. Filter for VFolder operation status enum fields. Supports in and not_in operations.
+Added in UNRELEASED. Ownership context for a virtual folder. Provides both scalar IDs (userId, projectId, creatorEmail) for lightweight access and full node resolvers (user, project, creator) for detailed entity information.
 """
-input VFolderOperationStatusFilter {
-  """The in field."""
-  in: [VFolderOperationStatus!] = null
+type VFolderOwnershipInfo {
+  """The user who owns this virtual folder. Null for project-owned folders."""
+  user: UserV2
 
-  """Exclude statuses not in this list."""
-  notIn: [VFolderOperationStatus!] = null
-}
+  """
+  The project that owns this virtual folder. Null for user-owned folders.
+  """
+  project: ProjectV2
 
-"""
-Added in UNRELEASED. Specifies ordering for virtual folder query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
-"""
-input VFolderOrderBy {
-  field: VFolderOrderField! = CREATED_AT
-  direction: OrderDirection! = DESC
-}
-
-"""
-Added in UNRELEASED. Fields available for ordering virtual folder query results. NAME: Order by folder name alphabetically. CREATED_AT: Order by creation timestamp. STATUS: Order by operation status. USAGE_MODE: Order by usage mode. HOST: Order by storage host.
-"""
-enum VFolderOrderField {
-  NAME
-  CREATED_AT
-  STATUS
-  USAGE_MODE
-  HOST
+  """The user who originally created this virtual folder."""
+  creator: UserV2
+  userId: UUID
+  projectId: UUID
+  creatorEmail: String
 }
 
 """
@@ -10931,17 +10878,6 @@ enum VFolderUsageMode {
   GENERAL
   MODEL
   DATA
-}
-
-"""
-Added in UNRELEASED. Filter for VFolder usage mode enum fields. Supports in and not_in operations.
-"""
-input VFolderUsageModeFilter {
-  """The in field."""
-  in: [VFolderUsageMode!] = null
-
-  """Exclude usage modes not in this list."""
-  notIn: [VFolderUsageMode!] = null
 }
 
 """Added in 24.09.0. Input for validate notification channel mutation"""
