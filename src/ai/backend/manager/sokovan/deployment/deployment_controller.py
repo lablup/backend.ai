@@ -23,7 +23,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
@@ -58,6 +58,16 @@ class SurgeResourceCheckResult:
     surge_count: int = 0
     scaling_group: str = ""
     insufficient_details: list[str] | None = None
+
+    @property
+    def surge_description(self) -> str:
+        match self.strategy:
+            case DeploymentStrategy.ROLLING:
+                return f"Rolling update max_surge={self.surge_count}"
+            case DeploymentStrategy.BLUE_GREEN:
+                return f"Blue-green deployment replica_count={self.surge_count}"
+            case _:
+                return f"Deployment surge_count={self.surge_count}"
 
 
 @dataclass
@@ -275,12 +285,9 @@ class DeploymentController:
         spec = policy.strategy_spec
 
         desired_replicas = deployment_info.replica_spec.target_replica_count
-        if isinstance(spec, RollingUpdateSpec):
-            surge_count = spec.resolve_max_surge(desired_replicas)
-            if surge_count == 0:
-                return SurgeResourceCheckResult(sufficient=True)
-        else:
-            surge_count = desired_replicas
+        surge_count = self._resolve_surge_count(spec, desired_replicas)
+        if surge_count == 0:
+            return SurgeResourceCheckResult(sufficient=True)
 
         revision_data = await self._deployment_repository.get_revision(revision_id)
         per_route_slots = revision_data.resource_config.resource_slot
@@ -308,6 +315,17 @@ class DeploymentController:
             scaling_group=scaling_group,
             insufficient_details=insufficient_details,
         )
+
+    @staticmethod
+    def _resolve_surge_count(
+        spec: RollingUpdateSpec | BlueGreenSpec,
+        desired_replicas: int,
+    ) -> int:
+        match spec:
+            case RollingUpdateSpec():
+                return spec.resolve_max_surge(desired_replicas)
+            case BlueGreenSpec():
+                return desired_replicas
 
     # ========== Deployment Policy Methods ==========
 

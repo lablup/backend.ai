@@ -841,12 +841,8 @@ class DeploymentService:
             deployment_info, action.revision_id
         )
         if not surge_check.sufficient:
-            if surge_check.strategy == DeploymentStrategy.ROLLING:
-                detail = f"Rolling update max_surge={surge_check.surge_count}"
-            else:
-                detail = f"Blue-green deployment replica_count={surge_check.surge_count}"
             raise InsufficientSurgeResources(
-                f"{detail} requires additional resources "
+                f"{surge_check.surge_description} requires additional resources "
                 f"that exceed the available capacity in scaling group "
                 f"'{surge_check.scaling_group}'. "
                 f"Insufficient resources: {', '.join(surge_check.insufficient_details or [])}"
