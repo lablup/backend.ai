@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Self, override
+from typing import Any, Self, cast, override
 from uuid import UUID
 
 import yarl
@@ -117,7 +117,7 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
             model_definition_path=creator.model_revision.mounts.model_definition_path,
             extra_mounts=creator.model_revision.mounts.extra_mounts,
             # Execution
-            runtime_variant=creator.model_revision.execution.runtime_variant,
+            runtime_variant=cast(RuntimeVariant, creator.model_revision.execution.runtime_variant),
             startup_command=creator.model_revision.execution.startup_command,
             bootstrap_script=creator.model_revision.execution.bootstrap_script,
             environ=creator.model_revision.execution.environ,

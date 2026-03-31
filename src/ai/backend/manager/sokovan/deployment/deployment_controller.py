@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.types import RuntimeVariant
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
@@ -100,8 +101,11 @@ class DeploymentController:
             )
         )
 
+        requested_variant = draft.draft_model_revision.execution.runtime_variant
         generator = self._revision_generator_registry.get(
-            draft.draft_model_revision.execution.runtime_variant
+            requested_variant
+            if isinstance(requested_variant, RuntimeVariant)
+            else RuntimeVariant.CUSTOM
         )
         model_revision = await generator.generate_revision(
             draft_revision=draft.draft_model_revision,

@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import uuid
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import yarl
 from aiohttp import web
@@ -175,7 +175,7 @@ def _serve_info_from_deployment_info(deployment_info: DeploymentInfo) -> ServeIn
         if deployment_info.network.url
         else None,
         is_public=deployment_info.network.open_to_public,
-        runtime_variant=model_revision.execution.runtime_variant
+        runtime_variant=cast(RuntimeVariant, model_revision.execution.runtime_variant)
         if model_revision
         else RuntimeVariant.CUSTOM,
     )

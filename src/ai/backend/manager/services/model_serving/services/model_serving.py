@@ -221,7 +221,9 @@ class ModelServingService:
                 scaling_group
             )
         )
-        generator = self._revision_generator_registry.get(draft.execution.runtime_variant)
+        generator = self._revision_generator_registry.get(
+            cast(RuntimeVariant, draft.execution.runtime_variant)
+        )
         return await generator.generate_revision(
             draft_revision=draft,
             vfolder_id=vfolder_id,

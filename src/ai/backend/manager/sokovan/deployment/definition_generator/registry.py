@@ -83,6 +83,8 @@ class ModelDefinitionGeneratorRegistry:
             3. User-provided model_definition override (highest)
         """
         runtime_variant = context.execution.runtime_variant
+        if not isinstance(runtime_variant, RuntimeVariant):
+            raise RuntimeVariantNotSupportedError(str(runtime_variant))
         generator = self.get(runtime_variant)
         definition = await generator.generate_model_definition(context)
         definition = await self._apply_vfolder_override(context, runtime_variant, definition)

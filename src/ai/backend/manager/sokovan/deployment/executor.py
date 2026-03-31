@@ -463,7 +463,7 @@ class DeploymentExecutor:
                     session_owner_id=deployment.metadata.session_owner,
                     project_id=deployment.metadata.project,
                     domain_name=deployment.metadata.domain,
-                    runtime_variant=target_revision.execution.runtime_variant,
+                    runtime_variant=cast(RuntimeVariant, target_revision.execution.runtime_variant),
                     existing_url=deployment.network.url,
                     open_to_public=deployment.network.open_to_public,
                     health_check_config=health_check_config,

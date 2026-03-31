@@ -2,7 +2,7 @@
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -211,7 +211,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
                 definition_path=rev.mounts.model_definition_path or "",
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=rev.execution.runtime_variant,
+                runtime_variant=cast(RuntimeVariant, rev.execution.runtime_variant),
                 inference_runtime_config=rev.execution.inference_runtime_config or {},
             ),
             extra_vfolder_mounts=[
@@ -353,7 +353,7 @@ class DeploymentService:
                     extra_mounts=(),  # TODO: Convert MountInfo to VFolderMount
                 ),
                 execution=DeploymentExecutionFields(
-                    runtime_variant=revision.execution.runtime_variant,
+                    runtime_variant=cast(RuntimeVariant, revision.execution.runtime_variant),
                     startup_command=revision.execution.startup_command,
                     bootstrap_script=revision.execution.bootstrap_script,
                     environ=revision.execution.environ,
@@ -657,7 +657,7 @@ class DeploymentService:
             callback_url=str(merged_creator.execution.callback_url)
             if merged_creator.execution.callback_url
             else None,
-            runtime_variant=merged_creator.execution.runtime_variant,
+            runtime_variant=cast(RuntimeVariant, merged_creator.execution.runtime_variant),
             # TODO: Convert merged_creator.mounts.extra_mounts (list[MountInfo]) to Sequence[VFolderMount] instead of discarding.
             extra_mounts=(),
         )
