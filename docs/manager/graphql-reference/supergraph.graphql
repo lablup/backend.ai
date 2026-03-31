@@ -11725,7 +11725,7 @@ type Query
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2! @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. List virtual folders within a specific project."""
-  projectVfolders(projectId: UUID!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
+  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Search virtual folders accessible to the current user with pagination and filtering.
