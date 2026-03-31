@@ -571,8 +571,11 @@ class DeploymentService:
             }
 
         execution_updates: dict[str, Any] = {"environ": merged_environ}
-        if service_def.runtime_variant is not None:
-            execution_updates["runtime_variant"] = service_def.runtime_variant
+        resolved_variant = service_def.resolve_runtime_variant(
+            revision_creator.execution.runtime_variant,
+        )
+        if resolved_variant != revision_creator.execution.runtime_variant:
+            execution_updates["runtime_variant"] = resolved_variant
 
         return ModelRevisionCreator(
             image_id=revision_creator.image_id,

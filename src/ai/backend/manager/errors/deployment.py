@@ -147,6 +147,26 @@ class RouteUnhealthy(BackendAIError):
         )
 
 
+class RuntimeVariantNotAllowed(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/runtime-variant-not-allowed"
+    error_title = "Runtime Variant Not Allowed"
+
+    def __init__(self, runtime_variant: str, allowed_variants: list[str]) -> None:
+        super().__init__(
+            extra_msg=(
+                f"Runtime variant '{runtime_variant}' is not allowed by the service definition. "
+                f"Allowed variants: {allowed_variants}"
+            ),
+        )
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class IncompleteRevisionData(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/incomplete-revision-data"
     error_title = "Revision data is missing required fields."

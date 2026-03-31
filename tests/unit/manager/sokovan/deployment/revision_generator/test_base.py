@@ -23,7 +23,10 @@ from ai.backend.manager.data.deployment.types import (
     ResourceSpecDraft,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.errors.deployment import DefinitionFileNotFound
+from ai.backend.manager.errors.deployment import (
+    DefinitionFileNotFound,
+    RuntimeVariantNotAllowed,
+)
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.revision_generator.base import BaseRevisionGenerator
 from ai.backend.manager.sokovan.deployment.revision_generator.custom import CustomRevisionGenerator
@@ -298,7 +301,66 @@ class TestLoadDeploymentConfig:
         )
 
         assert result is not None
-        assert result.runtime_variant == RuntimeVariant.VLLM
+        assert result.runtime_variants == [RuntimeVariant.VLLM]
+
+    async def test_runtime_variants_list_uses_api_variant_section(
+        self,
+        base_generator: BaseRevisionGenerator,
+        mock_deployment_repository: MagicMock,
+        vfolder_id: UUID,
+    ) -> None:
+        """When multiple runtime_variants are specified, the API-provided variant selects the section."""
+        mock_deployment_repository.fetch_deployment_config = AsyncMock(
+            return_value={
+                "runtime_variants": ["vllm", "sglang"],
+                "environment": {
+                    "image": "default-image:latest",
+                    "architecture": "x86_64",
+                },
+                "resource_slots": {"cpu": 4, "mem": "16gb"},
+                "vllm": {
+                    "resource_slots": {"cpu": 8},
+                },
+                "sglang": {
+                    "resource_slots": {"cpu": 12},
+                },
+            }
+        )
+
+        result = await base_generator.load_deployment_config(
+            vfolder_id=vfolder_id,
+            runtime_variant="sglang",
+        )
+
+        assert result is not None
+        assert result.runtime_variants == [RuntimeVariant.VLLM, RuntimeVariant.SGLANG]
+        assert result.resource_slots == {"cpu": 12, "mem": "16gb"}
+
+    async def test_backward_compat_single_runtime_variant_string(
+        self,
+        base_generator: BaseRevisionGenerator,
+        mock_deployment_repository: MagicMock,
+        vfolder_id: UUID,
+    ) -> None:
+        """Legacy runtime_variant (single string) is converted to runtime_variants list."""
+        mock_deployment_repository.fetch_deployment_config = AsyncMock(
+            return_value={
+                "runtime_variant": "vllm",
+                "environment": {
+                    "image": "default-image:latest",
+                    "architecture": "x86_64",
+                },
+                "resource_slots": {"cpu": 4},
+            }
+        )
+
+        result = await base_generator.load_deployment_config(
+            vfolder_id=vfolder_id,
+            runtime_variant="custom",
+        )
+
+        assert result is not None
+        assert result.runtime_variants == [RuntimeVariant.VLLM]
 
     async def test_no_deployment_config(
         self,
@@ -595,14 +657,14 @@ class TestMergeRevision:
         assert result.resource_spec.resource_opts == test_case.expected.resource_opts
         assert result.execution.environ == test_case.expected.environ
 
-    def test_forced_runtime_variant_overrides_draft(
+    def test_single_runtime_variant_forces_draft(
         self,
         base_generator: BaseRevisionGenerator,
         base_mount_metadata: MountMetadata,
     ) -> None:
-        """When service definition has runtime_variant, it overrides the draft's runtime_variant."""
+        """When service definition has a single runtime_variant, it overrides the draft's runtime_variant."""
         deployment_config = DeploymentConfig(
-            runtime_variant=RuntimeVariant.VLLM,
+            runtime_variants=[RuntimeVariant.VLLM],
             environment=ImageEnvironment(
                 image="vllm-image:latest",
                 architecture="x86_64",
@@ -631,12 +693,83 @@ class TestMergeRevision:
 
         assert result.execution.runtime_variant == RuntimeVariant.VLLM
 
-    def test_no_forced_runtime_variant_keeps_draft(
+    def test_multiple_runtime_variants_allows_valid_choice(
         self,
         base_generator: BaseRevisionGenerator,
         base_mount_metadata: MountMetadata,
     ) -> None:
-        """When service definition has no runtime_variant, the draft's value is kept."""
+        """When service definition has multiple runtime_variants and API picks a valid one, it succeeds."""
+        deployment_config = DeploymentConfig(
+            runtime_variants=[RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
+            environment=ImageEnvironment(
+                image="some-image:latest",
+                architecture="x86_64",
+            ),
+            resource_slots={"cpu": 4},
+        )
+        draft_revision = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
+                canonical=None,
+                architecture=None,
+            ),
+            resource_spec=ResourceSpecDraft(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots=None,
+                resource_opts=None,
+            ),
+            mounts=base_mount_metadata,
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.SGLANG,
+                startup_command=None,
+            ),
+        )
+
+        result = base_generator.merge_revision(draft_revision, deployment_config)
+
+        assert result.execution.runtime_variant == RuntimeVariant.SGLANG
+
+    def test_multiple_runtime_variants_rejects_invalid_choice(
+        self,
+        base_generator: BaseRevisionGenerator,
+        base_mount_metadata: MountMetadata,
+    ) -> None:
+        """When multiple runtime_variants exist and user picks one not in the list, reject it."""
+        deployment_config = DeploymentConfig(
+            runtime_variants=[RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
+            environment=ImageEnvironment(
+                image="some-image:latest",
+                architecture="x86_64",
+            ),
+            resource_slots={"cpu": 4},
+        )
+        draft_revision = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
+                canonical=None,
+                architecture=None,
+            ),
+            resource_spec=ResourceSpecDraft(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots=None,
+                resource_opts=None,
+            ),
+            mounts=base_mount_metadata,
+            execution=ExecutionSpec(
+                runtime_variant=RuntimeVariant.NIM,  # Explicitly chosen but not in allowed list
+                startup_command=None,
+            ),
+        )
+
+        with pytest.raises(RuntimeVariantNotAllowed):
+            base_generator.merge_revision(draft_revision, deployment_config)
+
+    def test_no_runtime_variants_keeps_draft(
+        self,
+        base_generator: BaseRevisionGenerator,
+        base_mount_metadata: MountMetadata,
+    ) -> None:
+        """When service definition has no runtime_variants, the draft's value is kept."""
         deployment_config = DeploymentConfig(
             environment=ImageEnvironment(
                 image="some-image:latest",

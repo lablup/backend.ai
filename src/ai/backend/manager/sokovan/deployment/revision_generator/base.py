@@ -106,10 +106,20 @@ class BaseRevisionGenerator(RevisionGenerator):
             k: v for k, v in deployment_config_dict.items() if k not in all_variant_keys
         }
 
-        # If the definition file specifies a runtime_variant, use it
-        # to select the variant section instead of the API-provided one.
-        forced_variant = root_level_dict.get("runtime_variant")
-        effective_variant = forced_variant if forced_variant is not None else runtime_variant
+        # Resolve the list of allowed runtime variants from the definition file.
+        # Supports both ``runtime_variants`` (list) and legacy ``runtime_variant`` (single string).
+        runtime_variants_raw: list[str] | None = root_level_dict.get("runtime_variants")
+        if runtime_variants_raw is None:
+            single_variant = root_level_dict.get("runtime_variant")
+            if single_variant is not None:
+                runtime_variants_raw = [single_variant]
+
+        # When exactly one variant is specified, force its section.
+        # Otherwise fall back to the API-provided variant.
+        if runtime_variants_raw is not None and len(runtime_variants_raw) == 1:
+            effective_variant = runtime_variants_raw[0]
+        else:
+            effective_variant = runtime_variant
 
         variant_overrides = deployment_config_dict.get(effective_variant, {})
 
@@ -194,10 +204,9 @@ class BaseRevisionGenerator(RevisionGenerator):
             config_dict["resource_opts"] = deployment_config.resource_opts
 
         request_dict = draft_revision.model_dump(mode="python")
-        # If deployment config forces a runtime_variant, use it instead of API request
-        effective_runtime_variant = request_dict["execution"]["runtime_variant"]
-        if deployment_config.runtime_variant is not None:
-            effective_runtime_variant = deployment_config.runtime_variant
+        effective_runtime_variant = deployment_config.resolve_runtime_variant(
+            request_dict["execution"]["runtime_variant"],
+        )
 
         merged_dict: dict[str, Any] = {
             "image_identifier": {},

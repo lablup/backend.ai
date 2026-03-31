@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import yarl
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -22,7 +22,10 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
-from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
+from ai.backend.manager.errors.deployment import (
+    DeploymentRevisionNotFound,
+    RuntimeVariantNotAllowed,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
@@ -61,18 +64,32 @@ class ImageEnvironment(BaseModel):
 
 
 class DeploymentConfig(BaseModel):
-    runtime_variant: RuntimeVariant | None = Field(
+    runtime_variants: list[RuntimeVariant] | None = Field(
         default=None,
         description="""
-        Runtime variant to force for this model service.
-        When specified, the deployment is forced to use this runtime variant
+        Allowed runtime variants for this model service.
+        When a single variant is specified, the deployment is forced to use it
         regardless of what the user provides via the API request.
+        When multiple variants are specified, the user must choose one from the list.
         """,
         examples=[
-            "vllm",
-            "huggingface-tgi",
+            ["vllm"],
+            ["vllm", "sglang"],
         ],
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_runtime_variant_field(cls, data: Any) -> Any:
+        """Accept both ``runtime_variant`` (single string) and
+        ``runtime_variants`` (list), normalizing to ``runtime_variants``."""
+        if isinstance(data, dict):
+            single = data.pop("runtime_variant", None)
+            variants = data.get("runtime_variants")
+            if variants is None and single is not None:
+                data["runtime_variants"] = [single]
+        return data
+
     environment: ImageEnvironment | None = Field(
         default=None,
         description="""
@@ -112,6 +129,24 @@ class DeploymentConfig(BaseModel):
             {"MY_ENV_VAR": "value", "ANOTHER_VAR": "another_value"},
         ],
     )
+
+    def resolve_runtime_variant(self, requested: RuntimeVariant) -> RuntimeVariant:
+        """Resolve the effective runtime variant against the allowed list.
+
+        - No constraints (runtime_variants is None/empty): return requested as-is.
+        - Single variant: force it regardless of requested.
+        - Multiple variants: validate requested is in the allowed list.
+        """
+        if not self.runtime_variants:
+            return requested
+        if len(self.runtime_variants) == 1:
+            return self.runtime_variants[0]
+        if requested not in self.runtime_variants:
+            raise RuntimeVariantNotAllowed(
+                runtime_variant=str(requested),
+                allowed_variants=[v.value for v in self.runtime_variants],
+            )
+        return requested
 
 
 class RouteStatus(enum.Enum):
