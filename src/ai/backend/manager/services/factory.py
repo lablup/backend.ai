@@ -50,6 +50,8 @@ from ai.backend.manager.services.metric.processors.utilization_metric import (
     UtilizationMetricProcessors,
 )
 from ai.backend.manager.services.metric.root_service import UtilizationMetricService
+from ai.backend.manager.services.model_card.processors import ModelCardProcessors
+from ai.backend.manager.services.model_card.service import ModelCardService
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
 )
@@ -262,6 +264,9 @@ def create_services(args: ServiceArgs) -> Services:
         runtime_variant_preset=RuntimeVariantPresetService(
             repositories.runtime_variant_preset.repository,
         ),
+        model_card=ModelCardService(
+            repositories.model_card.repository,
+        ),
         resource_usage=ResourceUsageService(
             repository=repositories.resource_usage_history.repository,
         ),
@@ -438,6 +443,7 @@ def create_processors(
         runtime_variant_preset=RuntimeVariantPresetProcessors(
             services.runtime_variant_preset, action_monitors, validators
         ),
+        model_card=ModelCardProcessors(services.model_card, action_monitors, validators),
         resource_usage=ResourceUsageProcessors(
             services.resource_usage, action_monitors, validators
         ),

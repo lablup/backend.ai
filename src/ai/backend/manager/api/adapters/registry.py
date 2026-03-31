@@ -17,6 +17,7 @@ from ai.backend.manager.api.adapters.huggingface_registry import HuggingFaceRegi
 from ai.backend.manager.api.adapters.image import ImageAdapter
 from ai.backend.manager.api.adapters.login_history import LoginHistoryAdapter
 from ai.backend.manager.api.adapters.login_session import LoginSessionAdapter
+from ai.backend.manager.api.adapters.model_card import ModelCardAdapter
 from ai.backend.manager.api.adapters.notification import NotificationAdapter
 from ai.backend.manager.api.adapters.object_storage import ObjectStorageAdapter
 from ai.backend.manager.api.adapters.project import ProjectAdapter
@@ -81,6 +82,7 @@ class Adapters:
         resource_slot: ResourceSlotAdapter,
         runtime_variant: RuntimeVariantAdapter,
         runtime_variant_preset: RuntimeVariantPresetAdapter,
+        model_card: ModelCardAdapter,
         resource_usage: ResourceUsageAdapter,
         scheduling_history: SchedulingHistoryAdapter,
         service_catalog: ServiceCatalogAdapter,
@@ -116,6 +118,7 @@ class Adapters:
         self.resource_slot = resource_slot
         self.runtime_variant = runtime_variant
         self.runtime_variant_preset = runtime_variant_preset
+        self.model_card = model_card
         self.resource_usage = resource_usage
         self.scheduling_history = scheduling_history
         self.service_catalog = service_catalog
@@ -160,6 +163,7 @@ class Adapters:
             resource_slot=ResourceSlotAdapter(processors),
             runtime_variant=RuntimeVariantAdapter(processors),
             runtime_variant_preset=RuntimeVariantPresetAdapter(processors),
+            model_card=ModelCardAdapter(processors),
             resource_usage=ResourceUsageAdapter(processors),
             scheduling_history=SchedulingHistoryAdapter(processors),
             service_catalog=ServiceCatalogAdapter(processors),

@@ -116,6 +116,7 @@ class EntityType(enum.StrEnum):
     RESOURCE_GROUP = "resource_group"
     PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     RESOURCE_PRESET = "resource_preset"
+    MODEL_CARD = "model_card"
     ROLE = "role"
     RUNTIME_VARIANT = "runtime_variant"
     ROUTING = "routing"

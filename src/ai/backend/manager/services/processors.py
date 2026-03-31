@@ -138,6 +138,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.metric.root_service import (
         UtilizationMetricService,  # pants: no-infer-dep
     )
+    from ai.backend.manager.services.model_card.processors import (
+        ModelCardProcessors,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.model_card.service import (
+        ModelCardService,  # pants: no-infer-dep
+    )
     from ai.backend.manager.services.model_serving.processors.auto_scaling import (
         ModelServingAutoScalingProcessors,  # pants: no-infer-dep
     )
@@ -359,6 +365,7 @@ class Services:
     resource_slot: ResourceSlotService
     runtime_variant: RuntimeVariantService
     runtime_variant_preset: RuntimeVariantPresetService
+    model_card: ModelCardService
     resource_usage: ResourceUsageService
     scaling_group: ScalingGroupService
     utilization_metric: UtilizationMetricService
@@ -419,6 +426,7 @@ class Processors(AbstractProcessorPackage):
     resource_slot: ResourceSlotProcessors
     runtime_variant: RuntimeVariantProcessors
     runtime_variant_preset: RuntimeVariantPresetProcessors
+    model_card: ModelCardProcessors
     resource_usage: ResourceUsageProcessors
     scaling_group: ScalingGroupProcessors
     utilization_metric: UtilizationMetricProcessors
@@ -472,6 +480,7 @@ class Processors(AbstractProcessorPackage):
             *self.resource_slot.supported_actions(),
             *self.runtime_variant.supported_actions(),
             *self.runtime_variant_preset.supported_actions(),
+            *self.model_card.supported_actions(),
             *self.resource_usage.supported_actions(),
             *self.scaling_group.supported_actions(),
             *self.utilization_metric.supported_actions(),

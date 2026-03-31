@@ -150,3 +150,12 @@ def runtime_variant() -> None:
 )
 def runtime_variant_preset() -> None:
     """Admin runtime variant preset commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.model_card:model_card",
+    name="model-card",
+)
+def model_card() -> None:
+    """Admin model card commands."""

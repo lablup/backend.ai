@@ -54,6 +54,8 @@ def build_v2_routes(
     from .login_history.registry import register_v2_login_history_routes
     from .login_session.handler import V2LoginSessionHandler
     from .login_session.registry import register_v2_login_session_routes
+    from .model_card.handler import V2ModelCardHandler
+    from .model_card.registry import register_v2_model_card_routes
     from .notification.handler import V2NotificationHandler
     from .notification.registry import register_v2_notification_routes
     from .object_storage.handler import V2ObjectStorageHandler
@@ -131,6 +133,7 @@ def build_v2_routes(
     runtime_variant_preset_handler = V2RuntimeVariantPresetHandler(
         adapter=adapters.runtime_variant_preset
     )
+    model_card_handler = V2ModelCardHandler(adapter=adapters.model_card)
     resource_usage_handler = V2ResourceUsageHandler(adapter=adapters.resource_usage)
     scheduling_history_handler = V2SchedulingHistoryHandler(adapter=adapters.scheduling_history)
     service_catalog_handler = V2ServiceCatalogHandler(adapter=adapters.service_catalog)
@@ -185,6 +188,7 @@ def build_v2_routes(
     v2_reg.add_subregistry(
         register_v2_runtime_variant_preset_routes(runtime_variant_preset_handler, route_deps)
     )
+    v2_reg.add_subregistry(register_v2_model_card_routes(model_card_handler, route_deps))
     v2_reg.add_subregistry(register_v2_resource_usage_routes(resource_usage_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_scheduling_history_routes(scheduling_history_handler, route_deps)

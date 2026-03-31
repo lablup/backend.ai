@@ -241,6 +241,29 @@ class RuntimeVariantPresetConflict(BackendAIError, web.HTTPConflict):
         )
 
 
+class ModelCardNotFound(ObjectNotFound):
+    object_name = "model card"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_CARD,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ModelCardConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-model-card"
+    error_title = "Duplicate Model Card"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_CARD,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class AgentNotFound(ObjectNotFound):
     object_name = "agent"
 

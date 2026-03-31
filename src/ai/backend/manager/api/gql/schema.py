@@ -164,6 +164,13 @@ from .login_session import (
     my_login_sessions_v2,
     my_revoke_login_session,
 )
+from .model_card import (
+    admin_create_model_card,
+    admin_delete_model_card,
+    admin_update_model_card,
+    model_card,
+    model_cards,
+)
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -544,6 +551,9 @@ class Query:
     # Runtime Variant Preset APIs
     runtime_variant_presets = runtime_variant_presets
     runtime_variant_preset = runtime_variant_preset
+    # Model Card APIs
+    model_cards = model_cards
+    model_card = model_card
     # Resource Allocation V2 APIs
     my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
     project_resource_allocation_v2 = project_resource_allocation_v2
@@ -735,6 +745,10 @@ class Mutation:
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
     admin_delete_runtime_variant_preset = admin_delete_runtime_variant_preset
+    # Model Card mutations
+    admin_create_model_card = admin_create_model_card
+    admin_update_model_card = admin_update_model_card
+    admin_delete_model_card = admin_delete_model_card
     # Session V2 mutations
     terminate_project_sessions_v2 = terminate_project_sessions_v2
 

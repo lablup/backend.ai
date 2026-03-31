@@ -30,6 +30,7 @@ from ai.backend.manager.repositories.keypair_resource_policy.repositories import
 )
 from ai.backend.manager.repositories.manager_admin.repositories import ManagerAdminRepositories
 from ai.backend.manager.repositories.metric.repositories import MetricRepositories
+from ai.backend.manager.repositories.model_card.repositories import ModelCardRepositories
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.notification.repositories import NotificationRepositories
 from ai.backend.manager.repositories.object_storage.repositories import ObjectStorageRepositories
@@ -102,6 +103,7 @@ class Repositories:
     resource_slot: ResourceSlotRepositories
     runtime_variant: RuntimeVariantRepositories
     runtime_variant_preset: RuntimeVariantPresetRepositories
+    model_card: ModelCardRepositories
     resource_usage_history: ResourceUsageHistoryRepositories
     scaling_group: ScalingGroupRepositories
     scheduler: SchedulerRepositories
@@ -149,6 +151,7 @@ class Repositories:
         resource_slot_repositories = ResourceSlotRepositories.create(args)
         runtime_variant_repositories = RuntimeVariantRepositories.create(args)
         runtime_variant_preset_repositories = RuntimeVariantPresetRepositories.create(args)
+        model_card_repositories = ModelCardRepositories.create(args)
         resource_usage_history_repositories = ResourceUsageHistoryRepositories.create(args)
         scaling_group_repositories = ScalingGroupRepositories.create(args)
         scheduler_repositories = SchedulerRepositories.create(args)
@@ -195,6 +198,7 @@ class Repositories:
             resource_slot=resource_slot_repositories,
             runtime_variant=runtime_variant_repositories,
             runtime_variant_preset=runtime_variant_preset_repositories,
+            model_card=model_card_repositories,
             resource_usage_history=resource_usage_history_repositories,
             scaling_group=scaling_group_repositories,
             scheduler=scheduler_repositories,

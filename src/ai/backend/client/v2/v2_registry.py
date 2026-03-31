@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from .domains_v2.keypair import V2KeypairClient
     from .domains_v2.login_history import V2LoginHistoryClient
     from .domains_v2.login_session import V2LoginSessionClient
+    from .domains_v2.model_card import V2ModelCardClient
     from .domains_v2.notification import V2NotificationClient
     from .domains_v2.object_storage import V2ObjectStorageClient
     from .domains_v2.project import V2ProjectClient
@@ -171,6 +172,12 @@ class V2ClientRegistry:
         from .domains_v2.login_session import V2LoginSessionClient
 
         return V2LoginSessionClient(self._client)
+
+    @cached_property
+    def model_card(self) -> V2ModelCardClient:
+        from .domains_v2.model_card import V2ModelCardClient
+
+        return V2ModelCardClient(self._client)
 
     @cached_property
     def notification(self) -> V2NotificationClient:
