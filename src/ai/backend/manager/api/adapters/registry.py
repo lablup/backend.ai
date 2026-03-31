@@ -34,6 +34,7 @@ from ai.backend.manager.api.adapters.service_catalog import ServiceCatalogAdapte
 from ai.backend.manager.api.adapters.session import SessionAdapter
 from ai.backend.manager.api.adapters.storage_namespace import StorageNamespaceAdapter
 from ai.backend.manager.api.adapters.user import UserAdapter
+from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
 from ai.backend.manager.api.adapters.vfs_storage import VFSStorageAdapter
 
 if TYPE_CHECKING:
@@ -82,6 +83,7 @@ class Adapters:
         session: SessionAdapter,
         storage_namespace: StorageNamespaceAdapter,
         user: UserAdapter,
+        vfolder: VFolderAdapter,
         vfs_storage: VFSStorageAdapter,
     ) -> None:
         self.agent = agent
@@ -114,6 +116,7 @@ class Adapters:
         self.session = session
         self.storage_namespace = storage_namespace
         self.user = user
+        self.vfolder = vfolder
         self.vfs_storage = vfs_storage
 
     @classmethod
@@ -155,5 +158,6 @@ class Adapters:
             session=SessionAdapter(processors),
             storage_namespace=StorageNamespaceAdapter(processors),
             user=UserAdapter(processors, auth_config),
+            vfolder=VFolderAdapter(processors),
             vfs_storage=VFSStorageAdapter(processors),
         )
