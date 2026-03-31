@@ -57,7 +57,6 @@ class TestVFolderCreateViaSDK:
             ),
         )
 
-    @pytest.mark.xfail(strict=True, reason="Requires storage-proxy mocking in component tests")
     async def test_admin_creates_unmanaged_vfolder(
         self,
         admin_registry: BackendAIClientRegistry,
