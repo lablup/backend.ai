@@ -584,7 +584,7 @@ class TestCreateModelService:
         await scenario.test(create_model_service)
 
 
-class TestCreateWithServiceDefinitionOverrides:
+class TestCreateWithDeploymentConfigOverrides:
     """Tests for CreateModelServiceAction with deployment config overrides."""
 
     @pytest.fixture
@@ -692,7 +692,7 @@ class TestCreateWithServiceDefinitionOverrides:
             execution=ExecutionSpec(
                 runtime_variant=RuntimeVariant.CUSTOM,
                 startup_command=None,
-                environ={"SERVICE_DEF_VAR": "from-service-definition"},
+                environ={"SERVICE_DEF_VAR": "from-deployment-config"},
             ),
         )
 

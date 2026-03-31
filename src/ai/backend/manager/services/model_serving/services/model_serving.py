@@ -268,7 +268,7 @@ class ModelServingService:
         action.creator = action.creator.with_revision(revision)
 
         creation_config = action.creator.config.to_dict()
-        # Override resource_opts with merged values from service-definition.toml + API request
+        # Override resource_opts with merged values from deployment config + API request
         creation_config["resource_opts"] = dict(revision.resource_spec.resource_opts or {})
         creation_config["mounts"] = [
             model_vfolder_id,

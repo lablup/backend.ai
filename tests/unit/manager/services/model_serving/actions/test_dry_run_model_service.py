@@ -541,7 +541,7 @@ class TestDryRunModelServiceActionWithRevision:
         assert result.config.environ == revision_spec_with_no_environ.execution.environ
 
 
-class TestDryRunWithServiceDefinitionOverrides:
+class TestDryRunWithDeploymentConfigOverrides:
     @pytest.fixture
     def user_data(self) -> UserData:
         return UserData(
@@ -645,7 +645,7 @@ class TestDryRunWithServiceDefinitionOverrides:
             execution=ExecutionSpec(
                 runtime_variant=RuntimeVariant.CUSTOM,
                 startup_command=None,
-                environ={"SERVICE_DEF_VAR": "from-service-definition"},
+                environ={"SERVICE_DEF_VAR": "from-deployment-config"},
             ),
         )
 
