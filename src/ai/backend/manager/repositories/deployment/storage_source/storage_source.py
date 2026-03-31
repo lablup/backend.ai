@@ -20,6 +20,34 @@ class DeploymentStorageSource:
     def __init__(self, storage_manager: StorageSessionManager) -> None:
         self._storage_manager = storage_manager
 
+    async def _try_fetch_config_file(
+        self,
+        model_vfolder: VFolderLocation,
+        filename: str,
+    ) -> DeploymentConfig | None:
+        try:
+            vfid = VFolderID(model_vfolder.quota_scope_id, model_vfolder.id)
+            folder_host = model_vfolder.host
+
+            proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host)
+            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+
+            chunks = await manager_client.fetch_file_content(
+                volume_name,
+                str(vfid),
+                f"./{filename}",
+            )
+            if not chunks:
+                return None
+            if filename.endswith(".toml"):
+                parsed = tomli.loads(chunks.decode("utf-8"))
+            else:
+                yaml = YAML()
+                parsed = cast(dict[str, Any], yaml.load(chunks))
+            return DeploymentConfig(**parsed)
+        except Exception:
+            return None
+
     async def fetch_deployment_config(
         self,
         model_vfolder: VFolderLocation,
@@ -36,42 +64,12 @@ class DeploymentStorageSource:
         Returns:
             Parsed deployment config as DeploymentConfig, or None if not found
         """
-        try:
-            vfid = VFolderID(model_vfolder.quota_scope_id, model_vfolder.id)
-            folder_host = model_vfolder.host
-
-            proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host)
-            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-
-            # Try deployment-config.yaml first (new format)
-            try:
-                chunks = await manager_client.fetch_file_content(
-                    volume_name,
-                    str(vfid),
-                    "./deployment-config.yaml",
-                )
-                if chunks:
-                    yaml = YAML()
-                    parsed: dict[str, Any] = cast(dict[str, Any], yaml.load(chunks))
-                    return DeploymentConfig(**parsed)
-            except Exception:
-                pass
-
-            # Fall back to legacy service-definition.toml
-            chunks = await manager_client.fetch_file_content(
-                volume_name,
-                str(vfid),
-                "./service-definition.toml",
-            )
-            if chunks:
-                raw_content = chunks.decode("utf-8")
-                parsed_toml = tomli.loads(raw_content)
-                return DeploymentConfig(**parsed_toml)
-
-        except Exception:
-            pass
-
-        return None
+        # Try deployment-config.yaml first (new format)
+        config = await self._try_fetch_config_file(model_vfolder, "deployment-config.yaml")
+        if config is not None:
+            return config
+        # Fall back to legacy service-definition.toml
+        return await self._try_fetch_config_file(model_vfolder, "service-definition.toml")
 
     async def fetch_definition_file(
         self,

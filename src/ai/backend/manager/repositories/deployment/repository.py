@@ -64,6 +64,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
@@ -471,6 +472,23 @@ class DeploymentRepository:
         yaml = YAML()
         return cast(dict[str, Any], yaml.load(model_definition_bytes))
 
+    async def _try_fetch_config_file(
+        self,
+        vfolder_location: VFolderLocation,
+        filename: str,
+    ) -> dict[str, Any] | None:
+        try:
+            raw_bytes = await self._storage_source.fetch_definition_file(
+                vfolder_location,
+                [filename],
+            )
+        except DefinitionFileNotFound:
+            return None
+        if filename.endswith(".toml"):
+            return tomli.loads(raw_bytes.decode("utf-8"))
+        yaml = YAML()
+        return cast(dict[str, Any], yaml.load(raw_bytes))
+
     @deployment_repository_resilience.apply()
     async def fetch_deployment_config(
         self,
@@ -494,31 +512,22 @@ class DeploymentRepository:
             )
 
         # Try deployment-config.yaml first (new format)
-        try:
-            yaml_bytes = await self._storage_source.fetch_definition_file(
-                vfolder_location,
-                ["deployment-config.yaml"],
-            )
-            yaml = YAML()
-            return cast(dict[str, Any], yaml.load(yaml_bytes))
-        except DefinitionFileNotFound:
-            pass
+        config = await self._try_fetch_config_file(vfolder_location, "deployment-config.yaml")
+        if config is not None:
+            return config
 
         # Fall back to legacy service-definition.toml
-        try:
-            toml_bytes = await self._storage_source.fetch_definition_file(
-                vfolder_location,
-                ["service-definition.toml"],
-            )
+        config = await self._try_fetch_config_file(vfolder_location, "service-definition.toml")
+        if config is not None:
             log.info(
                 "Found legacy service-definition.toml in vfolder {}. "
                 "Please rename it to deployment-config.yaml.",
                 vfolder_id,
             )
-            return tomli.loads(toml_bytes.decode("utf-8"))
-        except DefinitionFileNotFound:
-            # Deployment config is optional
-            return None
+            return config
+
+        # Deployment config is optional
+        return None
 
     @deployment_repository_resilience.apply()
     async def fetch_definition_files(
