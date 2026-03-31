@@ -235,21 +235,23 @@ class DeploymentController:
 
     # ========== Rolling Update Validation ==========
 
-    async def validate_rolling_update_resources(
+    async def validate_deployment_surge_resources(
         self,
         deployment_info: DeploymentInfo,
         revision_id: uuid.UUID,
     ) -> None:
-        """Validate that the rolling update max_surge can be satisfied by available resources.
+        """Validate that additional resources required by the deployment strategy are available.
 
-        During a rolling update, up to ``max_surge`` additional routes are created
-        beyond the desired count.  Each extra route requires the same resources as
-        defined in the revision spec.  This method checks that the scaling group has
-        enough free resources to accommodate the surge.
+        Depending on the strategy, a different number of extra routes must be
+        provisioned while old routes are still running:
 
-        This is called once at the start of a rolling update (in ``activate_revision``)
-        as a pre-flight check.  The underlying query computes actual resource usage
-        from kernel allocations, which is relatively expensive.
+        - **Rolling update**: up to ``max_surge`` extra routes beyond the desired count.
+        - **Blue-green**: the full ``target_replica_count`` worth of new routes, since
+          old and new routes coexist until traffic is switched.
+
+        This is called once at the start of ``activate_revision`` as a pre-flight check.
+        The underlying query computes actual resource usage from kernel allocations,
+        which is relatively expensive.
 
         Args:
             deployment_info: Current deployment information
@@ -259,19 +261,19 @@ class DeploymentController:
             InsufficientSurgeResources: If available resources cannot satisfy the surge
         """
         policy = await self._deployment_repository.get_deployment_policy(deployment_info.id)
-        if policy.strategy != DeploymentStrategy.ROLLING:
-            return
-
         spec = policy.strategy_spec
-        if not isinstance(spec, RollingUpdateSpec):
-            return
 
-        if spec.max_surge == 0:
-            return
+        desired_replicas = deployment_info.replica_spec.target_replica_count
+        if isinstance(spec, RollingUpdateSpec):
+            surge_count = spec.resolve_max_surge(desired_replicas)
+            if surge_count == 0:
+                return
+        else:
+            surge_count = desired_replicas
 
         revision_data = await self._deployment_repository.get_revision(revision_id)
         per_route_slots = revision_data.resource_config.resource_slot
-        surge_slots = ResourceSlot({k: v * spec.max_surge for k, v in per_route_slots.data.items()})
+        surge_slots = ResourceSlot({k: v * surge_count for k, v in per_route_slots.data.items()})
 
         scaling_group = deployment_info.metadata.resource_group
         resource_info = await self._scaling_group_repository.get_resource_info(scaling_group)
@@ -286,8 +288,12 @@ class DeploymentController:
                     insufficient_details.append(
                         f"{slot_name}: required={required}, available={available}"
                     )
+            if policy.strategy == DeploymentStrategy.ROLLING:
+                detail = f"Rolling update max_surge={surge_count}"
+            else:
+                detail = f"Blue-green deployment replica_count={surge_count}"
             raise InsufficientSurgeResources(
-                f"Rolling update max_surge={spec.max_surge} requires additional resources "
+                f"{detail} requires additional resources "
                 f"that exceed the available capacity in scaling group '{scaling_group}'. "
                 f"Insufficient resources: {', '.join(insufficient_details)}"
             )

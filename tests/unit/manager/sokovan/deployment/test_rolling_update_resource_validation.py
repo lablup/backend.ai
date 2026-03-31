@@ -1,8 +1,9 @@
-"""Tests for rolling update resource validation in DeploymentController.
+"""Tests for deployment surge resource validation in DeploymentController.
 
-Tests verify that validate_rolling_update_resources correctly checks
+Tests verify that validate_deployment_surge_resources correctly checks
 whether the scaling group has enough free resources to accommodate
-the max_surge of a rolling update deployment.
+the surge of a deployment (max_surge for rolling update, full replica
+count for blue-green).
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant, SlotQuantity
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
@@ -113,8 +115,8 @@ def _make_resource_info(
     )
 
 
-class TestValidateRollingUpdateResources:
-    """Tests for DeploymentController.validate_rolling_update_resources."""
+class TestValidateDeploymentSurgeResources:
+    """Tests for DeploymentController.validate_deployment_surge_resources."""
 
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
@@ -141,14 +143,14 @@ class TestValidateRollingUpdateResources:
         args.revision_generator_registry = MagicMock()
         return DeploymentController(args)
 
-    async def test_skip_validation_for_blue_green_strategy(
+    async def test_blue_green_pass_when_resources_are_sufficient(
         self,
         controller: DeploymentController,
         mock_deployment_repository: MagicMock,
         mock_scaling_group_repository: MagicMock,
     ) -> None:
-        """Blue-green deployments should not be validated for surge resources."""
-        deployment_info = _make_deployment_info()
+        """Blue-green requires target_replica_count worth of surge resources."""
+        deployment_info = _make_deployment_info()  # replica_count=2
         mock_deployment_repository.get_deployment_policy = AsyncMock(
             return_value=DeploymentPolicyData(
                 id=uuid.uuid4(),
@@ -159,12 +161,62 @@ class TestValidateRollingUpdateResources:
                 updated_at=datetime.now(UTC),
             )
         )
+        mock_deployment_repository.get_revision = AsyncMock(
+            return_value=_make_revision_data(
+                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+            )
+        )
+        # Blue-green surge = 2 replicas * (2 cpu, 4096 mem) = (4 cpu, 8192 mem)
+        # Free resources are (8 cpu, 16384 mem) — sufficient
+        mock_scaling_group_repository.get_resource_info = AsyncMock(
+            return_value=_make_resource_info({
+                "cpu": Decimal("8"),
+                "mem": Decimal("16384"),
+            })
+        )
 
         # Should not raise
-        await controller.validate_rolling_update_resources(deployment_info, REVISION_ID)
+        await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
 
-        # Should not check resources
-        mock_scaling_group_repository.get_resource_info.assert_not_called()
+    async def test_blue_green_fail_when_resources_are_insufficient(
+        self,
+        controller: DeploymentController,
+        mock_deployment_repository: MagicMock,
+        mock_scaling_group_repository: MagicMock,
+    ) -> None:
+        """Blue-green raises InsufficientSurgeResources when free < replica_count * per_route."""
+        deployment_info = _make_deployment_info()  # replica_count=2
+        mock_deployment_repository.get_deployment_policy = AsyncMock(
+            return_value=DeploymentPolicyData(
+                id=uuid.uuid4(),
+                endpoint=ENDPOINT_ID,
+                strategy=DeploymentStrategy.BLUE_GREEN,
+                strategy_spec=BlueGreenSpec(auto_promote=False),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+        )
+        mock_deployment_repository.get_revision = AsyncMock(
+            return_value=_make_revision_data(
+                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+            )
+        )
+        # Blue-green surge = 2 replicas * (2 cpu, 4096 mem) = (4 cpu, 8192 mem)
+        # Free resources are (1 cpu, 2048 mem) — insufficient
+        mock_scaling_group_repository.get_resource_info = AsyncMock(
+            return_value=_make_resource_info({
+                "cpu": Decimal("1"),
+                "mem": Decimal("2048"),
+            })
+        )
+
+        with pytest.raises(InsufficientSurgeResources) as exc_info:
+            await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
+
+        error_message = str(exc_info.value)
+        assert "replica_count=2" in error_message
+        assert "cpu" in error_message
+        assert "mem" in error_message
 
     async def test_skip_validation_when_max_surge_is_zero(
         self,
@@ -179,13 +231,15 @@ class TestValidateRollingUpdateResources:
                 id=uuid.uuid4(),
                 endpoint=ENDPOINT_ID,
                 strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(max_surge=0, max_unavailable=1),
+                strategy_spec=RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=0), max_unavailable=IntOrPercent(count=1)
+                ),
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
             )
         )
 
-        await controller.validate_rolling_update_resources(deployment_info, REVISION_ID)
+        await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
 
         mock_scaling_group_repository.get_resource_info.assert_not_called()
 
@@ -202,7 +256,9 @@ class TestValidateRollingUpdateResources:
                 id=uuid.uuid4(),
                 endpoint=ENDPOINT_ID,
                 strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=0),
+                strategy_spec=RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=2), max_unavailable=IntOrPercent(count=0)
+                ),
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
             )
@@ -222,7 +278,7 @@ class TestValidateRollingUpdateResources:
         )
 
         # Should not raise
-        await controller.validate_rolling_update_resources(deployment_info, REVISION_ID)
+        await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
 
     async def test_fail_when_resources_are_insufficient(
         self,
@@ -237,7 +293,9 @@ class TestValidateRollingUpdateResources:
                 id=uuid.uuid4(),
                 endpoint=ENDPOINT_ID,
                 strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=0),
+                strategy_spec=RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=2), max_unavailable=IntOrPercent(count=0)
+                ),
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
             )
@@ -257,7 +315,7 @@ class TestValidateRollingUpdateResources:
         )
 
         with pytest.raises(InsufficientSurgeResources) as exc_info:
-            await controller.validate_rolling_update_resources(deployment_info, REVISION_ID)
+            await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
 
         error_message = str(exc_info.value)
         assert "max_surge=2" in error_message
@@ -278,7 +336,9 @@ class TestValidateRollingUpdateResources:
                 id=uuid.uuid4(),
                 endpoint=ENDPOINT_ID,
                 strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
+                strategy_spec=RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
+                ),
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
             )
@@ -298,7 +358,7 @@ class TestValidateRollingUpdateResources:
         )
 
         with pytest.raises(InsufficientSurgeResources) as exc_info:
-            await controller.validate_rolling_update_resources(deployment_info, REVISION_ID)
+            await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
 
         error_message = str(exc_info.value)
         assert "mem" in error_message
@@ -320,7 +380,9 @@ class TestValidateRollingUpdateResources:
                 id=uuid.uuid4(),
                 endpoint=ENDPOINT_ID,
                 strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
+                strategy_spec=RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
+                ),
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
             )
@@ -334,6 +396,6 @@ class TestValidateRollingUpdateResources:
             return_value=_make_resource_info({"cpu": Decimal("100")})
         )
 
-        await controller.validate_rolling_update_resources(deployment_info, REVISION_ID)
+        await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
 
         mock_scaling_group_repository.get_resource_info.assert_called_once_with("my-gpu-group")

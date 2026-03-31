@@ -835,8 +835,8 @@ class DeploymentService:
                 f"of deployment {action.deployment_id}."
             )
 
-        # 3. Validate rolling update surge resource availability
-        await self._deployment_controller.validate_rolling_update_resources(
+        # 3. Validate deployment surge resource availability
+        await self._deployment_controller.validate_deployment_surge_resources(
             deployment_info, action.revision_id
         )
 
