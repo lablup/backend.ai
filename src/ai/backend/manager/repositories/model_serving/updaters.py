@@ -49,17 +49,23 @@ class EndpointUpdaterSpec(UpdaterSpec[EndpointRow]):
 
     @override
     def build_values(self) -> dict[str, Any]:
-        """Build values for endpoint-level column updates only.
-
-        Revision-level fields (resource_slots, resource_opts, cluster_mode, etc.)
-        are NOT included here — they are used to create a new DeploymentRevisionRow
-        in modify_endpoint() when changed.
-        """
+        """Build values for EndpointRow columns only."""
         to_update: dict[str, Any] = {}
-        self.resource_group.update_dict(to_update, "resource_group")
         self.desired_session_count.update_dict(to_update, "desired_session_count")
         self.replicas.update_dict(to_update, "replicas")
         return to_update
+
+    def build_revision_values(self) -> dict[str, Any]:
+        """Build values for DeploymentRevisionRow columns."""
+        to_update: dict[str, Any] = {}
+        self.resource_group.update_dict(to_update, "resource_group")
+        self.environ.update_dict(to_update, "environ")
+        return to_update
+
+    def apply_to_revision_row(self, row: Any) -> None:
+        """Apply revision-level update values to a DeploymentRevisionRow object via setattr."""
+        for field_name, value in self.build_revision_values().items():
+            setattr(row, field_name, value)
 
     def replica_count_modified(self) -> bool:
         """Check if replicas field was modified."""

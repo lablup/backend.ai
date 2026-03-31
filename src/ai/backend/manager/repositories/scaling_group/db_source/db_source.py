@@ -18,6 +18,7 @@ from ai.backend.manager.data.scaling_group.types import (
 )
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -162,9 +163,14 @@ class ScalingGroupDBSource:
                 )
                 await session.execute(delete_routings_stmt)
 
-            # Step 3: Delete all endpoints belonging to this scaling group
+            # Step 3: Delete all endpoints that have revisions belonging to this scaling group
+            endpoint_ids_with_scaling_group = (
+                sa.select(DeploymentRevisionRow.endpoint)
+                .where(DeploymentRevisionRow.resource_group == scaling_group_name)
+                .distinct()
+            )
             delete_endpoints_stmt = sa.delete(EndpointRow).where(
-                EndpointRow.resource_group == scaling_group_name
+                EndpointRow.id.in_(endpoint_ids_with_scaling_group)
             )
             await session.execute(delete_endpoints_stmt)
 

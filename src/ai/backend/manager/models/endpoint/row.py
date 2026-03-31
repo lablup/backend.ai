@@ -144,6 +144,12 @@ def _get_deployment_policy_join_condition() -> Any:
     return EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)
 
 
+def _get_current_revision_row_join_condition() -> Any:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return foreign(EndpointRow.current_revision) == DeploymentRevisionRow.id
+
+
 def _get_created_user_row_join_condition() -> Any:
     from ai.backend.manager.models.user import UserRow
 
@@ -204,13 +210,6 @@ class EndpointRow(Base):  # type: ignore[misc]
         sa.ForeignKey("groups.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    resource_group: Mapped[str] = mapped_column(
-        "resource_group",
-        sa.String,
-        sa.ForeignKey("scaling_groups.name", ondelete="RESTRICT"),
-        index=True,
-        nullable=False,
-    )
     lifecycle_stage: Mapped[EndpointLifecycle] = mapped_column(
         "lifecycle_stage",
         EnumValueType(EndpointLifecycle),
@@ -263,6 +262,14 @@ class EndpointRow(Base):  # type: ignore[misc]
     endpoint_auto_scaling_rules: Mapped[list[EndpointAutoScalingRuleRow]] = relationship(
         "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
     )
+    current_revision_row = relationship(
+        "DeploymentRevisionRow",
+        primaryjoin=_get_current_revision_row_join_condition,
+        uselist=False,
+        viewonly=True,
+        foreign_keys="EndpointRow.current_revision",
+    )
+
     created_user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         back_populates="created_endpoints",
@@ -308,7 +315,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
-        load_revisions: bool = False,
+        load_current_revision: bool = False,
     ) -> Self:
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
@@ -324,9 +331,15 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
             query = query.options(selectinload(EndpointRow.session_owner_row))
-        if load_revisions:
+        if load_current_revision:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                )
+            ).options(
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.model_row
+                )
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -621,26 +634,65 @@ class EndpointRow(Base):  # type: ignore[misc]
     def to_data(self) -> EndpointData:
         """Convert to EndpointData.
 
-        Requires revisions and revisions.image_row to be eagerly loaded
-        via selectinload for revision field population.
+        Uses current_revision_row relationship to populate revision-level fields.
         """
-        current_rev = self._find_current_revision()
+        current_revision = self.current_revision_row
+        routings = [routing.to_data() for routing in self.routings] if self.routings else None
+
+        if current_revision is not None:
+            return EndpointData(
+                id=self.id,
+                name=self.name,
+                image=current_revision.image_row.to_dataclass()
+                if current_revision.image_row
+                else None,
+                domain=self.domain,
+                project=self.project,
+                resource_group=current_revision.resource_group,
+                resource_slots=current_revision.resource_slots,
+                url=self.url or "",
+                model=current_revision.model or uuid.UUID(int=0),
+                model_definition_path=current_revision.model_definition_path,
+                model_mount_destination=current_revision.model_mount_destination,
+                created_user_id=self.created_user,
+                created_user_email=(
+                    self.created_user_row.email if self.created_user_row is not None else None
+                ),
+                session_owner_id=self.session_owner,
+                session_owner_email=self.session_owner_row.email if self.session_owner_row else "",
+                tag=self.tag,
+                startup_command=current_revision.startup_command,
+                bootstrap_script=current_revision.bootstrap_script,
+                callback_url=yarl.URL(current_revision.callback_url)
+                if current_revision.callback_url
+                else None,
+                environ=current_revision.environ,
+                resource_opts=current_revision.resource_opts,
+                replicas=self.replicas,
+                cluster_mode=ClusterMode(current_revision.cluster_mode),
+                cluster_size=current_revision.cluster_size,
+                open_to_public=self.open_to_public if self.open_to_public is not None else False,
+                created_at=self.created_at or datetime.now(UTC),
+                destroyed_at=self.destroyed_at,
+                retries=self.retries,
+                lifecycle_stage=self.lifecycle_stage,
+                runtime_variant=current_revision.runtime_variant,
+                extra_mounts=current_revision.extra_mounts,
+                routings=routings,
+            )
+
         return EndpointData(
             id=self.id,
             name=self.name,
-            image=(
-                current_rev.image_row.to_dataclass()
-                if current_rev and current_rev.image_row
-                else None
-            ),
+            image=None,
             domain=self.domain,
             project=self.project,
-            resource_group=self.resource_group,
-            resource_slots=current_rev.resource_slots if current_rev else ResourceSlot({}),
+            resource_group="",
+            resource_slots=ResourceSlot({}),
             url=self.url or "",
-            model=current_rev.model or uuid.UUID(int=0) if current_rev else uuid.UUID(int=0),
-            model_definition_path=current_rev.model_definition_path if current_rev else None,
-            model_mount_destination=(current_rev.model_mount_destination if current_rev else None),
+            model=uuid.UUID(int=0),
+            model_definition_path=None,
+            model_mount_destination="/models",
             created_user_id=self.created_user,
             created_user_email=(
                 self.created_user_row.email if self.created_user_row is not None else None
@@ -648,28 +700,22 @@ class EndpointRow(Base):  # type: ignore[misc]
             session_owner_id=self.session_owner,
             session_owner_email=self.session_owner_row.email if self.session_owner_row else "",
             tag=self.tag,
-            startup_command=current_rev.startup_command if current_rev else None,
-            bootstrap_script=current_rev.bootstrap_script if current_rev else None,
-            callback_url=(
-                yarl.URL(current_rev.callback_url)
-                if current_rev and current_rev.callback_url
-                else None
-            ),
-            environ=current_rev.environ if current_rev else None,
-            resource_opts=current_rev.resource_opts if current_rev else None,
+            startup_command=None,
+            bootstrap_script=None,
+            callback_url=None,
+            environ=None,
+            resource_opts=None,
             replicas=self.replicas,
-            cluster_mode=(
-                ClusterMode(current_rev.cluster_mode) if current_rev else ClusterMode.SINGLE_NODE
-            ),
-            cluster_size=current_rev.cluster_size if current_rev else 1,
+            cluster_mode=ClusterMode.SINGLE_NODE,
+            cluster_size=1,
             open_to_public=self.open_to_public if self.open_to_public is not None else False,
             created_at=self.created_at or datetime.now(UTC),
             destroyed_at=self.destroyed_at,
             retries=self.retries,
             lifecycle_stage=self.lifecycle_stage,
-            runtime_variant=(current_rev.runtime_variant if current_rev else RuntimeVariant.CUSTOM),
-            extra_mounts=current_rev.extra_mounts if current_rev else [],
-            routings=[routing.to_data() for routing in self.routings] if self.routings else None,
+            runtime_variant=RuntimeVariant.CUSTOM,
+            extra_mounts=[],
+            routings=routings,
         )
 
     @classmethod
@@ -719,13 +765,14 @@ class EndpointRow(Base):  # type: ignore[misc]
         model_revisions: list[ModelRevisionSpec],
     ) -> DeploymentInfo:
         """Build DeploymentInfo with pre-built model_revisions dict."""
+        current_revision = self.current_revision_row
         return DeploymentInfo(
             id=self.id,
             metadata=DeploymentMetadata(
                 name=self.name,
                 domain=self.domain,
                 project=self.project,
-                resource_group=self.resource_group,
+                resource_group=current_revision.resource_group if current_revision else None,
                 created_user=self.created_user,
                 session_owner=self.session_owner,
                 created_at=self.created_at,

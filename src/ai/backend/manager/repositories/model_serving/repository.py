@@ -123,7 +123,7 @@ class ModelServingRepository:
                 endpoint_id,
                 load_routes=True,
                 load_session_owner=True,
-                load_revisions=True,
+                load_current_revision=True,
             )
             if not endpoint:
                 return None
@@ -239,7 +239,7 @@ class ModelServingRepository:
                 endpoint.id,
                 load_created_user=True,
                 load_session_owner=True,
-                load_revisions=True,
+                load_current_revision=True,
                 load_routes=True,
             )
             endpoint_before_assign_url = endpoint_row.to_data()
@@ -433,8 +433,8 @@ class ModelServingRepository:
         session: SASession,
         endpoint_id: uuid.UUID,
         load_routes: bool = False,
+        load_current_revision: bool = False,
         load_session_owner: bool = False,
-        load_revisions: bool = False,
     ) -> EndpointRow | None:
         """
         Private method to get endpoint by ID using an existing session.
@@ -444,8 +444,8 @@ class ModelServingRepository:
                 session,
                 endpoint_id,
                 load_routes=load_routes,
+                load_current_revision=load_current_revision,
                 load_session_owner=load_session_owner,
-                load_revisions=load_revisions,
             )
         except NoResultFound:
             return None
@@ -760,7 +760,7 @@ class ModelServingRepository:
                         db_session,
                         action.endpoint_id,
                         load_session_owner=True,
-                        load_revisions=True,
+                        load_current_revision=True,
                         load_routes=True,
                     )
                     user_data = current_user()
@@ -788,8 +788,25 @@ class ModelServingRepository:
 
                 spec = cast(EndpointUpdaterSpec, action.updater.spec)
 
-                # Apply endpoint-level changes (replicas, resource_group, etc.)
+                # Apply endpoint-level changes (replicas, desired_session_count)
                 spec.apply_to_row(endpoint_row)
+
+                current_rev = endpoint_row.current_revision_row
+                if current_rev is None:
+                    raise InvalidAPIParameters("Endpoint has no current revision")
+
+                # Apply revision-level changes to current revision
+                spec.apply_to_revision_row(current_rev)
+
+                image_ref = spec.image.optional_value()
+                if image_ref is not None:
+                    image_name = image_ref.name
+                    arch = image_ref.architecture.value()
+                    # This needs to happen within the transaction
+                    image_row = await ImageRow.resolve(
+                        db_session, [ImageIdentifier(image_name, arch), ImageAlias(image_name)]
+                    )
+                    current_rev.image = image_row.id
 
                 session_owner = endpoint_row.session_owner_row
                 if session_owner is None:
@@ -805,7 +822,7 @@ class ModelServingRepository:
 
                 await ModelServiceHelper.check_scaling_group(
                     conn,
-                    endpoint_row.resource_group,
+                    current_rev.resource_group,
                     AccessKey(session_owner.main_access_key),
                     endpoint_row.domain,
                     endpoint_row.project,
@@ -813,10 +830,6 @@ class ModelServingRepository:
 
                 # If revision-level fields changed, create a new revision
                 if spec.has_revision_changes():
-                    current_rev = endpoint_row._find_current_revision()
-                    if current_rev is None:
-                        raise InvalidAPIParameters("Endpoint has no current revision")
-
                     # Resolve image if changed
                     image_id = current_rev.image
                     image_ref = spec.image.optional_value()
@@ -841,7 +854,7 @@ class ModelServingRepository:
                             if spec.model_definition_path.optional_value() is not None
                             else current_rev.model_definition_path
                         ),
-                        resource_group=endpoint_row.resource_group,
+                        resource_group=current_rev.resource_group,
                         resource_slots=(
                             spec.resource_slots.optional_value() or current_rev.resource_slots
                         ),
@@ -892,7 +905,7 @@ class ModelServingRepository:
                 endpoint_row = await EndpointRow.get(
                     db_session,
                     endpoint_row.id,
-                    load_revisions=True,
+                    load_current_revision=True,
                     load_created_user=True,
                     load_session_owner=True,
                 )

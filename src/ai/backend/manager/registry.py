@@ -2513,13 +2513,15 @@ class AgentRegistry:
         query = (
             sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
             .select_from(scaling_groups)
-            .where(scaling_groups.c.name == endpoint.resource_group)
+            .where(scaling_groups.c.name == endpoint.current_revision_row.resource_group)
         )
 
         result = await db_sess.execute(query)
         sgroup = result.first()
         if sgroup is None:
-            raise InvalidAPIParameters(f"Scaling group not found: {endpoint.resource_group}")
+            raise InvalidAPIParameters(
+                f"Scaling group not found: {endpoint.current_revision_row.resource_group}"
+            )
         wsproxy_addr = sgroup.wsproxy_addr
         wsproxy_api_token = sgroup.wsproxy_api_token
 
@@ -2533,11 +2535,10 @@ class AgentRegistry:
                 endpoint_id,
                 load_created_user=True,
                 load_session_owner=True,
-                load_revisions=True,
                 load_routes=True,
             )
             connection_info = await endpoint.generate_route_info(db_sess)
-            current_rev = endpoint._find_current_revision()
+            current_rev = endpoint.current_revision_row
             if current_rev is None or current_rev.model is None:
                 raise InvalidAPIParameters("Model not set for endpoint")
             model = await VFolderRow.get(db_sess, current_rev.model)

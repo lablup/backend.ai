@@ -360,6 +360,7 @@ class DeploymentAdapter(BaseAdapter):
         )
         model_revision_creator = ModelRevisionCreator(
             image_id=initial_revision.image.id,
+            resource_group=initial_revision.resource_config.resource_group.name,
             resource_spec=ResourceSpec(
                 cluster_mode=initial_revision.cluster_config.mode,
                 cluster_size=initial_revision.cluster_config.size,
@@ -377,16 +378,17 @@ class DeploymentAdapter(BaseAdapter):
             model_definition=initial_revision.model_definition,
             revision_preset_id=initial_revision.revision_preset_id,
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant(
-                    initial_revision.model_runtime_config.runtime_variant
+                    runtime_variant=RuntimeVariant(
+                        initial_revision.model_runtime_config.runtime_variant
+                    ),
+                    environ={
+                        e.name: e.value
+                        for e in initial_revision.model_runtime_config.environ.entries
+                    }
+                    if initial_revision.model_runtime_config.environ
+                    else None,
                 ),
-                environ={
-                    e.name: e.value for e in initial_revision.model_runtime_config.environ.entries
-                }
-                if initial_revision.model_runtime_config.environ
-                else None,
-            ),
-        )
+            )
         strategy = input.default_deployment_strategy
         policy: DeploymentPolicyConfig | None = None
         if strategy.rolling_update is not None:
@@ -416,7 +418,6 @@ class DeploymentAdapter(BaseAdapter):
                 name=meta.name or f"deployment-{created_user_id.hex[:8]}",
                 domain=meta.domain_name,
                 project=meta.project_id,
-                resource_group=initial_revision.resource_config.resource_group.name,
                 created_user=created_user_id,
                 session_owner=created_user_id,
                 created_at=None,
@@ -793,6 +794,7 @@ class DeploymentAdapter(BaseAdapter):
         )
         adder = ModelRevisionCreator(
             image_id=input.image.id,
+            resource_group=input.resource_config.resource_group.name,
             resource_spec=ResourceSpec(
                 cluster_mode=input.cluster_config.mode,
                 cluster_size=input.cluster_config.size,

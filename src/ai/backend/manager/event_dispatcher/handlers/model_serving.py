@@ -18,6 +18,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
@@ -88,12 +89,11 @@ class ModelServingEventHandler:
             async with self._db.begin_readonly_session() as db_sess:
                 log.debug("Route ID: {}", event.route_id)
                 route = await RoutingRow.get(db_sess, event.route_id)
-                endpoint = await EndpointRow.get(db_sess, route.endpoint, load_revisions=True)
-
-                # Get the current revision for revision-level fields
-                current_rev = endpoint._find_current_revision()
-                if current_rev is None:
-                    raise ValueError(f"No current revision for endpoint {endpoint.id}")
+                endpoint = await EndpointRow.get(
+                    db_sess,
+                    route.endpoint,
+                    load_current_revision=True,
+                )
 
                 query = sa.select(
                     sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)
@@ -123,25 +123,27 @@ class ModelServingEventHandler:
                     query_on_behalf_of=session_owner.access_key,
                 )
 
-                if current_rev.image_row is None:
-                    raise ValueError(f"Image not found for endpoint {endpoint.id}")
+                current_revision = endpoint.current_revision_row
+                if current_revision is None:
+                    raise ObjectNotFound(object_name=f"current revision for endpoint {endpoint.id}")
+                if current_revision.image_row is None:
+                    raise ObjectNotFound(object_name=f"image for endpoint {endpoint.id}")
+                if current_revision.model is None:
+                    raise ObjectNotFound(object_name=f"model for endpoint {endpoint.id}")
                 image_row = await ImageRow.resolve(
                     db_sess,
                     [
                         ImageIdentifier(
-                            current_rev.image_row.name, current_rev.image_row.architecture
+                            current_revision.image_row.name, current_revision.image_row.architecture
                         ),
-                        ImageAlias(current_rev.image_row.name),
+                        ImageAlias(current_revision.image_row.name),
                     ],
                 )
 
-                environ = {**(current_rev.environ or {})}
+                model_vfolder_row = await VFolderRow.get(db_sess, current_revision.model)
+                environ = {**(current_revision.environ or {})}
                 if "BACKEND_MODEL_NAME" not in environ:
-                    # Look up the model VFolder name for BACKEND_MODEL_NAME
-                    if current_rev.model is not None:
-                        model_row = await VFolderRow.get(db_sess, current_rev.model)
-                        if model_row is not None:
-                            environ["BACKEND_MODEL_NAME"] = model_row.name
+                    environ["BACKEND_MODEL_NAME"] = model_vfolder_row.name
 
                 await self._registry.create_session(
                     f"{endpoint.name}-{event.route_id!s}",
@@ -157,37 +159,35 @@ class ModelServingEventHandler:
                     SessionTypes.INFERENCE,
                     {
                         "mounts": [
-                            current_rev.model,
-                            *[m.vfid.folder_id for m in current_rev.extra_mounts],
+                            current_revision.model,
+                            *[m.vfid.folder_id for m in current_revision.extra_mounts],
                         ],
                         "mount_map": {
-                            current_rev.model: current_rev.model_mount_destination,
+                            current_revision.model: current_revision.model_mount_destination,
                             **{
                                 m.vfid.folder_id: m.kernel_path.as_posix()
-                                for m in current_rev.extra_mounts
+                                for m in current_revision.extra_mounts
                             },
                         },
                         "mount_options": {
                             m.vfid.folder_id: {"permission": m.mount_perm}
-                            for m in current_rev.extra_mounts
+                            for m in current_revision.extra_mounts
                         },
-                        "model_definition_path": current_rev.model_definition_path,
-                        "runtime_variant": current_rev.runtime_variant.value,
+                        "model_definition_path": current_revision.model_definition_path,
+                        "runtime_variant": current_revision.runtime_variant.value,
                         "environ": environ,
-                        "scaling_group": endpoint.resource_group,
-                        "resources": current_rev.resource_slots,
-                        "resource_opts": current_rev.resource_opts,
+                        "scaling_group": current_revision.resource_group,
+                        "resources": current_revision.resource_slots,
+                        "resource_opts": current_revision.resource_opts,
                         "preopen_ports": None,
                         "agent_list": None,
                     },
-                    ClusterMode(current_rev.cluster_mode),
-                    current_rev.cluster_size,
-                    bootstrap_script=current_rev.bootstrap_script,
-                    startup_command=current_rev.startup_command,
+                    ClusterMode(current_revision.cluster_mode),
+                    current_revision.cluster_size,
+                    bootstrap_script=current_revision.bootstrap_script,
+                    startup_command=current_revision.startup_command,
                     tag=endpoint.tag,
-                    callback_url=(
-                        yarl.URL(current_rev.callback_url) if current_rev.callback_url else None
-                    ),
+                    callback_url=current_revision.callback_url,
                     enqueue_only=True,
                     route_id=route.id,
                     sudo_session_enabled=session_owner.sudo_session_enabled,

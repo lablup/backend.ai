@@ -373,6 +373,7 @@ class ImageRow(Base):  # type: ignore[misc]
 
     aliases = relationship("ImageAliasRow", back_populates="image")
     # sessions = relationship("SessionRow", back_populates="image_row")
+
     registry_row = relationship(
         "ContainerRegistryRow",
         back_populates="image_rows",

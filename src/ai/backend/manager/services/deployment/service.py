@@ -43,6 +43,7 @@ from ai.backend.manager.data.deployment.types import (
     merge_revision_drafts,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
@@ -336,6 +337,7 @@ class DeploymentService:
             mounts = revision.mounts
             revision_fields = ModelRevisionFields(
                 image_id=revision.image_id,
+                resource_group=revision.resource_group,
                 resource=DeploymentResourceFields(
                     cluster_mode=revision.resource_spec.cluster_mode,
                     cluster_size=revision.resource_spec.cluster_size,
@@ -356,6 +358,7 @@ class DeploymentService:
                     callback_url=revision.execution.callback_url,
                 ),
             )
+
 
         creator_spec = DeploymentCreatorSpec(
             metadata=DeploymentMetadataFields(
@@ -681,6 +684,7 @@ class DeploymentService:
 
         return ModelRevisionCreator(
             image_id=revision_creator.image_id,
+            resource_group=revision_creator.resource_group,
             resource_spec=revision_creator.resource_spec.model_copy(
                 update={"resource_slots": merged_resource_slots},
             ),
@@ -734,6 +738,8 @@ class DeploymentService:
         merged_creator = await self._merge_deployment_config(preset_applied)
         resolved_model_definition = await self._resolve_model_definition(merged_creator)
 
+        if endpoint_info.metadata.resource_group is None:
+            raise InvalidAPIParameters("resource_group must be set when adding a revision")
         spec = DeploymentRevisionCreatorSpec(
             endpoint_id=deployment_id,
             image_id=merged_creator.image_id,

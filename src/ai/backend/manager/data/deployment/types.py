@@ -271,11 +271,11 @@ class DeploymentMetadata:
     name: str
     domain: str
     project: UUID
-    resource_group: str
     created_user: UUID
     session_owner: UUID
     created_at: datetime | None
     revision_history_limit: int
+    resource_group: str | None = None
     tag: str | None = None
 
 

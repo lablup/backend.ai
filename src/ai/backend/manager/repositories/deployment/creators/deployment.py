@@ -34,7 +34,6 @@ class DeploymentMetadataFields:
     name: str
     domain: str
     project_id: uuid.UUID
-    resource_group: str
     created_user_id: uuid.UUID
     session_owner_id: uuid.UUID
     revision_history_limit: int = 10
@@ -113,6 +112,7 @@ class ModelRevisionFields:
     """
 
     image_id: uuid.UUID
+    resource_group: str
     resource: DeploymentResourceFields
     mounts: DeploymentMountFields
     execution: DeploymentExecutionFields
@@ -138,7 +138,6 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
             name=self.metadata.name,
             domain=self.metadata.domain,
             project=self.metadata.project_id,
-            resource_group=self.metadata.resource_group,
             created_user=self.metadata.created_user_id,
             session_owner=self.metadata.session_owner_id,
             revision_history_limit=self.metadata.revision_history_limit,

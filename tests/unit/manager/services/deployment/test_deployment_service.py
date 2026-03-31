@@ -373,6 +373,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     ) -> ModelRevisionCreator:
         return ModelRevisionCreator(
             image_id=image_id,
+            resource_group="default",
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -426,6 +427,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
         """Creator with None environ and resource_opts for edge case testing."""
         return ModelRevisionCreator(
             image_id=image_id,
+            resource_group="default",
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -538,6 +540,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
     ) -> ModelRevisionCreator:
         return ModelRevisionCreator(
             image_id=image_id,
+            resource_group="default",
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,

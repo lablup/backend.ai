@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint import EndpointRow
     from ai.backend.manager.models.image import ImageRow
     from ai.backend.manager.models.routing import RoutingRow
+    from ai.backend.manager.models.vfolder import VFolderRow
 
 __all__ = ("DeploymentRevisionRow",)
 
@@ -60,6 +61,12 @@ def _get_image_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.image import ImageRow
 
     return foreign(DeploymentRevisionRow.image) == ImageRow.id
+
+
+def _get_model_join_condition() -> sa.sql.elements.ColumnElement[Any]:
+    from ai.backend.manager.models.vfolder import VFolderRow
+
+    return foreign(DeploymentRevisionRow.model) == VFolderRow.id
 
 
 def _get_routings_join_condition() -> sa.sql.elements.ColumnElement[Any]:
@@ -180,6 +187,12 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     image_row: Mapped[ImageRow] = relationship(
         "ImageRow",
         primaryjoin=_get_image_join_condition,
+    )
+    model_row: Mapped[VFolderRow | None] = relationship(
+        "VFolderRow",
+        primaryjoin=_get_model_join_condition,
+        foreign_keys="DeploymentRevisionRow.model",
+        viewonly=True,
     )
     routings: Mapped[list[RoutingRow]] = relationship(
         "RoutingRow",

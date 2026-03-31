@@ -408,9 +408,11 @@ class RouteExecutor:
                 endpoints = await self._deployment_repo.get_endpoints_by_ids(endpoint_ids)
 
             with RouteRecorderContext.shared_step("load_cleanup_policy"):
-                scaling_group_names = list({
-                    endpoint.metadata.resource_group for endpoint in endpoints
-                })
+                scaling_group_names = [
+                    endpoint.metadata.resource_group
+                    for endpoint in endpoints
+                    if endpoint.metadata.resource_group is not None
+                ]
                 cleanup_configs = await self._deployment_repo.get_scaling_group_cleanup_configs(
                     scaling_group_names
                 )
@@ -418,6 +420,8 @@ class RouteExecutor:
         # Create mapping of endpoint_id -> cleanup config (no phase - transformation only)
         endpoint_cleanup_config: dict[UUID, set[RouteHealthStatus]] = {}
         for endpoint in endpoints:
+            if endpoint.metadata.resource_group is None:
+                continue
             config = cleanup_configs.get(endpoint.metadata.resource_group, None)
             if config:
                 endpoint_cleanup_config[endpoint.id] = set(config.cleanup_target_statuses)

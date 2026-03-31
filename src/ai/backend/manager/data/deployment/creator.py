@@ -37,6 +37,7 @@ class ModelRevisionCreator:
     """
 
     image_id: UUID
+    resource_group: str
     resource_spec: ResourceSpec
     mounts: VFolderMountsCreator
     execution: ExecutionSpec
