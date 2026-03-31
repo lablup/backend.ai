@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from .domains_v2.resource_slot import V2ResourceSlotClient
     from .domains_v2.resource_usage import V2ResourceUsageClient
     from .domains_v2.runtime_variant import V2RuntimeVariantClient
+    from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
     from .domains_v2.scheduling_history import V2SchedulingHistoryClient
     from .domains_v2.service_catalog import V2ServiceCatalogClient
     from .domains_v2.session import V2SessionClient
@@ -242,6 +243,12 @@ class V2ClientRegistry:
         from .domains_v2.runtime_variant import V2RuntimeVariantClient
 
         return V2RuntimeVariantClient(self._client)
+
+    @cached_property
+    def runtime_variant_preset(self) -> V2RuntimeVariantPresetClient:
+        from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
+
+        return V2RuntimeVariantPresetClient(self._client)
 
     @cached_property
     def resource_usage(self) -> V2ResourceUsageClient:

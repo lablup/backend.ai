@@ -91,6 +91,10 @@ from ai.backend.manager.services.resource_usage.processors import ResourceUsageP
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
+from ai.backend.manager.services.runtime_variant_preset.processors import (
+    RuntimeVariantPresetProcessors,
+)
+from ai.backend.manager.services.runtime_variant_preset.service import RuntimeVariantPresetService
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
@@ -254,6 +258,9 @@ def create_services(args: ServiceArgs) -> Services:
         resource_slot=ResourceSlotService(repositories.resource_slot.repository),
         runtime_variant=RuntimeVariantService(
             repositories.runtime_variant.repository,
+        ),
+        runtime_variant_preset=RuntimeVariantPresetService(
+            repositories.runtime_variant_preset.repository,
         ),
         resource_usage=ResourceUsageService(
             repository=repositories.resource_usage_history.repository,
@@ -427,6 +434,9 @@ def create_processors(
         resource_slot=ResourceSlotProcessors(services.resource_slot, action_monitors, validators),
         runtime_variant=RuntimeVariantProcessors(
             services.runtime_variant, action_monitors, validators
+        ),
+        runtime_variant_preset=RuntimeVariantPresetProcessors(
+            services.runtime_variant_preset, action_monitors, validators
         ),
         resource_usage=ResourceUsageProcessors(
             services.resource_usage, action_monitors, validators

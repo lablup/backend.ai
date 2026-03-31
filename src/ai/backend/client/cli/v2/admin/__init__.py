@@ -141,3 +141,12 @@ def resource_preset() -> None:
 )
 def runtime_variant() -> None:
     """Admin runtime variant commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.runtime_variant_preset:runtime_variant_preset",
+    name="runtime-variant-preset",
+)
+def runtime_variant_preset() -> None:
+    """Admin runtime variant preset commands."""

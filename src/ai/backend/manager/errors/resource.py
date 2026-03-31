@@ -218,6 +218,29 @@ class RuntimeVariantConflict(BackendAIError, web.HTTPConflict):
         )
 
 
+class RuntimeVariantPresetNotFound(ObjectNotFound):
+    object_name = "runtime variant preset"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RUNTIME_VARIANT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class RuntimeVariantPresetConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-runtime-variant-preset"
+    error_title = "Duplicate Runtime Variant Preset"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RUNTIME_VARIANT,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class AgentNotFound(ObjectNotFound):
     object_name = "agent"
 

@@ -319,6 +319,13 @@ from .runtime_variant import (
     runtime_variant,
     runtime_variants,
 )
+from .runtime_variant_preset import (
+    admin_create_runtime_variant_preset,
+    admin_delete_runtime_variant_preset,
+    admin_update_runtime_variant_preset,
+    runtime_variant_preset,
+    runtime_variant_presets,
+)
 from .scheduler import (
     scheduling_events_by_session,
 )
@@ -534,6 +541,9 @@ class Query:
     # Runtime Variant APIs
     runtime_variants = runtime_variants
     runtime_variant = runtime_variant
+    # Runtime Variant Preset APIs
+    runtime_variant_presets = runtime_variant_presets
+    runtime_variant_preset = runtime_variant_preset
     # Resource Allocation V2 APIs
     my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
     project_resource_allocation_v2 = project_resource_allocation_v2
@@ -721,6 +731,10 @@ class Mutation:
     admin_create_runtime_variant = admin_create_runtime_variant
     admin_update_runtime_variant = admin_update_runtime_variant
     admin_delete_runtime_variant = admin_delete_runtime_variant
+    # Runtime Variant Preset mutations
+    admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
+    admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
+    admin_delete_runtime_variant_preset = admin_delete_runtime_variant_preset
     # Session V2 mutations
     terminate_project_sessions_v2 = terminate_project_sessions_v2
 

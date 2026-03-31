@@ -80,6 +80,8 @@ def build_v2_routes(
     from .resource_usage.registry import register_v2_resource_usage_routes
     from .runtime_variant.handler import V2RuntimeVariantHandler
     from .runtime_variant.registry import register_v2_runtime_variant_routes
+    from .runtime_variant_preset.handler import V2RuntimeVariantPresetHandler
+    from .runtime_variant_preset.registry import register_v2_runtime_variant_preset_routes
     from .scheduling_history.handler import V2SchedulingHistoryHandler
     from .scheduling_history.registry import register_v2_scheduling_history_routes
     from .service_catalog.handler import V2ServiceCatalogHandler
@@ -126,6 +128,9 @@ def build_v2_routes(
     resource_preset_handler = V2ResourcePresetHandler(adapter=adapters.resource_preset)
     resource_slot_handler = V2ResourceSlotHandler(adapter=adapters.resource_slot)
     runtime_variant_handler = V2RuntimeVariantHandler(adapter=adapters.runtime_variant)
+    runtime_variant_preset_handler = V2RuntimeVariantPresetHandler(
+        adapter=adapters.runtime_variant_preset
+    )
     resource_usage_handler = V2ResourceUsageHandler(adapter=adapters.resource_usage)
     scheduling_history_handler = V2SchedulingHistoryHandler(adapter=adapters.scheduling_history)
     service_catalog_handler = V2ServiceCatalogHandler(adapter=adapters.service_catalog)
@@ -177,6 +182,9 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_resource_preset_routes(resource_preset_handler, route_deps))
     v2_reg.add_subregistry(register_v2_resource_slot_routes(resource_slot_handler, route_deps))
     v2_reg.add_subregistry(register_v2_runtime_variant_routes(runtime_variant_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_runtime_variant_preset_routes(runtime_variant_preset_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_resource_usage_routes(resource_usage_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_scheduling_history_routes(scheduling_history_handler, route_deps)

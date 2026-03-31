@@ -30,6 +30,7 @@ from ai.backend.manager.api.adapters.resource_preset import ResourcePresetAdapte
 from ai.backend.manager.api.adapters.resource_slot import ResourceSlotAdapter
 from ai.backend.manager.api.adapters.resource_usage import ResourceUsageAdapter
 from ai.backend.manager.api.adapters.runtime_variant import RuntimeVariantAdapter
+from ai.backend.manager.api.adapters.runtime_variant_preset import RuntimeVariantPresetAdapter
 from ai.backend.manager.api.adapters.scheduling_history import SchedulingHistoryAdapter
 from ai.backend.manager.api.adapters.service_catalog import ServiceCatalogAdapter
 from ai.backend.manager.api.adapters.session import SessionAdapter
@@ -79,6 +80,7 @@ class Adapters:
         resource_preset: ResourcePresetAdapter,
         resource_slot: ResourceSlotAdapter,
         runtime_variant: RuntimeVariantAdapter,
+        runtime_variant_preset: RuntimeVariantPresetAdapter,
         resource_usage: ResourceUsageAdapter,
         scheduling_history: SchedulingHistoryAdapter,
         service_catalog: ServiceCatalogAdapter,
@@ -113,6 +115,7 @@ class Adapters:
         self.resource_preset = resource_preset
         self.resource_slot = resource_slot
         self.runtime_variant = runtime_variant
+        self.runtime_variant_preset = runtime_variant_preset
         self.resource_usage = resource_usage
         self.scheduling_history = scheduling_history
         self.service_catalog = service_catalog
@@ -156,6 +159,7 @@ class Adapters:
             resource_preset=ResourcePresetAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
             runtime_variant=RuntimeVariantAdapter(processors),
+            runtime_variant_preset=RuntimeVariantPresetAdapter(processors),
             resource_usage=ResourceUsageAdapter(processors),
             scheduling_history=SchedulingHistoryAdapter(processors),
             service_catalog=ServiceCatalogAdapter(processors),
