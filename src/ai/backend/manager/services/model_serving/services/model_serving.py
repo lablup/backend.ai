@@ -125,10 +125,6 @@ from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
     ModifyEndpointAction,
     ModifyEndpointActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.search_in_project import (
-    SearchServicesInProjectAction,
-    SearchServicesInProjectActionResult,
-)
 from ai.backend.manager.services.model_serving.actions.search_services import (
     SearchServicesAction,
     SearchServicesActionResult,
@@ -438,18 +434,6 @@ class ModelServingService:
             total_count=result.total_count,
             offset=action.offset,
             limit=action.limit,
-        )
-
-    async def search_services_in_project(
-        self, action: SearchServicesInProjectAction
-    ) -> SearchServicesInProjectActionResult:
-        """Search model serving services scoped to a project."""
-        result = await self._repository.search_in_project(action.querier, action.scope)
-        return SearchServicesInProjectActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
         )
 
     async def check_user_access(self) -> None:

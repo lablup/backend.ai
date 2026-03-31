@@ -1,18 +1,20 @@
-"""Tests for search_in_project functionality in ModelServingRepository."""
+"""Tests for search_endpoints_in_project functionality in DeploymentRepository."""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from unittest.mock import AsyncMock
 
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import ClusterMode, EndpointId, ResourceSlot, RuntimeVariant
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.deployment.types import DeploymentInfoSearchResult
 from ai.backend.manager.data.image.types import ImageType
-from ai.backend.manager.data.model_serving.types import EndpointLifecycle, ServiceSearchResult
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
@@ -41,8 +43,8 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
-from ai.backend.manager.repositories.model_serving.types import ProjectEndpointSearchScope
+from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.types import ProjectEndpointSearchScope
 from ai.backend.testutils.db import with_tables
 
 
@@ -55,7 +57,7 @@ class TestData:
 
 
 class TestEndpointSearchInProject:
-    """Test cases for search_in_project in ModelServingRepository."""
+    """Test cases for search_endpoints_in_project in DeploymentRepository."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -274,15 +276,25 @@ class TestEndpointSearchInProject:
         )
 
     @pytest.fixture
-    async def model_serving_repository(
+    async def deployment_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> ModelServingRepository:
-        return ModelServingRepository(db=db_with_cleanup)
+    ) -> DeploymentRepository:
+        mock_storage_manager = AsyncMock()
+        mock_valkey_stat = AsyncMock()
+        mock_valkey_live = AsyncMock()
+        mock_valkey_schedule = AsyncMock()
+        return DeploymentRepository(
+            db=db_with_cleanup,
+            storage_manager=mock_storage_manager,
+            valkey_stat=mock_valkey_stat,
+            valkey_live=mock_valkey_live,
+            valkey_schedule=mock_valkey_schedule,
+        )
 
     async def test_returns_only_endpoints_in_target_project(
         self,
-        model_serving_repository: ModelServingRepository,
+        deployment_repository: DeploymentRepository,
         test_data: TestData,
     ) -> None:
         querier = BatchQuerier(
@@ -292,9 +304,9 @@ class TestEndpointSearchInProject:
         )
         scope = ProjectEndpointSearchScope(project_id=test_data.project_a_id)
 
-        result = await model_serving_repository.search_in_project(querier, scope)
+        result = await deployment_repository.search_endpoints_in_project(querier, scope)
 
-        assert isinstance(result, ServiceSearchResult)
+        assert isinstance(result, DeploymentInfoSearchResult)
         assert result.total_count == 2
         assert len(result.items) == 2
         returned_ids = {item.id for item in result.items}
@@ -302,7 +314,7 @@ class TestEndpointSearchInProject:
 
     async def test_does_not_return_endpoints_from_other_project(
         self,
-        model_serving_repository: ModelServingRepository,
+        deployment_repository: DeploymentRepository,
         test_data: TestData,
     ) -> None:
         querier = BatchQuerier(
@@ -312,7 +324,7 @@ class TestEndpointSearchInProject:
         )
         scope = ProjectEndpointSearchScope(project_id=test_data.project_b_id)
 
-        result = await model_serving_repository.search_in_project(querier, scope)
+        result = await deployment_repository.search_endpoints_in_project(querier, scope)
 
         assert result.total_count == 1
         assert len(result.items) == 1
@@ -321,7 +333,7 @@ class TestEndpointSearchInProject:
 
     async def test_pagination_fields(
         self,
-        model_serving_repository: ModelServingRepository,
+        deployment_repository: DeploymentRepository,
         test_data: TestData,
     ) -> None:
         querier = BatchQuerier(
@@ -331,7 +343,7 @@ class TestEndpointSearchInProject:
         )
         scope = ProjectEndpointSearchScope(project_id=test_data.project_a_id)
 
-        result = await model_serving_repository.search_in_project(querier, scope)
+        result = await deployment_repository.search_endpoints_in_project(querier, scope)
 
         assert result.has_next_page is False
         assert result.has_previous_page is False

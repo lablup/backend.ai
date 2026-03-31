@@ -124,6 +124,7 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creator,
     execute_rbac_entity_creators,
 )
+from ai.backend.manager.repositories.base.types import SearchScope
 from ai.backend.manager.repositories.base.updater import (
     BatchUpdater,
     Updater,
@@ -1213,6 +1214,43 @@ class DeploymentDBSource:
                 db_sess,
                 query,
                 querier,
+            )
+
+            items = [row.EndpointRow.to_deployment_info() for row in result.rows]
+
+            return DeploymentInfoSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_endpoints_in_project(
+        self,
+        querier: BatchQuerier,
+        scope: SearchScope,
+    ) -> DeploymentInfoSearchResult:
+        """Search endpoints within a project scope with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination
+            scope: SearchScope providing project-level filtering condition
+
+        Returns:
+            DeploymentInfoSearchResult with items, total_count, and pagination info
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointRow).options(
+                selectinload(EndpointRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+                selectinload(EndpointRow.deployment_policy),
+            )
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+                scope=scope,
             )
 
             items = [row.EndpointRow.to_deployment_info() for row in result.rows]

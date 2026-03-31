@@ -1,11 +1,10 @@
-from typing import cast, override
+from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
@@ -51,10 +50,6 @@ from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
     ModifyEndpointAction,
     ModifyEndpointActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.search_in_project import (
-    SearchServicesInProjectAction,
-    SearchServicesInProjectActionResult,
-)
 from ai.backend.manager.services.model_serving.actions.search_services import (
     SearchServicesAction,
     SearchServicesActionResult,
@@ -79,9 +74,6 @@ class ModelServingProcessors(AbstractProcessorPackage):
     ]
     list_model_service: ActionProcessor[ListModelServiceAction, ListModelServiceActionResult]
     search_services: ActionProcessor[SearchServicesAction, SearchServicesActionResult]
-    search_services_in_project: ActionProcessor[
-        SearchServicesInProjectAction, SearchServicesInProjectActionResult
-    ]
 
     # Single entity actions (with RBAC)
     get_model_service_info: SingleEntityActionProcessor[
@@ -116,11 +108,6 @@ class ModelServingProcessors(AbstractProcessorPackage):
         )
         self.list_model_service = ActionProcessor(service.list_serve, action_monitors)
         self.search_services = ActionProcessor(service.search_services, action_monitors)
-        self.search_services_in_project = ActionProcessor(
-            service.search_services_in_project,
-            action_monitors,
-            validators=[cast(ActionValidator, validators.rbac.scope)],
-        )
 
         # Single entity actions with RBAC validator
         self.get_model_service_info = SingleEntityActionProcessor(
@@ -167,6 +154,5 @@ class ModelServingProcessors(AbstractProcessorPackage):
             GenerateTokenAction.spec(),
             ModifyEndpointAction.spec(),
             SearchServicesAction.spec(),
-            SearchServicesInProjectAction.spec(),
             ValidateModelServiceAction.spec(),
         ]

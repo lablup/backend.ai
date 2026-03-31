@@ -147,6 +147,10 @@ from ai.backend.manager.services.deployment.actions.search_deployments import (
     SearchDeploymentsAction,
     SearchDeploymentsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.search_deployments_in_project import (
+    SearchDeploymentsInProjectAction,
+    SearchDeploymentsInProjectActionResult,
+)
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
     SearchReplicasActionResult,
@@ -487,6 +491,21 @@ class DeploymentService:
         result = await self._deployment_repository.search_endpoints(action.querier)
         deployments = [_convert_deployment_info_to_data(info) for info in result.items]
         return SearchDeploymentsActionResult(
+            data=deployments,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_deployments_in_project(
+        self, action: SearchDeploymentsInProjectAction
+    ) -> SearchDeploymentsInProjectActionResult:
+        """Search deployments within a project scope."""
+        result = await self._deployment_repository.search_endpoints_in_project(
+            action.querier, action.scope
+        )
+        deployments = [_convert_deployment_info_to_data(info) for info in result.items]
+        return SearchDeploymentsInProjectActionResult(
             data=deployments,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
