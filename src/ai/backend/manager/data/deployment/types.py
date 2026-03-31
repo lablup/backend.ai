@@ -25,6 +25,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.manager.errors.deployment import (
     DeploymentRevisionNotFound,
     RuntimeVariantNotAllowed,
+    RuntimeVariantNotSpecified,
 )
 
 if TYPE_CHECKING:
@@ -131,32 +132,48 @@ class DeploymentConfig(BaseModel):
         ],
     )
 
+    @property
+    def _has_variant_constraint(self) -> bool:
+        """Whether the service definition restricts which variants are allowed."""
+        return bool(self.runtime_variants)
+
+    @property
+    def _has_single_variant(self) -> bool:
+        """Whether exactly one variant is specified, enabling auto-selection."""
+        return self.runtime_variants is not None and len(self.runtime_variants) == 1
+
+    @property
+    def _allowed_variant_values(self) -> list[str]:
+        """String values of allowed variants, for error messages."""
+        return [v.value for v in self.runtime_variants] if self.runtime_variants else []
+
+    def _is_variant_allowed(self, variant: RuntimeVariant) -> bool:
+        """Whether the given variant is permitted by the constraint list."""
+        if self.runtime_variants is None:
+            return True
+        return variant in self.runtime_variants
+
     def resolve_runtime_variant(self, requested: RuntimeVariant | Sentinel) -> RuntimeVariant:
         """Resolve the effective runtime variant.
 
         Priority: user request > runtime_variants list > CUSTOM default.
-
-        - User specified (RuntimeVariant): use it, validate against the list if present.
-        - User did not specify (Sentinel.TOKEN): fall back to runtime_variants list.
-          - Single variant in list: use it.
-          - Multiple variants: raise RuntimeVariantNotAllowed (user must choose).
-          - No list: fall back to CUSTOM.
         """
+        # User explicitly specified a variant — validate and use it.
         if isinstance(requested, RuntimeVariant):
-            if self.runtime_variants and requested not in self.runtime_variants:
+            if not self._is_variant_allowed(requested):
                 raise RuntimeVariantNotAllowed(
                     runtime_variant=str(requested),
-                    allowed_variants=[v.value for v in self.runtime_variants],
+                    allowed_variants=self._allowed_variant_values,
                 )
             return requested
         # User did not specify — fall back to runtime_variants list.
-        if not self.runtime_variants:
+        if self.runtime_variants is None or len(self.runtime_variants) == 0:
             return RuntimeVariant.CUSTOM
         if len(self.runtime_variants) == 1:
             return self.runtime_variants[0]
-        raise RuntimeVariantNotAllowed(
-            runtime_variant="(not specified)",
-            allowed_variants=[v.value for v in self.runtime_variants],
+        # Multiple variants available but user didn't choose.
+        raise RuntimeVariantNotSpecified(
+            allowed_variants=self._allowed_variant_values,
         )
 
 

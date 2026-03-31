@@ -167,6 +167,26 @@ class RuntimeVariantNotAllowed(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class RuntimeVariantNotSpecified(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/runtime-variant-not-specified"
+    error_title = "Runtime Variant Not Specified"
+
+    def __init__(self, allowed_variants: list[str]) -> None:
+        super().__init__(
+            extra_msg=(
+                "Multiple runtime variants are available. "
+                f"Please specify one of: {allowed_variants}"
+            ),
+        )
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class IncompleteRevisionData(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/incomplete-revision-data"
     error_title = "Revision data is missing required fields."

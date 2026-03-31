@@ -575,7 +575,7 @@ class DeploymentService:
                 **revision_creator.resource_spec.resource_slots,
             }
 
-        resolved_variant = service_def.resolve_runtime_variant(
+        resolved_variant = deployment_config.resolve_runtime_variant(
             revision_creator.execution.runtime_variant,
         )
         execution_updates: dict[str, Any] = {
