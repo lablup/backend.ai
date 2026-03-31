@@ -117,6 +117,7 @@ class EntityType(enum.StrEnum):
     PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     RESOURCE_PRESET = "resource_preset"
     ROLE = "role"
+    RUNTIME_VARIANT = "runtime_variant"
     ROUTING = "routing"
     DOTFILE = "dotfile"
     ETCD_CONFIG = "etcd_config"

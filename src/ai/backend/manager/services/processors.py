@@ -204,6 +204,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.resource_usage.service import (
         ResourceUsageService,  # pants: no-infer-dep
     )
+    from ai.backend.manager.services.runtime_variant.processors import (
+        RuntimeVariantProcessors,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.runtime_variant.service import (
+        RuntimeVariantService,  # pants: no-infer-dep
+    )
     from ai.backend.manager.services.scaling_group.processors import (
         ScalingGroupProcessors,  # pants: no-infer-dep
     )
@@ -345,6 +351,7 @@ class Services:
     prometheus_query_preset: PrometheusQueryPresetService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
+    runtime_variant: RuntimeVariantService
     resource_usage: ResourceUsageService
     scaling_group: ScalingGroupService
     utilization_metric: UtilizationMetricService
@@ -403,6 +410,7 @@ class Processors(AbstractProcessorPackage):
     prometheus_query_preset: PrometheusQueryPresetProcessors
     resource_preset: ResourcePresetProcessors
     resource_slot: ResourceSlotProcessors
+    runtime_variant: RuntimeVariantProcessors
     resource_usage: ResourceUsageProcessors
     scaling_group: ScalingGroupProcessors
     utilization_metric: UtilizationMetricProcessors
@@ -454,6 +462,7 @@ class Processors(AbstractProcessorPackage):
             *self.prometheus_query_preset.supported_actions(),
             *self.resource_preset.supported_actions(),
             *self.resource_slot.supported_actions(),
+            *self.runtime_variant.supported_actions(),
             *self.resource_usage.supported_actions(),
             *self.scaling_group.supported_actions(),
             *self.utilization_metric.supported_actions(),

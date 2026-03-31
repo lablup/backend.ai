@@ -132,3 +132,12 @@ def keypair() -> None:
 )
 def resource_preset() -> None:
     """Admin resource preset commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.runtime_variant:runtime_variant",
+    name="runtime-variant",
+)
+def runtime_variant() -> None:
+    """Admin runtime variant commands."""

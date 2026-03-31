@@ -195,6 +195,29 @@ class ResourcePresetNotFound(ObjectNotFound):
         )
 
 
+class RuntimeVariantNotFound(ObjectNotFound):
+    object_name = "runtime variant"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RUNTIME_VARIANT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class RuntimeVariantConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-runtime-variant"
+    error_title = "Duplicate Runtime Variant"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RUNTIME_VARIANT,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class AgentNotFound(ObjectNotFound):
     object_name = "agent"
 

@@ -312,6 +312,13 @@ from .resource_usage import (
     rg_user_usage_buckets,
     user_usage_buckets,
 )
+from .runtime_variant import (
+    admin_create_runtime_variant,
+    admin_delete_runtime_variant,
+    admin_update_runtime_variant,
+    runtime_variant,
+    runtime_variants,
+)
 from .scheduler import (
     scheduling_events_by_session,
 )
@@ -524,6 +531,9 @@ class Query:
     # Resource Preset V2 APIs
     admin_resource_presets_v2 = admin_resource_presets_v2
     admin_resource_preset_v2 = admin_resource_preset_v2
+    # Runtime Variant APIs
+    runtime_variants = runtime_variants
+    runtime_variant = runtime_variant
     # Resource Allocation V2 APIs
     my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
     project_resource_allocation_v2 = project_resource_allocation_v2
@@ -707,6 +717,10 @@ class Mutation:
     admin_create_resource_preset_v2 = admin_create_resource_preset_v2
     admin_update_resource_preset_v2 = admin_update_resource_preset_v2
     admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
+    # Runtime Variant mutations
+    admin_create_runtime_variant = admin_create_runtime_variant
+    admin_update_runtime_variant = admin_update_runtime_variant
+    admin_delete_runtime_variant = admin_delete_runtime_variant
     # Session V2 mutations
     terminate_project_sessions_v2 = terminate_project_sessions_v2
 

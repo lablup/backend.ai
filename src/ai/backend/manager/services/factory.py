@@ -89,6 +89,8 @@ from ai.backend.manager.services.resource_slot.processors import ResourceSlotPro
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
+from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
+from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
@@ -250,6 +252,9 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.resource_preset.repository,
         ),
         resource_slot=ResourceSlotService(repositories.resource_slot.repository),
+        runtime_variant=RuntimeVariantService(
+            repositories.runtime_variant.repository,
+        ),
         resource_usage=ResourceUsageService(
             repository=repositories.resource_usage_history.repository,
         ),
@@ -420,6 +425,9 @@ def create_processors(
             services.resource_preset, action_monitors, validators
         ),
         resource_slot=ResourceSlotProcessors(services.resource_slot, action_monitors, validators),
+        runtime_variant=RuntimeVariantProcessors(
+            services.runtime_variant, action_monitors, validators
+        ),
         resource_usage=ResourceUsageProcessors(
             services.resource_usage, action_monitors, validators
         ),
