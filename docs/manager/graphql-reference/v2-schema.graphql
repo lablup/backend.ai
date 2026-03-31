@@ -9240,19 +9240,21 @@ input UUIDFilter {
   notIn: [UUID!] = null
 }
 
-"""Added in UNRELEASED. Input for unassigning users from a project."""
-input UnassignUsersFromProjectInput {
-  """List of user UUIDs to unassign from the project."""
-  userIds: [UUID!]!
-}
-
-"""Added in UNRELEASED. Error information for a user that failed to be unassigned."""
+"""
+Added in UNRELEASED. Error information for a user that failed to be unassigned.
+"""
 type UnassignUserError {
   """UUID of the user that failed to be unassigned."""
   userId: UUID!
 
   """Error message describing the failure reason."""
   message: String!
+}
+
+"""Added in UNRELEASED. Input for unassigning users from a project."""
+input UnassignUsersFromProjectInput {
+  """List of user UUIDs to unassign from the project."""
+  userIds: [UUID!]!
 }
 
 """Added in UNRELEASED. Payload for user unassignment from project."""
