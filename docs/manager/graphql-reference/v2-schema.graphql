@@ -1936,6 +1936,36 @@ type CreateRuntimeVariantPayloadGQL {
   runtimeVariant: RuntimeVariant!
 }
 
+"""Added in UNRELEASED. Create preset input."""
+input CreateRuntimeVariantPresetInput {
+  """Runtime variant ID."""
+  runtimeVariantId: UUID!
+
+  """Preset name."""
+  name: String!
+
+  """Description."""
+  description: String = null
+
+  """env or args."""
+  presetTarget: String!
+
+  """str, int, float, bool."""
+  valueType: String!
+
+  """Default value."""
+  defaultValue: String = null
+
+  """Env key or args flag."""
+  key: String!
+}
+
+"""Added in UNRELEASED. Create preset payload."""
+type CreateRuntimeVariantPresetPayloadGQL {
+  """The created preset."""
+  preset: RuntimeVariantPreset!
+}
+
 """Added in UNRELEASED. Input for creating a user resource policy."""
 input CreateUserResourcePolicyInputGQL {
   """Policy name. Must be unique."""
@@ -2318,6 +2348,12 @@ type DeleteRolePayload {
 """Added in UNRELEASED. Payload for runtime variant deletion."""
 type DeleteRuntimeVariantPayloadGQL {
   """ID of the deleted runtime variant."""
+  id: UUID!
+}
+
+"""Added in UNRELEASED. Delete preset payload."""
+type DeleteRuntimeVariantPresetPayloadGQL {
+  """ID of the deleted preset."""
   id: UUID!
 }
 
@@ -5476,6 +5512,21 @@ type Mutation {
   """Added in UNRELEASED. Delete a runtime variant (superadmin only)."""
   adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL!
 
+  """
+  Added in UNRELEASED. Create a runtime variant preset (superadmin only).
+  """
+  adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayloadGQL!
+
+  """
+  Added in UNRELEASED. Update a runtime variant preset (superadmin only).
+  """
+  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayloadGQL!
+
+  """
+  Added in UNRELEASED. Delete a runtime variant preset (superadmin only).
+  """
+  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL!
+
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload!
 }
@@ -7153,6 +7204,12 @@ type Query {
   """Added in UNRELEASED. Get a single runtime variant by ID."""
   runtimeVariant(id: UUID!): RuntimeVariant
 
+  """Added in UNRELEASED. Search runtime variant presets."""
+  runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection
+
+  """Added in UNRELEASED. Get a single runtime variant preset by ID."""
+  runtimeVariantPreset(id: UUID!): RuntimeVariantPreset
+
   """
   Added in UNRELEASED. Get my keypair resource allocation (current user).
   """
@@ -8545,6 +8602,89 @@ enum RuntimeVariantOrderField {
   CREATED_AT
 }
 
+"""Added in UNRELEASED. A runtime variant preset entity."""
+type RuntimeVariantPreset implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Preset ID."""
+  rowId: UUID!
+
+  """Runtime variant ID."""
+  runtimeVariantId: UUID!
+
+  """Preset name."""
+  name: String!
+
+  """Description."""
+  description: String
+
+  """Display order rank."""
+  rank: Int!
+
+  """Target: env or args."""
+  presetTarget: String!
+
+  """Value type."""
+  valueType: String!
+
+  """Default value."""
+  defaultValue: String
+
+  """Env key or args flag."""
+  key: String!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of runtime variant presets."""
+type RuntimeVariantPresetConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RuntimeVariantPresetEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RuntimeVariantPresetEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RuntimeVariantPreset!
+}
+
+"""Added in UNRELEASED. Filter for presets."""
+input RuntimeVariantPresetFilter {
+  """Name filter."""
+  name: StringFilter = null
+
+  """Variant ID filter."""
+  runtimeVariantId: UUID = null
+}
+
+"""Added in UNRELEASED. Order specification."""
+input RuntimeVariantPresetOrderBy {
+  """Field to order by."""
+  field: RuntimeVariantPresetOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for runtime variant presets."""
+enum RuntimeVariantPresetOrderField {
+  NAME
+  RANK
+  CREATED_AT
+}
+
 """Added in 24.09.0. Input for SMTP authentication credentials"""
 input SMTPAuthInput {
   username: String = null
@@ -9934,6 +10074,39 @@ input UpdateRuntimeVariantInput {
 type UpdateRuntimeVariantPayloadGQL {
   """The updated runtime variant."""
   runtimeVariant: RuntimeVariant!
+}
+
+"""Added in UNRELEASED. Update preset input."""
+input UpdateRuntimeVariantPresetInput {
+  """Preset ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """New rank."""
+  rank: Int = null
+
+  """New target."""
+  presetTarget: String = null
+
+  """New value type."""
+  valueType: String = null
+
+  """New default value."""
+  defaultValue: String = null
+
+  """New key."""
+  key: String = null
+}
+
+"""Added in UNRELEASED. Update preset payload."""
+type UpdateRuntimeVariantPresetPayloadGQL {
+  """The updated preset."""
+  preset: RuntimeVariantPreset!
 }
 
 """
