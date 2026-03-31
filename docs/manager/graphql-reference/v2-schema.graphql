@@ -3491,6 +3491,21 @@ extend type GroupNode @key(fields: "id") {
   id: ID! @external
 }
 
+"""
+Added in UNRELEASED. Filter by storage host permission accessibility. Returns vfolders on hosts where the requesting user has (or lacks) the specified permissions.
+"""
+input HostPermissionFilter {
+  """
+  Include only vfolders on hosts where the user has ALL listed permissions.
+  """
+  in: [VFolderHostPermission!] = null
+
+  """
+  Include only vfolders on hosts where the user LACKS the listed permissions.
+  """
+  notIn: [VFolderHostPermission!] = null
+}
+
 """Added in 25.14.0. HuggingFace registry node."""
 type HuggingFaceRegistry implements Node {
   """The Globally Unique ID of this object"""
@@ -11513,7 +11528,7 @@ type VFolderEdge {
 }
 
 """
-Added in UNRELEASED. Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
+Added in UNRELEASED. Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, host permission, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input VFolderFilter {
   name: StringFilter = null
@@ -11522,9 +11537,24 @@ input VFolderFilter {
   usageMode: VFolderUsageModeFilter = null
   cloneable: Boolean = null
   createdAt: DateTimeFilter = null
+  hostPermission: HostPermissionFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null
+}
+
+"""
+Added in UNRELEASED. Host-level permission for virtual folder storage hosts. CREATE: Create new vfolders on the host. MODIFY: Rename or update vfolder options. DELETE: Delete vfolders from the host. MOUNT_IN_SESSION: Mount vfolders in compute sessions. UPLOAD_FILE: Upload files to vfolders. DOWNLOAD_FILE: Download files from vfolders. INVITE_OTHERS: Invite other users to user-type vfolders. SET_USER_PERM: Override permission of group-type vfolders.
+"""
+enum VFolderHostPermission {
+  CREATE
+  MODIFY
+  DELETE
+  MOUNT_IN_SESSION
+  UPLOAD_FILE
+  DOWNLOAD_FILE
+  INVITE_OTHERS
+  SET_USER_PERM
 }
 
 """
