@@ -16,7 +16,7 @@ from .types import (
     VFolderInvitationState,
     VFolderMetadataInfo,
     VFolderOperationStatusField,
-    VFolderOwnerInfo,
+    VFolderOwnershipInfo,
     VFolderPermissionField,
     VFolderUsageInfo,
 )
@@ -57,7 +57,7 @@ class VFolderNode(BaseResponseModel):
     host: str = Field(description="Storage host where the virtual folder is located")
     metadata: VFolderMetadataInfo = Field(description="Descriptive metadata fields")
     access_control: VFolderAccessControlInfo = Field(description="Access control fields")
-    owner: VFolderOwnerInfo = Field(description="Owner context fields")
+    ownership: VFolderOwnershipInfo = Field(description="Ownership context fields")
     usage: VFolderUsageInfo | None = Field(
         default=None,
         description="Usage statistics; None for list responses where usage is not loaded",

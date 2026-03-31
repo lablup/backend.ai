@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderAccessControlInfo,
     VFolderMetadataInfo,
-    VFolderOwnerInfo,
+    VFolderOwnershipInfo,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
@@ -93,10 +93,10 @@ class VFolderAdapter(BaseAdapter):
                 permission=data.permission.to_field() if data.permission else None,
                 ownership_type=data.ownership_type.to_field(),
             ),
-            owner=VFolderOwnerInfo(
-                user=data.user,
-                group=data.group,
-                creator=data.creator,
+            ownership=VFolderOwnershipInfo(
+                user_id=data.user,
+                project_id=data.group,
+                creator_email=data.creator,
             ),
             usage=VFolderUsageInfoDTO(
                 num_files=data.num_files,

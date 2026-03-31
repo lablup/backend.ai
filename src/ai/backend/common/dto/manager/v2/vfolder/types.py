@@ -23,7 +23,7 @@ __all__ = (
     "VFolderMetadataInfo",
     "VFolderOperationStatusField",
     "VFolderOrderField",
-    "VFolderOwnerInfo",
+    "VFolderOwnershipInfo",
     "VFolderOwnershipTypeField",
     "VFolderPermissionField",
     "VFolderAccessControlInfo",
@@ -85,12 +85,12 @@ class VFolderAccessControlInfo(BaseResponseModel):
     ownership_type: VFolderOwnershipTypeField
 
 
-class VFolderOwnerInfo(BaseResponseModel):
-    """Owner context fields for a virtual folder."""
+class VFolderOwnershipInfo(BaseResponseModel):
+    """Ownership context fields for a virtual folder."""
 
-    user: UUID | None
-    group: UUID | None
-    creator: str | None
+    user_id: UUID | None
+    project_id: UUID | None
+    creator_email: str | None
 
 
 class VFolderUsageInfo(BaseResponseModel):
