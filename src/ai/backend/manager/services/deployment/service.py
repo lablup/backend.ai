@@ -504,9 +504,8 @@ class DeploymentService:
         result = await self._deployment_repository.search_deployments_in_project(
             action.querier, action.scope
         )
-        deployments = [_convert_deployment_info_to_data(info) for info in result.items]
         return SearchDeploymentsInProjectActionResult(
-            data=deployments,
+            data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,

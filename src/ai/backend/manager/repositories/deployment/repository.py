@@ -53,6 +53,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSearchResult,
     DeploymentWithHistory,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -1410,16 +1411,8 @@ class DeploymentRepository:
         self,
         querier: BatchQuerier,
         scope: ProjectDeploymentSearchScope,
-    ) -> DeploymentInfoSearchResult:
-        """Search endpoints within a project scope with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination
-            scope: Project-scoped search scope providing filtering condition
-
-        Returns:
-            DeploymentInfoSearchResult with items, total_count, and pagination info
-        """
+    ) -> DeploymentSearchResult:
+        """Search endpoints within a project scope with pagination and filtering."""
         return await self._db_source.search_deployments_in_project(querier, scope)
 
     # ========== Access Token Operations ==========
