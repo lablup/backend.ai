@@ -11726,6 +11726,11 @@ type Query
 
   """Added in UNRELEASED. List virtual folders within a specific project."""
   projectVfolders(projectId: UUID!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Search virtual folders accessible to the current user with pagination and filtering.
+  """
+  myVfolders(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
 }
 
 """
@@ -16557,6 +16562,22 @@ type VFolderEdge
 }
 
 """
+Added in UNRELEASED. Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input VFolderFilter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  host: StringFilter = null
+  status: VFolderOperationStatusFilter = null
+  usageMode: VFolderUsageModeFilter = null
+  createdAt: DateTimeFilter = null
+  AND: [VFolderFilter!] = null
+  OR: [VFolderFilter!] = null
+  NOT: [VFolderFilter!] = null
+}
+
+"""
 Added in 26.2.0. Storage host permission configuration. Defines what operations are allowed for a specific storage host.
 """
 type VFolderHostPermissionEntry
@@ -16632,6 +16653,42 @@ enum VFolderOperationStatus
 }
 
 """
+Added in UNRELEASED. Filter for VFolder operation status enum fields. Supports in and not_in operations.
+"""
+input VFolderOperationStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """The in field."""
+  in: [VFolderOperationStatus!] = null
+
+  """Exclude statuses not in this list."""
+  notIn: [VFolderOperationStatus!] = null
+}
+
+"""
+Added in UNRELEASED. Specifies ordering for virtual folder query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
+"""
+input VFolderOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: VFolderOrderField! = CREATED_AT
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering virtual folder query results. NAME: Order by folder name alphabetically. CREATED_AT: Order by creation timestamp. STATUS: Order by operation status. USAGE_MODE: Order by usage mode. HOST: Order by storage host.
+"""
+enum VFolderOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
+  USAGE_MODE @join__enumValue(graph: STRAWBERRY)
+  HOST @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
 Added in UNRELEASED. Ownership context for a virtual folder. Provides both scalar IDs (userId, projectId, creatorEmail) for lightweight access and full node resolvers (user, project, creator) for detailed entity information.
 """
 type VFolderOwnershipInfo
@@ -16677,6 +16734,19 @@ enum VFolderUsageMode
   GENERAL @join__enumValue(graph: STRAWBERRY)
   MODEL @join__enumValue(graph: STRAWBERRY)
   DATA @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. Filter for VFolder usage mode enum fields. Supports in and not_in operations.
+"""
+input VFolderUsageModeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """The in field."""
+  in: [VFolderUsageMode!] = null
+
+  """Exclude usage modes not in this list."""
+  notIn: [VFolderUsageMode!] = null
 }
 
 """Added in 25.16.0. VFS Storage configuration."""
