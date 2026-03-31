@@ -16518,6 +16518,19 @@ type VFolder implements Node
   """Path for unmanaged virtual folders."""
   unmanagedPath: String
 
+  """
+  UUID of the user who owns this virtual folder. Null for project-owned folders.
+  """
+  ownerUserId: UUID
+
+  """
+  UUID of the project that owns this virtual folder. Null for user-owned folders.
+  """
+  ownerProjectId: UUID
+
+  """Email of the user who originally created this virtual folder."""
+  creatorEmail: String
+
   """The user who owns this virtual folder. Null for project-owned folders."""
   ownerUser: UserV2
 
