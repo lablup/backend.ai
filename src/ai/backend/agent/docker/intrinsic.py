@@ -45,6 +45,7 @@ from ai.backend.agent.utils import read_sysfs
 from ai.backend.agent.vendor.linux import libnuma
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.json import dump_json
+from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     ClusterInfo,
@@ -80,20 +81,11 @@ pruned_disk_types = frozenset([
 ])
 
 
-def read_proc_net_dev(container_pid: int) -> tuple[int, int]:
-    """Read network stats from /proc/[pid]/net/dev for the given container PID.
-
-    Parses the kernel's net/dev format directly from the container's proc entry,
-    avoiding the need for namespace switching (setns) which is unreliable in
-    threaded Python processes.
-
-    Returns a tuple of (rx_bytes, tx_bytes) summed across all non-loopback interfaces.
-    """
-    net_dev_path = Path(f"/proc/{container_pid}/net/dev")
+def _parse_proc_net_dev(content: str) -> tuple[int, int]:
+    """Parse /proc/net/dev content and return (rx_bytes, tx_bytes) for non-lo interfaces."""
     rx_bytes = 0
     tx_bytes = 0
-    for line in net_dev_path.read_text().splitlines():
-        # Skip header lines (first two lines: "Inter-|..." and " face |...")
+    for line in content.splitlines():
         if ":" not in line:
             continue
         iface, _, stats_str = line.partition(":")
@@ -105,6 +97,32 @@ def read_proc_net_dev(container_pid: int) -> tuple[int, int]:
         rx_bytes += int(fields[0])
         tx_bytes += int(fields[8])
     return rx_bytes, tx_bytes
+
+
+def read_proc_net_dev(container_pid: int) -> tuple[int, int]:
+    """Read network stats from /proc/[pid]/net/dev for the given container PID.
+
+    Parses the kernel's net/dev format directly from the container's proc entry,
+    avoiding the need for namespace switching (setns) which is unreliable in
+    threaded Python processes.
+
+    Returns a tuple of (rx_bytes, tx_bytes) summed across all non-loopback interfaces.
+    """
+    content = Path(f"/proc/{container_pid}/net/dev").read_text()
+    return _parse_proc_net_dev(content)
+
+
+def read_netns_net_dev(ns_path: Path) -> tuple[int, int]:
+    """Read network stats by switching into the given network namespace.
+
+    Uses setns() to enter the namespace, then reads /proc/thread-self/net/dev
+    which reflects the calling thread's namespace (not the process-level one).
+
+    This is the fallback for when the container PID is unavailable (PID=0).
+    """
+    with nsenter(ns_path):
+        content = Path("/proc/thread-self/net/dev").read_text()
+    return _parse_proc_net_dev(content)
 
 
 async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
@@ -716,14 +734,8 @@ class MemoryPlugin(AbstractComputePlugin):
                 return None
             net_rx_bytes = 0
             net_tx_bytes = 0
-            if container_pid == 0:
-                log.warning(
-                    "MemoryPlugin: container {0} is not running (PID=0),"
-                    " skipping net stat collection",
-                    container_id[:7],
-                )
-            else:
-                loop = current_loop()
+            loop = current_loop()
+            if container_pid > 0:
                 try:
                     net_rx_bytes, net_tx_bytes = await loop.run_in_executor(
                         None, read_proc_net_dev, container_pid
@@ -735,8 +747,28 @@ class MemoryPlugin(AbstractComputePlugin):
                         container_pid,
                         e,
                     )
-                    net_rx_bytes = 0
-                    net_tx_bytes = 0
+            else:
+                sandbox_key = data.get("NetworkSettings", {}).get("SandboxKey", "")
+                ns_path = Path(sandbox_key) if sandbox_key else None
+                if ns_path and ns_path.exists():
+                    try:
+                        net_rx_bytes, net_tx_bytes = await loop.run_in_executor(
+                            None, read_netns_net_dev, ns_path
+                        )
+                    except OSError as e:
+                        log.warning(
+                            "MemoryPlugin: cannot read net stats via netns for"
+                            " container {0} (sandbox_key={1!r}): {2!r}",
+                            container_id[:7],
+                            sandbox_key,
+                            e,
+                        )
+                else:
+                    log.warning(
+                        "MemoryPlugin: container {0} has no PID and no valid SandboxKey,"
+                        " skipping net stat collection",
+                        container_id[:7],
+                    )
             loop = current_loop()
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
             return (
