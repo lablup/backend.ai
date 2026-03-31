@@ -13,7 +13,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import ClusterMode, EndpointId, ResourceSlot, RuntimeVariant
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.deployment.types import DeploymentSearchResult
+from ai.backend.manager.data.deployment.types import DeploymentSummarySearchResult
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -306,7 +306,7 @@ class TestEndpointSearchInProject:
 
         result = await deployment_repository.search_deployments_in_project(querier, scope)
 
-        assert isinstance(result, DeploymentSearchResult)
+        assert isinstance(result, DeploymentSummarySearchResult)
         assert result.total_count == 2
         assert len(result.items) == 2
         returned_ids = {item.id for item in result.items}

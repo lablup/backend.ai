@@ -53,7 +53,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
-    DeploymentSearchResult,
+    DeploymentSummarySearchResult,
     DeploymentWithHistory,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -1411,7 +1411,7 @@ class DeploymentRepository:
         self,
         querier: BatchQuerier,
         scope: ProjectDeploymentSearchScope,
-    ) -> DeploymentSearchResult:
+    ) -> DeploymentSummarySearchResult:
         """Search endpoints within a project scope with pagination and filtering."""
         return await self._db_source.search_deployments_in_project(querier, scope)
 

@@ -6,7 +6,7 @@ from typing import override
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.data.deployment.types import DeploymentSummaryData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment.types import ProjectDeploymentSearchScope
@@ -44,7 +44,7 @@ class SearchDeploymentsInProjectAction(DeploymentScopeAction):
 
 @dataclass
 class SearchDeploymentsInProjectActionResult(BaseActionResult):
-    data: list[ModelDeploymentData]
+    data: list[DeploymentSummaryData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

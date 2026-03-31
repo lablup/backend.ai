@@ -6,7 +6,7 @@ from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -18,7 +18,6 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelDefinition, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
@@ -46,18 +45,14 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
     DeploymentLifecycleSubStep,
-    DeploymentNetworkSpec,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
-    DeploymentSearchResult,
+    DeploymentSummarySearchResult,
     DeploymentWithHistory,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
-    ModelDeploymentData,
-    ModelDeploymentMetadataInfo,
     ModelRevisionData,
-    ReplicaStateData,
     RevisionSearchResult,
     RouteHealthStatus,
     RouteInfo,
@@ -166,47 +161,6 @@ class EndpointWithRoutesRawData:
 
     endpoint_row: EndpointRow
     route_rows: list[RoutingRow]
-
-
-_LIFECYCLE_STATUS_MAP: dict[EndpointLifecycle, ModelDeploymentStatus] = {
-    EndpointLifecycle.PENDING: ModelDeploymentStatus.PENDING,
-    EndpointLifecycle.CREATED: ModelDeploymentStatus.READY,
-    EndpointLifecycle.READY: ModelDeploymentStatus.READY,
-    EndpointLifecycle.SCALING: ModelDeploymentStatus.SCALING,
-    EndpointLifecycle.DEPLOYING: ModelDeploymentStatus.DEPLOYING,
-    EndpointLifecycle.DESTROYING: ModelDeploymentStatus.STOPPING,
-    EndpointLifecycle.DESTROYED: ModelDeploymentStatus.STOPPED,
-}
-
-
-def _endpoint_row_to_deployment_data(row: EndpointRow) -> ModelDeploymentData:
-    desired_count = row.desired_replicas if row.desired_replicas is not None else row.replicas
-    return ModelDeploymentData(
-        id=row.id,
-        metadata=ModelDeploymentMetadataInfo(
-            name=row.name,
-            status=_LIFECYCLE_STATUS_MAP[row.lifecycle_stage],
-            tags=[row.tag] if row.tag else [],
-            project_id=row.project,
-            domain_name=row.domain,
-            created_at=row.created_at or datetime.now(UTC),
-            updated_at=row.created_at or datetime.now(UTC),
-        ),
-        network_access=DeploymentNetworkSpec(
-            open_to_public=row.open_to_public or False,
-            url=row.url,
-        ),
-        revision=None,
-        revision_history_ids=[row.current_revision] if row.current_revision else [],
-        scaling_rule_ids=[],
-        replica_state=ReplicaStateData(
-            desired_replica_count=desired_count,
-            replica_ids=[],
-        ),
-        default_deployment_strategy=DeploymentStrategy.ROLLING,
-        created_user_id=row.created_user,
-        sub_step=row.sub_step,
-    )
 
 
 class DeploymentDBSource:
@@ -1276,10 +1230,10 @@ class DeploymentDBSource:
         self,
         querier: BatchQuerier,
         scope: SearchScope,
-    ) -> DeploymentSearchResult:
+    ) -> DeploymentSummarySearchResult:
         """Search endpoints within a project scope with pagination and filtering.
 
-        Returns lightweight ModelDeploymentData built from EndpointRow scalar
+        Returns lightweight DeploymentSummaryData built from EndpointRow scalar
         columns only (no eager-loaded relationships). Revision and policy
         details are not included.
         """
@@ -1293,9 +1247,9 @@ class DeploymentDBSource:
                 scope=scope,
             )
 
-            items = [_endpoint_row_to_deployment_data(row.EndpointRow) for row in result.rows]
+            items = [row.EndpointRow.to_summary_data() for row in result.rows]
 
-            return DeploymentSearchResult(
+            return DeploymentSummarySearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
