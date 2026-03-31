@@ -1921,6 +1921,21 @@ input CreateRoleInput {
   source: RoleSource! = CUSTOM
 }
 
+"""Added in UNRELEASED. Input for creating a runtime variant."""
+input CreateRuntimeVariantInput {
+  """Unique name."""
+  name: String!
+
+  """Description."""
+  description: String = null
+}
+
+"""Added in UNRELEASED. Payload for runtime variant creation."""
+type CreateRuntimeVariantPayloadGQL {
+  """The created runtime variant."""
+  runtimeVariant: RuntimeVariant!
+}
+
 """Added in UNRELEASED. Input for creating a user resource policy."""
 input CreateUserResourcePolicyInputGQL {
   """Policy name. Must be unique."""
@@ -2297,6 +2312,12 @@ input DeleteRoleInput {
 """Added in 26.3.0. Payload for delete role mutation."""
 type DeleteRolePayload {
   """ID of the deleted role"""
+  id: UUID!
+}
+
+"""Added in UNRELEASED. Payload for runtime variant deletion."""
+type DeleteRuntimeVariantPayloadGQL {
+  """ID of the deleted runtime variant."""
   id: UUID!
 }
 
@@ -5446,6 +5467,15 @@ type Mutation {
   """Added in UNRELEASED. Delete a resource preset (admin only)."""
   adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL!
 
+  """Added in UNRELEASED. Create a new runtime variant (superadmin only)."""
+  adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayloadGQL!
+
+  """Added in UNRELEASED. Update a runtime variant (superadmin only)."""
+  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayloadGQL!
+
+  """Added in UNRELEASED. Delete a runtime variant (superadmin only)."""
+  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL!
+
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload!
 }
@@ -7117,6 +7147,12 @@ type Query {
   """Added in UNRELEASED. Get a single resource preset by ID (admin only)."""
   adminResourcePresetV2(id: UUID!): ResourcePresetV2
 
+  """Added in UNRELEASED. Search runtime variants."""
+  runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection
+
+  """Added in UNRELEASED. Get a single runtime variant by ID."""
+  runtimeVariant(id: UUID!): RuntimeVariant
+
   """
   Added in UNRELEASED. Get my keypair resource allocation (current user).
   """
@@ -8446,6 +8482,67 @@ Added in 25.19.0. Traffic routing status for a route. Controls whether traffic s
 enum RouteTrafficStatus {
   ACTIVE
   INACTIVE
+}
+
+"""Added in UNRELEASED. A runtime variant entity."""
+type RuntimeVariant implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Runtime variant ID."""
+  rowId: UUID!
+
+  """Unique name."""
+  name: String!
+
+  """Description."""
+  description: String
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of runtime variants."""
+type RuntimeVariantConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RuntimeVariantEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RuntimeVariantEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RuntimeVariant!
+}
+
+"""Added in UNRELEASED. Filter for runtime variants."""
+input RuntimeVariantFilter {
+  """Name filter."""
+  name: StringFilter = null
+}
+
+"""Added in UNRELEASED. Order specification."""
+input RuntimeVariantOrderBy {
+  """Field to order by."""
+  field: RuntimeVariantOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for runtime variants."""
+enum RuntimeVariantOrderField {
+  NAME
+  CREATED_AT
 }
 
 """Added in 24.09.0. Input for SMTP authentication credentials"""
@@ -9819,6 +9916,24 @@ input UpdateRouteTrafficStatusInput {
 type UpdateRouteTrafficStatusPayload {
   """The updated route"""
   route: Route!
+}
+
+"""Added in UNRELEASED. Input for updating a runtime variant."""
+input UpdateRuntimeVariantInput {
+  """Runtime variant ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+}
+
+"""Added in UNRELEASED. Payload for runtime variant update."""
+type UpdateRuntimeVariantPayloadGQL {
+  """The updated runtime variant."""
+  runtimeVariant: RuntimeVariant!
 }
 
 """

@@ -3259,6 +3259,25 @@ input CreateRoleInput
   source: RoleSource! = CUSTOM
 }
 
+"""Added in UNRELEASED. Input for creating a runtime variant."""
+input CreateRuntimeVariantInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Unique name."""
+  name: String!
+
+  """Description."""
+  description: String = null
+}
+
+"""Added in UNRELEASED. Payload for runtime variant creation."""
+type CreateRuntimeVariantPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The created runtime variant."""
+  runtimeVariant: RuntimeVariant!
+}
+
 type CreateScalingGroup
   @join__type(graph: GRAPHENE)
 {
@@ -3892,6 +3911,14 @@ type DeleteRolePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted role"""
+  id: UUID!
+}
+
+"""Added in UNRELEASED. Payload for runtime variant deletion."""
+type DeleteRuntimeVariantPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted runtime variant."""
   id: UUID!
 }
 
@@ -9272,6 +9299,15 @@ type Mutation
   """Added in UNRELEASED. Delete a resource preset (admin only)."""
   adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL! @join__field(graph: STRAWBERRY)
 
+  """Added in UNRELEASED. Create a new runtime variant (superadmin only)."""
+  adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Update a runtime variant (superadmin only)."""
+  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a runtime variant (superadmin only)."""
+  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL! @join__field(graph: STRAWBERRY)
+
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload! @join__field(graph: STRAWBERRY)
 }
@@ -11700,6 +11736,12 @@ type Query
   """Added in UNRELEASED. Get a single resource preset by ID (admin only)."""
   adminResourcePresetV2(id: UUID!): ResourcePresetV2 @join__field(graph: STRAWBERRY)
 
+  """Added in UNRELEASED. Search runtime variants."""
+  runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get a single runtime variant by ID."""
+  runtimeVariant(id: UUID!): RuntimeVariant @join__field(graph: STRAWBERRY)
+
   """
   Added in UNRELEASED. Get my keypair resource allocation (current user).
   """
@@ -13363,12 +13405,86 @@ type RoutingList implements PaginatedList
   total_count: Int!
 }
 
+"""Added in UNRELEASED. A runtime variant entity."""
+type RuntimeVariant implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Runtime variant ID."""
+  rowId: UUID!
+
+  """Unique name."""
+  name: String!
+
+  """Description."""
+  description: String
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of runtime variants."""
+type RuntimeVariantConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RuntimeVariantEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RuntimeVariantEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RuntimeVariant!
+}
+
+"""Added in UNRELEASED. Filter for runtime variants."""
+input RuntimeVariantFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Name filter."""
+  name: StringFilter = null
+}
+
 """Added in 24.03.5."""
 type RuntimeVariantInfo
   @join__type(graph: GRAPHENE)
 {
   name: String
   human_readable_name: String
+}
+
+"""Added in UNRELEASED. Order specification."""
+input RuntimeVariantOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: RuntimeVariantOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for runtime variants."""
+enum RuntimeVariantOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 type ScalingGroup
@@ -15208,6 +15324,28 @@ type UpdateRouteTrafficStatusPayload
 {
   """The updated route"""
   route: Route!
+}
+
+"""Added in UNRELEASED. Input for updating a runtime variant."""
+input UpdateRuntimeVariantInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Runtime variant ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+}
+
+"""Added in UNRELEASED. Payload for runtime variant update."""
+type UpdateRuntimeVariantPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated runtime variant."""
+  runtimeVariant: RuntimeVariant!
 }
 
 """
