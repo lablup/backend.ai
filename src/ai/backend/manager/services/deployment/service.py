@@ -166,6 +166,7 @@ from ai.backend.manager.sokovan.deployment.definition_generator.registry import 
 )
 from ai.backend.manager.sokovan.deployment.exceptions import (
     DeploymentAlreadyInProgress,
+    InsufficientSurgeResources,
     InvalidEndpointState,
 )
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
@@ -836,9 +837,20 @@ class DeploymentService:
             )
 
         # 3. Validate deployment surge resource availability
-        await self._deployment_controller.validate_deployment_surge_resources(
+        surge_check = await self._deployment_controller.check_deployment_surge_resources(
             deployment_info, action.revision_id
         )
+        if not surge_check.sufficient:
+            if surge_check.strategy == DeploymentStrategy.ROLLING:
+                detail = f"Rolling update max_surge={surge_check.surge_count}"
+            else:
+                detail = f"Blue-green deployment replica_count={surge_check.surge_count}"
+            raise InsufficientSurgeResources(
+                f"{detail} requires additional resources "
+                f"that exceed the available capacity in scaling group "
+                f"'{surge_check.scaling_group}'. "
+                f"Insufficient resources: {', '.join(surge_check.insufficient_details or [])}"
+            )
 
         # 4. Set deploying_revision and transition to DEPLOYING lifecycle.
         # The DB WHERE clause includes ``deploying_revision IS NULL`` to guard

@@ -41,7 +41,6 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
 )
-from ai.backend.manager.sokovan.deployment.exceptions import InsufficientSurgeResources
 
 ENDPOINT_ID = uuid.UUID("aaaaaaaa-0000-0000-0000-aaaaaaaaaaaa")
 REVISION_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
@@ -175,8 +174,8 @@ class TestValidateDeploymentSurgeResources:
             })
         )
 
-        # Should not raise
-        await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
+        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        assert result.sufficient is True
 
     async def test_blue_green_fail_when_resources_are_insufficient(
         self,
@@ -184,7 +183,7 @@ class TestValidateDeploymentSurgeResources:
         mock_deployment_repository: MagicMock,
         mock_scaling_group_repository: MagicMock,
     ) -> None:
-        """Blue-green raises InsufficientSurgeResources when free < replica_count * per_route."""
+        """Blue-green returns insufficient when free < replica_count * per_route."""
         deployment_info = _make_deployment_info()  # replica_count=2
         mock_deployment_repository.get_deployment_policy = AsyncMock(
             return_value=DeploymentPolicyData(
@@ -210,13 +209,13 @@ class TestValidateDeploymentSurgeResources:
             })
         )
 
-        with pytest.raises(InsufficientSurgeResources) as exc_info:
-            await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
-
-        error_message = str(exc_info.value)
-        assert "replica_count=2" in error_message
-        assert "cpu" in error_message
-        assert "mem" in error_message
+        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        assert result.sufficient is False
+        assert result.strategy == DeploymentStrategy.BLUE_GREEN
+        assert result.surge_count == 2
+        assert result.insufficient_details is not None
+        assert any("cpu" in d for d in result.insufficient_details)
+        assert any("mem" in d for d in result.insufficient_details)
 
     async def test_skip_validation_when_max_surge_is_zero(
         self,
@@ -239,7 +238,8 @@ class TestValidateDeploymentSurgeResources:
             )
         )
 
-        await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
+        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        assert result.sufficient is True
 
         mock_scaling_group_repository.get_resource_info.assert_not_called()
 
@@ -277,8 +277,8 @@ class TestValidateDeploymentSurgeResources:
             })
         )
 
-        # Should not raise
-        await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
+        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        assert result.sufficient is True
 
     async def test_fail_when_resources_are_insufficient(
         self,
@@ -286,7 +286,7 @@ class TestValidateDeploymentSurgeResources:
         mock_deployment_repository: MagicMock,
         mock_scaling_group_repository: MagicMock,
     ) -> None:
-        """Validation raises InsufficientSurgeResources when free resources < surge."""
+        """Validation returns insufficient when free resources < surge."""
         deployment_info = _make_deployment_info()
         mock_deployment_repository.get_deployment_policy = AsyncMock(
             return_value=DeploymentPolicyData(
@@ -314,14 +314,14 @@ class TestValidateDeploymentSurgeResources:
             })
         )
 
-        with pytest.raises(InsufficientSurgeResources) as exc_info:
-            await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
-
-        error_message = str(exc_info.value)
-        assert "max_surge=2" in error_message
-        assert "cpu" in error_message
-        assert "mem" in error_message
-        assert "default" in error_message  # scaling group name
+        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        assert result.sufficient is False
+        assert result.strategy == DeploymentStrategy.ROLLING
+        assert result.surge_count == 2
+        assert result.scaling_group == "default"
+        assert result.insufficient_details is not None
+        assert any("cpu" in d for d in result.insufficient_details)
+        assert any("mem" in d for d in result.insufficient_details)
 
     async def test_fail_when_single_resource_is_insufficient(
         self,
@@ -357,13 +357,12 @@ class TestValidateDeploymentSurgeResources:
             })
         )
 
-        with pytest.raises(InsufficientSurgeResources) as exc_info:
-            await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
-
-        error_message = str(exc_info.value)
-        assert "mem" in error_message
+        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        assert result.sufficient is False
+        assert result.insufficient_details is not None
+        assert any("mem" in d for d in result.insufficient_details)
         # CPU should NOT be in insufficient details since it's sufficient
-        assert "cpu: required" not in error_message
+        assert not any("cpu" in d for d in result.insufficient_details)
 
     async def test_correct_scaling_group_is_queried(
         self,
@@ -396,6 +395,6 @@ class TestValidateDeploymentSurgeResources:
             return_value=_make_resource_info({"cpu": Decimal("100")})
         )
 
-        await controller.validate_deployment_surge_resources(deployment_info, REVISION_ID)
+        await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
 
         mock_scaling_group_repository.get_resource_info.assert_called_once_with("my-gpu-group")

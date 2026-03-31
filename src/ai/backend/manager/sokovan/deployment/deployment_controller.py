@@ -38,7 +38,6 @@ from ai.backend.manager.repositories.deployment.updaters import (
     RouteUpdaterSpec,
 )
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
-from ai.backend.manager.sokovan.deployment.exceptions import InsufficientSurgeResources
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
 )
@@ -48,6 +47,17 @@ from ai.backend.manager.sokovan.scheduling_controller.types import SessionValida
 from ai.backend.manager.types import OptionalState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@dataclass(frozen=True)
+class SurgeResourceCheckResult:
+    """Result of a deployment surge resource availability check."""
+
+    sufficient: bool
+    strategy: DeploymentStrategy | None = None
+    surge_count: int = 0
+    scaling_group: str = ""
+    insufficient_details: list[str] | None = None
 
 
 @dataclass
@@ -235,12 +245,12 @@ class DeploymentController:
 
     # ========== Rolling Update Validation ==========
 
-    async def validate_deployment_surge_resources(
+    async def check_deployment_surge_resources(
         self,
         deployment_info: DeploymentInfo,
         revision_id: uuid.UUID,
-    ) -> None:
-        """Validate that additional resources required by the deployment strategy are available.
+    ) -> SurgeResourceCheckResult:
+        """Check whether the scaling group has enough free resources for the deployment surge.
 
         Depending on the strategy, a different number of extra routes must be
         provisioned while old routes are still running:
@@ -257,8 +267,9 @@ class DeploymentController:
             deployment_info: Current deployment information
             revision_id: ID of the revision being activated
 
-        Raises:
-            InsufficientSurgeResources: If available resources cannot satisfy the surge
+        Returns:
+            SurgeResourceCheckResult with ``sufficient=True`` when resources are adequate,
+            or ``sufficient=False`` with detail fields populated otherwise.
         """
         policy = await self._deployment_repository.get_deployment_policy(deployment_info.id)
         spec = policy.strategy_spec
@@ -267,7 +278,7 @@ class DeploymentController:
         if isinstance(spec, RollingUpdateSpec):
             surge_count = spec.resolve_max_surge(desired_replicas)
             if surge_count == 0:
-                return
+                return SurgeResourceCheckResult(sufficient=True)
         else:
             surge_count = desired_replicas
 
@@ -279,24 +290,24 @@ class DeploymentController:
         resource_info = await self._scaling_group_repository.get_resource_info(scaling_group)
         free_slots = ResourceSlot({sq.slot_name: sq.quantity for sq in resource_info.free})
 
-        if not (surge_slots <= free_slots):
-            insufficient_details = []
-            for slot_name in surge_slots.keys():
-                required = surge_slots.get(slot_name, Decimal(0))
-                available = free_slots.get(slot_name, Decimal(0))
-                if required > available:
-                    insufficient_details.append(
-                        f"{slot_name}: required={required}, available={available}"
-                    )
-            if policy.strategy == DeploymentStrategy.ROLLING:
-                detail = f"Rolling update max_surge={surge_count}"
-            else:
-                detail = f"Blue-green deployment replica_count={surge_count}"
-            raise InsufficientSurgeResources(
-                f"{detail} requires additional resources "
-                f"that exceed the available capacity in scaling group '{scaling_group}'. "
-                f"Insufficient resources: {', '.join(insufficient_details)}"
-            )
+        if surge_slots <= free_slots:
+            return SurgeResourceCheckResult(sufficient=True)
+
+        insufficient_details = []
+        for slot_name in surge_slots.keys():
+            required = surge_slots.get(slot_name, Decimal(0))
+            available = free_slots.get(slot_name, Decimal(0))
+            if required > available:
+                insufficient_details.append(
+                    f"{slot_name}: required={required}, available={available}"
+                )
+        return SurgeResourceCheckResult(
+            sufficient=False,
+            strategy=policy.strategy,
+            surge_count=surge_count,
+            scaling_group=scaling_group,
+            insufficient_details=insufficient_details,
+        )
 
     # ========== Deployment Policy Methods ==========
 
