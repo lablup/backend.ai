@@ -3,7 +3,7 @@
 Tests verify that check_deployment_surge_resources correctly checks
 whether the scaling group has enough free resources to accommodate
 the surge of a deployment (max_surge for rolling update, full replica
-count for blue-green).
+count for blue-green), accounting for per-agent resource fragmentation.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
     ResourceConfigData,
 )
-from ai.backend.manager.data.scaling_group.types import ResourceInfo
+from ai.backend.manager.data.scaling_group.types import AgentFreeResource
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     RollingUpdateSpec,
@@ -56,7 +56,7 @@ class SurgeResourceCase:
     strategy: DeploymentStrategy
     strategy_spec: BlueGreenSpec | RollingUpdateSpec
     resource_slots: dict[str, Decimal]
-    free_slots: dict[str, Decimal]
+    agent_free_slots: list[dict[str, Decimal]]
     expected_sufficient: bool
     expected_surge_count: int
     cluster_size: int = 1
@@ -117,17 +117,17 @@ def _make_revision_data(
     )
 
 
-def _make_resource_info(
-    free_slots: dict[str, Decimal],
-) -> ResourceInfo:
-    """Create ResourceInfo with the given free slots."""
-    capacity = {k: v * 10 for k, v in free_slots.items()}
-    used = {k: capacity[k] - v for k, v in free_slots.items()}
-    return ResourceInfo(
-        capacity=[SlotQuantity(k, v) for k, v in capacity.items()],
-        used=[SlotQuantity(k, v) for k, v in used.items()],
-        free=[SlotQuantity(k, v) for k, v in free_slots.items()],
-    )
+def _make_agent_free_resources(
+    agent_slots_list: list[dict[str, Decimal]],
+) -> list[AgentFreeResource]:
+    """Create a list of AgentFreeResource from per-agent free slot dicts."""
+    return [
+        AgentFreeResource(
+            agent_id=f"agent-{i}",
+            free_slots={k: SlotQuantity(k, v) for k, v in slots.items()},
+        )
+        for i, slots in enumerate(agent_slots_list)
+    ]
 
 
 class TestCheckDeploymentSurgeResources:
@@ -165,7 +165,9 @@ class TestCheckDeploymentSurgeResources:
                 strategy=DeploymentStrategy.BLUE_GREEN,
                 strategy_spec=BlueGreenSpec(auto_promote=False),
                 resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-                free_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                agent_free_slots=[
+                    {"cpu": Decimal("8"), "mem": Decimal("16384")},
+                ],
                 expected_sufficient=True,
                 expected_surge_count=2,
             ),
@@ -173,7 +175,9 @@ class TestCheckDeploymentSurgeResources:
                 strategy=DeploymentStrategy.BLUE_GREEN,
                 strategy_spec=BlueGreenSpec(auto_promote=False),
                 resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-                free_slots={"cpu": Decimal("1"), "mem": Decimal("2048")},
+                agent_free_slots=[
+                    {"cpu": Decimal("1"), "mem": Decimal("2048")},
+                ],
                 expected_sufficient=False,
                 expected_surge_count=2,
             ),
@@ -183,7 +187,9 @@ class TestCheckDeploymentSurgeResources:
                     max_surge=IntOrPercent(count=2), max_unavailable=IntOrPercent(count=0)
                 ),
                 resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-                free_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                agent_free_slots=[
+                    {"cpu": Decimal("8"), "mem": Decimal("16384")},
+                ],
                 expected_sufficient=True,
                 expected_surge_count=2,
             ),
@@ -193,7 +199,9 @@ class TestCheckDeploymentSurgeResources:
                     max_surge=IntOrPercent(count=2), max_unavailable=IntOrPercent(count=0)
                 ),
                 resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-                free_slots={"cpu": Decimal("1"), "mem": Decimal("2048")},
+                agent_free_slots=[
+                    {"cpu": Decimal("1"), "mem": Decimal("2048")},
+                ],
                 expected_sufficient=False,
                 expected_surge_count=2,
             ),
@@ -223,8 +231,8 @@ class TestCheckDeploymentSurgeResources:
         )
         deployment_info = _make_deployment_info(policy=policy)
         revision_data = _make_revision_data(resource_slots=case.resource_slots)
-        mock_scaling_group_repository.get_resource_info = AsyncMock(
-            return_value=_make_resource_info(case.free_slots)
+        mock_scaling_group_repository.get_per_agent_free_resources = AsyncMock(
+            return_value=_make_agent_free_resources(case.agent_free_slots)
         )
 
         result = await controller.check_deployment_surge_resources(deployment_info, revision_data)
@@ -255,7 +263,7 @@ class TestCheckDeploymentSurgeResources:
 
         result = await controller.check_deployment_surge_resources(deployment_info, revision_data)
         assert result.sufficient is True
-        mock_scaling_group_repository.get_resource_info.assert_not_called()
+        mock_scaling_group_repository.get_per_agent_free_resources.assert_not_called()
 
     async def test_fail_when_single_resource_is_insufficient(
         self,
@@ -279,11 +287,10 @@ class TestCheckDeploymentSurgeResources:
             resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
         )
         # CPU is sufficient (10) but mem is insufficient (2048)
-        mock_scaling_group_repository.get_resource_info = AsyncMock(
-            return_value=_make_resource_info({
-                "cpu": Decimal("10"),
-                "mem": Decimal("2048"),
-            })
+        mock_scaling_group_repository.get_per_agent_free_resources = AsyncMock(
+            return_value=_make_agent_free_resources([
+                {"cpu": Decimal("10"), "mem": Decimal("2048")},
+            ])
         )
 
         result = await controller.check_deployment_surge_resources(deployment_info, revision_data)
@@ -311,12 +318,14 @@ class TestCheckDeploymentSurgeResources:
         )
         deployment_info = _make_deployment_info(policy=policy, resource_group="my-gpu-group")
         revision_data = _make_revision_data(resource_slots={"cpu": Decimal("1")})
-        mock_scaling_group_repository.get_resource_info = AsyncMock(
-            return_value=_make_resource_info({"cpu": Decimal("100")})
+        mock_scaling_group_repository.get_per_agent_free_resources = AsyncMock(
+            return_value=_make_agent_free_resources([{"cpu": Decimal("100")}])
         )
 
         await controller.check_deployment_surge_resources(deployment_info, revision_data)
-        mock_scaling_group_repository.get_resource_info.assert_called_once_with("my-gpu-group")
+        mock_scaling_group_repository.get_per_agent_free_resources.assert_called_once_with(
+            "my-gpu-group"
+        )
 
     @pytest.mark.parametrize(
         "case",
@@ -327,7 +336,7 @@ class TestCheckDeploymentSurgeResources:
                     max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
                 ),
                 resource_slots={"cpu": Decimal("4")},
-                free_slots={"cpu": Decimal("6")},
+                agent_free_slots=[{"cpu": Decimal("6")}],
                 expected_sufficient=False,
                 expected_surge_count=1,
                 cluster_size=2,
@@ -338,7 +347,7 @@ class TestCheckDeploymentSurgeResources:
                     max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
                 ),
                 resource_slots={"cpu": Decimal("4")},
-                free_slots={"cpu": Decimal("10")},
+                agent_free_slots=[{"cpu": Decimal("10")}],
                 expected_sufficient=True,
                 expected_surge_count=1,
                 cluster_size=2,
@@ -371,9 +380,77 @@ class TestCheckDeploymentSurgeResources:
             resource_slots=case.resource_slots,
             cluster_size=case.cluster_size,
         )
-        mock_scaling_group_repository.get_resource_info = AsyncMock(
-            return_value=_make_resource_info(case.free_slots)
+        mock_scaling_group_repository.get_per_agent_free_resources = AsyncMock(
+            return_value=_make_agent_free_resources(case.agent_free_slots)
         )
 
         result = await controller.check_deployment_surge_resources(deployment_info, revision_data)
         assert result.sufficient is case.expected_sufficient
+
+    async def test_fragmented_resources_detected_as_insufficient(
+        self,
+        controller: DeploymentController,
+        mock_scaling_group_repository: MagicMock,
+    ) -> None:
+        """Resources spread across agents that individually cannot fit a kernel.
+
+        Total free: 4 cpu across 2 agents (2 each).
+        Each kernel needs 3 cpu → no single agent can fit one.
+        Aggregated check would pass, per-agent check correctly fails.
+        """
+        policy = DeploymentPolicyData(
+            id=uuid.uuid4(),
+            endpoint=ENDPOINT_ID,
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(
+                max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
+            ),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        deployment_info = _make_deployment_info(policy=policy)
+        revision_data = _make_revision_data(resource_slots={"cpu": Decimal("3")})
+        # 2 agents with 2 cpu each = 4 cpu total, but neither can fit 3 cpu
+        mock_scaling_group_repository.get_per_agent_free_resources = AsyncMock(
+            return_value=_make_agent_free_resources([
+                {"cpu": Decimal("2")},
+                {"cpu": Decimal("2")},
+            ])
+        )
+
+        result = await controller.check_deployment_surge_resources(deployment_info, revision_data)
+        assert result.sufficient is False
+        assert result.shortfall is not None
+        assert result.shortfall.fragmented is True
+
+    async def test_multi_agent_placement_succeeds(
+        self,
+        controller: DeploymentController,
+        mock_scaling_group_repository: MagicMock,
+    ) -> None:
+        """Kernels can be spread across multiple agents.
+
+        2 kernels needed (surge_count=2), each needs 2 cpu.
+        Agent A: 3 cpu (fits 1), Agent B: 3 cpu (fits 1) → total 2 placeable.
+        """
+        policy = DeploymentPolicyData(
+            id=uuid.uuid4(),
+            endpoint=ENDPOINT_ID,
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(
+                max_surge=IntOrPercent(count=2), max_unavailable=IntOrPercent(count=0)
+            ),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        deployment_info = _make_deployment_info(policy=policy)
+        revision_data = _make_revision_data(resource_slots={"cpu": Decimal("2")})
+        mock_scaling_group_repository.get_per_agent_free_resources = AsyncMock(
+            return_value=_make_agent_free_resources([
+                {"cpu": Decimal("3")},
+                {"cpu": Decimal("3")},
+            ])
+        )
+
+        result = await controller.check_deployment_surge_resources(deployment_info, revision_data)
+        assert result.sufficient is True

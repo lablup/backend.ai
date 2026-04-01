@@ -150,3 +150,11 @@ class ResourceInfo:
 
     free: list[SlotQuantity]
     """Available resources (capacity - used)."""
+
+
+@dataclass(frozen=True)
+class AgentFreeResource:
+    """Per-agent free resource slots for placement feasibility checks."""
+
+    agent_id: str
+    free_slots: dict[str, SlotQuantity]

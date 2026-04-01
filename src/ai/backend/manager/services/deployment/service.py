@@ -168,6 +168,7 @@ from ai.backend.manager.sokovan.deployment.exceptions import (
     DeploymentAlreadyInProgress,
     InsufficientSurgeResources,
     InvalidEndpointState,
+    SurgeResourceFragmented,
 )
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
@@ -843,6 +844,8 @@ class DeploymentService:
         if not surge_check.sufficient:
             if surge_check.shortfall is None:
                 raise RuntimeError("Unreachable")
+            if surge_check.shortfall.fragmented:
+                raise SurgeResourceFragmented(surge_check.shortfall.error_message)
             raise InsufficientSurgeResources(surge_check.shortfall.error_message)
 
         # 4. Set deploying_revision and transition to DEPLOYING lifecycle.

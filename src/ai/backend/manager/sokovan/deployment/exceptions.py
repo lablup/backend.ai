@@ -96,10 +96,28 @@ class DeploymentAlreadyInProgress(DeploymentError):
 
 
 class InsufficientSurgeResources(DeploymentError):
-    """Raised when a deployment surge requires more resources than currently available."""
+    """Raised when the scaling group lacks total resources for the deployment surge."""
 
     error_type = "https://api.backend.ai/probs/insufficient-surge-resources"
     error_title = "Insufficient resources for deployment surge."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class SurgeResourceFragmented(DeploymentError):
+    """Raised when total free resources are sufficient but no single agent can fit a kernel.
+
+    This happens when resources are spread across multiple agents in chunks
+    smaller than what a single kernel requires.
+    """
+
+    error_type = "https://api.backend.ai/probs/surge-resource-fragmented"
+    error_title = "Resources are fragmented across agents."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(

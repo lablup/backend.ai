@@ -13,6 +13,7 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.scaling_group.types import (
+    AgentFreeResource,
     ResourceInfo,
     ScalingGroupData,
     ScalingGroupListResult,
@@ -231,6 +232,24 @@ class ScalingGroupRepository:
             ScalingGroupNotFound: If the scaling group does not exist.
         """
         return await self._db_source.get_resource_info(scaling_group)
+
+    @scaling_group_repository_resilience.apply()
+    async def get_per_agent_free_resources(
+        self,
+        scaling_group: str,
+    ) -> list[AgentFreeResource]:
+        """Get per-agent free resource slots for placement feasibility checks.
+
+        Args:
+            scaling_group: The name of the scaling group.
+
+        Returns:
+            List of AgentFreeResource with per-agent free slots.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        return await self._db_source.get_per_agent_free_resources(scaling_group)
 
     # Allow / Disallow operations
 

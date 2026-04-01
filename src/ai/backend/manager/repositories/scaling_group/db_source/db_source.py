@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -11,7 +12,9 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.scaling_group.types import (
+    AgentFreeResource,
     ResourceInfo,
     ScalingGroupData,
     ScalingGroupListResult,
@@ -23,7 +26,11 @@ from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
@@ -410,6 +417,90 @@ class ScalingGroupDBSource:
             used=used_list,
             free=free_list,
         )
+
+    async def get_per_agent_free_resources(
+        self,
+        scaling_group: str,
+    ) -> list[AgentFreeResource]:
+        """Get per-agent free resource slots for a scaling group.
+
+        Capacity comes from ``agent_resources`` (schema-level, not a cache concern).
+        Used slots are computed from actual kernel allocations via
+        ``resource_allocations`` (ground truth), not from the cached
+        ``agent_resources.used`` column which may drift between reconciliation cycles.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        ar = AgentResourceRow.__table__
+        ag = AgentRow.__table__
+        ra = ResourceAllocationRow.__table__
+        kr = KernelRow.__table__
+
+        async with self._db.begin_readonly_session() as db_sess:
+            sg_exists = await db_sess.scalar(
+                sa.select(sa.exists().where(ScalingGroupRow.name == scaling_group))
+            )
+            if not sg_exists:
+                raise ScalingGroupNotFound(scaling_group)
+
+            # Per-agent capacity from agent_resources
+            capacity_stmt = (
+                sa.select(ar.c.agent_id, ar.c.slot_name, ar.c.capacity)
+                .select_from(ar.join(ag, ar.c.agent_id == ag.c.id))
+                .where(
+                    ag.c.scaling_group == scaling_group,
+                    ag.c.status == AgentStatus.ALIVE,
+                    ag.c.schedulable == sa.true(),
+                )
+            )
+            capacity_result = await db_sess.execute(capacity_stmt)
+
+            agent_capacity: dict[str, dict[str, Decimal]] = {}
+            for row in capacity_result:
+                if row.agent_id not in agent_capacity:
+                    agent_capacity[row.agent_id] = {}
+                agent_capacity[row.agent_id][row.slot_name] = row.capacity
+
+            # Per-agent used from kernel allocations (ground truth)
+            all_resource_statuses = (
+                KernelStatus.resource_occupied_statuses()
+                | KernelStatus.resource_requested_statuses()
+            )
+            effective_amount = sa.func.coalesce(ra.c.used, ra.c.requested)
+            used_stmt = (
+                sa.select(
+                    kr.c.agent,
+                    ra.c.slot_name,
+                    sa.func.sum(effective_amount).label("total_used"),
+                )
+                .select_from(ra.join(kr, ra.c.kernel_id == kr.c.id).join(ag, kr.c.agent == ag.c.id))
+                .where(
+                    ag.c.scaling_group == scaling_group,
+                    ag.c.status == AgentStatus.ALIVE,
+                    ag.c.schedulable == sa.true(),
+                    kr.c.status.in_(all_resource_statuses),
+                    ra.c.free_at.is_(None),
+                )
+                .group_by(kr.c.agent, ra.c.slot_name)
+            )
+            used_result = await db_sess.execute(used_stmt)
+
+            agent_used: dict[str, dict[str, Decimal]] = {}
+            for row in used_result:
+                if row.agent not in agent_used:
+                    agent_used[row.agent] = {}
+                agent_used[row.agent][row.slot_name] = row.total_used
+
+        results: list[AgentFreeResource] = []
+        for agent_id, cap_slots in agent_capacity.items():
+            used_slots = agent_used.get(agent_id, {})
+            free_slots: dict[str, SlotQuantity] = {}
+            for slot_name, capacity in cap_slots.items():
+                used = used_slots.get(slot_name, Decimal(0))
+                free_slots[slot_name] = SlotQuantity(slot_name, capacity - used)
+            results.append(AgentFreeResource(agent_id=agent_id, free_slots=free_slots))
+        return results
 
     # =========================================================================
     # Allow / Disallow (atomic add+remove in single read-committed transaction)

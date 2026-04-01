@@ -24,6 +24,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.scaling_group.types import AgentFreeResource
 from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -59,6 +60,7 @@ class SurgeShortfallDetail:
     surge_count: int
     scaling_group: str
     insufficient_slots: list[str]
+    fragmented: bool = False
 
     @property
     def surge_description(self) -> str:
@@ -306,34 +308,26 @@ class DeploymentController:
         if surge_count == 0:
             return SurgeResourceCheckResult(sufficient=True)
 
-        per_route_slots = revision_data.resource_config.resource_slot
-        cluster_size = revision_data.cluster_config.size
-        total_surge = surge_count * cluster_size
-        surge_slots = ResourceSlot({k: v * total_surge for k, v in per_route_slots.data.items()})
+        per_kernel_slots = revision_data.resource_config.resource_slot
+        total_kernels_needed = surge_count * revision_data.cluster_config.size
 
         scaling_group = deployment_info.metadata.resource_group
-        resource_info = await self._scaling_group_repository.get_resource_info(scaling_group)
-        free_slots = ResourceSlot({sq.slot_name: sq.quantity for sq in resource_info.free})
+        agent_resources = await self._scaling_group_repository.get_per_agent_free_resources(
+            scaling_group
+        )
 
-        if surge_slots <= free_slots:
+        placeable = self._count_placeable_kernels(per_kernel_slots, agent_resources)
+        if placeable >= total_kernels_needed:
             return SurgeResourceCheckResult(sufficient=True)
 
-        insufficient_slots = []
-        for slot_name in surge_slots.keys():
-            required = surge_slots.get(slot_name, Decimal(0))
-            available = free_slots.get(slot_name, Decimal(0))
-            if required > available:
-                insufficient_slots.append(
-                    f"{slot_name}: required={required}, available={available}"
-                )
-        return SurgeResourceCheckResult(
-            sufficient=False,
-            shortfall=SurgeShortfallDetail(
-                strategy=deployment_info.policy.strategy,
-                surge_count=surge_count,
-                scaling_group=scaling_group,
-                insufficient_slots=insufficient_slots,
-            ),
+        return self._build_shortfall_result(
+            per_kernel_slots=per_kernel_slots,
+            agent_resources=agent_resources,
+            total_kernels_needed=total_kernels_needed,
+            placeable_kernels=placeable,
+            strategy=deployment_info.policy.strategy,
+            surge_count=surge_count,
+            scaling_group=scaling_group,
         )
 
     @staticmethod
@@ -346,6 +340,79 @@ class DeploymentController:
                 return spec.resolve_max_surge(desired_replicas)
             case BlueGreenSpec():
                 return desired_replicas
+
+    @staticmethod
+    def _count_placeable_kernels(
+        per_kernel_slots: ResourceSlot,
+        agent_resources: list[AgentFreeResource],
+    ) -> int:
+        """Count how many identical kernels can be placed across agents.
+
+        Aggregated free resources can mask fragmentation — e.g. 2 agents with
+        2 cpu each looks like 4 cpu free, but a kernel needing 3 cpu cannot be
+        placed on either.  This method checks per-agent capacity so the surge
+        pre-flight rejects deployments that would fail at scheduling time.
+        """
+        required_slots = {k: v for k, v in per_kernel_slots.data.items() if v > 0}
+        if not required_slots:
+            return 0
+
+        placeable = 0
+        for agent in agent_resources:
+            fits = min(
+                int(agent.free_slots[slot].quantity // required_slots[slot])
+                if slot in agent.free_slots
+                else 0
+                for slot in required_slots
+            )
+            placeable += fits
+        return placeable
+
+    @staticmethod
+    def _build_shortfall_result(
+        *,
+        per_kernel_slots: ResourceSlot,
+        agent_resources: list[AgentFreeResource],
+        total_kernels_needed: int,
+        placeable_kernels: int,
+        strategy: DeploymentStrategy,
+        surge_count: int,
+        scaling_group: str,
+    ) -> SurgeResourceCheckResult:
+        """Build a shortfall result with detailed insufficient slot information."""
+        total_surge_slots = ResourceSlot({
+            k: v * total_kernels_needed for k, v in per_kernel_slots.data.items()
+        })
+        aggregated_free: dict[str, Decimal] = {}
+        for agent in agent_resources:
+            for slot_name, sq in agent.free_slots.items():
+                aggregated_free[slot_name] = (
+                    aggregated_free.get(slot_name, Decimal(0)) + sq.quantity
+                )
+
+        insufficient_slots = [
+            f"{slot_name}: required={total_surge_slots.get(slot_name, Decimal(0))},"
+            f" available={aggregated_free.get(slot_name, Decimal(0))}"
+            for slot_name in total_surge_slots.keys()
+            if total_surge_slots.get(slot_name, Decimal(0))
+            > aggregated_free.get(slot_name, Decimal(0))
+        ]
+        fragmented = not insufficient_slots
+        if fragmented:
+            insufficient_slots.append(
+                f"Resource fragmentation: {total_kernels_needed} kernels needed "
+                f"but only {placeable_kernels} placeable across agents"
+            )
+        return SurgeResourceCheckResult(
+            sufficient=False,
+            shortfall=SurgeShortfallDetail(
+                strategy=strategy,
+                surge_count=surge_count,
+                scaling_group=scaling_group,
+                insufficient_slots=insufficient_slots,
+                fragmented=fragmented,
+            ),
+        )
 
     # ========== Deployment Policy Methods ==========
 
