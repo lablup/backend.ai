@@ -35,8 +35,8 @@ from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
 from ai.backend.testutils.db import with_tables
 
 
-class TestVfolderSearchCloneableFilter:
-    """Tests for search_user_vfolders with cloneable condition filter."""
+class TestVfolderSearchFilter:
+    """Tests for search_user_vfolders with filters."""
 
     @pytest.fixture
     async def db_with_cleanup(
