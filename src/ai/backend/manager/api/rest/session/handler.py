@@ -93,7 +93,6 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.session import KernelLoadingStrategy
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
@@ -182,7 +181,6 @@ from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
-    from ai.backend.manager.repositories.session.repository import SessionRepository
     from ai.backend.manager.services.agent.processors import AgentProcessors
     from ai.backend.manager.services.auth.processors import AuthProcessors
     from ai.backend.manager.services.session.processors import SessionProcessors
@@ -250,14 +248,12 @@ class SessionHandler:
         agent: AgentProcessors,
         vfolder: VFolderProcessors,
         config_provider: ManagerConfigProvider,
-        session_repository: SessionRepository,
     ) -> None:
         self._auth = auth
         self._session = session
         self._agent = agent
         self._vfolder = vfolder
         self._config_provider = config_provider
-        self._session_repository = session_repository
 
     # ------------------------------------------------------------------
     # create_from_template (POST /_/create-from-template)
@@ -639,16 +635,10 @@ class SessionHandler:
             session_name,
         )
         try:
-            session_row = await self._session_repository.get_session_validated(
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.NONE,
-            )
             result = await self._session.get_session_info.wait_for_complete(
                 GetSessionInfoAction(
                     session_name=session_name,
                     owner_access_key=owner_access_key,
-                    session_id=session_row.id,
                 )
             )
         except BackendAIError:
@@ -736,12 +726,6 @@ class SessionHandler:
             params.recursive,
         )
 
-        session_row = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.NONE,
-            allow_stale=True,
-        )
         result = await self._session.destroy_session.wait_for_complete(
             DestroySessionAction(
                 session_name=session_name,
@@ -749,7 +733,6 @@ class SessionHandler:
                 user_role=user_role,
                 forced=params.forced,
                 recursive=params.recursive,
-                session_id=session_row.id,
             )
         )
         return APIResponse.build(HTTPStatus.OK, DestroySessionResponse(result.result))
@@ -782,11 +765,6 @@ class SessionHandler:
             session_name,
         )
 
-        session_row = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.NONE,
-        )
         result = await self._session.execute_session.wait_for_complete(
             ExecuteSessionAction(
                 session_name=session_name,
@@ -798,7 +776,6 @@ class SessionHandler:
                     code=params.code,
                     options=params.options,
                 ),
-                session_id=session_row.id,
             )
         )
         return APIResponse.build(HTTPStatus.OK, ExecuteResponse(result.result))

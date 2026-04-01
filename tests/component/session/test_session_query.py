@@ -50,7 +50,6 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
@@ -67,7 +66,6 @@ def server_module_registries(
     session_processors: SessionProcessors,
     agent_processors_mock: AgentProcessors,
     vfolder_processors_mock: VFolderProcessors,
-    session_repository: SessionRepository,
 ) -> list[RouteRegistry]:
     """Extended module registries including session and compute-sessions routes.
 
@@ -82,7 +80,6 @@ def server_module_registries(
                 agent=agent_processors_mock,
                 vfolder=vfolder_processors_mock,
                 config_provider=config_provider,
-                session_repository=session_repository,
             ),
             route_deps,
         ),

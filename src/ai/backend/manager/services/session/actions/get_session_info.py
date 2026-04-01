@@ -1,44 +1,34 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import (
-    SessionSingleEntityAction,
-    SessionSingleEntityActionResult,
-)
+from ai.backend.manager.services.session.base import SessionAction
 from ai.backend.manager.services.session.types import LegacySessionInfo
 
 
 @dataclass
-class GetSessionInfoAction(SessionSingleEntityAction):
+class GetSessionInfoAction(SessionAction):
     session_name: str
     owner_access_key: AccessKey
-    session_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.session_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.SESSION, str(self.session_id))
-
 
 @dataclass
-class GetSessionInfoActionResult(SessionSingleEntityActionResult):
+class GetSessionInfoActionResult(BaseActionResult):
     session_info: LegacySessionInfo
     session_data: SessionData
 
     @override
-    def target_entity_id(self) -> str:
+    def entity_id(self) -> str | None:
         return str(self.session_data.id)

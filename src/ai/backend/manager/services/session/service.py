@@ -792,7 +792,7 @@ class SessionService:
 
         # Return response - same format for both recursive and non-recursive
         resp = {"stats": last_stat}
-        return DestroySessionActionResult(result=resp, session_id=action.session_id)
+        return DestroySessionActionResult(result=resp)
 
     async def terminate_sessions(
         self, action: TerminateSessionsAction
