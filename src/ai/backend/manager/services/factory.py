@@ -384,6 +384,7 @@ def create_services(args: ServiceArgs) -> Services:
                 config_provider=args.config_provider,
             ),
             resource_preset_repository=repositories.resource_preset.repository,
+            scaling_group_repository=repositories.scaling_group.repository,
         ),
         stream=StreamService(
             repository=repositories.stream.repository,

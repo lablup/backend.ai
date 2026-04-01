@@ -6,6 +6,10 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.services.resource_allocation.actions.check_placement_feasibility import (
+    CheckPlacementFeasibilityAction,
+    CheckPlacementFeasibilityActionResult,
+)
 from ai.backend.manager.services.resource_allocation.actions.check_preset_availability import (
     CheckPresetAvailabilityAction,
     CheckPresetAvailabilityActionResult,
@@ -53,6 +57,9 @@ class ResourceAllocationProcessors(AbstractProcessorPackage):
     check_preset_availability: ActionProcessor[
         CheckPresetAvailabilityAction, CheckPresetAvailabilityActionResult
     ]
+    check_placement_feasibility: ActionProcessor[
+        CheckPlacementFeasibilityAction, CheckPlacementFeasibilityActionResult
+    ]
 
     def __init__(
         self,
@@ -75,6 +82,9 @@ class ResourceAllocationProcessors(AbstractProcessorPackage):
         self.check_preset_availability = ActionProcessor(
             service.check_preset_availability, action_monitors
         )
+        self.check_placement_feasibility = ActionProcessor(
+            service.check_placement_feasibility, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -86,4 +96,5 @@ class ResourceAllocationProcessors(AbstractProcessorPackage):
             GetResourceGroupUsageAction.spec(),
             GetEffectiveAllocationAction.spec(),
             CheckPresetAvailabilityAction.spec(),
+            CheckPlacementFeasibilityAction.spec(),
         ]

@@ -49,6 +49,16 @@ class PresetAvailabilityData:
 
 
 @dataclass(frozen=True)
+class PlacementFeasibilityResult:
+    """Result of checking whether identical kernels can be placed across agents."""
+
+    feasible: bool
+    total_needed: int
+    total_placeable: int
+    fragmented: bool = False
+
+
+@dataclass(frozen=True)
 class KeypairContextData:
     """Resolved keypair context for a user (access_key + resource_policy)."""
 

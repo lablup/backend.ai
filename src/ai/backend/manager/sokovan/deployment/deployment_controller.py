@@ -310,13 +310,13 @@ class DeploymentController:
 
         per_kernel_slots = revision_data.resource_config.resource_slot
         total_kernels_needed = surge_count * revision_data.cluster_config.size
-
         scaling_group = deployment_info.metadata.resource_group
+
         agent_resources = await self._scaling_group_repository.get_per_agent_free_resources(
             scaling_group
         )
-
         placeable = self._count_placeable_kernels(per_kernel_slots, agent_resources)
+
         if placeable >= total_kernels_needed:
             return SurgeResourceCheckResult(sufficient=True)
 
