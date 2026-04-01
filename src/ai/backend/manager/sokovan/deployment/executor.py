@@ -614,7 +614,7 @@ class DeploymentExecutor:
                         )
                 elif len(routes) > target_count:
                     termination_route_candidates = sorted(
-                        routes, key=lambda r: (r.status.termination_priority())
+                        routes, key=lambda r: r.status.termination_priority(r.health_status)
                     )
                     candidates = termination_route_candidates[: len(routes) - target_count]
                     scale_in_route_ids.extend(r.route_id for r in candidates)
