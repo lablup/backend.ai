@@ -21,6 +21,11 @@ class ModelDeploymentCreateRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.MODEL_DEPLOYMENT, OperationType.CREATE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.PROJECT
+
 
 class ModelDeploymentGetRBACAction(BaseRBACAction):
     @classmethod
@@ -32,6 +37,11 @@ class ModelDeploymentGetRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.MODEL_DEPLOYMENT, OperationType.READ)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.PROJECT
 
 
 class ModelDeploymentSearchRBACAction(BaseRBACAction):
@@ -45,6 +55,11 @@ class ModelDeploymentSearchRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.MODEL_DEPLOYMENT, OperationType.READ)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.PROJECT
+
 
 class ModelDeploymentUpdateRBACAction(BaseRBACAction):
     @classmethod
@@ -57,6 +72,11 @@ class ModelDeploymentUpdateRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.MODEL_DEPLOYMENT, OperationType.UPDATE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.PROJECT
+
 
 class ModelDeploymentHardDeleteRBACAction(BaseRBACAction):
     @classmethod
@@ -68,3 +88,8 @@ class ModelDeploymentHardDeleteRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.MODEL_DEPLOYMENT, OperationType.HARD_DELETE)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.PROJECT

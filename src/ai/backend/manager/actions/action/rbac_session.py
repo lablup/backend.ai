@@ -21,6 +21,11 @@ class SessionCreateRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.SESSION, OperationType.CREATE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
+
 
 class SessionGetRBACAction(BaseRBACAction):
     @classmethod
@@ -32,6 +37,11 @@ class SessionGetRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.SESSION, OperationType.READ)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
 
 
 class SessionSearchRBACAction(BaseRBACAction):
@@ -45,6 +55,11 @@ class SessionSearchRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.SESSION, OperationType.READ)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
+
 
 class SessionUpdateRBACAction(BaseRBACAction):
     @classmethod
@@ -56,6 +71,11 @@ class SessionUpdateRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.SESSION, OperationType.UPDATE)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
 
 
 class SessionHardDeleteRBACAction(BaseRBACAction):
@@ -69,6 +89,11 @@ class SessionHardDeleteRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.SESSION, OperationType.HARD_DELETE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
+
 
 class SessionGrantAllRBACAction(BaseRBACAction):
     @classmethod
@@ -80,6 +105,11 @@ class SessionGrantAllRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.SESSION, OperationType.GRANT_ALL)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
 
 
 class SessionGrantReadRBACAction(BaseRBACAction):
@@ -93,6 +123,11 @@ class SessionGrantReadRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.SESSION, OperationType.GRANT_READ)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
+
 
 class SessionGrantUpdateRBACAction(BaseRBACAction):
     @classmethod
@@ -105,6 +140,11 @@ class SessionGrantUpdateRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.SESSION, OperationType.GRANT_UPDATE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
+
 
 class SessionGrantHardDeleteRBACAction(BaseRBACAction):
     @classmethod
@@ -116,3 +156,8 @@ class SessionGrantHardDeleteRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.SESSION, OperationType.GRANT_HARD_DELETE)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER

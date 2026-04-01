@@ -21,6 +21,11 @@ class VFolderCreateRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.VFOLDER, OperationType.CREATE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
+
 
 class VFolderGetRBACAction(BaseRBACAction):
     @classmethod
@@ -32,6 +37,11 @@ class VFolderGetRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.VFOLDER, OperationType.READ)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
 
 
 class VFolderSearchRBACAction(BaseRBACAction):
@@ -45,6 +55,11 @@ class VFolderSearchRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.VFOLDER, OperationType.READ)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
+
 
 class VFolderUpdateRBACAction(BaseRBACAction):
     @classmethod
@@ -56,6 +71,11 @@ class VFolderUpdateRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.VFOLDER, OperationType.UPDATE)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
 
 
 class VFolderSoftDeleteRBACAction(BaseRBACAction):
@@ -69,6 +89,11 @@ class VFolderSoftDeleteRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.VFOLDER, OperationType.SOFT_DELETE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
+
 
 class VFolderHardDeleteRBACAction(BaseRBACAction):
     @classmethod
@@ -80,6 +105,11 @@ class VFolderHardDeleteRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.VFOLDER, OperationType.HARD_DELETE)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
 
 
 class VFolderGrantAllRBACAction(BaseRBACAction):
@@ -93,6 +123,11 @@ class VFolderGrantAllRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.VFOLDER, OperationType.GRANT_ALL)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
+
 
 class VFolderGrantReadRBACAction(BaseRBACAction):
     @classmethod
@@ -104,6 +139,11 @@ class VFolderGrantReadRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.VFOLDER, OperationType.GRANT_READ)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
 
 
 class VFolderGrantUpdateRBACAction(BaseRBACAction):
@@ -117,6 +157,11 @@ class VFolderGrantUpdateRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.VFOLDER, OperationType.GRANT_UPDATE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
+
 
 class VFolderGrantSoftDeleteRBACAction(BaseRBACAction):
     @classmethod
@@ -129,6 +174,11 @@ class VFolderGrantSoftDeleteRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.VFOLDER, OperationType.GRANT_SOFT_DELETE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
+
 
 class VFolderGrantHardDeleteRBACAction(BaseRBACAction):
     @classmethod
@@ -140,3 +190,8 @@ class VFolderGrantHardDeleteRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.VFOLDER, OperationType.GRANT_HARD_DELETE)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.USER
