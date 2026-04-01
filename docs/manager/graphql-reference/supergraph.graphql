@@ -13861,10 +13861,6 @@ enum RouteStatus
   TERMINATING @join__enumValue(graph: STRAWBERRY)
   TERMINATED @join__enumValue(graph: STRAWBERRY)
   FAILED_TO_START @join__enumValue(graph: STRAWBERRY)
-  HEALTHY @join__enumValue(graph: STRAWBERRY)
-  UNHEALTHY @join__enumValue(graph: STRAWBERRY)
-  DEGRADED @join__enumValue(graph: STRAWBERRY)
-  NOT_CHECKED @join__enumValue(graph: STRAWBERRY)
 }
 
 """
