@@ -2,8 +2,9 @@ import asyncio
 import itertools
 import logging
 from collections import defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
+from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from typing import (
     Annotated,
@@ -90,6 +91,11 @@ class CircuitManager:
             self._circuit_locks[circuit_id] = asyncio.Lock()
         return self._circuit_locks[circuit_id]
 
+    @actxmgr
+    async def circuit_lock(self, circuit_id: UUID) -> AsyncIterator[None]:
+        async with self._get_lock(circuit_id):
+            yield
+
     async def initialize_circuits(self, circuits: Sequence[Circuit]) -> None:
         if self.local_config.proxy_coordinator.enable_traefik:
             await self.initialize_traefik_circuits(circuits)
@@ -161,11 +167,16 @@ class CircuitManager:
         self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
     async def update_circuit_routes(self, circuit: Circuit, old_routes: list[RouteInfo]) -> None:
-        async with self._get_lock(circuit.id):
-            if self.local_config.proxy_coordinator.enable_traefik:
-                await self.update_traefik_circuit_routes(circuit, old_routes)
-            else:
-                await self.update_legacy_circuit_routes(circuit, old_routes)
+        async with self.circuit_lock(circuit.id):
+            await self._update_circuit_routes_unlocked(circuit, old_routes)
+
+    async def _update_circuit_routes_unlocked(
+        self, circuit: Circuit, old_routes: list[RouteInfo]
+    ) -> None:
+        if self.local_config.proxy_coordinator.enable_traefik:
+            await self.update_traefik_circuit_routes(circuit, old_routes)
+        else:
+            await self.update_legacy_circuit_routes(circuit, old_routes)
 
     async def update_traefik_circuit_routes(
         self, circuit: Circuit, old_routes: list[RouteInfo]
@@ -226,13 +237,12 @@ class CircuitManager:
         await self.event_producer.broadcast_event(event)
 
     async def unload_circuits(self, circuits: Sequence[Circuit]) -> None:
-        if self.local_config.proxy_coordinator.enable_traefik:
-            for circuit in circuits:
-                async with self._get_lock(circuit.id):
+        for circuit in circuits:
+            async with self.circuit_lock(circuit.id):
+                if self.local_config.proxy_coordinator.enable_traefik:
                     await self.unload_traefik_circuit(circuit)
-                self._circuit_locks.pop(circuit.id, None)
-        else:
-            await self.unload_legacy_circuits(circuits)
+                else:
+                    await self.unload_legacy_circuit(circuit)
 
     async def unload_traefik_circuit(self, circuit: Circuit) -> None:
         log.debug("unload_traefik_circuit(): start")
@@ -262,17 +272,12 @@ class CircuitManager:
             await self.traefik_etcd.delete_prefix(prefix)
         log.debug("unload_traefik_circuit(): end")
 
-    async def unload_legacy_circuits(self, circuits: Sequence[Circuit]) -> None:
-        circuits_by_worker: defaultdict[str, list[Circuit]] = defaultdict(list)
-        for circuit in circuits:
-            circuits_by_worker[circuit.worker_row.authority].append(circuit)
-
-        for authority, circuits in circuits_by_worker.items():
-            event = AppProxyCircuitRemovedEvent(
-                target_worker_authority=authority,
-                circuits=[SerializableCircuit(**c.dump_model()) for c in circuits],
-            )
-            await self.event_producer.broadcast_event(event)
+    async def unload_legacy_circuit(self, circuit: Circuit) -> None:
+        event = AppProxyCircuitRemovedEvent(
+            target_worker_authority=circuit.worker_row.authority,
+            circuits=[SerializableCircuit(**circuit.dump_model())],
+        )
+        await self.event_producer.broadcast_event(event)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
