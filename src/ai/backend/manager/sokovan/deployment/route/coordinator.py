@@ -210,6 +210,7 @@ class RouteCoordinator:
             records: Execution records from the recorder context
         """
         handler_name = handler.name()
+        handler_category = handler.category()
         transitions = handler.status_transitions()
         target = handler.target_statuses()
         from_status = target.lifecycle[0] if target.lifecycle else None
@@ -226,11 +227,13 @@ class RouteCoordinator:
                 RouteHistoryCreatorSpec(
                     route_id=r.route_id,
                     deployment_id=r.endpoint_id,
+                    category=handler_category,
                     phase=handler_name,
                     result=SchedulingResult.SUCCESS,
                     message=f"{handler_name} completed successfully",
                     from_status=from_status,
                     to_status=to_status,
+                    to_health_status=transitions.success.health_status,
                     sub_steps=extract_sub_steps_for_entity(r.route_id, records),
                 )
                 for r in result.successes
@@ -257,11 +260,13 @@ class RouteCoordinator:
                 RouteHistoryCreatorSpec(
                     route_id=e.route_info.route_id,
                     deployment_id=e.route_info.endpoint_id,
+                    category=handler_category,
                     phase=handler_name,
                     result=SchedulingResult.FAILURE,
                     message=e.reason,
                     from_status=from_status,
                     to_status=to_status,
+                    to_health_status=transitions.failure.health_status,
                     error_code=e.error_code,
                     sub_steps=extract_sub_steps_for_entity(e.route_info.route_id, records),
                 )
@@ -289,11 +294,13 @@ class RouteCoordinator:
                 RouteHistoryCreatorSpec(
                     route_id=r.route_id,
                     deployment_id=r.endpoint_id,
+                    category=handler_category,
                     phase=handler_name,
                     result=SchedulingResult.SUCCESS,
                     message=f"{handler_name} marked route as stale",
                     from_status=from_status,
                     to_status=to_status,
+                    to_health_status=transitions.stale.health_status,
                     sub_steps=extract_sub_steps_for_entity(r.route_id, records),
                 )
                 for r in result.stale

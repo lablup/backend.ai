@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    RouteHandlerCategory,
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
@@ -41,6 +42,10 @@ class ServiceDiscoverySyncHandler(RouteHandler):
     def lock_id(self) -> LockID | None:
         """No lock needed for service discovery sync."""
         return None
+
+    @classmethod
+    def category(cls) -> RouteHandlerCategory:
+        return RouteHandlerCategory.HEALTH
 
     @classmethod
     def target_statuses(cls) -> RouteTargetStatuses:

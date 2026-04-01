@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    RouteHandlerCategory,
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
@@ -42,6 +43,10 @@ class HealthCheckRouteHandler(RouteHandler):
     def lock_id(self) -> LockID | None:
         """Lock for health check routes."""
         return LockID.LOCKID_DEPLOYMENT_HEALTH_CHECK_ROUTES
+
+    @classmethod
+    def category(cls) -> RouteHandlerCategory:
+        return RouteHandlerCategory.HEALTH
 
     @classmethod
     def target_statuses(cls) -> RouteTargetStatuses:

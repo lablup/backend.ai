@@ -21,7 +21,7 @@ def upgrade() -> None:
     # Commit so the new enum value is visible in the same transaction
     op.execute("COMMIT")
 
-    # 2. Add health_status column (plain VARCHAR, not native enum)
+    # 2. Add health_status column to routings
     op.execute("""
         ALTER TABLE routings
         ADD COLUMN IF NOT EXISTS health_status VARCHAR(64)
@@ -47,8 +47,27 @@ def upgrade() -> None:
             END
     """)
 
+    # 4. Add category, from_health_status, to_health_status to route_history
+    op.execute("""
+        ALTER TABLE route_history
+        ADD COLUMN IF NOT EXISTS category VARCHAR(32) NOT NULL DEFAULT 'lifecycle'
+    """)
+    op.execute("""
+        ALTER TABLE route_history
+        ADD COLUMN IF NOT EXISTS from_health_status VARCHAR(64)
+    """)
+    op.execute("""
+        ALTER TABLE route_history
+        ADD COLUMN IF NOT EXISTS to_health_status VARCHAR(64)
+    """)
+
 
 def downgrade() -> None:
+    # Remove route_history columns
+    op.execute("ALTER TABLE route_history DROP COLUMN IF EXISTS to_health_status")
+    op.execute("ALTER TABLE route_history DROP COLUMN IF EXISTS from_health_status")
+    op.execute("ALTER TABLE route_history DROP COLUMN IF EXISTS category")
+
     # Merge health_status back into status
     op.execute("""
         UPDATE routings SET

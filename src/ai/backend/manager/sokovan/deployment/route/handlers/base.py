@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 from ai.backend.manager.data.deployment.types import (
+    RouteHandlerCategory,
     RouteStatusTransitions,
     RouteTargetStatuses,
 )
@@ -28,6 +29,12 @@ class RouteHandler(ABC):
     def name(cls) -> str:
         """Get the name of the handler."""
         raise NotImplementedError("Subclasses must implement name()")
+
+    @classmethod
+    @abstractmethod
+    def category(cls) -> RouteHandlerCategory:
+        """Whether this handler manages lifecycle or health transitions."""
+        raise NotImplementedError("Subclasses must implement category()")
 
     @property
     @abstractmethod

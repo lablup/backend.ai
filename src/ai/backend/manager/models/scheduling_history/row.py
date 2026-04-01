@@ -11,7 +11,6 @@ from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryData,
     RouteHistoryData,
-    RouteStatus,
 )
 from ai.backend.manager.data.kernel.types import (
     KernelSchedulingHistoryData,
@@ -256,11 +255,20 @@ class RouteHistoryRow(Base):  # type: ignore[misc]
         "deployment_id", GUID, nullable=False, index=True
     )
 
+    category: Mapped[str] = mapped_column(
+        "category", sa.String(length=32), nullable=False, server_default=sa.text("'lifecycle'")
+    )
     phase: Mapped[str] = mapped_column("phase", sa.String(length=64), nullable=False)
     from_status: Mapped[str | None] = mapped_column(
         "from_status", sa.String(length=64), nullable=True
     )
     to_status: Mapped[str | None] = mapped_column("to_status", sa.String(length=64), nullable=True)
+    from_health_status: Mapped[str | None] = mapped_column(
+        "from_health_status", sa.String(length=64), nullable=True
+    )
+    to_health_status: Mapped[str | None] = mapped_column(
+        "to_health_status", sa.String(length=64), nullable=True
+    )
 
     result: Mapped[str] = mapped_column("result", sa.String(length=32), nullable=False)
     error_code: Mapped[str | None] = mapped_column(
@@ -294,23 +302,34 @@ class RouteHistoryRow(Base):  # type: ignore[misc]
         """Check if a new entry should be merged with this one.
 
         Merge conditions:
-        - Same phase, error_code, and to_status -> merge (increment attempts)
-        - from_status and result (success/failure) do not affect merge decision
+        - Same category, phase, error_code
+        - For lifecycle category: same to_status
+        - For health category: same to_health_status
         """
-        return (
-            self.phase == new_row.phase
-            and self.error_code == new_row.error_code
-            and self.to_status == new_row.to_status
-        )
+        if self.category != new_row.category:
+            return False
+        if self.phase != new_row.phase or self.error_code != new_row.error_code:
+            return False
+        if self.category == "health":
+            return self.to_health_status == new_row.to_health_status
+        return self.to_status == new_row.to_status
 
     def to_data(self) -> RouteHistoryData:
+        # API exposes unified from_status/to_status based on category
+        if self.category == "health":
+            from_val = self.from_health_status
+            to_val = self.to_health_status
+        else:
+            from_val = self.from_status
+            to_val = self.to_status
         return RouteHistoryData(
             id=self.id,
             route_id=self.route_id,
             deployment_id=self.deployment_id,
+            category=self.category,
             phase=self.phase,
-            from_status=RouteStatus(self.from_status) if self.from_status else None,
-            to_status=RouteStatus(self.to_status) if self.to_status else None,
+            from_status=from_val,
+            to_status=to_val,
             result=SchedulingResult(self.result),
             error_code=self.error_code,
             message=self.message,

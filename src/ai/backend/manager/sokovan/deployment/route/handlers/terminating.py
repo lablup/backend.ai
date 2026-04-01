@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    RouteHandlerCategory,
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
@@ -42,6 +43,10 @@ class TerminatingRouteHandler(RouteHandler):
     def lock_id(self) -> LockID | None:
         """No lock needed for terminating routes."""
         return None
+
+    @classmethod
+    def category(cls) -> RouteHandlerCategory:
+        return RouteHandlerCategory.LIFECYCLE
 
     @classmethod
     def target_statuses(cls) -> RouteTargetStatuses:

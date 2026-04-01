@@ -152,6 +152,13 @@ class RouteHealthStatus(enum.Enum):
     DEGRADED = "degraded"
 
 
+class RouteHandlerCategory(enum.StrEnum):
+    """Category of route handler for history separation."""
+
+    LIFECYCLE = "lifecycle"
+    HEALTH = "health"
+
+
 class RouteTrafficStatus(enum.StrEnum):
     """Traffic routing status for a route.
 
@@ -732,15 +739,21 @@ class DeploymentHistoryData:
 
 @dataclass
 class RouteHistoryData:
-    """Domain model for route history."""
+    """Domain model for route history.
+
+    from_status/to_status contain the relevant status for the category:
+    - category=lifecycle: lifecycle status values (provisioning, running, etc.)
+    - category=health: health status values (healthy, unhealthy, etc.)
+    """
 
     id: UUID
     route_id: UUID
     deployment_id: UUID
 
+    category: str  # RouteHandlerCategory value
     phase: str  # RouteLifecycleType value
-    from_status: RouteStatus | None
-    to_status: RouteStatus | None
+    from_status: str | None
+    to_status: str | None
 
     result: SchedulingResult
     error_code: str | None
