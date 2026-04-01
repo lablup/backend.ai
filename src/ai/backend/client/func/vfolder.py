@@ -783,17 +783,19 @@ class VFolderByName(BaseFunction):
         self,
         target_name: str,
         target_host: str | None = None,
-        usage_mode: str = "general",
+        usage_mode: str | None = None,
         permission: str = "rw",
     ) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/clone")
-        rqst.set_json({
+        body: dict[str, Any] = {
             "target_name": target_name,
             "target_host": target_host,
-            "usage_mode": usage_mode,
             "permission": permission,
-        })
+        }
+        if usage_mode is not None:
+            body["usage_mode"] = usage_mode
+        rqst.set_json(body)
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
             return result

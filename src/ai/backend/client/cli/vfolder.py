@@ -815,8 +815,8 @@ def leave(name: str, shared_user_uuid: str | None) -> None:
     "--usage-mode",
     metavar="USAGE_MODE",
     type=str,
-    default="general",
-    help="Purpose of the cloned virtual folder. Default value is 'general'.",
+    default=None,
+    help="Purpose of the cloned virtual folder. If not specified, inherits from the source vfolder.",
 )
 @click.option(
     "-p",
@@ -826,7 +826,9 @@ def leave(name: str, shared_user_uuid: str | None) -> None:
     default="rw",
     help="Cloned virtual folder's permission. Default value is 'rw'.",
 )
-def clone(name: str, target_name: str, target_host: str, usage_mode: str, permission: str) -> None:
+def clone(
+    name: str, target_name: str, target_host: str, usage_mode: str | None, permission: str
+) -> None:
     """Clone a virtual folder.
 
     \b
