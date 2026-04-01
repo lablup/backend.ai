@@ -197,7 +197,7 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         if to_terminate > 0:
             sorted_old = sorted(
                 classified.old_active,
-                key=lambda route: route.status.termination_priority(route.health_status),
+                key=lambda route: route.termination_priority,
             )
             for route in sorted_old[:to_terminate]:
                 route_changes.drain_route_ids.append(route.route_id)

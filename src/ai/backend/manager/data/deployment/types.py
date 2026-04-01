@@ -131,17 +131,6 @@ class RouteStatus(enum.Enum):
     def is_inactive(self) -> bool:
         return self in self.inactive_route_statuses()
 
-    def termination_priority(self, health: RouteHealthStatus) -> int:
-        if self != RouteStatus.RUNNING:
-            return 0
-        priority_map = {
-            RouteHealthStatus.UNHEALTHY: 1,
-            RouteHealthStatus.DEGRADED: 2,
-            RouteHealthStatus.NOT_CHECKED: 3,
-            RouteHealthStatus.HEALTHY: 4,
-        }
-        return priority_map.get(health, 0)
-
 
 class RouteHealthStatus(enum.Enum):
     """Health check status of a route (independent of lifecycle)."""
@@ -539,6 +528,14 @@ class DefinitionFiles:
     model_definition: dict[str, Any]
 
 
+_HEALTH_TERMINATION_PRIORITY: dict[RouteHealthStatus, int] = {
+    RouteHealthStatus.UNHEALTHY: 1,
+    RouteHealthStatus.DEGRADED: 2,
+    RouteHealthStatus.NOT_CHECKED: 3,
+    RouteHealthStatus.HEALTHY: 4,
+}
+
+
 @dataclass
 class RouteInfo:
     """Route information for deployment."""
@@ -553,6 +550,17 @@ class RouteInfo:
     revision_id: UUID
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def termination_priority(self) -> int:
+        """Priority for scale-in termination (lower = terminated first).
+
+        Non-RUNNING routes are terminated first (0).
+        Among RUNNING routes: UNHEALTHY(1) > DEGRADED(2) > NOT_CHECKED(3) > HEALTHY(4).
+        """
+        if self.status != RouteStatus.RUNNING:
+            return 0
+        return _HEALTH_TERMINATION_PRIORITY.get(self.health_status, 0)
 
 
 @dataclass
