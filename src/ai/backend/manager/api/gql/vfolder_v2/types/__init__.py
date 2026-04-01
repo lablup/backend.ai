@@ -8,7 +8,7 @@ from .enum import (
     VFolderUsageModeGQL,
 )
 from .filters import (
-    HostPermissionFilterGQL,
+    HostPermissionConditionGQL,
     VFolderFilterGQL,
     VFolderOperationStatusFilterGQL,
     VFolderOrderByGQL,
@@ -32,7 +32,7 @@ __all__ = [
     # Enum filters
     "VFolderOperationStatusFilterGQL",
     "VFolderUsageModeFilterGQL",
-    "HostPermissionFilterGQL",
+    "HostPermissionConditionGQL",
     # Filter and OrderBy
     "VFolderFilterGQL",
     "VFolderOrderByGQL",

@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, OrderDirecti
 from ai.backend.common.types import VFolderUsageMode
 
 __all__ = (
-    "HostPermissionFilter",
+    "HostPermissionCondition",
     "OrderDirection",
     "VFolderHostPermissionField",
     "VFolderInvitationState",
@@ -82,7 +82,7 @@ class VFolderHostPermissionField(StrEnum):
     SET_USER_PERM = "set-user-specific-permission"
 
 
-class HostPermissionFilter(BaseRequestModel):
+class HostPermissionCondition(BaseRequestModel):
     """Filter by host permission accessibility.
 
     ``in_`` returns vfolders on hosts where the user has **all** listed permissions.

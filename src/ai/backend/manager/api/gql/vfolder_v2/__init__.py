@@ -6,7 +6,7 @@ replacing JSON scalars and organized into logical field groups.
 
 from .resolver import my_vfolders, project_vfolders
 from .types import (
-    HostPermissionFilterGQL,
+    HostPermissionConditionGQL,
     VFolderAccessControlInfoGQL,
     VFolderConnection,
     VFolderEdge,
@@ -31,7 +31,7 @@ __all__ = [
     "VFolderOperationStatusGQL",
     "VFolderUsageModeGQL",
     # Enum filters
-    "HostPermissionFilterGQL",
+    "HostPermissionConditionGQL",
     "VFolderOperationStatusFilterGQL",
     "VFolderUsageModeFilterGQL",
     # Filter and OrderBy

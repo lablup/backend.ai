@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
-    HostPermissionFilter,
+    HostPermissionCondition,
     OrderDirection,
     VFolderOrderField,
     VFolderPermissionField,
@@ -261,9 +261,6 @@ class VFolderFilter(BaseRequestModel):
     )
     cloneable: bool | None = Field(default=None, description="Filter by cloneable flag.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
-    host_permission: HostPermissionFilter | None = Field(
-        default=None, description="Filter by host permission accessibility."
-    )
     AND: list[VFolderFilter] | None = Field(default=None, description="AND logical combinator.")
     OR: list[VFolderFilter] | None = Field(default=None, description="OR logical combinator.")
     NOT: list[VFolderFilter] | None = Field(default=None, description="NOT logical combinator.")
@@ -283,6 +280,10 @@ class SearchVFoldersInput(BaseRequestModel):
     """Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches)."""
 
     filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")
+    host_permission: HostPermissionCondition | None = Field(
+        default=None,
+        description="Filter by host permission accessibility. Evaluated against the requesting user's permissions.",
+    )
     order: list[VFolderOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")
     after: str | None = Field(default=None, description="Cursor pagination: after cursor.")

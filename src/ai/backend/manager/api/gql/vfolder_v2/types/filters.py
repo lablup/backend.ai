@@ -7,7 +7,7 @@ from typing import Self
 
 from ai.backend.common.dto.manager.v2.vfolder.request import VFolderFilter, VFolderOrder
 from ai.backend.common.dto.manager.v2.vfolder.types import (
-    HostPermissionFilter,
+    HostPermissionCondition,
     VFolderStatusFilter,
     VFolderUsageModeFilter,
 )
@@ -69,9 +69,9 @@ class VFolderUsageModeFilterGQL(PydanticInputMixin[VFolderUsageModeFilter]):
         description="Filter by storage host permission accessibility. Returns vfolders on hosts where the requesting user has (or lacks) the specified permissions.",
         added_version=NEXT_RELEASE_VERSION,
     ),
-    name="HostPermissionFilter",
+    name="HostPermissionCondition",
 )
-class HostPermissionFilterGQL(PydanticInputMixin[HostPermissionFilter]):
+class HostPermissionConditionGQL(PydanticInputMixin[HostPermissionCondition]):
     """Filter by host permission accessibility."""
 
     in_: list[VFolderHostPermissionGQL] | None = gql_field(
@@ -104,7 +104,6 @@ class VFolderFilterGQL(PydanticInputMixin[VFolderFilter]):
     usage_mode: VFolderUsageModeFilterGQL | None = None
     cloneable: bool | None = None
     created_at: DateTimeFilter | None = None
-    host_permission: HostPermissionFilterGQL | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
