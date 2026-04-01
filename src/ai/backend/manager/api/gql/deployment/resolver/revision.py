@@ -154,16 +154,9 @@ async def add_model_revision(
     options: AddRevisionOptionsGQL | None = None,
 ) -> AddRevisionPayload:
     """Add a model revision to a deployment."""
-    adapter_options = (
-        AdapterAddRevisionOptions(
-            activate=options.activate,
-        )
-        if options
-        else AdapterAddRevisionOptions()
-    )
     payload = await info.context.adapters.deployment.add_revision(
         input.to_pydantic(),
-        options=adapter_options,
+        options=options.to_pydantic() if options else AdapterAddRevisionOptions(),
     )
     return AddRevisionPayload(revision=ModelRevision.from_pydantic(payload.revision))
 

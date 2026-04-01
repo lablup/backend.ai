@@ -201,6 +201,15 @@ class CreateRevisionInputDTO(BaseRequestModel):
     )
 
 
+class AddRevisionOptions(BaseRequestModel):
+    """Options for the add revision operation."""
+
+    activate: bool = Field(
+        default=False,
+        description="When true, automatically activate the newly added revision immediately after creation.",
+    )
+
+
 class AddRevisionGQLInputDTO(BaseRequestModel):
     """Input for adding a revision via GQL (flat structure matching GQL AddRevisionInput)."""
 
@@ -222,14 +231,9 @@ class AddRevisionGQLInputDTO(BaseRequestModel):
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Additional vfolder mounts"
     )
-
-
-class AddRevisionOptions(BaseRequestModel):
-    """Options for the add revision operation."""
-
-    activate: bool = Field(
-        default=False,
-        description="When true, automatically activate the newly added revision immediately after creation.",
+    options: AddRevisionOptions | None = Field(
+        default=None,
+        description="Additional options for the add revision operation.",
     )
 
 
