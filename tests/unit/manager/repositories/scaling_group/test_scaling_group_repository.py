@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -8,8 +9,16 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SessionTypes
+from ai.backend.common.types import (
+    AccessKey,
+    ClusterMode,
+    DefaultForUnspecified,
+    ResourceSlot,
+    RuntimeVariant,
+    SessionTypes,
+)
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -1323,10 +1332,27 @@ class TestScalingGroupRepositoryDB:
         sample_scaling_group_for_hierarchy: str,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
     ) -> AsyncGenerator[uuid.UUID, None]:
-        """Create an endpoint referencing the scaling group."""
+        """Create an endpoint with a deployment revision referencing the scaling group."""
         test_user_uuid, test_domain, test_group_id = test_user_domain_group
         endpoint_id = uuid.uuid4()
+        revision_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            image = ImageRow(
+                name="test-image:latest",
+                project=str(uuid.uuid4()),
+                image="test-image",
+                registry="docker.io",
+                registry_id=uuid.uuid4(),
+                architecture="x86_64",
+                is_local=False,
+                config_digest="sha256:abc123",
+                size_bytes=1000000,
+                type=ImageType.COMPUTE,
+                labels={},
+            )
+            db_sess.add(image)
+            await db_sess.flush()
+
             db_sess.add(
                 EndpointRow(
                     id=endpoint_id,
@@ -1334,9 +1360,29 @@ class TestScalingGroupRepositoryDB:
                     domain=test_domain,
                     project=test_group_id,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
+                    current_revision=revision_id,
                     session_owner=test_user_uuid,
                     created_user=test_user_uuid,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                DeploymentRevisionRow(
+                    id=revision_id,
+                    endpoint=endpoint_id,
+                    revision_number=1,
+                    image=image.id,
+                    model=None,
+                    model_mount_destination="/models",
+                    resource_group=sample_scaling_group_for_hierarchy,
+                    resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
+                    resource_opts={},
+                    cluster_mode=ClusterMode.SINGLE_NODE.name,
+                    cluster_size=1,
+                    runtime_variant=RuntimeVariant.CUSTOM,
+                    environ={},
+                    extra_mounts=[],
                 )
             )
             await db_sess.flush()

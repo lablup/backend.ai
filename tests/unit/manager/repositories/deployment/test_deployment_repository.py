@@ -153,6 +153,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 SessionRow,
                 KernelRow,
                 EndpointRow,
+                EntityFieldRow,  # DeploymentRevisionRow relationship dependency
                 DeploymentRevisionRow,
                 RoutingRow,
             ],
@@ -547,6 +548,30 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         return kernel_id
 
     @pytest.fixture
+    async def test_image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> uuid.UUID:
+        """Create test image and return image ID."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            image = ImageRow(
+                name="test-image:latest",
+                project=str(uuid.uuid4()),
+                image="test-image",
+                registry="docker.io",
+                registry_id=uuid.uuid4(),
+                architecture="x86_64",
+                is_local=False,
+                config_digest="sha256:abc123",
+                size_bytes=1000000,
+                type=ImageType.COMPUTE,
+                labels={},
+            )
+            db_sess.add(image)
+            await db_sess.commit()
+            return image.id
+
+    @pytest.fixture
     async def test_endpoint_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -554,6 +579,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
+        test_image_id: uuid.UUID,
     ) -> uuid.UUID:
         """Create test endpoint with revision and return endpoint ID."""
         endpoint_id = uuid.uuid4()
@@ -771,6 +797,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_agent_id: AgentId,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
+        test_image_id: uuid.UUID,
     ) -> None:
         """Test fetching service discovery info for multiple routes."""
         # Create 3 sets of endpoint/session/kernel/route
