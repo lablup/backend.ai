@@ -277,7 +277,7 @@ Backend.AI requires specific Python and Pantsbuild versions for each release:
 
 | Backend.AI Version | Python Version | Pantsbuild Version |
 |:------------------|:--------------|:-------------------|
-| 25.06.x ~ (main)  | 3.14.x        | 2.27.x             |
+| 25.06.x ~ (main)  | 3.14.x        | 2.29.x             |
 | 24.03.x ~ 25.05.x | 3.12.x        | 2.21.x             |
 | 23.03.x / 23.09.x | 3.11.x        | 2.19.x             |
 | 22.03.x / 22.09.x | 3.10.x        | -                  |
@@ -285,7 +285,7 @@ Backend.AI requires specific Python and Pantsbuild versions for each release:
 
 **Current main branch**:
 - Python: CPython 3.14.3
-- Pantsbuild: 2.27.0
+- Pantsbuild: 2.29.0
 - Versions defined in `pants.toml`
 
 ### Build System
