@@ -524,45 +524,48 @@ class DeploymentService:
 
     # ========== Revision Operations ==========
 
-    async def _merge_service_definition(
+    async def _merge_deployment_config(
         self,
         revision_creator: ModelRevisionCreator,
     ) -> ModelRevisionCreator:
-        """Merge service-definition.toml defaults into the revision creator.
+        """Merge deployment-config.yaml defaults into the revision creator.
 
-        Loads the service definition from the model vfolder and merges
+        Loads the deployment config from the model vfolder and merges
         environ and resource_slots. The creator's values take precedence
-        over service definition defaults.
+        over deployment config defaults.
 
-        If loading the service definition fails (e.g. network error, malformed file),
-        the creator is returned as-is since service definitions are optional defaults.
+        If loading the deployment config fails (e.g. network error, malformed file),
+        the creator is returned as-is since deployment configs are optional defaults.
         """
         generator = self._revision_generator_registry.get(
             revision_creator.execution.runtime_variant
         )
         try:
-            service_def = await generator.load_service_definition(
+            deployment_config = await generator.load_deployment_config(
                 vfolder_id=revision_creator.mounts.model_vfolder_id,
                 runtime_variant=revision_creator.execution.runtime_variant.value,
             )
         except Exception:
             log.warning(
-                "Failed to load service definition for vfolder {}, proceeding without it",
+                "Failed to load deployment config for vfolder {}, proceeding without it",
                 revision_creator.mounts.model_vfolder_id,
                 exc_info=True,
             )
             return revision_creator
-        if service_def is None:
+        if deployment_config is None:
             return revision_creator
 
         merged_environ = revision_creator.execution.environ
-        if service_def.environ:
-            merged_environ = {**service_def.environ, **(revision_creator.execution.environ or {})}
+        if deployment_config.environ:
+            merged_environ = {
+                **deployment_config.environ,
+                **(revision_creator.execution.environ or {}),
+            }
 
         merged_resource_slots = revision_creator.resource_spec.resource_slots
-        if service_def.resource_slots:
+        if deployment_config.resource_slots:
             merged_resource_slots = {
-                **service_def.resource_slots,
+                **deployment_config.resource_slots,
                 **revision_creator.resource_spec.resource_slots,
             }
 
@@ -617,7 +620,7 @@ class DeploymentService:
         log.info("Adding model revision to deployment {}", deployment_id)
 
         endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
-        merged_creator = await self._merge_service_definition(action.adder)
+        merged_creator = await self._merge_deployment_config(action.adder)
         resolved_model_definition = await self._resolve_model_definition(merged_creator)
 
         spec = DeploymentRevisionCreatorSpec(

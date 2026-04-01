@@ -1,5 +1,5 @@
 """
-Tests for VfolderRepository.search_vfolders() functionality.
+Tests for VFolderAdminRepository.search_vfolders() functionality.
 Verifies that admin-scoped vfolder search returns ALL vfolders without any scope filtering.
 """
 
@@ -29,12 +29,12 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.testutils.db import with_tables
 
 
 class TestVfolderSearchVfolders:
-    """Tests for VfolderRepository.search_vfolders()"""
+    """Tests for VFolderAdminRepository.search_vfolders()"""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -57,11 +57,11 @@ class TestVfolderSearchVfolders:
             yield database_connection
 
     @pytest.fixture
-    async def vfolder_repository(
+    async def vfolder_admin_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> VfolderRepository:
-        return VfolderRepository(db=db_with_cleanup)
+    ) -> VFolderAdminRepository:
+        return VFolderAdminRepository(db=db_with_cleanup)
 
     @pytest.fixture
     async def test_data(
@@ -308,7 +308,7 @@ class TestVfolderSearchVfolders:
 
     async def test_returns_all_vfolders(
         self,
-        vfolder_repository: VfolderRepository,
+        vfolder_admin_repository: VFolderAdminRepository,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """With 3 vfolders across 2 projects, search_vfolders returns all 3."""
@@ -316,7 +316,7 @@ class TestVfolderSearchVfolders:
             pagination=OffsetPagination(limit=100, offset=0),
         )
 
-        result = await vfolder_repository.search_vfolders(querier=querier)
+        result = await vfolder_admin_repository.search_vfolders(querier=querier)
 
         assert result.total_count == 3
         result_ids = {item.id for item in result.items}
@@ -328,7 +328,7 @@ class TestVfolderSearchVfolders:
 
     async def test_empty_result_when_no_vfolders(
         self,
-        vfolder_repository: VfolderRepository,
+        vfolder_admin_repository: VFolderAdminRepository,
         empty_test_data: dict[str, uuid.UUID],
     ) -> None:
         """With no vfolders in DB, returns empty result."""
@@ -336,14 +336,14 @@ class TestVfolderSearchVfolders:
             pagination=OffsetPagination(limit=100, offset=0),
         )
 
-        result = await vfolder_repository.search_vfolders(querier=querier)
+        result = await vfolder_admin_repository.search_vfolders(querier=querier)
 
         assert result.items == []
         assert result.total_count == 0
 
     async def test_pagination_fields(
         self,
-        vfolder_repository: VfolderRepository,
+        vfolder_admin_repository: VFolderAdminRepository,
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """When all results fit in one page, has_next_page and has_previous_page are False."""
@@ -351,7 +351,7 @@ class TestVfolderSearchVfolders:
             pagination=OffsetPagination(limit=100, offset=0),
         )
 
-        result = await vfolder_repository.search_vfolders(querier=querier)
+        result = await vfolder_admin_repository.search_vfolders(querier=querier)
 
         assert result.total_count == 3
         assert result.has_next_page is False

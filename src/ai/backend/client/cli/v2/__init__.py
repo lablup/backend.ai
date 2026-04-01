@@ -128,6 +128,11 @@ def service_catalog() -> None:
 # ------------------------------------------------------------------ Storage
 
 
+@v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.vfolder:vfolder")
+def vfolder() -> None:
+    """VFolder commands."""
+
+
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.vfs_storage:vfs_storage")
 def vfs_storage() -> None:
     """VFS storage commands."""

@@ -24,7 +24,7 @@ from ai.backend.common.dto.manager.v2.export.request import (
     UserExportOrder,
     UserExportOrderField,
 )
-from ai.backend.common.dto.manager.v2.export.types import BooleanFilter, OrderDirection
+from ai.backend.common.dto.manager.v2.export.types import OrderDirection
 
 
 class TestUserExportCSVInput:
@@ -191,16 +191,16 @@ class TestProjectExportCSVInput:
         assert req.order[0].direction == OrderDirection.DESC
 
     def test_creation_with_is_active_filter(self) -> None:
-        f = ProjectExportFilter(is_active=BooleanFilter(equals=True))
+        f = ProjectExportFilter(is_active=True)
         req = ProjectExportCSVInput(filter=f)
         assert req.filter is not None
         assert req.filter.is_active is not None
-        assert req.filter.is_active.equals is True
+        assert req.filter.is_active is True
 
     def test_round_trip_serialization(self) -> None:
         req = ProjectExportCSVInput(
             fields=["name", "domain_name"],
-            filter=ProjectExportFilter(is_active=BooleanFilter(equals=False)),
+            filter=ProjectExportFilter(is_active=False),
             order=[
                 ProjectExportOrder(
                     field=ProjectExportOrderField.NAME, direction=OrderDirection.DESC
@@ -212,7 +212,7 @@ class TestProjectExportCSVInput:
         assert restored.fields == req.fields
         assert restored.filter is not None
         assert restored.filter.is_active is not None
-        assert restored.filter.is_active.equals is False
+        assert restored.filter.is_active is False
         assert restored.order is not None
         assert restored.order[0].field == ProjectExportOrderField.NAME
         assert restored.order[0].direction == OrderDirection.DESC

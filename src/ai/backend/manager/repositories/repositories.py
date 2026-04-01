@@ -13,6 +13,9 @@ from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
 )
 from ai.backend.manager.repositories.deployment.repositories import DeploymentRepositories
+from ai.backend.manager.repositories.deployment_revision_preset.repositories import (
+    DeploymentRevisionPresetRepositories,
+)
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
 from ai.backend.manager.repositories.dotfile.repositories import DotfileRepositories
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
@@ -30,6 +33,7 @@ from ai.backend.manager.repositories.keypair_resource_policy.repositories import
 )
 from ai.backend.manager.repositories.manager_admin.repositories import ManagerAdminRepositories
 from ai.backend.manager.repositories.metric.repositories import MetricRepositories
+from ai.backend.manager.repositories.model_card.repositories import ModelCardRepositories
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.notification.repositories import NotificationRepositories
 from ai.backend.manager.repositories.object_storage.repositories import ObjectStorageRepositories
@@ -49,6 +53,10 @@ from ai.backend.manager.repositories.resource_preset.repositories import Resourc
 from ai.backend.manager.repositories.resource_slot.repositories import ResourceSlotRepositories
 from ai.backend.manager.repositories.resource_usage_history.repositories import (
     ResourceUsageHistoryRepositories,
+)
+from ai.backend.manager.repositories.runtime_variant.repositories import RuntimeVariantRepositories
+from ai.backend.manager.repositories.runtime_variant_preset.repositories import (
+    RuntimeVariantPresetRepositories,
 )
 from ai.backend.manager.repositories.scaling_group.repositories import ScalingGroupRepositories
 from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
@@ -96,6 +104,10 @@ class Repositories:
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
     resource_slot: ResourceSlotRepositories
+    runtime_variant: RuntimeVariantRepositories
+    runtime_variant_preset: RuntimeVariantPresetRepositories
+    deployment_revision_preset: DeploymentRevisionPresetRepositories
+    model_card: ModelCardRepositories
     resource_usage_history: ResourceUsageHistoryRepositories
     scaling_group: ScalingGroupRepositories
     scheduler: SchedulerRepositories
@@ -141,6 +153,10 @@ class Repositories:
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         resource_slot_repositories = ResourceSlotRepositories.create(args)
+        runtime_variant_repositories = RuntimeVariantRepositories.create(args)
+        runtime_variant_preset_repositories = RuntimeVariantPresetRepositories.create(args)
+        deployment_revision_preset_repositories = DeploymentRevisionPresetRepositories.create(args)
+        model_card_repositories = ModelCardRepositories.create(args)
         resource_usage_history_repositories = ResourceUsageHistoryRepositories.create(args)
         scaling_group_repositories = ScalingGroupRepositories.create(args)
         scheduler_repositories = SchedulerRepositories.create(args)
@@ -185,6 +201,10 @@ class Repositories:
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
             resource_slot=resource_slot_repositories,
+            runtime_variant=runtime_variant_repositories,
+            runtime_variant_preset=runtime_variant_preset_repositories,
+            deployment_revision_preset=deployment_revision_preset_repositories,
+            model_card=model_card_repositories,
             resource_usage_history=resource_usage_history_repositories,
             scaling_group=scaling_group_repositories,
             scheduler=scheduler_repositories,

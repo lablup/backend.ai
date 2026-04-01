@@ -94,7 +94,7 @@ class RoutingRow(Base):  # type: ignore[misc]
     )
 
     # Revision reference without FK (relationship only)
-    revision: Mapped[uuid.UUID | None] = mapped_column("revision", GUID, nullable=True)
+    revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
     traffic_status: Mapped[RouteTrafficStatus] = mapped_column(
         "traffic_status",
         EnumValueType(RouteTrafficStatus),
@@ -215,9 +215,9 @@ class RoutingRow(Base):  # type: ignore[misc]
         session_owner: uuid.UUID,
         domain: str,
         project: uuid.UUID,
+        revision: uuid.UUID,
         status: RouteStatus = RouteStatus.PROVISIONING,
         traffic_ratio: float = 1.0,
-        revision: uuid.UUID | None = None,
         traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE,
     ) -> None:
         self.id = id

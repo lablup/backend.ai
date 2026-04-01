@@ -15,7 +15,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.group.types import GroupData, UnassignUsersResult
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode
 from ai.backend.manager.models.group.row import GroupRow
@@ -26,6 +26,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
+from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.group.types import (
     DomainProjectSearchScope,
     GroupSearchResult,
@@ -130,6 +131,13 @@ class GroupRepository:
         Returns the list of newly assigned users.
         """
         return await self._db_source.assign_users_to_project(project_id, user_ids)
+
+    @group_repository_resilience.apply()
+    async def unassign_users_from_project(
+        self, unbinder: UserProjectEntityUnbinder
+    ) -> UnassignUsersResult:
+        """Remove users from a project and return unassigned users and failures."""
+        return await self._db_source.unassign_users_from_project(unbinder)
 
     @group_repository_resilience.apply()
     async def get_project(self, project_id: UUID) -> GroupData:

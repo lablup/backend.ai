@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     CreateGroupInput,
     DeleteGroupInput,
     PurgeGroupInput,
+    UnassignUsersFromProjectInput,
     UpdateGroupInput,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
@@ -18,6 +19,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
     ProjectNode,
     ProjectPayload,
     PurgeProjectPayload,
+    UnassignUsersFromProjectPayload,
 )
 
 _PATH = "/v2/projects"
@@ -80,4 +82,17 @@ class V2ProjectClient(BaseDomainClient):
             f"{_PATH}/purge",
             request=request,
             response_model=PurgeProjectPayload,
+        )
+
+    async def unassign_users(
+        self,
+        project_id: UUID,
+        request: UnassignUsersFromProjectInput,
+    ) -> UnassignUsersFromProjectPayload:
+        """Unassign users from a project."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{project_id}/users/unassign",
+            request=request,
+            response_model=UnassignUsersFromProjectPayload,
         )

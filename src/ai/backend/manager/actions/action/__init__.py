@@ -18,6 +18,21 @@ from .rbac import (
     RBACRequiredPermission,
     build_operation_description,
 )
+from .rbac_model_deployment import (
+    ModelDeploymentCreateRBACAction,
+    ModelDeploymentGetRBACAction,
+    ModelDeploymentHardDeleteRBACAction,
+    ModelDeploymentSearchRBACAction,
+    ModelDeploymentUpdateRBACAction,
+)
+from .rbac_project import (
+    ProjectCreateRBACAction,
+    ProjectGetRBACAction,
+    ProjectHardDeleteRBACAction,
+    ProjectSearchRBACAction,
+    ProjectSoftDeleteRBACAction,
+    ProjectUpdateRBACAction,
+)
 from .rbac_session import (
     SessionCreateRBACAction,
     SessionGetRBACAction,
@@ -29,8 +44,40 @@ from .rbac_session import (
     SessionSearchRBACAction,
     SessionUpdateRBACAction,
 )
+from .rbac_user import (
+    UserCreateRBACAction,
+    UserGetRBACAction,
+    UserHardDeleteRBACAction,
+    UserSearchRBACAction,
+    UserSoftDeleteRBACAction,
+    UserUpdateRBACAction,
+)
+from .rbac_vfolder import (
+    VFolderCreateRBACAction,
+    VFolderGetRBACAction,
+    VFolderGrantAllRBACAction,
+    VFolderGrantHardDeleteRBACAction,
+    VFolderGrantReadRBACAction,
+    VFolderGrantSoftDeleteRBACAction,
+    VFolderGrantUpdateRBACAction,
+    VFolderHardDeleteRBACAction,
+    VFolderSearchRBACAction,
+    VFolderSoftDeleteRBACAction,
+    VFolderUpdateRBACAction,
+)
 
 RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
+    ModelDeploymentCreateRBACAction,
+    ModelDeploymentGetRBACAction,
+    ModelDeploymentSearchRBACAction,
+    ModelDeploymentUpdateRBACAction,
+    ModelDeploymentHardDeleteRBACAction,
+    ProjectCreateRBACAction,
+    ProjectGetRBACAction,
+    ProjectSearchRBACAction,
+    ProjectUpdateRBACAction,
+    ProjectSoftDeleteRBACAction,
+    ProjectHardDeleteRBACAction,
     SessionCreateRBACAction,
     SessionGetRBACAction,
     SessionSearchRBACAction,
@@ -40,6 +87,23 @@ RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
     SessionGrantReadRBACAction,
     SessionGrantUpdateRBACAction,
     SessionGrantHardDeleteRBACAction,
+    UserCreateRBACAction,
+    UserGetRBACAction,
+    UserSearchRBACAction,
+    UserUpdateRBACAction,
+    UserSoftDeleteRBACAction,
+    UserHardDeleteRBACAction,
+    VFolderCreateRBACAction,
+    VFolderGetRBACAction,
+    VFolderSearchRBACAction,
+    VFolderUpdateRBACAction,
+    VFolderSoftDeleteRBACAction,
+    VFolderHardDeleteRBACAction,
+    VFolderGrantAllRBACAction,
+    VFolderGrantReadRBACAction,
+    VFolderGrantUpdateRBACAction,
+    VFolderGrantSoftDeleteRBACAction,
+    VFolderGrantHardDeleteRBACAction,
 )
 
 __all__ = (

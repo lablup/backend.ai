@@ -357,6 +357,25 @@ async def server_main(
             ),
         )
 
+        # Set up XForwardedStrict middleware if trusted proxies are configured.
+        # This must be inserted BEFORE auth middleware so that request.remote is
+        # resolved to the real client IP before authentication runs.
+        trusted_proxies = dep_resources.bootstrap.config_provider.config.manager.trusted_proxies
+        if trusted_proxies:
+            from aiohttp_remotes import XForwardedStrict
+
+            xff_middleware = XForwardedStrict(
+                [trusted_proxies],
+                white_paths=root_app.get("auth_middleware_allowlist", []),
+            )
+            await xff_middleware.setup(root_app)
+            root_app["_trusted_proxies_enabled"] = True
+            log.info(
+                "XForwardedStrict middleware enabled with trusted proxies: {}", trusted_proxies
+            )
+        else:
+            root_app["_trusted_proxies_enabled"] = False
+
         # Build and mount the API module tree.
         # Must happen before runner.setup() which freezes the application router.
         from .api.rest.setup import setup_api

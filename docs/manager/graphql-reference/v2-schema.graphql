@@ -1644,6 +1644,21 @@ type CreateDeploymentPayload {
   deployment: ModelDeployment!
 }
 
+"""Added in UNRELEASED. Create deployment revision preset input."""
+input CreateDeploymentRevisionPresetInput {
+  """Runtime variant ID."""
+  runtimeVariantId: UUID!
+
+  """Preset name."""
+  name: String!
+}
+
+"""Added in UNRELEASED. Create deployment revision preset payload."""
+type CreateDeploymentRevisionPresetPayloadGQL {
+  """The created preset."""
+  preset: DeploymentRevisionPreset!
+}
+
 """Added in UNRELEASED. Input for creating a new domain."""
 input CreateDomainInputGQL {
   """Domain name. Must be unique across the system."""
@@ -1717,6 +1732,27 @@ Added in UNRELEASED. Payload for keypair resource policy create/update mutations
 type CreateKeypairResourcePolicyPayloadGQL {
   """Created keypair resource policy."""
   keypairResourcePolicy: KeypairResourcePolicyV2!
+}
+
+"""Added in UNRELEASED. Create model card payload."""
+type CreateModelCardPayloadGQL {
+  """The created model card."""
+  modelCard: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Create model card input."""
+input CreateModelCardV2Input {
+  """Model card name."""
+  name: String!
+
+  """VFolder ID."""
+  vfolderId: UUID!
+
+  """Project ID."""
+  projectId: UUID!
+
+  """Domain name."""
+  domainName: String!
 }
 
 """Added in 24.09.0. Input for creating a notification channel"""
@@ -1919,6 +1955,57 @@ input CreateRoleInput {
   name: String!
   description: String = null
   source: RoleSource! = CUSTOM
+}
+
+"""Added in UNRELEASED. Input for creating a runtime variant."""
+input CreateRuntimeVariantInput {
+  """
+  Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang').
+  """
+  name: String!
+
+  """Human-readable description of the runtime engine."""
+  description: String = null
+}
+
+"""Added in UNRELEASED. Payload for runtime variant creation."""
+type CreateRuntimeVariantPayloadGQL {
+  """The created runtime variant."""
+  runtimeVariant: RuntimeVariant!
+}
+
+"""Added in UNRELEASED. Create preset input."""
+input CreateRuntimeVariantPresetInput {
+  """The runtime variant this preset belongs to."""
+  runtimeVariantId: UUID!
+
+  """Human-readable name of the configurable parameter."""
+  name: String!
+
+  """Detailed explanation of what this parameter controls."""
+  description: String = null
+
+  """
+  How the value is applied: 'env' for environment variable, 'args' for command-line argument.
+  """
+  presetTarget: String!
+
+  """Data type for validation (e.g., 'str', 'int', 'float', 'bool')."""
+  valueType: String!
+
+  """The default value shown to users when creating a deployment."""
+  defaultValue: String = null
+
+  """
+  For 'env' target, the environment variable name; for 'args' target, the CLI flag name.
+  """
+  key: String!
+}
+
+"""Added in UNRELEASED. Create preset payload."""
+type CreateRuntimeVariantPresetPayloadGQL {
+  """The created preset."""
+  preset: RuntimeVariantPreset!
 }
 
 """Added in UNRELEASED. Input for creating a user resource policy."""
@@ -2168,6 +2255,12 @@ type DeleteDeploymentPayload {
   id: ID!
 }
 
+"""Added in UNRELEASED. Delete deployment revision preset payload."""
+type DeleteDeploymentRevisionPresetPayloadGQL {
+  """ID of the deleted preset."""
+  id: UUID!
+}
+
 """Added in 25.16.0. Input for deleting domain-level app configuration"""
 input DeleteDomainConfigInput {
   domainName: String!
@@ -2202,6 +2295,12 @@ type DeleteHuggingFaceRegistryPayload {
 type DeleteKeypairResourcePolicyPayloadGQL {
   """Name of the deleted keypair resource policy."""
   name: String!
+}
+
+"""Added in UNRELEASED. Delete model card payload."""
+type DeleteModelCardPayloadGQL {
+  """ID of the deleted model card."""
+  id: UUID!
 }
 
 """Added in 24.09.0. Input for deleting a notification channel"""
@@ -2297,6 +2396,18 @@ input DeleteRoleInput {
 """Added in 26.3.0. Payload for delete role mutation."""
 type DeleteRolePayload {
   """ID of the deleted role"""
+  id: UUID!
+}
+
+"""Added in UNRELEASED. Payload for runtime variant deletion."""
+type DeleteRuntimeVariantPayloadGQL {
+  """ID of the deleted runtime variant."""
+  id: UUID!
+}
+
+"""Added in UNRELEASED. Delete preset payload."""
+type DeleteRuntimeVariantPresetPayloadGQL {
+  """ID of the deleted preset."""
   id: UUID!
 }
 
@@ -2449,6 +2560,117 @@ type DeploymentPolicy implements Node {
   strategySpec: DeploymentStrategySpec!
   createdAt: DateTime!
   updatedAt: DateTime!
+}
+
+"""
+Added in UNRELEASED. A reusable deployment configuration template. Users select a preset when deploying a model to automatically populate resource allocation, execution settings, and runtime-specific parameters. Each preset is designed for a specific runtime variant and captures the full configuration needed to launch an inference service.
+"""
+type DeploymentRevisionPreset implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The unique database identifier of this deployment preset."""
+  rowId: UUID!
+
+  """The runtime variant this preset is designed for (e.g., vLLM, SGLang)."""
+  runtimeVariantId: UUID!
+
+  """Display name of this deployment configuration template."""
+  name: String!
+
+  """Detailed explanation of when and why to use this preset configuration."""
+  description: String
+
+  """
+  Display ordering among presets of the same runtime variant, with lower values shown first.
+  """
+  rank: Int!
+
+  """
+  Cluster topology settings defining single-node or multi-node deployment.
+  """
+  cluster: PresetClusterSpec!
+
+  """Compute resource allocation including CPU, memory, and accelerators."""
+  resource: PresetResourceAllocation!
+
+  """
+  Container execution configuration including image, startup command, and environment.
+  """
+  execution: PresetExecutionSpec!
+
+  """
+  Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.
+  """
+  modelDefinition: ModelDefinition
+
+  """
+  List of runtime variant preset values applied when using this deployment preset to auto-configure runtime parameters.
+  """
+  presetValues: [DeploymentRevisionPresetValueEntry!]!
+
+  """Timestamp when this deployment preset was created."""
+  createdAt: DateTime!
+
+  """Timestamp of the last modification to this deployment preset."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of deployment revision presets."""
+type DeploymentRevisionPresetConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [DeploymentRevisionPresetEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type DeploymentRevisionPresetEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: DeploymentRevisionPreset!
+}
+
+"""Added in UNRELEASED. Filter for deployment revision presets."""
+input DeploymentRevisionPresetFilter {
+  """Name filter."""
+  name: StringFilter = null
+
+  """Variant ID filter."""
+  runtimeVariantId: UUID = null
+}
+
+"""
+Added in UNRELEASED. Order specification for deployment revision presets.
+"""
+input DeploymentRevisionPresetOrderBy {
+  """Field to order by."""
+  field: DeploymentRevisionPresetOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for deployment revision presets."""
+enum DeploymentRevisionPresetOrderField {
+  NAME
+  RANK
+  CREATED_AT
+}
+
+"""
+Added in UNRELEASED. A mapping of a runtime variant preset to a specific value, used to auto-configure runtime parameters when this deployment preset is applied.
+"""
+type DeploymentRevisionPresetValueEntry {
+  """Runtime variant preset ID."""
+  presetId: UUID!
+
+  """Value for this preset."""
+  value: String!
 }
 
 """Added in 24.09.0. Scope for deployment scheduling history query"""
@@ -4360,6 +4582,116 @@ input MetricLabelEntryInput {
 }
 
 """
+Added in UNRELEASED. Represents a registered AI model with metadata extracted from model-definition.yaml. A model card links to a VFolder containing the actual model files and belongs to a MODEL_STORE type project for access control scoping.
+"""
+type ModelCardV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The unique database identifier of this model card."""
+  rowId: UUID!
+
+  """Display name of the registered model."""
+  name: String!
+
+  """
+  The VFolder that stores the actual model files, weights, and configuration.
+  """
+  vfolderId: UUID!
+
+  """
+  The domain this model card belongs to, used for access control scoping.
+  """
+  domainName: String!
+
+  """
+  The MODEL_STORE type project this model card is associated with for access control.
+  """
+  projectId: UUID!
+
+  """The user who registered this model card."""
+  creatorId: UUID!
+
+  """
+  Model metadata including authorship, classification, framework info, and licensing extracted from model-definition.yaml.
+  """
+  metadata: ModelCardV2Metadata!
+
+  """
+  README content from the model VFolder, typically containing usage instructions and model documentation.
+  """
+  readme: String
+
+  """Timestamp when this model card was registered."""
+  createdAt: DateTime!
+
+  """Timestamp of the last modification to this model card."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of model cards."""
+type ModelCardV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelCardV2Edge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelCardV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Filter for model cards."""
+input ModelCardV2Filter {
+  """Name filter."""
+  name: StringFilter = null
+
+  """Domain filter."""
+  domainName: String = null
+
+  """Project filter."""
+  projectId: UUID = null
+}
+
+"""
+Added in UNRELEASED. Metadata extracted from the model-definition.yaml file in the model VFolder. Contains authorship, classification, and framework information used for discovery and compatibility checks.
+"""
+type ModelCardV2Metadata {
+  author: String
+  title: String
+  modelVersion: String
+  description: String
+  task: String
+  category: String
+  architecture: String
+  framework: [String!]!
+  label: [String!]!
+  license: String
+}
+
+"""Added in UNRELEASED. Order specification."""
+input ModelCardV2OrderBy {
+  """Field to order by."""
+  field: ModelCardV2OrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for model cards."""
+enum ModelCardV2OrderField {
+  NAME
+  CREATED_AT
+}
+
+"""
 Added in UNRELEASED. Configuration for a single model in the model definition.
 """
 type ModelConfig {
@@ -5263,6 +5595,11 @@ type Mutation {
   adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayloadGQL!
 
   """
+  Added in UNRELEASED. Unassign users from a project. RBAC validates project admin permission.
+  """
+  unassignUsersFromProjectV2(projectId: UUID!, input: UnassignUsersFromProjectInput!): UnassignUsersFromProjectPayload!
+
+  """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user
   """
   adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload!
@@ -5440,6 +5777,48 @@ type Mutation {
 
   """Added in UNRELEASED. Delete a resource preset (admin only)."""
   adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL!
+
+  """Added in UNRELEASED. Create a new runtime variant (superadmin only)."""
+  adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayloadGQL!
+
+  """Added in UNRELEASED. Update a runtime variant (superadmin only)."""
+  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayloadGQL!
+
+  """Added in UNRELEASED. Delete a runtime variant (superadmin only)."""
+  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL!
+
+  """
+  Added in UNRELEASED. Create a runtime variant preset (superadmin only).
+  """
+  adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayloadGQL!
+
+  """
+  Added in UNRELEASED. Update a runtime variant preset (superadmin only).
+  """
+  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayloadGQL!
+
+  """
+  Added in UNRELEASED. Delete a runtime variant preset (superadmin only).
+  """
+  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL!
+
+  """Added in UNRELEASED. Create a deployment revision preset."""
+  createDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL!
+
+  """Added in UNRELEASED. Update a deployment revision preset."""
+  updateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL!
+
+  """Added in UNRELEASED. Delete a deployment revision preset."""
+  deleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL!
+
+  """Added in UNRELEASED. Create a model card (admin only)."""
+  adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL!
+
+  """Added in UNRELEASED. Update a model card (admin only)."""
+  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayloadGQL!
+
+  """Added in UNRELEASED. Delete a model card (admin only)."""
+  adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL!
 
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload!
@@ -5880,6 +6259,62 @@ type PresetAvailabilityV2 {
 
   """Whether this preset can be used for session creation."""
   available: Boolean!
+}
+
+"""
+Added in UNRELEASED. Cluster topology settings for the deployment, defining whether the inference workload runs on a single node or is distributed across multiple nodes.
+"""
+type PresetClusterSpec {
+  """Cluster mode."""
+  clusterMode: String!
+
+  """Cluster size."""
+  clusterSize: Int!
+}
+
+"""
+Added in UNRELEASED. Container execution configuration for the deployment, including the inference server image, startup commands, and environment variables.
+"""
+type PresetExecutionSpec {
+  """Container image reference."""
+  image: String
+
+  """Startup command."""
+  startupCommand: String
+
+  """Bootstrap script."""
+  bootstrapScript: String
+
+  """Environment variables."""
+  environ: [EnvironmentVariableEntry!]!
+}
+
+"""
+Added in UNRELEASED. Compute resource allocation for the deployment, specifying CPU, memory, and accelerator requirements along with additional resource options.
+"""
+type PresetResourceAllocation {
+  """Resource slot allocations."""
+  resourceSlots: [ResourceSlotEntry!]!
+
+  """Additional resource options."""
+  resourceOpts: [ResourceOptsEntry!]!
+}
+
+"""
+Added in UNRELEASED. Specifies how a runtime variant preset value is applied to the inference container, either as an environment variable or a command-line argument.
+"""
+type PresetTargetSpec {
+  """Target: env or args."""
+  presetTarget: String!
+
+  """Value type: str, int, float, bool."""
+  valueType: String!
+
+  """Default value."""
+  defaultValue: String
+
+  """Env key or args flag."""
+  key: String!
 }
 
 """
@@ -6782,6 +7217,11 @@ type Query {
   adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
 
   """
+  Added in UNRELEASED. List sessions within a specific project. Requires project membership or higher privileges.
+  """
+  projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
+
+  """
   Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
   """
   resourceSlotType(slotName: String!): ResourceSlotType
@@ -7107,6 +7547,30 @@ type Query {
   """Added in UNRELEASED. Get a single resource preset by ID (admin only)."""
   adminResourcePresetV2(id: UUID!): ResourcePresetV2
 
+  """Added in UNRELEASED. Search runtime variants."""
+  runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection
+
+  """Added in UNRELEASED. Get a single runtime variant by ID."""
+  runtimeVariant(id: UUID!): RuntimeVariant
+
+  """Added in UNRELEASED. Search runtime variant presets."""
+  runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection
+
+  """Added in UNRELEASED. Get a single runtime variant preset by ID."""
+  runtimeVariantPreset(id: UUID!): RuntimeVariantPreset
+
+  """Added in UNRELEASED. Search deployment revision presets."""
+  deploymentRevisionPresets(filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection
+
+  """Added in UNRELEASED. Get a single deployment revision preset by ID."""
+  deploymentRevisionPreset(id: UUID!): DeploymentRevisionPreset
+
+  """Added in UNRELEASED. Search model cards."""
+  modelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+
+  """Added in UNRELEASED. Get a single model card by ID."""
+  modelCardV2(id: UUID!): ModelCardV2
+
   """
   Added in UNRELEASED. Get my keypair resource allocation (current user).
   """
@@ -7137,7 +7601,12 @@ type Query {
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2!
 
   """Added in UNRELEASED. List virtual folders within a specific project."""
-  projectVfolders(projectId: UUID!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
+  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
+
+  """
+  Added in UNRELEASED. Search virtual folders accessible to the current user with pagination and filtering.
+  """
+  myVfolders(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
 }
 
 """
@@ -8433,6 +8902,157 @@ enum RouteTrafficStatus {
   INACTIVE
 }
 
+"""
+Added in UNRELEASED. Represents an inference runtime engine definition (e.g., vLLM, SGLang, NIM, TGI). Previously hardcoded as an enum, runtime variants are now managed as dynamic database entities to allow administrators to register and configure new inference runtimes without code changes.
+"""
+type RuntimeVariant implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The unique database identifier of this runtime variant."""
+  rowId: UUID!
+
+  """
+  Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang', 'nim', 'tgi').
+  """
+  name: String!
+
+  """
+  Human-readable description explaining the runtime engine and its typical use cases.
+  """
+  description: String
+
+  """Timestamp when this runtime variant was registered."""
+  createdAt: DateTime!
+
+  """Timestamp of the last modification to this runtime variant."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of runtime variants."""
+type RuntimeVariantConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RuntimeVariantEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RuntimeVariantEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RuntimeVariant!
+}
+
+"""Added in UNRELEASED. Filter for runtime variants."""
+input RuntimeVariantFilter {
+  """Name filter."""
+  name: StringFilter = null
+}
+
+"""Added in UNRELEASED. Order specification."""
+input RuntimeVariantOrderBy {
+  """Field to order by."""
+  field: RuntimeVariantOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for runtime variants."""
+enum RuntimeVariantOrderField {
+  NAME
+  CREATED_AT
+}
+
+"""
+Added in UNRELEASED. Defines a configurable parameter for a runtime variant. Each preset maps a user-facing setting (e.g., tensor parallelism, quantization) to either an environment variable or a command-line argument that is applied to the inference container.
+"""
+type RuntimeVariantPreset implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The unique database identifier of this preset."""
+  rowId: UUID!
+
+  """The runtime variant this preset belongs to."""
+  runtimeVariantId: UUID!
+
+  """
+  Human-readable name of the configurable parameter (e.g., 'Tensor Parallel Size', 'Quantization').
+  """
+  name: String!
+
+  """
+  Detailed explanation of what this parameter controls and how it affects inference behavior.
+  """
+  description: String
+
+  """
+  Display ordering among presets of the same runtime variant, with lower values shown first.
+  """
+  rank: Int!
+
+  """
+  Specification defining how the user-provided value is applied to the inference container.
+  """
+  targetSpec: PresetTargetSpec!
+
+  """Timestamp when this preset was created."""
+  createdAt: DateTime!
+
+  """Timestamp of the last modification to this preset."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of runtime variant presets."""
+type RuntimeVariantPresetConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RuntimeVariantPresetEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RuntimeVariantPresetEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RuntimeVariantPreset!
+}
+
+"""Added in UNRELEASED. Filter for presets."""
+input RuntimeVariantPresetFilter {
+  """Name filter."""
+  name: StringFilter = null
+
+  """Variant ID filter."""
+  runtimeVariantId: UUID = null
+}
+
+"""Added in UNRELEASED. Order specification."""
+input RuntimeVariantPresetOrderBy {
+  """Field to order by."""
+  field: RuntimeVariantPresetOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for runtime variant presets."""
+enum RuntimeVariantPresetOrderField {
+  NAME
+  RANK
+  CREATED_AT
+}
+
 """Added in 24.09.0. Input for SMTP authentication credentials"""
 input SMTPAuthInput {
   username: String = null
@@ -9225,6 +9845,32 @@ input UUIDFilter {
   notIn: [UUID!] = null
 }
 
+"""
+Added in UNRELEASED. Error information for a user that failed to be unassigned.
+"""
+type UnassignUserError {
+  """UUID of the user that failed to be unassigned."""
+  userId: UUID!
+
+  """Error message describing the failure reason."""
+  message: String!
+}
+
+"""Added in UNRELEASED. Input for unassigning users from a project."""
+input UnassignUsersFromProjectInput {
+  """List of user UUIDs to unassign from the project."""
+  userIds: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for user unassignment from project."""
+type UnassignUsersFromProjectPayload {
+  """List of users that were unassigned from the project."""
+  unassignedUsers: [UserV2!]!
+
+  """List of errors for users that could not be unassigned."""
+  failed: [UnassignUserError!]!
+}
+
 """Added in 25.15.0. Input type for unregistering a storage namespace."""
 input UnregisterStorageNamespaceInput {
   storageId: UUID!
@@ -9415,6 +10061,27 @@ type UpdateDeploymentPolicyPayload {
   deploymentPolicy: DeploymentPolicy!
 }
 
+"""Added in UNRELEASED. Update deployment revision preset input."""
+input UpdateDeploymentRevisionPresetInput {
+  """Preset ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """New rank."""
+  rank: Int = null
+}
+
+"""Added in UNRELEASED. Update deployment revision preset payload."""
+type UpdateDeploymentRevisionPresetPayloadGQL {
+  """The updated preset."""
+  preset: DeploymentRevisionPreset!
+}
+
 """
 Added in UNRELEASED. Input for updating domain information. All fields optional.
 """
@@ -9490,6 +10157,24 @@ Added in UNRELEASED. Payload for keypair resource policy update mutation.
 type UpdateKeypairResourcePolicyPayloadGQL {
   """Updated keypair resource policy."""
   keypairResourcePolicy: KeypairResourcePolicyV2!
+}
+
+"""Added in UNRELEASED. Update model card payload."""
+type UpdateModelCardPayloadGQL {
+  """The updated model card."""
+  modelCard: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Update model card input."""
+input UpdateModelCardV2Input {
+  """Model card ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
 }
 
 """
@@ -9778,6 +10463,57 @@ input UpdateRouteTrafficStatusInput {
 type UpdateRouteTrafficStatusPayload {
   """The updated route"""
   route: Route!
+}
+
+"""Added in UNRELEASED. Input for updating a runtime variant."""
+input UpdateRuntimeVariantInput {
+  """Runtime variant ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+}
+
+"""Added in UNRELEASED. Payload for runtime variant update."""
+type UpdateRuntimeVariantPayloadGQL {
+  """The updated runtime variant."""
+  runtimeVariant: RuntimeVariant!
+}
+
+"""Added in UNRELEASED. Update preset input."""
+input UpdateRuntimeVariantPresetInput {
+  """Preset ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """New rank."""
+  rank: Int = null
+
+  """New target."""
+  presetTarget: String = null
+
+  """New value type."""
+  valueType: String = null
+
+  """New default value."""
+  defaultValue: String = null
+
+  """New key."""
+  key: String = null
+}
+
+"""Added in UNRELEASED. Update preset payload."""
+type UpdateRuntimeVariantPresetPayloadGQL {
+  """The updated preset."""
+  preset: RuntimeVariantPreset!
 }
 
 """
@@ -10736,19 +11472,13 @@ type VFolder implements Node {
   """Access control including permission level and ownership type."""
   accessControl: VFolderAccessControlInfo!
 
+  """
+  Ownership context including scalar IDs (userId, projectId, creatorEmail) and full node resolvers (user, project, creator).
+  """
+  ownership: VFolderOwnershipInfo!
+
   """Path for unmanaged virtual folders."""
   unmanagedPath: String
-
-  """The user who owns this virtual folder. Null for project-owned folders."""
-  ownerUser: UserV2
-
-  """
-  The project that owns this virtual folder. Null for user-owned folders.
-  """
-  ownerProject: ProjectV2
-
-  """The user who originally created this virtual folder."""
-  creator: UserV2
 }
 
 """
@@ -10780,6 +11510,21 @@ type VFolderEdge {
 
   """The item at the end of the edge"""
   node: VFolder!
+}
+
+"""
+Added in UNRELEASED. Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input VFolderFilter {
+  name: StringFilter = null
+  host: StringFilter = null
+  status: VFolderOperationStatusFilter = null
+  usageMode: VFolderUsageModeFilter = null
+  cloneable: Boolean = null
+  createdAt: DateTimeFilter = null
+  AND: [VFolderFilter!] = null
+  OR: [VFolderFilter!] = null
+  NOT: [VFolderFilter!] = null
 }
 
 """
@@ -10846,6 +11591,55 @@ enum VFolderOperationStatus {
 }
 
 """
+Added in UNRELEASED. Filter for VFolder operation status enum fields. Supports in and not_in operations.
+"""
+input VFolderOperationStatusFilter {
+  """The in field."""
+  in: [VFolderOperationStatus!] = null
+
+  """Exclude statuses not in this list."""
+  notIn: [VFolderOperationStatus!] = null
+}
+
+"""
+Added in UNRELEASED. Specifies ordering for virtual folder query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
+"""
+input VFolderOrderBy {
+  field: VFolderOrderField! = CREATED_AT
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering virtual folder query results. NAME: Order by folder name alphabetically. CREATED_AT: Order by creation timestamp. STATUS: Order by operation status. USAGE_MODE: Order by usage mode. HOST: Order by storage host.
+"""
+enum VFolderOrderField {
+  NAME
+  CREATED_AT
+  STATUS
+  USAGE_MODE
+  HOST
+}
+
+"""
+Added in UNRELEASED. Ownership context for a virtual folder. Provides both scalar IDs (userId, projectId, creatorEmail) for lightweight access and full node resolvers (user, project, creator) for detailed entity information.
+"""
+type VFolderOwnershipInfo {
+  """The user who owns this virtual folder. Null for project-owned folders."""
+  user: UserV2
+
+  """
+  The project that owns this virtual folder. Null for user-owned folders.
+  """
+  project: ProjectV2
+
+  """The user who originally created this virtual folder."""
+  creator: UserV2
+  userId: UUID
+  projectId: UUID
+  creatorEmail: String
+}
+
+"""
 Added in UNRELEASED. Ownership type of a virtual folder (USER or GROUP).
 """
 enum VFolderOwnershipType {
@@ -10860,6 +11654,17 @@ enum VFolderUsageMode {
   GENERAL
   MODEL
   DATA
+}
+
+"""
+Added in UNRELEASED. Filter for VFolder usage mode enum fields. Supports in and not_in operations.
+"""
+input VFolderUsageModeFilter {
+  """The in field."""
+  in: [VFolderUsageMode!] = null
+
+  """Exclude usage modes not in this list."""
+  notIn: [VFolderUsageMode!] = null
 }
 
 """Added in 24.09.0. Input for validate notification channel mutation"""

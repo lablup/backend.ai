@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from .domains_v2.audit_log import V2AuditLogClient
     from .domains_v2.container_registry import V2ContainerRegistryClient
     from .domains_v2.deployment import V2DeploymentClient
+    from .domains_v2.deployment_revision_preset import V2DeploymentRevisionPresetClient
     from .domains_v2.domain import V2DomainClient
     from .domains_v2.export import V2ExportClient
     from .domains_v2.fair_share import V2FairShareClient
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
     from .domains_v2.keypair import V2KeypairClient
     from .domains_v2.login_history import V2LoginHistoryClient
     from .domains_v2.login_session import V2LoginSessionClient
+    from .domains_v2.model_card import V2ModelCardClient
     from .domains_v2.notification import V2NotificationClient
     from .domains_v2.object_storage import V2ObjectStorageClient
     from .domains_v2.project import V2ProjectClient
@@ -43,11 +45,14 @@ if TYPE_CHECKING:
     from .domains_v2.resource_preset import V2ResourcePresetClient
     from .domains_v2.resource_slot import V2ResourceSlotClient
     from .domains_v2.resource_usage import V2ResourceUsageClient
+    from .domains_v2.runtime_variant import V2RuntimeVariantClient
+    from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
     from .domains_v2.scheduling_history import V2SchedulingHistoryClient
     from .domains_v2.service_catalog import V2ServiceCatalogClient
     from .domains_v2.session import V2SessionClient
     from .domains_v2.storage_namespace import V2StorageNamespaceClient
     from .domains_v2.user import V2UserClient
+    from .domains_v2.vfolder import V2VFolderClient
     from .domains_v2.vfs_storage import V2VFSStorageClient
 
 
@@ -170,6 +175,12 @@ class V2ClientRegistry:
         return V2LoginSessionClient(self._client)
 
     @cached_property
+    def model_card(self) -> V2ModelCardClient:
+        from .domains_v2.model_card import V2ModelCardClient
+
+        return V2ModelCardClient(self._client)
+
+    @cached_property
     def notification(self) -> V2NotificationClient:
         from .domains_v2.notification import V2NotificationClient
 
@@ -236,6 +247,24 @@ class V2ClientRegistry:
         return V2ResourceSlotClient(self._client)
 
     @cached_property
+    def runtime_variant(self) -> V2RuntimeVariantClient:
+        from .domains_v2.runtime_variant import V2RuntimeVariantClient
+
+        return V2RuntimeVariantClient(self._client)
+
+    @cached_property
+    def runtime_variant_preset(self) -> V2RuntimeVariantPresetClient:
+        from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
+
+        return V2RuntimeVariantPresetClient(self._client)
+
+    @cached_property
+    def deployment_revision_preset(self) -> V2DeploymentRevisionPresetClient:
+        from .domains_v2.deployment_revision_preset import V2DeploymentRevisionPresetClient
+
+        return V2DeploymentRevisionPresetClient(self._client)
+
+    @cached_property
     def resource_usage(self) -> V2ResourceUsageClient:
         from .domains_v2.resource_usage import V2ResourceUsageClient
 
@@ -270,6 +299,12 @@ class V2ClientRegistry:
         from .domains_v2.user import V2UserClient
 
         return V2UserClient(self._client)
+
+    @cached_property
+    def vfolder(self) -> V2VFolderClient:
+        from .domains_v2.vfolder import V2VFolderClient
+
+        return V2VFolderClient(self._client)
 
     @cached_property
     def vfs_storage(self) -> V2VFSStorageClient:

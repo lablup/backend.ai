@@ -810,7 +810,7 @@ class EndpointRow(Base):  # type: ignore[misc]
                 open_to_public=self.open_to_public if self.open_to_public is not None else False,
                 url=self.url,
             ),
-            model_revisions=model_revisions,
+            model_revisions=list(model_revisions),
             current_revision_id=self.current_revision,
             deploying_revision_id=self.deploying_revision,
             sub_step=self.sub_step,

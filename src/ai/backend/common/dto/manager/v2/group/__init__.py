@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     GroupOrder,
     PurgeGroupInput,
     SearchGroupsRequest,
+    UnassignUsersFromProjectInput,
     UpdateGroupInput,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
@@ -25,6 +26,8 @@ from ai.backend.common.dto.manager.v2.group.response import (
     ProjectStorageInfo,
     PurgeProjectPayload,
     SearchProjectsPayload,
+    UnassignUserError,
+    UnassignUsersFromProjectPayload,
     VFolderHostPermissionEntry,
 )
 from ai.backend.common.dto.manager.v2.group.types import (
@@ -56,6 +59,7 @@ __all__ = (
     "GroupFilter",
     "GroupOrder",
     "SearchGroupsRequest",
+    "UnassignUsersFromProjectInput",
     # Response DTOs
     "AdminSearchGroupsPayload",
     "AssignUsersToProjectPayload",
@@ -69,4 +73,6 @@ __all__ = (
     "SearchProjectsPayload",
     "DeleteProjectPayload",
     "PurgeProjectPayload",
+    "UnassignUserError",
+    "UnassignUsersFromProjectPayload",
 )

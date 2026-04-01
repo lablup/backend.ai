@@ -15,7 +15,6 @@ from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilte
 from ai.backend.common.dto.manager.v2.export import (
     AuditLogExportFilter,
     AuditLogExportOrder,
-    BooleanFilter,
     OrderDirection,
     ProjectExportFilter,
     ProjectExportOrder,
@@ -777,10 +776,9 @@ class ExportAdapter(BaseFilterAdapter):
 
     def _build_boolean_condition(
         self,
-        bool_filter: BooleanFilter,
+        value: bool,
         field_def: ExportFieldDef,
     ) -> QueryCondition:
-        """Convert BooleanFilter to QueryCondition."""
+        """Convert a bool value to QueryCondition."""
         column = field_def.column
-        value = bool_filter.equals
         return lambda: column == value

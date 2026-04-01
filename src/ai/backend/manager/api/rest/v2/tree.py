@@ -40,6 +40,10 @@ def build_v2_routes(
     from .container_registry.registry import register_v2_container_registry_routes
     from .deployment.handler import V2DeploymentHandler
     from .deployment.registry import register_v2_deployment_routes
+    from .deployment_revision_preset.handler import V2DeploymentRevisionPresetHandler
+    from .deployment_revision_preset.registry import (
+        register_v2_deployment_revision_preset_routes,
+    )
     from .domain.handler import V2DomainHandler
     from .domain.registry import register_v2_domain_routes
     from .fair_share.handler import V2FairShareHandler
@@ -54,6 +58,8 @@ def build_v2_routes(
     from .login_history.registry import register_v2_login_history_routes
     from .login_session.handler import V2LoginSessionHandler
     from .login_session.registry import register_v2_login_session_routes
+    from .model_card.handler import V2ModelCardHandler
+    from .model_card.registry import register_v2_model_card_routes
     from .notification.handler import V2NotificationHandler
     from .notification.registry import register_v2_notification_routes
     from .object_storage.handler import V2ObjectStorageHandler
@@ -78,6 +84,10 @@ def build_v2_routes(
     from .resource_slot.registry import register_v2_resource_slot_routes
     from .resource_usage.handler import V2ResourceUsageHandler
     from .resource_usage.registry import register_v2_resource_usage_routes
+    from .runtime_variant.handler import V2RuntimeVariantHandler
+    from .runtime_variant.registry import register_v2_runtime_variant_routes
+    from .runtime_variant_preset.handler import V2RuntimeVariantPresetHandler
+    from .runtime_variant_preset.registry import register_v2_runtime_variant_preset_routes
     from .scheduling_history.handler import V2SchedulingHistoryHandler
     from .scheduling_history.registry import register_v2_scheduling_history_routes
     from .service_catalog.handler import V2ServiceCatalogHandler
@@ -88,6 +98,8 @@ def build_v2_routes(
     from .storage_namespace.registry import register_v2_storage_namespace_routes
     from .user.handler import V2UserHandler
     from .user.registry import register_v2_user_routes
+    from .vfolder.handler import V2VFolderHandler
+    from .vfolder.registry import register_v2_vfolder_routes
     from .vfs_storage.handler import V2VFSStorageHandler
     from .vfs_storage.registry import register_v2_vfs_storage_routes
 
@@ -121,12 +133,21 @@ def build_v2_routes(
     resource_policy_handler = V2ResourcePolicyHandler(adapter=adapters.resource_policy)
     resource_preset_handler = V2ResourcePresetHandler(adapter=adapters.resource_preset)
     resource_slot_handler = V2ResourceSlotHandler(adapter=adapters.resource_slot)
+    runtime_variant_handler = V2RuntimeVariantHandler(adapter=adapters.runtime_variant)
+    runtime_variant_preset_handler = V2RuntimeVariantPresetHandler(
+        adapter=adapters.runtime_variant_preset
+    )
+    deployment_revision_preset_handler = V2DeploymentRevisionPresetHandler(
+        adapter=adapters.deployment_revision_preset
+    )
+    model_card_handler = V2ModelCardHandler(adapter=adapters.model_card)
     resource_usage_handler = V2ResourceUsageHandler(adapter=adapters.resource_usage)
     scheduling_history_handler = V2SchedulingHistoryHandler(adapter=adapters.scheduling_history)
     service_catalog_handler = V2ServiceCatalogHandler(adapter=adapters.service_catalog)
     session_handler = V2SessionHandler(adapter=adapters.session)
     storage_namespace_handler = V2StorageNamespaceHandler(adapter=adapters.storage_namespace)
     user_handler = V2UserHandler(adapter=adapters.user)
+    vfolder_handler = V2VFolderHandler(adapter=adapters.vfolder)
     vfs_storage_handler = V2VFSStorageHandler(adapter=adapters.vfs_storage)
 
     # Build the v2 parent registry
@@ -170,6 +191,16 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_resource_policy_routes(resource_policy_handler, route_deps))
     v2_reg.add_subregistry(register_v2_resource_preset_routes(resource_preset_handler, route_deps))
     v2_reg.add_subregistry(register_v2_resource_slot_routes(resource_slot_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_runtime_variant_routes(runtime_variant_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_runtime_variant_preset_routes(runtime_variant_preset_handler, route_deps)
+    )
+    v2_reg.add_subregistry(
+        register_v2_deployment_revision_preset_routes(
+            deployment_revision_preset_handler, route_deps
+        )
+    )
+    v2_reg.add_subregistry(register_v2_model_card_routes(model_card_handler, route_deps))
     v2_reg.add_subregistry(register_v2_resource_usage_routes(resource_usage_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_scheduling_history_routes(scheduling_history_handler, route_deps)
@@ -180,6 +211,7 @@ def build_v2_routes(
         register_v2_storage_namespace_routes(storage_namespace_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_user_routes(user_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_vfolder_routes(vfolder_handler, route_deps))
     v2_reg.add_subregistry(register_v2_vfs_storage_routes(vfs_storage_handler, route_deps))
 
     # Export (reuses v1 handler directly, no adapter)

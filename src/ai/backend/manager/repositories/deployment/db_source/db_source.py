@@ -253,7 +253,7 @@ class DeploymentDBSource:
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint = rbac_result.row
 
-            # Create deployment policy (use provided config or default rolling policy)
+            # Create deployment policy if provided
             if policy_config is not None:
                 policy_creator_spec = DeploymentPolicyCreatorSpec(
                     endpoint_id=endpoint.id,
@@ -338,7 +338,7 @@ class DeploymentDBSource:
             await db_sess.flush()
             endpoint.current_revision = initial_revision.id
 
-            # Create deployment policy (use provided spec or default rolling policy)
+            # Create deployment policy if provided
             if spec.policy is not None:
                 policy_spec = spec.policy
             else:

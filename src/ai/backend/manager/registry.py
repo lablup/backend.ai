@@ -328,9 +328,10 @@ class AgentRegistry:
         max_wait: int,
     ) -> None:
         cache_id = EventCacheDomain.SESSION_SCHEDULER.cache_id(str(session_id))
+        timeout_seconds = max_wait if max_wait > 0 else DEFAULT_WAIT_TIMEOUT_SECONDS
         while True:
             try:
-                with _timeout(DEFAULT_WAIT_TIMEOUT_SECONDS):
+                with _timeout(timeout_seconds):
                     async for event in propagator.receive(cache_id):
                         if isinstance(event, SchedulingBroadcastEvent):
                             if event.status_transition == str(SessionStatus.RUNNING):

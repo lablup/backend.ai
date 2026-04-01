@@ -64,11 +64,16 @@ from .deployment import (
     create_access_token,
     # Auto Scaling
     create_auto_scaling_rule,
+    # Revision Preset
+    create_deployment_revision_preset,
     # Deployment
     create_model_deployment,
     delete_auto_scaling_rule,
+    delete_deployment_revision_preset,
     delete_model_deployment,
     deployment,
+    deployment_revision_preset,
+    deployment_revision_presets,
     deployment_status_changed,
     deployments,
     inference_runtime_config,
@@ -85,6 +90,7 @@ from .deployment import (
     sync_replicas,
     update_auto_scaling_rule,
     update_deployment_policy,
+    update_deployment_revision_preset,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -164,6 +170,13 @@ from .login_session import (
     my_login_sessions_v2,
     my_revoke_login_session,
 )
+from .model_card import (
+    admin_create_model_card_v2,
+    admin_delete_model_card_v2,
+    admin_update_model_card_v2,
+    model_card_v2,
+    model_cards_v2,
+)
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -209,6 +222,7 @@ from .project_v2 import (
     domain_projects_v2,
     project_domain_v2,
     project_v2,
+    unassign_users_from_project_v2,
 )
 from .prometheus_query_preset import (
     admin_create_prometheus_query_preset,
@@ -311,6 +325,20 @@ from .resource_usage import (
     rg_user_usage_buckets,
     user_usage_buckets,
 )
+from .runtime_variant import (
+    admin_create_runtime_variant,
+    admin_delete_runtime_variant,
+    admin_update_runtime_variant,
+    runtime_variant,
+    runtime_variants,
+)
+from .runtime_variant_preset import (
+    admin_create_runtime_variant_preset,
+    admin_delete_runtime_variant_preset,
+    admin_update_runtime_variant_preset,
+    runtime_variant_preset,
+    runtime_variant_presets,
+)
 from .scheduler import (
     scheduling_events_by_session,
 )
@@ -326,7 +354,11 @@ from .scheduling_history import (
     session_scoped_scheduling_histories,
 )
 from .service_catalog import admin_service_catalogs
-from .session.resolver import admin_sessions_v2, terminate_project_sessions_v2
+from .session.resolver import (
+    admin_sessions_v2,
+    project_sessions_v2,
+    terminate_project_sessions_v2,
+)
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -351,7 +383,7 @@ from .user import (
     update_my_allowed_client_ip,
     update_user_v2,
 )
-from .vfolder_v2 import project_vfolders
+from .vfolder_v2 import my_vfolders, project_vfolders
 from .vfs_storage import (
     create_vfs_storage,
     delete_vfs_storage,
@@ -421,6 +453,7 @@ class Query:
     admin_login_sessions_v2 = admin_login_sessions_v2
     admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
+    project_sessions_v2 = project_sessions_v2
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases
@@ -518,6 +551,18 @@ class Query:
     # Resource Preset V2 APIs
     admin_resource_presets_v2 = admin_resource_presets_v2
     admin_resource_preset_v2 = admin_resource_preset_v2
+    # Runtime Variant APIs
+    runtime_variants = runtime_variants
+    runtime_variant = runtime_variant
+    # Runtime Variant Preset APIs
+    runtime_variant_presets = runtime_variant_presets
+    runtime_variant_preset = runtime_variant_preset
+    # Deployment Revision Preset APIs
+    deployment_revision_presets = deployment_revision_presets
+    deployment_revision_preset = deployment_revision_preset
+    # Model Card APIs
+    model_cards_v2 = model_cards_v2
+    model_card_v2 = model_card_v2
     # Resource Allocation V2 APIs
     my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
     project_resource_allocation_v2 = project_resource_allocation_v2
@@ -528,6 +573,7 @@ class Query:
     check_preset_availability_v2 = check_preset_availability_v2
     # VFolder APIs
     project_vfolders = project_vfolders
+    my_vfolders = my_vfolders
 
 
 @strawberry.type
@@ -645,6 +691,7 @@ class Mutation:
     admin_update_project_v2 = admin_update_project_v2
     admin_delete_project_v2 = admin_delete_project_v2
     admin_purge_project_v2 = admin_purge_project_v2
+    unassign_users_from_project_v2 = unassign_users_from_project_v2
     # User V2 APIs
     admin_create_user_v2 = admin_create_user_v2
     admin_bulk_create_users_v2 = admin_bulk_create_users_v2
@@ -699,6 +746,22 @@ class Mutation:
     admin_create_resource_preset_v2 = admin_create_resource_preset_v2
     admin_update_resource_preset_v2 = admin_update_resource_preset_v2
     admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
+    # Runtime Variant mutations
+    admin_create_runtime_variant = admin_create_runtime_variant
+    admin_update_runtime_variant = admin_update_runtime_variant
+    admin_delete_runtime_variant = admin_delete_runtime_variant
+    # Runtime Variant Preset mutations
+    admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
+    admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
+    admin_delete_runtime_variant_preset = admin_delete_runtime_variant_preset
+    # Deployment Revision Preset mutations
+    create_deployment_revision_preset = create_deployment_revision_preset
+    update_deployment_revision_preset = update_deployment_revision_preset
+    delete_deployment_revision_preset = delete_deployment_revision_preset
+    # Model Card mutations
+    admin_create_model_card_v2 = admin_create_model_card_v2
+    admin_update_model_card_v2 = admin_update_model_card_v2
+    admin_delete_model_card_v2 = admin_delete_model_card_v2
     # Session V2 mutations
     terminate_project_sessions_v2 = terminate_project_sessions_v2
 

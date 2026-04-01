@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     GroupFilter,
     GroupOrder,
     PurgeGroupInput,
+    UnassignUsersFromProjectInput,
     UpdateGroupInput,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
@@ -29,6 +30,8 @@ from ai.backend.common.dto.manager.v2.group.response import (
     ProjectPayload,
     ProjectStorageInfo,
     PurgeProjectPayload,
+    UnassignUserError,
+    UnassignUsersFromProjectPayload,
     VFolderHostPermissionEntry,
 )
 from ai.backend.common.dto.manager.v2.group.types import (
@@ -57,6 +60,7 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
+from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.group.types import (
     DomainProjectSearchScope,
     UserProjectSearchScope,
@@ -74,6 +78,9 @@ from ai.backend.manager.services.group.actions.search_projects import (
     SearchProjectsAction,
     SearchProjectsByDomainAction,
     SearchProjectsByUserAction,
+)
+from ai.backend.manager.services.group.actions.unassign_users import (
+    UnassignUsersFromProjectAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -222,6 +229,26 @@ class ProjectAdapter(BaseAdapter):
             PurgeGroupAction(group_id=input.group_id)
         )
         return PurgeProjectPayload(purged=True)
+
+    async def unassign_users(
+        self, project_id: UUID, input: UnassignUsersFromProjectInput
+    ) -> UnassignUsersFromProjectPayload:
+        """Unassign users from a project."""
+        result = await self._processors.group.unassign_users_from_project.wait_for_complete(
+            UnassignUsersFromProjectAction(
+                unbinder=UserProjectEntityUnbinder(
+                    user_uuids=input.user_ids, project_id=project_id
+                ),
+            )
+        )
+        return UnassignUsersFromProjectPayload(
+            unassigned_users=[
+                UserAdapter._user_data_to_node(user_data) for user_data in result.unassigned_users
+            ],
+            failed=[
+                UnassignUserError(user_id=f.user_id, message=f.reason) for f in result.failures
+            ],
+        )
 
     async def search_by_domain(
         self,

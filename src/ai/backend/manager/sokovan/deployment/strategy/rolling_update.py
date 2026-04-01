@@ -21,6 +21,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.deployment import DeploymentHasNoTargetRevision
 from ai.backend.manager.models.deployment_policy import DeploymentStrategySpec, RollingUpdateSpec
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -257,6 +258,10 @@ def _build_route_creators(
     count: int,
 ) -> list[RBACEntityCreator[RoutingRow]]:
     """Build route creator specs for new revision routes."""
+    if deployment.deploying_revision_id is None:
+        raise DeploymentHasNoTargetRevision(
+            f"Cannot create routes: deployment {deployment.id} has no deploying revision"
+        )
     creators: list[RBACEntityCreator[RoutingRow]] = []
     for _ in range(count):
         spec = RouteCreatorSpec(

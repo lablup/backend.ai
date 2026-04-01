@@ -11,12 +11,16 @@ from ai.backend.manager.api.adapters.artifact_registry import ArtifactRegistryAd
 from ai.backend.manager.api.adapters.audit_log import AuditLogAdapter
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.deployment import DeploymentAdapter
+from ai.backend.manager.api.adapters.deployment_revision_preset import (
+    DeploymentRevisionPresetAdapter,
+)
 from ai.backend.manager.api.adapters.domain import DomainAdapter
 from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
 from ai.backend.manager.api.adapters.huggingface_registry import HuggingFaceRegistryAdapter
 from ai.backend.manager.api.adapters.image import ImageAdapter
 from ai.backend.manager.api.adapters.login_history import LoginHistoryAdapter
 from ai.backend.manager.api.adapters.login_session import LoginSessionAdapter
+from ai.backend.manager.api.adapters.model_card import ModelCardAdapter
 from ai.backend.manager.api.adapters.notification import NotificationAdapter
 from ai.backend.manager.api.adapters.object_storage import ObjectStorageAdapter
 from ai.backend.manager.api.adapters.project import ProjectAdapter
@@ -29,11 +33,14 @@ from ai.backend.manager.api.adapters.resource_policy import ResourcePolicyAdapte
 from ai.backend.manager.api.adapters.resource_preset import ResourcePresetAdapter
 from ai.backend.manager.api.adapters.resource_slot import ResourceSlotAdapter
 from ai.backend.manager.api.adapters.resource_usage import ResourceUsageAdapter
+from ai.backend.manager.api.adapters.runtime_variant import RuntimeVariantAdapter
+from ai.backend.manager.api.adapters.runtime_variant_preset import RuntimeVariantPresetAdapter
 from ai.backend.manager.api.adapters.scheduling_history import SchedulingHistoryAdapter
 from ai.backend.manager.api.adapters.service_catalog import ServiceCatalogAdapter
 from ai.backend.manager.api.adapters.session import SessionAdapter
 from ai.backend.manager.api.adapters.storage_namespace import StorageNamespaceAdapter
 from ai.backend.manager.api.adapters.user import UserAdapter
+from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
 from ai.backend.manager.api.adapters.vfs_storage import VFSStorageAdapter
 
 if TYPE_CHECKING:
@@ -76,12 +83,17 @@ class Adapters:
         resource_policy: ResourcePolicyAdapter,
         resource_preset: ResourcePresetAdapter,
         resource_slot: ResourceSlotAdapter,
+        runtime_variant: RuntimeVariantAdapter,
+        runtime_variant_preset: RuntimeVariantPresetAdapter,
+        deployment_revision_preset: DeploymentRevisionPresetAdapter,
+        model_card: ModelCardAdapter,
         resource_usage: ResourceUsageAdapter,
         scheduling_history: SchedulingHistoryAdapter,
         service_catalog: ServiceCatalogAdapter,
         session: SessionAdapter,
         storage_namespace: StorageNamespaceAdapter,
         user: UserAdapter,
+        vfolder: VFolderAdapter,
         vfs_storage: VFSStorageAdapter,
     ) -> None:
         self.agent = agent
@@ -108,12 +120,17 @@ class Adapters:
         self.resource_policy = resource_policy
         self.resource_preset = resource_preset
         self.resource_slot = resource_slot
+        self.runtime_variant = runtime_variant
+        self.runtime_variant_preset = runtime_variant_preset
+        self.deployment_revision_preset = deployment_revision_preset
+        self.model_card = model_card
         self.resource_usage = resource_usage
         self.scheduling_history = scheduling_history
         self.service_catalog = service_catalog
         self.session = session
         self.storage_namespace = storage_namespace
         self.user = user
+        self.vfolder = vfolder
         self.vfs_storage = vfs_storage
 
     @classmethod
@@ -149,11 +166,16 @@ class Adapters:
             resource_policy=ResourcePolicyAdapter(processors),
             resource_preset=ResourcePresetAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
+            runtime_variant=RuntimeVariantAdapter(processors),
+            runtime_variant_preset=RuntimeVariantPresetAdapter(processors),
+            deployment_revision_preset=DeploymentRevisionPresetAdapter(processors),
+            model_card=ModelCardAdapter(processors),
             resource_usage=ResourceUsageAdapter(processors),
             scheduling_history=SchedulingHistoryAdapter(processors),
             service_catalog=ServiceCatalogAdapter(processors),
             session=SessionAdapter(processors),
             storage_namespace=StorageNamespaceAdapter(processors),
             user=UserAdapter(processors, auth_config),
+            vfolder=VFolderAdapter(processors),
             vfs_storage=VFSStorageAdapter(processors),
         )

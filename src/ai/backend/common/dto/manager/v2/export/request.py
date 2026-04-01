@@ -13,7 +13,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
-from ai.backend.common.dto.manager.v2.export.types import BooleanFilter, OrderDirection
+from ai.backend.common.dto.manager.v2.export.types import OrderDirection
 
 __all__ = (
     "AuditLogExportCSVInput",
@@ -354,11 +354,11 @@ class ProjectExportFilter(BaseRequestModel):
             "Use this to export projects belonging to a specific domain."
         ),
     )
-    is_active: BooleanFilter | None = Field(
+    is_active: bool | None = Field(
         default=None,
         description=(
             "Filter projects by active status. "
-            "Set equals to true for active projects only, "
+            "Set to true for active projects only, "
             "or false for inactive/archived projects only."
         ),
     )

@@ -98,9 +98,7 @@ from ai.backend.common.dto.manager.vfolder.response import (
     VolumeInfoDTO,
 )
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.types import (
-    VFolderID,
-)
+from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.dto.context import (
@@ -1625,6 +1623,7 @@ class VFolderHandler:
                 source_vfolder_uuid=row["id"],
                 target_name=params.target_name,
                 target_host=params.target_host,
+                target_quota_scope_id=params.target_quota_scope_id,
                 cloneable=params.cloneable,
                 usage_mode=params.usage_mode,
                 mount_permission=VFolderPermission(params.permission.value),

@@ -60,7 +60,7 @@ class ImageEnvironment(BaseModel):
     )
 
 
-class ModelServiceDefinition(BaseModel):
+class DeploymentConfig(BaseModel):
     environment: ImageEnvironment | None = Field(
         default=None,
         description="""
@@ -80,6 +80,15 @@ class ModelServiceDefinition(BaseModel):
         """,
         examples=[
             {"cpu": 1, "mem": "2gb"},
+        ],
+    )
+    resource_opts: dict[str, Any] | None = Field(
+        default=None,
+        description="""
+        Resource options for the model service session (e.g., shmem).
+        """,
+        examples=[
+            {"shmem": "16g"},
         ],
     )
     environ: dict[str, str] | None = Field(
@@ -431,7 +440,7 @@ class ScaleOutDecision:
 
 @dataclass
 class DefinitionFiles:
-    service_definition: dict[str, Any] | None
+    deployment_config: dict[str, Any] | None
     model_definition: dict[str, Any]
 
 
@@ -445,7 +454,7 @@ class RouteInfo:
     status: RouteStatus
     traffic_ratio: float
     created_at: datetime
-    revision_id: UUID | None
+    revision_id: UUID
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
 

@@ -448,6 +448,7 @@ class TestScalingGroupRepositoryDB:
                     domain=test_domain,
                     project=test_group_id,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
                 db_sess.add(routing)
 
@@ -1366,6 +1367,7 @@ class TestScalingGroupRepositoryDB:
                     domain=test_domain,
                     project=test_group_id,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
             )
             await db_sess.flush()

@@ -599,6 +599,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 domain=test_domain_name,
                 project=test_group_id,
                 traffic_ratio=1.0,
+                revision=uuid.uuid4(),
             )
             db_sess.add(route)
             await db_sess.commit()
@@ -673,6 +674,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 domain=test_domain_name,
                 project=test_group_id,
                 traffic_ratio=1.0,
+                revision=uuid.uuid4(),
             )
             db_sess.add(route)
             await db_sess.flush()
@@ -819,6 +821,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     domain=test_domain_name,
                     project=test_group_id,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
                 db_sess.add(route)
                 route_ids.add(route_id)
@@ -3191,8 +3194,8 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
+            revision_id=uuid.uuid4(),
             traffic_ratio=1.0,
-            revision_id=None,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
         creator = RBACEntityCreator(
@@ -3225,6 +3228,7 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
+            revision_id=uuid.uuid4(),
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3272,6 +3276,7 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
+            revision_id=uuid.uuid4(),
         )
         creator = RBACEntityCreator(
             spec=spec,

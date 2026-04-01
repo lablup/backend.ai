@@ -17,6 +17,8 @@ from ai.backend.manager.api.gql.project_v2.types.mutations import (
     DeleteProjectPayloadGQL,
     ProjectPayloadGQL,
     PurgeProjectPayloadGQL,
+    UnassignUsersFromProjectInputGQL,
+    UnassignUsersFromProjectPayloadGQL,
     UpdateProjectInputGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -90,3 +92,20 @@ async def admin_purge_project_v2(
     ctx = info.context
     payload = await ctx.adapters.project.admin_purge(PurgeGroupInput(group_id=project_id))
     return PurgeProjectPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Unassign users from a project. RBAC validates project admin permission.",
+    )
+)  # type: ignore[misc]
+async def unassign_users_from_project_v2(
+    info: Info[StrawberryGQLContext],
+    project_id: UUID,
+    input: UnassignUsersFromProjectInputGQL,
+) -> UnassignUsersFromProjectPayloadGQL:
+    """Unassign users from a project."""
+    ctx = info.context
+    payload = await ctx.adapters.project.unassign_users(project_id, input.to_pydantic())
+    return UnassignUsersFromProjectPayloadGQL.from_pydantic(payload)

@@ -50,6 +50,10 @@ from ai.backend.manager.services.group.actions.search_projects import (
     SearchProjectsByDomainAction,
     SearchProjectsByUserAction,
 )
+from ai.backend.manager.services.group.actions.unassign_users import (
+    UnassignUsersFromProjectAction,
+    UnassignUsersFromProjectActionResult,
+)
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
@@ -106,6 +110,16 @@ class GroupService:
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
         await self._group_repository.purge_group(action.group_id)
         return PurgeGroupActionResult(group_id=action.group_id)
+
+    async def unassign_users_from_project(
+        self, action: UnassignUsersFromProjectAction
+    ) -> UnassignUsersFromProjectActionResult:
+        result = await self._group_repository.unassign_users_from_project(action.unbinder)
+        return UnassignUsersFromProjectActionResult(
+            project_id=action.unbinder.project_id,
+            unassigned_users=result.unassigned_users,
+            failures=result.failures,
+        )
 
     async def _get_project_stats_for_period(
         self,

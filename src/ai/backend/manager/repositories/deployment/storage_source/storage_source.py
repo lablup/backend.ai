@@ -1,9 +1,6 @@
 """Storage source implementation for deployment repository."""
 
-import tomli
-
 from ai.backend.common.types import VFolderID
-from ai.backend.manager.data.deployment.types import ModelServiceDefinition
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -16,43 +13,6 @@ class DeploymentStorageSource:
 
     def __init__(self, storage_manager: StorageSessionManager) -> None:
         self._storage_manager = storage_manager
-
-    async def fetch_service_config(
-        self,
-        model_vfolder: VFolderLocation,
-    ) -> ModelServiceDefinition | None:
-        """
-        Fetch and parse service-definition.toml from model vfolder.
-
-        Args:
-            model_vfolder: The model vfolder location information
-
-        Returns:
-            Parsed service definition as ModelServiceDefinition, or None if not found
-        """
-        try:
-            vfid = VFolderID(model_vfolder.quota_scope_id, model_vfolder.id)
-            folder_host = model_vfolder.host
-
-            proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host)
-            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-
-            chunks = await manager_client.fetch_file_content(
-                volume_name,
-                str(vfid),
-                "./service-definition.toml",
-            )
-
-            if chunks:
-                raw_content = chunks.decode("utf-8")
-                parsed_toml = tomli.loads(raw_content)
-                return ModelServiceDefinition(**parsed_toml)
-
-        except Exception:
-            # Service definition file not found or parse error
-            pass
-
-        return None
 
     async def fetch_definition_file(
         self,

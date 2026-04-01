@@ -243,9 +243,13 @@ class DeploymentExecutor:
 
         # Phase 2: Evaluate scaling (per-deployment)
         for deployment in deployments:
+            info = deployment.deployment_info
+            if info.current_revision_id is None:
+                skipped.append(deployment)
+                continue
             try:
                 out_creators, in_route_ids = self._evaluate_deployment_scaling(
-                    deployment.deployment_info, route_map
+                    info, route_map, info.current_revision_id
                 )
                 if out_creators or in_route_ids:
                     scale_out_creators.extend(out_creators)
@@ -574,6 +578,7 @@ class DeploymentExecutor:
         self,
         deployment: DeploymentInfo,
         route_map: Mapping[UUID, Sequence[RouteInfo]],
+        revision_id: UUID,
     ) -> tuple[list[RBACEntityCreator[RoutingRow]], list[UUID]]:
         """Evaluate scaling action for a deployment and return creators/route IDs."""
         pool = DeploymentRecorderContext.current_pool()
@@ -595,7 +600,7 @@ class DeploymentExecutor:
                             session_owner_id=deployment.metadata.session_owner,
                             domain=deployment.metadata.domain,
                             project_id=deployment.metadata.project,
-                            revision_id=deployment.current_revision_id,
+                            revision_id=revision_id,
                         )
                         scale_out_creators.append(
                             RBACEntityCreator(

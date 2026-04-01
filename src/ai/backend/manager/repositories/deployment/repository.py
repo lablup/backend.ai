@@ -64,6 +64,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
@@ -94,6 +95,9 @@ from .storage_source import DeploymentStorageSource
 from .types import RouteData, RouteServiceDiscoveryInfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+_DEPLOYMENT_CONFIG_FILENAME = "deployment-config.yaml"
+_LEGACY_SERVICE_DEFINITION_FILENAME = "service-definition.toml"
 
 
 @dataclass
@@ -471,18 +475,46 @@ class DeploymentRepository:
         yaml = YAML()
         return cast(dict[str, Any], yaml.load(model_definition_bytes))
 
+    async def _try_fetch_config_file(
+        self,
+        vfolder_location: VFolderLocation,
+        filename: str,
+    ) -> dict[str, Any] | None:
+        try:
+            raw_bytes = await self._storage_source.fetch_definition_file(
+                vfolder_location,
+                [filename],
+            )
+        except DefinitionFileNotFound:
+            return None
+        if filename.endswith(".toml"):
+            return tomli.loads(raw_bytes.decode("utf-8"))
+        yaml = YAML()
+        loaded = yaml.load(raw_bytes)
+        if loaded is None:
+            return None
+        if not isinstance(loaded, Mapping):
+            raise InvalidAPIParameters(
+                f"Invalid deployment config in '{filename}': "
+                "top-level YAML value must be a mapping."
+            )
+        return dict(loaded)
+
     @deployment_repository_resilience.apply()
-    async def fetch_service_definition(
+    async def fetch_deployment_config(
         self,
         vfolder_id: uuid.UUID,
     ) -> dict[str, Any] | None:
         """
-        Fetch service definition file from model vfolder.
+        Fetch deployment config file from model vfolder.
+
+        Tries ``deployment-config.yaml`` first. Falls back to the legacy
+        ``service-definition.toml`` for backward compatibility.
 
         Args:
             vfolder_id: ID of the model vfolder
         Returns:
-            dict: Parsed service definition content
+            dict: Parsed deployment config content, or None if not found
         """
         vfolder_location = await self._db_source.get_vfolder_by_id(vfolder_id)
         if vfolder_location.ownership_type == VFolderOwnershipType.GROUP:
@@ -490,19 +522,26 @@ class DeploymentRepository:
                 "Cannot create model service with the project type's vfolder"
             )
 
-        # Read service definition from storage
-        service_definition_content: dict[str, Any] | None = None
-        try:
-            service_definition_bytes = await self._storage_source.fetch_definition_file(
-                vfolder_location,
-                ["service-definition.toml"],
-            )
-            service_definition_content = tomli.loads(service_definition_bytes.decode("utf-8"))
-        except DefinitionFileNotFound:
-            # Service definition is optional
-            pass
+        # Try deployment-config.yaml first (new format)
+        config = await self._try_fetch_config_file(vfolder_location, _DEPLOYMENT_CONFIG_FILENAME)
+        if config is not None:
+            return config
 
-        return service_definition_content
+        # Fall back to legacy service-definition.toml
+        config = await self._try_fetch_config_file(
+            vfolder_location, _LEGACY_SERVICE_DEFINITION_FILENAME
+        )
+        if config is not None:
+            log.info(
+                "Found legacy {} in vfolder {}. Please rename it to {}.",
+                _LEGACY_SERVICE_DEFINITION_FILENAME,
+                vfolder_id,
+                _DEPLOYMENT_CONFIG_FILENAME,
+            )
+            return config
+
+        # Deployment config is optional
+        return None
 
     @deployment_repository_resilience.apply()
     async def fetch_definition_files(
@@ -511,23 +550,23 @@ class DeploymentRepository:
         model_definition_path: str | None,
     ) -> DefinitionFiles:
         """
-        Fetch definition files(Both service and model definitions) from model vfolder.
+        Fetch definition files(Both deployment config and model definition) from model vfolder.
 
         Args:
             vfolder_id: ID of the model vfolder
             definition_path: Path to the definition file
         Returns:
-            DefinitionFiles: Contains service definition and model definition bytes
+            DefinitionFiles: Contains deployment config and model definition bytes
         """
         model_definition_content: dict[str, Any] = await self.fetch_model_definition(
             vfolder_id, model_definition_path
         )
-        service_definition_content: dict[str, Any] | None = await self.fetch_service_definition(
+        deployment_config_content: dict[str, Any] | None = await self.fetch_deployment_config(
             vfolder_id
         )
 
         return DefinitionFiles(
-            service_definition=service_definition_content,
+            deployment_config=deployment_config_content,
             model_definition=model_definition_content,
         )
 
