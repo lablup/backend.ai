@@ -400,14 +400,16 @@ def merge_revision_drafts(*drafts: RevisionDraft) -> RevisionDraft:
     """
     result = RevisionDraft()
     merged_environ: dict[str, str] = {}
+    merged_resource_slots: dict[str, Any] = {}
+    merged_resource_opts: dict[str, Any] = {}
 
     for draft in drafts:
         if draft.image_id is not None:
             result = dataclasses.replace(result, image_id=draft.image_id)
         if draft.resource_slots is not None:
-            result = dataclasses.replace(result, resource_slots=draft.resource_slots)
+            merged_resource_slots.update(draft.resource_slots)
         if draft.resource_opts is not None:
-            result = dataclasses.replace(result, resource_opts=draft.resource_opts)
+            merged_resource_opts.update(draft.resource_opts)
         if draft.cluster_mode is not None:
             result = dataclasses.replace(result, cluster_mode=draft.cluster_mode)
         if draft.cluster_size is not None:
@@ -423,6 +425,10 @@ def merge_revision_drafts(*drafts: RevisionDraft) -> RevisionDraft:
         if draft.model_definition is not None:
             result = dataclasses.replace(result, model_definition=draft.model_definition)
 
+    if merged_resource_slots:
+        result = dataclasses.replace(result, resource_slots=merged_resource_slots)
+    if merged_resource_opts:
+        result = dataclasses.replace(result, resource_opts=merged_resource_opts)
     if merged_environ:
         result = dataclasses.replace(result, environ=merged_environ)
 
