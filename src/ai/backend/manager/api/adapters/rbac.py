@@ -110,7 +110,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
-from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY, build_operation_description
+from ai.backend.manager.actions.action import build_operation_description
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.association_scopes_entities import (
@@ -183,6 +183,9 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role i
 )
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
+from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
+    GetPermissionMatrixAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
@@ -476,22 +479,14 @@ class RBACAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ permission matrix
 
-    def get_permission_matrix(self) -> list[ScopeEntityOperationCombinationInfo]:
+    async def get_permission_matrix(self) -> list[ScopeEntityOperationCombinationInfo]:
         """Return the complete RBAC scope-entity-operation permission matrix."""
-        scope_entity_ops: dict[RBACElementType, dict[RBACElementType, list[OperationInfo]]] = {}
-        for action_cls in RBAC_ACTION_REGISTRY:
-            scope = action_cls.permission_scope()
-            perm = action_cls.required_permission()
-            name = action_cls.action_name()
-            desc = build_operation_description(name, perm.element_type)
-            entity_map = scope_entity_ops.setdefault(scope, {})
-            entity_map.setdefault(perm.element_type, []).append(
-                OperationInfo(
-                    operation=name.value,
-                    description=desc,
-                    required_permission=OperationTypeDTO(perm.operation.value),
-                )
+        action_result = (
+            await self._processors.permission_controller.get_permission_matrix.wait_for_complete(
+                GetPermissionMatrixAction()
             )
+        )
+        matrix = action_result.matrix
         return [
             ScopeEntityOperationCombinationInfo(
                 scope_type=RBACElementTypeDTO(scope.value),
@@ -499,14 +494,26 @@ class RBACAdapter(BaseAdapter):
                     [
                         EntityActionInfo(
                             entity_type=RBACElementTypeDTO(entity.value),
-                            actions=sorted(ops, key=lambda o: o.operation),
+                            actions=sorted(
+                                [
+                                    OperationInfo(
+                                        operation=action_name.value,
+                                        description=build_operation_description(
+                                            action_name, perm.element_type
+                                        ),
+                                        required_permission=OperationTypeDTO(perm.operation.value),
+                                    )
+                                    for action_name, perm in actions.items()
+                                ],
+                                key=lambda o: o.operation,
+                            ),
                         )
-                        for entity, ops in entity_map.items()
+                        for entity, actions in entity_map.items()
                     ],
                     key=lambda e: e.entity_type,
                 ),
             )
-            for scope, entity_map in sorted(scope_entity_ops.items(), key=lambda e: e[0].value)
+            for scope, entity_map in sorted(matrix.items(), key=lambda e: e[0].value)
         ]
 
     # ------------------------------------------------------------------ create

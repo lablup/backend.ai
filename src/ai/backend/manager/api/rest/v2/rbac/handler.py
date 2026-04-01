@@ -201,7 +201,7 @@ class V2RBACHandler:
 
     async def get_permission_matrix(self) -> APIResponse:
         """Return the complete RBAC permission matrix."""
-        result = self._adapter.get_permission_matrix()
+        result = await self._adapter.get_permission_matrix()
         return APIResponse.build(
             status_code=HTTPStatus.OK, response_model=PermissionMatrixPayload(result)
         )
