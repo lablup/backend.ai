@@ -165,6 +165,9 @@ from ai.backend.manager.services.session.actions.match_sessions import (
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
 )
+from ai.backend.manager.services.session.actions.resolve_session import (
+    ResolveSessionAction,
+)
 from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
 )
@@ -635,9 +638,15 @@ class SessionHandler:
             session_name,
         )
         try:
+            resolved = await self._session.resolve_session.wait_for_complete(
+                ResolveSessionAction(
+                    session_name=session_name,
+                    owner_access_key=owner_access_key,
+                )
+            )
             result = await self._session.get_session_info.wait_for_complete(
                 GetSessionInfoAction(
-                    session_name=session_name,
+                    session_id=resolved.session_id,
                     owner_access_key=owner_access_key,
                 )
             )
@@ -726,9 +735,15 @@ class SessionHandler:
             params.recursive,
         )
 
+        resolved = await self._session.resolve_session.wait_for_complete(
+            ResolveSessionAction(
+                session_name=session_name,
+                owner_access_key=owner_access_key,
+            )
+        )
         result = await self._session.destroy_session.wait_for_complete(
             DestroySessionAction(
-                session_name=session_name,
+                session_id=resolved.session_id,
                 owner_access_key=owner_access_key,
                 user_role=user_role,
                 forced=params.forced,
@@ -765,9 +780,15 @@ class SessionHandler:
             session_name,
         )
 
+        resolved = await self._session.resolve_session.wait_for_complete(
+            ResolveSessionAction(
+                session_name=session_name,
+                owner_access_key=owner_access_key,
+            )
+        )
         result = await self._session.execute_session.wait_for_complete(
             ExecuteSessionAction(
-                session_name=session_name,
+                session_id=resolved.session_id,
                 owner_access_key=owner_access_key,
                 api_version=request["api_version"],
                 params=ExecuteSessionActionParams(

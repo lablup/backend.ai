@@ -14,6 +14,8 @@ import pytest
 from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
@@ -24,6 +26,9 @@ from ai.backend.common.types import (
     SessionId,
     SessionResult,
     SessionTypes,
+)
+from ai.backend.manager.actions.validators.rbac.single_entity import (
+    SingleEntityActionRBACValidator,
 )
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
@@ -498,8 +503,8 @@ class TestDestroySession:
         )
 
         action = DestroySessionAction(
+            session_id=sample_session_id,
             user_role=UserRole.USER,
-            session_name="test-session",
             forced=False,
             recursive=False,
             owner_access_key=sample_access_key,
@@ -508,7 +513,7 @@ class TestDestroySession:
 
         assert result.result == {"stats": {"status": "cancelled"}}
         mock_session_repository.get_target_session_ids.assert_called_once_with(
-            "test-session", sample_access_key, recursive=False
+            sample_session_id, sample_access_key, recursive=False
         )
         mock_scheduling_controller.mark_sessions_for_termination.assert_called_once()
 
@@ -532,8 +537,8 @@ class TestDestroySession:
         )
 
         action = DestroySessionAction(
+            session_id=sample_session_id,
             user_role=UserRole.USER,
-            session_name="test-session",
             forced=False,
             recursive=False,
             owner_access_key=sample_access_key,
@@ -567,8 +572,8 @@ class TestDestroySession:
         )
 
         action = DestroySessionAction(
+            session_id=sample_session_id,
             user_role=UserRole.USER,
-            session_name="test-session",
             forced=True,
             recursive=False,
             owner_access_key=sample_access_key,
@@ -602,8 +607,8 @@ class TestDestroySession:
         )
 
         action = DestroySessionAction(
+            session_id=sample_session_id,
             user_role=UserRole.USER,
-            session_name="test-session",
             forced=False,
             recursive=True,
             owner_access_key=sample_access_key,
@@ -611,7 +616,7 @@ class TestDestroySession:
         result = await session_service.destroy_session(action)
 
         mock_session_repository.get_target_session_ids.assert_called_once_with(
-            "test-session", sample_access_key, recursive=True
+            sample_session_id, sample_access_key, recursive=True
         )
         assert result.result == {"stats": {"status": "cancelled"}}
 
@@ -620,6 +625,7 @@ class TestDestroySession:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         mock_scheduling_controller: MagicMock,
+        sample_session_id: SessionId,
         sample_access_key: AccessKey,
     ) -> None:
         """Test destroying when no sessions found"""
@@ -634,8 +640,8 @@ class TestDestroySession:
         )
 
         action = DestroySessionAction(
+            session_id=sample_session_id,
             user_role=UserRole.USER,
-            session_name="nonexistent",
             forced=False,
             recursive=False,
             owner_access_key=sample_access_key,
@@ -759,6 +765,7 @@ class TestGetSessionInfo:
         mock_session_repository: MagicMock,
         mock_agent_registry: MagicMock,
         mock_running_session: MagicMock,
+        sample_session_id: SessionId,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
     ) -> None:
@@ -766,7 +773,7 @@ class TestGetSessionInfo:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_running_session)
 
         action = GetSessionInfoAction(
-            session_name="test-session",
+            session_id=sample_session_id,
             owner_access_key=sample_access_key,
         )
         result = await session_service.get_session_info(action)
@@ -786,6 +793,7 @@ class TestGetSessionInfo:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         mock_running_session: MagicMock,
+        sample_session_id: SessionId,
         sample_access_key: AccessKey,
     ) -> None:
         """Test getting session info when container_id is None (pre-RUNNING state)"""
@@ -794,7 +802,7 @@ class TestGetSessionInfo:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_running_session)
 
         action = GetSessionInfoAction(
-            session_name="test-session",
+            session_id=sample_session_id,
             owner_access_key=sample_access_key,
         )
         result = await session_service.get_session_info(action)
@@ -806,6 +814,7 @@ class TestGetSessionInfo:
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
+        sample_session_id: SessionId,
         sample_access_key: AccessKey,
     ) -> None:
         """Test getting session info when session not found"""
@@ -814,7 +823,7 @@ class TestGetSessionInfo:
         )
 
         action = GetSessionInfoAction(
-            session_name="nonexistent",
+            session_id=sample_session_id,
             owner_access_key=sample_access_key,
         )
 
@@ -1200,6 +1209,7 @@ class TestExecute:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         mock_agent_registry: MagicMock,
+        sample_session_id: SessionId,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
     ) -> None:
@@ -1225,7 +1235,7 @@ class TestExecute:
             run_id="test-run-id",
         )
         action = ExecuteSessionAction(
-            session_name="test-session",
+            session_id=sample_session_id,
             api_version=(4, 0),
             owner_access_key=sample_access_key,
             params=params,
@@ -1244,6 +1254,7 @@ class TestExecute:
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
+        sample_session_id: SessionId,
         sample_access_key: AccessKey,
     ) -> None:
         """Test executing code when session not found"""
@@ -1258,7 +1269,7 @@ class TestExecute:
             run_id="test-run-id",
         )
         action = ExecuteSessionAction(
-            session_name="nonexistent",
+            session_id=sample_session_id,
             api_version=(4, 0),
             owner_access_key=sample_access_key,
             params=params,
@@ -1872,3 +1883,86 @@ class TestSearchKernels:
         assert result.total_count == 25
         assert result.has_next_page is True
         assert result.has_previous_page is True
+
+
+# ==================== RBAC Regression Tests (BA-5518) ====================
+
+
+class TestSessionActionRBACCompatibility:
+    """Regression tests for BA-5518.
+
+    DestroySessionAction (and other session single-entity actions) previously
+    inherited from SessionAction instead of BaseSingleEntityAction, causing
+    AttributeError when SingleEntityActionRBACValidator called target_element().
+    """
+
+    async def test_destroy_session_action_has_target_element(
+        self,
+        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
+    ) -> None:
+        action = DestroySessionAction(
+            session_id=sample_session_id,
+            user_role=UserRole.USER,
+            forced=False,
+            recursive=False,
+            owner_access_key=sample_access_key,
+        )
+        ref = action.target_element()
+        assert ref.element_type == RBACElementType.SESSION
+        assert ref.element_id == str(sample_session_id)
+
+    async def test_execute_session_action_has_target_element(
+        self,
+        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
+    ) -> None:
+        action = ExecuteSessionAction(
+            session_id=sample_session_id,
+            api_version=(2,),
+            owner_access_key=sample_access_key,
+            params=ExecuteSessionActionParams(mode="query", options=None, code="", run_id=None),
+        )
+        ref = action.target_element()
+        assert ref.element_type == RBACElementType.SESSION
+        assert ref.element_id == str(sample_session_id)
+
+    async def test_get_session_info_action_has_target_element(
+        self,
+        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
+    ) -> None:
+        action = GetSessionInfoAction(
+            session_id=sample_session_id,
+            owner_access_key=sample_access_key,
+        )
+        ref = action.target_element()
+        assert ref.element_type == RBACElementType.SESSION
+        assert ref.element_id == str(sample_session_id)
+
+    async def test_destroy_session_rbac_validator_does_not_raise_attribute_error(
+        self,
+        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """The original bug: SingleEntityActionRBACValidator.validate() raised
+        AttributeError because DestroySessionAction had no target_element().
+        """
+        mock_repository = MagicMock()
+        mock_repository.check_permission_with_scope_chain = AsyncMock(return_value=True)
+        validator = SingleEntityActionRBACValidator(repository=mock_repository)
+
+        action = DestroySessionAction(
+            session_id=sample_session_id,
+            user_role=UserRole.USER,
+            forced=False,
+            recursive=False,
+            owner_access_key=sample_access_key,
+        )
+
+        mock_user = MagicMock()
+        mock_user.user_id = uuid4()
+        with with_user(mock_user):
+            await validator.validate(action, MagicMock())
+
+        mock_repository.check_permission_with_scope_chain.assert_called_once()

@@ -453,7 +453,7 @@ class TestExecuteSession:
         )
 
         action = ExecuteSessionAction(
-            session_name="test-session",
+            session_id=sample_session_id,
             api_version=(1,),
             owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
@@ -498,7 +498,7 @@ class TestExecuteSession:
         )
 
         action = ExecuteSessionAction(
-            session_name="test-session",
+            session_id=sample_session_id,
             api_version=(2,),
             owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
@@ -537,7 +537,7 @@ class TestExecuteSession:
         mock_agent_registry.get_completions = AsyncMock(return_value=mock_completion)
 
         action = ExecuteSessionAction(
-            session_name="test-session",
+            session_id=sample_session_id,
             api_version=(2,),
             owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
@@ -568,7 +568,7 @@ class TestExecuteSession:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
 
         action = ExecuteSessionAction(
-            session_name="test-session",
+            session_id=sample_session_id,
             api_version=(2,),
             owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
@@ -599,7 +599,7 @@ class TestExecuteSession:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
 
         action = ExecuteSessionAction(
-            session_name="test-session",
+            session_id=sample_session_id,
             api_version=(2,),
             owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
@@ -630,7 +630,7 @@ class TestExecuteSession:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
 
         action = ExecuteSessionAction(
-            session_name="test-session",
+            session_id=sample_session_id,
             api_version=(2,),
             owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
@@ -671,7 +671,7 @@ class TestExecuteSession:
         )
 
         action = ExecuteSessionAction(
-            session_name="test-session",
+            session_id=sample_session_id,
             api_version=(2,),
             owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(

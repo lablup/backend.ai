@@ -173,6 +173,10 @@ from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.resolve_session import (
+    ResolveSessionAction,
+    ResolveSessionActionResult,
+)
 from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
@@ -756,15 +760,23 @@ class SessionService:
             log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError from e
 
+    async def resolve_session(self, action: ResolveSessionAction) -> ResolveSessionActionResult:
+        session = await self._session_repository.get_session_validated(
+            action.session_name,
+            action.owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.NONE,
+        )
+        return ResolveSessionActionResult(session_id=session.id)
+
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
-        session_name = action.session_name
+        session_id = action.session_id
         owner_access_key = action.owner_access_key
         forced = action.forced
         recursive = action.recursive
 
         # Get session IDs to terminate (based on recursive flag)
         session_ids = await self._session_repository.get_target_session_ids(
-            session_name,
+            session_id,
             owner_access_key,
             recursive=recursive,
         )
@@ -910,13 +922,13 @@ class SessionService:
             )
 
     async def execute_session(self, action: ExecuteSessionAction) -> ExecuteSessionActionResult:
-        session_name = action.session_name
+        session_id = action.session_id
         owner_access_key = action.owner_access_key
         api_version = action.api_version
 
         resp = {}
         session = await self._session_repository.get_session_validated(
-            session_name,
+            session_id,
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
@@ -1137,11 +1149,11 @@ class SessionService:
         return GetDirectAccessInfoActionResult(result=resp, session_data=sess.to_dataclass())
 
     async def get_session_info(self, action: GetSessionInfoAction) -> GetSessionInfoActionResult:
-        session_name = action.session_name
+        session_id = action.session_id
         owner_access_key = action.owner_access_key
 
         sess = await self._session_repository.get_session_validated(
-            session_name,
+            session_id,
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )

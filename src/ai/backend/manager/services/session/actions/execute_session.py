@@ -1,11 +1,16 @@
+import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.base import (
+    SessionSingleEntityAction,
+    SessionSingleEntityActionResult,
+)
 
 
 @dataclass
@@ -18,15 +23,19 @@ class ExecuteSessionActionParams:
 
 
 @dataclass
-class ExecuteSessionAction(SessionAction):
-    session_name: str
+class ExecuteSessionAction(SessionSingleEntityAction):
+    session_id: uuid.UUID
     api_version: tuple[Any, ...]
     owner_access_key: AccessKey
     params: ExecuteSessionActionParams
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def target_entity_id(self) -> str:
+        return str(self.session_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.SESSION, str(self.session_id))
 
     @override
     @classmethod
@@ -35,11 +44,11 @@ class ExecuteSessionAction(SessionAction):
 
 
 @dataclass
-class ExecuteSessionActionResult(BaseActionResult):
+class ExecuteSessionActionResult(SessionSingleEntityActionResult):
     # TODO: Add proper type
     result: Any
     session_data: SessionData
 
     @override
-    def entity_id(self) -> str | None:
+    def target_entity_id(self) -> str:
         return str(self.session_data.id)
