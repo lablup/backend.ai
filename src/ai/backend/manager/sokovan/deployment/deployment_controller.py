@@ -23,6 +23,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
@@ -295,11 +296,9 @@ class DeploymentController:
             SurgeResourceCheckResult with ``sufficient=True`` when resources are adequate,
             or ``sufficient=False`` with detail fields populated otherwise.
         """
-        if deployment_info.policy is not None:
-            policy = deployment_info.policy
-        else:
-            policy = await self._deployment_repository.get_deployment_policy(deployment_info.id)
-        spec = policy.strategy_spec
+        if deployment_info.policy is None:
+            raise DeploymentPolicyNotFound(str(deployment_info.id))
+        spec = deployment_info.policy.strategy_spec
 
         desired_replicas = deployment_info.replica_spec.target_replica_count
         surge_count = self._resolve_surge_count(spec, desired_replicas)
@@ -330,7 +329,7 @@ class DeploymentController:
         return SurgeResourceCheckResult(
             sufficient=False,
             shortfall=SurgeShortfallDetail(
-                strategy=policy.strategy,
+                strategy=deployment_info.policy.strategy,
                 surge_count=surge_count,
                 scaling_group=scaling_group,
                 insufficient_slots=insufficient_slots,

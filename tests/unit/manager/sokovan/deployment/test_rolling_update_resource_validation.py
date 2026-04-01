@@ -1,6 +1,6 @@
 """Tests for deployment surge resource validation in DeploymentController.
 
-Tests verify that validate_deployment_surge_resources correctly checks
+Tests verify that check_deployment_surge_resources correctly checks
 whether the scaling group has enough free resources to accommodate
 the surge of a deployment (max_surge for rolling update, full replica
 count for blue-green).
@@ -9,6 +9,7 @@ count for blue-green).
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
@@ -48,8 +49,22 @@ PROJECT_ID = uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
 USER_ID = uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")
 
 
+@dataclass(frozen=True)
+class SurgeResourceCase:
+    """A single parametrized case for surge resource validation."""
+
+    strategy: DeploymentStrategy
+    strategy_spec: BlueGreenSpec | RollingUpdateSpec
+    resource_slots: dict[str, Decimal]
+    free_slots: dict[str, Decimal]
+    expected_sufficient: bool
+    expected_surge_count: int
+    cluster_size: int = 1
+
+
 def _make_deployment_info(
     *,
+    policy: DeploymentPolicyData,
     resource_group: str = "default",
 ) -> DeploymentInfo:
     """Create a DeploymentInfo for testing (revisions are fetched from repository)."""
@@ -73,23 +88,23 @@ def _make_deployment_info(
         network=DeploymentNetworkSpec(open_to_public=False),
         model_revisions=[],
         current_revision_id=REVISION_ID,
+        policy=policy,
     )
 
 
 def _make_revision_data(
     *,
-    resource_slots: dict[str, Decimal] | None = None,
+    resource_slots: dict[str, Decimal],
     cluster_size: int = 1,
 ) -> ModelRevisionData:
     """Create a ModelRevisionData with the given resource slots."""
-    slots = resource_slots or {"cpu": Decimal("2"), "mem": Decimal("4096")}
     return ModelRevisionData(
         id=REVISION_ID,
         name="v1",
         cluster_config=ClusterConfigData(mode=ClusterMode.SINGLE_NODE, size=cluster_size),
         resource_config=ResourceConfigData(
             resource_group_name="default",
-            resource_slot=ResourceSlot(slots),
+            resource_slot=ResourceSlot(resource_slots),
         ),
         model_runtime_config=ModelRuntimeConfigData(runtime_variant=RuntimeVariant.CUSTOM),
         model_mount_config=ModelMountConfigData(
@@ -115,8 +130,8 @@ def _make_resource_info(
     )
 
 
-class TestValidateDeploymentSurgeResources:
-    """Tests for DeploymentController.validate_deployment_surge_resources."""
+class TestCheckDeploymentSurgeResources:
+    """Tests for DeploymentController.check_deployment_surge_resources."""
 
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
@@ -143,186 +158,105 @@ class TestValidateDeploymentSurgeResources:
         args.revision_generator_registry = MagicMock()
         return DeploymentController(args)
 
-    async def test_blue_green_pass_when_resources_are_sufficient(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            SurgeResourceCase(
+                strategy=DeploymentStrategy.BLUE_GREEN,
+                strategy_spec=BlueGreenSpec(auto_promote=False),
+                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+                free_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                expected_sufficient=True,
+                expected_surge_count=2,
+            ),
+            SurgeResourceCase(
+                strategy=DeploymentStrategy.BLUE_GREEN,
+                strategy_spec=BlueGreenSpec(auto_promote=False),
+                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+                free_slots={"cpu": Decimal("1"), "mem": Decimal("2048")},
+                expected_sufficient=False,
+                expected_surge_count=2,
+            ),
+            SurgeResourceCase(
+                strategy=DeploymentStrategy.ROLLING,
+                strategy_spec=RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=2), max_unavailable=IntOrPercent(count=0)
+                ),
+                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+                free_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                expected_sufficient=True,
+                expected_surge_count=2,
+            ),
+            SurgeResourceCase(
+                strategy=DeploymentStrategy.ROLLING,
+                strategy_spec=RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=2), max_unavailable=IntOrPercent(count=0)
+                ),
+                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+                free_slots={"cpu": Decimal("1"), "mem": Decimal("2048")},
+                expected_sufficient=False,
+                expected_surge_count=2,
+            ),
+        ],
+        ids=[
+            "blue_green-sufficient",
+            "blue_green-insufficient",
+            "rolling-sufficient",
+            "rolling-insufficient",
+        ],
+    )
+    async def test_surge_resource_check(
         self,
         controller: DeploymentController,
         mock_deployment_repository: MagicMock,
         mock_scaling_group_repository: MagicMock,
+        case: SurgeResourceCase,
     ) -> None:
-        """Blue-green requires target_replica_count worth of surge resources."""
-        deployment_info = _make_deployment_info()  # replica_count=2
-        mock_deployment_repository.get_deployment_policy = AsyncMock(
-            return_value=DeploymentPolicyData(
-                id=uuid.uuid4(),
-                endpoint=ENDPOINT_ID,
-                strategy=DeploymentStrategy.BLUE_GREEN,
-                strategy_spec=BlueGreenSpec(auto_promote=False),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
+        """Surge resource check for both blue-green and rolling strategies."""
+        policy = DeploymentPolicyData(
+            id=uuid.uuid4(),
+            endpoint=ENDPOINT_ID,
+            strategy=case.strategy,
+            strategy_spec=case.strategy_spec,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
+        deployment_info = _make_deployment_info(policy=policy)
         mock_deployment_repository.get_revision = AsyncMock(
-            return_value=_make_revision_data(
-                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-            )
+            return_value=_make_revision_data(resource_slots=case.resource_slots)
         )
-        # Blue-green surge = 2 replicas * (2 cpu, 4096 mem) = (4 cpu, 8192 mem)
-        # Free resources are (8 cpu, 16384 mem) — sufficient
         mock_scaling_group_repository.get_resource_info = AsyncMock(
-            return_value=_make_resource_info({
-                "cpu": Decimal("8"),
-                "mem": Decimal("16384"),
-            })
+            return_value=_make_resource_info(case.free_slots)
         )
 
         result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
-        assert result.sufficient is True
-
-    async def test_blue_green_fail_when_resources_are_insufficient(
-        self,
-        controller: DeploymentController,
-        mock_deployment_repository: MagicMock,
-        mock_scaling_group_repository: MagicMock,
-    ) -> None:
-        """Blue-green returns insufficient when free < replica_count * per_route."""
-        deployment_info = _make_deployment_info()  # replica_count=2
-        mock_deployment_repository.get_deployment_policy = AsyncMock(
-            return_value=DeploymentPolicyData(
-                id=uuid.uuid4(),
-                endpoint=ENDPOINT_ID,
-                strategy=DeploymentStrategy.BLUE_GREEN,
-                strategy_spec=BlueGreenSpec(auto_promote=False),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
-        )
-        mock_deployment_repository.get_revision = AsyncMock(
-            return_value=_make_revision_data(
-                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-            )
-        )
-        # Blue-green surge = 2 replicas * (2 cpu, 4096 mem) = (4 cpu, 8192 mem)
-        # Free resources are (1 cpu, 2048 mem) — insufficient
-        mock_scaling_group_repository.get_resource_info = AsyncMock(
-            return_value=_make_resource_info({
-                "cpu": Decimal("1"),
-                "mem": Decimal("2048"),
-            })
-        )
-
-        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
-        assert result.sufficient is False
-        assert result.shortfall is not None
-        assert result.shortfall.strategy == DeploymentStrategy.BLUE_GREEN
-        assert result.shortfall.surge_count == 2
-        assert any("cpu" in d for d in result.shortfall.insufficient_slots)
-        assert any("mem" in d for d in result.shortfall.insufficient_slots)
+        assert result.sufficient is case.expected_sufficient
+        if not case.expected_sufficient:
+            assert result.shortfall is not None
+            assert result.shortfall.strategy == case.strategy
+            assert result.shortfall.surge_count == case.expected_surge_count
 
     async def test_skip_validation_when_max_surge_is_zero(
         self,
         controller: DeploymentController,
-        mock_deployment_repository: MagicMock,
         mock_scaling_group_repository: MagicMock,
     ) -> None:
         """Rolling update with max_surge=0 needs no surge resources."""
-        deployment_info = _make_deployment_info()
-        mock_deployment_repository.get_deployment_policy = AsyncMock(
-            return_value=DeploymentPolicyData(
-                id=uuid.uuid4(),
-                endpoint=ENDPOINT_ID,
-                strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(
-                    max_surge=IntOrPercent(count=0), max_unavailable=IntOrPercent(count=1)
-                ),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
+        policy = DeploymentPolicyData(
+            id=uuid.uuid4(),
+            endpoint=ENDPOINT_ID,
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(
+                max_surge=IntOrPercent(count=0), max_unavailable=IntOrPercent(count=1)
+            ),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
+        deployment_info = _make_deployment_info(policy=policy)
 
         result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
         assert result.sufficient is True
-
         mock_scaling_group_repository.get_resource_info.assert_not_called()
-
-    async def test_pass_when_resources_are_sufficient(
-        self,
-        controller: DeploymentController,
-        mock_deployment_repository: MagicMock,
-        mock_scaling_group_repository: MagicMock,
-    ) -> None:
-        """Validation passes when free resources >= surge requirements."""
-        deployment_info = _make_deployment_info()
-        mock_deployment_repository.get_deployment_policy = AsyncMock(
-            return_value=DeploymentPolicyData(
-                id=uuid.uuid4(),
-                endpoint=ENDPOINT_ID,
-                strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(
-                    max_surge=IntOrPercent(count=2), max_unavailable=IntOrPercent(count=0)
-                ),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
-        )
-        mock_deployment_repository.get_revision = AsyncMock(
-            return_value=_make_revision_data(
-                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-            )
-        )
-        # Surge requires 2 * (2 cpu, 4096 mem) = (4 cpu, 8192 mem)
-        # Free resources are (8 cpu, 16384 mem) — sufficient
-        mock_scaling_group_repository.get_resource_info = AsyncMock(
-            return_value=_make_resource_info({
-                "cpu": Decimal("8"),
-                "mem": Decimal("16384"),
-            })
-        )
-
-        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
-        assert result.sufficient is True
-
-    async def test_fail_when_resources_are_insufficient(
-        self,
-        controller: DeploymentController,
-        mock_deployment_repository: MagicMock,
-        mock_scaling_group_repository: MagicMock,
-    ) -> None:
-        """Validation returns insufficient when free resources < surge."""
-        deployment_info = _make_deployment_info()
-        mock_deployment_repository.get_deployment_policy = AsyncMock(
-            return_value=DeploymentPolicyData(
-                id=uuid.uuid4(),
-                endpoint=ENDPOINT_ID,
-                strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(
-                    max_surge=IntOrPercent(count=2), max_unavailable=IntOrPercent(count=0)
-                ),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
-        )
-        mock_deployment_repository.get_revision = AsyncMock(
-            return_value=_make_revision_data(
-                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-            )
-        )
-        # Surge requires 2 * (2 cpu, 4096 mem) = (4 cpu, 8192 mem)
-        # Free resources are (1 cpu, 2048 mem) — insufficient
-        mock_scaling_group_repository.get_resource_info = AsyncMock(
-            return_value=_make_resource_info({
-                "cpu": Decimal("1"),
-                "mem": Decimal("2048"),
-            })
-        )
-
-        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
-        assert result.sufficient is False
-        assert result.shortfall is not None
-        assert result.shortfall.strategy == DeploymentStrategy.ROLLING
-        assert result.shortfall.surge_count == 2
-        assert result.shortfall.scaling_group == "default"
-        assert any("cpu" in d for d in result.shortfall.insufficient_slots)
-        assert any("mem" in d for d in result.shortfall.insufficient_slots)
 
     async def test_fail_when_single_resource_is_insufficient(
         self,
@@ -331,25 +265,22 @@ class TestValidateDeploymentSurgeResources:
         mock_scaling_group_repository: MagicMock,
     ) -> None:
         """Validation fails even if only one resource type is insufficient."""
-        deployment_info = _make_deployment_info()
-        mock_deployment_repository.get_deployment_policy = AsyncMock(
-            return_value=DeploymentPolicyData(
-                id=uuid.uuid4(),
-                endpoint=ENDPOINT_ID,
-                strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(
-                    max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
-                ),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
+        policy = DeploymentPolicyData(
+            id=uuid.uuid4(),
+            endpoint=ENDPOINT_ID,
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(
+                max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
+            ),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
+        deployment_info = _make_deployment_info(policy=policy)
         mock_deployment_repository.get_revision = AsyncMock(
             return_value=_make_revision_data(
                 resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
             )
         )
-        # Surge requires 1 * (2 cpu, 4096 mem) = (2 cpu, 4096 mem)
         # CPU is sufficient (10) but mem is insufficient (2048)
         mock_scaling_group_repository.get_resource_info = AsyncMock(
             return_value=_make_resource_info({
@@ -362,7 +293,6 @@ class TestValidateDeploymentSurgeResources:
         assert result.sufficient is False
         assert result.shortfall is not None
         assert any("mem" in d for d in result.shortfall.insufficient_slots)
-        # CPU should NOT be in insufficient details since it's sufficient
         assert not any("cpu" in d for d in result.shortfall.insufficient_slots)
 
     async def test_correct_scaling_group_is_queried(
@@ -372,101 +302,83 @@ class TestValidateDeploymentSurgeResources:
         mock_scaling_group_repository: MagicMock,
     ) -> None:
         """Validation queries the correct scaling group from deployment metadata."""
-        deployment_info = _make_deployment_info(
-            resource_group="my-gpu-group",
+        policy = DeploymentPolicyData(
+            id=uuid.uuid4(),
+            endpoint=ENDPOINT_ID,
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(
+                max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
+            ),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
-        mock_deployment_repository.get_deployment_policy = AsyncMock(
-            return_value=DeploymentPolicyData(
-                id=uuid.uuid4(),
-                endpoint=ENDPOINT_ID,
-                strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(
-                    max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
-                ),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
-        )
+        deployment_info = _make_deployment_info(policy=policy, resource_group="my-gpu-group")
         mock_deployment_repository.get_revision = AsyncMock(
-            return_value=_make_revision_data(
-                resource_slots={"cpu": Decimal("1")},
-            )
+            return_value=_make_revision_data(resource_slots={"cpu": Decimal("1")}),
         )
         mock_scaling_group_repository.get_resource_info = AsyncMock(
             return_value=_make_resource_info({"cpu": Decimal("100")})
         )
 
         await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
-
         mock_scaling_group_repository.get_resource_info.assert_called_once_with("my-gpu-group")
 
+    @pytest.mark.parametrize(
+        "case",
+        [
+            SurgeResourceCase(
+                strategy=DeploymentStrategy.ROLLING,
+                strategy_spec=RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
+                ),
+                resource_slots={"cpu": Decimal("4")},
+                free_slots={"cpu": Decimal("6")},
+                expected_sufficient=False,
+                cluster_size=2,
+            ),
+            SurgeResourceCase(
+                strategy=DeploymentStrategy.ROLLING,
+                strategy_spec=RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
+                ),
+                resource_slots={"cpu": Decimal("4")},
+                free_slots={"cpu": Decimal("10")},
+                expected_sufficient=True,
+                cluster_size=2,
+            ),
+        ],
+        ids=["insufficient", "sufficient"],
+    )
     async def test_cluster_size_multiplies_surge_resource_requirement(
         self,
         controller: DeploymentController,
         mock_deployment_repository: MagicMock,
         mock_scaling_group_repository: MagicMock,
+        case: SurgeResourceCase,
     ) -> None:
-        """Surge resources must account for cluster_size > 1."""
-        deployment_info = _make_deployment_info()  # replica_count=2
-        mock_deployment_repository.get_deployment_policy = AsyncMock(
-            return_value=DeploymentPolicyData(
-                id=uuid.uuid4(),
-                endpoint=ENDPOINT_ID,
-                strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(
-                    max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
-                ),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
+        """Surge resources must account for cluster_size > 1.
+
+        surge_count=1 (max_surge) * cluster_size=2 = 2 total kernels
+        per_route_slots: cpu=4 → total surge = 4 * 2 = 8 cpu
+        """
+        policy = DeploymentPolicyData(
+            id=uuid.uuid4(),
+            endpoint=ENDPOINT_ID,
+            strategy=case.strategy,
+            strategy_spec=case.strategy_spec,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
-        # cluster_size=2: each surge route needs 2 kernels
-        # surge_count=1 (max_surge) * cluster_size=2 = 2 total kernels
-        # per_route_slots: cpu=4 → total surge = 4 * 2 = 8 cpu
+        deployment_info = _make_deployment_info(policy=policy)
         mock_deployment_repository.get_revision = AsyncMock(
             return_value=_make_revision_data(
-                resource_slots={"cpu": Decimal("4")},
-                cluster_size=2,
+                resource_slots=case.resource_slots,
+                cluster_size=case.cluster_size,
             )
         )
-        # Only 6 cpu free — insufficient for 8 cpu surge requirement
         mock_scaling_group_repository.get_resource_info = AsyncMock(
-            return_value=_make_resource_info({"cpu": Decimal("6")})
+            return_value=_make_resource_info(case.free_slots)
         )
 
         result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
-        assert result.sufficient is False
-
-    async def test_cluster_size_pass_when_resources_cover_multiplied_surge(
-        self,
-        controller: DeploymentController,
-        mock_deployment_repository: MagicMock,
-        mock_scaling_group_repository: MagicMock,
-    ) -> None:
-        """Sufficient resources when free slots cover surge * cluster_size."""
-        deployment_info = _make_deployment_info()  # replica_count=2
-        mock_deployment_repository.get_deployment_policy = AsyncMock(
-            return_value=DeploymentPolicyData(
-                id=uuid.uuid4(),
-                endpoint=ENDPOINT_ID,
-                strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(
-                    max_surge=IntOrPercent(count=1), max_unavailable=IntOrPercent(count=0)
-                ),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
-        )
-        mock_deployment_repository.get_revision = AsyncMock(
-            return_value=_make_revision_data(
-                resource_slots={"cpu": Decimal("4")},
-                cluster_size=2,
-            )
-        )
-        # surge_count=1 * cluster_size=2 * cpu=4 = 8 cpu needed, 10 available
-        mock_scaling_group_repository.get_resource_info = AsyncMock(
-            return_value=_make_resource_info({"cpu": Decimal("10")})
-        )
-
-        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
-        assert result.sufficient is True
+        assert result.sufficient is case.expected_sufficient
