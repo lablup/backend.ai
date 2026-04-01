@@ -264,6 +264,29 @@ class ModelCardConflict(BackendAIError, web.HTTPConflict):
         )
 
 
+class DeploymentRevisionPresetNotFound(ObjectNotFound):
+    object_name = "deployment revision preset"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class DeploymentRevisionPresetConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-deployment-revision-preset"
+    error_title = "Duplicate Deployment Revision Preset"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class AgentNotFound(ObjectNotFound):
     object_name = "agent"
 

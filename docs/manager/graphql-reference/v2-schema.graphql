@@ -1644,6 +1644,21 @@ type CreateDeploymentPayload {
   deployment: ModelDeployment!
 }
 
+"""Added in UNRELEASED. Create deployment revision preset input."""
+input CreateDeploymentRevisionPresetInput {
+  """Runtime variant ID."""
+  runtimeVariantId: UUID!
+
+  """Preset name."""
+  name: String!
+}
+
+"""Added in UNRELEASED. Create deployment revision preset payload."""
+type CreateDeploymentRevisionPresetPayloadGQL {
+  """The created preset."""
+  preset: DeploymentRevisionPreset!
+}
+
 """Added in UNRELEASED. Input for creating a new domain."""
 input CreateDomainInputGQL {
   """Domain name. Must be unique across the system."""
@@ -2234,6 +2249,12 @@ type DeleteDeploymentPayload {
   id: ID!
 }
 
+"""Added in UNRELEASED. Delete deployment revision preset payload."""
+type DeleteDeploymentRevisionPresetPayloadGQL {
+  """ID of the deleted preset."""
+  id: UUID!
+}
+
 """Added in 25.16.0. Input for deleting domain-level app configuration"""
 input DeleteDomainConfigInput {
   domainName: String!
@@ -2533,6 +2554,94 @@ type DeploymentPolicy implements Node {
   strategySpec: DeploymentStrategySpec!
   createdAt: DateTime!
   updatedAt: DateTime!
+}
+
+"""Added in UNRELEASED. A deployment revision preset entity."""
+type DeploymentRevisionPreset implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Preset ID."""
+  rowId: UUID!
+
+  """Runtime variant ID."""
+  runtimeVariantId: UUID!
+
+  """Preset name."""
+  name: String!
+
+  """Description."""
+  description: String
+
+  """Display order rank."""
+  rank: Int!
+
+  """Container image reference."""
+  image: String
+
+  """Cluster mode."""
+  clusterMode: String!
+
+  """Cluster size."""
+  clusterSize: Int!
+
+  """Startup command."""
+  startupCommand: String
+
+  """Bootstrap script."""
+  bootstrapScript: String
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of deployment revision presets."""
+type DeploymentRevisionPresetConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [DeploymentRevisionPresetEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type DeploymentRevisionPresetEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: DeploymentRevisionPreset!
+}
+
+"""Added in UNRELEASED. Filter for deployment revision presets."""
+input DeploymentRevisionPresetFilter {
+  """Name filter."""
+  name: StringFilter = null
+
+  """Variant ID filter."""
+  runtimeVariantId: UUID = null
+}
+
+"""
+Added in UNRELEASED. Order specification for deployment revision presets.
+"""
+input DeploymentRevisionPresetOrderBy {
+  """Field to order by."""
+  field: DeploymentRevisionPresetOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for deployment revision presets."""
+enum DeploymentRevisionPresetOrderField {
+  NAME
+  RANK
+  CREATED_AT
 }
 
 """Added in 24.09.0. Scope for deployment scheduling history query"""
@@ -5663,6 +5772,15 @@ type Mutation {
   """
   adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL!
 
+  """Added in UNRELEASED. Create a deployment revision preset."""
+  createDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL!
+
+  """Added in UNRELEASED. Update a deployment revision preset."""
+  updateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL!
+
+  """Added in UNRELEASED. Delete a deployment revision preset."""
+  deleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL!
+
   """Added in UNRELEASED. Create a model card (admin only)."""
   adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL!
 
@@ -7354,6 +7472,12 @@ type Query {
 
   """Added in UNRELEASED. Get a single runtime variant preset by ID."""
   runtimeVariantPreset(id: UUID!): RuntimeVariantPreset
+
+  """Added in UNRELEASED. Search deployment revision presets."""
+  deploymentRevisionPresets(filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection
+
+  """Added in UNRELEASED. Get a single deployment revision preset by ID."""
+  deploymentRevisionPreset(id: UUID!): DeploymentRevisionPreset
 
   """Added in UNRELEASED. Search model cards."""
   modelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
@@ -9842,6 +9966,27 @@ Added in UNRELEASED. Result payload returned after creating or updating a deploy
 type UpdateDeploymentPolicyPayload {
   """The updated deployment policy"""
   deploymentPolicy: DeploymentPolicy!
+}
+
+"""Added in UNRELEASED. Update deployment revision preset input."""
+input UpdateDeploymentRevisionPresetInput {
+  """Preset ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """New rank."""
+  rank: Int = null
+}
+
+"""Added in UNRELEASED. Update deployment revision preset payload."""
+type UpdateDeploymentRevisionPresetPayloadGQL {
+  """The updated preset."""
+  preset: DeploymentRevisionPreset!
 }
 
 """

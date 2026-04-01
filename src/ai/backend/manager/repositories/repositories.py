@@ -13,6 +13,9 @@ from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
 )
 from ai.backend.manager.repositories.deployment.repositories import DeploymentRepositories
+from ai.backend.manager.repositories.deployment_revision_preset.repositories import (
+    DeploymentRevisionPresetRepositories,
+)
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
 from ai.backend.manager.repositories.dotfile.repositories import DotfileRepositories
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
@@ -103,6 +106,7 @@ class Repositories:
     resource_slot: ResourceSlotRepositories
     runtime_variant: RuntimeVariantRepositories
     runtime_variant_preset: RuntimeVariantPresetRepositories
+    deployment_revision_preset: DeploymentRevisionPresetRepositories
     model_card: ModelCardRepositories
     resource_usage_history: ResourceUsageHistoryRepositories
     scaling_group: ScalingGroupRepositories
@@ -151,6 +155,7 @@ class Repositories:
         resource_slot_repositories = ResourceSlotRepositories.create(args)
         runtime_variant_repositories = RuntimeVariantRepositories.create(args)
         runtime_variant_preset_repositories = RuntimeVariantPresetRepositories.create(args)
+        deployment_revision_preset_repositories = DeploymentRevisionPresetRepositories.create(args)
         model_card_repositories = ModelCardRepositories.create(args)
         resource_usage_history_repositories = ResourceUsageHistoryRepositories.create(args)
         scaling_group_repositories = ScalingGroupRepositories.create(args)
@@ -198,6 +203,7 @@ class Repositories:
             resource_slot=resource_slot_repositories,
             runtime_variant=runtime_variant_repositories,
             runtime_variant_preset=runtime_variant_preset_repositories,
+            deployment_revision_preset=deployment_revision_preset_repositories,
             model_card=model_card_repositories,
             resource_usage_history=resource_usage_history_repositories,
             scaling_group=scaling_group_repositories,

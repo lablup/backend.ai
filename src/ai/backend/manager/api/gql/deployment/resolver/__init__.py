@@ -37,6 +37,13 @@ from .revision import (
     revision,
     revisions,
 )
+from .revision_preset import (
+    create_deployment_revision_preset,
+    delete_deployment_revision_preset,
+    deployment_revision_preset,
+    deployment_revision_presets,
+    update_deployment_revision_preset,
+)
 from .route import (
     route,
     routes,
@@ -75,4 +82,10 @@ __all__ = [
     "routes",
     "route",
     "update_route_traffic_status",
+    # Revision Preset
+    "create_deployment_revision_preset",
+    "delete_deployment_revision_preset",
+    "deployment_revision_preset",
+    "deployment_revision_presets",
+    "update_deployment_revision_preset",
 ]

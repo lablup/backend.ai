@@ -2788,6 +2788,25 @@ type CreateDeploymentPayload
   deployment: ModelDeployment!
 }
 
+"""Added in UNRELEASED. Create deployment revision preset input."""
+input CreateDeploymentRevisionPresetInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Runtime variant ID."""
+  runtimeVariantId: UUID!
+
+  """Preset name."""
+  name: String!
+}
+
+"""Added in UNRELEASED. Create deployment revision preset payload."""
+type CreateDeploymentRevisionPresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The created preset."""
+  preset: DeploymentRevisionPreset!
+}
+
 type CreateDomain
   @join__type(graph: GRAPHENE)
 {
@@ -3735,6 +3754,14 @@ type DeleteDeploymentPayload
   id: ID!
 }
 
+"""Added in UNRELEASED. Delete deployment revision preset payload."""
+type DeleteDeploymentRevisionPresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted preset."""
+  id: UUID!
+}
+
 """Instead of deleting the domain, just mark it as inactive."""
 type DeleteDomain
   @join__type(graph: GRAPHENE)
@@ -4210,6 +4237,107 @@ type DeploymentPolicy implements Node
   strategySpec: DeploymentStrategySpec!
   createdAt: DateTime!
   updatedAt: DateTime!
+}
+
+"""Added in UNRELEASED. A deployment revision preset entity."""
+type DeploymentRevisionPreset implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Preset ID."""
+  rowId: UUID!
+
+  """Runtime variant ID."""
+  runtimeVariantId: UUID!
+
+  """Preset name."""
+  name: String!
+
+  """Description."""
+  description: String
+
+  """Display order rank."""
+  rank: Int!
+
+  """Container image reference."""
+  image: String
+
+  """Cluster mode."""
+  clusterMode: String!
+
+  """Cluster size."""
+  clusterSize: Int!
+
+  """Startup command."""
+  startupCommand: String
+
+  """Bootstrap script."""
+  bootstrapScript: String
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of deployment revision presets."""
+type DeploymentRevisionPresetConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [DeploymentRevisionPresetEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type DeploymentRevisionPresetEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: DeploymentRevisionPreset!
+}
+
+"""Added in UNRELEASED. Filter for deployment revision presets."""
+input DeploymentRevisionPresetFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Name filter."""
+  name: StringFilter = null
+
+  """Variant ID filter."""
+  runtimeVariantId: UUID = null
+}
+
+"""
+Added in UNRELEASED. Order specification for deployment revision presets.
+"""
+input DeploymentRevisionPresetOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: DeploymentRevisionPresetOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for deployment revision presets."""
+enum DeploymentRevisionPresetOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  RANK @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 24.09.0. Scope for deployment scheduling history query"""
@@ -9520,6 +9648,15 @@ type Mutation
   """
   adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL! @join__field(graph: STRAWBERRY)
 
+  """Added in UNRELEASED. Create a deployment revision preset."""
+  createDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Update a deployment revision preset."""
+  updateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a deployment revision preset."""
+  deleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
   """Added in UNRELEASED. Create a model card (admin only)."""
   adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
 
@@ -11968,6 +12105,12 @@ type Query
 
   """Added in UNRELEASED. Get a single runtime variant preset by ID."""
   runtimeVariantPreset(id: UUID!): RuntimeVariantPreset @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Search deployment revision presets."""
+  deploymentRevisionPresets(filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get a single deployment revision preset by ID."""
+  deploymentRevisionPreset(id: UUID!): DeploymentRevisionPreset @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. Search model cards."""
   modelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection @join__field(graph: STRAWBERRY)
@@ -15228,6 +15371,31 @@ type UpdateDeploymentPolicyPayload
 {
   """The updated deployment policy"""
   deploymentPolicy: DeploymentPolicy!
+}
+
+"""Added in UNRELEASED. Update deployment revision preset input."""
+input UpdateDeploymentRevisionPresetInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Preset ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """New rank."""
+  rank: Int = null
+}
+
+"""Added in UNRELEASED. Update deployment revision preset payload."""
+type UpdateDeploymentRevisionPresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated preset."""
+  preset: DeploymentRevisionPreset!
 }
 
 """

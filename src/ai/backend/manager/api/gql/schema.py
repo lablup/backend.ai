@@ -64,11 +64,16 @@ from .deployment import (
     create_access_token,
     # Auto Scaling
     create_auto_scaling_rule,
+    # Revision Preset
+    create_deployment_revision_preset,
     # Deployment
     create_model_deployment,
     delete_auto_scaling_rule,
+    delete_deployment_revision_preset,
     delete_model_deployment,
     deployment,
+    deployment_revision_preset,
+    deployment_revision_presets,
     deployment_status_changed,
     deployments,
     inference_runtime_config,
@@ -85,6 +90,7 @@ from .deployment import (
     sync_replicas,
     update_auto_scaling_rule,
     update_deployment_policy,
+    update_deployment_revision_preset,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -551,6 +557,9 @@ class Query:
     # Runtime Variant Preset APIs
     runtime_variant_presets = runtime_variant_presets
     runtime_variant_preset = runtime_variant_preset
+    # Deployment Revision Preset APIs
+    deployment_revision_presets = deployment_revision_presets
+    deployment_revision_preset = deployment_revision_preset
     # Model Card APIs
     model_cards_v2 = model_cards_v2
     model_card_v2 = model_card_v2
@@ -745,6 +754,10 @@ class Mutation:
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
     admin_delete_runtime_variant_preset = admin_delete_runtime_variant_preset
+    # Deployment Revision Preset mutations
+    create_deployment_revision_preset = create_deployment_revision_preset
+    update_deployment_revision_preset = update_deployment_revision_preset
+    delete_deployment_revision_preset = delete_deployment_revision_preset
     # Model Card mutations
     admin_create_model_card_v2 = admin_create_model_card_v2
     admin_update_model_card_v2 = admin_update_model_card_v2

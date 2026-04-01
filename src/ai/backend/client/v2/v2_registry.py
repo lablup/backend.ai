@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from .domains_v2.audit_log import V2AuditLogClient
     from .domains_v2.container_registry import V2ContainerRegistryClient
     from .domains_v2.deployment import V2DeploymentClient
+    from .domains_v2.deployment_revision_preset import V2DeploymentRevisionPresetClient
     from .domains_v2.domain import V2DomainClient
     from .domains_v2.export import V2ExportClient
     from .domains_v2.fair_share import V2FairShareClient
@@ -256,6 +257,12 @@ class V2ClientRegistry:
         from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
 
         return V2RuntimeVariantPresetClient(self._client)
+
+    @cached_property
+    def deployment_revision_preset(self) -> V2DeploymentRevisionPresetClient:
+        from .domains_v2.deployment_revision_preset import V2DeploymentRevisionPresetClient
+
+        return V2DeploymentRevisionPresetClient(self._client)
 
     @cached_property
     def resource_usage(self) -> V2ResourceUsageClient:
