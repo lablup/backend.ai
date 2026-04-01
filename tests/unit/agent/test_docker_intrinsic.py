@@ -10,7 +10,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.agent.docker.intrinsic import CPUPlugin, MemoryPlugin, read_proc_net_dev
+from ai.backend.agent.docker.intrinsic import (
+    CPUPlugin,
+    ContainerNetStat,
+    MemoryPlugin,
+    read_proc_net_dev,
+)
 from ai.backend.agent.stats import StatModes
 
 
@@ -183,7 +188,7 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
             ),
             patch(
                 "ai.backend.agent.docker.intrinsic.read_proc_net_dev",
-                return_value=(0, 0),
+                return_value=ContainerNetStat(rx_bytes=0, tx_bytes=0),
             ),
             patch(
                 "ai.backend.agent.docker.intrinsic.current_loop",
@@ -192,7 +197,13 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
             mock_container_instance = AsyncMock()
             mock_container_instance.show.return_value = mock_container_data
             mock_container_cls.return_value = mock_container_instance
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
+
+            async def default_run_in_executor(executor: Any, fn: Any, *args: Any) -> Any:
+                return fn(*args)
+
+            mock_loop.return_value.run_in_executor = AsyncMock(
+                side_effect=default_run_in_executor,
+            )
             yield ctx
 
     async def test_init_creates_docker_client(self, memory_plugin: MemoryPlugin) -> None:
@@ -292,7 +303,7 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
                 "ai.backend.agent.docker.intrinsic.current_loop",
             ) as mock_loop,
         ):
-            mock_read_proc_net_dev.return_value = (4096, 8192)
+            mock_read_proc_net_dev.return_value = ContainerNetStat(rx_bytes=4096, tx_bytes=8192)
 
             async def run_in_executor_impl(executor: Any, fn: Any, *args: Any) -> Any:
                 return fn(*args)
@@ -412,7 +423,7 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
             patch("ai.backend.agent.docker.intrinsic.read_sysfs", return_value=1048576),
             patch(
                 "ai.backend.agent.docker.intrinsic.read_proc_net_dev",
-                return_value=(0, 0),
+                return_value=ContainerNetStat(rx_bytes=0, tx_bytes=0),
             ) as mock_read_proc_net_dev,
             patch("ai.backend.agent.docker.intrinsic.current_loop") as mock_loop,
         ):
@@ -578,9 +589,9 @@ class TestReadProcNetDev:
             "ai.backend.agent.docker.intrinsic.Path",
             return_value=net_dev,
         ):
-            rx, tx = read_proc_net_dev(42)
-        assert rx == 50000
-        assert tx == 80000
+            result = read_proc_net_dev(42)
+        assert result.rx_bytes == 50000
+        assert result.tx_bytes == 80000
 
     def test_sums_multiple_interfaces(self, tmp_path: Path) -> None:
         """Sums rx/tx bytes across all non-loopback interfaces."""
@@ -590,9 +601,9 @@ class TestReadProcNetDev:
             "ai.backend.agent.docker.intrinsic.Path",
             return_value=net_dev,
         ):
-            rx, tx = read_proc_net_dev(42)
-        assert rx == 40000  # 10000 + 30000
-        assert tx == 60000  # 20000 + 40000
+            result = read_proc_net_dev(42)
+        assert result.rx_bytes == 40000  # 10000 + 30000
+        assert result.tx_bytes == 60000  # 20000 + 40000
 
     def test_loopback_only_returns_zero(self, tmp_path: Path) -> None:
         """When only loopback is present, returns (0, 0)."""
@@ -602,9 +613,9 @@ class TestReadProcNetDev:
             "ai.backend.agent.docker.intrinsic.Path",
             return_value=net_dev,
         ):
-            rx, tx = read_proc_net_dev(42)
-        assert rx == 0
-        assert tx == 0
+            result = read_proc_net_dev(42)
+        assert result.rx_bytes == 0
+        assert result.tx_bytes == 0
 
     def test_raises_oserror_for_nonexistent_pid(self) -> None:
         """Raises OSError when /proc/[pid]/net/dev does not exist."""
