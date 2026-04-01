@@ -70,6 +70,7 @@ def setup_api(
         valkey_rate_limit=r.infrastructure.valkey.rate_limit,
         root_app=root_app,
         stream_cleanup_handler=r.processing.stream_cleanup_handler,
+        session_repository=r.domain.repositories.session.repository,
         pidx=pidx,
     ):
         root_registry.add_subregistry(sub)

@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
         StreamCleanupEventHandler,
     )
+    from ai.backend.manager.repositories.session.repository import SessionRepository
     from ai.backend.manager.services.processors import Processors
 
     from .types import CORSOptions, GQLContextDeps
@@ -41,6 +42,7 @@ def build_api_routes(
     valkey_rate_limit: ValkeyRateLimitClient | None,
     root_app: web.Application,
     stream_cleanup_handler: StreamCleanupEventHandler,
+    session_repository: SessionRepository,
     pidx: int = 0,
 ) -> list[RouteRegistry]:
     """Build the full API module tree and return all root-level registries.
@@ -211,6 +213,7 @@ def build_api_routes(
         agent=processors.agent,
         vfolder=processors.vfolder,
         config_provider=config_provider,
+        session_repository=session_repository,
     )
     userconfig_handler = UserConfigHandler(
         auth=processors.auth,
