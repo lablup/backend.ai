@@ -786,6 +786,25 @@ class ManagerConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod="/etc/backend.ai/ssl/manager.key"),
         ),
     ]
+    trusted_proxies: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            validation_alias=AliasChoices("trusted-proxies", "trusted_proxies"),
+            serialization_alias="trusted-proxies",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "List of trusted reverse proxy IP addresses or CIDR ranges. "
+                "When configured, the manager uses aiohttp_remotes.XForwardedStrict middleware "
+                "to securely resolve client IPs from X-Forwarded-For headers. "
+                "Only proxies in this list are trusted to set forwarding headers. "
+                "If empty (default), the manager falls back to manual X-Forwarded-For parsing."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="", prod='["10.0.0.0/8", "172.16.0.0/12"]'),
+        ),
+    ]
     event_loop: Annotated[
         EventLoopType,
         Field(

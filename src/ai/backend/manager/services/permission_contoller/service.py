@@ -277,3 +277,23 @@ class PermissionControllerService:
             actions = result.setdefault(perm.element_type, {})
             actions[action_cls.action_name()] = perm
         return result
+
+    def get_permission_matrix(
+        self,
+    ) -> dict[RBACElementType, dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]]]:
+        """
+        Build the RBAC permission matrix: scope -> entity -> action_name -> permission.
+
+        Reads ``permission_scope()`` from each registered RBAC action to produce
+        the full (scope, entity, operation) mapping.
+        """
+        result: dict[
+            RBACElementType, dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]]
+        ] = {}
+        for action_cls in self._rbac_action_registry:
+            scope = action_cls.permission_scope()
+            perm = action_cls.required_permission()
+            entity_map = result.setdefault(scope, {})
+            actions = entity_map.setdefault(perm.element_type, {})
+            actions[action_cls.action_name()] = perm
+        return result

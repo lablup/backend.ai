@@ -21,6 +21,11 @@ class ProjectCreateRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.PROJECT, OperationType.CREATE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN
+
 
 class ProjectGetRBACAction(BaseRBACAction):
     @classmethod
@@ -32,6 +37,11 @@ class ProjectGetRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.PROJECT, OperationType.READ)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN
 
 
 class ProjectSearchRBACAction(BaseRBACAction):
@@ -45,6 +55,11 @@ class ProjectSearchRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.PROJECT, OperationType.READ)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN
+
 
 class ProjectUpdateRBACAction(BaseRBACAction):
     @classmethod
@@ -56,6 +71,11 @@ class ProjectUpdateRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.PROJECT, OperationType.UPDATE)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN
 
 
 class ProjectSoftDeleteRBACAction(BaseRBACAction):
@@ -69,6 +89,11 @@ class ProjectSoftDeleteRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.PROJECT, OperationType.SOFT_DELETE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN
+
 
 class ProjectHardDeleteRBACAction(BaseRBACAction):
     @classmethod
@@ -80,3 +105,8 @@ class ProjectHardDeleteRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.PROJECT, OperationType.HARD_DELETE)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN

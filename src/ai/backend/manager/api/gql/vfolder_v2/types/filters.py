@@ -77,6 +77,7 @@ class VFolderFilterGQL(PydanticInputMixin[VFolderFilter]):
     host: StringFilter | None = None
     status: VFolderOperationStatusFilterGQL | None = None
     usage_mode: VFolderUsageModeFilterGQL | None = None
+    cloneable: bool | None = None
     created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None

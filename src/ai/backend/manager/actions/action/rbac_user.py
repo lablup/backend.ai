@@ -21,6 +21,11 @@ class UserCreateRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.USER, OperationType.CREATE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN
+
 
 class UserGetRBACAction(BaseRBACAction):
     @classmethod
@@ -32,6 +37,11 @@ class UserGetRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.USER, OperationType.READ)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN
 
 
 class UserSearchRBACAction(BaseRBACAction):
@@ -45,6 +55,11 @@ class UserSearchRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.USER, OperationType.READ)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN
+
 
 class UserUpdateRBACAction(BaseRBACAction):
     @classmethod
@@ -56,6 +71,11 @@ class UserUpdateRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.USER, OperationType.UPDATE)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN
 
 
 class UserSoftDeleteRBACAction(BaseRBACAction):
@@ -69,6 +89,11 @@ class UserSoftDeleteRBACAction(BaseRBACAction):
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.USER, OperationType.SOFT_DELETE)
 
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN
+
 
 class UserHardDeleteRBACAction(BaseRBACAction):
     @classmethod
@@ -80,3 +105,8 @@ class UserHardDeleteRBACAction(BaseRBACAction):
     @override
     def required_permission(cls) -> RBACRequiredPermission:
         return RBACRequiredPermission(RBACElementType.USER, OperationType.HARD_DELETE)
+
+    @classmethod
+    @override
+    def permission_scope(cls) -> RBACElementType:
+        return RBACElementType.DOMAIN

@@ -265,6 +265,8 @@ class VFolderAdapter(BaseAdapter):
             )
             if c is not None:
                 conditions.append(c)
+        if f.cloneable is not None:
+            conditions.append(VFolderConditions.by_cloneable(f.cloneable))
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_vfolder_filter(sub))

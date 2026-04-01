@@ -154,6 +154,15 @@ def runtime_variant_preset() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.deployment_revision_preset:deployment_revision_preset",
+    name="deployment-revision-preset",
+)
+def deployment_revision_preset() -> None:
+    """Admin deployment revision preset commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.model_card:model_card",
     name="model-card",
 )

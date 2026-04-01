@@ -129,6 +129,15 @@ class VFolderConditions:
 
         return inner
 
+    # ── boolean filter factories ──
+
+    @staticmethod
+    def by_cloneable(value: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.cloneable == value
+
+        return inner
+
     # ── enum filter factories ──
 
     @staticmethod

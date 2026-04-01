@@ -84,6 +84,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.deployment.service import (
         DeploymentService,  # pants: no-infer-dep
     )
+    from ai.backend.manager.services.deployment_revision_preset.processors import (
+        DeploymentRevisionPresetProcessors,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.deployment_revision_preset.service import (
+        DeploymentRevisionPresetService,  # pants: no-infer-dep
+    )
     from ai.backend.manager.services.domain.processors import (
         DomainProcessors,  # pants: no-infer-dep
     )
@@ -365,6 +371,7 @@ class Services:
     resource_slot: ResourceSlotService
     runtime_variant: RuntimeVariantService
     runtime_variant_preset: RuntimeVariantPresetService
+    deployment_revision_preset: DeploymentRevisionPresetService
     model_card: ModelCardService
     resource_usage: ResourceUsageService
     scaling_group: ScalingGroupService
@@ -426,6 +433,7 @@ class Processors(AbstractProcessorPackage):
     resource_slot: ResourceSlotProcessors
     runtime_variant: RuntimeVariantProcessors
     runtime_variant_preset: RuntimeVariantPresetProcessors
+    deployment_revision_preset: DeploymentRevisionPresetProcessors
     model_card: ModelCardProcessors
     resource_usage: ResourceUsageProcessors
     scaling_group: ScalingGroupProcessors
@@ -480,6 +488,7 @@ class Processors(AbstractProcessorPackage):
             *self.resource_slot.supported_actions(),
             *self.runtime_variant.supported_actions(),
             *self.runtime_variant_preset.supported_actions(),
+            *self.deployment_revision_preset.supported_actions(),
             *self.model_card.supported_actions(),
             *self.resource_usage.supported_actions(),
             *self.scaling_group.supported_actions(),

@@ -25,6 +25,9 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     DeleteRuntimeVariantPresetPayload as DeletePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
+    PresetTargetSpec as PresetTargetSpecDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     RuntimeVariantPresetNode as NodeDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
@@ -58,26 +61,56 @@ class RuntimeVariantPresetOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Specifies how a runtime variant preset value is applied to the inference container, either as an environment variable or a command-line argument.",
+    ),
+    model=PresetTargetSpecDTO,
+    name="PresetTargetSpec",
+)
+class PresetTargetSpecGQL(PydanticOutputMixin[PresetTargetSpecDTO]):
+    preset_target: str = gql_field(
+        description="How the value is applied to the container: 'env' sets it as an environment variable, 'args' appends it as a command-line argument."
+    )
+    value_type: str = gql_field(
+        description="Data type used for input validation (e.g., 'str', 'int', 'float', 'bool')."
+    )
+    default_value: str | None = gql_field(
+        description="The default value shown to users when they create a deployment using this preset."
+    )
+    key: str = gql_field(
+        description="For 'env' target, the environment variable name (e.g., VLLM_TENSOR_PARALLEL_SIZE); for 'args' target, the CLI flag name (e.g., --tensor-parallel)."
+    )
+
+
 @gql_node_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="A runtime variant preset entity.",
+        description="Defines a configurable parameter for a runtime variant. Each preset maps a user-facing setting (e.g., tensor parallelism, quantization) to either an environment variable or a command-line argument that is applied to the inference container.",
     ),
     name="RuntimeVariantPreset",
 )
 class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
-    row_id: UUID = gql_field(description="Preset ID.")
-    runtime_variant_id: UUID = gql_field(description="Runtime variant ID.")
-    name: str = gql_field(description="Preset name.")
-    description: str | None = gql_field(description="Description.")
-    rank: int = gql_field(description="Display order rank.")
-    preset_target: str = gql_field(description="Target: env or args.")
-    value_type: str = gql_field(description="Value type.")
-    default_value: str | None = gql_field(description="Default value.")
-    key: str = gql_field(description="Env key or args flag.")
-    created_at: datetime = gql_field(description="Creation timestamp.")
-    updated_at: datetime | None = gql_field(description="Last update timestamp.")
+    row_id: UUID = gql_field(description="The unique database identifier of this preset.")
+    runtime_variant_id: UUID = gql_field(description="The runtime variant this preset belongs to.")
+    name: str = gql_field(
+        description="Human-readable name of the configurable parameter (e.g., 'Tensor Parallel Size', 'Quantization')."
+    )
+    description: str | None = gql_field(
+        description="Detailed explanation of what this parameter controls and how it affects inference behavior."
+    )
+    rank: int = gql_field(
+        description="Display ordering among presets of the same runtime variant, with lower values shown first."
+    )
+    target_spec: PresetTargetSpecGQL = gql_field(
+        description="Specification defining how the user-provided value is applied to the inference container."
+    )
+    created_at: datetime = gql_field(description="Timestamp when this preset was created.")
+    updated_at: datetime | None = gql_field(
+        description="Timestamp of the last modification to this preset."
+    )
 
 
 RuntimeVariantPresetEdge = Edge[RuntimeVariantPresetGQL]
@@ -120,13 +153,23 @@ class RuntimeVariantPresetOrderByGQL(PydanticInputMixin[OrderDTO]):
     name="CreateRuntimeVariantPresetInput",
 )
 class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
-    runtime_variant_id: UUID = gql_field(description="Runtime variant ID.")
-    name: str = gql_field(description="Preset name.")
-    description: str | None = gql_field(default=None, description="Description.")
-    preset_target: str = gql_field(description="env or args.")
-    value_type: str = gql_field(description="str, int, float, bool.")
-    default_value: str | None = gql_field(default=None, description="Default value.")
-    key: str = gql_field(description="Env key or args flag.")
+    runtime_variant_id: UUID = gql_field(description="The runtime variant this preset belongs to.")
+    name: str = gql_field(description="Human-readable name of the configurable parameter.")
+    description: str | None = gql_field(
+        default=None, description="Detailed explanation of what this parameter controls."
+    )
+    preset_target: str = gql_field(
+        description="How the value is applied: 'env' for environment variable, 'args' for command-line argument."
+    )
+    value_type: str = gql_field(
+        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool')."
+    )
+    default_value: str | None = gql_field(
+        default=None, description="The default value shown to users when creating a deployment."
+    )
+    key: str = gql_field(
+        description="For 'env' target, the environment variable name; for 'args' target, the CLI flag name."
+    )
 
 
 @gql_pydantic_input(

@@ -13,13 +13,7 @@ class ResourceSlotEntryInfo(BaseResponseModel):
     quantity: str = Field(description="Resource quantity.")
 
 
-class ModelCardNode(BaseResponseModel):
-    id: UUID = Field(description="Model card ID.")
-    name: str = Field(description="Model card name.")
-    vfolder_id: UUID = Field(description="VFolder ID.")
-    domain_name: str = Field(description="Domain name.")
-    project_id: UUID = Field(description="Project ID.")
-    creator_id: UUID = Field(description="Creator user ID.")
+class ModelCardMetadata(BaseResponseModel):
     author: str | None = Field(default=None)
     title: str | None = Field(default=None)
     model_version: str | None = Field(default=None)
@@ -30,6 +24,16 @@ class ModelCardNode(BaseResponseModel):
     framework: list[str] = Field(default_factory=list)
     label: list[str] = Field(default_factory=list)
     license: str | None = Field(default=None)
+
+
+class ModelCardNode(BaseResponseModel):
+    id: UUID = Field(description="Model card ID.")
+    name: str = Field(description="Model card name.")
+    vfolder_id: UUID = Field(description="VFolder ID.")
+    domain_name: str = Field(description="Domain name.")
+    project_id: UUID = Field(description="Project ID.")
+    creator_id: UUID = Field(description="Creator user ID.")
+    metadata: ModelCardMetadata = Field(description="Model metadata.")
     min_resource: list[ResourceSlotEntryInfo] | None = Field(default=None)
     readme: str | None = Field(default=None)
     created_at: datetime = Field(description="Creation timestamp.")

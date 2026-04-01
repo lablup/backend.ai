@@ -40,6 +40,10 @@ def build_v2_routes(
     from .container_registry.registry import register_v2_container_registry_routes
     from .deployment.handler import V2DeploymentHandler
     from .deployment.registry import register_v2_deployment_routes
+    from .deployment_revision_preset.handler import V2DeploymentRevisionPresetHandler
+    from .deployment_revision_preset.registry import (
+        register_v2_deployment_revision_preset_routes,
+    )
     from .domain.handler import V2DomainHandler
     from .domain.registry import register_v2_domain_routes
     from .fair_share.handler import V2FairShareHandler
@@ -133,6 +137,9 @@ def build_v2_routes(
     runtime_variant_preset_handler = V2RuntimeVariantPresetHandler(
         adapter=adapters.runtime_variant_preset
     )
+    deployment_revision_preset_handler = V2DeploymentRevisionPresetHandler(
+        adapter=adapters.deployment_revision_preset
+    )
     model_card_handler = V2ModelCardHandler(adapter=adapters.model_card)
     resource_usage_handler = V2ResourceUsageHandler(adapter=adapters.resource_usage)
     scheduling_history_handler = V2SchedulingHistoryHandler(adapter=adapters.scheduling_history)
@@ -187,6 +194,11 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_runtime_variant_routes(runtime_variant_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_runtime_variant_preset_routes(runtime_variant_preset_handler, route_deps)
+    )
+    v2_reg.add_subregistry(
+        register_v2_deployment_revision_preset_routes(
+            deployment_revision_preset_handler, route_deps
+        )
     )
     v2_reg.add_subregistry(register_v2_model_card_routes(model_card_handler, route_deps))
     v2_reg.add_subregistry(register_v2_resource_usage_routes(resource_usage_handler, route_deps))

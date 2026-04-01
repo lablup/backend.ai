@@ -11,6 +11,9 @@ from ai.backend.manager.api.adapters.artifact_registry import ArtifactRegistryAd
 from ai.backend.manager.api.adapters.audit_log import AuditLogAdapter
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.deployment import DeploymentAdapter
+from ai.backend.manager.api.adapters.deployment_revision_preset import (
+    DeploymentRevisionPresetAdapter,
+)
 from ai.backend.manager.api.adapters.domain import DomainAdapter
 from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
 from ai.backend.manager.api.adapters.huggingface_registry import HuggingFaceRegistryAdapter
@@ -82,6 +85,7 @@ class Adapters:
         resource_slot: ResourceSlotAdapter,
         runtime_variant: RuntimeVariantAdapter,
         runtime_variant_preset: RuntimeVariantPresetAdapter,
+        deployment_revision_preset: DeploymentRevisionPresetAdapter,
         model_card: ModelCardAdapter,
         resource_usage: ResourceUsageAdapter,
         scheduling_history: SchedulingHistoryAdapter,
@@ -118,6 +122,7 @@ class Adapters:
         self.resource_slot = resource_slot
         self.runtime_variant = runtime_variant
         self.runtime_variant_preset = runtime_variant_preset
+        self.deployment_revision_preset = deployment_revision_preset
         self.model_card = model_card
         self.resource_usage = resource_usage
         self.scheduling_history = scheduling_history
@@ -163,6 +168,7 @@ class Adapters:
             resource_slot=ResourceSlotAdapter(processors),
             runtime_variant=RuntimeVariantAdapter(processors),
             runtime_variant_preset=RuntimeVariantPresetAdapter(processors),
+            deployment_revision_preset=DeploymentRevisionPresetAdapter(processors),
             model_card=ModelCardAdapter(processors),
             resource_usage=ResourceUsageAdapter(processors),
             scheduling_history=SchedulingHistoryAdapter(processors),
