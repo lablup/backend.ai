@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-PYVER="3.14.3"
+PYVER="3.14"
 if ! command -v uv >/dev/null 2>&1; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
   if [ $SHELL = "/bin/fish" ]; then
