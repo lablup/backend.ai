@@ -124,7 +124,7 @@ input AddRevisionInput {
   extraMounts: [ExtraVFolderMountInput!]
 }
 
-"""Added in 26.4.0. Options for the add_model_revision mutation."""
+"""Added in UNRELEASED. Options for the add_model_revision mutation."""
 input AddRevisionOptions {
   """
   When true, automatically activate the newly added revision immediately after creation.
