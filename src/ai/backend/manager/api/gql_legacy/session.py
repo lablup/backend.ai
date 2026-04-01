@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
 )
@@ -38,6 +37,7 @@ from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
+from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
@@ -53,6 +53,7 @@ from ai.backend.manager.models.session import (
     SessionDependencyRow,
     SessionRow,
     SessionTypes,
+    batch_populate_session_occupied_slots,
     by_domain_name,
     by_raw_filter,
     by_resource_group_name,
@@ -84,8 +85,6 @@ from .base import (
     OrderExprArg,
     PaginatedConnectionField,
     PaginatedList,
-    batch_multiresult_in_session,
-    batch_result_in_session,
     generate_sql_info_for_gql_connection,
 )
 from .gql_relay import (
@@ -95,7 +94,6 @@ from .gql_relay import (
     GlobalIDField,
     ResolvedGlobalID,
 )
-from .group import GroupRow
 from .kernel import ComputeContainer, KernelConnection, KernelNode
 from .user import UserNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
@@ -174,7 +172,7 @@ _queryorder_colmap: ColumnMapType = {
 }
 
 
-class SessionPermissionValueField(graphene.Scalar):
+class SessionPermissionValueField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 24.09.0. One of {[val.value for val in ComputeSessionPermission]}."
 
@@ -183,7 +181,9 @@ class SessionPermissionValueField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None):
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> ComputeSessionPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ComputeSessionPermission(node.value)
         return None
@@ -194,7 +194,7 @@ class SessionPermissionValueField(graphene.Scalar):
 
 
 @graphene_federation.key("id")
-class ComputeSessionNode(graphene.ObjectType):
+class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.09.0."
@@ -286,7 +286,7 @@ class ComputeSessionNode(graphene.ObjectType):
         cls,
         info: graphene.ResolveInfo,
         id: str,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         graphene_ctx: GraphQueryContext = info.context
         _, raw_session_id = AsyncNode.resolve_global_id(info, id)
         async with graphene_ctx.db.begin_readonly_session() as db_session:
@@ -296,12 +296,15 @@ class ComputeSessionNode(graphene.ObjectType):
                 .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
             )
             query_result = await db_session.scalar(stmt)
-            return cls.from_row(graphene_ctx, query_result) if query_result is not None else None
+            if query_result is None:
+                return None
+            await batch_populate_session_occupied_slots(db_session, [query_result])
+            return cls.from_row(graphene_ctx, query_result)
 
     @classmethod
     def _add_basic_options_to_query(
-        cls, stmt: sa.sql.Select, is_count: bool = False
-    ) -> sa.sql.Select:
+        cls, stmt: sa.sql.Select[Any], is_count: bool = False
+    ) -> sa.sql.Select[Any]:
         options = [
             join_by_related_field(SessionRow.user),
             join_by_related_field(SessionRow.group),
@@ -317,18 +320,18 @@ class ComputeSessionNode(graphene.ObjectType):
             stmt = option(stmt)
         return stmt
 
-    async def resolve_queue_position(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_queue_position(self, info: graphene.ResolveInfo) -> int | None:
         if self.status != SessionStatus.PENDING:
             return None
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self._batch_load_queue_position
         )
-        return await loader.load(self.row_id)
+        return cast(int | None, await loader.load(self.row_id))
 
     async def _batch_load_queue_position(
         self, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
-    ) -> list[Optional[int]]:
+    ) -> list[int | None]:
         return await ctx.valkey_schedule.get_queue_positions(session_ids)
 
     @classmethod
@@ -337,9 +340,9 @@ class ComputeSessionNode(graphene.ObjectType):
         ctx: GraphQueryContext,
         row: SessionRow,
         *,
-        permissions: Optional[Iterable[ComputeSessionPermission]] = None,
+        permissions: Iterable[ComputeSessionPermission] | None = None,
     ) -> Self:
-        status_history = row.status_history or {}
+        status_history: dict[str, Any] = dict(row.status_history) if row.status_history else {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
         result = cls(
             # identity
@@ -393,7 +396,7 @@ class ComputeSessionNode(graphene.ObjectType):
         ctx: GraphQueryContext,
         session_data: SessionData,
         *,
-        permissions: Optional[Iterable[ComputeSessionPermission]] = None,
+        permissions: Iterable[ComputeSessionPermission] | None = None,
     ) -> Self:
         status_history = session_data.status_history or {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
@@ -451,8 +454,8 @@ class ComputeSessionNode(graphene.ObjectType):
         return result
 
     async def __resolve_reference(
-        self, info: graphene.ResolveInfo, **kwargs
-    ) -> Optional[ComputeSessionNode]:
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> ComputeSessionNode | None:
         # TODO: Confirm if scope and permsission are correct
         # Parse the global ID from Federation (converts base64 encoded string to tuple)
         resolved_id = resolve_global_id(self.id)
@@ -465,7 +468,7 @@ class ComputeSessionNode(graphene.ObjectType):
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self.batch_load_idle_checks
         )
-        return await loader.load(self.row_id)
+        return cast(dict[str, Any] | None, await loader.load(self.row_id))
 
     async def resolve_vfolder_nodes(
         self,
@@ -582,7 +585,8 @@ class ComputeSessionNode(graphene.ObjectType):
                     selectinload(SessionRow.user),
                 )
             )
-            session_rows = (await db_sess.execute(query)).scalars().all()
+            session_rows = list((await db_sess.execute(query)).scalars().all())
+            await batch_populate_session_occupied_slots(db_sess, session_rows)
 
         # Convert into GraphQL node objects
         sessions = [type(self).from_row(ctx, r) for r in session_rows]
@@ -605,49 +609,91 @@ class ComputeSessionNode(graphene.ObjectType):
     async def batch_load_by_dependee_id(
         cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
     ) -> Sequence[Sequence[Self]]:
+        """Load dependent sessions for the given dependee session IDs.
+
+        Used by resolve_dependents(): given dependee IDs (sessions being depended on),
+        return the dependent sessions (sessions that depend on them).
+        """
         from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
-            j = sa.join(
-                SessionRow, SessionDependencyRow, SessionRow.id == SessionDependencyRow.depends_on
-            )
-            query = (
+            # Step 1: Find dependency rows where depends_on matches the input IDs
+            dep_query = sa.select(
+                SessionDependencyRow.depends_on, SessionDependencyRow.session_id
+            ).where(SessionDependencyRow.depends_on.in_(session_ids))
+            dep_rows = (await db_sess.execute(dep_query)).all()
+
+            objs_per_key: dict[SessionId, list[Self]] = {sid: [] for sid in session_ids}
+            if not dep_rows:
+                return [*objs_per_key.values()]
+
+            # Build map: dependent_id → list of dependee session_ids (input keys)
+            dependent_ids = list({row.session_id for row in dep_rows})
+            dep_map: dict[SessionId, list[SessionId]] = {}
+            for dependee_id, dependent_id in dep_rows:
+                dep_map.setdefault(dependent_id, []).append(dependee_id)
+
+            # Step 2: Fetch dependent SessionRows with eager loading
+            sess_query = (
                 sa.select(SessionRow)
-                .select_from(j)
-                .where(SessionDependencyRow.session_id.in_(session_ids))
+                .where(SessionRow.id.in_(dependent_ids))
+                .options(
+                    selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)),
+                    joinedload(SessionRow.user),
+                )
             )
-            return await batch_multiresult_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.id,
-            )
+            rows = list((await db_sess.execute(sess_query)).unique().scalars().all())
+            await batch_populate_session_occupied_slots(db_sess, rows)
+
+            for row in rows:
+                for dependee_id in dep_map.get(row.id, []):
+                    objs_per_key[dependee_id].append(cls.from_row(ctx, row))
+            return [*objs_per_key.values()]
 
     @classmethod
     async def batch_load_by_dependent_id(
         cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
     ) -> Sequence[Sequence[Self]]:
+        """Load dependee sessions for the given dependent session IDs.
+
+        Used by resolve_dependees(): given dependent IDs (sessions that depend on others),
+        return the dependee sessions (sessions they depend on).
+        """
         from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
-            j = sa.join(
-                SessionRow, SessionDependencyRow, SessionRow.id == SessionDependencyRow.session_id
-            )
-            query = (
+            # Step 1: Find dependency rows where session_id matches the input IDs
+            dep_query = sa.select(
+                SessionDependencyRow.session_id, SessionDependencyRow.depends_on
+            ).where(SessionDependencyRow.session_id.in_(session_ids))
+            dep_rows = (await db_sess.execute(dep_query)).all()
+
+            objs_per_key: dict[SessionId, list[Self]] = {sid: [] for sid in session_ids}
+            if not dep_rows:
+                return [*objs_per_key.values()]
+
+            # Build map: dependee_id → list of dependent session_ids (input keys)
+            dependee_ids = list({row.depends_on for row in dep_rows})
+            dep_map: dict[SessionId, list[SessionId]] = {}
+            for dependent_id, dependee_id in dep_rows:
+                dep_map.setdefault(dependee_id, []).append(dependent_id)
+
+            # Step 2: Fetch dependee SessionRows with eager loading
+            sess_query = (
                 sa.select(SessionRow)
-                .select_from(j)
-                .where(SessionDependencyRow.depends_on.in_(session_ids))
+                .where(SessionRow.id.in_(dependee_ids))
+                .options(
+                    selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)),
+                    joinedload(SessionRow.user),
+                )
             )
-            return await batch_multiresult_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.id,
-            )
+            rows = list((await db_sess.execute(sess_query)).unique().scalars().all())
+            await batch_populate_session_occupied_slots(db_sess, rows)
+
+            for row in rows:
+                for dependent_id in dep_map.get(row.id, []):
+                    objs_per_key[dependent_id].append(cls.from_row(ctx, row))
+            return [*objs_per_key.values()]
 
     @classmethod
     async def get_accessible_node(
@@ -656,7 +702,7 @@ class ComputeSessionNode(graphene.ObjectType):
         id: ResolvedGlobalID,
         scope_id: ScopeType,
         permission: ComputeSessionPermission,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user
         client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
@@ -670,6 +716,10 @@ class ComputeSessionNode(graphene.ObjectType):
             query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)
+                if session_row is not None:
+                    await batch_populate_session_occupied_slots(db_session, [session_row])
+        if session_row is None:
+            return None
         return cls.from_row(
             graph_ctx,
             session_row,
@@ -682,13 +732,13 @@ class ComputeSessionNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         permission: ComputeSessionPermission,
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
@@ -732,8 +782,9 @@ class ComputeSessionNode(graphene.ObjectType):
             query = cls._add_basic_options_to_query(query.where(cond))
             cnt_query = cls._add_basic_options_to_query(cnt_query.where(cond), is_count=True)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
-                session_rows = (await db_session.scalars(query)).all()
+                session_rows = list((await db_session.scalars(query)).all())
                 total_cnt = await db_session.scalar(cnt_query)
+                await batch_populate_session_occupied_slots(db_session, session_rows)
         result: list[Self] = [
             cls.from_row(
                 graph_ctx,
@@ -751,7 +802,7 @@ class ComputeSessionConnection(Connection):
         description = "Added in 24.09.0."
 
 
-class TotalResourceSlot(graphene.ObjectType):
+class TotalResourceSlot(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
         description = "Added in 25.5.0."
@@ -763,10 +814,10 @@ class TotalResourceSlot(graphene.ObjectType):
     async def get_data(
         cls,
         ctx: GraphQueryContext,
-        statuses: Optional[Iterable[str]] = None,
-        raw_filter: Optional[str] = None,
-        domain_name: Optional[str] = None,
-        resource_group_name: Optional[str] = None,
+        statuses: Iterable[str] | None = None,
+        raw_filter: str | None = None,
+        domain_name: str | None = None,
+        resource_group_name: str | None = None,
     ) -> Self:
         if statuses is not None:
             status_list = [SessionStatus[s] for s in statuses]
@@ -789,6 +840,8 @@ class TotalResourceSlot(graphene.ObjectType):
         session_rows = await SessionRow.list_session_by_condition(
             query_conditions, query_options, db=ctx.db
         )
+        async with ctx.db.begin_readonly_session() as db_sess:
+            await batch_populate_session_occupied_slots(db_sess, session_rows)
         occupied_slots = ResourceSlot()
         requested_slots = ResourceSlot()
         for row in session_rows:
@@ -813,11 +866,11 @@ def _validate_priority_input(priority: int) -> None:
 def _validate_name_input(name: str) -> None:
     try:
         tx.SessionName().check(name)
-    except t.DataError:
-        raise ValueError(f"Not allowed session name (n:{name})")
+    except t.DataError as e:
+        raise ValueError(f"Not allowed session name (n:{name})") from e
 
 
-class ModifyComputeSession(graphene.relay.ClientIDMutation):
+class ModifyComputeSession(graphene.relay.ClientIDMutation):  # type: ignore[misc]
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)  # TODO: check if working
 
     class Meta:
@@ -838,7 +891,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        **input,
+        **input: Any,
     ) -> ModifyComputeSession:
         graph_ctx: GraphQueryContext = info.context
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
@@ -871,7 +924,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         )
 
 
-class CheckAndTransitStatusInput(graphene.InputObjectType):
+class CheckAndTransitStatusInput(graphene.InputObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 24.12.0."
 
@@ -879,7 +932,7 @@ class CheckAndTransitStatusInput(graphene.InputObjectType):
     client_mutation_id = graphene.String(required=False)  # input for relay
 
 
-class CheckAndTransitStatus(graphene.Mutation):
+class CheckAndTransitStatus(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Meta:
@@ -895,7 +948,7 @@ class CheckAndTransitStatus(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         input: CheckAndTransitStatusInput,
     ) -> CheckAndTransitStatus:
@@ -923,7 +976,7 @@ class CheckAndTransitStatus(graphene.Mutation):
         return CheckAndTransitStatus(session_nodes, input.get("client_mutation_id"))
 
 
-class ComputeSession(graphene.ObjectType):
+class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -997,7 +1050,7 @@ class ComputeSession(graphene.ObjectType):
     inference_metrics = graphene.JSONString()
 
     @classmethod
-    def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
+    def parse_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> Mapping[str, Any]:
         if row is None:
             raise DataTransformationFailed("Session row cannot be None")
         email = row.email
@@ -1071,7 +1124,7 @@ class ComputeSession(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row | None) -> ComputeSession | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any] | None) -> ComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -1079,12 +1132,12 @@ class ComputeSession(graphene.ObjectType):
 
     async def resolve_inference_metrics(
         self, info: graphene.ResolveInfo
-    ) -> Optional[Mapping[str, Any]]:
+    ) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
         )
-        return await loader.load(self.id)
+        return cast(Mapping[str, Any] | None, await loader.load(self.id))
 
     async def resolve_containers(
         self,
@@ -1092,7 +1145,7 @@ class ComputeSession(graphene.ObjectType):
     ) -> Iterable[ComputeContainer]:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
-        return await loader.load(self.session_id)
+        return cast(Iterable[ComputeContainer], await loader.load(self.session_id))
 
     async def resolve_dependencies(
         self,
@@ -1100,14 +1153,14 @@ class ComputeSession(graphene.ObjectType):
     ) -> Iterable[ComputeSession]:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeSession.by_dependency")
-        return await loader.load(self.id)
+        return cast(Iterable[ComputeSession], await loader.load(self.id))
 
     async def resolve_commit_status(self, info: graphene.ResolveInfo) -> str:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx, "ComputeSession.commit_statuses"
         )
-        return await loader.load(self.main_kernel_id)
+        return cast(str, await loader.load(self.main_kernel_id))
 
     async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
         containers = self.containers
@@ -1120,7 +1173,7 @@ class ComputeSession(graphene.ObjectType):
 
     async def resolve_abusing_reports(
         self, info: graphene.ResolveInfo
-    ) -> Iterable[Optional[Mapping[str, Any]]]:
+    ) -> Iterable[Mapping[str, Any] | None]:
         containers = self.containers
         if containers is None:
             containers = await self.resolve_containers(info)
@@ -1200,17 +1253,17 @@ class ComputeSession(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        access_key: Optional[str] = None,
-        status: Optional[str] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        access_key: str | None = None,
+        status: str | SessionStatus | None = None,
+        filter: str | None = None,
     ) -> int:
         status_list: list[SessionStatus] | None = None
-        if isinstance(status, str):
-            status_list = [SessionStatus[s] for s in status.split(",")]
-        elif isinstance(status, SessionStatus):
+        if isinstance(status, SessionStatus):
             status_list = [status]
+        elif isinstance(status, str):
+            status_list = [SessionStatus[s] for s in status.split(",")]
         j = (
             # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
             sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
@@ -1231,7 +1284,7 @@ class ComputeSession(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -1240,18 +1293,18 @@ class ComputeSession(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        access_key: Optional[str] = None,
-        status: Optional[str] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        access_key: str | None = None,
+        status: str | SessionStatus | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[ComputeSession | None]:
         status_list: list[SessionStatus] | None = None
-        if isinstance(status, str):
-            status_list = [SessionStatus[s] for s in status.split(",")]
-        elif isinstance(status, SessionStatus):
+        if isinstance(status, SessionStatus):
             status_list = [status]
+        elif isinstance(status, str):
+            status_list = [SessionStatus[s] for s in status.split(",")]
         j = (
             # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
             sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
@@ -1288,7 +1341,10 @@ class ComputeSession(graphene.ObjectType):
         else:
             query = query.order_by(*DEFAULT_SESSION_ORDERING)
         async with ctx.db.begin_readonly_session() as db_sess:
-            return [cls.from_row(ctx, r) async for r in (await db_sess.stream(query))]
+            rows = (await db_sess.execute(query)).all()
+            session_rows = [r.SessionRow for r in rows]
+            await batch_populate_session_occupied_slots(db_sess, session_rows)
+            return [cls.from_row(ctx, r) for r in rows]
 
     @classmethod
     async def batch_load_detail(
@@ -1296,8 +1352,8 @@ class ComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         session_ids: Sequence[SessionId],
         *,
-        domain_name: Optional[str] = None,
-        access_key: Optional[str] = None,
+        domain_name: str | None = None,
+        access_key: str | None = None,
     ) -> Sequence[ComputeSession | None]:
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid
@@ -1318,14 +1374,13 @@ class ComputeSession(graphene.ObjectType):
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
         async with ctx.db.begin_readonly_session() as db_sess:
-            return await batch_result_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.SessionRow.id,
-            )
+            rows = (await db_sess.execute(query)).all()
+            sr_list = [r.SessionRow for r in rows]
+            await batch_populate_session_occupied_slots(db_sess, sr_list)
+            objs_per_key: dict[SessionId, ComputeSession | None] = dict.fromkeys(session_ids)
+            for row in rows:
+                objs_per_key[row.SessionRow.id] = cls.from_row(ctx, row)
+            return [*objs_per_key.values()]
 
     @classmethod
     async def batch_load_by_dependency(
@@ -1345,14 +1400,15 @@ class ComputeSession(graphene.ObjectType):
             .options(selectinload(SessionRow.kernels))
         )
         async with ctx.db.begin_readonly_session() as db_sess:
-            return await batch_multiresult_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.SessionRow.id,
-            )
+            rows = (await db_sess.execute(query)).all()
+            sr_list = [r.SessionRow for r in rows]
+            await batch_populate_session_occupied_slots(db_sess, sr_list)
+            objs_per_key: dict[SessionId, list[ComputeSession]] = {sid: [] for sid in session_ids}
+            for row in rows:
+                obj = cls.from_row(ctx, row)
+                if obj is not None:
+                    objs_per_key[row.SessionRow.id].append(obj)
+            return [*objs_per_key.values()]
 
     @classmethod
     async def batch_load_commit_statuses(
@@ -1364,19 +1420,19 @@ class ComputeSession(graphene.ObjectType):
         return [commit_statuses[kernel_id] for kernel_id in kernel_ids]
 
 
-class ComputeSessionList(graphene.ObjectType):
+class ComputeSessionList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(ComputeSession, required=True)
 
 
-class InferenceSession(graphene.ObjectType):
+class InferenceSession(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
 
-class InferenceSessionList(graphene.ObjectType):
+class InferenceSessionList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 

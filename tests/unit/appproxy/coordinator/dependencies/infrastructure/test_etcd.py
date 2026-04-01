@@ -5,12 +5,18 @@ from unittest.mock import Mock
 
 import pytest
 
-from ai.backend.appproxy.coordinator.config import ProxyCoordinatorConfig, ServerConfig
+from ai.backend.appproxy.coordinator.config import (
+    ProxyCoordinatorConfig,
+    ServerConfig,
+    TraefikConfig,
+)
 from ai.backend.appproxy.coordinator.dependencies.infrastructure.etcd import (
     EtcdProvider,
 )
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.testutils.bootstrap import HostPortPairModel
+from ai.backend.common.typed_validators import HostPortPair
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 
 
 class TestEtcdProvider:
@@ -28,13 +34,6 @@ class TestEtcdProvider:
         test_ns: str,
     ) -> ServerConfig:
         """Create a coordinator config with Traefik enabled."""
-        from ai.backend.appproxy.coordinator.config import (
-            EtcdConfig,
-            ProxyCoordinatorConfig,
-            TraefikConfig,
-        )
-        from ai.backend.common.typed_validators import HostPortPair
-
         container_id, etcd_addr = etcd_container
 
         # Create etcd config
@@ -67,7 +66,6 @@ class TestEtcdProvider:
         config.proxy_coordinator = proxy_config
         return config
 
-    @pytest.mark.asyncio
     async def test_provide_traefik_etcd_when_enabled(
         self,
         coordinator_config_with_traefik: ServerConfig,
@@ -84,7 +82,6 @@ class TestEtcdProvider:
             value = await etcd.get(test_key)
             assert value == test_value
 
-    @pytest.mark.asyncio
     async def test_provide_none_when_disabled(
         self,
         coordinator_config_without_traefik: ServerConfig,
@@ -95,7 +92,6 @@ class TestEtcdProvider:
         async with dependency.provide(coordinator_config_without_traefik) as etcd:
             assert etcd is None
 
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         coordinator_config_with_traefik: ServerConfig,

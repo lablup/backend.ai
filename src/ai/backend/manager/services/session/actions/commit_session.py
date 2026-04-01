@@ -1,27 +1,28 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.actions.commit_base import SessionCommitAction
 
 
 @dataclass
-class CommitSessionAction(SessionAction):
+class CommitSessionAction(SessionCommitAction):
     session_name: str
     owner_access_key: AccessKey
-    filename: Optional[str]
+    filename: str | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "commit"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass
@@ -32,5 +33,5 @@ class CommitSessionActionResult(BaseActionResult):
     commit_result: Mapping[str, Any]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_data.id)

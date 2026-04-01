@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import graphene
@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -27,7 +28,6 @@ from .base import (
     batch_result,
     batch_result_in_scalar_stream,
 )
-from .user import UserRole
 
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
@@ -42,7 +42,7 @@ __all__: Sequence[str] = (
 )
 
 
-class ResourcePreset(graphene.ObjectType):
+class ResourcePreset(graphene.ObjectType):  # type: ignore[misc]
     id = graphene.UUID(description="Added in 25.4.0. ID of the resource preset.")
     name = graphene.String()
     resource_slots = graphene.JSONString()
@@ -69,7 +69,7 @@ class ResourcePreset(graphene.ObjectType):
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: ResourcePresetRow | ResourcePresetData | Row | None,
+        row: ResourcePresetRow | ResourcePresetData | Row[Any] | None,
     ) -> ResourcePreset | None:
         match row:
             case ResourcePresetRow():
@@ -107,8 +107,8 @@ class ResourcePreset(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[ResourcePreset]:
         query = sa.select(ResourcePresetRow)
         if filter is not None:
@@ -170,7 +170,7 @@ class ResourcePreset(graphene.ObjectType):
             )
 
 
-class CreateResourcePresetInput(graphene.InputObjectType):
+class CreateResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
     resource_slots = graphene.JSONString(required=True)
     shared_memory = graphene.String(required=False)
     scaling_group_name = graphene.String(
@@ -191,7 +191,7 @@ class CreateResourcePresetInput(graphene.InputObjectType):
         )
 
 
-class ModifyResourcePresetInput(graphene.InputObjectType):
+class ModifyResourcePresetInput(graphene.InputObjectType):  # type: ignore[misc]
     name = graphene.String(
         required=False,
         description=("Added in 25.4.0. A name of resource preset."),
@@ -205,7 +205,7 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
         ),
     )
 
-    def to_updater(self, id: Optional[UUID], name: Optional[str]) -> Updater[ResourcePresetRow]:
+    def to_updater(self, id: UUID | None, name: str | None) -> Updater[ResourcePresetRow]:
         resource_slots = (
             ResourceSlot.from_json(self.resource_slots) if self.resource_slots else Undefined
         )
@@ -226,7 +226,7 @@ class ModifyResourcePresetInput(graphene.InputObjectType):
         )
 
 
-class CreateResourcePreset(graphene.Mutation):
+class CreateResourcePreset(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -240,7 +240,7 @@ class CreateResourcePreset(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         props: CreateResourcePresetInput,
@@ -258,7 +258,7 @@ class CreateResourcePreset(graphene.Mutation):
         return cls(True, "success", ResourcePreset.from_row(graph_ctx, result.resource_preset))
 
 
-class ModifyResourcePreset(graphene.Mutation):
+class ModifyResourcePreset(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -278,10 +278,10 @@ class ModifyResourcePreset(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
-        id: Optional[UUID],
-        name: Optional[str],
+        id: UUID | None,
+        name: str | None,
         props: ModifyResourcePresetInput,
     ) -> ModifyResourcePreset:
         from ai.backend.manager.services.resource_preset.actions.modify_preset import (
@@ -297,7 +297,7 @@ class ModifyResourcePreset(graphene.Mutation):
         return cls(True, "success")
 
 
-class DeleteResourcePreset(graphene.Mutation):
+class DeleteResourcePreset(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -316,10 +316,10 @@ class DeleteResourcePreset(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
-        id: Optional[UUID],
-        name: Optional[str],
+        id: UUID | None,
+        name: str | None,
     ) -> DeleteResourcePreset:
         from ai.backend.manager.services.resource_preset.actions.delete_preset import (
             DeleteResourcePresetAction,

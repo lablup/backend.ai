@@ -4,13 +4,13 @@ import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
@@ -35,16 +35,16 @@ if TYPE_CHECKING:
 __all__ = ("RouteStatus", "RoutingRow")
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _get_deployment_revision_join_condition():
+def _get_deployment_revision_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
     return RoutingRow.revision == DeploymentRevisionRow.id
 
 
-class RoutingRow(Base):
+class RoutingRow(Base):  # type: ignore[misc]
     __tablename__ = "routings"
     __table_args__ = (
         sa.UniqueConstraint("endpoint", "session", name="uq_routings_endpoint_session"),
@@ -82,19 +82,19 @@ class RoutingRow(Base):
     )
     weight: Mapped[int | None] = mapped_column("weight", sa.Integer(), nullable=True, default=None)
     traffic_ratio: Mapped[float] = mapped_column("traffic_ratio", sa.Float(), nullable=False)
-    created_at: Mapped[datetime | None] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.text("now()"),
-        nullable=True,
+        nullable=False,
     )
 
-    error_data: Mapped[dict | None] = mapped_column(
+    error_data: Mapped[dict[str, Any] | None] = mapped_column(
         "error_data", pgsql.JSONB(), nullable=True, default=sa.null()
     )
 
     # Revision reference without FK (relationship only)
-    revision: Mapped[uuid.UUID | None] = mapped_column("revision", GUID, nullable=True)
+    revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
     traffic_status: Mapped[RouteTrafficStatus] = mapped_column(
         "traffic_status",
         EnumValueType(RouteTrafficStatus),
@@ -215,9 +215,9 @@ class RoutingRow(Base):
         session_owner: uuid.UUID,
         domain: str,
         project: uuid.UUID,
+        revision: uuid.UUID,
         status: RouteStatus = RouteStatus.PROVISIONING,
         traffic_ratio: float = 1.0,
-        revision: uuid.UUID | None = None,
         traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE,
     ) -> None:
         self.id = id

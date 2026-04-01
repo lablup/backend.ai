@@ -1,9 +1,9 @@
-from ai.backend.common.events.dispatcher import AbstractEvent
 from ai.backend.common.events.reporter import (
     AbstractEventReporter,
     CompleteEventReportArgs,
     PrepareEventReportArgs,
 )
+from ai.backend.common.events.types import AbstractEvent
 from ai.backend.manager.models.event_log import EventLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 

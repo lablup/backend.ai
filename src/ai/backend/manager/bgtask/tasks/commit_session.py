@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Optional, cast, override
+from typing import TYPE_CHECKING, cast, override
 
 from pydantic import Field
 
@@ -11,12 +11,17 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskManifest,
     BaseBackgroundTaskResult,
 )
+from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
-from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, KernelFeatures, LabelName
+from ai.backend.common.docker import (
+    DEFAULT_KERNEL_FEATURE,
+    ImageRef,
+    KernelFeatures,
+    LabelName,
+)
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
     BaseBgtaskEvent,
-    BgtaskStatus,
 )
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
@@ -31,6 +36,7 @@ if TYPE_CHECKING:
     from ai.backend.common.events.hub.hub import EventHub
     from ai.backend.manager.models.image import ImageRow
     from ai.backend.manager.registry import AgentRegistry
+    from ai.backend.manager.repositories.image.repository import ImageRepository
     from ai.backend.manager.repositories.session.repository import SessionRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -42,10 +48,10 @@ class CommitSessionResult(BaseBackgroundTaskResult):
     Contains the rescanned image ID or error message.
     """
 
-    image_id: Optional[uuid.UUID] = Field(
+    image_id: uuid.UUID | None = Field(
         default=None, description="ID of the rescanned image after commit"
     )
-    error_message: Optional[str] = Field(default=None, description="Error message if task failed")
+    error_message: str | None = Field(default=None, description="Error message if task failed")
 
 
 class CommitSessionManifest(BaseBackgroundTaskManifest):
@@ -70,6 +76,7 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
     """
 
     _session_repository: SessionRepository
+    _image_repository: ImageRepository
     _agent_registry: AgentRegistry
     _event_hub: EventHub
     _event_fetcher: EventFetcher
@@ -77,11 +84,13 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
     def __init__(
         self,
         session_repository: SessionRepository,
+        image_repository: ImageRepository,
         agent_registry: AgentRegistry,
         event_hub: EventHub,
         event_fetcher: EventFetcher,
     ) -> None:
         self._session_repository = session_repository
+        self._image_repository = image_repository
         self._agent_registry = agent_registry
         self._event_hub = event_hub
         self._event_fetcher = event_fetcher
@@ -89,7 +98,7 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
     @classmethod
     @override
     def name(cls) -> ManagerBgtaskName:
-        return ManagerBgtaskName.COMMIT_SESSION  # type: ignore[return-value]
+        return ManagerBgtaskName.COMMIT_SESSION
 
     @classmethod
     @override
@@ -168,8 +177,6 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
 
             new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
 
-            from ai.backend.common.docker import ImageRef
-
             new_image_ref = ImageRef.from_image_str(
                 new_canonical,
                 None,
@@ -224,7 +231,7 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
 
             # Rescan updated image
             log.info("Rescanning image")
-            rescan_result = await self._session_repository.rescan_images(
+            rescan_result = await self._image_repository.rescan_images(
                 new_image_ref.canonical,
                 manifest.registry_project,
                 reporter=None,

@@ -16,7 +16,6 @@ from typing import (
     Any,
     Final,
     NamedTuple,
-    Optional,
     Protocol,
     TypedDict,
     TypeVar,
@@ -29,6 +28,7 @@ import trafaret as t
 from aiodocker.docker import DockerContainer
 
 from ai.backend.common import identity
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.cgroup import (
     get_cgroup_of_pid,
     get_container_id_of_cgroup,
@@ -37,7 +37,6 @@ from ai.backend.common.cgroup import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import PID, ContainerId, ContainerPID, HostPID, KernelId
-from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -69,7 +68,7 @@ class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
     async def __aenter__(self) -> _SupportsAsyncCloseT:
         return self.obj
 
-    async def __aexit__(self, *exc_info) -> None:
+    async def __aexit__(self, *exc_info: Any) -> None:
         await self.obj.close()
 
 
@@ -89,7 +88,7 @@ def get_arch_name() -> str:
     return aliases.get(ret, ret)
 
 
-def update_nested_dict(dest: MutableMapping, additions: Mapping) -> None:
+def update_nested_dict(dest: MutableMapping[str, Any], additions: Mapping[str, Any]) -> None:
     for k, v in additions.items():
         if k not in dest:
             dest[k] = v
@@ -121,22 +120,22 @@ def remove_exponent(num: Decimal) -> Decimal:
 
 
 @overload
-def read_sysfs(path: str | Path, type_: type[bool], default: Optional[bool] = None) -> bool: ...
+def read_sysfs(path: str | Path, type_: type[bool], default: bool | None = None) -> bool: ...
 
 
 @overload
-def read_sysfs(path: str | Path, type_: type[int], default: Optional[int] = None) -> int: ...
+def read_sysfs(path: str | Path, type_: type[int], default: int | None = None) -> int: ...
 
 
 @overload
-def read_sysfs(path: str | Path, type_: type[float], default: Optional[float] = None) -> float: ...
+def read_sysfs(path: str | Path, type_: type[float], default: float | None = None) -> float: ...
 
 
 @overload
-def read_sysfs(path: str | Path, type_: type[str], default: Optional[str] = None) -> str: ...
+def read_sysfs(path: str | Path, type_: type[str], default: str | None = None) -> str: ...
 
 
-def read_sysfs(path: str | Path, type_: type[Any], default: Optional[Any] = None) -> Any:
+def read_sysfs(path: str | Path, type_: type[Any], default: Any | None = None) -> Any:
     def_vals: Mapping[Any, Any] = {
         bool: False,
         int: 0,
@@ -160,7 +159,7 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
     file_size = path.stat().st_size
 
     def _read_tail() -> bytes:
-        with open(path, "rb") as f:
+        with path.open("rb") as f:
             f.seek(max(file_size - nbytes, 0), io.SEEK_SET)
             return f.read(nbytes)
 
@@ -168,7 +167,7 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
     return await loop.run_in_executor(None, _read_tail)
 
 
-async def get_kernel_id_from_container(val: str | DockerContainer) -> Optional[KernelId]:
+async def get_kernel_id_from_container(val: str | DockerContainer) -> KernelId | None:
     if isinstance(val, DockerContainer):
         if "Name" not in val._container:
             await val.show()
@@ -286,6 +285,7 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
             #    'python', 'mnist.py'],
             #   ... (processes with the same COMMAND)
             # ]
+            docker: aiodocker.Docker | None = None
             try:
                 docker = aiodocker.Docker()
                 # Get process table from host (docker top information). Filter processes which have
@@ -311,7 +311,8 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
             except (IndexError, KeyError, aiodocker.exceptions.DockerError):
                 return NotContainerPID
             finally:
-                await docker.close()
+                if docker is not None:
+                    await docker.close()
 
     try:
         cgroup = get_cgroup_of_pid("pids", host_pid)
@@ -335,6 +336,7 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
         kernel_ver_tuple: tuple[str, str] = m.groups()  # type: ignore
         if kernel_ver_tuple < ("4", "1"):
             # reverse implementation of host_pid_to_container_pid().
+            docker: aiodocker.Docker | None = None
             try:
                 docker = aiodocker.Docker()
                 container_procs = await get_container_process_table(docker, container_id)
@@ -353,7 +355,8 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
             except (IndexError, KeyError, aiodocker.exceptions.DockerError):
                 return NotHostPID
             finally:
-                await docker.close()
+                if docker is not None:
+                    await docker.close()
 
     try:
         cgtasks = await get_container_pids(ContainerId(container_id))

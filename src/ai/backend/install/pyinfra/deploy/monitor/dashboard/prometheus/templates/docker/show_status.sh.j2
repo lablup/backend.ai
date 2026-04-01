@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Prometheus Health Check Script
+# Checks Prometheus service health via HTTP endpoint
+
+set -euo pipefail
+
+# Load port from .env
+if [[ -f .env ]]; then
+    source .env
+fi
+
+PROMETHEUS_URL="http://localhost:${PROMETHEUS_PORT:-19090}"
+HEALTH_ENDPOINT="/-/healthy"
+
+echo "=== Prometheus Service Status ==="
+
+# Check Docker Compose status
+echo "Docker Compose Status:"
+if command -v docker-compose >/dev/null 2>&1; then
+    docker-compose ps
+else
+    docker compose ps
+fi
+
+echo ""
+
+# Check Prometheus health endpoint
+echo "Prometheus Health Check:"
+if command -v curl >/dev/null 2>&1; then
+    response=$(curl -s "${PROMETHEUS_URL}${HEALTH_ENDPOINT}" 2>/dev/null || echo "Connection failed")
+    if [[ "$response" == "Prometheus Server is Healthy." ]]; then
+        echo "✓ Prometheus Status: Healthy"
+        health_status=0
+    else
+        echo "✗ Prometheus Status: Unhealthy (Response: $response)"
+        health_status=1
+    fi
+else
+    echo "⚠ curl not available, skipping health check"
+    health_status=0
+fi
+
+exit $health_status

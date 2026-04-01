@@ -22,7 +22,7 @@ depends_on = None
 metadata = sa.MetaData(naming_convention=convention)
 
 
-def upgrade():
+def upgrade() -> None:
     workers = sa.Table(
         "workers",
         metadata,
@@ -38,22 +38,23 @@ def upgrade():
         "workers", sa.Column("tls_advertised", sa.BOOLEAN(), nullable=False, server_default="false")
     )
     conn = op.get_bind()
-    query = sa.select(workers)
+    select_query = sa.select(workers)
     updates = [
-        {"wid": row.id, "tls_advertised": row.use_tls} for row in conn.execute(query).fetchall()
+        {"wid": row.id, "tls_advertised": row.use_tls}
+        for row in conn.execute(select_query).fetchall()
     ]
     if updates:
-        query = (
+        update_query = (
             sa.update(workers)
             .values(tls_advertised=bindparam("tls_advertised"))
             .where(workers.c.id == bindparam("wid"))
         )
-        conn.execute(query, updates)
+        conn.execute(update_query, updates)
 
     op.drop_column("workers", "use_tls")
 
 
-def downgrade():
+def downgrade() -> None:
     op.add_column(
         "workers", sa.Column("use_tls", sa.BOOLEAN(), autoincrement=False, nullable=False)
     )

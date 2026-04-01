@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
-    RequesterCtx,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
 
@@ -18,15 +19,19 @@ class SearchAutoScalingRulesAction(ModelServiceAction):
     """Action to search endpoint auto scaling rules."""
 
     querier: BatchQuerier
-    requester_ctx: RequesterCtx
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search_auto_scaling_rules"
+    def entity_type(cls) -> EntityType:
+        return EntityType.DEPLOYMENT_AUTO_SCALING_RULE
 
     @override
-    def entity_id(self) -> Optional[str]:
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    def entity_id(self) -> str | None:
         return None
 
 
@@ -40,5 +45,5 @@ class SearchAutoScalingRulesActionResult(BaseActionResult):
     has_previous_page: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

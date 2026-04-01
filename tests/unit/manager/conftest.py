@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -37,7 +38,7 @@ here = Path(__file__).parent
 log = logging.getLogger("tests.manager.conftest")
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser: Any) -> None:
     parser.addoption(
         "--rescan-cr-backend-ai",
         action="store_true",
@@ -46,14 +47,14 @@ def pytest_addoption(parser):
     )
 
 
-def pytest_configure(config):
+def pytest_configure(config: Any) -> None:
     config.addinivalue_line(
         "markers",
         "rescan_cr_backend_ai: mark test to run only when --rescan-cr-backend-ai is set",
     )
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(config: Any, items: Any) -> None:
     if not config.getoption("--rescan-cr-backend-ai"):
         skip_flag = pytest.mark.skip(reason="--rescan-cr-backend-ai not set")
         for item in items:
@@ -62,30 +63,37 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def test_id():
+def test_id() -> str:
     return secrets.token_hex(12)
 
 
 @pytest.fixture(scope="session", autouse=True)
-def test_ns(test_id):
+def test_ns(test_id: str) -> str:
     ret = f"testing-ns-{test_id}"
     os.environ["BACKEND_NAMESPACE"] = ret
     return ret
 
 
 @pytest.fixture(scope="session")
-def test_db(test_id):
+def test_db(test_id: str) -> str:
     return f"test_db_{test_id}"
 
 
 @pytest.fixture(scope="session")
-def logging_config():
+def logging_config() -> Generator[LoggingConfig, None, None]:
     config = LoggingConfig(
+        version=1,
+        disable_existing_loggers=False,
+        handlers={},
+        loggers={},
         drivers=[LogDriver.CONSOLE],
         console=ConsoleConfig(
             colored=None,
             format=LogFormat.VERBOSE,
         ),
+        file=None,
+        logstash=None,
+        graylog=None,
         level=LogLevel.DEBUG,
         pkg_ns={
             "": LogLevel.INFO,
@@ -103,7 +111,7 @@ def logging_config():
 
 
 @pytest.fixture(scope="session")
-def ipc_base_path(test_id) -> Path:
+def ipc_base_path(test_id: str) -> Path:
     ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     return ipc_base_path

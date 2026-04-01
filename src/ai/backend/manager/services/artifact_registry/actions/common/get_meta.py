@@ -1,31 +1,45 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.services.artifact_registry.actions.base import (
+    ArtifactRegistrySingleEntityAction,
+    ArtifactRegistrySingleEntityActionResult,
+)
 
 
 @dataclass
-class GetArtifactRegistryMetaAction(ArtifactRegistryAction):
-    registry_id: Optional[uuid.UUID] = None
-    registry_name: Optional[str] = None
-
-    @override
-    def entity_id(self) -> Optional[str]:
-        return str(self.registry_id)
+class GetArtifactRegistryMetaAction(ArtifactRegistrySingleEntityAction):
+    registry_id: uuid.UUID | None = None
+    registry_name: str | None = None
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_meta"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+    @override
+    def target_entity_id(self) -> str:
+        if self.registry_id:
+            return str(self.registry_id)
+        if self.registry_name:
+            return self.registry_name
+        raise InvalidAPIParameters("Either registry_id or registry_name must be provided.")
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.ARTIFACT_REGISTRY, self.target_entity_id())
 
 
 @dataclass
-class GetArtifactRegistryMetaActionResult(BaseActionResult):
+class GetArtifactRegistryMetaActionResult(ArtifactRegistrySingleEntityActionResult):
     result: ArtifactRegistryData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def target_entity_id(self) -> str:
         return str(self.result.id)

@@ -1,0 +1,80 @@
+import psycopg2
+import requests
+
+BACKEND_DB = {
+    "host": "{{ backend_db_host }}",
+    "dbname": "{{ backend_db_name }}",
+    "user": "{{ backend_db_user }}",
+    "password": "{{ backend_db_password }}",
+    "port": {{ backend_db_port }},
+}
+WSPROXY_DB = {
+    "host": "{{ wsproxy_db_host }}",
+    "dbname": "{{ wsproxy_db_name }}",
+    "user": "{{ wsproxy_db_user }}",
+    "password": "{{ wsproxy_db_password }}",
+    "port": {{ wsproxy_db_port }},
+}
+
+API_URL = "{{ api_url }}"
+SECRET_KEY = "{{ api_token }}"
+
+
+def delete_circuits_via_api(circuit_ids):
+    if not circuit_ids:
+        print("No circuit IDs provided.")
+        return True
+
+    headers = {"X-BackendAI-Token": SECRET_KEY, "Content-Type": "application/json"}
+    data = {"circuit_ids": circuit_ids}
+    try:
+        response = requests.delete(f"{API_URL}/api/circuit/_/bulk", headers=headers, json=data)
+        if response.status_code == 200:
+            result = response.json()
+            return result.get("success", False)
+        else:
+            print(f"API call fails: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        print(f"API call error: {e}")
+        return False
+
+
+def clean_terminated_circuits():
+    # 1) Read all circuits
+    with psycopg2.connect(**WSPROXY_DB) as ws_conn:
+        with ws_conn.cursor() as cur:
+            cur.execute("SELECT id, worker, port, session_ids::text[] FROM circuits")
+            circuits = cur.fetchall()
+    if not circuits:
+        print("No circuits found.")
+        return
+
+    # 2) Gather all session IDs
+    session_ids = {sid for _, _, _, sids in circuits if sids for sid in sids}
+
+    # 3) Query backend for those sessions' status
+    with psycopg2.connect(**BACKEND_DB) as be_conn:
+        with be_conn.cursor() as cur:
+            cur.execute("SELECT id, status FROM sessions WHERE id = ANY(%s::uuid[])", (list(session_ids),))
+            session_map = dict(cur.fetchall())
+
+    # 4) Determine which circuits should be deleted (all sessions = 'TERMINATED')
+    to_delete = [
+        cid for cid, _, _, sids in circuits if sids and all(session_map.get(sid) == "TERMINATED" for sid in sids)
+    ]
+    if not to_delete:
+        print("No circuits to delete.")
+        return
+
+    # 5) Delete circuits via API instead of direct DB manipulation
+    print(f"Deleting {len(to_delete)} circuits ...")
+    success = delete_circuits_via_api(to_delete)
+    if success:
+        print(f"Successfully deleted {len(to_delete)} circuits.")
+    else:
+        print(f"Failed to delete {len(to_delete)} circuits.")
+
+
+if __name__ == "__main__":
+    clean_terminated_circuits()

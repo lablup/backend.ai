@@ -1,7 +1,10 @@
 import uuid
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 
+from ai.backend.client import request
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.request import Request
 from ai.backend.client.session import AsyncSession, Session
@@ -10,7 +13,7 @@ from ai.backend.client.session import AsyncSession, Session
 pytestmark = pytest.mark.integration
 
 
-def test_auth():
+def test_auth() -> None:
     random_msg = uuid.uuid4().hex
     with Session():
         request = Request("GET", "/auth")
@@ -24,22 +27,20 @@ def test_auth():
             assert data["echo"] == random_msg
 
 
-def test_auth_missing_signature(monkeypatch):
+def test_auth_missing_signature(monkeypatch: Any) -> None:
     random_msg = uuid.uuid4().hex
     with Session():
         rqst = Request("GET", "/auth")
         rqst.set_json({"echo": random_msg})
         # let it bypass actual signing
-        from ai.backend.client import request
-
-        noop_sign = lambda *args, **kwargs: ({}, None)
+        noop_sign: Callable[..., tuple[dict[str, Any], None]] = lambda *args, **kwargs: ({}, None)
         monkeypatch.setattr(request, "generate_signature", noop_sign)
         with pytest.raises(BackendAPIError) as e, rqst.fetch():
             pass
         assert e.value.status == 401
 
 
-def test_auth_malformed():
+def test_auth_malformed() -> None:
     with Session():
         request = Request("GET", "/auth")
         request.set_content(
@@ -51,7 +52,7 @@ def test_auth_malformed():
         assert e.value.status == 400
 
 
-def test_auth_missing_body():
+def test_auth_missing_body() -> None:
     with Session():
         request = Request("GET", "/auth")
         with pytest.raises(BackendAPIError) as e, request.fetch():
@@ -59,8 +60,7 @@ def test_auth_missing_body():
         assert e.value.status == 400
 
 
-@pytest.mark.asyncio
-async def test_async_auth():
+async def test_async_auth() -> None:
     random_msg = uuid.uuid4().hex
     async with AsyncSession():
         request = Request("GET", "/auth")

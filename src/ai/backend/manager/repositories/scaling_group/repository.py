@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -11,11 +12,24 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
-from ai.backend.manager.data.scaling_group.types import ScalingGroupData, ScalingGroupListResult
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
+from ai.backend.manager.data.scaling_group.types import (
+    ResourceInfo,
+    ScalingGroupData,
+    ScalingGroupListResult,
+)
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
+    ScalingGroupRow,
+)
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
+from ai.backend.manager.repositories.base.rbac.scope_binder import RBACScopeBinder
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    RBACScopeEntityUnbinder,
+)
 from ai.backend.manager.repositories.base.updater import Updater
 
 from .db_source import ScalingGroupDBSource
@@ -47,7 +61,10 @@ class ScalingGroupRepository:
 
     _db_source: ScalingGroupDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+    ) -> None:
         self._db_source = ScalingGroupDBSource(db)
 
     @scaling_group_repository_resilience.apply()
@@ -70,16 +87,35 @@ class ScalingGroupRepository:
         return await self._db_source.search_scaling_groups(querier=querier)
 
     @scaling_group_repository_resilience.apply()
+    async def get_scaling_group_by_name(
+        self,
+        name: str,
+    ) -> ScalingGroupData:
+        """Get a single scaling group by name (primary key).
+
+        Args:
+            name: The name of the scaling group (primary key).
+
+        Returns:
+            ScalingGroupData for the requested scaling group.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        return await self._db_source.get_scaling_group_by_name(name=name)
+
+    @scaling_group_repository_resilience.apply()
     async def purge_scaling_group(
         self,
         purger: Purger[ScalingGroupRow],
     ) -> ScalingGroupData:
-        """Purges a scaling group and all related sessions and routes using a purger.
+        """Purges a scaling group and all related sessions, routes, endpoints, and kernels.
 
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
         return await self._db_source.purge_scaling_group(purger)
 
+    @scaling_group_repository_resilience.apply()
     async def update_scaling_group(
         self,
         updater: Updater[ScalingGroupRow],
@@ -92,17 +128,17 @@ class ScalingGroupRepository:
 
     async def associate_scaling_group_with_domains(
         self,
-        bulk_creator: BulkCreator[ScalingGroupForDomainRow],
+        binder: RBACScopeBinder[ScalingGroupForDomainRow],
     ) -> None:
         """Associates a scaling group with multiple domains."""
-        await self._db_source.associate_scaling_group_with_domains(bulk_creator)
+        await self._db_source.associate_scaling_group_with_domains(binder)
 
     async def disassociate_scaling_group_with_domains(
         self,
-        purger: BatchPurger[ScalingGroupForDomainRow],
+        unbinder: RBACScopeEntityUnbinder[ScalingGroupForDomainRow],
     ) -> None:
-        """Disassociates a scaling group from multiple domains."""
-        await self._db_source.disassociate_scaling_group_with_domains(purger)
+        """Disassociates scaling groups from a domain."""
+        await self._db_source.disassociate_scaling_group_with_domains(unbinder)
 
     async def check_scaling_group_domain_association_exists(
         self,
@@ -114,3 +150,166 @@ class ScalingGroupRepository:
             scaling_group=scaling_group,
             domain=domain,
         )
+
+    async def associate_scaling_group_with_keypairs(
+        self,
+        bulk_creator: BulkCreator[ScalingGroupForKeypairsRow],
+    ) -> None:
+        """Associates a scaling group with multiple keypairs."""
+        await self._db_source.associate_scaling_group_with_keypairs(bulk_creator)
+
+    async def disassociate_scaling_group_with_keypairs(
+        self,
+        purger: BatchPurger[ScalingGroupForKeypairsRow],
+    ) -> None:
+        """Disassociates a scaling group from multiple keypairs."""
+        await self._db_source.disassociate_scaling_group_with_keypairs(purger)
+
+    async def check_scaling_group_keypair_association_exists(
+        self,
+        scaling_group_name: str,
+        access_key: str,
+    ) -> bool:
+        """Checks if a scaling group is associated with a keypair."""
+        return await self._db_source.check_scaling_group_keypair_association_exists(
+            scaling_group_name, access_key
+        )
+
+    async def associate_scaling_group_with_user_groups(
+        self,
+        binder: RBACScopeBinder[ScalingGroupForProjectRow],
+    ) -> None:
+        """Associates a scaling group with multiple user groups (projects)."""
+        await self._db_source.associate_scaling_group_with_user_groups(binder)
+
+    async def disassociate_scaling_group_with_user_groups(
+        self,
+        unbinder: RBACScopeEntityUnbinder[ScalingGroupForProjectRow],
+    ) -> None:
+        """Disassociates scaling groups from a project."""
+        await self._db_source.disassociate_scaling_group_with_user_groups(unbinder)
+
+    async def check_scaling_group_user_group_association_exists(
+        self,
+        scaling_group: str,
+        user_group: UUID,
+    ) -> bool:
+        """Checks if a scaling group is associated with a user group (project)."""
+        return await self._db_source.check_scaling_group_user_group_association_exists(
+            scaling_group=scaling_group,
+            user_group=user_group,
+        )
+
+    @scaling_group_repository_resilience.apply()
+    async def list_allowed_sgroups(
+        self,
+        *,
+        domain_name: str,
+        group: str,
+        access_key: str,
+    ) -> list[ScalingGroupData]:
+        """List scaling groups allowed for a user."""
+        return await self._db_source.list_allowed_sgroups(
+            domain_name=domain_name,
+            group=group,
+            access_key=access_key,
+        )
+
+    async def get_resource_info(
+        self,
+        scaling_group: str,
+    ) -> ResourceInfo:
+        """Get aggregated resource information for a scaling group.
+
+        Args:
+            scaling_group: The name of the scaling group.
+
+        Returns:
+            ResourceInfo containing capacity, used, and free resource metrics.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        return await self._db_source.get_resource_info(scaling_group)
+
+    # Allow / Disallow operations
+
+    async def update_allowed_resource_groups_for_domain(
+        self,
+        domain_name: str,
+        add: list[str],
+        remove: list[str],
+    ) -> list[str]:
+        """Atomically add/remove allowed resource groups for a domain."""
+        return await self._db_source.update_allowed_resource_groups_for_domain(
+            domain_name=domain_name,
+            add=add,
+            remove=remove,
+        )
+
+    async def update_allowed_resource_groups_for_project(
+        self,
+        project_id: UUID,
+        add: list[str],
+        remove: list[str],
+    ) -> list[str]:
+        """Atomically add/remove allowed resource groups for a project."""
+        return await self._db_source.update_allowed_resource_groups_for_project(
+            project_id=project_id,
+            add=add,
+            remove=remove,
+        )
+
+    async def update_allowed_domains_for_resource_group(
+        self,
+        resource_group_name: str,
+        add: list[str],
+        remove: list[str],
+    ) -> list[str]:
+        """Atomically add/remove allowed domains for a resource group."""
+        return await self._db_source.update_allowed_domains_for_resource_group(
+            resource_group_name=resource_group_name,
+            add=add,
+            remove=remove,
+        )
+
+    async def update_allowed_projects_for_resource_group(
+        self,
+        resource_group_name: str,
+        add: list[UUID],
+        remove: list[UUID],
+    ) -> list[UUID]:
+        """Atomically add/remove allowed projects for a resource group."""
+        return await self._db_source.update_allowed_projects_for_resource_group(
+            resource_group_name=resource_group_name,
+            add=add,
+            remove=remove,
+        )
+
+    async def get_allowed_resource_groups_for_domain(
+        self,
+        domain_name: str,
+    ) -> list[str]:
+        """Get allowed resource group names for a domain."""
+        return await self._db_source.get_allowed_resource_groups_for_domain(domain_name)
+
+    async def get_allowed_resource_groups_for_project(
+        self,
+        project_id: UUID,
+    ) -> list[str]:
+        """Get allowed resource group names for a project."""
+        return await self._db_source.get_allowed_resource_groups_for_project(project_id)
+
+    async def get_allowed_domains_for_resource_group(
+        self,
+        resource_group_name: str,
+    ) -> list[str]:
+        """Get allowed domain names for a resource group."""
+        return await self._db_source.get_allowed_domains_for_resource_group(resource_group_name)
+
+    async def get_allowed_projects_for_resource_group(
+        self,
+        resource_group_name: str,
+    ) -> list[UUID]:
+        """Get allowed projects for a resource group."""
+        return await self._db_source.get_allowed_projects_for_resource_group(resource_group_name)

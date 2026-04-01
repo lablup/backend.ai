@@ -19,7 +19,7 @@ class DeploymentError(BackendAIError):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.SESSION,
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
@@ -33,7 +33,7 @@ class InvalidEndpointState(DeploymentError):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.SESSION,
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.BAD_REQUEST,  # Use BAD_REQUEST instead of INVALID_STATE
         )
@@ -47,7 +47,7 @@ class RouteCreationFailed(DeploymentError):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.SESSION,
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
@@ -61,7 +61,7 @@ class ScalingOperationFailed(DeploymentError):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.SESSION,
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
@@ -75,7 +75,21 @@ class ServiceInfoRetrievalFailed(DeploymentError):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.SESSION,
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class DeploymentAlreadyInProgress(DeploymentError):
+    """Raised when trying to activate a revision while another deployment is in progress."""
+
+    error_type = "https://api.backend.ai/probs/deployment-already-in-progress"
+    error_title = "Another deployment is already in progress."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
         )

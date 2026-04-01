@@ -18,7 +18,7 @@ class ClusterValidationRule(SessionValidatorRule):
     def validate(
         self,
         spec: SessionCreationSpec,
-        context: SessionCreationContext,
+        _context: SessionCreationContext,
     ) -> None:
         """Validate cluster configuration and kernel specifications."""
         # Check if kernel_specs exists

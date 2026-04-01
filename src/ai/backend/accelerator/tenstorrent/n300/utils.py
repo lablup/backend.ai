@@ -33,7 +33,7 @@ async def host_pid_to_container_pid(container_id: str, host_pid: int) -> int:
 T = TypeVar("T")
 
 
-async def run_sync(
+async def run_sync[T](
     closure: Callable[..., T], *args: Sequence[Any], **kwargs: Mapping[Any, Any]
 ) -> T:
     return await asyncio.get_running_loop().run_in_executor(

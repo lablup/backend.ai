@@ -12,12 +12,12 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 
 
 @pytest.fixture
-def mock_hook_plugin_ctx():
+def mock_hook_plugin_ctx() -> MagicMock:
     return MagicMock(spec=HookPluginContext)
 
 
 @pytest.fixture
-def mock_config_provider():
+def mock_config_provider() -> MagicMock:
     mock_provider = MagicMock(spec=ManagerConfigProvider)
     mock_provider.config = MagicMock(spec=ManagerConfig)
     mock_provider.config.auth = AuthConfig(
@@ -25,5 +25,6 @@ def mock_config_provider():
         password_hash_algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
         password_hash_rounds=100_000,
         password_hash_salt_size=32,
+        login_session_max_age=604800,
     )
     return mock_provider

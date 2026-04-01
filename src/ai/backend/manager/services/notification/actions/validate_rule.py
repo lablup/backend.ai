@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 
 from .base import NotificationAction
 
@@ -19,11 +20,11 @@ class ValidateRuleAction(NotificationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "validate_rule"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.rule_id)
 
 
@@ -34,5 +35,5 @@ class ValidateRuleActionResult(BaseActionResult):
     message: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

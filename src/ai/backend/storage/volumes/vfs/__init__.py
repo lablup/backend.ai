@@ -11,7 +11,7 @@ import time
 from collections import deque
 from collections.abc import AsyncIterator, Sequence
 from pathlib import Path, PurePosixPath
-from typing import Any, Optional, final, override
+from typing import Any, final, override
 
 import aiofiles.os
 import janus
@@ -26,6 +26,8 @@ from ai.backend.storage.errors import (
     MetadataTooLargeError,
     ProcessExecutionError,
     QuotaDirectoryNotEmptyError,
+    QuotaScopeAlreadyExists,
+    QuotaScopeCreationFailedError,
     QuotaScopeNotFoundError,
 )
 from ai.backend.storage.subproc import run
@@ -84,26 +86,29 @@ class BaseQuotaModel(AbstractQuotaModel):
                     raise InvalidQuotaScopeError(
                         f"Invalid value format for quota scope ID: {ref!r}"
                     )
-        except t.DataError:
-            raise InvalidQuotaScopeError(f"Invalid value format for quota scope ID: {ref!r}")
+        except t.DataError as e:
+            raise InvalidQuotaScopeError(f"Invalid value format for quota scope ID: {ref!r}") from e
 
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
-        )
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
+            )
+        except FileExistsError as e:
+            raise QuotaScopeAlreadyExists(f"Quota scope '{quota_scope_id}' already exists") from e
 
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
 
@@ -150,21 +155,24 @@ class SetGIDQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
-        )
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
+            )
+        except FileExistsError as e:
+            raise QuotaScopeAlreadyExists(f"Quota scope '{quota_scope_id}' already exists") from e
         # TODO: setgid impl.
 
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-    ) -> Optional[QuotaUsage]:
+    ) -> QuotaUsage | None:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
         # TODO: setgid impl.
@@ -204,7 +212,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
 
 class BaseFSOpModel(AbstractFSOpModel):
     def __init__(
-        self, mount_path: Path, scandir_limit: int, watcher: Optional[WatcherClient] = None
+        self, mount_path: Path, scandir_limit: int, watcher: WatcherClient | None = None
     ) -> None:
         self.mount_path = mount_path
         self.scandir_limit = scandir_limit
@@ -344,7 +352,7 @@ class BaseFSOpModel(AbstractFSOpModel):
             next_paths.append(path)
             while next_paths:
                 next_path = next_paths.popleft()
-                with os.scandir(next_path) as scanner:  # type: ignore
+                with os.scandir(next_path) as scanner:
                     for entry in scanner:
                         try:
                             stat = entry.stat(follow_symlinks=False)
@@ -424,8 +432,8 @@ class BaseVolume(AbstractVolume):
         await aiofiles.os.makedirs(vfpath, mode, exist_ok=exist_ok)
         if mode != DEFAULT_VFOLDER_PERMISSION_MODE:
             # The mode parameter in os.makedirs() sometimes fails to set directory permissions correctly.
-            # Calling os.chmod() afterward ensures the desired permissions are properly applied.
-            os.chmod(vfpath, mode)
+            # Calling Path.chmod() afterward ensures the desired permissions are properly applied.
+            vfpath.chmod(mode)
 
     @final
     async def delete_vfolder(self, vfid: VFolderID) -> None:
@@ -455,18 +463,30 @@ class BaseVolume(AbstractVolume):
         if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
             raise ProcessExecutionError("Not enough space available for clone.")
 
-        # create the target vfolder
+        # create the target vfolder (auto-create quota scope if missing)
         src_vfpath = self.mangle_vfpath(src_vfid)
+        if not self.quota_model.mangle_qspath(dst_vfid).exists():
+            if dst_vfid.quota_scope_id is None:
+                raise QuotaScopeNotFoundError
+            try:
+                await self.quota_model.create_quota_scope(dst_vfid.quota_scope_id)
+            except QuotaScopeAlreadyExists:
+                pass
+            except Exception as e:
+                raise QuotaScopeCreationFailedError(
+                    f"Failed to create quota scope '{dst_vfid.quota_scope_id}' "
+                    f"for clone destination: {e}"
+                ) from e
         await self.create_vfolder(dst_vfid)
         dst_vfpath = self.mangle_vfpath(dst_vfid)
 
         # perform the file-tree copy
         try:
             await self.fsop_model.copy_tree(src_vfpath, dst_vfpath)
-        except Exception:
+        except Exception as e:
             await self.delete_vfolder(dst_vfid)
             log.exception("clone_vfolder: error during copy_tree()")
-            raise ProcessExecutionError("Copying files from source directories failed.")
+            raise ProcessExecutionError("Copying files from source directories failed.") from e
 
     @final
     async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
@@ -601,7 +621,7 @@ class BaseVolume(AbstractVolume):
         vfpath = self.mangle_vfpath(vfid)
         session_id = secrets.token_hex(16)
 
-        def _create_target():
+        def _create_target() -> None:
             upload_base_path = vfpath / ".upload"
             upload_base_path.mkdir(exist_ok=True)
             upload_target_path = upload_base_path / session_id
@@ -621,7 +641,7 @@ class BaseVolume(AbstractVolume):
         q: janus.Queue[bytes] = janus.Queue()
 
         def _write(q: janus._SyncQueueProxy[bytes]) -> None:
-            with open(target_path, "wb") as f:
+            with target_path.open("wb") as f:
                 while True:
                     buf = q.get()
                     try:
@@ -632,16 +652,14 @@ class BaseVolume(AbstractVolume):
                         q.task_done()
 
         loop = asyncio.get_running_loop()
-        write_task: asyncio.Task = asyncio.create_task(
-            loop.run_in_executor(None, _write, q.sync_q),  # type: ignore
-        )
+        write_fut = loop.run_in_executor(None, _write, q.sync_q)
         try:
             async for buf in payload:
                 await q.async_q.put(buf)
             await q.async_q.put(b"")
             await q.async_q.join()
         finally:
-            await write_task
+            await write_fut
 
     def read_file(
         self,
@@ -659,7 +677,7 @@ class BaseVolume(AbstractVolume):
             chunk_size: int,
         ) -> None:
             try:
-                with open(target_path, "rb") as f:
+                with target_path.open("rb") as f:
                     while True:
                         buf = f.read(chunk_size)
                         if not buf:

@@ -6,7 +6,7 @@
 // {
 //   "version": 4,
 //   "valid_for_interpreter_constraints": [
-//     "CPython==3.14.2"
+//     "CPython==3.14.3"
 //   ],
 //   "generated_with_requirements": [
 //     "towncrier~=24.8"
@@ -210,7 +210,7 @@
     "towncrier~=24.8"
   ],
   "requires_python": [
-    "CPython==3.14.2"
+    "CPython==3.14.3"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

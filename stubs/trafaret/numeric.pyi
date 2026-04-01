@@ -1,19 +1,19 @@
-from typing import Optional
+from typing import Any
 
 from .base import Trafaret, TrafaretMeta
 
 class NumberMeta(TrafaretMeta):
-    def __getitem__(cls, slice_): ...
-    def __lt__(cls, lt): ...
-    def __gt__(cls, gt): ...
+    def __getitem__(cls, slice_: Any) -> Any: ...
+    def __lt__(cls, lt: Any) -> Any: ...
+    def __gt__(cls, gt: Any) -> Any: ...
 
 class Float(Trafaret, metaclass=NumberMeta):
     def __init__(
         self,
-        gte: Optional[float] = None,
-        lte: Optional[float] = None,
-        gt: Optional[float] = None,
-        lt: Optional[float] = None,
+        gte: float | None = None,
+        lte: float | None = None,
+        gt: float | None = None,
+        lt: float | None = None,
     ): ...
 
 class ToFloat(Float): ...

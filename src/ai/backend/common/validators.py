@@ -2,6 +2,8 @@
 An extension module to Trafaret which provides additional type checkers.
 """
 
+from __future__ import annotations
+
 import datetime
 import enum
 import ipaddress
@@ -17,10 +19,9 @@ from pathlib import Path as _Path
 from pathlib import PurePath as _PurePath
 from typing import (
     Any,
-    Generic,
     Literal,
-    Optional,
     TypeVar,
+    cast,
 )
 
 import dateutil.tz
@@ -74,8 +75,8 @@ class StringLengthMeta(TrafaretMeta):
     A metaclass that makes string-like trafarets to have sliced min/max length indicator.
     """
 
-    def __getitem__(cls, slice_) -> t.Trafaret:
-        return cls(min_length=slice_.start, max_length=slice_.stop)
+    def __getitem__(cls, slice_: slice) -> t.Trafaret:
+        return cast(t.Trafaret, cls(min_length=slice_.start, max_length=slice_.stop))
 
 
 class AliasedKey(t.Key):
@@ -87,17 +88,16 @@ class AliasedKey(t.Key):
 
     names: Sequence[str]
 
-    def __init__(self, names: Sequence[str], **kwargs) -> None:
+    def __init__(self, names: Sequence[str], **kwargs: Any) -> None:
         super().__init__(names[0], **kwargs)
         self.names = names
 
-    def __call__(self, data, context=None) -> Generator[tuple, None, None]:  # type: ignore[override]
+    def __call__(self, data: Any, context: Any = None) -> Generator[tuple[Any, ...], None, None]:
+        key: str | None = None
         for name in self.names:
             if name in data:
                 key = name
                 break
-        else:
-            key = None
 
         if key is None:  # not specified
             if self.default is not _empty:  # type: ignore[attr-defined]
@@ -122,14 +122,14 @@ class AliasedKey(t.Key):
 
 
 class MultiKey(t.Key):
-    def get_data(self, data, default):
+    def get_data(self, data: Any, default: Any) -> list[Any]:
         if isinstance(data, (multidict.MultiDict, multidict.MultiDictProxy)):
-            return data.getall(self.name, default)
+            return data.getall(self.name, default)  # type: ignore[attr-defined]
         # fallback for plain dicts
-        raw_value = data.get(self.name, default)
+        raw_value = data.get(self.name, default)  # type: ignore[attr-defined]
         if isinstance(raw_value, (list, tuple)):
             # if plain dict already contains list of values, just return it.
-            return raw_value
+            return list(raw_value)
         # otherwise, wrap the value in a list.
         return [raw_value]
 
@@ -147,13 +147,13 @@ class BinarySize(t.Trafaret):
 TItem = TypeVar("TItem")
 
 
-class DelimiterSeperatedList(t.Trafaret, Generic[TItem]):
+class DelimiterSeperatedList[TItem](t.Trafaret):
     def __init__(
         self,
         trafaret: type[t.Trafaret] | t.Trafaret,
         *,
         delimiter: str = ",",
-        min_length: Optional[int] = None,
+        min_length: int | None = None,
         empty_str_as_empty_list: bool = False,
     ) -> None:
         self.delimiter = delimiter
@@ -175,7 +175,7 @@ class DelimiterSeperatedList(t.Trafaret, Generic[TItem]):
                 f"the number of items should be greater than {self.min_length}",
                 value=value,
             )
-        return [self.trafaret.check_and_return(x) for x in splited]
+        return [self.trafaret.check(x) for x in splited]
 
 
 class StringList(DelimiterSeperatedList[str]):
@@ -184,7 +184,7 @@ class StringList(DelimiterSeperatedList[str]):
         *,
         delimiter: str = ",",
         allow_blank: bool = False,
-        min_length: Optional[int] = None,
+        min_length: int | None = None,
         empty_str_as_empty_list: bool = False,
     ) -> None:
         super().__init__(
@@ -198,7 +198,7 @@ class StringList(DelimiterSeperatedList[str]):
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class Enum(t.Trafaret, Generic[T_enum]):
+class Enum[T_enum: enum.Enum](t.Trafaret):
     def __init__(self, enum_cls: type[T_enum], *, use_name: bool = False) -> None:
         self.enum_cls = enum_cls
         self.use_name = use_name
@@ -213,9 +213,12 @@ class Enum(t.Trafaret, Generic[T_enum]):
 
 
 class JSONString(t.Trafaret):
-    def check_and_return(self, value: Any) -> dict:
+    def check_and_return(self, value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
         try:
-            return json.loads(value)
+            result: dict[str, Any] = json.loads(value)
+            return result
         except (KeyError, ValueError):
             self._failure("value is not a valid JSON string", value=value)
 
@@ -224,7 +227,7 @@ class PurePath(t.Trafaret):
     def __init__(
         self,
         *,
-        base_path: Optional[_PurePath] = None,
+        base_path: _PurePath | None = None,
         relative_only: bool = False,
     ) -> None:
         super().__init__()
@@ -252,7 +255,7 @@ class Path(PurePath):
         self,
         *,
         type: Literal["dir", "file"],
-        base_path: Optional[_Path] = None,
+        base_path: _Path | None = None,
         auto_create: bool = False,
         allow_nonexisting: bool = False,
         allow_devnull: bool = False,
@@ -299,7 +302,7 @@ class Path(PurePath):
 
 
 class IPNetwork(t.Trafaret):
-    def check_and_return(self, value: Any) -> ipaddress._BaseNetwork:
+    def check_and_return(self, value: Any) -> ipaddress._BaseNetwork[Any]:
         try:
             return ipaddress.ip_network(value)
         except ValueError:
@@ -381,7 +384,7 @@ class PortRange(t.Trafaret):
 
 
 class UserID(t.Trafaret):
-    def __init__(self, *, default_uid: Optional[int] = None) -> None:
+    def __init__(self, *, default_uid: int | None = None) -> None:
         super().__init__()
         self._default_uid = default_uid
 
@@ -413,7 +416,7 @@ class UserID(t.Trafaret):
 
 
 class GroupID(t.Trafaret):
-    def __init__(self, *, default_gid: Optional[int] = None) -> None:
+    def __init__(self, *, default_gid: int | None = None) -> None:
         super().__init__()
         self._default_gid = default_gid
 
@@ -533,7 +536,8 @@ class TimeDuration(t.Trafaret):
             self._failure("value must be a number or string", value=value)
         if isinstance(value, (int, float)):
             return datetime.timedelta(seconds=value)
-        assert isinstance(value, str)
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         if len(value) == 0:
             self._failure("value must not be empty", value=value)
         try:
@@ -604,8 +608,8 @@ class Slug(t.Trafaret, metaclass=StringLengthMeta):
     def __init__(
         self,
         *,
-        min_length: Optional[int] = None,
-        max_length: Optional[int] = None,
+        min_length: int | None = None,
+        max_length: int | None = None,
         allow_dot: bool = False,
         allow_space: bool = False,
         allow_unicode: bool = False,
@@ -657,7 +661,7 @@ if jwt_available:
             self,
             *,
             secret: str,
-            inner_iv: Optional[t.Trafaret] = None,
+            inner_iv: t.Trafaret | None = None,
             algorithms: list[str] = default_algorithms,
         ) -> None:
             self.secret = secret
@@ -668,8 +672,8 @@ if jwt_available:
             try:
                 token_data = jwt.decode(value, self.secret, algorithms=self.algorithms)
                 if self.inner_iv is not None:
-                    return self.inner_iv.check(token_data)
-                return token_data
+                    return cast(Mapping[str, Any], self.inner_iv.check(token_data))
+                return cast(Mapping[str, Any], token_data)
             except jwt.PyJWTError as e:
                 self._failure(f"cannot decode the given value as JWT: {e}", value=value)
 
@@ -696,11 +700,10 @@ class URL(t.Trafaret):
 
 
 class ToSet(t.Trafaret):
-    def check_and_return(self, value: Any) -> set:
+    def check_and_return(self, value: Any) -> set[Any]:  # noqa: RET503
         if isinstance(value, Iterable):
             return set(value)
-        self._failure("value must be Iterable")
-        return None
+        self._failure("value must be Iterable")  # raises DataError
 
 
 class ToNone(t.Trafaret):
@@ -721,7 +724,7 @@ class Delay(t.Trafaret):
     to use in time.sleep() or asyncio.sleep()
     """
 
-    def check_and_return(self, value: Any) -> float:
+    def check_and_return(self, value: Any) -> float:  # noqa: RET503
         match value:
             case float() | int():
                 return float(value)
@@ -730,8 +733,9 @@ class Delay(t.Trafaret):
             case None:
                 return 0
             case _:
-                self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
-        return None
+                self._failure(
+                    f"Value must be (float, tuple of float or None), not {type(value)}."
+                )  # raises DataError
 
 
 class SessionName(t.Regexp):

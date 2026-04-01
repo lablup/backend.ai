@@ -1,8 +1,11 @@
+from .abc import BackendAIClient
 from .client import AgentClient
-from .pool import AgentPool, AgentPoolConfig
+from .pool import AgentClientPool
+from .types import AgentPoolSpec
 
 __all__ = [
+    "BackendAIClient",
     "AgentClient",
-    "AgentPool",
-    "AgentPoolConfig",
+    "AgentClientPool",
+    "AgentPoolSpec",
 ]

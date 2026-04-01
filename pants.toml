@@ -17,19 +17,17 @@ backend_packages = [
 pants_ignore = [
     ".*/",
     "/dist/",
+    "/docker/",
     "__pycache__",
     "*~",  # vim swap/backup files
     "/scripts/",
     "/plugins/",
     "/docs/",  # TODO: docs build config
+    "/proposals/",
     "*.log",
     "/tools/pants-plugins",
     "/wheelhouse/*/",
-    "/wheelhouse/*.whl",
-    # Alembic migration files - legacy SQLAlchemy 1.x style, excluded from type checking
-    "/src/ai/backend/manager/models/alembic/versions/",
-    "/src/ai/backend/account_manager/models/alembic/versions/",
-    "/src/ai/backend/appproxy/coordinator/models/alembic/versions/",
+    "/wheelhouse/*.whl"
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 
@@ -58,7 +56,7 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.14.2"]
+interpreter_constraints = ["CPython==3.14.3"]
 interpreter_versions_universe = ["3.11", "3.12", "3.13", "3.14"]
 tailor_pex_binary_targets = false
 pip_version = "25.3"

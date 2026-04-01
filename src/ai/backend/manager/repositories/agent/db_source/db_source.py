@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -10,17 +10,23 @@ from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
     AgentData,
+    AgentDetailData,
     AgentHeartbeatUpsert,
+    AgentListResult,
     AgentStatus,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -40,7 +46,7 @@ class AgentDBSource:
     async def get_images_by_image_identifiers(
         self, image_identifiers: list[ImageIdentifier]
     ) -> dict[ImageID, ImageDataWithDetails]:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             identifier_tuples = [
                 (identifier.canonical, identifier.architecture) for identifier in image_identifiers
             ]
@@ -57,7 +63,7 @@ class AgentDBSource:
             return images_data
 
     async def get_images_by_digest(self, digests: list[str]) -> dict[ImageID, ImageDataWithDetails]:
-        async with self._db.begin_readonly_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             query = (
                 sa.select(ImageRow)
                 .where(ImageRow.config_digest.in_(digests))
@@ -70,11 +76,11 @@ class AgentDBSource:
             return images_data
 
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
-        async with self._db.begin_readonly_session() as db_session:
-            agent_row: Optional[AgentRow] = await db_session.scalar(
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            agent_row: AgentRow | None = await db_session.scalar(
                 sa.select(AgentRow)
                 .where(AgentRow.id == agent_id)
-                .options(selectinload(AgentRow.kernels))
+                .options(selectinload(AgentRow.agent_resource_rows))
             )
             if agent_row is None:
                 log.error("Agent with id {} not found", agent_id)
@@ -92,13 +98,13 @@ class AgentDBSource:
             raise ScalingGroupNotFound(scaling_group_name)
 
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
-        async with self._db.begin_session() as session:
+        async with self._db.begin_session_read_committed() as session:
             await self._check_scaling_group_exists(session, upsert_data.metadata.scaling_group)
 
             query = (
                 sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
             )
-            row: Optional[AgentRow] = await session.scalar(query)
+            row: AgentRow | None = await session.scalar(query)
             agent_data = row.to_heartbeat_update_data() if row is not None else None
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
@@ -135,3 +141,54 @@ class AgentDBSource:
     async def update_agent_status(self, updater: Updater[AgentRow]) -> None:
         async with self._db.begin_session() as session:
             await execute_updater(session, updater)
+
+    async def search_agents(
+        self,
+        querier: BatchQuerier,
+    ) -> AgentListResult:
+        """Searches agents with total count."""
+
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(AgentRow).options(
+                selectinload(AgentRow.agent_resource_rows),
+            )
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+            agent_rows: list[AgentRow] = [row.AgentRow for row in result.rows]
+            items = [agent_row.to_data() for agent_row in agent_rows]
+            admin_permissions = list(ADMIN_AGENT_PERMISSIONS)
+            agents_with_permissions = [
+                AgentDetailData(agent=agent_data, permissions=admin_permissions)
+                for agent_data in items
+            ]
+
+            return AgentListResult(
+                items=agents_with_permissions,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def upsert_agent_resource_capacity(
+        self,
+        bulk_upserter: BulkUpserter[AgentResourceRow],
+    ) -> int:
+        """Bulk UPSERT agent resource capacity rows.
+
+        On INSERT: sets capacity (used defaults to 0).
+        On CONFLICT: updates capacity only.
+
+        Returns:
+            Number of rows upserted.
+        """
+        async with self._db.begin_session_read_committed() as db_sess:
+            result = await execute_bulk_upserter(
+                db_sess,
+                bulk_upserter,
+                index_elements=["agent_id", "slot_name"],
+            )
+            return result.upserted_count

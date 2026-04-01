@@ -17,7 +17,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     NotRequired,
-    Optional,
     TypedDict,
     cast,
 )
@@ -35,8 +34,14 @@ from ai.backend.common.api_handlers import (
 )
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
-from ai.backend.common.dto.storage.request import FileDeleteAsyncRequest
+from ai.backend.common.dto.storage.request import (
+    ArchiveDownloadTokenData,
+    CreateArchiveDownloadSessionRequest,
+    FileDeleteAsyncRequest,
+    TokenOperationType,
+)
 from ai.backend.common.dto.storage.response import (
+    CreateArchiveDownloadSessionResponse,
     FileDeleteAsyncResponse,
     VFolderCloneResponse,
     VFolderDeleteResponse,
@@ -197,7 +202,7 @@ def handle_fs_errors(
                 },
             ),
             content_type="application/json",
-        )
+        ) from e
 
 
 @ctxmgr
@@ -210,7 +215,7 @@ def handle_external_errors() -> Iterator[None]:
                 "msg": str(e),
             }),
             content_type="application/json",
-        )
+        ) from e
 
 
 async def get_volumes(request: web.Request) -> web.Response:
@@ -398,7 +403,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
-        mode: Optional[int]
+        mode: int | None
         options: dict[str, Any] | None  # deprecated
 
     async with cast(
@@ -420,8 +425,8 @@ async def create_vfolder(request: web.Request) -> web.Response:
         if params["vfid"].quota_scope_id is None:
             raise InvalidAPIParameters("quota_scope_id is required for vfid")
         ctx: RootContext = request.app["ctx"]
-        perm_mode = cast(
-            int, params["mode"] if params["mode"] is not None else DEFAULT_VFOLDER_PERMISSION_MODE
+        perm_mode = (
+            params["mode"] if params["mode"] is not None else DEFAULT_VFOLDER_PERMISSION_MODE
         )
         async with ctx.get_volume(params["volume"]) as volume:
             try:
@@ -432,7 +437,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 if not params["vfid"].quota_scope_id:
                     raise InvalidAPIParameters(
                         "quota_scope_id is required for auto quota scope creation"
-                    )
+                    ) from None
                 if initial_max_size_for_quota_scope := (params["options"] or {}).get(
                     "initial_max_size_for_quota_scope"
                 ):
@@ -444,10 +449,10 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 )
                 try:
                     await volume.create_vfolder(params["vfid"], mode=perm_mode)
-                except QuotaScopeNotFoundError:
+                except QuotaScopeNotFoundError as e:
                     raise ExternalStorageServiceError(
                         "Failed to create vfolder due to quota scope not found."
-                    )
+                    ) from e
             return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -550,7 +555,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                     params["vfid"],
                     params["subpath"],
                 )
-            except VFolderNotFoundError:
+            except VFolderNotFoundError as e:
                 raise web.HTTPBadRequest(
                     text=dump_json_str(
                         {
@@ -559,7 +564,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                         },
                     ),
                     content_type="application/json",
-                )
+                ) from e
             except InvalidSubpathError as e:
                 raise web.HTTPBadRequest(
                     text=dump_json_str(
@@ -570,7 +575,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
                         },
                     ),
                     content_type="application/json",
-                )
+                ) from e
             return web.json_response(
                 {
                     "path": str(mount_path),
@@ -595,13 +600,13 @@ async def get_performance_metric(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "get_performance_metric", params)
         ctx: RootContext = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            metric = await volume.get_performance_metric()
-            return web.json_response(
-                {
-                    "metric": attr.asdict(cast(attr.AttrsInstance, metric)),
-                },
-            )
+        cached = await ctx.volume_stats_state.get_performance_metric(params["volume"])
+        return web.json_response(
+            {
+                "metric": attr.asdict(cast(attr.AttrsInstance, cached.to_metric())),
+                "observed_at": cached.observed_at.isoformat(),
+            },
+        )
 
 
 async def fetch_file(request: web.Request) -> web.StreamResponse:
@@ -1088,6 +1093,37 @@ async def create_download_session(request: web.Request) -> web.Response:
         )
 
 
+class ArchiveDownloadHandler:
+    """Handler for archive download session operations."""
+
+    @api_handler
+    async def create_session(
+        self,
+        body: BodyParam[CreateArchiveDownloadSessionRequest],
+        ctx: StorageRootCtx,
+    ) -> APIResponse:
+        """Create a JWT token for archive download session."""
+        await log_manager_api_entry(log, "create_archive_download_session", body.parsed)
+        token_payload = ArchiveDownloadTokenData(
+            operation=TokenOperationType.DOWNLOAD,
+            volume=body.parsed.volume,
+            virtual_folder_id=body.parsed.virtual_folder_id,
+            files=body.parsed.files,
+            filename=body.parsed.filename,
+            exp=datetime.now(UTC) + ctx.root_ctx.local_config.storage_proxy.session_expire,
+        )
+        payload = token_payload.model_dump(mode="json")
+        token = jwt.encode(
+            payload,
+            ctx.root_ctx.local_config.storage_proxy.secret,
+            algorithm="HS256",
+        )
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=CreateArchiveDownloadSessionResponse(token=token),
+        )
+
+
 async def create_upload_session(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
@@ -1268,6 +1304,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
 
     # Initialize handlers
     file_operation_handler = FileOperationHandler()
+    archive_download_handler = ArchiveDownloadHandler()
 
     app.router.add_route("GET", "/", check_status)
     app.router.add_route("GET", "/health", check_health)
@@ -1296,6 +1333,9 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/move", move_file)
     app.router.add_route("POST", "/folder/file/fetch", fetch_file)
     app.router.add_route("POST", "/folder/file/download", create_download_session)
+    app.router.add_route(
+        "POST", "/folder/file/archive-download-token", archive_download_handler.create_session
+    )
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
     app.router.add_route(
@@ -1325,7 +1365,7 @@ def init_internal_app(ctx: RootContext) -> web.Application:
 
 async def handle_volume_mount(
     context: RootContext,
-    source: AgentId,
+    _source: AgentId,
     event: DoVolumeMountEvent,
 ) -> None:
     if context.pidx != 0:
@@ -1372,7 +1412,7 @@ async def handle_volume_mount(
 
 async def handle_volume_umount(
     context: RootContext,
-    source: AgentId,
+    _source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:
     if context.pidx != 0:

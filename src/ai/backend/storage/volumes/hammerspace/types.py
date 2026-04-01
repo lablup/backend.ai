@@ -1,13 +1,12 @@
 from dataclasses import dataclass
-from typing import Optional
 
 from pydantic import BaseModel
 from yarl import URL
 
 
 class SSLConfig(BaseModel):
-    cert_file: Optional[str]
-    key_file: Optional[str]
+    cert_file: str | None
+    key_file: str | None
 
 
 @dataclass
@@ -16,4 +15,4 @@ class APIConnectionInfo:
     username: str
     password: str
     ssl_enabled: bool
-    ssl_config: Optional[SSLConfig]
+    ssl_config: SSLConfig | None

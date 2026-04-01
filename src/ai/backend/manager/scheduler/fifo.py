@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import (
-    Optional,
     override,
 )
 
@@ -32,7 +31,7 @@ class FIFOSlotScheduler(AbstractScheduler):
         total_capacity: ResourceSlot,
         pending_sessions: Sequence[SessionRow],
         existing_sessions: Sequence[SessionRow],
-    ) -> Optional[SessionId]:
+    ) -> SessionId | None:
         local_pending_sessions = list(pending_sessions)
         skipped_sessions: list[SessionRow] = []
         max_retries = self.config["num_retries_to_skip"]
@@ -74,7 +73,7 @@ class LIFOSlotScheduler(AbstractScheduler):
         total_capacity: ResourceSlot,
         pending_sessions: Sequence[SessionRow],
         existing_sessions: Sequence[SessionRow],
-    ) -> Optional[SessionId]:
+    ) -> SessionId | None:
         # Just pick the last pending session.
         return SessionId(pending_sessions[-1].id)
 

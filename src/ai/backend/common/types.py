@@ -23,11 +23,9 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Generic,
     Literal,
     NewType,
     NotRequired,
-    Optional,
     Self,
     TypeAlias,
     TypedDict,
@@ -109,6 +107,8 @@ __all__ = (
     "MountPoint",
     "MountTypes",
     "MovingStatValue",
+    "PreemptionMode",
+    "PreemptionOrder",
     "PromMetric",
     "PromMetricGroup",
     "PromMetricPrimitive",
@@ -129,6 +129,7 @@ __all__ = (
     "SchedulerStatus",
     "SecretKey",
     "Sentinel",
+    "ServiceCatalogStatus",
     "ServicePort",
     "ServicePortProtocols",
     "SessionEnqueueingConfig",
@@ -175,7 +176,7 @@ class aobject:
     """
 
     @classmethod
-    async def new(cls: type[Self], *args, **kwargs) -> Self:
+    async def new(cls: type[Self], *args: Any, **kwargs: Any) -> Self:
         """
         We can do ``await SomeAObject(...)``, but this makes mypy
         to complain about its return type with ``await`` statement.
@@ -186,7 +187,7 @@ class aobject:
         await instance.__ainit__()
         return instance
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
 
     async def __ainit__(self) -> None:
@@ -217,7 +218,8 @@ class CIStrEnum(enum.StrEnum):
     @override
     @classmethod
     def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         value = value.lower()
         # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
         # members as the official stdlib example suggests.
@@ -236,7 +238,7 @@ class CIStrEnum(enum.StrEnum):
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+class CIStrEnumTrafaret[T_enum: enum.Enum](t.Trafaret):
     """
     A case-insensitive version of trafaret to parse StrEnum values.
     """
@@ -248,8 +250,10 @@ class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
         try:
             # Assume that the enum values are lowercases.
             return self.enum_cls(value.lower())
-        except (KeyError, ValueError):
-            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
+        except (KeyError, ValueError) as e:
+            raise self._failure(
+                f"value is not a valid member of {self.enum_cls.__name__}", value=value
+            ) from e
 
 
 T1 = TypeVar("T1")
@@ -259,34 +263,34 @@ T4 = TypeVar("T4")
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1](
     value: tuple[Any],
     types: tuple[type[T1]],
 ) -> tuple[T1]: ...
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1, T2](
     value: tuple[Any, Any],
     types: tuple[type[T1], type[T2]],
 ) -> tuple[T1, T2]: ...
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1, T2, T3](
     value: tuple[Any, Any, Any],
     types: tuple[type[T1], type[T2], type[T3]],
 ) -> tuple[T1, T2, T3]: ...
 
 
 @overload
-def check_typed_tuple(
+def check_typed_tuple[T1, T2, T3, T4](
     value: tuple[Any, Any, Any, Any],
     types: tuple[type[T1], type[T2], type[T3], type[T4]],
 ) -> tuple[T1, T2, T3, T4]: ...
 
 
-def check_typed_tuple(value: tuple[Any, ...], types: tuple[type, ...]) -> tuple:
+def check_typed_tuple(value: tuple[Any, ...], types: tuple[type, ...]) -> tuple[Any, ...]:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
             typeguard.check_type(val, typ)
@@ -457,7 +461,7 @@ class SlotTypes(enum.StrEnum):
 
 class HardwareMetadata(TypedDict):
     status: Literal["healthy", "degraded", "offline", "unavailable"]
-    status_info: Optional[str]
+    status_info: str | None
     metadata: dict[str, str]
 
 
@@ -472,6 +476,8 @@ class ServicePortProtocols(enum.StrEnum):
     TCP = "tcp"
     PREOPEN = "preopen"
     INTERNAL = "internal"
+    VNC = "vnc"
+    RDP = "rdp"
 
 
 class SessionTypes(CIStrEnum):
@@ -513,8 +519,9 @@ class ClusterMode(enum.StrEnum):
 
     @override
     @classmethod
-    def _missing_(cls, value: object) -> Optional[ClusterMode]:
-        assert isinstance(value, str)
+    def _missing_(cls, value: object) -> ClusterMode | None:
+        if not isinstance(value, str):
+            raise TypeError("value must be a string")
         # This implementation ensures compatibility with both cases, as we are mixing the use of enum names and values in DB, GraphQL, REST, etc.
         match value.lower():
             case "single-node" | "single_node":
@@ -530,8 +537,8 @@ class CommitStatus(enum.StrEnum):
 
 
 class ItemResult(TypedDict):
-    msg: Optional[str]
-    item: Optional[str]
+    msg: str | None
+    item: str | None
 
 
 class ResultSet(TypedDict):
@@ -546,7 +553,7 @@ class AbuseReportValue(enum.StrEnum):
 
 class AbuseReport(TypedDict):
     kernel: str
-    abuse_report: Optional[str]
+    abuse_report: str | None
 
 
 class MovingStatValue(TypedDict):
@@ -556,14 +563,14 @@ class MovingStatValue(TypedDict):
     avg: str
     diff: str
     rate: str
-    version: Optional[int]  # for legacy client compatibility
+    version: int | None  # for legacy client compatibility
 
 
 MetricValue = TypedDict(
     "MetricValue",
     {
         "current": str,
-        "capacity": Optional[str],
+        "capacity": str | None,
         "pct": str,
         "unit_hint": str,
         "stats.min": str,
@@ -572,7 +579,7 @@ MetricValue = TypedDict(
         "stats.avg": str,
         "stats.diff": str,
         "stats.rate": str,
-        "stats.version": Optional[int],
+        "stats.version": int | None,
     },
 )
 
@@ -625,7 +632,7 @@ class MountPoint(BaseModel):
 
 
 class MountExpression:
-    def __init__(self, expression: str, *, escape_map: Optional[Mapping[str, str]] = None) -> None:
+    def __init__(self, expression: str, *, escape_map: Mapping[str, str] | None = None) -> None:
         self.expression = expression
         self.escape_map = {
             "\\,": ",",
@@ -663,10 +670,7 @@ class HostPortPair(namedtuple("HostPortPair", "host port")):
         return f"{self.host}:{self.port}"
 
 
-_Address = TypeVar("_Address", bound=ipaddress.IPv4Network | ipaddress.IPv6Network)
-
-
-class ReadableCIDR(Generic[_Address]):
+class ReadableCIDR[Address: ipaddress.IPv4Network | ipaddress.IPv6Network]:
     """
     Convert wild-card based IP address into CIDR.
 
@@ -674,16 +678,16 @@ class ReadableCIDR(Generic[_Address]):
     192.10.*.* -> 192.10.0.0/16
     """
 
-    _address: _Address | None
+    _address: Address | None
 
     def __init__(self, address: str | None, is_network: bool = True) -> None:
         self._is_network = is_network
         self._address = self._convert_to_cidr(address) if address is not None else None
 
-    def _convert_to_cidr(self, value: str) -> _Address:
+    def _convert_to_cidr(self, value: str) -> Address:
         str_val = str(value)
         if not self._is_network:
-            return cast(_Address, ip_address(str_val))
+            return cast(Address, ip_address(str_val))
         if "*" in str_val:
             _ip, _, given_cidr = str_val.partition("/")
             filtered = _ip.replace("*", "0")
@@ -695,14 +699,14 @@ class ReadableCIDR(Generic[_Address]):
         return self._to_ip_network(str_val)
 
     @staticmethod
-    def _to_ip_network(val: str) -> _Address:
+    def _to_ip_network(val: str) -> Address:
         try:
-            return cast(_Address, ip_network(val))
-        except ValueError:
-            raise InvalidIpAddressValue
+            return cast(Address, ip_network(val))
+        except ValueError as e:
+            raise InvalidIpAddressValue from e
 
     @property
-    def address(self) -> _Address | None:
+    def address(self) -> Address | None:
         return self._address
 
     def __str__(self) -> str:
@@ -711,7 +715,8 @@ class ReadableCIDR(Generic[_Address]):
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
-        assert isinstance(other, ReadableCIDR), "Only can compare ReadableCIDR objects."
+        if not isinstance(other, ReadableCIDR):
+            raise TypeError("Only can compare ReadableCIDR objects.")
         return self.address == other.address
 
 
@@ -751,6 +756,7 @@ class BinarySize(int):
             expr = expr.lower()
             ending = ""
             dec_expr: Decimal
+            suffix: str = ""
             try:
                 for ending in cls.endings:
                     if (stem := expr.removesuffix(ending)) != expr:
@@ -766,12 +772,12 @@ class BinarySize(int):
                         # has no suffix and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
-            except (ArithmeticError, IndexError):
-                raise ValueError("Unconvertible value", orig_expr, ending)
+            except (ArithmeticError, IndexError) as e:
+                raise ValueError("Unconvertible value", orig_expr, ending) from e
             try:
                 multiplier = cls.suffix_map[suffix]
-            except KeyError:
-                raise ValueError("Unconvertible value", orig_expr)
+            except KeyError as e:
+                raise ValueError("Unconvertible value", orig_expr) from e
             return cls(dec_expr * multiplier)
 
     @classmethod
@@ -801,8 +807,8 @@ class BinarySize(int):
             return cls(int(expr))
         return cls._parse_str(expr)
 
-    def _preformat(self):
-        scale = self
+    def _preformat(self) -> int:
+        scale: int = int(self)
         suffix_idx = 0
         while scale >= 1024:
             scale //= 1024
@@ -810,7 +816,7 @@ class BinarySize(int):
         return suffix_idx
 
     @staticmethod
-    def _quantize(val, multiplier):
+    def _quantize(val: int | Decimal, multiplier: int) -> Decimal:
         d = Decimal(val) / Decimal(multiplier)
         if d == d.to_integral():
             value = d.quantize(Decimal(1))
@@ -829,7 +835,7 @@ class BinarySize(int):
         value = self._quantize(self, multiplier)
         return f"{value:f} {suffix.upper()}iB"
 
-    def __format__(self, format_spec) -> str:
+    def __format__(self, format_spec: str) -> str:
         if len(format_spec) != 1:
             raise ValueError("format-string for BinarySize can be only one character.")
         if format_spec == "s":
@@ -927,14 +933,16 @@ class ResourceSlot(UserDict[str, Decimal]):
             self.data[k] = Decimal(0)
 
     def __add__(self, other: ResourceSlot) -> ResourceSlot:
-        assert isinstance(other, ResourceSlot), "Only can add ResourceSlot to ResourceSlot."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can add ResourceSlot to ResourceSlot.")
         self.sync_keys(other)
         return type(self)({
             k: self.get(k, 0) + other.get(k, 0) for k in (self.keys() | other.keys())
         })
 
     def __sub__(self, other: ResourceSlot) -> ResourceSlot:
-        assert isinstance(other, ResourceSlot), "Only can subtract ResourceSlot from ResourceSlot."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can subtract ResourceSlot from ResourceSlot.")
         self.sync_keys(other)
         return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
 
@@ -944,19 +952,22 @@ class ResourceSlot(UserDict[str, Decimal]):
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         self.sync_keys(other)
         self_values = [self.data[k] for k in sorted(self.data.keys())]
         other_values = [other.data[k] for k in sorted(other.data.keys())]
         return self_values == other_values
 
     def __ne__(self, other: object) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            return NotImplemented
         self.sync_keys(other)
         return not self.__eq__(other)
 
     def eq_contains(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         common_keys = sorted(other.keys() & self.keys())
         only_other_keys = other.keys() - self.keys()
         self_values = [self.data[k] for k in common_keys]
@@ -964,22 +975,25 @@ class ResourceSlot(UserDict[str, Decimal]):
         return self_values == other_values and all(other[k] == 0 for k in only_other_keys)
 
     def eq_contained(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+        if not isinstance(other, ResourceSlot):
+            raise TypeError("Only can compare ResourceSlot objects.")
         common_keys = sorted(other.keys() & self.keys())
         only_self_keys = self.keys() - other.keys()
         self_values = [self.data[k] for k in common_keys]
         other_values = [other.data[k] for k in common_keys]
         return self_values == other_values and all(self[k] == 0 for k in only_self_keys)
 
-    def __le__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+    def __le__(self, other: object) -> bool:
+        if not isinstance(other, ResourceSlot):
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
         return not any(s > o for s, o in zip(self_values, other_values, strict=True))
 
-    def __lt__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, ResourceSlot):
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
@@ -987,15 +1001,17 @@ class ResourceSlot(UserDict[str, Decimal]):
             self_values == other_values
         )
 
-    def __ge__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+    def __ge__(self, other: object) -> bool:
+        if not isinstance(other, ResourceSlot):
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
         return not any(s < o for s, o in zip(self_values, other_values, strict=True))
 
-    def __gt__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
+    def __gt__(self, other: object) -> bool:
+        if not isinstance(other, ResourceSlot):
+            return NotImplemented
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
@@ -1029,8 +1045,8 @@ class ResourceSlot(UserDict[str, Decimal]):
         except (
             ArithmeticError,
             ValueError,  # catch wrapped errors from BinarySize.from_str()
-        ):
-            raise ValueError(f"Cannot convert the slot {key!r} to decimal: {value!r}")
+        ) as e:
+            raise ValueError(f"Cannot convert the slot {key!r} to decimal: {value!r}") from e
         return value
 
     @classmethod
@@ -1051,7 +1067,7 @@ class ResourceSlot(UserDict[str, Decimal]):
         return SlotTypes.COUNT
 
     @classmethod
-    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> ResourceSlot:
+    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping[str, Any]) -> ResourceSlot:
         try:
             data = {
                 k: cls._normalize_value(k, v, slot_types[k])
@@ -1066,14 +1082,14 @@ class ResourceSlot(UserDict[str, Decimal]):
                 if k not in data:
                     data[k] = fill
         except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}")
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}") from e
         return cls(data)
 
     @classmethod
     def from_user_input(
         cls,
         obj: Mapping[str, Any],
-        slot_types: Optional[Mapping[SlotName, SlotTypes]],
+        slot_types: Mapping[SlotName, SlotTypes] | None,
     ) -> ResourceSlot:
         pruned_obj = {k: v for k, v in obj.items() if v != 0}
 
@@ -1098,10 +1114,10 @@ class ResourceSlot(UserDict[str, Decimal]):
             extra_guide = ""
             if e.args[0] == "shmem":
                 extra_guide = " (Put it at the 'resource_opts' field in API, or use '--resource-opts shmem=...' in CLI)"
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide)
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide) from e
         return cls(data)
 
-    def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
+    def to_humanized(self, slot_types: Mapping[str, Any]) -> Mapping[str, str]:
         try:
             return {
                 k: type(self)._humanize_value(Decimal(v), slot_types[k])
@@ -1109,7 +1125,7 @@ class ResourceSlot(UserDict[str, Decimal]):
                 if v is not None
             }
         except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}")
+            raise ValueError(f"Unknown slot type: {e.args[0]!r}") from e
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> ResourceSlot:
@@ -1121,6 +1137,18 @@ class ResourceSlot(UserDict[str, Decimal]):
 
     def has_intrinsic_slots(self) -> bool:
         return all(k in self.data.keys() for k in [name.value for name in IntrinsicSlotNames])
+
+
+@dataclass(frozen=True)
+class SlotQuantity:
+    """A single resource slot entry with slot name and quantity.
+
+    Represents one (slot_name, quantity) pair as a list-friendly alternative
+    to ResourceSlot (UserDict).
+    """
+
+    slot_name: str
+    quantity: Decimal
 
 
 class ResourceSlotState(enum.StrEnum):
@@ -1200,6 +1228,35 @@ class VFolderID:
             return cls(QuotaScopeID.parse(first), UUID(hex=second))
         return cls(None, UUID(hex=first))
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: Any,
+    ) -> Any:
+        """Provide Pydantic core schema for VFolderID serialization/deserialization."""
+        from pydantic_core import core_schema
+
+        def validate_vfolder_id(v: Any) -> VFolderID:
+            if isinstance(v, VFolderID):
+                return v
+            if isinstance(v, str):
+                return cls.from_str(v)
+            raise ValueError(f"Invalid VFolderID: {v}")
+
+        # Accept both VFolderID objects and strings
+        return core_schema.no_info_after_validator_function(
+            validate_vfolder_id,
+            core_schema.union_schema([
+                core_schema.is_instance_schema(cls),
+                core_schema.str_schema(),
+            ]),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda v: str(v),
+                return_schema=core_schema.str_schema(),
+            ),
+        )
+
     def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: UUID) -> None:
         self.folder_id = folder_id
         match quota_scope_id:
@@ -1209,16 +1266,17 @@ class VFolderID:
                 self.quota_scope_id = QuotaScopeID.parse(quota_scope_id)
             case None:
                 self.quota_scope_id = None
-            case _:
-                self.quota_scope_id = QuotaScopeID.parse(str(quota_scope_id))
 
     def __str__(self) -> str:
         if self.quota_scope_id is None:
             return self.folder_id.hex
         return f"{self.quota_scope_id}/{self.folder_id.hex}"
 
-    def __eq__(self, other) -> bool:
-        return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+    def __eq__(self, other: Any) -> bool:
+        result: bool = (
+            self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+        )
+        return result
 
     def __hash__(self) -> int:
         qsid = str(self.quota_scope_id) if self.quota_scope_id is not None else None
@@ -1305,18 +1363,30 @@ class VFolderMount(JSONSerializableMixin):
         })
 
 
-class VFolderHostPermissionMap(dict, JSONSerializableMixin):
-    def __or__(self, other: Any) -> VFolderHostPermissionMap:
-        if self is other:
+class VFolderHostPermissionMap(dict[str, set[VFolderHostPermission]], JSONSerializableMixin):
+    @overload
+    def __or__(
+        self, value: dict[str, set[VFolderHostPermission]], /
+    ) -> dict[str, set[VFolderHostPermission]]: ...
+
+    @overload
+    def __or__[T1, T2](
+        self, value: dict[T1, T2], /
+    ) -> dict[str | T1, set[VFolderHostPermission] | T2]: ...
+
+    def __or__(
+        self, value: dict[Any, Any], /
+    ) -> dict[str, set[VFolderHostPermission]] | dict[str | Any, set[VFolderHostPermission] | Any]:
+        if self is value:
             return self
-        if not isinstance(other, dict):
-            raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
-        union_map: dict[str, set] = defaultdict(set)
-        for host, perms in [*self.items(), *other.items()]:
+        if not isinstance(value, dict):
+            raise ValueError(f"Invalid type. expected `dict` type, got {type(value)} type")
+        union_map: dict[str, set[VFolderHostPermission]] = defaultdict(set)
+        for host, perms in [*self.items(), *value.items()]:
             try:
                 perm_list = [VFolderHostPermission(perm) for perm in perms]
-            except ValueError:
-                raise ValueError(f"Invalid type. Permissions of Host `{host}` are ({perms})")
+            except ValueError as e:
+                raise ValueError(f"Invalid type. Permissions of Host `{host}` are ({perms})") from e
             union_map[host] |= set(perm_list)
         return VFolderHostPermissionMap(union_map)
 
@@ -1325,7 +1395,9 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
-        return cls(**cls.as_trafaret().check(obj))
+        return cls({
+            host: {VFolderHostPermission(perm) for perm in perms} for host, perms in obj.items()
+        })
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
@@ -1361,16 +1433,16 @@ class QuotaScopeType(enum.StrEnum):
 class ImageRegistry(TypedDict):
     name: str
     url: str
-    username: Optional[str]
-    password: Optional[str]
+    username: str | None
+    password: str | None
 
 
 class ImageConfig(TypedDict):
     canonical: str
-    project: Optional[str]
+    project: str | None
     architecture: str
     digest: str
-    repo_digest: Optional[str]
+    repo_digest: str | None
     registry: ImageRegistry
     labels: Mapping[str, str]
     is_local: bool
@@ -1381,7 +1453,7 @@ class ServicePort(TypedDict):
     name: str
     protocol: ServicePortProtocols
     container_ports: Sequence[int]
-    host_ports: Sequence[Optional[int]]
+    host_ports: Sequence[int | None]
     is_inference: bool
 
 
@@ -1393,8 +1465,8 @@ class ClusterInfo(TypedDict):
     size: int
     replicas: Mapping[str, int]  # per-role kernel counts
     network_config: Mapping[str, Any]
-    ssh_keypair: ClusterSSHKeyPair
-    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
+    ssh_keypair: ClusterSSHKeyPair | None
+    cluster_ssh_port_mapping: ClusterSSHPortMapping | None
 
 
 class ClusterSSHKeyPair(TypedDict):
@@ -1431,7 +1503,7 @@ class KernelContainerId:
     """
 
     kernel_id: KernelId
-    container_id: Optional[ContainerId]
+    container_id: ContainerId | None
 
     @property
     def human_readable_container_id(self) -> str:
@@ -1443,7 +1515,7 @@ class KernelContainerId:
             str(self.container_id)[:12] if self.container_id is not None else UNKNOWN_CONTAINER_ID
         )
 
-    def serialize(self) -> tuple[str, Optional[str]]:
+    def serialize(self) -> tuple[str, str | None]:
         """
         Serializes the KernelContainerId to a string format.
         """
@@ -1453,7 +1525,7 @@ class KernelContainerId:
         )
 
     @classmethod
-    def deserialize(cls, data: tuple[str, Optional[str]]) -> Self:
+    def deserialize(cls, data: tuple[str, str | None]) -> Self:
         """
         Deserializes a string into a KernelContainerId instance.
         """
@@ -1519,7 +1591,7 @@ class KernelCreationConfig(TypedDict):
     kernel_id: str  # the kernel's ID
     session_id: str  # the session's ID
     owner_user_id: str  # the owner user's ID
-    owner_project_id: Optional[str]  # the owner project's ID (for project-owned sessions)
+    owner_project_id: str | None  # the owner project's ID (for project-owned sessions)
     network_id: str
     auto_pull: AutoPullBehavior
     session_type: SessionTypes
@@ -1528,8 +1600,8 @@ class KernelCreationConfig(TypedDict):
     cluster_idx: int  # the kernel's index in the cluster
     cluster_hostname: str  # the kernel's hostname in the cluster
     local_rank: int  # the kernel's local rank in the cluster
-    uid: Optional[int]
-    main_gid: Optional[int]
+    uid: int | None
+    main_gid: int | None
     supplementary_gids: list[int]
     resource_slots: Mapping[str, str]  # json form of ResourceSlot
     resource_opts: Mapping[str, Any]  # json form of resource options
@@ -1537,18 +1609,18 @@ class KernelCreationConfig(TypedDict):
     mounts: Sequence[Mapping[str, Any]]  # list of serialized VFolderMount
     package_directory: Sequence[str]
     idle_timeout: int
-    bootstrap_script: Optional[str]
-    startup_command: Optional[str]
-    internal_data: Optional[Mapping[str, Any]]
+    bootstrap_script: str | None
+    startup_command: str | None
+    internal_data: Mapping[str, Any] | None
     preopen_ports: list[int]
     allocated_host_ports: list[int]
     scaling_group: str
     agent_addr: str
-    endpoint_id: Optional[str]
+    endpoint_id: str | None
 
 
 class SessionEnqueueingConfig(TypedDict):
-    creation_config: dict
+    creation_config: dict[str, Any]
     kernel_configs: list[KernelEnqueueingConfig]
 
 
@@ -1558,11 +1630,11 @@ class KernelEnqueueingConfig(TypedDict):
     cluster_idx: int
     local_rank: int
     cluster_hostname: str
-    creation_config: dict
+    creation_config: dict[str, Any]
     bootstrap_script: str
-    startup_command: Optional[str]
-    uid: Optional[int]
-    main_gid: Optional[int]
+    startup_command: str | None
+    uid: int | None
+    main_gid: int | None
     supplementary_gids: list[int]
 
 
@@ -1576,23 +1648,24 @@ def _stringify_number(v: BinarySize | int | float | Decimal) -> str:
         elif math.isinf(v) and v < 0:
             result = "-Infinity"
         else:
-            result = f"{v:f}"
+            if isinstance(v, Decimal):
+                result = f"{v.quantize(Decimal('0.01')).normalize():f}"
+            else:
+                result = f"{v:.2f}".rstrip("0").rstrip(".")
     elif isinstance(v, BinarySize):
         result = f"{int(v):d}"
-    elif isinstance(v, int):
-        result = f"{v:d}"
     else:
-        result = str(v)
+        result = f"{v:d}"
     return result
 
 
 @dataclass
 class ValkeyTarget:
-    addr: Optional[str] = None
-    sentinel: Optional[list[str]] = None
-    service_name: Optional[str] = None
-    password: Optional[str] = None
-    request_timeout: Optional[int] = None
+    addr: str | None = None
+    sentinel: list[str] | None = None
+    service_name: str | None = None
+    password: str | None = None
+    request_timeout: int | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
 
@@ -1611,11 +1684,11 @@ class ValkeyTarget:
 
 @dataclass
 class RedisTarget:
-    addr: Optional[HostPortPair] = None
-    sentinel: Optional[str | list[HostPortPair]] = None
-    service_name: Optional[str] = None
-    password: Optional[str] = None
-    redis_helper_config: Optional[RedisHelperConfig] = None
+    addr: HostPortPair | None = None
+    sentinel: str | list[HostPortPair] | None = None
+    service_name: str | None = None
+    password: str | None = None
+    redis_helper_config: RedisHelperConfig | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
 
@@ -1644,7 +1717,7 @@ class RedisTarget:
 
     def to_valkey_target(self) -> ValkeyTarget:
         addr = str(self.addr) if self.addr else None
-        sentinel_addrs: Optional[list[str]] = None
+        sentinel_addrs: list[str] | None = None
         if self.sentinel:
             sentinel_addrs = None
             if isinstance(self.sentinel, list):
@@ -1669,17 +1742,17 @@ class RedisTarget:
 @dataclass
 class ValkeyProfileTarget:
     _base_target: ValkeyTarget
-    _override_targets: Optional[Mapping[str, ValkeyTarget]]
+    _override_targets: Mapping[str, ValkeyTarget] | None
 
     def __init__(
         self,
         *,
-        addr: Optional[str] = None,
-        sentinel: Optional[list[str]] = None,
-        service_name: Optional[str] = None,
-        password: Optional[str] = None,
-        request_timeout: Optional[int] = None,
-        override_targets: Optional[Mapping[str, ValkeyTarget]] = None,
+        addr: str | None = None,
+        sentinel: list[str] | None = None,
+        service_name: str | None = None,
+        password: str | None = None,
+        request_timeout: int | None = None,
+        override_targets: Mapping[str, ValkeyTarget] | None = None,
     ) -> None:
         self._base_target = ValkeyTarget(
             addr=addr,
@@ -1700,17 +1773,17 @@ class ValkeyProfileTarget:
 @dataclass
 class RedisProfileTarget:
     _base_target: RedisTarget
-    _override_targets: Optional[Mapping[str, RedisTarget]]
+    _override_targets: Mapping[str, RedisTarget] | None
 
     def __init__(
         self,
         *,
-        addr: Optional[HostPortPair] = None,
-        sentinel: Optional[str | list[HostPortPair]] = None,
-        service_name: Optional[str] = None,
-        password: Optional[str] = None,
-        redis_helper_config: Optional[RedisHelperConfig] = None,
-        override_targets: Optional[Mapping[str, RedisTarget]] = None,
+        addr: HostPortPair | None = None,
+        sentinel: str | list[HostPortPair] | None = None,
+        service_name: str | None = None,
+        password: str | None = None,
+        redis_helper_config: RedisHelperConfig | None = None,
+        override_targets: Mapping[str, RedisTarget] | None = None,
         use_tls: bool = False,
         tls_skip_verify: bool = False,
     ) -> None:
@@ -1731,7 +1804,7 @@ class RedisProfileTarget:
         return self._base_target
 
     @staticmethod
-    def _parse_addr(addr_data) -> HostPortPair:
+    def _parse_addr(addr_data: Any) -> HostPortPair:
         match addr_data:
             case HostPortPair(host=host, port=port):
                 return HostPortPair(host, port)
@@ -1791,13 +1864,13 @@ class RedisHelperConfig(TypedDict, total=False):
 
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
-    client: Redis
+    client: Redis[Any]
     name: str  # connection pool name
-    service_name: Optional[str]
-    sentinel: Optional[redis.asyncio.sentinel.Sentinel]
+    service_name: str | None
+    sentinel: redis.asyncio.sentinel.Sentinel | None
     redis_helper_config: RedisHelperConfig
 
-    async def close(self, close_connection_pool: Optional[bool] = None) -> None:
+    async def close(self, close_connection_pool: bool | None = None) -> None:
         await self.client.close(close_connection_pool)
 
 
@@ -1823,6 +1896,16 @@ class AgentSelectionStrategy(enum.StrEnum):
     LEGACY = "legacy"
 
 
+class PreemptionMode(enum.StrEnum):
+    TERMINATE = "terminate"
+    RESCHEDULE = "reschedule"
+
+
+class PreemptionOrder(enum.StrEnum):
+    OLDEST = "oldest"
+    NEWEST = "newest"
+
+
 class SchedulerStatus(TypedDict):
     trigger_event: str
     execution_time: str
@@ -1837,7 +1920,7 @@ class VolumeMountableNodeType(enum.StrEnum):
     STORAGE_PROXY = enum.auto()
 
 
-SSLContextType: TypeAlias = bool | Fingerprint | SSLContext
+type SSLContextType = bool | Fingerprint | SSLContext
 
 
 class ModelServiceStatus(enum.Enum):
@@ -1897,10 +1980,7 @@ class PromMetric(metaclass=ABCMeta):
         pass
 
 
-MetricType = TypeVar("MetricType", bound=PromMetric)
-
-
-class PromMetricGroup(Generic[MetricType], metaclass=ABCMeta):
+class PromMetricGroup[MetricType: PromMetric](metaclass=ABCMeta):
     """
     Support text format to expose metric data to Prometheus.
     ref: https://github.com/prometheus/docs/blob/main/content/docs/instrumenting/exposition_formats.md
@@ -1957,8 +2037,8 @@ ResultType = TypeVar("ResultType")
 
 
 @dataclass
-class DispatchResult(Generic[ResultType]):
-    result: Optional[ResultType] = None
+class DispatchResult[ResultType]:
+    result: ResultType | None = None
     errors: list[str] = field(default_factory=list)
 
     def is_success(self) -> bool:
@@ -1991,13 +2071,19 @@ class DispatchResult(Generic[ResultType]):
 
 class PurgeImageResult(TypedDict):
     image: str
-    result: Optional[list[Any]]
-    error: Optional[str]
+    result: list[Any] | None
+    error: str | None
 
 
 class ServiceDiscoveryType(enum.StrEnum):
     ETCD = "etcd"
     REDIS = "redis"
+
+
+class ServiceCatalogStatus(enum.StrEnum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    DEREGISTERED = "deregistered"
 
 
 class SessionExecutionStatus(enum.StrEnum):
@@ -2017,5 +2103,5 @@ class StreamReader(ABC):
         raise GenericNotImplementedError
 
     @abstractmethod
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         raise GenericNotImplementedError

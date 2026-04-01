@@ -8,6 +8,7 @@ from uuid import UUID
 
 import graphene
 
+from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
 )
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 
 
-class UserUtilizationMetricQueryInput(graphene.InputObjectType):
+class UserUtilizationMetricQueryInput(graphene.InputObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.6.0."
 
@@ -54,7 +55,7 @@ class UserUtilizationMetricQueryInput(graphene.InputObjectType):
         )
 
 
-class UserUtilizationMetric(graphene.ObjectType):
+class UserUtilizationMetric(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.6.0."
 
@@ -76,9 +77,7 @@ class UserUtilizationMetric(graphene.ObjectType):
                     labels=ContainerMetricOptionalLabel(
                         user_id=user_id, value_type=param.value_type
                     ),
-                    start=param.start,
-                    end=param.end,
-                    step=param.step,
+                    time_range=QueryTimeRange(start=param.start, end=param.end, step=param.step),
                 )
             )
         )

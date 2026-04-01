@@ -3,7 +3,7 @@ import pytest
 from ai.backend.agent.kernel import match_distro_data
 
 
-def test_match_distro_data():
+def test_match_distro_data() -> None:
     krunner_volumes = {
         "ubuntu8.04": "u1",
         "ubuntu18.04": "u2",
@@ -51,7 +51,7 @@ def test_match_distro_data():
         match_distro_data(krunner_volumes, "xyz")
 
 
-def test_match_distro_data_with_libc_based_krunners():
+def test_match_distro_data_with_libc_based_krunners() -> None:
     krunner_volumes = {
         "static-gnu": "x1",
         "static-musl": "x2",
@@ -102,7 +102,7 @@ def test_match_distro_data_with_libc_based_krunners():
     assert ret[1] == "x1"
 
 
-def test_match_distro_data_with_libc_based_krunners_mixed():
+def test_match_distro_data_with_libc_based_krunners_mixed() -> None:
     krunner_volumes = {
         "static-gnu": "x1",
         "alpine3.8": "c1",

@@ -24,19 +24,19 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("ArtifactRegistryRow",)
 
 
-def _get_huggingface_registry_join_condition():
+def _get_huggingface_registry_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 
     return HuggingFaceRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
-def _get_reservoir_registry_join_condition():
+def _get_reservoir_registry_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 
     return ReservoirRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
-class ArtifactRegistryRow(Base):
+class ArtifactRegistryRow(Base):  # type: ignore[misc]
     """
     Common information of all artifact_registry records.
     """

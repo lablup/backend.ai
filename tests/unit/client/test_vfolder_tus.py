@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import secrets
 from collections.abc import Iterator
 from http import HTTPStatus
 from pathlib import Path
 from time import time
+from typing import TYPE_CHECKING
 from unittest import mock
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
@@ -14,10 +18,12 @@ from yarl import URL
 from ai.backend.client.config import API_VERSION
 from ai.backend.client.request import Request, Response
 from ai.backend.client.session import AsyncSession
-from ai.backend.testutils.mock import AsyncMock
+
+if TYPE_CHECKING:
+    from ai.backend.client.config import APIConfig
 
 
-def build_url(config, path: str) -> URL:
+def build_url(config: APIConfig, path: str) -> URL:
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
     path = f"{base_url}/{query_path}"
@@ -32,8 +38,7 @@ def api_version() -> Iterator[None]:
         yield
 
 
-@pytest.mark.asyncio
-async def test_upload_jwt_generation(tmp_path) -> None:
+async def test_upload_jwt_generation(tmp_path: Path) -> None:
     with aioresponses() as m:
         async with AsyncSession() as session:
             mock_file = tmp_path / "example.bin"
@@ -71,7 +76,6 @@ async def test_upload_jwt_generation(tmp_path) -> None:
                 assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" in res["token"]
 
 
-@pytest.mark.asyncio
 async def test_tus_upload(tmp_path: Path) -> None:
     basedir = tmp_path / "example.bin"
     mock_file = basedir
@@ -136,8 +140,7 @@ async def test_tus_upload(tmp_path: Path) -> None:
         assert res is None
 
 
-@pytest.mark.asyncio
-async def test_vfolder_download(mocker) -> None:
+async def test_vfolder_download(mocker: object) -> None:
     mock_reader = AsyncMock()
     mock_reader.next = AsyncMock()
     mock_reader.next.return_value = None

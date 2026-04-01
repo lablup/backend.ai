@@ -10,7 +10,7 @@ from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesData,
 )
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -18,7 +18,7 @@ from ai.backend.manager.models.base import (
 )
 
 
-class AssociationScopesEntitiesRow(Base):
+class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
     __tablename__ = "association_scopes_entities"
     __table_args__ = (
         # constraint
@@ -44,6 +44,12 @@ class AssociationScopesEntitiesRow(Base):
         "entity_id",
         sa.String(64),
         nullable=False,
+    )
+    relation_type: Mapped[RelationType] = mapped_column(
+        "relation_type",
+        StrEnumType(RelationType, length=32),
+        nullable=False,
+        server_default=RelationType.AUTO.value,
     )
     registered_at: Mapped[datetime] = mapped_column(
         "registered_at",
@@ -72,4 +78,6 @@ class AssociationScopesEntitiesRow(Base):
                 scope_id=self.scope_id,
             ),
             object_id=self.object_id(),
+            relation_type=self.relation_type,
+            registered_at=self.registered_at,
         )

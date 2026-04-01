@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Runtime data
+/run/
+
 # Distribution / packaging
 .Python
 /build/
@@ -75,25 +78,25 @@ celerybeat-schedule
 
 # virtualenv
 venv/
-.venv/
+.venv
 ENV/
 
 # IDE/vim
-.idea/
+/.idea
 .swp
 .swo
 .*.swp
 .*.swo
-.vscode/
-.vim/
+/.vscode
+/.vim
 /.vimrc
 /.nvimrc
 /.exrc
-.ripgreprc
-.neoconf.json
-.zed/
+/.ripgreprc
+/.neoconf.json
+/.zed
 /.ropeproject
-pyrightconfig.json
+/pyrightconfig.json
 
 # Pants
 /.pants.d/

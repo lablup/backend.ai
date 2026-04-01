@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Optional, Self
+from typing import Self
 
 from ai.backend.common.dto.storage.field import VFolderMetaField, VolumeMetaField
 from ai.backend.common.dto.storage.path import QuotaScopeKeyPath, VFolderKeyPath
@@ -53,7 +53,7 @@ class VolumeMeta(LoggingInternalMeta):
     volume_id: VolumeID
     backend: str
     path: Path
-    fsprefix: Optional[PurePath]
+    fsprefix: PurePath | None
     capabilities: list[str]
 
     def to_field(self) -> VolumeMetaField:
@@ -99,8 +99,8 @@ class VFolderMeta(LoggingInternalMeta):
 
 @dataclass
 class QuotaScopeMeta(LoggingInternalMeta):
-    used_bytes: Optional[int] = 0
-    limit_bytes: Optional[int] = 0
+    used_bytes: int | None = 0
+    limit_bytes: int | None = 0
 
     def to_response(self) -> QuotaScopeResponse:
         return QuotaScopeResponse(

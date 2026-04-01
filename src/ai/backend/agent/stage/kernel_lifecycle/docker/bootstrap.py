@@ -7,7 +7,7 @@ This stage handles creation of bootstrap scripts in the container work directory
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 
@@ -24,11 +24,11 @@ class AgentConfig:
 @dataclass
 class BootstrapSpec:
     work_dir: Path
-    bootstrap_script: Optional[str]
+    bootstrap_script: str | None
 
     # Override UID/GID settings
-    uid_override: Optional[int]
-    gid_override: Optional[int]
+    uid_override: int | None
+    gid_override: int | None
 
     agent_config: AgentConfig
 
@@ -39,7 +39,7 @@ class BootstrapSpecGenerator(ArgsSpecGenerator[BootstrapSpec]):
 
 @dataclass
 class BootstrapResult:
-    bootstrap_path: Optional[Path]
+    bootstrap_path: Path | None
 
 
 class BootstrapProvisioner(Provisioner[BootstrapSpec, BootstrapResult]):
@@ -61,7 +61,7 @@ class BootstrapProvisioner(Provisioner[BootstrapSpec, BootstrapResult]):
         bootstrap_path = await loop.run_in_executor(None, self._write_bootstrap_script, spec)
         return BootstrapResult(bootstrap_path=bootstrap_path)
 
-    def _write_bootstrap_script(self, spec: BootstrapSpec) -> Optional[Path]:
+    def _write_bootstrap_script(self, spec: BootstrapSpec) -> Path | None:
         if not spec.bootstrap_script:
             return None
 

@@ -145,7 +145,7 @@ class ObjectStorageService:
                 )
 
             return storage
-        except KeyError:
+        except KeyError as e:
             raise StorageNotFoundError(
                 f"No storage configuration found for storage: {storage_name}"
-            )
+            ) from e

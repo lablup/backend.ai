@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
@@ -24,7 +23,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
     SubStepResult,
 )
-from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.base import GUID, Base, PydanticListColumn
 
 __all__ = (
     "DeploymentHistoryRow",
@@ -34,7 +33,7 @@ __all__ = (
 )
 
 
-class SessionSchedulingHistoryRow(Base):
+class SessionSchedulingHistoryRow(Base):  # type: ignore[misc]
     __tablename__ = "session_scheduling_history"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -54,7 +53,12 @@ class SessionSchedulingHistoryRow(Base):
     )
     message: Mapped[str] = mapped_column("message", sa.Text, nullable=False)
 
-    sub_steps: Mapped[list[dict] | None] = mapped_column("sub_steps", JSONB, nullable=True)
+    sub_steps: Mapped[list[SubStepResult]] = mapped_column(
+        "sub_steps",
+        PydanticListColumn(SubStepResult),
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
 
     attempts: Mapped[int] = mapped_column("attempts", sa.Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(
@@ -71,18 +75,20 @@ class SessionSchedulingHistoryRow(Base):
         onupdate=sa.func.now(),
     )
 
-    def should_merge_with(
-        self, phase: str, result: SchedulingResult, error_code: str | None
-    ) -> bool:
-        """Check if a new entry should be merged with this one (same phase, error_code, and both are failures)."""
-        if result != SchedulingResult.FAILURE:
-            return False
-        return self.phase == phase and self.error_code == error_code
+    def should_merge_with(self, new_row: SessionSchedulingHistoryRow) -> bool:
+        """Check if a new entry should be merged with this one.
+
+        Merge conditions:
+        - Same phase, error_code, and to_status -> merge (increment attempts)
+        - from_status and result (success/failure) do not affect merge decision
+        """
+        return (
+            self.phase == new_row.phase
+            and self.error_code == new_row.error_code
+            and self.to_status == new_row.to_status
+        )
 
     def to_data(self) -> SessionSchedulingHistoryData:
-        sub_steps: list[SubStepResult] | None = None
-        if self.sub_steps:
-            sub_steps = [SubStepResult.model_validate(s) for s in self.sub_steps]
         return SessionSchedulingHistoryData(
             id=self.id,
             session_id=SessionId(self.session_id),
@@ -92,14 +98,14 @@ class SessionSchedulingHistoryRow(Base):
             result=SchedulingResult(self.result),
             error_code=self.error_code,
             message=self.message,
-            sub_steps=sub_steps,
+            sub_steps=self.sub_steps,  # PydanticListColumn handles conversion
             attempts=self.attempts,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
 
 
-class KernelSchedulingHistoryRow(Base):
+class KernelSchedulingHistoryRow(Base):  # type: ignore[misc]
     __tablename__ = "kernel_scheduling_history"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -135,13 +141,18 @@ class KernelSchedulingHistoryRow(Base):
         onupdate=sa.func.now(),
     )
 
-    def should_merge_with(
-        self, phase: str, result: SchedulingResult, error_code: str | None
-    ) -> bool:
-        """Check if a new entry should be merged with this one (same phase, error_code, and both are failures)."""
-        if result != SchedulingResult.FAILURE:
-            return False
-        return self.phase == phase and self.error_code == error_code
+    def should_merge_with(self, new_row: KernelSchedulingHistoryRow) -> bool:
+        """Check if a new entry should be merged with this one.
+
+        Merge conditions:
+        - Same phase, error_code, and to_status -> merge (increment attempts)
+        - from_status and result (success/failure) do not affect merge decision
+        """
+        return (
+            self.phase == new_row.phase
+            and self.error_code == new_row.error_code
+            and self.to_status == new_row.to_status
+        )
 
     def to_data(self) -> KernelSchedulingHistoryData:
         return KernelSchedulingHistoryData(
@@ -160,7 +171,7 @@ class KernelSchedulingHistoryRow(Base):
         )
 
 
-class DeploymentHistoryRow(Base):
+class DeploymentHistoryRow(Base):  # type: ignore[misc]
     __tablename__ = "deployment_history"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -182,6 +193,13 @@ class DeploymentHistoryRow(Base):
     )
     message: Mapped[str] = mapped_column("message", sa.Text, nullable=False)
 
+    sub_steps: Mapped[list[SubStepResult]] = mapped_column(
+        "sub_steps",
+        PydanticListColumn(SubStepResult),
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+
     attempts: Mapped[int] = mapped_column("attempts", sa.Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -197,13 +215,18 @@ class DeploymentHistoryRow(Base):
         onupdate=sa.func.now(),
     )
 
-    def should_merge_with(
-        self, phase: str, result: SchedulingResult, error_code: str | None
-    ) -> bool:
-        """Check if a new entry should be merged with this one (same phase, error_code, and both are failures)."""
-        if result != SchedulingResult.FAILURE:
-            return False
-        return self.phase == phase and self.error_code == error_code
+    def should_merge_with(self, new_row: DeploymentHistoryRow) -> bool:
+        """Check if a new entry should be merged with this one.
+
+        Merge conditions:
+        - Same phase, error_code, and to_status -> merge (increment attempts)
+        - from_status and result (success/failure) do not affect merge decision
+        """
+        return (
+            self.phase == new_row.phase
+            and self.error_code == new_row.error_code
+            and self.to_status == new_row.to_status
+        )
 
     def to_data(self) -> DeploymentHistoryData:
         return DeploymentHistoryData(
@@ -215,13 +238,14 @@ class DeploymentHistoryRow(Base):
             result=SchedulingResult(self.result),
             error_code=self.error_code,
             message=self.message,
+            sub_steps=self.sub_steps,
             attempts=self.attempts,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
 
 
-class RouteHistoryRow(Base):
+class RouteHistoryRow(Base):  # type: ignore[misc]
     __tablename__ = "route_history"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -244,6 +268,13 @@ class RouteHistoryRow(Base):
     )
     message: Mapped[str] = mapped_column("message", sa.Text, nullable=False)
 
+    sub_steps: Mapped[list[SubStepResult]] = mapped_column(
+        "sub_steps",
+        PydanticListColumn(SubStepResult),
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+    )
+
     attempts: Mapped[int] = mapped_column("attempts", sa.Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -259,13 +290,18 @@ class RouteHistoryRow(Base):
         onupdate=sa.func.now(),
     )
 
-    def should_merge_with(
-        self, phase: str, result: SchedulingResult, error_code: str | None
-    ) -> bool:
-        """Check if a new entry should be merged with this one (same phase, error_code, and both are failures)."""
-        if result != SchedulingResult.FAILURE:
-            return False
-        return self.phase == phase and self.error_code == error_code
+    def should_merge_with(self, new_row: RouteHistoryRow) -> bool:
+        """Check if a new entry should be merged with this one.
+
+        Merge conditions:
+        - Same phase, error_code, and to_status -> merge (increment attempts)
+        - from_status and result (success/failure) do not affect merge decision
+        """
+        return (
+            self.phase == new_row.phase
+            and self.error_code == new_row.error_code
+            and self.to_status == new_row.to_status
+        )
 
     def to_data(self) -> RouteHistoryData:
         return RouteHistoryData(
@@ -278,6 +314,7 @@ class RouteHistoryRow(Base):
             result=SchedulingResult(self.result),
             error_code=self.error_code,
             message=self.message,
+            sub_steps=self.sub_steps,
             attempts=self.attempts,
             created_at=self.created_at,
             updated_at=self.updated_at,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -22,8 +22,8 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
     username: OptionalState[str] = field(default_factory=OptionalState.nop)
     password: OptionalState[PasswordInfo] = field(default_factory=OptionalState.nop)
     need_password_change: OptionalState[bool] = field(default_factory=OptionalState.nop)
-    full_name: OptionalState[str] = field(default_factory=OptionalState.nop)
-    description: OptionalState[str] = field(default_factory=OptionalState.nop)
+    full_name: TriState[str] = field(default_factory=TriState.nop)
+    description: TriState[str] = field(default_factory=TriState.nop)
     is_active: OptionalState[bool] = field(default_factory=OptionalState.nop)
     status: OptionalState[UserStatus] = field(default_factory=OptionalState.nop)
     domain_name: OptionalState[str] = field(default_factory=OptionalState.nop)
@@ -67,14 +67,15 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
         self.container_gids.update_dict(to_update, "container_gids")
         # Set status based on is_active if not explicitly set
         status = self.status.optional_value()
-        if status is None:
-            is_active = self.is_active.optional_value()
-            to_update["status"] = UserStatus.ACTIVE if is_active else UserStatus.INACTIVE
-        else:
+        if status is not None:
             to_update["status"] = status
+        else:
+            is_active = self.is_active.optional_value()
+            if is_active is not None:
+                to_update["status"] = UserStatus.ACTIVE if is_active else UserStatus.INACTIVE
         return to_update
 
     @property
-    def group_ids_value(self) -> Optional[list[str]]:
+    def group_ids_value(self) -> list[str] | None:
         """Helper property for group_ids access."""
         return self.group_ids.optional_value()

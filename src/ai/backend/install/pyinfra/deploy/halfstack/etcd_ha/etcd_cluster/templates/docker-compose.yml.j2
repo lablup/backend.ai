@@ -1,0 +1,47 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  extra_hosts:
+  {%- for node in etcd_nodes %}
+    - "etcd{{node.node_number}}:${ETCD{{node.node_number}}_IP:?error}"
+  {%- endfor %}
+  image: {{ config.container_image }}
+  user: "${ETCD_UID}:${ETCD_GID}"
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cpu_count: 1
+  mem_limit: "1g"
+  pids_limit: ${PIDS_LIMIT_VALUE}
+
+services:
+  etcd{{ etcd_cluster_info.node_number }}:
+    <<: *base
+    container_name: {{ config.container_name_prefix }}-{{ etcd_cluster_info.node_name }}
+    volumes:
+      - "{{ bai_home_dir }}/.data/backend.ai/etcd-cluster/${ETCD_CLUSTER_NAME:?error}/${THIS_ETCD_NODE_NAME:?error}:/etcd-data:rw"
+    ports:
+      # listen_client
+      - "${THIS_HOST_ETCD_CLIENT_PORT:?error}:2379"
+      # listen_peer
+      - "${THIS_HOST_ETCD_PEER_PORT:?error}:2380"
+    command: >
+      /usr/local/bin/etcd
+      --name ${THIS_ETCD_NODE_NAME:?error}
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://${THIS_ETCD_NODE_NAME}:${THIS_HOST_ETCD_CLIENT_PORT:?error}
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://${THIS_ETCD_NODE_NAME}:${THIS_HOST_ETCD_PEER_PORT:?error}
+      --initial-cluster {% for node in etcd_nodes %}etcd{{node.node_number}}=http://etcd{{node.node_number}}:${ETCD{{node.node_number}}_PEER_PORT:?error}{% if not loop.last %},{% endif %}{% endfor %}
+      --initial-cluster-token ${INITIAL_ETCD_CLUSTER_TOKEN:?error}
+      --initial-cluster-state ${ETCD_INITIAL_CLUSTER_STATE}
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+      start_period: 30s

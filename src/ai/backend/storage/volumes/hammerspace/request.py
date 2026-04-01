@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from .schema.object_type import ObjectType
 
@@ -12,7 +12,7 @@ from .schema.object_type import ObjectType
 class CreateShareParams:
     name: str
     path: Path
-    share_size_limit: Optional[int] = None
+    share_size_limit: int | None = None
     create_path: bool = True
     validate_only: bool = False
 

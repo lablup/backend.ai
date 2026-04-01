@@ -17,11 +17,11 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column(
         "kernels", sa.Column("status_data", postgresql.JSONB(astext_type=sa.Text()), nullable=True)
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("kernels", "status_data")

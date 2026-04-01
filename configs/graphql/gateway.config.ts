@@ -44,6 +44,9 @@ export const gatewayConfig = defineConfig({
       return headers;
     },
   },
+  disableIntrospection: {
+    disableIf: () => true
+  },
   maskedErrors: false,
   logging: false,
   supergraph: '/gateway/supergraph.graphql',

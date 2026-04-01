@@ -1,5 +1,5 @@
 ---
-Author: Hyeokjin Kim (hj.kim@lablup.com)
+Author: HyeokJin Kim (hyeokjin@lablup.com)
 Status: Implemented
 Created: 2026-01-06
 Created-Version: 26.1.0

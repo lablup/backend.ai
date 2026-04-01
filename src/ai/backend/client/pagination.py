@@ -21,7 +21,7 @@ async def execute_paginated_query(
     *,
     limit: int,
     offset: int,
-) -> PaginatedResult:
+) -> PaginatedResult[Any]:
     if limit > MAX_PAGE_SIZE:
         raise ValueError(f"The page size cannot exceed {MAX_PAGE_SIZE}")
     if limit < MIN_PAGE_SIZE:
@@ -65,7 +65,7 @@ async def execute_paginated_relay_query(
     offset: int | None = None,
     after: str | None = None,
     before: str | None = None,
-) -> RelayPaginatedResult:
+) -> RelayPaginatedResult[Any]:
     if limit and limit > MAX_PAGE_SIZE:
         raise ValueError(f"The page size cannot exceed {MAX_PAGE_SIZE}")
     if limit and limit < MIN_PAGE_SIZE:
@@ -112,7 +112,7 @@ async def fetch_paginated_result(
     *,
     page_offset: int,
     page_size: int,
-) -> PaginatedResult:
+) -> PaginatedResult[Any]:
     if page_size > MAX_PAGE_SIZE:
         raise ValueError(f"The page size cannot exceed {MAX_PAGE_SIZE}")
     if page_size < MIN_PAGE_SIZE:

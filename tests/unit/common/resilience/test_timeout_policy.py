@@ -13,7 +13,6 @@ from ai.backend.common.resilience.resilience import Resilience
 
 
 class TestTimeoutPolicy:
-    @pytest.mark.asyncio
     async def test_success_within_timeout(self) -> None:
         """Test that operations completing within timeout succeed."""
 
@@ -25,7 +24,6 @@ class TestTimeoutPolicy:
         result = await quick_operation()
         assert result == "success"
 
-    @pytest.mark.asyncio
     async def test_timeout_exceeded(self) -> None:
         """Test that operations exceeding timeout raise ResilienceTimeoutError."""
 
@@ -37,7 +35,6 @@ class TestTimeoutPolicy:
         with pytest.raises(ResilienceTimeoutError, match="Operation exceeded timeout"):
             await slow_operation()
 
-    @pytest.mark.asyncio
     async def test_timeout_with_exception(self) -> None:
         """Test that exceptions within timeout are propagated correctly."""
 

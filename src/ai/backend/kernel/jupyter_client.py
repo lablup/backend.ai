@@ -1,23 +1,29 @@
 import inspect
+from collections.abc import Awaitable, Callable, Mapping
 from time import monotonic
+from typing import Any
 
 import zmq
 import zmq.asyncio
-from jupyter_client import AsyncKernelClient
+from jupyter_client.asynchronous.client import AsyncKernelClient
 
 
 async def aexecute_interactive(
     kernel_client: AsyncKernelClient,
     code: str,
-    silent=False,
-    store_history=True,
-    user_expressions=None,
-    allow_stdin=None,
-    stop_on_error=True,
-    timeout=None,
-    output_hook=None,
-    stdin_hook=None,
-):
+    silent: bool = False,
+    store_history: bool = True,
+    user_expressions: Mapping[str, Any] | None = None,
+    allow_stdin: bool | None = None,
+    stop_on_error: bool = True,
+    timeout_seconds: float | None = None,
+    output_hook: Callable[[Mapping[str, Any]], Any]
+    | Callable[[Mapping[str, Any]], Awaitable[Any]]
+    | None = None,
+    stdin_hook: Callable[[Mapping[str, Any]], Any]
+    | Callable[[Mapping[str, Any]], Awaitable[Any]]
+    | None = None,
+) -> dict[str, Any]:
     """Async version of jupyter_client's execute_interactive method.
 
     https://github.com/jupyter/jupyter_client/blob/9f1c379/jupyter_client/client.py#L415
@@ -36,14 +42,14 @@ async def aexecute_interactive(
         allow_stdin=allow_stdin,
         stop_on_error=stop_on_error,
     )
-    stdin_hook = stdin_hook if stdin_hook else kernel_client._stdin_hook_default
-    output_hook = output_hook if output_hook else kernel_client._output_hook_default
+    stdin_hook = stdin_hook if stdin_hook else kernel_client._stdin_hook_default  # type: ignore[assignment]
+    output_hook = output_hook if output_hook else kernel_client._output_hook_default  # type: ignore[assignment]
 
     # set deadline based on timeout
-    if timeout is not None:
-        deadline = monotonic() + timeout
-    else:
-        timeout_ms = None
+    deadline: float = 0.0
+    timeout_ms: float | None = None
+    if timeout_seconds is not None:
+        deadline = monotonic() + timeout_seconds
 
     poller = zmq.asyncio.Poller()
     iopub_socket = kernel_client.iopub_channel.socket
@@ -55,15 +61,18 @@ async def aexecute_interactive(
         stdin_socket = None
 
     # Wait for zmq events and handle them
+    timeout_seconds_remaining: float | None
     while True:
-        if timeout is not None:
-            timeout = max(0, deadline - monotonic())
-            timeout_ms = 1e3 * timeout
+        if timeout_seconds is not None:
+            timeout_seconds_remaining = max(0, deadline - monotonic())
+            timeout_ms = 1e3 * timeout_seconds_remaining
         events = dict(await poller.poll(timeout_ms))
         if not events:
             raise TimeoutError("Timeout waiting for output")
         if stdin_socket in events:
             req = await kernel_client.stdin_channel.get_msg(timeout=0)
+            if stdin_hook is None:
+                raise RuntimeError("stdin_hook is None")
             if inspect.iscoroutinefunction(stdin_hook):
                 await stdin_hook(req)
             else:
@@ -77,6 +86,8 @@ async def aexecute_interactive(
         if msg["parent_header"].get("msg_id") != msg_id:
             # not from my request
             continue
+        if output_hook is None:
+            raise RuntimeError("output_hook is None")
         if inspect.iscoroutinefunction(output_hook):
             await output_hook(msg)
         else:
@@ -87,6 +98,8 @@ async def aexecute_interactive(
             break
 
     # output is done, get the reply
-    if timeout is not None:
-        timeout = max(0, deadline - monotonic())
-    return await kernel_client._recv_reply(msg_id, timeout=timeout)
+    if timeout_seconds is not None:
+        timeout_seconds_remaining = max(0, deadline - monotonic())
+    else:
+        timeout_seconds_remaining = None
+    return await kernel_client._recv_reply(msg_id, timeout=timeout_seconds_remaining)

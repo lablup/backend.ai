@@ -1,0 +1,46 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+echo "=== PostgreSQL HA Cluster Status ==="
+STATUS=$(curl http://127.0.0.1:{{ pg_cluster_info.pg_api_port }}/ 2> /dev/null)
+NODE_NAME=$(echo "$STATUS" | jq -r '.name // "{{ pg_cluster_info.node_name }}"')
+echo "Node Name      : $NODE_NAME"
+echo "Patroni Status : $(echo "$STATUS" | jq -r .state)"
+echo "DB Role        : $(echo "$STATUS" | jq -r .role)"
+echo "PostgreSQL Ver : $(echo "$STATUS" | jq -r .server_version)"
+echo "Timeline       : $(echo "$STATUS" | jq -r .timeline)"
+echo "DB service port: $(nc -vz 127.0.0.1 {{ pg_cluster_info.pg_sql_port }} 2>&1)"
+echo ""
+
+echo "=== Cluster Information ==="
+CLUSTER=$(curl http://127.0.0.1:{{ pg_cluster_info.pg_api_port }}/cluster 2> /dev/null)
+echo "Cluster members:"
+echo "$CLUSTER" | jq -r '.members[] | "  - \(.name): \(.role) (\(.state)) - \(.host):\(.port)"'
+echo ""
+
+echo "=== Replication Status ==="
+ROLE=$(echo "$STATUS" | jq -r .role)
+if [ "$ROLE" = "master" ] || [ "$ROLE" = "leader" ]; then
+    echo "This node is the PRIMARY"
+    echo "Replication lag:"
+    echo "$STATUS" | jq -r '.replication[]? // empty | "  - \(.client_addr): \(.state) (sync: \(.sync_state))"'
+else
+    echo "This node is a REPLICA"
+    LAG=$(echo "$STATUS" | jq -r '.lag // "N/A"')
+    echo "Replication lag: $LAG"
+fi
+echo ""
+
+echo "=== Resource Usage ==="
+container_id=$(docker ps --filter "name=postgresql" --format "{{ '{{.ID}}' }}" | head -1)
+if [ ! -z "$container_id" ]; then
+    echo "CPU/Memory usage:"
+    docker stats --no-stream $container_id --format "table {{ '{{.Container}}' }}\t{{ '{{.CPUPerc}}' }}\t{{ '{{.MemUsage}}' }}\t{{ '{{.MemPerc}}' }}"
+    echo ""
+    echo "Database connections:"
+    docker exec $container_id psql -U {{ config.pg_superuser_id }} -d postgres -c "SELECT count(*) as active_connections FROM pg_stat_activity WHERE state = 'active';" 2>/dev/null || echo "  Unable to query connections"
+    echo ""
+    echo "PostgreSQL Configuration:"
+    docker exec $container_id psql -U {{ config.pg_superuser_id }} -d postgres -c "SELECT name, setting, unit FROM pg_settings WHERE name IN ('max_connections', 'max_worker_processes', 'deadlock_timeout', 'lock_timeout', 'idle_in_transaction_session_timeout') ORDER BY name;" 2>/dev/null || echo "  Unable to query configuration"
+fi

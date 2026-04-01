@@ -1,6 +1,5 @@
 from typing import (
     Any,
-    Optional,
 )
 
 import graphene
@@ -13,7 +12,7 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 
 
-class ScopeField(graphene.Scalar):
+class ScopeField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = (
             "Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. "
@@ -27,7 +26,7 @@ class ScopeField(graphene.Scalar):
         return val.serialize()
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None) -> Optional[ScopeType]:
+    def parse_literal(node: Any, _variables: dict[str, Any] | None = None) -> ScopeType | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return deserialize_scope(node.value)
         return None
@@ -37,7 +36,7 @@ class ScopeField(graphene.Scalar):
         return deserialize_scope(value)
 
 
-class AgentPermissionField(graphene.Scalar):
+class AgentPermissionField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 24.12.0. One of {[val.value for val in AgentPermission]}."
 
@@ -46,7 +45,9 @@ class AgentPermissionField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None):
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> AgentPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return AgentPermission(node.value)
         return None

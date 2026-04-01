@@ -3,7 +3,7 @@ import logging
 from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Final, Literal, Optional, cast
+from typing import Any, Final, Literal, cast
 
 import aiofiles
 import aiofiles.os
@@ -52,9 +52,9 @@ class VASTQuotaModel(BaseQuotaModel):
     async def _get_vast_quota_id(self, quota_scope_id: QuotaScopeID) -> VASTQuotaID | None:
         qs_path = self.mangle_qspath(quota_scope_id)
 
-        def _read():
+        def _read() -> VASTQuotaID | None:
             try:
-                with open(qs_path / VAST_QUOTA_ID_FILE_NAME) as f:
+                with (qs_path / VAST_QUOTA_ID_FILE_NAME).open() as f:
                     return VASTQuotaID(f.read())
             except FileNotFoundError:
                 return None
@@ -66,9 +66,9 @@ class VASTQuotaModel(BaseQuotaModel):
     ) -> None:
         qs_path = self.mangle_qspath(quota_scope_id)
 
-        def _write():
+        def _write() -> None:
             qs_path.mkdir(parents=True, exist_ok=True)
-            with open(qs_path / VAST_QUOTA_ID_FILE_NAME, "w") as f:
+            with (qs_path / VAST_QUOTA_ID_FILE_NAME).open("w") as f:
                 f.write(str(vast_quota_id))
 
         await asyncio.get_running_loop().run_in_executor(None, _write)
@@ -92,18 +92,18 @@ class VASTQuotaModel(BaseQuotaModel):
                 soft_limit=config.limit_bytes,
                 hard_limit=config.limit_bytes,
             )
-        except VASTInvalidParameterError:
-            raise InvalidQuotaConfig
+        except VASTInvalidParameterError as e:
+            raise InvalidQuotaConfig from e
         except VASTUnknownError as e:
             raise ExternalStorageServiceError(
                 f"VAST API unknown error during quota modification: {e}"
-            )
+            ) from e
 
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
 
@@ -118,7 +118,7 @@ class VASTQuotaModel(BaseQuotaModel):
                 # Check if quota has already been set to the quota scope path
                 quota_name = str(qspath)
                 quotas = await self.api_client.list_quotas(quota_name)
-                existing_quota: Optional[VASTQuota] = None
+                existing_quota: VASTQuota | None = None
                 for q in quotas:
                     if q.name == quota_name:
                         existing_quota = q
@@ -128,7 +128,9 @@ class VASTQuotaModel(BaseQuotaModel):
                         "Got invalid parameter error but no quota exists with given quota name"
                         f" ({quota_name}). Raise error (orig:{e!s})"
                     )
-                    raise InvalidQuotaConfig(f"No existing quota found with name {quota_name}")
+                    raise InvalidQuotaConfig(
+                        f"No existing quota found with name {quota_name}"
+                    ) from e
                 await self._set_vast_quota_id(quota_scope_id, existing_quota.id)
                 await self.api_client.modify_quota(
                     existing_quota.id,
@@ -139,7 +141,7 @@ class VASTQuotaModel(BaseQuotaModel):
             except VASTUnknownError as e:
                 raise ExternalStorageServiceError(
                     f"VAST API unknown error during quota creation: {e}"
-                )
+                ) from e
             return quota
 
         try:
@@ -173,7 +175,7 @@ class VASTQuotaModel(BaseQuotaModel):
             raise QuotaScopeNotFoundError
         await self._modify_quota_scope(vast_quota_id, config)
 
-    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         if (vast_quota_id := await self._get_vast_quota_id(quota_scope_id)) is None:
             return None
         if (quota := await self.api_client.get_quota(vast_quota_id)) is None:
@@ -197,8 +199,8 @@ class VASTQuotaModel(BaseQuotaModel):
             raise QuotaScopeNotFoundError
         try:
             await self.api_client.remove_quota(vast_quota_id)
-        except VASTNotFoundError:
-            raise QuotaScopeNotFoundError
+        except VASTNotFoundError as e:
+            raise QuotaScopeNotFoundError from e
         await self._rm_vast_quota_id(quota_scope_id)
 
     async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
@@ -220,8 +222,8 @@ class VASTVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        watcher: Optional[WatcherClient] = None,
-        options: Optional[Mapping[str, Any]] = None,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             local_config,

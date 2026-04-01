@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
     CreateProjectResourcePolicyActionResult,
@@ -11,14 +12,28 @@ from ai.backend.manager.services.project_resource_policy.actions.delete_project_
     DeleteProjectResourcePolicyAction,
     DeleteProjectResourcePolicyActionResult,
 )
+from ai.backend.manager.services.project_resource_policy.actions.get_project_resource_policy import (
+    GetProjectResourcePolicyAction,
+    GetProjectResourcePolicyActionResult,
+)
 from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
     ModifyProjectResourcePolicyAction,
     ModifyProjectResourcePolicyActionResult,
+)
+from ai.backend.manager.services.project_resource_policy.actions.search_project_resource_policies import (
+    SearchProjectResourcePoliciesAction,
+    SearchProjectResourcePoliciesActionResult,
 )
 from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
 
 
 class ProjectResourcePolicyProcessors(AbstractProcessorPackage):
+    get_project_resource_policy: ActionProcessor[
+        GetProjectResourcePolicyAction, GetProjectResourcePolicyActionResult
+    ]
+    search_project_resource_policies: ActionProcessor[
+        SearchProjectResourcePoliciesAction, SearchProjectResourcePoliciesActionResult
+    ]
     create_project_resource_policy: ActionProcessor[
         CreateProjectResourcePolicyAction, CreateProjectResourcePolicyActionResult
     ]
@@ -30,8 +45,17 @@ class ProjectResourcePolicyProcessors(AbstractProcessorPackage):
     ]
 
     def __init__(
-        self, service: ProjectResourcePolicyService, action_monitors: list[ActionMonitor]
+        self,
+        service: ProjectResourcePolicyService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
+        self.get_project_resource_policy = ActionProcessor(
+            service.get_project_resource_policy, action_monitors
+        )
+        self.search_project_resource_policies = ActionProcessor(
+            service.search_project_resource_policies, action_monitors
+        )
         self.create_project_resource_policy = ActionProcessor(
             service.create_project_resource_policy, action_monitors
         )
@@ -45,6 +69,8 @@ class ProjectResourcePolicyProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
+            GetProjectResourcePolicyAction.spec(),
+            SearchProjectResourcePoliciesAction.spec(),
             CreateProjectResourcePolicyAction.spec(),
             ModifyProjectResourcePolicyAction.spec(),
             DeleteProjectResourcePolicyAction.spec(),

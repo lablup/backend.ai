@@ -1,0 +1,17 @@
+{
+  "_types": {
+    "group": "",
+    "user": ""
+  },
+  "default_host": "{{ storageproxy_name }}:{{ storageproxy_volume_names.split(',')[0] }}",
+  "proxies": {
+    "{{ storageproxy_name }}": {
+      "client_api": "{{ storageproxy_client_endpoint }}",
+      "manager_api": "{{ storageproxy_manager_endpoint }}",
+      "secret": "{{ storageproxy_manager_token }}",
+      "sftp_scaling_groups": "upload",
+      "ssl_verify": "false"
+    }
+  },
+  "exposed_volume_info": "percentage"
+}

@@ -1,0 +1,10 @@
+# Node-specific environment variables for {{ current_node.hostname }}
+NODE_NAME={{ current_node.hostname }}
+NODE_IP={{ current_node.ip }}
+NODE_NUMBER={{ current_node.node_number }}
+NODE_PORT={{ current_node.port }}
+
+# Master node information
+MASTER_NODE_NAME={{ master_node.hostname }}
+MASTER_NODE_IP={{ master_node.ip }}
+MASTER_NODE_PORT={{ master_node.port }}

@@ -1,14 +1,14 @@
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.types import CapacityUsage, FSPerfMetric
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ai.backend.storage.volumes.abc import (
     CAP_FAST_FS_SIZE,
     CAP_METRIC,
@@ -16,14 +16,13 @@ from ai.backend.storage.volumes.abc import (
     CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
-    QuotaConfig,
-    QuotaUsage,
 )
 from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient
 
 from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
+from .types import GPFSSystemHealthState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -38,7 +37,7 @@ class GPFSQuotaModel(BaseQuotaModel):
         fs: str,
         gpfs_owner: str,
         *,
-        fileset_prefix: Optional[str] = None,
+        fileset_prefix: str | None = None,
     ) -> None:
         super().__init__(mount_path)
         self.api_client = api_client
@@ -52,8 +51,8 @@ class GPFSQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await self.api_client.create_fileset(
@@ -72,7 +71,7 @@ class GPFSQuotaModel(BaseQuotaModel):
             config.limit_bytes,
         )
 
-    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
 
@@ -147,8 +146,8 @@ class GPFSVolume(BaseVolume):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        watcher: Optional[WatcherClient] = None,
-        options: Optional[Mapping[str, Any]] = None,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
             local_config,
@@ -196,7 +195,7 @@ class GPFSVolume(BaseVolume):
     async def get_hwinfo(self) -> HardwareMetadata:
         nodes = await self.api_client.list_nodes()
         invalid_status = ["FAILED", "DEGRADED", "ERROR"]
-        health_status = "HEALTHY"
+        health_status: str | GPFSSystemHealthState = "HEALTHY"
 
         for node in nodes:
             if health_status == "ERROR":
@@ -255,8 +254,8 @@ class GPFSVolume(BaseVolume):
         try:
             metrics = await self.api_client.get_metric(query)
             latest_metric = metrics["performanceData"]["rows"][-1]["values"]
-        except (KeyError, IndexError):
-            raise GPFSNoMetricError
+        except (KeyError, IndexError) as e:
+            raise GPFSNoMetricError from e
         return FSPerfMetric(
             iops_read=latest_metric[0] or 0,
             iops_write=latest_metric[1] or 0,

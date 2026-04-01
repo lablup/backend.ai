@@ -1,0 +1,1375 @@
+"""
+Tests for entity-based fair share search with Scope pattern.
+
+Tests that domains/projects/users are returned with complete fair share data.
+When no record exists, default values are generated with use_default=True.
+
+Scope pattern:
+- Scope provides required filters (resource_group) converted to query conditions
+- Scope defines existence_checks for validation (e.g., ScalingGroupNotFound)
+- Valid scope with no matching data returns empty result (not error)
+"""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+from decimal import Decimal
+
+import pytest
+
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.fair_share import (
+    DomainFairShareRow,
+    ProjectFairShareRow,
+    UserFairShareRow,
+)
+from ai.backend.manager.models.fair_share.conditions import (
+    RGDomainFairShareConditions,
+    RGProjectFairShareConditions,
+    RGUserFairShareConditions,
+)
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForProjectRow,
+    ScalingGroupOpts,
+    ScalingGroupRow,
+)
+from ai.backend.manager.models.user import (
+    PasswordHashAlgorithm,
+    PasswordInfo,
+    UserRole,
+    UserRow,
+    UserStatus,
+)
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base.pagination import OffsetPagination
+from ai.backend.manager.repositories.fair_share import (
+    DomainFairShareCreatorSpec,
+    FairShareRepository,
+    ProjectFairShareCreatorSpec,
+    UserFairShareCreatorSpec,
+)
+from ai.backend.manager.repositories.fair_share.types import (
+    DomainFairShareSearchScope,
+    ProjectFairShareSearchScope,
+    UserFairShareSearchScope,
+)
+from ai.backend.testutils.db import with_tables
+
+
+class TestSearchDomainFairSharesEntityBased:
+    """Test domain fair share search with Scope pattern."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ScalingGroupForDomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ScalingGroupForProjectRow,
+                AssocGroupUserRow,
+                AgentRow,  # Required for _fetch_available_slots()
+                ResourceSlotTypeRow,
+                AgentResourceRow,
+                DomainFairShareRow,
+                ProjectFairShareRow,
+                UserFairShareRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def scaling_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ScalingGroupRow(
+                    name=sg_name,
+                    description="Test scaling group",
+                    is_active=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ScalingGroupOpts(),
+                    wsproxy_addr=None,
+                )
+            )
+            await db_sess.commit()
+        return sg_name
+
+    @pytest.fixture
+    async def fair_share_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> FairShareRepository:
+        return FairShareRepository(db_with_cleanup)
+
+    @pytest.fixture
+    async def domain_with_record(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scaling_group: str,
+        fair_share_repository: FairShareRepository,
+    ) -> str:
+        """Create a domain with fair share record."""
+        domain_name = f"domain-with-record-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="Domain with fair share record",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(ScalingGroupForDomainRow(scaling_group=scaling_group, domain=domain_name))
+            await db_sess.commit()
+
+        await fair_share_repository.create_domain_fair_share(
+            Creator(
+                spec=DomainFairShareCreatorSpec(
+                    resource_group=scaling_group,
+                    domain_name=domain_name,
+                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
+                )
+            )
+        )
+        return domain_name
+
+    @pytest.fixture
+    async def domain_without_record(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scaling_group: str,
+    ) -> str:
+        """Create a domain without fair share record."""
+        domain_name = f"domain-no-record-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="Domain without fair share record",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(ScalingGroupForDomainRow(scaling_group=scaling_group, domain=domain_name))
+            await db_sess.commit()
+        return domain_name
+
+    @pytest.fixture
+    async def scaling_group_without_domains(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create a scaling group with no associated domains."""
+        sg_name = f"empty-sg-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ScalingGroupRow(
+                    name=sg_name,
+                    description="Scaling group without domains",
+                    is_active=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ScalingGroupOpts(),
+                    wsproxy_addr=None,
+                )
+            )
+            await db_sess.commit()
+        return sg_name
+
+    @dataclass
+    class TwoScalingGroupsFixture:
+        rg1: str
+        rg2: str
+        domain_in_rg1: str
+        domain_in_rg2: str
+
+    @pytest.fixture
+    async def two_scaling_groups_with_domains(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> TwoScalingGroupsFixture:
+        """Create two scaling groups, each with one domain."""
+        rg1 = f"rg1-{uuid.uuid4().hex[:8]}"
+        rg2 = f"rg2-{uuid.uuid4().hex[:8]}"
+        domain1 = f"domain1-{uuid.uuid4().hex[:8]}"
+        domain2 = f"domain2-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            for sg_name in [rg1, rg2]:
+                db_sess.add(
+                    ScalingGroupRow(
+                        name=sg_name,
+                        description=f"Test {sg_name}",
+                        is_active=True,
+                        driver="static",
+                        driver_opts={},
+                        scheduler="fifo",
+                        scheduler_opts=ScalingGroupOpts(),
+                        wsproxy_addr=None,
+                    )
+                )
+            for domain_name in [domain1, domain2]:
+                db_sess.add(
+                    DomainRow(
+                        name=domain_name,
+                        description=f"Test {domain_name}",
+                        is_active=True,
+                        total_resource_slots=ResourceSlot(),
+                        allowed_vfolder_hosts={},
+                        allowed_docker_registries=[],
+                    )
+                )
+            await db_sess.flush()
+            db_sess.add(ScalingGroupForDomainRow(scaling_group=rg1, domain=domain1))
+            db_sess.add(ScalingGroupForDomainRow(scaling_group=rg2, domain=domain2))
+            await db_sess.commit()
+
+        return self.TwoScalingGroupsFixture(
+            rg1=rg1, rg2=rg2, domain_in_rg1=domain1, domain_in_rg2=domain2
+        )
+
+    @pytest.fixture
+    async def five_domains_two_with_records(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scaling_group: str,
+        fair_share_repository: FairShareRepository,
+    ) -> list[str]:
+        """Create 5 domains, only first 2 have fair share records."""
+        domain_names = [f"domain-{i}-{uuid.uuid4().hex[:8]}" for i in range(5)]
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            for name in domain_names:
+                db_sess.add(
+                    DomainRow(
+                        name=name,
+                        description=f"Test {name}",
+                        is_active=True,
+                        total_resource_slots=ResourceSlot(),
+                        allowed_vfolder_hosts={},
+                        allowed_docker_registries=[],
+                    )
+                )
+                await db_sess.flush()
+                db_sess.add(ScalingGroupForDomainRow(scaling_group=scaling_group, domain=name))
+            await db_sess.commit()
+
+        for name in domain_names[:2]:
+            await fair_share_repository.create_domain_fair_share(
+                Creator(
+                    spec=DomainFairShareCreatorSpec(
+                        resource_group=scaling_group,
+                        domain_name=name,
+                        weight=Decimal("2.0"),  # Explicit weight for use_default=False
+                    )
+                )
+            )
+        return domain_names
+
+    # ==================== Scope Validation Tests ====================
+
+    async def test_raises_error_for_nonexistent_resource_group(
+        self,
+        fair_share_repository: FairShareRepository,
+    ) -> None:
+        """Non-existent resource_group in scope should raise ScalingGroupNotFound."""
+        scope = DomainFairShareSearchScope(resource_group="nonexistent-rg")
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        with pytest.raises(ScalingGroupNotFound):
+            await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
+
+    # ==================== Empty Result Tests ====================
+
+    async def test_returns_empty_for_resource_group_without_domains(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group_without_domains: str,
+    ) -> None:
+        """Valid resource_group with no domains should return empty result (not error)."""
+        scope = DomainFairShareSearchScope(resource_group=scaling_group_without_domains)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
+
+        assert result.total_count == 0
+        assert len(result.items) == 0
+
+    # ==================== Success Cases ====================
+
+    async def test_returns_domain_with_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_with_record: str,
+    ) -> None:
+        """Domain with fair share record should have complete details with use_default=False."""
+        scope = DomainFairShareSearchScope(resource_group=scaling_group)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].domain_name == domain_with_record
+        assert result.items[0].resource_group == scaling_group
+        # Details always present
+        # From DB record (not default)
+        assert result.items[0].data.use_default is False
+        # Has metadata from DB
+        assert result.items[0].data.metadata is not None
+
+    async def test_returns_domain_without_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_without_record: str,
+    ) -> None:
+        """Domain without fair share record should have default values with use_default=True."""
+        scope = DomainFairShareSearchScope(resource_group=scaling_group)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].domain_name == domain_without_record
+        assert result.items[0].resource_group == scaling_group
+        # Details always present
+        # Generated from defaults
+        assert result.items[0].data.use_default is True
+        # No metadata (not from DB)
+        assert result.items[0].data.metadata is None
+
+    async def test_mixed_domains_with_and_without_records(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_with_record: str,
+        domain_without_record: str,
+    ) -> None:
+        """Search should return both domains with complete data (record vs default)."""
+        scope = DomainFairShareSearchScope(resource_group=scaling_group)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
+
+        assert result.total_count == 2
+        assert len(result.items) == 2
+
+        result_domains = {d.domain_name: d for d in result.items}
+        assert domain_with_record in result_domains
+        assert domain_without_record in result_domains
+
+        # Both have details
+
+        # Different use_default values
+        assert result_domains[domain_with_record].data.use_default is False
+        assert result_domains[domain_without_record].data.use_default is True
+
+        # Different metadata presence
+        assert result_domains[domain_with_record].data.metadata is not None
+        assert result_domains[domain_without_record].data.metadata is None
+
+    async def test_returns_all_domains_regardless_of_rg_membership(
+        self,
+        fair_share_repository: FairShareRepository,
+        two_scaling_groups_with_domains: TwoScalingGroupsFixture,
+    ) -> None:
+        """BA-4682: Search should return ALL domains, not just RG-registered ones.
+
+        Both domains appear in results; fair share data is from the queried RG.
+        """
+        fixture = two_scaling_groups_with_domains
+        scope = DomainFairShareSearchScope(resource_group=fixture.rg1)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
+
+        assert result.total_count == 2
+        assert len(result.items) == 2
+        result_domains = {d.domain_name: d for d in result.items}
+        assert fixture.domain_in_rg1 in result_domains
+        assert fixture.domain_in_rg2 in result_domains
+        # Both get default data since no fair share records exist
+        assert result_domains[fixture.domain_in_rg1].data.use_default is True
+        assert result_domains[fixture.domain_in_rg2].data.use_default is True
+
+    async def test_pagination_includes_all_entities(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        five_domains_two_with_records: list[str],
+    ) -> None:
+        """Pagination total_count should include entities without records."""
+        scope = DomainFairShareSearchScope(resource_group=scaling_group)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
+
+        assert result.total_count == 5
+        assert len(result.items) == 2
+        assert result.has_next_page is True
+
+    # ==================== RG-Context Filter Regression Tests ====================
+
+    async def test_rg_filter_by_domain_name_includes_entity_without_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_without_record: str,
+    ) -> None:
+        """RG-context domain_name filter should include entities without fair share records.
+
+        Regression: Non-RG conditions reference DomainFairShareRow.domain_name (LEFT JOIN'd),
+        which is NULL for entities without records, causing SQL to exclude them.
+        RG conditions reference ScalingGroupForDomainRow.domain (INNER JOIN'd), which is never NULL.
+        """
+        scope = DomainFairShareSearchScope(resource_group=scaling_group)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[
+                RGDomainFairShareConditions.by_domain_name_equals(
+                    StringMatchSpec(domain_without_record, case_insensitive=False, negated=False)
+                ),
+            ],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].domain_name == domain_without_record
+        assert result.items[0].data.use_default is True
+
+    async def test_rg_filter_by_domain_name_with_mixed_records(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_with_record: str,
+        domain_without_record: str,
+    ) -> None:
+        """RG-context filter should return both domains (with and without records)."""
+        scope = DomainFairShareSearchScope(resource_group=scaling_group)
+
+        # Filter for domain_without_record only
+        querier_without = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[
+                RGDomainFairShareConditions.by_domain_name_equals(
+                    StringMatchSpec(domain_without_record, case_insensitive=False, negated=False)
+                ),
+            ],
+            orders=[],
+        )
+        result_without = await fair_share_repository.search_rg_domain_fair_shares(
+            scope, querier_without
+        )
+        assert result_without.total_count == 1
+        assert result_without.items[0].domain_name == domain_without_record
+        assert result_without.items[0].data.use_default is True
+
+        # Filter for domain_with_record only
+        querier_with = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[
+                RGDomainFairShareConditions.by_domain_name_equals(
+                    StringMatchSpec(domain_with_record, case_insensitive=False, negated=False)
+                ),
+            ],
+            orders=[],
+        )
+        result_with = await fair_share_repository.search_rg_domain_fair_shares(scope, querier_with)
+        assert result_with.total_count == 1
+        assert result_with.items[0].domain_name == domain_with_record
+        assert result_with.items[0].data.use_default is False
+
+    # ==================== BA-4682: Non-RG-member entity search regression ====================
+
+    @pytest.fixture
+    async def domain_not_in_rg(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create a domain NOT associated with any scaling group."""
+        domain_name = f"no-rg-domain-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="Domain not in any RG",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.commit()
+        return domain_name
+
+    async def test_search_includes_domain_not_in_rg(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_with_record: str,
+        domain_not_in_rg: str,
+    ) -> None:
+        """BA-4682: Domain not in any RG should appear in search results with defaults."""
+        scope = DomainFairShareSearchScope(resource_group=scaling_group)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_domain_fair_shares(scope, querier)
+
+        assert result.total_count == 2
+        result_domains = {d.domain_name: d for d in result.items}
+        assert domain_with_record in result_domains
+        assert domain_not_in_rg in result_domains
+        # Domain in RG with record: use_default=False
+        assert result_domains[domain_with_record].data.use_default is False
+        # Domain not in any RG: use_default=True (defaults from queried RG)
+        assert result_domains[domain_not_in_rg].data.use_default is True
+
+
+class TestSearchProjectFairSharesEntityBased:
+    """Test project fair share search with Scope pattern."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ScalingGroupForDomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ScalingGroupForProjectRow,
+                AssocGroupUserRow,
+                AgentRow,  # Required for _fetch_available_slots()
+                ResourceSlotTypeRow,
+                AgentResourceRow,
+                DomainFairShareRow,
+                ProjectFairShareRow,
+                UserFairShareRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def scaling_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ScalingGroupRow(
+                    name=sg_name,
+                    description="Test scaling group",
+                    is_active=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ScalingGroupOpts(),
+                    wsproxy_addr=None,
+                )
+            )
+            await db_sess.commit()
+        return sg_name
+
+    @pytest.fixture
+    async def domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scaling_group: str,
+    ) -> str:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="Test domain",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(ScalingGroupForDomainRow(scaling_group=scaling_group, domain=domain_name))
+            await db_sess.commit()
+        return domain_name
+
+    @pytest.fixture
+    async def fair_share_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> FairShareRepository:
+        return FairShareRepository(db_with_cleanup)
+
+    @pytest.fixture
+    async def project_with_record(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scaling_group: str,
+        domain_name: str,
+        fair_share_repository: FairShareRepository,
+    ) -> uuid.UUID:
+        """Create a project with fair share record."""
+        project_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=-1,
+                    max_network_count=10,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=f"test-project-{project_id.hex[:8]}",
+                    domain_name=domain_name,
+                    description="Test project with record",
+                    resource_policy=policy_name,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(ScalingGroupForProjectRow(scaling_group=scaling_group, group=project_id))
+            await db_sess.commit()
+
+        await fair_share_repository.create_project_fair_share(
+            Creator(
+                spec=ProjectFairShareCreatorSpec(
+                    resource_group=scaling_group,
+                    project_id=project_id,
+                    domain_name=domain_name,
+                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
+                )
+            )
+        )
+        return project_id
+
+    @pytest.fixture
+    async def project_without_record(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scaling_group: str,
+        domain_name: str,
+    ) -> uuid.UUID:
+        """Create a project without fair share record."""
+        project_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=-1,
+                    max_network_count=10,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=f"test-project-{project_id.hex[:8]}",
+                    domain_name=domain_name,
+                    description="Test project without record",
+                    resource_policy=policy_name,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(ScalingGroupForProjectRow(scaling_group=scaling_group, group=project_id))
+            await db_sess.commit()
+        return project_id
+
+    # ==================== Scope Validation Tests ====================
+
+    async def test_raises_error_for_nonexistent_resource_group(
+        self,
+        fair_share_repository: FairShareRepository,
+        domain_name: str,
+    ) -> None:
+        """Non-existent resource_group in scope should raise ScalingGroupNotFound."""
+        scope = ProjectFairShareSearchScope(
+            resource_group="nonexistent-rg",
+            domain_name=domain_name,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        with pytest.raises(ScalingGroupNotFound):
+            await fair_share_repository.search_rg_project_fair_shares(scope, querier)
+
+    # ==================== Success Cases ====================
+
+    async def test_returns_project_with_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_with_record: uuid.UUID,
+    ) -> None:
+        """Project with fair share record should have details populated."""
+        scope = ProjectFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_project_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].project_id == project_with_record
+        assert result.items[0].resource_group == scaling_group
+
+    async def test_returns_project_without_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_without_record: uuid.UUID,
+    ) -> None:
+        """Project without fair share record should have default values with use_default=True."""
+        scope = ProjectFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_project_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].project_id == project_without_record
+        assert result.items[0].resource_group == scaling_group
+        # Details always present
+        # Generated from defaults
+        assert result.items[0].data.use_default is True
+        # No metadata (not from DB)
+        assert result.items[0].data.metadata is None
+
+    async def test_mixed_projects_with_and_without_records(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_with_record: uuid.UUID,
+        project_without_record: uuid.UUID,
+    ) -> None:
+        """Search should return both projects with and without records."""
+        scope = ProjectFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_project_fair_shares(scope, querier)
+
+        assert result.total_count == 2
+        assert len(result.items) == 2
+
+        result_projects = {p.project_id: p for p in result.items}
+        assert project_with_record in result_projects
+        assert project_without_record in result_projects
+        # Project with record: has DB data
+        # Project without record: has default-generated data
+        assert result_projects[project_without_record].data.use_default is True
+        assert result_projects[project_without_record].data.metadata is None
+
+    # ==================== RG-Context Filter Regression Tests ====================
+
+    async def test_rg_filter_by_project_id_includes_entity_without_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_without_record: uuid.UUID,
+    ) -> None:
+        """RG-context project_id filter should include entities without fair share records.
+
+        Regression: Non-RG conditions reference ProjectFairShareRow.project_id (LEFT JOIN'd),
+        which is NULL for entities without records. RG conditions reference
+        ScalingGroupForProjectRow.group (INNER JOIN'd), which is never NULL.
+        """
+        scope = ProjectFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[
+                RGProjectFairShareConditions.by_project_id(
+                    UUIDEqualMatchSpec(value=project_without_record, negated=False)
+                ),
+            ],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_project_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].project_id == project_without_record
+        assert result.items[0].data.use_default is True
+
+    # ==================== BA-4682: Non-RG-member entity search regression ====================
+
+    @pytest.fixture
+    async def project_not_in_rg(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_name: str,
+    ) -> uuid.UUID:
+        """Create a project NOT associated with any scaling group."""
+        project_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=-1,
+                    max_network_count=10,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=f"no-rg-project-{project_id.hex[:8]}",
+                    domain_name=domain_name,
+                    description="Project not in any RG",
+                    resource_policy=policy_name,
+                )
+            )
+            await db_sess.commit()
+        return project_id
+
+    async def test_search_includes_project_not_in_rg(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_with_record: uuid.UUID,
+        project_not_in_rg: uuid.UUID,
+    ) -> None:
+        """BA-4682: Project not in any RG should appear in search results with defaults."""
+        scope = ProjectFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_project_fair_shares(scope, querier)
+
+        assert result.total_count == 2
+        result_projects = {p.project_id: p for p in result.items}
+        assert project_with_record in result_projects
+        assert project_not_in_rg in result_projects
+        # Project in RG with record: use_default=False
+        assert result_projects[project_with_record].data.use_default is False
+        # Project not in any RG: use_default=True
+        assert result_projects[project_not_in_rg].data.use_default is True
+
+
+class TestSearchUserFairSharesEntityBased:
+    """Test user fair share search with Scope pattern."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ScalingGroupForDomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ScalingGroupForProjectRow,
+                AssocGroupUserRow,
+                AgentRow,  # Required for _fetch_available_slots()
+                ResourceSlotTypeRow,
+                AgentResourceRow,
+                DomainFairShareRow,
+                ProjectFairShareRow,
+                UserFairShareRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def scaling_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ScalingGroupRow(
+                    name=sg_name,
+                    description="Test scaling group",
+                    is_active=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ScalingGroupOpts(),
+                    wsproxy_addr=None,
+                )
+            )
+            await db_sess.commit()
+        return sg_name
+
+    @pytest.fixture
+    async def domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scaling_group: str,
+    ) -> str:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="Test domain",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(ScalingGroupForDomainRow(scaling_group=scaling_group, domain=domain_name))
+            await db_sess.commit()
+        return domain_name
+
+    @pytest.fixture
+    async def project_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_name: str,
+        scaling_group: str,
+    ) -> uuid.UUID:
+        project_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=-1,
+                    max_network_count=10,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=f"test-project-{project_id.hex[:8]}",
+                    domain_name=domain_name,
+                    description="Test project",
+                    resource_policy=policy_name,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(ScalingGroupForProjectRow(scaling_group=scaling_group, group=project_id))
+            await db_sess.commit()
+        return project_id
+
+    @pytest.fixture
+    async def fair_share_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> FairShareRepository:
+        return FairShareRepository(db_with_cleanup)
+
+    async def _create_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_name: str,
+        project_id: uuid.UUID,
+    ) -> uuid.UUID:
+        """Helper to create a user associated with domain and project."""
+        user_uuid = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=user_policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=10,
+                    max_customized_image_count=10,
+                )
+            )
+
+            kp_policy_name = f"test-kp-policy-{uuid.uuid4().hex[:8]}"
+            db_sess.add(
+                KeyPairResourcePolicyRow(
+                    name=kp_policy_name,
+                    total_resource_slots=ResourceSlot(),
+                    max_session_lifetime=0,
+                    max_concurrent_sessions=10,
+                    max_concurrent_sftp_sessions=5,
+                    max_containers_per_session=1,
+                    idle_timeout=3600,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"test-user-{user_uuid.hex[:8]}",
+                    email=f"test-{user_uuid.hex[:8]}@test.com",
+                    password=PasswordInfo(
+                        password="test_password",
+                        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                        rounds=100_000,
+                        salt_size=32,
+                    ),
+                    need_password_change=False,
+                    full_name="Test User",
+                    domain_name=domain_name,
+                    role=UserRole.USER,
+                    status=UserStatus.ACTIVE,
+                    resource_policy=user_policy_name,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                KeyPairRow(
+                    user=user_uuid,
+                    access_key=f"AKIATEST{uuid.uuid4().hex[:12].upper()}",
+                    secret_key="test-secret-key",
+                    is_active=True,
+                    resource_policy=kp_policy_name,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(AssocGroupUserRow(group_id=project_id, user_id=user_uuid))
+            await db_sess.commit()
+        return user_uuid
+
+    @pytest.fixture
+    async def user_with_record(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scaling_group: str,
+        domain_name: str,
+        project_id: uuid.UUID,
+        fair_share_repository: FairShareRepository,
+    ) -> uuid.UUID:
+        """Create a user with fair share record."""
+        user_uuid = await self._create_user(db_with_cleanup, domain_name, project_id)
+
+        await fair_share_repository.create_user_fair_share(
+            Creator(
+                spec=UserFairShareCreatorSpec(
+                    resource_group=scaling_group,
+                    user_uuid=user_uuid,
+                    project_id=project_id,
+                    domain_name=domain_name,
+                    weight=Decimal("2.0"),  # Explicit weight for use_default=False
+                )
+            )
+        )
+        return user_uuid
+
+    @pytest.fixture
+    async def user_without_record(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_name: str,
+        project_id: uuid.UUID,
+    ) -> uuid.UUID:
+        """Create a user without fair share record."""
+        return await self._create_user(db_with_cleanup, domain_name, project_id)
+
+    # ==================== Scope Validation Tests ====================
+
+    async def test_raises_error_for_nonexistent_resource_group(
+        self,
+        fair_share_repository: FairShareRepository,
+        domain_name: str,
+        project_id: uuid.UUID,
+    ) -> None:
+        """Non-existent resource_group in scope should raise ScalingGroupNotFound."""
+
+        scope = UserFairShareSearchScope(
+            resource_group="nonexistent-rg",
+            domain_name=domain_name,
+            project_id=project_id,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        with pytest.raises(ScalingGroupNotFound):
+            await fair_share_repository.search_rg_user_fair_shares(scope, querier)
+
+    # ==================== Success Cases ====================
+
+    async def test_returns_user_with_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_id: uuid.UUID,
+        user_with_record: uuid.UUID,
+    ) -> None:
+        """User with fair share record should have details populated."""
+
+        scope = UserFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+            project_id=project_id,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_user_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].user_uuid == user_with_record
+        assert result.items[0].resource_group == scaling_group
+        assert result.items[0].project_id == project_id
+
+    async def test_returns_user_without_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_id: uuid.UUID,
+        user_without_record: uuid.UUID,
+    ) -> None:
+        """User without fair share record should have default values with use_default=True."""
+
+        scope = UserFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+            project_id=project_id,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_user_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].user_uuid == user_without_record
+        assert result.items[0].resource_group == scaling_group
+        assert result.items[0].project_id == project_id
+        # Details always present
+        # Generated from defaults
+        assert result.items[0].data.use_default is True
+        # No metadata (not from DB)
+        assert result.items[0].data.metadata is None
+
+    async def test_mixed_users_with_and_without_records(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_id: uuid.UUID,
+        user_with_record: uuid.UUID,
+        user_without_record: uuid.UUID,
+    ) -> None:
+        """Search should return both users with and without records."""
+
+        scope = UserFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+            project_id=project_id,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_user_fair_shares(scope, querier)
+
+        assert result.total_count == 2
+        assert len(result.items) == 2
+
+        result_users = {u.user_uuid: u for u in result.items}
+        assert user_with_record in result_users
+        assert user_without_record in result_users
+        # User with record: has DB data
+        # User without record: has default-generated data
+        assert result_users[user_without_record].data.use_default is True
+        assert result_users[user_without_record].data.metadata is None
+
+    # ==================== RG-Context Filter Regression Tests ====================
+
+    async def test_rg_filter_by_user_uuid_includes_entity_without_record(
+        self,
+        fair_share_repository: FairShareRepository,
+        scaling_group: str,
+        domain_name: str,
+        project_id: uuid.UUID,
+        user_without_record: uuid.UUID,
+    ) -> None:
+        """RG-context user_uuid filter should include entities without fair share records.
+
+        Regression: Non-RG conditions reference UserFairShareRow.user_uuid (LEFT JOIN'd),
+        which is NULL for entities without records. RG conditions reference
+        AssocGroupUserRow.user_id (INNER JOIN'd), which is never NULL.
+        """
+        scope = UserFairShareSearchScope(
+            resource_group=scaling_group,
+            domain_name=domain_name,
+            project_id=project_id,
+        )
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=100, offset=0),
+            conditions=[
+                RGUserFairShareConditions.by_user_uuid(
+                    UUIDEqualMatchSpec(value=user_without_record, negated=False)
+                ),
+            ],
+            orders=[],
+        )
+
+        result = await fair_share_repository.search_rg_user_fair_shares(scope, querier)
+
+        assert result.total_count == 1
+        assert len(result.items) == 1
+        assert result.items[0].user_uuid == user_without_record
+        assert result.items[0].data.use_default is True

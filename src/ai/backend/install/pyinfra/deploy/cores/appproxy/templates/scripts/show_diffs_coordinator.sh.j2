@@ -1,0 +1,85 @@
+#!/bin/bash
+# Automated diff script for comparing old vs new configurations
+# Generated during appproxy-coordinator update
+
+set -e
+
+UPGRADE_DIR="{{ upgrade_dir }}"
+SERVICE_DIR="{{ coordinator_dir }}"
+HOME_DIR="{{ home_dir }}"
+BIN_DIR="bin"
+SERVICE_NAME="appproxy-coordinator"
+
+echo "==================================================================="
+echo "AppProxy Coordinator Configuration Diff Report"
+echo "==================================================================="
+echo ""
+
+# Function to show diff with header
+show_diff() {
+    local old_file="$1"
+    local new_file="$2"
+    local description="$3"
+
+    echo "-------------------------------------------------------------------"
+    echo "$description"
+    echo "-------------------------------------------------------------------"
+
+    if [ ! -f "$old_file" ]; then
+        echo "  ⚠️  Original file not found: $old_file"
+        echo "  ✓  New file available at: $new_file"
+        echo ""
+        return
+    fi
+
+    if diff -q "$old_file" "$new_file" > /dev/null 2>&1; then
+        echo "  ✓ No changes"
+        echo ""
+        return
+    fi
+
+    echo "  📝 Changes detected:"
+    echo ""
+    diff -u "$old_file" "$new_file" || true
+    echo ""
+}
+
+# Compare each file
+show_diff "$SERVICE_DIR/app-proxy-coordinator.toml" \
+          "$UPGRADE_DIR/app-proxy-coordinator.toml" \
+          "app-proxy-coordinator.toml"
+
+show_diff "$HOME_DIR/$BIN_DIR/run-appproxy-coordinator.sh" \
+          "$UPGRADE_DIR/run-appproxy-coordinator.sh" \
+          "run-appproxy-coordinator.sh"
+
+show_diff "$SERVICE_DIR/alembic.ini" \
+          "$UPGRADE_DIR/alembic.ini" \
+          "alembic.ini"
+
+show_diff "/etc/systemd/system/backendai-$SERVICE_NAME.service" \
+          "$UPGRADE_DIR/backendai-$SERVICE_NAME.service" \
+          "systemd service"
+
+for script in start stop status show_status; do
+    show_diff "$SERVICE_DIR/${script}.sh" \
+              "$UPGRADE_DIR/${script}.sh" \
+              "${script}.sh"
+done
+
+echo "==================================================================="
+echo "Summary"
+echo "==================================================================="
+echo ""
+echo "Next steps:"
+echo "1. Review the diffs above carefully"
+echo "2. Manually merge necessary changes to production configs"
+echo "3. Pay special attention to:"
+echo "   - Database credentials and connection strings"
+echo "   - Redis/ETCD endpoints"
+echo "   - JWT secrets and shared keys"
+echo "   - Custom overrides you may have made"
+echo "4. Test after changes: systemctl restart backendai-appproxy-coordinator"
+echo "5. Monitor logs: journalctl -u backendai-appproxy-coordinator -f"
+echo ""
+echo "==================================================================="

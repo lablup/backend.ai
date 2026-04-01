@@ -3,7 +3,7 @@ from abc import abstractmethod
 from collections.abc import Iterator, Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Generic, Optional, TypeVar, final
+from typing import TypeVar, final
 
 T = TypeVar("T")
 
@@ -53,7 +53,7 @@ class ContextName(enum.StrEnum):
     CREATED_GROUP = "created_group"
 
 
-class BaseTestContext(Generic[T]):
+class BaseTestContext[T]:
     """
     Base class for tester's context management.
     This class provides a way to manage context variables for test scenarios.
@@ -61,10 +61,10 @@ class BaseTestContext(Generic[T]):
     It is designed to be subclassed for specific test contexts.
     """
 
-    _ctxvar: Optional[ContextVar[Optional[T]]] = None
-    _used: MutableMapping[ContextName, "BaseTestContext"] = {}
+    _ctxvar: ContextVar[T | None] | None = None
+    _used: MutableMapping[ContextName, "BaseTestContext[T]"] = {}
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         if cls._ctxvar is not None:
             raise RuntimeError(f"{cls.__name__} is already initialized")
         cls._ctxvar = ContextVar[T](f"{cls.__name__}_ctxvar", default=None)
@@ -82,7 +82,7 @@ class BaseTestContext(Generic[T]):
         )
 
     @classmethod
-    def used_contexts(cls) -> Mapping[ContextName, "BaseTestContext"]:
+    def used_contexts(cls) -> Mapping[ContextName, "BaseTestContext[T]"]:
         """
         Get all used contexts
         :return: mapping of context names to context instances

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import textwrap
 from pathlib import Path
+from typing import Any, cast
 from weakref import WeakSet
 
 from rich.text import Text
@@ -45,11 +47,11 @@ from .types import (
     PrerequisiteError,
 )
 
-top_tasks: WeakSet[asyncio.Task] = WeakSet()
+top_tasks: WeakSet[asyncio.Task[Any]] = WeakSet()
 
 
 class DevSetup(Static):
-    def __init__(self, *, non_interactive: bool = False, **kwargs) -> None:
+    def __init__(self, *, non_interactive: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._non_interactive = non_interactive
         self._task = None
@@ -58,7 +60,10 @@ class DevSetup(Static):
         yield Label("Development Setup", classes="mode-title")
         with TabbedContent():
             with TabPane("Install Log", id="tab-dev-log"):
-                yield SetupLog(wrap=True, classes="log")
+                yield SetupLog(
+                    wrap=True,
+                    classes="log",
+                )
             with TabPane("Install Report", id="tab-dev-report"):
                 yield Label("Installation is not complete.")
 
@@ -70,7 +75,10 @@ class DevSetup(Static):
         _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
         ctx = DevContext(
-            dist_info, install_variable, self.app, non_interactive=self._non_interactive
+            dist_info,
+            install_variable,
+            cast(App[None], self.app),
+            non_interactive=self._non_interactive,
         )
         try:
             # prerequisites
@@ -106,7 +114,7 @@ class DevSetup(Static):
 
 
 class PackageSetup(Static):
-    def __init__(self, *, non_interactive: bool = False, **kwargs) -> None:
+    def __init__(self, *, non_interactive: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._non_interactive = non_interactive
         self._task = None
@@ -115,7 +123,10 @@ class PackageSetup(Static):
         yield Label("Package Setup", classes="mode-title")
         with TabbedContent():
             with TabPane("Install Log", id="tab-pkg-log"):
-                yield SetupLog(wrap=True, classes="log")
+                yield SetupLog(
+                    wrap=True,
+                    classes="log",
+                )
             with TabPane("Install Report", id="tab-pkg-report"):
                 yield Label("Installation is not complete.")
 
@@ -128,7 +139,8 @@ class PackageSetup(Static):
         _log_token = current_log.set(_log)
         # prerequisites
         if self._non_interactive:
-            assert dist_info.target_path is not None
+            if dist_info.target_path is None:
+                raise ValueError("Target path must be specified in non-interactive mode")
         else:
             if dist_info.target_path.exists():
                 input_box = InputDialog(
@@ -140,10 +152,14 @@ class PackageSetup(Static):
                 )
                 _log.mount(input_box)
                 value = await input_box.wait()
-                assert value is not None
+                if value is None:
+                    raise ValueError("Target path input was cancelled")
                 dist_info.target_path = Path(value)
         ctx = PackageContext(
-            dist_info, install_variable, self.app, non_interactive=self._non_interactive
+            dist_info,
+            install_variable,
+            cast(App[None], self.app),
+            non_interactive=self._non_interactive,
         )
         try:
             await ctx.check_prerequisites()
@@ -177,11 +193,215 @@ class PackageSetup(Static):
             current_log.reset(_log_token)
 
 
+class ProductionSetup(Static):
+    """Production deployment setup using PyInfra."""
+
+    def __init__(self, *, non_interactive: bool = False, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._non_interactive = non_interactive
+
+    def compose(self) -> ComposeResult:
+        yield Label("Production Deployment", classes="mode-title")
+        with TabbedContent():
+            with TabPane("Deploy Log", id="tab-prod-log"):
+                yield SetupLog(
+                    wrap=True,
+                    classes="log",
+                )
+            with TabPane("Deploy Report", id="tab-prod-report"):
+                yield Label("Deployment has not started.")
+
+    def begin_install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
+        self.query_one("SetupLog.log").focus()
+        top_tasks.add(asyncio.create_task(self.install(dist_info, install_variable)))
+
+    async def install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
+        _log = self.query_one(".log", SetupLog)
+        _log_token = current_log.set(_log)
+        try:
+            _log.write(
+                Text.from_markup(
+                    "[bold bright_cyan]Production Deployment (PyInfra)[/]\n"
+                    "This mode deploys Backend.AI to production servers using PyInfra.\n"
+                )
+            )
+
+            # Check prerequisites
+            build_root = find_build_root()
+            pyinfra_dir = build_root / "src" / "ai" / "backend" / "install" / "pyinfra"
+            inventory_path = pyinfra_dir / "inventory.py"
+            env_path = pyinfra_dir / ".env"
+
+            _log.write(Text.from_markup("\n[bold]Checking prerequisites...[/]\n"))
+
+            # Check inventory.py
+            if inventory_path.exists():
+                _log.write(
+                    Text.from_markup(
+                        f"  [green]✓[/] inventory.py found at {shorten_path(inventory_path)}"
+                    )
+                )
+            else:
+                _log.write(
+                    Text.from_markup(
+                        f"  [red]✗[/] inventory.py not found at {shorten_path(inventory_path)}"
+                    )
+                )
+                _log.write(
+                    Text.from_markup(
+                        "    [dim]Create inventory.py with host definitions. See inventory_base.py for reference.[/]"
+                    )
+                )
+
+            # Check .env
+            if env_path.exists():
+                _log.write(
+                    Text.from_markup(f"  [green]✓[/] .env found at {shorten_path(env_path)}")
+                )
+            else:
+                _log.write(
+                    Text.from_markup(f"  [red]✗[/] .env not found at {shorten_path(env_path)}")
+                )
+                _log.write(
+                    Text.from_markup(
+                        "    [dim]Create .env with environment configuration (passwords, endpoints, etc.)[/]"
+                    )
+                )
+
+            # Check pyinfra availability
+            pyinfra_cmd = shutil.which("pyinfra")
+            if pyinfra_cmd:
+                _log.write(Text.from_markup(f"  [green]✓[/] pyinfra found at {pyinfra_cmd}"))
+            else:
+                _log.write(Text.from_markup("  [red]✗[/] pyinfra not found in PATH"))
+                _log.write(Text.from_markup("    [dim]Install with: pip install pyinfra[/]"))
+
+            _log.write(
+                Text.from_markup(
+                    "\n[bold]Available deployment modules:[/]\n"
+                    "  - OS setup (docker, python, tools, network)\n"
+                    "  - Halfstack (postgres, redis, etcd)\n"
+                    "  - Core services (manager, agent, webserver, storage_proxy, appproxy)\n"
+                    "  - Monitoring (prometheus, grafana, loki, pyroscope)\n"
+                )
+            )
+
+            if not inventory_path.exists() or not env_path.exists() or not pyinfra_cmd:
+                _log.write(
+                    Text.from_markup(
+                        "\n[yellow]Prerequisites not met.[/]\n"
+                        "Please create the required files and install pyinfra before proceeding.\n"
+                    )
+                )
+            else:
+                _log.write(
+                    Text.from_markup(
+                        "\n[green]All prerequisites met![/]\n"
+                        "To deploy, run pyinfra from the command line:\n"
+                        f"  cd {shorten_path(pyinfra_dir)}\n"
+                        "  pyinfra inventory.py deploy/<module>/deploy.py\n\n"
+                        "[dim]Example modules:[/]\n"
+                        "  deploy/os/docker/deploy.py      - Install Docker\n"
+                        "  deploy/halfstack/postgres/deploy.py - Deploy PostgreSQL\n"
+                        "  deploy/cores/manager/deploy.py  - Deploy Manager\n"
+                    )
+                )
+        except asyncio.CancelledError:
+            _log.write(Text.from_markup("[red]Interrupted!"))
+            await asyncio.sleep(1)
+            raise
+        except Exception as e:
+            _log.write(Text.from_markup("[red]:warning: Unexpected error!"))
+            _log.write(e)
+            _log.write(Traceback())
+        finally:
+            _log.write("")
+            _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))
+            if self._non_interactive:
+                self.app.post_message(Key("q", "q"))
+            current_log.reset(_log_token)
+
+
+class PackageTypeMenu(Static):
+    """Sub-menu for selecting package deployment type (Release vs Production)."""
+
+    BINDINGS = [
+        Binding("left", "cursor_up", show=False),
+        Binding("right", "cursor_down", show=False),
+        Binding("escape", "go_back", "Back to main menu"),
+    ]
+
+    def __init__(
+        self,
+        dist_info: DistInfo,
+        install_variable: InstallVariable,
+        *,
+        non_interactive: bool = False,
+        id: str | None = None,
+    ) -> None:
+        super().__init__(id=id)
+        self._dist_info = dist_info
+        self._install_variable = install_variable
+        self._non_interactive = non_interactive
+
+    def compose(self) -> ComposeResult:
+        yield Label("Choose deployment type:", id="pkg-type-heading")
+        with ListView(id="pkg-type-list") as lv:
+            self.lv = lv
+            yield ListItem(
+                Vertical(
+                    Label("RELEASE PACKAGE", classes="mode-item-title"),
+                    Label(
+                        "Install using prebuilt release packages from GitHub",
+                        classes="mode-item-desc",
+                    ),
+                ),
+                id="pkg-type-release",
+            )
+            yield ListItem(
+                Vertical(
+                    Label("PRODUCTION DEPLOYMENT", classes="mode-item-title"),
+                    Label(
+                        "Deploy to production servers via PyInfra (requires inventory.py)",
+                        classes="mode-item-desc",
+                    ),
+                ),
+                id="pkg-type-production",
+            )
+
+    def action_cursor_up(self) -> None:
+        self.lv.action_cursor_up()
+
+    def action_cursor_down(self) -> None:
+        self.lv.action_cursor_down()
+
+    def action_go_back(self) -> None:
+        switcher = self.app.query_one("#top", ContentSwitcher)
+        switcher.current = "mode-menu"
+        self.app.query_one("#mode-list", ListView).focus()
+
+    @on(ListView.Selected, "#pkg-type-list", item="#pkg-type-release")
+    def start_release_mode(self) -> None:
+        self.app.sub_title = "Package Setup"
+        switcher = self.app.query_one("#top", ContentSwitcher)
+        switcher.current = "pkg-setup"
+        pkg_setup = self.app.query_one("#pkg-setup", PackageSetup)
+        self.app.call_later(pkg_setup.begin_install, self._dist_info, self._install_variable)
+
+    @on(ListView.Selected, "#pkg-type-list", item="#pkg-type-production")
+    def start_production_mode(self) -> None:
+        self.app.sub_title = "Production Deployment"
+        switcher = self.app.query_one("#top", ContentSwitcher)
+        switcher.current = "prod-setup"
+        prod_setup = self.app.query_one("#prod-setup", ProductionSetup)
+        self.app.call_later(prod_setup.begin_install, self._dist_info, self._install_variable)
+
+
 class Configure(Static):
     install_variable: InstallVariable | None
     public_facing_address: str | None
 
-    def __init__(self, id: str, **kwargs) -> None:
+    def __init__(self, id: str, **kwargs: Any) -> None:
         super().__init__(**kwargs, id=id)
         self.public_facing_address = None
         self.install_variable = None
@@ -216,7 +436,8 @@ class Configure(Static):
 
     @on(Button.Pressed, "#save-config")
     def save_config(self) -> None:
-        assert self.install_variable
+        if self.install_variable is None:
+            raise RuntimeError("Install variable is not initialized")
         if self.public_facing_address is not None:
             self.install_variable.public_facing_address = self.public_facing_address
         self.close()
@@ -229,7 +450,7 @@ class Configure(Static):
 
 
 class InstallReport(Static):
-    def __init__(self, install_info: InstallInfo, **kwargs) -> None:
+    def __init__(self, install_info: InstallInfo, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.install_info = install_info
 
@@ -403,11 +624,18 @@ class ModeMenu(Static):
         # if Path("INSTALL-INFO").exists():
         #     self._enabled_menus.add(InstallModes.MAINTAIN)
         self._enabled_menus.add(InstallModes.CONFIGURE)
-        assert mode is not None
+        if mode is None:
+            raise ValueError("Installation mode must be specified")
         self._mode = mode
         self.install_variable = InstallVariable(
             public_facing_address=args.public_facing_address,
             accelerator=Accelerator(args.accelerator) if args.accelerator is not None else None,
+            fqdn_prefix=args.fqdn_prefix,
+            tls_advertised=args.tls_advertised,
+            advertised_port=args.advertised_port,
+            endpoint_protocol=args.endpoint_protocol,
+            frontend_mode=args.frontend_mode,
+            use_wildcard_binding=args.use_wildcard_binding,
         )
 
     def compose(self) -> ComposeResult:
@@ -487,11 +715,13 @@ class ModeMenu(Static):
     def start_package_mode(self) -> None:
         if InstallModes.PACKAGE not in self._enabled_menus:
             return
-        self.app.sub_title = "Package Setup"
+        self.app.sub_title = "Package Mode"
         switcher = self.app.query_one("#top", ContentSwitcher)
-        switcher.current = "pkg-setup"
-        pkg_setup = self.app.query_one("#pkg-setup", PackageSetup)
-        self.app.call_later(pkg_setup.begin_install, self._dist_info, self.install_variable)
+        pkg_type_menu = self.app.query_one("#pkg-type-menu", PackageTypeMenu)
+        pkg_type_menu._dist_info = self._dist_info
+        pkg_type_menu._install_variable = self.install_variable
+        switcher.current = "pkg-type-menu"
+        self.app.query_one("#pkg-type-list", ListView).focus()
 
     @on(ListView.Selected, "#mode-list", item="#mode-maintain")
     def start_maintain_mode(self) -> None:
@@ -508,7 +738,7 @@ class ModeMenu(Static):
         self.app.call_later(configure.feed_variables, self.install_variable)
 
 
-class InstallerApp(App):
+class InstallerApp(App[None]):
     BINDINGS = [
         Binding("q", "shutdown", "Interrupt ongoing tasks / Quit the installer"),
         Binding(
@@ -561,7 +791,14 @@ class InstallerApp(App):
             with ContentSwitcher(id="top", initial="mode-menu"):
                 yield ModeMenu(self._args, id="mode-menu")
                 yield DevSetup(id="dev-setup", non_interactive=self._args.non_interactive)
+                yield PackageTypeMenu(
+                    DistInfo(),
+                    InstallVariable(),
+                    non_interactive=self._args.non_interactive,
+                    id="pkg-type-menu",
+                )
                 yield PackageSetup(id="pkg-setup", non_interactive=self._args.non_interactive)
+                yield ProductionSetup(id="prod-setup", non_interactive=self._args.non_interactive)
                 yield Configure(id="configure")
         yield Footer()
 

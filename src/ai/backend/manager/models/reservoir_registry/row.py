@@ -24,19 +24,19 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("ReservoirRegistryRow",)
 
 
-def _get_registry_artifact_join_condition():
+def _get_registry_artifact_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.artifact import ArtifactRow
 
     return ReservoirRegistryRow.id == foreign(ArtifactRow.registry_id)
 
 
-def _get_registry_meta_join_condition():
+def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 
     return ReservoirRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
-class ReservoirRegistryRow(Base):
+class ReservoirRegistryRow(Base):  # type: ignore[misc]
     __tablename__ = "reservoir_registries"
 
     id: Mapped[uuid.UUID] = mapped_column(

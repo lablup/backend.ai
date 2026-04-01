@@ -1,7 +1,7 @@
 """Validator for group resource limits."""
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
+from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
 
 from .exceptions import GroupResourceQuotaExceeded
 from .validator import ValidatorRule
@@ -28,8 +28,11 @@ class GroupResourceLimitValidator(ValidatorRule):
             # If no limit is defined, we can't validate - let it pass
             return
 
-        # Get current group occupancy
-        group_occupied = snapshot.resource_occupancy.by_group.get(workload.group_id, ResourceSlot())
+        # Get current group occupancy (list[SlotQuantity]) and convert to ResourceSlot
+        group_occupied_quantities = snapshot.resource_occupancy.by_group.get(workload.group_id, [])
+        group_occupied = ResourceSlot({
+            sq.slot_name: sq.quantity for sq in group_occupied_quantities
+        })
 
         # Check if adding this workload would exceed the limit
         total_after = group_occupied + workload.requested_slots

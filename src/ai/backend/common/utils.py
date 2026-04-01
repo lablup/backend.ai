@@ -7,6 +7,7 @@ import numbers
 import random
 import re
 import sys
+import textwrap
 import uuid
 from collections import OrderedDict
 from collections.abc import AsyncIterator, Iterable, Iterator, Mapping
@@ -16,7 +17,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     TypeVar,
 )
 
@@ -77,7 +77,7 @@ def env_info() -> str:
     return f"{pyver} (env: {sys.prefix})"
 
 
-def odict(*args: tuple[KT, VT]) -> OrderedDict[KT, VT]:
+def odict[KT, VT](*args: tuple[KT, VT]) -> OrderedDict[KT, VT]:
     """
     A short-hand for the constructor of OrderedDict.
     :code:`odict(('a',1), ('b',2))` is equivalent to
@@ -86,7 +86,7 @@ def odict(*args: tuple[KT, VT]) -> OrderedDict[KT, VT]:
     return OrderedDict(args)
 
 
-def dict2kvlist(o: Mapping[KT, VT]) -> Iterable[KT | VT]:
+def dict2kvlist[KT, VT](o: Mapping[KT, VT]) -> Iterable[KT | VT]:
     """
     Serializes a dict-like object into a generator of the flatten list of
     repeating key-value pairs.  It is useful when using HMSET method in Redis.
@@ -116,10 +116,11 @@ def get_random_seq(length: float, num_points: int, min_distance: float) -> Itera
 
     :return: An iterator over the generated sequence
     """
-    assert num_points * min_distance <= length + min_distance, (
-        "There are too many points or it has a too large distance which cannot be fit into the"
-        " given length."
-    )
+    if num_points * min_distance > length + min_distance:
+        raise ValueError(
+            "There are too many points or it has a too large distance which cannot be fit into the"
+            " given length."
+        )
     extra = length - (num_points - 1) * min_distance
     ro = [random.uniform(0, 1) for _ in range(num_points + 1)]
     sum_ro = sum(ro)
@@ -177,7 +178,7 @@ def pprint_with_type(
 def nmget(
     o: Mapping[str, Any],
     key_path: str,
-    def_val: Optional[Any] = None,
+    def_val: Any | None = None,
     path_delimiter: str = ".",
     null_as_default: bool = True,
 ) -> Any:
@@ -203,14 +204,15 @@ def nmget(
     None
     """
     pieces = key_path.split(path_delimiter)
+    current: Any = o
     while pieces:
         p = pieces.pop(0)
-        if o is None or p not in o:
+        if current is None or p not in current:
             return def_val
-        o = o[p]
-    if o is None and null_as_default:
+        current = current[p]
+    if current is None and null_as_default:
         return def_val
-    return o
+    return current
 
 
 def readable_size_to_bytes(expr: Any) -> BinarySize | Decimal:
@@ -256,7 +258,7 @@ def str_to_timedelta(tstr: str) -> timedelta:
     if set(groups.values()) == {None}:
         raise ValueError("Invalid time expression")
     params = {n: -float(t) if sign == "-" else float(t) for n, t in groups.items() if t}
-    return timedelta(**params)  # type: ignore
+    return timedelta(**params)
 
 
 class FstabEntry:
@@ -265,7 +267,7 @@ class FstabEntry:
     """
 
     def __init__(
-        self, device: str, mountpoint: str, fstype: str, options: str | None, d=0, p=0
+        self, device: str, mountpoint: str, fstype: str, options: str | None, d: int = 0, p: int = 0
     ) -> None:
         self.device = device
         self.mountpoint = mountpoint
@@ -276,7 +278,7 @@ class FstabEntry:
         self.d = d
         self.p = p
 
-    def __eq__(self, o) -> bool:
+    def __eq__(self, o: Any) -> bool:
         return str(self) == str(o)
 
     def __str__(self) -> str:
@@ -299,7 +301,16 @@ class Fstab:
         self._fp = fp
 
     def _hydrate_entry(self, line: str) -> FstabEntry:
-        return FstabEntry(*[x for x in line.strip("\n").split(" ") if x not in ("", None)])
+        parts = [x for x in line.strip("\n").split(" ") if x not in ("", None)]
+        # Ensure we have at least 4 parts (device, mountpoint, fstype, options)
+        # and convert the last two to integers if present
+        device = parts[0] if len(parts) > 0 else ""
+        mountpoint = parts[1] if len(parts) > 1 else ""
+        fstype = parts[2] if len(parts) > 2 else ""
+        options = parts[3] if len(parts) > 3 else None
+        d = int(parts[4]) if len(parts) > 4 else 0
+        p = int(parts[5]) if len(parts) > 5 else 0
+        return FstabEntry(device, mountpoint, fstype, options, d, p)
 
     async def get_entries(self) -> AsyncIterator[FstabEntry]:
         await self._fp.seek(0)
@@ -325,7 +336,13 @@ class Fstab:
         await self._fp.truncate()
 
     async def add(
-        self, device: str, mountpoint: str, fstype: str, options: str | None = None, d=0, p=0
+        self,
+        device: str,
+        mountpoint: str,
+        fstype: str,
+        options: str | None = None,
+        d: int = 0,
+        p: int = 0,
     ) -> None:
         return await self.add_entry(FstabEntry(device, mountpoint, fstype, options, d, p))
 
@@ -343,7 +360,8 @@ class Fstab:
                     pass
         else:
             return False
-        assert line_no is not None
+        if line_no is None:
+            raise RuntimeError("Failed to find entry in fstab")
         del lines[line_no]
         await self._fp.seek(0)
         await self._fp.write("".join(lines))
@@ -404,14 +422,14 @@ async def check_nfs_remote_server(
 
         # Export path not found
         raise ExportPathNotFound(f"Export '{export_path}' not found on server '{server}'.")
-    except BaseNFSMountCheckFailed:
-        raise
+    except BaseNFSMountCheckFailed as e:
+        raise e from None
 
-    except TimeoutError:
-        raise NFSTimeoutError(f"Timeout: No response from {server} within 10 seconds")
+    except TimeoutError as e:
+        raise NFSTimeoutError(f"Timeout: No response from {server} within 10 seconds") from e
 
-    except FileNotFoundError:
-        raise ShowmountNotFound("showmount command not found. Install nfs-common package.")
+    except FileNotFoundError as e:
+        raise ShowmountNotFound("showmount command not found. Install nfs-common package.") from e
 
     except Exception as e:
         raise NFSUnexpectedError(f"Unexpected error: {e!s}") from e
@@ -459,7 +477,7 @@ async def mount(
     if err:
         raise VolumeMountFailed(f"Failed to mount {fs_location} on {mountpoint}. (e: {err})")
     if edit_fstab:
-        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+        async with aiofiles.open(fstab_path, mode="r+") as fp:
             fstab = Fstab(fp)
             await fstab.add(
                 fs_location,
@@ -484,7 +502,8 @@ async def umount(
     if fstab_path is None:
         fstab_path = "/etc/fstab"
     mountpoint = Path(mount_prefix) / mount_path
-    assert Path(mount_prefix) != mountpoint
+    if Path(mount_prefix) == mountpoint:
+        raise ValueError("mountpoint cannot be the same as mount_prefix")
     if not mountpoint.is_mount():
         return False
     try:
@@ -501,11 +520,11 @@ async def umount(
             raw_out.decode("utf8")
             err = raw_err.decode("utf8")
             await proc.wait()
-    except TimeoutError:
+    except TimeoutError as e:
         raise VolumeUnmountFailed(
             f"Failed to umount {mountpoint}. Raise timeout ({timeout_sec}sec). "
             "The process may be hanging in state D, which needs to be checked."
-        )
+        ) from e
     if err:
         raise VolumeUnmountFailed(f"Failed to umount {mountpoint}")
     if rmdir_if_empty:
@@ -514,13 +533,13 @@ async def umount(
         except OSError:
             pass
     if edit_fstab:
-        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+        async with aiofiles.open(fstab_path, mode="r+") as fp:
             fstab = Fstab(fp)
             await fstab.remove_by_mountpoint(str(mountpoint))
     return True
 
 
-async def chown(path: Path | str, uid_gid: str, mount_prefix: Optional[str | Path] = None) -> None:
+async def chown(path: Path | str, uid_gid: str, mount_prefix: str | Path | None = None) -> None:
     mounted = Path(mount_prefix or "/", path)
     await asyncio.create_subprocess_exec(
         "chown",
@@ -539,7 +558,7 @@ def is_ip_address_format(str: str) -> bool:
         return False
 
 
-def join_non_empty(*args: Optional[str], sep: str) -> str:
+def join_non_empty(*args: str | None, sep: str) -> str:
     """
     Joins non-empty strings from the given arguments using the specified separator.
     """
@@ -626,3 +645,11 @@ def addr_to_hostport_pair(addr: str) -> tuple[str, int]:
     host = parts[0]
     port = int(parts[1])
     return host, port
+
+
+def dedent_strip(text: str) -> str:
+    """
+    Apply textwrap.dedent and strip to remove both indentation and leading/trailing whitespace.
+    Useful for multi-line descriptions in API schemas and GraphQL types.
+    """
+    return textwrap.dedent(text).strip()

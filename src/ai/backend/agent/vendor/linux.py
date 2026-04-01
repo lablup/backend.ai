@@ -47,15 +47,15 @@ def parse_cpuset(value: str) -> Iterator[int]:
 
 class libnuma:
     @staticmethod
-    def node_of_cpu(core) -> int:
+    def node_of_cpu(core: int) -> int:
         if _numa_supported:
-            return int(_libnuma.numa_node_of_cpu(core))  # type: ignore
+            return int(_libnuma.numa_node_of_cpu(core))  # type: ignore[name-defined,unused-ignore]
         return 0
 
     @staticmethod
     def num_nodes() -> int:
         if _numa_supported:
-            return int(_libnuma.numa_num_configured_nodes())  # type: ignore
+            return int(_libnuma.numa_num_configured_nodes())  # type: ignore[name-defined,unused-ignore]
         return 1
 
     @staticmethod
@@ -118,7 +118,7 @@ class libnuma:
 
         async def read_affinity_cpuset() -> tuple[set[int], str] | None:
             try:
-                cpuset = os.sched_getaffinity(0)  # type: ignore
+                cpuset = os.sched_getaffinity(0)  # type: ignore[attr-defined,unused-ignore]
                 cpuset_source = "the scheduler affinity mask of the agent process"
             except AttributeError:
                 return None
@@ -163,7 +163,7 @@ class libnuma:
             log.debug("read the available cpuset from {}", cpuset_source)
 
     @staticmethod
-    async def get_core_topology(limit_cpus=None) -> tuple[list[int], ...]:
+    async def get_core_topology(limit_cpus: set[int] | None = None) -> tuple[list[int], ...]:
         topo: tuple[list[int], ...] = tuple([] for _ in range(libnuma.num_nodes()))
         for c in await libnuma.get_available_cores():
             if limit_cpus is not None and c not in limit_cpus:

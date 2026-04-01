@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -25,7 +25,7 @@ class ModelTarget(BaseModel):
         """,
         examples=["microsoft/DialoGPT-medium", "openai/gpt-2", "bert-base-uncased"],
     )
-    revision: Optional[str] = Field(
+    revision: str | None = Field(
         default=None,
         description="""
         Specific revision (branch or tag) of the model to import.
@@ -101,7 +101,7 @@ class ModelData(BaseModel):
         """,
         examples=["DialoGPT-medium", "gpt-2", "bert-base-uncased"],
     )
-    author: Optional[str] = Field(
+    author: str | None = Field(
         default=None,
         description="""
         Username or organization that owns the model repository.
@@ -125,28 +125,28 @@ class ModelData(BaseModel):
         """,
         examples=[["pytorch", "text-generation"], ["transformers", "image-classification"]],
     )
-    created_at: Optional[datetime] = Field(
+    created_at: datetime | None = Field(
         default=None,
         description="""
         ISO timestamp when the model repository was created.
         Provides information about the model's age and development timeline.
         """,
     )
-    modified_at: Optional[datetime] = Field(
+    modified_at: datetime | None = Field(
         default=None,
         description="""
         ISO timestamp when the model was last updated or modified.
         Indicates the freshness and maintenance status of the model.
         """,
     )
-    readme: Optional[str] = Field(
+    readme: str | None = Field(
         default=None,
         description="""
         README file content for the model.
         Provides documentation and usage instructions for the model.
         """,
     )
-    size: Optional[int] = Field(
+    size: int | None = Field(
         default=None,
         description="""
         Total size of the model repository in bytes, if available.
@@ -154,7 +154,7 @@ class ModelData(BaseModel):
         """,
         examples=[2048000, 512000000],
     )
-    sha: Optional[str] = Field(
+    sha: str | None = Field(
         default=None,
         description="""
         Git commit hash (SHA) of the specific model revision.
@@ -162,7 +162,7 @@ class ModelData(BaseModel):
         """,
         examples=["607a30d783dfa663caf39e06633721c8d4cfcd7e", "abc123def456", None],
     )
-    extra: Optional[dict[str, Any]] = Field(
+    extra: dict[str, Any] | None = Field(
         default=None,
         description="""
         Additional metadata about the model (e.g., gated status).

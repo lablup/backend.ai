@@ -3,25 +3,21 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
 from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
-    TypeAlias,
     cast,
     override,
 )
 from uuid import UUID
 
 import aiotools
-import redis.exceptions
 import sqlalchemy as sa
 import yarl
 from dateutil.tz import tzutc
@@ -41,24 +37,8 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
-from ai.backend.common.events.dispatcher import (
-    EventProducer,
-)
-from ai.backend.common.events.event_types.schedule.anycast import (
-    DoStartSessionEvent,
-)
-from ai.backend.common.events.event_types.session.anycast import (
-    DoUpdateSessionStatusEvent,
-    SessionStartedAnycastEvent,
-    SessionTerminatedAnycastEvent,
-)
-from ai.backend.common.events.event_types.session.broadcast import (
-    SessionStartedBroadcastEvent,
-    SessionTerminatedBroadcastEvent,
-)
-from ai.backend.common.plugin.hook import HookPluginContext
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -69,13 +49,8 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.user.types import UserData
-
-if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.exception import BackendAIError
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
     ImageSpec,
     MountSpec,
@@ -90,6 +65,7 @@ from ai.backend.manager.data.session.types import (
     SessionNetwork,
     SessionStatus,
 )
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import (
     KernelCreationFailed,
@@ -131,7 +107,8 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ComputeSessionPermission
-from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.resource_slot import ResourceAllocationRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -149,7 +126,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.keypair import KeyPairRow
     from ai.backend.manager.models.scaling_group import ScalingGroupRow
     from ai.backend.manager.models.user import UserRow
-    from ai.backend.manager.registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -452,8 +428,8 @@ async def handle_session_exception(
     db: ExtendedAsyncSAEngine,
     op: str,
     session_id: SessionId,
-    error_callback=None,
-    cancellation_callback=None,
+    error_callback: Callable[[], Any] | None = None,
+    cancellation_callback: Callable[[], Any] | None = None,
     set_error: bool = False,
 ) -> AsyncIterator[None]:
     exc_class = OP_EXC[op]
@@ -517,15 +493,15 @@ async def handle_session_exception(
 
 
 def _build_session_fetch_query(
-    base_cond,
+    base_cond: Any,
     access_key: AccessKey | None = None,
     *,
     allow_stale: bool = True,
     for_update: bool = False,
     do_ordering: bool = False,
-    max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence] = None,
-):
+    max_matches: int | None = None,
+    eager_loading_op: Sequence[_AbstractLoad] | None = None,
+) -> sa.sql.Select[Any]:
     cond = base_cond
     if access_key:
         cond = cond & (SessionRow.access_key == access_key)
@@ -557,8 +533,8 @@ async def _match_sessions_by_id(
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
-    max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence[_AbstractLoad]] = None,
+    max_matches: int | None = None,
+    eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> Sequence[SessionRow]:
     cond: sa.sql.elements.ColumnElement[bool]
     if isinstance(session_id_or_list, list):
@@ -589,8 +565,8 @@ async def _match_sessions_by_name(
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
-    max_matches: Optional[int] = None,
-    eager_loading_op: Optional[Sequence[_AbstractLoad]] = None,
+    max_matches: int | None = None,
+    eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> Sequence[SessionRow]:
     cond: sa.sql.elements.ColumnElement[bool]
     if allow_prefix:
@@ -662,19 +638,19 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 
 
 # Defined for avoiding circular import
-def _get_keypair_row_join_condition():
+def _get_keypair_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.keypair import KeyPairRow
 
     return KeyPairRow.access_key == foreign(SessionRow.access_key)
 
 
-def _get_user_row_join_condition():
+def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(SessionRow.user_uuid)
 
 
-class SessionRow(Base):
+class SessionRow(Base):  # type: ignore[misc]
     __tablename__ = "sessions"
     id: Mapped[SessionId] = mapped_column(
         "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -697,6 +673,13 @@ class SessionRow(Base):
         nullable=False,
         default=SESSION_PRIORITY_DEFAULT,
         index=True,
+    )
+    is_preemptible: Mapped[bool] = mapped_column(
+        "is_preemptible",
+        sa.Boolean(),
+        nullable=False,
+        default=True,
+        server_default=sa.text("true"),
     )
 
     cluster_mode: Mapped[str] = mapped_column(
@@ -725,7 +708,7 @@ class SessionRow(Base):
     target_sgroup_names: Mapped[list[str] | None] = mapped_column(
         "target_sgroup_names",
         sa.ARRAY(sa.String(length=64)),
-        default="{}",
+        default=None,
         server_default="{}",
         nullable=True,
     )
@@ -760,7 +743,10 @@ class SessionRow(Base):
     tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
 
     # Resource occupation
-    # occupied_slots = mapped_column('occupied_slots', ResourceSlotColumn(), nullable=False)
+    # DEPRECATED (Phase 3, BA-4308): No longer written to.
+    # Resource allocations are now tracked by the normalized
+    # resource_allocations / agent_resources tables.
+    # Retained for historical audit; will be dropped in a future major version.
     occupying_slots: Mapped[ResourceSlot] = mapped_column(
         "occupying_slots", ResourceSlotColumn(), nullable=False
     )
@@ -965,13 +951,14 @@ class SessionRow(Base):
         instance.id = SessionId(session_data.id)
         return instance
 
-    def to_dataclass(self, owner: Optional[UserData] = None) -> SessionData:
+    def to_dataclass(self, owner: UserData | None = None) -> SessionData:
         return SessionData(
             id=self.id,
             creation_id=self.creation_id,
             name=self.name,
             session_type=self.session_type,
             priority=self.priority,
+            is_preemptible=self.is_preemptible,
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
             agent_ids=self.agent_ids,
@@ -1145,7 +1132,7 @@ class SessionRow(Base):
         return kerns[0]
 
     @property
-    def status_changed(self) -> Optional[datetime]:
+    def status_changed(self) -> datetime | None:
         if self.status_history is None:
             return None
         try:
@@ -1187,7 +1174,8 @@ class SessionRow(Base):
     ) -> SessionId | None:
         query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
         async with db.begin_readonly_session() as db_session:
-            return await db_session.scalar(query)
+            result: SessionId | None = await db_session.scalar(query)
+            return result
 
     @classmethod
     async def get_sessions_by_status(
@@ -1297,7 +1285,7 @@ class SessionRow(Base):
     def delegate_ownership(self, user_uuid: UUID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
-        for kernel_row in cast(list[KernelRow], self.kernels):
+        for kernel_row in self.kernels:
             kernel_row.delegate_ownership(user_uuid, access_key)
 
     @staticmethod
@@ -1311,9 +1299,9 @@ class SessionRow(Base):
         session_id: SessionId,
         status: SessionStatus,
         *,
-        status_data: Optional[Mapping[str, Any]] = None,
-        reason: Optional[str] = None,
-        status_changed_at: Optional[datetime] = None,
+        status_data: Mapping[str, Any] | None = None,
+        reason: str | None = None,
+        status_changed_at: datetime | None = None,
     ) -> None:
         if status_changed_at is None:
             now = datetime.now(tzutc())
@@ -1349,7 +1337,6 @@ class SessionRow(Base):
         db: ExtendedAsyncSAEngine,
         session_id: SessionId,
         success: bool,
-        exit_code: int,
     ) -> None:
         # TODO: store exit code?
         data = {
@@ -1368,13 +1355,13 @@ class SessionRow(Base):
         cls,
         db_session: SASession,
         session_reference: str | UUID | list[UUID],
-        access_key: Optional[AccessKey],
+        access_key: AccessKey | None,
         *,
         allow_prefix: bool = False,
         allow_stale: bool = True,
         for_update: bool = False,
-        max_matches: Optional[int] = 10,
-        eager_loading_op: Optional[Sequence] = None,
+        max_matches: int | None = 10,
+        eager_loading_op: Sequence[Any] | None = None,
     ) -> list[SessionRow]:
         """
         Match the prefix of session ID or session name among the sessions
@@ -1439,7 +1426,7 @@ class SessionRow(Base):
         cls,
         db_session: SASession,
         session_name_or_id: str | UUID,
-        access_key: Optional[AccessKey] = None,
+        access_key: AccessKey | None = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
@@ -1510,13 +1497,13 @@ class SessionRow(Base):
         cls,
         db_session: SASession,
         session_ids: list[UUID],
-        access_key: Optional[AccessKey] = None,
+        access_key: AccessKey | None = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
-        kernel_loading_strategy=KernelLoadingStrategy.NONE,
+        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
         eager_loading_op: list[Any] | None = None,
-        max_load_count: Optional[int] = None,
+        max_load_count: int | None = None,
     ) -> Iterable[SessionRow]:
         _eager_loading_op = eager_loading_op or []
         match kernel_loading_strategy:
@@ -1550,20 +1537,20 @@ class SessionRow(Base):
         )
         try:
             return session_list
-        except IndexError:
-            raise SessionNotFound(f"Session (ids={session_ids}) does not exist.")
+        except IndexError as e:
+            raise SessionNotFound(f"Session (ids={session_ids}) does not exist.") from e
 
     @classmethod
     async def get_session_by_id(
         cls,
         db_session: SASession,
         session_id: SessionId,
-        access_key: Optional[AccessKey] = None,
+        access_key: AccessKey | None = None,
         *,
         max_matches: int | None = None,
         allow_stale: bool = True,
         for_update: bool = False,
-        eager_loading_op=None,
+        eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
         sessions = await _match_sessions_by_id(
             db_session,
@@ -1577,8 +1564,8 @@ class SessionRow(Base):
         )
         try:
             return sessions[0]
-        except IndexError:
-            raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+        except IndexError as e:
+            raise SessionNotFound(f"Session (id={session_id}) does not exist.") from e
 
     @classmethod
     async def get_sgroup_managed_sessions(
@@ -1613,20 +1600,21 @@ class SessionRow(Base):
             case NetworkType.PERSISTENT:
                 network_row = await NetworkRow.get(db_sess, UUID(self.network_id))
                 return network_row.ref_name
-            case _:
-                return None
 
     @classmethod
     def get_status_elapsed_time(
         cls, status: SessionStatus, until: datetime
-    ) -> sa.sql.elements.BinaryExpression:
-        return until - cls.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
+    ) -> sa.sql.elements.BinaryExpression[Any]:
+        result: sa.sql.elements.BinaryExpression[Any] = until - cls.status_history[
+            status.name
+        ].astext.cast(sa.types.DateTime(timezone=True))
+        return result
 
 
 def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
     def _by_status(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.status.in_(statuses))
 
     return _by_status
@@ -1634,8 +1622,8 @@ def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
 
 def by_user_id(user_id: UUID) -> QueryCondition:
     def _by_user_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.user_uuid == user_id)
 
     return _by_user_id
@@ -1643,8 +1631,8 @@ def by_user_id(user_id: UUID) -> QueryCondition:
 
 def by_project_id(project_id: UUID) -> QueryCondition:
     def _by_project_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.group_id == project_id)
 
     return _by_project_id
@@ -1652,8 +1640,8 @@ def by_project_id(project_id: UUID) -> QueryCondition:
 
 def by_domain_name(domain_name: str) -> QueryCondition:
     def _by_domain_name(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.domain_name == domain_name)
 
     return _by_domain_name
@@ -1661,8 +1649,8 @@ def by_domain_name(domain_name: str) -> QueryCondition:
 
 def by_resource_group_name(resource_group_name: str) -> QueryCondition:
     def _by_resource_group_name(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(SessionRow.scaling_group_name == resource_group_name)
 
     return _by_resource_group_name
@@ -1670,8 +1658,8 @@ def by_resource_group_name(resource_group_name: str) -> QueryCondition:
 
 def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition:
     def _by_raw_filter(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         qfparser = QueryFilterParser(filter_spec)
         new_cond = qfparser.parse_filter(SessionRow, raw_filter)
         return query_stmt.where(new_cond)
@@ -1679,218 +1667,7 @@ def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition
     return _by_raw_filter
 
 
-class SessionLifecycleManager:
-    status_set_key = "session_status_update"
-
-    def __init__(
-        self,
-        db: ExtendedAsyncSAEngine,
-        valkey_stat: ValkeyStatClient,
-        valkey_live: ValkeyLiveClient,
-        event_producer: EventProducer,
-        hook_plugin_ctx: HookPluginContext,
-        registry: AgentRegistry,
-    ) -> None:
-        self.db = db
-        self.valkey_stat = valkey_stat
-        self.valkey_live = valkey_live
-        self.event_producer = event_producer
-        self.hook_plugin_ctx = hook_plugin_ctx
-        self.registry = registry
-
-        def _encode(sid: SessionId) -> bytes:
-            return sid.bytes
-
-        def _decode(raw_sid: bytes) -> SessionId:
-            return SessionId(UUID(bytes=raw_sid))
-
-        self._encoder = _encode
-        self._decoder = _decode
-
-    async def _transit_session_status(
-        self,
-        db_conn: SAConnection,
-        session_id: SessionId,
-        status_changed_at: datetime | None = None,
-    ) -> tuple[SessionRow, bool]:
-        now = status_changed_at or datetime.now(tzutc())
-
-        async def _get_and_transit(
-            db_session: SASession,
-        ) -> tuple[SessionRow, bool]:
-            session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
-            transited = session_row.determine_and_set_status(status_changed_at=now)
-
-            def _calculate_session_occupied_slots(session_row: SessionRow):
-                session_occupying_slots = ResourceSlot()
-                for row in session_row.kernels:
-                    kernel_row = cast(KernelRow, row)
-                    kernel_allocs = kernel_row.occupied_slots
-                    session_occupying_slots.sync_keys(kernel_allocs)
-                    for key, val in session_occupying_slots.items():
-                        session_occupying_slots[key] = str(
-                            Decimal(val) + Decimal(kernel_allocs[key])
-                        )
-                session_row.occupying_slots = session_occupying_slots
-
-            match session_row.status:
-                case SessionStatus.CREATING:
-                    _calculate_session_occupied_slots(session_row)
-                case SessionStatus.RUNNING if transited:
-                    _calculate_session_occupied_slots(session_row)
-
-            return session_row, transited
-
-        return await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
-
-    async def _post_status_transition(
-        self,
-        session_row: SessionRow,
-    ) -> None:
-        match session_row.status:
-            case SessionStatus.PREPARED:
-                await self.event_producer.anycast_event(DoStartSessionEvent())
-            case SessionStatus.RUNNING:
-                creation_id = session_row.creation_id or ""
-                log.debug(
-                    "Producing SessionStartedEvent({}, {})",
-                    session_row.id,
-                    creation_id,
-                )
-                await self.event_producer.anycast_and_broadcast_event(
-                    SessionStartedAnycastEvent(session_row.id, creation_id),
-                    SessionStartedBroadcastEvent(session_row.id, creation_id),
-                )
-                await self.hook_plugin_ctx.notify(
-                    "POST_START_SESSION",
-                    (
-                        session_row.id,
-                        session_row.name,
-                        session_row.access_key,
-                    ),
-                )
-                match session_row.session_type:
-                    case SessionTypes.BATCH:
-                        await self.registry.trigger_batch_execution(session_row)
-                    case SessionTypes.INFERENCE:
-                        await self.handle_inference_session_update(session_row)
-            case SessionStatus.TERMINATING:
-                if session_row.session_type == SessionTypes.INFERENCE:
-                    async with self.db.begin_session() as db_sess:
-                        route = await RoutingRow.get_by_session(db_sess, session_row.id)
-                        route.status = RouteStatus.TERMINATING
-                        await db_sess.commit()
-                    await self.handle_inference_session_update(session_row)
-            case SessionStatus.TERMINATED:
-                if session_row.session_type == SessionTypes.INFERENCE:
-                    async with self.db.begin_session() as db_sess:
-                        query = sa.delete(RoutingRow).where(RoutingRow.session == session_row.id)
-                        await db_sess.execute(query)
-                        await db_sess.commit()
-                status_info = session_row.main_kernel.status_info or ""
-                await self.event_producer.anycast_and_broadcast_event(
-                    SessionTerminatedAnycastEvent(session_row.id, status_info),
-                    SessionTerminatedBroadcastEvent(session_row.id, status_info),
-                )
-            case _:
-                pass
-
-    async def handle_inference_session_update(self, session: SessionRow) -> None:
-        async with self.db.begin_readonly_session() as db_sess:
-            route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
-        await self.registry.notify_endpoint_route_update_to_appproxy(route.endpoint)
-
-    async def transit_session_status(
-        self,
-        session_ids: Iterable[SessionId],
-        status_changed_at: datetime | None = None,
-    ) -> list[tuple[SessionRow, bool]]:
-        if not session_ids:
-            return []
-        now = status_changed_at or datetime.now(tzutc())
-
-        async def _transit(_db_conn: SAConnection) -> list[tuple[SessionRow, bool]]:
-            result: list[tuple[SessionRow, bool]] = []
-            for sid in session_ids:
-                row, is_transited = await self._transit_session_status(_db_conn, sid, now)
-                result.append((row, is_transited))
-            return result
-
-        async with self.db.connect() as db_conn:
-            result = await _transit(db_conn)
-        for session_row, is_transited in result:
-            if is_transited:
-                await self._post_status_transition(session_row)
-        return result
-
-    async def register_status_updatable_session(self, session_ids: Iterable[SessionId]) -> None:
-        if not session_ids:
-            return
-
-        try:
-            await self.valkey_stat.register_session_ids_for_status_update(
-                self.status_set_key,
-                [self._encoder(sid) for sid in session_ids],
-            )
-        except (
-            redis.exceptions.RedisError,
-            redis.exceptions.RedisClusterException,
-            redis.exceptions.ChildDeadlockedError,
-        ) as e:
-            log.warning(f"Failed to update session status to redis, skip. (e:{e!r})")
-        await self.event_producer.anycast_event(DoUpdateSessionStatusEvent())
-
-    async def get_status_updatable_sessions(self) -> set[SessionId]:
-        try:
-            results = await self.valkey_stat.get_and_clear_session_ids_for_status_update(
-                self.status_set_key,
-            )
-        except (
-            redis.exceptions.RedisError,
-            redis.exceptions.RedisClusterException,
-            redis.exceptions.ChildDeadlockedError,
-        ) as e:
-            log.warning(f"Failed to fetch session status data from redis, skip. (e:{e!r})")
-            results = []
-        result: list[SessionId] = []
-        for raw_session_id in results:
-            try:
-                result.append(self._decoder(raw_session_id))
-            except (ValueError, SyntaxError):
-                log.warning(f"Cannot parse session id, skip. (id:{raw_session_id!r})")
-                continue
-
-        async with self.db.begin_readonly_session() as db_session:
-            session_query = sa.select(SessionRow).where(
-                SessionRow.status.in_(SessionStatus.kernel_awaiting_statuses())
-            )
-            session_rows = await db_session.scalars(session_query)
-            session_ids = [row.id for row in session_rows]
-        return {*result, *session_ids}
-
-    async def deregister_status_updatable_session(
-        self,
-        session_ids: Iterable[SessionId],
-    ) -> int:
-        if not session_ids:
-            return 0
-
-        try:
-            ret = await self.valkey_stat.remove_session_ids_from_status_update(
-                self.status_set_key,
-                [self._encoder(sid) for sid in session_ids],
-            )
-        except (
-            redis.exceptions.RedisError,
-            redis.exceptions.RedisClusterException,
-            redis.exceptions.ChildDeadlockedError,
-        ) as e:
-            log.warning(f"Failed to remove session status data from redis, skip. (e:{e!r})")
-            return 0
-        return ret
-
-
-class SessionDependencyRow(Base):
+class SessionDependencyRow(Base):  # type: ignore[misc]
     __tablename__ = "session_dependencies"
     session_id: Mapped[UUID] = mapped_column(
         "session_id",
@@ -1956,9 +1733,7 @@ MONITOR_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset({
 PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
 MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
 
-WhereClauseType: TypeAlias = (
-    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
-)
+type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
 
 
 class ComputeSessionPermissionContext(
@@ -1970,7 +1745,7 @@ class ComputeSessionPermissionContext(
 
         def _OR_coalesce(
             base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression,
+            _cond: sa.sql.expression.BinaryExpression[Any],
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
@@ -1996,7 +1771,7 @@ class ComputeSessionPermissionContext(
             )
         return cond
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -2006,7 +1781,7 @@ class ComputeSessionPermissionContext(
         self, rbac_obj: SessionRow
     ) -> frozenset[ComputeSessionPermission]:
         session_row = rbac_obj
-        session_id = cast(SessionId, session_row.id)
+        session_id = session_row.id
         permissions: frozenset[ComputeSessionPermission] = frozenset()
 
         if (
@@ -2152,7 +1927,7 @@ class ComputeSessionPermissionContextBuilder(
             .options(load_only(GroupRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):
-            _row = cast(GroupRow, row)
+            _row = row
             _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
             result.merge(_project_perm_ctx)
         return result
@@ -2220,3 +1995,49 @@ async def get_permission_ctx(
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ComputeSessionPermissionContextBuilder(db_session)
         return await builder.build(ctx, target_scope, requested_permission)
+
+
+async def batch_populate_session_occupied_slots(
+    db_session: SASession,
+    session_rows: Sequence[SessionRow],
+) -> None:
+    """Batch-compute occupied slots from the normalized resource_allocations table
+    and populate each SessionRow's occupying_slots attribute in-place.
+
+    This replaces the deprecated JSONB column read with a live computation
+    from the resource_allocations table (Phase 3, BA-4308).
+    """
+    if not session_rows:
+        return
+    session_ids = [row.id for row in session_rows]
+    ra = ResourceAllocationRow.__table__
+    kernels = KernelRow.__table__
+    effective = sa.func.coalesce(ra.c.used, ra.c.requested)
+    stmt = (
+        sa.select(
+            kernels.c.session_id,
+            ra.c.slot_name,
+            sa.func.sum(effective).label("total"),
+        )
+        .select_from(ra.join(kernels, ra.c.kernel_id == kernels.c.id))
+        .where(
+            kernels.c.session_id.in_(session_ids),
+            ra.c.free_at.is_(None),
+        )
+        .group_by(kernels.c.session_id, ra.c.slot_name)
+    )
+    rows = (await db_session.execute(stmt)).all()
+    slots_map: dict[SessionId, ResourceSlot] = {}
+    for r in rows:
+        sid = SessionId(r.session_id)
+        if sid not in slots_map:
+            slots_map[sid] = ResourceSlot()
+        slots_map[sid][r.slot_name] = r.total
+    for session_row in session_rows:
+        # Use set_committed_value to avoid marking the attribute as dirty
+        # in readonly sessions.
+        sa.orm.attributes.set_committed_value(
+            session_row,
+            "occupying_slots",
+            slots_map.get(SessionId(session_row.id), ResourceSlot()),
+        )

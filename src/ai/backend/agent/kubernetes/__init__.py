@@ -15,7 +15,7 @@ from .resources import load_resources, scan_available_resources
 
 class KubernetesAgentDiscovery(AbstractAgentDiscovery):
     @override
-    def get_agent_cls(self) -> type[AbstractAgent]:
+    def get_agent_cls(self) -> type[AbstractAgent[Any, Any]]:
         return KubernetesAgent
 
     @override

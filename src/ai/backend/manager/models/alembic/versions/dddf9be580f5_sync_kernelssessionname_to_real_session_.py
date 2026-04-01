@@ -18,7 +18,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     conn = op.get_bind()
     sync_stmt = textwrap.dedent(
         """
@@ -32,5 +32,5 @@ def upgrade():
     conn.execute(text(sync_stmt))
 
 
-def downgrade():
+def downgrade() -> None:
     pass

@@ -7,7 +7,7 @@ from typing import Any, override
 
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
@@ -19,7 +19,7 @@ class ObjectStorageUpdaterSpec(UpdaterSpec[ObjectStorageRow]):
     access_key: OptionalState[str] = field(default_factory=OptionalState.nop)
     secret_key: OptionalState[str] = field(default_factory=OptionalState.nop)
     endpoint: OptionalState[str] = field(default_factory=OptionalState.nop)
-    region: OptionalState[str] = field(default_factory=OptionalState.nop)
+    region: TriState[str] = field(default_factory=TriState.nop)
 
     @property
     @override

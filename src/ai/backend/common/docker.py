@@ -13,11 +13,12 @@ from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
     TYPE_CHECKING,
+    Any,
     Final,
     Literal,
     NamedTuple,
-    Optional,
     Self,
+    cast,
 )
 
 import aiohttp
@@ -173,7 +174,7 @@ def get_docker_context_host() -> str | None:
     for meta_path in (Path.home() / ".docker" / "contexts" / "meta").glob("*/meta.json"):
         context_data = json.loads(meta_path.read_bytes())
         if context_data["Name"] == current_context_name:
-            return context_data["Endpoints"]["docker"]["Host"]
+            return cast(str | None, context_data["Endpoints"]["docker"]["Host"])
     return None
 
 
@@ -181,6 +182,8 @@ def parse_docker_host_url(
     docker_host: yarl.URL,
 ) -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
     connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+    path: Path
+    decoded_path: str
     match docker_host.scheme:
         case "http" | "https":
             return None, docker_host, aiohttp.TCPConnector()
@@ -211,6 +214,7 @@ def _search_docker_socket_files_impl() -> tuple[
     Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
 ]:
     connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+    search_paths: list[Path]
     match sys.platform:
         case "linux" | "darwin":
             search_paths = [
@@ -275,8 +279,8 @@ def get_docker_connector() -> DockerConnector:
 
 
 async def login(
-    sess: aiohttp.ClientSession, registry_url: yarl.URL, credentials: dict, scope: str
-) -> dict:
+    sess: aiohttp.ClientSession, registry_url: yarl.URL, credentials: dict[str, Any], scope: str
+) -> dict[str, Any]:
     """
     Authorize to the docker registry using the given credentials and token scope, and returns a set
     of required aiohttp.ClientSession.request() keyword arguments for further API requests.
@@ -284,7 +288,7 @@ async def login(
     Some registry servers only rely on HTTP Basic Authentication without token-based access controls
     (usually via nginx proxy). We do support them also. :)
     """
-    basic_auth: Optional[aiohttp.BasicAuth]
+    basic_auth: aiohttp.BasicAuth | None
 
     if credentials.get("username") and credentials.get("password"):
         basic_auth = aiohttp.BasicAuth(
@@ -357,15 +361,15 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
             common_labels.update(inference_labels)
         case _:
             pass
-    return common_labels
+    return cast(dict[str, str], common_labels)
 
 
-class PlatformTagSet(Mapping):
+class PlatformTagSet(Mapping[str, str]):
     __slots__ = ("_data",)
     _data: dict[str, str]
     _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z_]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
 
-    def __init__(self, tags: Iterable[str], value: Optional[str] = None) -> None:
+    def __init__(self, tags: Iterable[str], value: str | None = None) -> None:
         self._data = dict()
         rx = type(self)._rx_ver
         for tag in tags:
@@ -386,7 +390,7 @@ class PlatformTagSet(Mapping):
     def __str__(self) -> str:
         return f"PlatformTagSet({self._data!s})"
 
-    def has(self, key: str, version: Optional[str] = None):
+    def has(self, key: str, version: str | None = None) -> bool:
         if version is None:
             return key in self._data
         _v = self._data.get(key, None)
@@ -401,10 +405,10 @@ class PlatformTagSet(Mapping):
     def __len__(self) -> int:
         return len(self._data)
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, (set, frozenset)):
             return set(self._data.keys()) == other
-        return self._data == other
+        return cast(bool, self._data == other)
 
 
 class ParsedImageStr(NamedTuple):
@@ -589,7 +593,7 @@ class ImageRef:
             image = default_repository + "/" + image
         return image, tag
 
-    def _update_tag_set(self):
+    def _update_tag_set(self) -> None:
         tags = self.tag.split("-")
         self._tag_set = (tags[0], PlatformTagSet(tags[1:], self.name))
 
@@ -624,7 +628,9 @@ class ImageRef:
         return ret
 
     @staticmethod
-    def merge_aliases(genned_aliases_1, genned_aliases_2) -> Mapping[str, ImageRef]:
+    def merge_aliases(
+        genned_aliases_1: Mapping[str, ImageRef], genned_aliases_2: Mapping[str, ImageRef]
+    ) -> Mapping[str, ImageRef]:
         ret = {}
         aliases_set_1, aliases_set_2 = set(genned_aliases_1.keys()), set(genned_aliases_2.keys())
         aliases_dup = aliases_set_1 & aliases_set_2
@@ -668,7 +674,9 @@ class ImageRef:
     def __hash__(self) -> int:
         return hash((self.project, self.name, self.tag, self.registry, self.architecture))
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, ImageRef):
+            return NotImplemented
         if self == other:  # call __eq__ first for resolved check
             return False
         if not (self.name == other.name and self.project == other.project):

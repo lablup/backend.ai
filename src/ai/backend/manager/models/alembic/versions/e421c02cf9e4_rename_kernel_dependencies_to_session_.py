@@ -16,7 +16,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.drop_constraint("fk_kernel_dependencies_depends_on_kernels", "kernel_dependencies")
     op.drop_constraint("fk_kernel_dependencies_kernel_id_kernels", "kernel_dependencies")
     op.rename_table("kernel_dependencies", "session_dependencies")
@@ -57,7 +57,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_constraint("fk_session_dependencies_depends_on_kernels", "session_dependencies")
     op.drop_constraint("fk_session_dependencies_session_id_kernels", "session_dependencies")
     op.rename_table("session_dependencies", "kernel_dependencies")

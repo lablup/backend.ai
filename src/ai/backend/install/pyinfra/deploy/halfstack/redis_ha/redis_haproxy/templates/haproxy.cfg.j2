@@ -1,0 +1,44 @@
+global
+    maxconn 32768
+    log stdout local0
+
+defaults
+    timeout client 300s
+    timeout connect 4s
+    timeout server 300s
+    mode tcp
+    log global
+    option tcplog
+
+listen stats
+    bind :{{ config.haproxy_stat_port }}
+    mode http
+    stats enable
+    stats hide-version
+    stats realm Haproxy\ Statistics
+    stats uri /stats
+    stats admin if LOCALHOST
+
+frontend redis
+    bind :6379
+    default_backend redis-cluster
+
+backend redis-cluster
+    option tcp-check
+
+    # Comprehensive Redis health check
+    tcp-check connect
+    tcp-check send "AUTH\ $REDIS_PASSWORD\r\n"
+    tcp-check expect string +OK
+    tcp-check send PING\r\n
+    tcp-check expect string +PONG
+    tcp-check send INFO\ REPLICATION\r\n
+    tcp-check expect string role:master
+    tcp-check send QUIT\r\n
+    tcp-check expect string +OK
+
+    # Server configuration with health checks
+    default-server check inter 1s fall 3 rise 2 on-marked-down shutdown-sessions
+{%- for node in config.cluster_nodes %}
+    server redis{{ node.node_number }} {{ node.ip }}:{{ node.port }}
+{%- endfor %}

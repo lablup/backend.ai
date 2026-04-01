@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
 from redis.asyncio import Redis
 
@@ -28,7 +29,7 @@ class CoordinatorValkeyClients:
 
     valkey_live: ValkeyLiveClient
     core_valkey_live: ValkeyLiveClient
-    redis_lock: Redis
+    redis_lock: Redis[Any]
     valkey_schedule: ValkeyScheduleClient
 
 

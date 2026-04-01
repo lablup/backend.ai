@@ -112,7 +112,7 @@ def check(
 
     async def _display_health_results(
         health_response: ConnectivityCheckResponse,
-        no_timestamps: bool,
+        _no_timestamps: bool,
     ) -> None:
         """Display health check results."""
         # Group by service group

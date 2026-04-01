@@ -1,0 +1,22 @@
+[Unit]
+Description= Backend.AI Agent service
+Requires=backendai-watcher.service
+After=network.target remote-fs.target backendai-watcher.service
+
+[Service]
+Type=simple
+ExecStart={{ home_dir }}/bin/run-{{ service_name }}.sh
+PIDFile={{ home_dir }}/{{ service_name }}/{{ service_name }}.pid
+WorkingDirectory={{ home_dir }}/{{ service_name }}
+TimeoutStopSec=5
+KillMode=mixed
+KillSignal=SIGINT
+PrivateTmp=false
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=5242880
+LimitNPROC=131072
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target

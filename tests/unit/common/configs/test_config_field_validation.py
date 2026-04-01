@@ -7,7 +7,17 @@ from typing import Annotated, Any, get_args, get_origin
 import pytest
 from pydantic import BaseModel
 
+from ai.backend.agent.config.unified import (
+    AgentGlobalConfig,
+    AgentOverrideConfig,
+    AgentSpecificConfig,
+)
+from ai.backend.appproxy.coordinator.config import ProxyCoordinatorConfig
+from ai.backend.appproxy.worker.config import ProxyWorkerConfig
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType
+from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
+from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 
 def get_annotation_with_metadata(model: type[BaseModel], field_name: str) -> Any:
@@ -119,8 +129,6 @@ class TestManagerConfigFieldValidation:
 
     @pytest.fixture
     def manager_config(self) -> type[BaseModel]:
-        from ai.backend.manager.config.unified import ManagerUnifiedConfig
-
         return ManagerUnifiedConfig
 
     def test_all_fields_have_meta(self, manager_config: type[BaseModel]) -> None:
@@ -147,12 +155,6 @@ class TestAgentConfigFieldValidation:
 
     @pytest.fixture
     def agent_configs(self) -> list[type[BaseModel]]:
-        from ai.backend.agent.config.unified import (
-            AgentGlobalConfig,
-            AgentOverrideConfig,
-            AgentSpecificConfig,
-        )
-
         return [AgentGlobalConfig, AgentSpecificConfig, AgentOverrideConfig]
 
     def test_all_fields_have_meta(self, agent_configs: list[type[BaseModel]]) -> None:
@@ -173,8 +175,6 @@ class TestStorageConfigFieldValidation:
 
     @pytest.fixture
     def storage_config(self) -> type[BaseModel]:
-        from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
-
         return StorageProxyUnifiedConfig
 
     def test_all_fields_have_meta(self, storage_config: type[BaseModel]) -> None:
@@ -191,8 +191,6 @@ class TestWebConfigFieldValidation:
 
     @pytest.fixture
     def web_config(self) -> type[BaseModel]:
-        from ai.backend.web.config.unified import WebServerUnifiedConfig
-
         return WebServerUnifiedConfig
 
     def test_all_fields_have_meta(self, web_config: type[BaseModel]) -> None:
@@ -209,9 +207,6 @@ class TestAppProxyConfigFieldValidation:
 
     @pytest.fixture
     def appproxy_configs(self) -> list[type[BaseModel]]:
-        from ai.backend.appproxy.coordinator.config import ProxyCoordinatorConfig
-        from ai.backend.appproxy.worker.config import ProxyWorkerConfig
-
         return [ProxyCoordinatorConfig, ProxyWorkerConfig]
 
     def test_all_fields_have_meta(self, appproxy_configs: list[type[BaseModel]]) -> None:

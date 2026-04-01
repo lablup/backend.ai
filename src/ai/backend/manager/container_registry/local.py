@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import override
+from typing import Any, override
 
 import aiohttp
 import sqlalchemy as sa
@@ -60,13 +60,13 @@ class LocalRegistry(BaseContainerRegistry):
     async def _scan_tag_local(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args: dict[str, str],
+        _rqst_args: dict[str, str],
         image: str,
         tag: str,
     ) -> None:
         async def _read_image_info(
             _tag: str,
-        ) -> tuple[dict[str, dict], str | None]:
+        ) -> tuple[dict[str, dict[str, Any]], str | None]:
             async with sess.get(
                 self.registry_url / "images" / f"{image}:{tag}" / "json"
             ) as response:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import graphene
 import sqlalchemy as sa
@@ -38,8 +38,9 @@ __all__ = (
     "UserInfo",
 )
 
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import agg_to_array
 
@@ -54,7 +55,7 @@ from .base import (
 )
 
 
-class UserInfo(graphene.ObjectType):
+class UserInfo(graphene.ObjectType):  # type: ignore[misc]
     email = graphene.String()
     full_name = graphene.String()
 
@@ -62,8 +63,8 @@ class UserInfo(graphene.ObjectType):
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row,
-    ) -> Optional[UserInfo]:
+        row: Row[Any] | None,
+    ) -> UserInfo | None:
         if row is None:
             return None
         return cls(email=row.email, full_name=row.full_name)
@@ -73,10 +74,10 @@ class UserInfo(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         user_uuids: Sequence[uuid.UUID],
-    ) -> Sequence[Optional[UserInfo]]:
-        async with ctx.db.begin_readonly() as conn:
-            from .user import users
+    ) -> Sequence[UserInfo | None]:
+        from ai.backend.manager.models.user.row import users
 
+        async with ctx.db.begin_readonly() as conn:
             query = (
                 sa.select(users.c.uuid, users.c.email, users.c.full_name)
                 .select_from(users)
@@ -92,7 +93,7 @@ class UserInfo(graphene.ObjectType):
             )
 
 
-class KeyPair(graphene.ObjectType):
+class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -135,7 +136,7 @@ class KeyPair(graphene.ObjectType):
     ) -> UserInfo:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "UserInfo.by_uuid")
-        return await loader.load(self.user)
+        return cast(UserInfo, await loader.load(self.user))
 
     @classmethod
     def from_data(cls, data: KeyPairData) -> Self:
@@ -155,7 +156,7 @@ class KeyPair(graphene.ObjectType):
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row,
+        row: Row[Any],
     ) -> KeyPair:
         return cls(
             id=row.access_key,
@@ -195,17 +196,18 @@ class KeyPair(graphene.ObjectType):
     async def resolve_vfolders(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolder]:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "VirtualFolder")
-        return await loader.load(self.access_key)
+        return cast(Sequence[VirtualFolder], await loader.load(self.access_key))
 
     async def resolve_compute_sessions(
-        self, info: graphene.ResolveInfo, raw_status: Optional[str] = None
-    ):
+        self, info: graphene.ResolveInfo, raw_status: str | None = None
+    ) -> list[ComputeSession]:
         ctx: GraphQueryContext = info.context
 
+        status: KernelStatus | None = None
         if raw_status is not None:
             status = KernelStatus[raw_status]
         loader = ctx.dataloader_manager.get_loader(ctx, "ComputeSession", status=status)
-        return await loader.load(self.access_key)
+        return cast(list[ComputeSession], await loader.load(self.access_key))
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
@@ -230,11 +232,11 @@ class KeyPair(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
-        limit: Optional[int] = None,
+        domain_name: str | None = None,
+        is_active: bool | None = None,
+        limit: int | None = None,
     ) -> Sequence[KeyPair]:
-        from .user import users
+        from ai.backend.manager.models.user.row import users
 
         j = sa.join(
             keypairs,
@@ -290,13 +292,13 @@ class KeyPair(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        email: Optional[str] = None,
-        is_active: Optional[bool] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        email: str | None = None,
+        is_active: bool | None = None,
+        filter: str | None = None,
     ) -> int:
-        from .group import association_groups_users, groups
-        from .user import users
+        from ai.backend.manager.models.group.row import association_groups_users, groups
+        from ai.backend.manager.models.user.row import users
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
@@ -324,14 +326,14 @@ class KeyPair(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        email: Optional[str] = None,
-        is_active: Optional[bool] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        email: str | None = None,
+        is_active: bool | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[KeyPair]:
-        from .group import association_groups_users, groups
-        from .user import users
+        from ai.backend.manager.models.group.row import association_groups_users, groups
+        from ai.backend.manager.models.user.row import users
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
@@ -377,11 +379,11 @@ class KeyPair(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         user_ids: Sequence[uuid.UUID],
         *,
-        domain_name: Optional[str] = None,
-        is_active: Optional[bool] = None,
-    ) -> Sequence[Sequence[Optional[KeyPair]]]:
-        from .group import association_groups_users, groups
-        from .user import users
+        domain_name: str | None = None,
+        is_active: bool | None = None,
+    ) -> Sequence[Sequence[KeyPair | None]]:
+        from ai.backend.manager.models.group.row import association_groups_users, groups
+        from ai.backend.manager.models.user.row import users
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
@@ -419,10 +421,10 @@ class KeyPair(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         access_keys: Sequence[AccessKey],
         *,
-        domain_name: Optional[str] = None,
-    ) -> Sequence[Optional[KeyPair]]:
-        from .group import association_groups_users, groups
-        from .user import users
+        domain_name: str | None = None,
+    ) -> Sequence[KeyPair | None]:
+        from ai.backend.manager.models.group.row import association_groups_users, groups
+        from ai.backend.manager.models.user.row import users
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
@@ -453,14 +455,14 @@ class KeyPair(graphene.ObjectType):
             )
 
 
-class KeyPairList(graphene.ObjectType):
+class KeyPairList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(KeyPair, required=True)
 
 
-class KeyPairInput(graphene.InputObjectType):
+class KeyPairInput(graphene.InputObjectType):  # type: ignore[misc]
     is_active = graphene.Boolean(required=False, default_value=True)
     is_admin = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=True)
@@ -479,7 +481,7 @@ class KeyPairInput(graphene.InputObjectType):
         )
 
 
-class ModifyKeyPairInput(graphene.InputObjectType):
+class ModifyKeyPairInput(graphene.InputObjectType):  # type: ignore[misc]
     is_active = graphene.Boolean(required=False)
     is_admin = graphene.Boolean(required=False)
     resource_policy = graphene.String(required=False)
@@ -487,7 +489,7 @@ class ModifyKeyPairInput(graphene.InputObjectType):
     rate_limit = graphene.Int(required=False)
 
 
-class CreateKeyPair(graphene.Mutation):
+class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -501,12 +503,12 @@ class CreateKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         user_id: str,
         props: KeyPairInput,
     ) -> CreateKeyPair:
-        from .user import users
+        from ai.backend.manager.models.user.row import users
 
         graph_ctx: GraphQueryContext = info.context
         data = prepare_new_keypair(user_id, props.to_creator())
@@ -517,7 +519,7 @@ class CreateKeyPair(graphene.Mutation):
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
 
 
-class ModifyKeyPair(graphene.Mutation):
+class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -530,7 +532,7 @@ class ModifyKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
         props: ModifyKeyPairInput,
@@ -546,7 +548,7 @@ class ModifyKeyPair(graphene.Mutation):
         return await simple_db_mutate(cls, ctx, update_query)
 
 
-class DeleteKeyPair(graphene.Mutation):
+class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -558,11 +560,11 @@ class DeleteKeyPair(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
     ) -> DeleteKeyPair:
-        from .user import UserRow
+        from ai.backend.manager.models.user.row import UserRow
 
         ctx: GraphQueryContext = info.context
         async with ctx.db.begin_readonly_session() as db_session:
@@ -571,7 +573,7 @@ class DeleteKeyPair(graphene.Mutation):
                 .select_from(UserRow)
                 .where(UserRow.main_access_key == access_key)
             )
-            if (await db_session.scalar(user_query)) > 0:
+            if (await db_session.scalar(user_query) or 0) > 0:
                 return DeleteKeyPair(False, "the keypair is used as main access key by any user")
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
         result = await simple_db_mutate(cls, ctx, delete_query)

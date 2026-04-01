@@ -42,7 +42,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
                 os.fsencode(dst_path),
             ])
         except CalledProcessError as e:
-            raise PureStorageCommandFailedError(f'"pcp" command failed: {e.stderr}')
+            raise PureStorageCommandFailedError(f'"pcp" command failed: {e.stderr}') from e
 
     async def delete_tree(
         self,
@@ -55,7 +55,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
                 os.fsencode(path),
             ])
         except CalledProcessError as e:
-            raise PureStorageCommandFailedError(f"'prm' command failed: {e.stderr}")
+            raise PureStorageCommandFailedError(f"'prm' command failed: {e.stderr}") from e
 
     def scan_tree(
         self,
@@ -131,6 +131,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
             raise SubprocessStdoutNotAvailableError("pdu process stdout is not available")
         try:
             # TODO: check slowdowns when there are millions of files
+            line: bytes = b""
             while True:
                 try:
                     line = await proc.stdout.readuntil(b"\0")

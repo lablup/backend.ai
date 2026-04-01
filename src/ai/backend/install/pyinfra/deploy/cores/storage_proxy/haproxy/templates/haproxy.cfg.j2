@@ -1,0 +1,64 @@
+global
+  maxconn 60000
+  log stdout format raw local0 warning  # print logs to stdout
+
+defaults
+  mode http
+  log global
+  option httplog
+  option http-server-close
+  option dontlognull
+  # option redispatch
+  option contstats
+  option tcp-check
+  retries 3
+  backlog 10000
+  timeout client          25s
+  timeout connect          5s
+  timeout server          25s
+  timeout tunnel        3600s
+  timeout http-keep-alive 60s
+  timeout http-request    15s
+  timeout queue           30s
+  timeout tarpit          60s
+  default-server inter 3s rise 2 fall 3
+  option forwardfor
+
+frontend stats
+  bind *:7999
+  stats enable
+  stats uri /stats
+  stats refresh 10s
+  stats admin if LOCALHOST
+
+
+# -- Storage Proxy
+frontend fe_storage_proxy
+  bind *:{{ haproxy_service_port }}
+  # bind *:6021 ssl crt /etc/web_cert/full.crt
+  # http-request redirect scheme https unless { ssl_fc }
+  default_backend be_storage_proxy_client
+
+backend be_storage_proxy_client
+  balance url_param token
+  hash-type consistent
+  http-request set-header X-Forwarded-Port %[dst_port]
+  http-request add-header X-Forwarded-Proto https if { ssl_fc }
+  http-response set-header HA-storage-proxy %s
+  option httpchk GET /
+  default-server check inter 1s fall 3 rise 2 on-marked-down shutdown-sessions
+{%- for node in storage_proxy_nodes %}
+  server {{ node.name }} {{ node.hostname }}:{{ storageproxy_port }} weight 1
+{%- endfor %}
+
+frontend fe_storage_proxy_manager
+  bind :6022
+  default_backend be_storage_proxy_manager
+
+backend be_storage_proxy_manager
+  default-server check inter 1s fall 3 rise 2 on-marked-down shutdown-sessions
+  fullconn 32768
+  option httpchk GET /
+{%- for node in storage_proxy_nodes %}
+  server {{ node.name }} {{ node.hostname }}:{{ storageproxy_manager_port }} weight 1
+{%- endfor %}

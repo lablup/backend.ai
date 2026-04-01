@@ -1,39 +1,41 @@
-from enum import StrEnum
+from ai.backend.common.types import CIStrEnum
 
 
-class ReadinessStatus(StrEnum):
+class ReadinessStatus(CIStrEnum):
     NOT_CHECKED = "NOT_CHECKED"
     HEALTHY = "HEALTHY"
     UNHEALTHY = "UNHEALTHY"
 
 
-class LivenessStatus(StrEnum):
+class LivenessStatus(CIStrEnum):
     NOT_CHECKED = "NOT_CHECKED"
     HEALTHY = "HEALTHY"
     UNHEALTHY = "UNHEALTHY"
     DEGRADED = "DEGRADED"
 
 
-class ActivenessStatus(StrEnum):
+class ActivenessStatus(CIStrEnum):
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
 
 
-class ModelDeploymentStatus(StrEnum):
+class ModelDeploymentStatus(CIStrEnum):
     PENDING = "PENDING"
     SCALING = "SCALING"
     DEPLOYING = "DEPLOYING"
     READY = "READY"
+    DESTROYING = "DESTROYING"
+    DESTROYED = "DESTROYED"
     STOPPING = "STOPPING"
     STOPPED = "STOPPED"
 
 
-class DeploymentStrategy(StrEnum):
+class DeploymentStrategy(CIStrEnum):
     ROLLING = "ROLLING"
     BLUE_GREEN = "BLUE_GREEN"
 
 
-class RouteStatus(StrEnum):
+class RouteStatus(CIStrEnum):
     """Status of a route in the deployment."""
 
     PROVISIONING = "provisioning"
@@ -45,7 +47,7 @@ class RouteStatus(StrEnum):
     FAILED_TO_START = "failed_to_start"
 
 
-class RouteTrafficStatus(StrEnum):
+class RouteTrafficStatus(CIStrEnum):
     """Traffic routing status for a route.
 
     Controls whether traffic should be sent to this route.

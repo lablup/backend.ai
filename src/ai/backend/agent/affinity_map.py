@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import attr
 import networkx as nx
@@ -28,12 +28,12 @@ class AffinityHint:
     as the allocation proceeds with the next resource slot.
     """
 
-    devices: Optional[Sequence[AbstractComputeDevice]]
+    devices: Sequence[AbstractComputeDevice] | None
     affinity_map: AffinityMap
     policy: AffinityPolicy
 
 
-class AffinityMap(nx.Graph):
+class AffinityMap(nx.Graph):  # type: ignore[misc]
     """
     Represents the NUMA distance matrix of all device pairs from all compute device plugins.
     """

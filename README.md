@@ -22,7 +22,7 @@ Requirements
 
 ### Python & Build Tools
 
-- **Python**: 3.14.x (main branch requires CPython 3.14.2)
+- **Python**: 3.14.x (main branch requires CPython 3.14.3)
 - **Pantsbuild**: 2.29.x
 - See [full version compatibility table](src/ai/backend/README.md#development-setup)
 
@@ -348,8 +348,8 @@ Backend.AI uses Git pre-commit hooks to maintain code quality:
 
 ```bash
 # Automatically runs on every commit:
+# - Auto-formatting (pants fmt)
 # - Linting (pants lint)
-# - Type checking (pants check)
 
 # Bypass hooks if needed (use sparingly)
 git commit --no-verify
@@ -357,9 +357,8 @@ git commit --no-verify
 
 The pre-commit hook validates:
 - Code style and formatting
-- Type annotations
 
-Tests run in CI for comprehensive coverage.
+Type checking and tests run in CI for comprehensive coverage.
 
 See [CLAUDE.md](CLAUDE.md#hooks-and-code-quality) for detailed hook system documentation.
 
@@ -369,6 +368,32 @@ For detailed development setup, build system usage, and contribution guidelines:
 - [Development Setup](src/ai/backend/README.md#development-setup) - Python versions, Pantsbuild, dependency management
 - [CONTRIBUTING.md](.github/CONTRIBUTING.md) - Contribution guidelines and development workflow
 - [MIGRATION.md](MIGRATION.md) - Migration guide for major version updates
+
+#### CLI Tab Completion for Development
+
+To enable shell tab completion for the Backend.AI CLI during development:
+
+```bash
+# For bash/zsh (from repository root) - MUST use 'source', not execute directly
+source scripts/setup-dev-completion.sh
+
+# For fish shell
+source scripts/setup-dev-completion.fish
+
+# Or create a permanent alias
+# bash/zsh:
+echo 'alias bai-dev="cd /path/to/backend.ai && source scripts/setup-dev-completion.sh"' >> ~/.zshrc
+# fish:
+echo 'alias bai-dev="cd /path/to/backend.ai; and source scripts/setup-dev-completion.fish"' >> ~/.config/fish/config.fish
+```
+
+This will enable tab completion for:
+- `backend.ai <tab>` - Show all commands
+- `backend.ai session <tab>` - Session management
+- `backend.ai admin <tab>` - Admin operations
+- `backend.ai --<tab>` - Global options
+
+Supports **bash**, **zsh**, and **fish** shells.
 
 License
 -------

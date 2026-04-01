@@ -1,11 +1,12 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, override
+from typing import override
 
 from aiohttp import web
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.auth.actions.base import AuthAction
 
 
@@ -18,13 +19,13 @@ class UpdatePasswordNoAuthAction(AuthAction):
     new_password: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update_password_no_auth"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @property
     def hook_params(self) -> dict[str, str]:
@@ -42,5 +43,5 @@ class UpdatePasswordNoAuthActionResult(BaseActionResult):
     password_changed_at: datetime
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.user_id)

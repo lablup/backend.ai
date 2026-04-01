@@ -3,13 +3,12 @@ from __future__ import annotations
 import enum
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Generic,
-    Optional,
     Protocol,
     TypeVar,
 )
@@ -87,7 +86,7 @@ TVal = TypeVar("TVal")
 
 
 @dataclass
-class TriState(Generic[TVal]):
+class TriState[TVal]:
     """
     TriState is a class that represents partial updates to an attribute of an object.
     It is used to indicate whether an attribute should be updated, set to None, or not modified at all.
@@ -98,9 +97,9 @@ class TriState(Generic[TVal]):
     """
 
     _state: _TriStateEnum
-    _value: Optional[TVal]
+    _value: TVal | None
 
-    def __init__(self, state: _TriStateEnum, value: Optional[TVal]) -> None:
+    def __init__(self, state: _TriStateEnum, value: TVal | None) -> None:
         """
         Initialize a TriState object with the given state and value.
         Do not call this constructor directly. Use the class methods instead.
@@ -109,7 +108,7 @@ class TriState(Generic[TVal]):
         self._value = value
 
     @classmethod
-    def from_graphql(cls, value: Optional[TVal] | UndefinedType) -> TriState[TVal]:
+    def from_graphql(cls, value: TVal | None | UndefinedType) -> TriState[TVal]:
         if value is None:
             return cls.nullify()
         if isinstance(value, (UndefinedType, UnsetType)):
@@ -139,7 +138,7 @@ class TriState(Generic[TVal]):
             raise ValueError("TriState value is not set when state is UPDATE")
         return self._value
 
-    def optional_value(self) -> Optional[TVal]:
+    def optional_value(self) -> TVal | None:
         """
         Returns the value of the TriState object.
         When state is not UPDATE, it returns None.
@@ -149,6 +148,13 @@ class TriState(Generic[TVal]):
         if self._state == _TriStateEnum.UPDATE:
             return self._value
         return None
+
+    def map[TNew](self, fn: Callable[[TVal], TNew]) -> TriState[TNew]:
+        if self._state == _TriStateEnum.UPDATE:
+            return TriState.update(fn(self.value()))
+        if self._state == _TriStateEnum.NULLIFY:
+            return TriState.nullify()
+        return TriState.nop()
 
     def update_dict(self, dict: dict[str, Any], attr_name: str) -> None:
         match self._state:
@@ -160,7 +166,7 @@ class TriState(Generic[TVal]):
                 pass
 
 
-class OptionalState(Generic[TVal]):
+class OptionalState[TVal]:
     """
     OptionalState is a class that represents partial updates to an attribute of an object.
     It is used to indicate whether an attribute should be updated or not modified at all.
@@ -171,16 +177,16 @@ class OptionalState(Generic[TVal]):
     """
 
     _state: _TriStateEnum
-    _value: Optional[TVal]
+    _value: TVal | None
 
-    def __init__(self, state: _TriStateEnum, value: Optional[TVal]) -> None:
+    def __init__(self, state: _TriStateEnum, value: TVal | None) -> None:
         if state == _TriStateEnum.NULLIFY:
             raise ValueError("OptionalState cannot be NULLIFY")
         self._state = state
         self._value = value
 
     @classmethod
-    def from_graphql(cls, value: Optional[TVal] | UndefinedType | UnsetType) -> OptionalState[TVal]:
+    def from_graphql(cls, value: TVal | None | UndefinedType | UnsetType) -> OptionalState[TVal]:
         if isinstance(value, (UndefinedType, UnsetType)):
             return OptionalState.nop()
         if value is None:
@@ -206,7 +212,7 @@ class OptionalState(Generic[TVal]):
             raise ValueError("TriState value is not set when state is UPDATE")
         return self._value
 
-    def optional_value(self) -> Optional[TVal]:
+    def optional_value(self) -> TVal | None:
         """
         Returns the value of the TriState object.
         When state is not UPDATE, it returns None.
@@ -216,6 +222,11 @@ class OptionalState(Generic[TVal]):
         if self._state == _TriStateEnum.UPDATE:
             return self._value
         return None
+
+    def map[TNew](self, fn: Callable[[TVal], TNew]) -> OptionalState[TNew]:
+        if self._state == _TriStateEnum.UPDATE:
+            return OptionalState.update(fn(self.value()))
+        return OptionalState.nop()
 
     def update_dict(self, dict: dict[str, Any], attr_name: str) -> None:
         match self._state:
@@ -234,28 +245,28 @@ class SMTPTriggerPolicy(enum.StrEnum):
 class OffsetBasedPaginationOptions:
     """Standard offset/limit pagination options."""
 
-    offset: Optional[int] = None
-    limit: Optional[int] = None
+    offset: int | None = None
+    limit: int | None = None
 
 
 @dataclass
 class ForwardPaginationOptions:
     """Forward pagination: fetch items after a given cursor."""
 
-    after: Optional[str] = None
-    first: Optional[int] = None
+    after: str | None = None
+    first: int | None = None
 
 
 @dataclass
 class BackwardPaginationOptions:
     """Backward pagination: fetch items before a given cursor."""
 
-    before: Optional[str] = None
-    last: Optional[int] = None
+    before: str | None = None
+    last: int | None = None
 
 
 @dataclass
 class PaginationOptions:
-    forward: Optional[ForwardPaginationOptions] = None
-    backward: Optional[BackwardPaginationOptions] = None
-    offset: Optional[OffsetBasedPaginationOptions] = None
+    forward: ForwardPaginationOptions | None = None
+    backward: BackwardPaginationOptions | None = None
+    offset: OffsetBasedPaginationOptions | None = None

@@ -1,333 +1,99 @@
-# Coding guidelines for AI Coding Agents
+# Coding Guidelines for AI Coding Agents
 
-This file provides guidance to AI coding agents when working with code in this repository.
+This file contains core rules for AI coding agents. For detailed patterns and workflows, use skills and documentation below.
 
+## Documentation Index
 
-## Project Overview
+**Core Documents (Read directly):**
+- `tests/CLAUDE.md` - Testing guidelines and strategies
+- `BUILDING.md` - Build system, quality enforcement, BUILD policies
+- `src/ai/backend/manager/models/alembic/README.md` - Alembic migration backport strategy
+- `README.md` - Project overview and architecture
+- `proposals/README.md` - BEP (Backend.AI Enhancement Proposals)
 
-Read `README.md` for overall architecture and purpose of directories.
+**Skills (Invoke with `/skill-name`):**
 
-This project uses a monorepo structure containing multiple Python pacakges under `ai.backend` namespace.
-Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
+Design: `/bep-guide`
+Development: `/repository-guide`, `/service-guide`, `/api-guide`, `/tdd-guide`
+Utilities: `/cli-executor`, `/db-status`, `/db-migrate`, `/local-dev`, `/halfstack`
 
+Skills are in `.claude/skills/{name}/SKILL.md`. See `.claude/skills/README.md` for complete documentation.
 
-## README-First Development
+## Absolute Rules
 
-**Always read the component README before making changes.**
+**NEVER bypass quality enforcement:**
+- Do NOT use `# noqa` to suppress linter warnings
+- Do NOT use `# type: ignore` to suppress type errors
+- Fix all quality issues immediately, even if unrelated to your change
 
-Key README locations:
-- Component: `src/ai/backend/{component}/README.md`
-- Manager sub-components: `manager/sokovan/`, `manager/services/`, `manager/repositories/`
+**Python critical rules:**
+- **Async-first**: All I/O operations MUST use async/await
+- **Exceptions**: All exceptions MUST inherit from `BackendAIError` (never raise built-in exceptions in business logic)
+- **Imports**: NEVER use parent relative imports (`from ..module`) - use absolute imports instead
 
-Update README when:
-- Adding new components, services, repositories, or APIs
-- Changing architecture or component dependencies
-- Adding new directories or significant structural changes
+**BUILD files:**
+- ❌ NEVER add BUILD files to `src/` directory
+- ✅ MUST add BUILD files to new test directories
+- Use `python_tests()` for test modules, `python_testutils()` for utilities
 
-Example: Adding a new service → Read `services/README.md` → Follow patterns → Update service index
+## Before Committing
 
-
-## BEP-First Development
-
-**For significant new features, check BEP (Backend.AI Enhancement Proposals) first.**
-
-BEP documents define architectural decisions, API designs, and implementation strategies for major features.
-
-### Before Starting Development
-
-1. Read `proposals/README.md` for the BEP process overview
-2. Check the BEP Number Registry table for existing proposals related to your work
-3. If a relevant BEP exists:
-   - Read the BEP document in `proposals/BEP-XXXX-*.md`
-   - Follow the design decisions and implementation plans documented
-4. If no BEP exists for a significant feature:
-   - **Do not start implementation** until the BEP is created and discussed
-   - Reserve a BEP number in the registry
-   - Create the BEP document using the template at `proposals/BEP-0000-template.md`
-   - Submit a PR and discuss with maintainers
-
-### When BEP is Required
-
-- New subsystems or major components
-- Significant API changes or additions
-- Architectural changes affecting multiple packages
-- New integrations with external systems
-- Changes to core workflows (scheduling, storage, etc.)
-
-### When BEP is NOT Required
-
-- Bug fixes
-- Minor enhancements to existing features
-- Refactoring without behavioral changes
-- Documentation updates
-- Test additions
-
-
-## General
-
-### Tidy First Approach
-
-* Separate all changes into two distinct types:
-  - STRUCTURAL CHANGES: Rearranging code without changing behavior (renaming, extracting methods, moving code)
-  - BEHAVIORAL CHANGES: Adding or modifying actual functionality
-* Never mix structural and behavioral changes in the same commit
-* Always make structural changes first when both are needed
-* Validate structural changes do not alter behavior by running tests before and after
-
-### Code Quality
-
-* Maintain high code quality throughout development
-* Eliminate duplication ruthlessly
-* Keep methods small and focused on a single responsibility
-* Minimize state and side effects
-* Use the simplest solution that could possibly work
-* Make dependencies explicit
-  - Use child relative imports (`from .submodule`) only for modules within the same package directory
-  - Use absolute imports (`from ai.backend.package.module`) for parent modules and cross-package references
-  - Never use parent relative imports (`from ..module`) - always convert to absolute imports
-* Express intent clearly through naming and structure
-* Name things with meaningful, predictable, and explicit but concise tones
-  - When reading codes, variable names should align with what intermediate-level developers could expect from them.
-  - The words in names should follow adjectives/descriptives and nouns in a meaningful order.
-    - Example: `container_user_info` vs. `user_container_info` means completely different things.
-      The former represents container-specific "user" information,
-      while the latter represents user-specific "container" information.
-  - Legacy stuffs should have distinguishable names
-  - Be cautious when naming similar but different stuffs to avoid reader's confusion
-* Avoid replicating legacy patterns when writing new codes
-  - Stick to the user prompts about the new code patterns
-
-### Working with Long Contexts
-
-* Store and consult the user request, your analysis and plans in `.claude/tasks/{job-slug}.md`
-  when the user request is expected to require a long context
-  - Example: `./claude/tasks/refactor-sokovan-scheduler.md`
-* Split large work into step by step sprints
-* Update the current design and next plans in `{job-slug}.md` when completing a sprint
-* Do not make changes beyond those originally asked for but explicitly proceed with user confirmation
-
-### Python Specifics
-
-* **Latest Syntax and Patterns**: No need to add branches or fallbacks for Python 3.11 or older
-  - Use the pattern matching syntax when there are self-repeating if-elif statements
-* **Async-first**: All I/O operations use async/await
-* **Type Hints**: Comprehensive type annotations required
-  - Put `from __future__ import annotations` if not exists and do not stringify type annotations
-  - Use `typing.TYPE_CHECKING` to import annotation-only references to avoid circular imports and break deep dependency chains between Python modules
-  - Use `typing.cast()` sparingly but explicitly specify the types in the LHS of assignments when the RHS expression is `Any` or has unknown types
-  - DO NOT forget adding return type annotations of all functions and methods
-  - Use `collections.abc` when referring to generic collection/container types such as `Mapping`, `Sequence`, `Iterable`, `Awaitable`, etc.
-* **Structured Logging**: Use `ai.backend.logging.BraceStyleAdapter` for consistent logging
-* **Configuration**: Use Pydantic models for validation and serilization for configurations and DTOs
-* **Error Handling**: Comprehensive exception handling with proper logging
-
-### Directory Conventions
-
-- Packages in `src/ai/backend/{package}` directories
-- Database schema in `src/ai/backend/{package}/models`
-- Data access and manipulation models in `src/ai/backend/{package}/repositories`
-- Connectors and client wrappers to external services and other packages in `src/ai/backend/{package}/clients`
-- Reusable business logic for individual features in `src/ai/backend/{package}/services`
-- API handlers and endpoints in `src/ai/backend/{pacakge}/api`
-- Component-specific local CLI commands based on Click in `src/ai/backend/{package}/cli`
-- Client SDK and CLI as the server-side API counterpart in `src/ai/backend/client`
-- Unit tests in `tests/{package}` subdirectories and written in pytest
-- Integration tests in `src/ai/backend/test`
-- Reusable helper utilities for testing in `src/ai/backend/testutils`
-
-### Python Module Conventions
-
-- `types.py`: Reusable type definitions such as pydantic models, dataclasses, enums, and constants annotated with `typing.Final`.
-- `abc.py`: Abstract base classes (ABCs) providing pure interfaces
-- `base.py`: Base classes providing shared, partial, reusable implementation for subclasses
-- `utils.py`: Reusable helper functions that are out of scope of the core logic or minor details
-- If the types or utilities could be shared with other `ai.backend` namespace packages, put them in the `ai.backend.common` package.
-
-### Writing Tests
-
-* Write the simplest failing test first
-  - Let tests verify the intention rather than direct inputs and outputs
-  - Avoid duplicating the original logic in tests
-* Implement the minimum code needed to make tests pass while preserving the design intention
-  - Avoid making simple branches just to satisfy test input combinations, but think about the fundamental fix
-* Refactor only after tests are passing
-* Use the tester subagent to run and write tests considering the general guides in this document
-  - `integration`: for tests requiring externally provisioned resources
-  - `asyncio`: for tests using async/await codes
-* Always add type annotations to test codes
-  - Add argument type annotations to the fixture references in test functions
-  - Add return type annotations to the fixture functions
-  - Add return type annotation (`-> None`) to the test functions
-* Utilize `typing.Protocol` and `typing.TypedDict` when typing mocked objects and functions if applicable
-  - When using partial data structures, use `typing.cast()` to minimal scopes.
-* Add BUILD files including `python_tests()` and `python_test_utils()` appropriately depending on the directory contents
-* Prefer pytest-style module-level test functions rather than unittest-style test classes
-
-### Database Tests with `with_tables`
-
-When writing repository tests that use real database with `with_tables` from `ai.backend.testutils.db`:
-
-* **Include all Row dependencies**: SQLAlchemy ORM uses string-based relationship references.
-  When a Row model has relationships to other Row models, all related models must be imported
-  AND included in `with_tables` to ensure proper mapper initialization.
-  ```python
-  # Example: If UserRow has relationship to EndpointRow
-  from ai.backend.manager.models.user import UserRow
-  from ai.backend.manager.models.endpoint import EndpointRow  # Required for UserRow's relationship
-
-  async with with_tables(db, [
-      DomainRow,
-      UserRow,
-      EndpointRow,  # Must be included, not just imported
-      # ... other dependencies
-  ]):
-  ```
-* **Order by FK dependencies**: Tables must be ordered with parent tables before children
-  to satisfy foreign key constraints during table creation.
-* **Trace relationship chains**: If `RowA` → `RowB` → `RowC` via relationships,
-  all three must be in `with_tables`. Check each Row's `relationship()` definitions
-  for string references to other Row classes.
-* **Do NOT use `# noqa: F401` for mapper-only imports**: All Row models needed for mapper
-  configuration should also be in `with_tables` to avoid FK constraint errors.
-
-## Build System & Development Commands
-
-This project uses **Pantsbuild** (version 2) and Python as specified in the `pants.toml` configuration.
-All development commands use `pants` instead of `pip`, `poetry`, or `uv` commands.
-
-### Predefined sub-agents
-
-There are predefined sub-agents for this project: linter, typechecker, and tester.
-Use them proactively as their description specifies.
-
-### Running generic pants commands
-
-Most pants command accepts a special target argument which can indicate a set of files or the files
-changed for a specific revision range with optional transitive dependent files of the changed files.
-
-**Basic structure of pants commands:**
-```bash
-pants {global-options} {subcommand} {subcommand-options} {targets}
-pants {global-options} {subcommand} {subcommand-options} {targets} -- {arguments-and-options-passed-to-spawned-processes}
-```
-
-**Global options:**
-- `--no-colors`: Recommended to ensure non-colored output for reading console output via pipes
-- `--no-dynamic-ui`: Recommended to remove progress outputs for reading console output via pipes
-
-**Targets:**
-- All files: `::`
-- All files under specific directory of the dependency tree: `path/to/subpkg::`
-- Files changed after the last commit: `--changed-since=HEAD~1` (here, the revision range syntax is that used by Git)
-- Files changed after the last commit and their dependent files as inferred: `--changed-dependents=transitive` (this option must be used with `--changed-since`)
-
-### Adding new packages and modules
-
-When adding new packages and modules, ensure that `BUILD` files are present in their directories so that the Pantsbuild system could detect them.
-
-- Under the `src` directory, generate or update the top-level `BUILD` files in each package (e.g., `src/ai/backend/manager/BUILD`, `src/ai/backend/appproxy/coordinator/BUILD`, `src/ai/backend/agent/BUILD`) referring to sibling package's `BUILD` files.
-- Under the `tests` directory, use `python_tests()` and/or `python_testutils()`.
-
-The `BUILD` files must be created or updated BEFORE running linting, typecheck, and tests via the `pants` command.
-
-### Dependency Management using Lock files
-
-The project uses separate lock files for different tool resolves:
-- `python.lock` - Main source tree dependencies (python-default)
-- `tools/*.lock` - Tool-specific dependencies (mypy, ruff, black, pytest, etc.)
-
-Regenerate lock files when dependencies change:
-```bash
-# Populating the virtual environment from a specific resolve set
-pants export --resolve=python-default   # Export Python virtual environment for the main source tree
-
-# Updating the package dependencies after updating requirements.txt
-# After this command, you need to re-run `pants export` with the same resolve name to refresh the virtualenv.
-pants generate-lockfiles --resolve=python-default
-```
-
-### Running Project Entrypoints
-
-Use the special entrypoint script `./backend.ai` to execute project-specific CLI commands like:
-```bash
-./backend.ai mgr ...           # Run manager CLI
-./backend.ai ag ...            # Run agent CLI
-./backend.ai storage ...       # Run storage-proxy CLI
-./backend.ai web ...           # Run webserver CLI
-./backend.ai app-proxy-coordiantor ...  # Run app-proxy coordinator CLI
-./backend.ai app-proxy-worker ...       # Run app-proxy worker CLI
-```
-
-Use the generic entrypoint script `./py` to execute modules inside the virtualenv of the main source tree (python-default) like:
-```bash
-./py -m {python-package-or-module} ...
-```
-
-### Database Schema Management
-
-When working with SQLAlchemy schema migrations, we use Alembic to generate and run migrations.
-Always specify the appropriate alembic configuration path depending on the target pacakge.
+Before committing, run these commands and fix all errors:
 
 ```bash
-./py -m alembic -c {alembic-ini-path} ...
-```
-
-Replace `...` with appropriate subcommands, options, and arguments as specified in the help message
-available via `--help` or using your knowledge.
-
-There are multiple `alembic.ini` files, namely:
-
-- `alembic.ini`: The alembic config for manager
-- `alembic-accountmgr.ini`: The alembic config for account manager
-- `alembic-appproxy.ini`: The alembic config for app proxy
-
-Alembic migrations are located in `src/ai/backend/appproxy/coordinator/models/alembic/`:
-
-```bash
-# Run migrations for the main database
-./py -m alembic upgrade head
-
-# Run migrations for the app proxy database
-./py -m alembic -c alembic-appproxy.ini upgrade head
-
-# Create new migration
-./py -m alembic revision --autogenerate -m "Description"
-
-# Check for multiple heads (CI validation)
-python scripts/check-multiple-alembic-heads.py
-
-# Rebase the migration history
-./py -m scripts/alembic-rebase.py {base_head} {top_head}
-```
-
-When you observe migration failures due to multiple heads, do the followings:
-- Check `./py -m alembic heads` and `./py -m alembic history --verbose` to inspect the branched out
-  change history.
-- Inspect the migrations to see if there are potential conflicts like modifying the same column of
-  the same table, duplicate table or column names to be created, etc.
-- If there are no conflicts, run `./py scripts/alembic-rebase.py {base_head} {top_head}` command to
-  rebase the alembic history, where base_head is the topmost revision ID of the migrations from the Git
-  base branch like main and top_head is the topmost revision ID of the migrations added in the current working
-  branch.
-
-## Hooks and Code Quality
-
-Backend.AI uses Claude Code hooks and Git pre-commit hooks for code quality:
-
-**Claude Code Hooks** (configured in `.claude/settings.local.json`, gitignored):
-- **PostToolUse**: Runs `pants fmt` after Edit/Write operations
-  - Formats code immediately but does NOT run `pants fix` to avoid removing imports prematurely
-- **Stop**: Runs `pants fix` on all modified Python files when Claude finishes
-  - Removes unused imports and fixes auto-fixable lint issues
-
-**Git Pre-commit Hook** (`scripts/pre-commit.sh`):
-- Runs on every `git commit`
-- Validates: `pants lint`, `pants check` on changed files only
-- Tests run in CI for comprehensive coverage
-- Bypass with `git commit --no-verify` for WIP commits (never on main/master/release/merge commits)
-
-**Manual execution:**
-```bash
+pants fmt --changed-since=HEAD~1
+pants fix --changed-since=HEAD~1
 pants lint --changed-since=HEAD~1
 pants check --changed-since=HEAD~1
+pants test --changed-since=HEAD~1
 ```
+
+**Fix all lint, type, and test errors — never suppress or skip.**
+
+## Alembic Migration Backport
+
+When backporting migrations to release branches, both the backport and main branch
+migrations must be idempotent. See `src/ai/backend/manager/models/alembic/README.md`
+for the full strategy and examples.
+
+## Layer Architecture
+
+API Handler → Processor → Service → Repository → DB
+
+- API handlers MUST call Processors, NEVER Services directly
+- Services accept Actions (frozen dataclasses), return ActionResults
+- Repositories handle all DB access via `begin_session()` / `begin_readonly_session()`
+- NEVER import from a lower layer to a higher layer
+- For detailed patterns, read skill files: `/repository-guide`, `/service-guide`, `/api-guide`
+
+## API Development Rules
+
+**All new features MUST use v2 patterns across the full stack:**
+- REST API: `api/rest/v2/{entity}/` (NEVER add new endpoints to REST v1)
+- DTOs: `common/dto/manager/v2/{entity}/` (shared across GQL and REST v2)
+- GraphQL: Strawberry-based `api/gql/{entity}/` (NEVER add to `gql_legacy/`)
+- Adapter: `api/adapters/{entity}.py` (shared between GQL and REST v2)
+- Client SDK: `client/v2/domains_v2/{entity}.py` (typed Pydantic request/response)
+- CLI: `client/cli/v2/{entity}/` (calls SDK v2)
+
+**Standard 6 operations per entity:** create, get, search, update, delete, purge
+- For detailed API patterns: `/api-guide`
+- For SDK/CLI patterns: `/cli-sdk-guide`
+
+**After implementing new API endpoints, verify with the live server:**
+1. Restart server: `./dev restart mgr`
+2. Test each operation via `./bai` CLI (see `/local-dev` skill for setup and commands)
+3. Verify both admin and non-admin scenarios
+
+## Development Guidelines
+
+**README-First:** Always read component README (`src/ai/backend/{component}/README.md`) before making changes.
+
+**BEP-First:** For significant features, use `/bep-guide` skill. Check `proposals/README.md` for existing BEP or create new one.
+
+**TDD:** Write tests first. Use `/tdd-guide` skill for workflow. See `tests/CLAUDE.md` for test strategies.
+
+**Implementation Patterns:** Use skills for detailed guidance:
+- Repository layer → `/repository-guide`
+- Service layer → `/service-guide`
+- API/GraphQL → `/api-guide`

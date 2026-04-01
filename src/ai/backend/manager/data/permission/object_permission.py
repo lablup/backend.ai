@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.data.common.types import SearchResult
 
 from .id import ObjectId
 from .status import PermissionStatus
@@ -38,20 +38,15 @@ class ObjectPermissionCreateInput:
 
 
 @dataclass
-class ObjectPermissionUpdater:
-    id: uuid.UUID
-    status: OptionalState[PermissionStatus]
-
-
-@dataclass
-class ObjectPermissionDeleteInput:
-    id: uuid.UUID
-    _status: PermissionStatus = PermissionStatus.DELETED
-
-
-@dataclass
 class ObjectPermissionData:
     id: uuid.UUID
     role_id: uuid.UUID
     object_id: ObjectId
     operation: OperationType
+
+
+@dataclass(frozen=True)
+class ObjectPermissionListResult(SearchResult[ObjectPermissionData]):
+    """Result of object permission search with pagination info."""
+
+    pass

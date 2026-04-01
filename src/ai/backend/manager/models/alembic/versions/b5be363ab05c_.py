@@ -25,7 +25,7 @@ depends_on = None
 typename = SessionTypes.__name__.lower()
 
 
-def upgrade():
+def upgrade() -> None:
     op.execute(text(f"ALTER TYPE {typename} ADD VALUE IF NOT EXISTS 'INFERENCE';"))
     op.execute(
         text(
@@ -38,7 +38,7 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     conn = op.get_bind()
     conn.execute(
         text(

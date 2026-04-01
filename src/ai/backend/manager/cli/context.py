@@ -5,7 +5,7 @@ import sys
 from collections.abc import AsyncIterator
 from pathlib import Path
 from pprint import pformat
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import click
 
@@ -20,10 +20,10 @@ if TYPE_CHECKING:
 
 
 class CLIContext:
-    _bootstrap_config: Optional[BootstrapConfig]
+    _bootstrap_config: BootstrapConfig | None
     _logger: AbstractLogger
 
-    def __init__(self, log_level: LogLevel, config_path: Optional[Path] = None) -> None:
+    def __init__(self, log_level: LogLevel, config_path: Path | None = None) -> None:
         self.config_path = config_path
         self.log_level = log_level
         self._bootstrap_config = None
@@ -48,7 +48,7 @@ class CLIContext:
                 file=sys.stderr,
             )
             print(pformat(e.invalid_data), file=sys.stderr)
-            raise click.Abort()
+            raise click.Abort() from e
         return self._bootstrap_config
 
     def __enter__(self) -> Self:
@@ -91,16 +91,13 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
         ConfigScopes.GLOBAL: "",
         # TODO: provide a way to specify other scope prefixes
     }
-    etcd = AsyncEtcd(
+    async with AsyncEtcd(
         [addr.to_legacy() for addr in etcd_config_data.addrs],
         etcd_config_data.namespace,
         scope_prefix_map,
         credentials=creds,
-    )
-    try:
+    ) as etcd:
         yield etcd
-    finally:
-        await etcd.close()
 
 
 @contextlib.asynccontextmanager
@@ -113,15 +110,11 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
 
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     etcd_config_data = bootstrap_config.etcd.to_dataclass()
-    etcd = AsyncEtcd.initialize(etcd_config_data)
-    etcd_loader = LegacyEtcdLoader(etcd)
-    redis_config = await etcd_loader.load()
-    unified_config = ManagerUnifiedConfig(**redis_config)
-
-    try:
-        yield unified_config
-    finally:
-        await etcd_loader.close()
+    async with AsyncEtcd.create_from_config(etcd_config_data) as etcd:
+        etcd_loader = LegacyEtcdLoader(etcd)
+        redis_config = await etcd_loader.load()
+        unified_config = ManagerUnifiedConfig(**redis_config)
+    yield unified_config
 
 
 @contextlib.asynccontextmanager
@@ -130,6 +123,7 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+    from ai.backend.common.configs.redis import RedisConfig
     from ai.backend.common.defs import (
         REDIS_IMAGE_DB,
         REDIS_LIVE_DB,
@@ -139,17 +133,16 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     )
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-    from ai.backend.manager.config.unified import RedisConfig
 
     from .types import RedisConnectionSet
 
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     etcd_config_data = bootstrap_config.etcd.to_dataclass()
-    etcd = AsyncEtcd.initialize(etcd_config_data)
-    loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
-    raw_redis_config = await loader.load()
-    redis_config = RedisConfig(**raw_redis_config)
-    redis_profile_target = redis_config.to_redis_profile_target()
+    async with AsyncEtcd.create_from_config(etcd_config_data) as etcd:
+        loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
+        raw_redis_config = await loader.load()
+        redis_config = RedisConfig(**raw_redis_config)
+        redis_profile_target = redis_config.to_redis_profile_target()
 
     valkey_live_client = await ValkeyLiveClient.create(
         redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),

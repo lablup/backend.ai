@@ -14,7 +14,6 @@ from .row import (
     ConcurrencyUsed,
     KernelLoadingStrategy,
     SessionDependencyRow,
-    SessionLifecycleManager,
     SessionRow,
     by_domain_name,
     by_raw_filter,
@@ -27,6 +26,9 @@ from .row import (
 )
 from .row import (
     _build_session_fetch_query as _build_session_fetch_query,
+)
+from .row import (
+    batch_populate_session_occupied_slots as batch_populate_session_occupied_slots,
 )
 from .row import (
     get_permission_ctx as get_permission_ctx,
@@ -47,7 +49,6 @@ __all__ = (
     "QueryOption",
     "SessionDependencyRow",
     "SessionId",
-    "SessionLifecycleManager",
     "SessionResult",
     "SessionRow",
     "SessionStatus",

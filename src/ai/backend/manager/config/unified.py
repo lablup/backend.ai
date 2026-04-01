@@ -182,7 +182,7 @@ from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     AliasChoices,
@@ -202,10 +202,15 @@ from ai.backend.common.configs.otel import OTELConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
-from ai.backend.common.data.storage.types import ArtifactStorageImportStep
+from ai.backend.common.data.storage.types import ArtifactStorageImportStep, NamedStorageTarget
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
@@ -303,7 +308,7 @@ class DatabaseConfig(BaseConfigSchema):
         ),
     ]
     password: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -427,7 +432,7 @@ class DistributedLockType(enum.StrEnum):
 
 class AuthConfig(BaseConfigSchema):
     max_password_age: Annotated[
-        Optional[TimeDuration],
+        TimeDuration | None,
         Field(
             default=None,
             validation_alias=AliasChoices("max_password_age", "max-password-age"),
@@ -503,6 +508,24 @@ class AuthConfig(BaseConfigSchema):
             example=ConfigExample(local="32", prod="32"),
         ),
     ]
+    login_session_max_age: Annotated[
+        int,
+        Field(
+            default=604800,
+            ge=60,
+            validation_alias=AliasChoices("login-session-max-age", "login_session_max_age"),
+            serialization_alias="login-session-max-age",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum login session age in seconds. "
+                "Default is 604800 (7 days). "
+                "Sessions older than this are considered expired."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="604800", prod="604800"),
+        ),
+    ]
 
 
 class ManagerConfig(BaseConfigSchema):
@@ -559,7 +582,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     user: Annotated[
-        Optional[UserID],
+        UserID | None,
         Field(default=UserID(_file_perm.st_uid)),
         BackendAIConfigMeta(
             description=(
@@ -573,7 +596,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     group: Annotated[
-        Optional[GroupID],
+        GroupID | None,
         Field(default=GroupID(_file_perm.st_gid)),
         BackendAIConfigMeta(
             description=(
@@ -729,7 +752,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     ssl_cert: Annotated[
-        Optional[FilePath],
+        FilePath | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl-cert", "ssl_cert"),
@@ -746,7 +769,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     ssl_privkey: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("ssl-privkey", "ssl_privkey"),
@@ -940,7 +963,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     allowed_plugins: Annotated[
-        Optional[set[str]],
+        set[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("allowed-plugins", "allowed_plugins"),
@@ -961,7 +984,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     disabled_plugins: Annotated[
-        Optional[set[str]],
+        set[str] | None,
         Field(
             default=None,
             validation_alias=AliasChoices("disabled-plugins", "disabled_plugins"),
@@ -1060,7 +1083,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     aiomonitor_port: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             ge=1,
@@ -1136,7 +1159,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     status_update_interval: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             ge=0,
@@ -1154,7 +1177,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     status_lifetime: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             ge=0,
@@ -1172,7 +1195,7 @@ class ManagerConfig(BaseConfigSchema):
         ),
     ]
     public_metrics_port: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             ge=1,
@@ -1188,23 +1211,6 @@ class ManagerConfig(BaseConfigSchema):
             ),
             added_version="25.8.0",
             example=ConfigExample(local="", prod="9090"),
-        ),
-    ]
-    use_sokovan: Annotated[
-        bool,
-        Field(
-            default=True,
-            validation_alias=AliasChoices("use-sokovan", "use_sokovan"),
-            serialization_alias="use-sokovan",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Whether to use the Sokovan orchestrator for session scheduling. "
-                "Sokovan provides improved scheduling performance with better resource utilization. "
-                "When disabled, falls back to the legacy scheduling system."
-            ),
-            added_version="25.8.0",
-            example=ConfigExample(local="true", prod="true"),
         ),
     ]
 
@@ -1661,7 +1667,7 @@ class APIConfig(BaseConfigSchema):
         ),
     ]
     max_gql_query_depth: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             ge=1,
@@ -1679,7 +1685,7 @@ class APIConfig(BaseConfigSchema):
         ),
     ]
     max_gql_connection_page_size: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             ge=1,
@@ -1699,7 +1705,7 @@ class APIConfig(BaseConfigSchema):
         ),
     ]
     resources: Annotated[
-        Optional[ResourcesConfig],
+        ResourcesConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1811,7 +1817,7 @@ class PluginsConfig(BaseConfigSchema):
 
 class InterContainerNetworkConfig(BaseConfigSchema):
     default_driver: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default="overlay",
             validation_alias=AliasChoices("default_driver", "default-driver"),
@@ -1841,7 +1847,7 @@ class InterContainerNetworkConfig(BaseConfigSchema):
         ),
     ]
     plugin: Annotated[
-        Optional[Any],
+        Any | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1949,7 +1955,7 @@ class NetworkConfig(BaseConfigSchema):
 
 class WatcherConfig(BaseConfigSchema):
     token: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1983,7 +1989,7 @@ class WatcherConfig(BaseConfigSchema):
 
 class HangToleranceThresholdConfig(BaseConfigSchema):
     PREPARING: Annotated[
-        Optional[datetime],
+        datetime | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -1996,7 +2002,7 @@ class HangToleranceThresholdConfig(BaseConfigSchema):
         ),
     ]
     TERMINATING: Annotated[
-        Optional[datetime],
+        datetime | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -2082,7 +2088,7 @@ class MetricConfig(BaseConfigSchema):
     ]
 
     @field_serializer("address")
-    def _serialize_addr(self, addr: Optional[HostPortPair], _info: Any) -> Optional[str]:
+    def _serialize_addr(self, addr: HostPortPair | None, _info: Any) -> str | None:
         return None if addr is None else f"{addr.host}:{addr.port}"
 
 
@@ -2142,7 +2148,7 @@ class IdleCheckerConfig(BaseConfigSchema):
 
 class VolumeTypeConfig(BaseConfigSchema):
     user: Annotated[
-        Optional[dict[str, Any] | str],
+        dict[str, Any] | str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -2155,7 +2161,7 @@ class VolumeTypeConfig(BaseConfigSchema):
         ),
     ]
     group: Annotated[
-        Optional[dict[str, Any] | str],
+        dict[str, Any] | str | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -2507,6 +2513,24 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
                 "or slow network connections."
             ),
             added_version="25.8.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    create_archive_download_session: Annotated[
+        HttpTimeoutConfig,
+        Field(
+            default_factory=lambda: _DEFAULT_TIMEOUT,
+            validation_alias=AliasChoices(
+                "create-archive-download-session", "create_archive_download_session"
+            ),
+            serialization_alias="create-archive-download-session",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout for archive download session creation (token issuance). "
+                "Does not affect the subsequent archive download streaming."
+            ),
+            added_version="26.3.0",
             composite=CompositeType.FIELD,
         ),
     ]
@@ -2863,7 +2887,7 @@ class VolumeProxyConfig(BaseConfigSchema):
         ),
     ]
     sftp_scaling_groups: Annotated[
-        Optional[CommaSeparatedStrList],
+        CommaSeparatedStrList | None,
         Field(
             default=None,
             validation_alias=AliasChoices("sftp_scaling_groups", "sftp-scaling-groups"),
@@ -2915,7 +2939,7 @@ class VolumesConfig(BaseConfigSchema):
         ),
     ]
     default_host: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             validation_alias=AliasChoices("default_host", "default-host"),
@@ -3133,19 +3157,24 @@ class ReservoirConfig(BaseConfigSchema):
         ),
     ]
 
-    def resolve_storage_step_selection(self) -> dict[ArtifactStorageImportStep, str]:
+    def resolve_storage_step_selection(
+        self,
+    ) -> dict[ArtifactStorageImportStep, NamedStorageTarget]:
         """
         Resolves the actual `storage_step_selection` to be passed to the storage proxy based on `storage_step_selection` and `storage_name`
         """
 
         _REQUIRED_STEPS = {ArtifactStorageImportStep.DOWNLOAD, ArtifactStorageImportStep.ARCHIVE}
 
-        resolved_selection: dict[ArtifactStorageImportStep, str] = (
-            self.storage_step_selection.copy()
-        )
+        resolved_selection: dict[ArtifactStorageImportStep, NamedStorageTarget] = {
+            step: NamedStorageTarget(storage_name=name)
+            for step, name in self.storage_step_selection.items()
+        }
         for required_step in _REQUIRED_STEPS:
             if required_step not in resolved_selection:
-                resolved_selection[required_step] = self.storage_name
+                resolved_selection[required_step] = NamedStorageTarget(
+                    storage_name=self.storage_name
+                )
 
         return resolved_selection
 
@@ -3203,6 +3232,68 @@ class DeploymentConfig(BaseConfigSchema):
     ]
 
 
+class ExportConfig(BaseConfigSchema):
+    """Export-related configuration."""
+
+    max_rows: Annotated[
+        int,
+        Field(
+            default=100_000,
+            ge=1000,
+            le=1_000_000,
+            validation_alias=AliasChoices("max-rows", "max_rows"),
+            serialization_alias="max-rows",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of rows per export request. "
+                "Limits the amount of data that can be exported in a single request "
+                "to prevent memory exhaustion and timeout issues."
+            ),
+            added_version="26.1.0",
+            example=ConfigExample(local="100000", prod="100000"),
+        ),
+    ]
+
+    statement_timeout_sec: Annotated[
+        int,
+        Field(
+            default=300,
+            ge=60,
+            le=3600,
+            validation_alias=AliasChoices("statement-timeout-sec", "statement_timeout_sec"),
+            serialization_alias="statement-timeout-sec",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Database statement timeout in seconds for export queries. "
+                "Long-running export queries will be cancelled after this duration."
+            ),
+            added_version="26.1.0",
+            example=ConfigExample(local="300", prod="300"),
+        ),
+    ]
+
+    max_concurrent_exports: Annotated[
+        int,
+        Field(
+            default=10,
+            ge=1,
+            le=50,
+            validation_alias=AliasChoices("max-concurrent-exports", "max_concurrent_exports"),
+            serialization_alias="max-concurrent-exports",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of concurrent export requests allowed. "
+                "Prevents system overload from too many simultaneous export operations."
+            ),
+            added_version="26.1.0",
+            example=ConfigExample(local="10", prod="10"),
+        ),
+    ]
+
+
 class ManagerUnifiedConfig(BaseConfigSchema):
     # From legacy local config
     db: Annotated[
@@ -3221,7 +3312,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
     ]
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=EtcdConfig),  # type: ignore[arg-type]
+        Field(default_factory=EtcdConfig),
         BackendAIConfigMeta(
             description=(
                 "Etcd distributed key-value store configuration. Etcd is used for cluster "
@@ -3283,7 +3374,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
     ]
     pyroscope: Annotated[
         PyroscopeConfig,
-        Field(default_factory=PyroscopeConfig),  # type: ignore[arg-type]
+        Field(default_factory=PyroscopeConfig),
         BackendAIConfigMeta(
             description=(
                 "Pyroscope continuous profiling configuration. When enabled, sends profiling "
@@ -3509,7 +3600,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
     ]
     otel: Annotated[
         OTELConfig,
-        Field(default_factory=OTELConfig),  # type: ignore[arg-type]
+        Field(default_factory=OTELConfig),
         BackendAIConfigMeta(
             description=(
                 "OpenTelemetry configuration for distributed tracing. When enabled, sends trace "
@@ -3522,7 +3613,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
     ]
     service_discovery: Annotated[
         ServiceDiscoveryConfig,
-        Field(default_factory=ServiceDiscoveryConfig),  # type: ignore[arg-type]
+        Field(default_factory=ServiceDiscoveryConfig),
         BackendAIConfigMeta(
             description=(
                 "Service discovery configuration. Controls how Backend.AI components discover "
@@ -3534,7 +3625,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         ),
     ]
     artifact_registry: Annotated[
-        Optional[ArtifactRegistryConfig],
+        ArtifactRegistryConfig | None,
         Field(
             default=None,
             validation_alias=AliasChoices("artifact_registry", "artifact-registry"),
@@ -3551,7 +3642,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         ),
     ]
     reservoir: Annotated[
-        Optional[ReservoirConfig],
+        ReservoirConfig | None,
         Field(default=None),
         BackendAIConfigMeta(
             description=(
@@ -3573,6 +3664,19 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "and model definition handling."
             ),
             added_version="25.8.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    export: Annotated[
+        ExportConfig,
+        Field(default_factory=ExportConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Export API configuration. Controls CSV export functionality including "
+                "row limits, timeouts, and concurrency limits. These settings prevent "
+                "resource exhaustion from large export operations."
+            ),
+            added_version="26.1.0",
             composite=CompositeType.FIELD,
         ),
     ]

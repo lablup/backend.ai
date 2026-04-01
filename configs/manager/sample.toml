@@ -298,11 +298,6 @@
   # metrics exposure.
   # Added in 25.8.0
   ## public-metrics-port = 9090
-  # Whether to use the Sokovan orchestrator for session scheduling. Sokovan
-  # provides improved scheduling performance with better resource utilization.
-  # When disabled, falls back to the legacy scheduling system.
-  # Added in 25.8.0
-  use-sokovan = true
 
 # Deprecated Docker registry configuration. This legacy configuration controls
 # basic Docker registry connection settings. For new deployments, use the
@@ -941,6 +936,15 @@
   # OTLP receiver.
   # Added in 25.7.0
   endpoint = "http://otel-collector:4317"
+  # Maximum number of spans queued for export. Spans are dropped when the queue
+  # is full. The default (65536) accommodates burst traffic from GraphQL
+  # workloads.
+  # Added in 26.2.0
+  max-queue-size = 65536
+  # Maximum number of spans exported in a single batch. Larger batches reduce
+  # export overhead but increase memory usage.
+  # Added in 26.2.0
+  max-export-batch-size = 4096
 
 # Service discovery configuration. Controls how Backend.AI components discover
 # and connect to each other in dynamic environments. Supports multiple discovery
@@ -950,6 +954,46 @@
   # Type of service discovery to use. Supported types are 'etcd' and 'redis'.
   # Added in 25.9.0
   type = "redis"
+  # Unique instance identifier for this service instance.
+  # Added in 26.3.0
+  ## instance-id = "..."
+  # Logical group name for this service (e.g., 'manager', 'agent', 'storage-
+  # proxy').
+  # Added in 26.3.0
+  ## service-group = "..."
+  # Human-readable display name for this service instance.
+  # Added in 26.3.0
+  ## display-name = "..."
+
+  # Additional labels for service categorization and filtering.
+  # Added in 26.3.0
+  # Replace <name> with your actual key (e.g., 'default', 'local')
+  [service-discovery.extra-labels.<name>]
+
+  # List of endpoints exposed by this service instance.
+  # Added in 26.3.0
+  [[service-discovery.endpoints]]
+  # Add multiple [[service-discovery.endpoints]] sections as needed
+    # Role of this endpoint (e.g., 'main', 'health', 'internal').
+    # Added in 26.3.0
+    role = "main"
+    # Network scope of this endpoint (e.g., 'public', 'private', 'internal').
+    # Added in 26.3.0
+    scope = "public"
+    # Hostname or IP address of the endpoint.
+    # Added in 26.3.0
+    address = "manager.example.com"
+    # Port number of the endpoint.
+    # Added in 26.3.0
+    port = 443
+    # Protocol used by the endpoint (e.g., 'grpc', 'http', 'https').
+    # Added in 26.3.0
+    protocol = "https"
+
+    # Additional metadata for the endpoint.
+    # Added in 26.3.0
+    # Replace <name> with your actual key (e.g., 'default', 'local')
+    [service-discovery.endpoints.metadata.<name>]
 
 # Default artifact registry configuration. Specifies the default model registry
 # for artifact operations. When configured, enables model artifact management
@@ -1017,3 +1061,22 @@
   # serving configurations while maintaining automatic defaults.
   # Added in 25.8.0
   enable-model-definition-override = true
+
+# Export API configuration. Controls CSV export functionality including row
+# limits, timeouts, and concurrency limits. These settings prevent resource
+# exhaustion from large export operations.
+# Added in 26.1.0
+[export]
+  # Maximum number of rows per export request. Limits the amount of data that
+  # can be exported in a single request to prevent memory exhaustion and timeout
+  # issues.
+  # Added in 26.1.0
+  max-rows = 100000
+  # Database statement timeout in seconds for export queries. Long-running
+  # export queries will be cancelled after this duration.
+  # Added in 26.1.0
+  statement-timeout-sec = 300
+  # Maximum number of concurrent export requests allowed. Prevents system
+  # overload from too many simultaneous export operations.
+  # Added in 26.1.0
+  max-concurrent-exports = 10

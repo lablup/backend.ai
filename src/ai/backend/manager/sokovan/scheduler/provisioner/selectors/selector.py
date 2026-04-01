@@ -5,14 +5,25 @@ This module defines the interface for agent selection that abstracts away
 the row-based implementation details of the legacy selectors.
 """
 
+from __future__ import annotations
+
+import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    BinarySize,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
+from ai.backend.logging.utils import BraceStyleAdapter
 
 from .exceptions import (
     ContainerLimitExceededError,
@@ -20,6 +31,12 @@ from .exceptions import (
     NoAvailableAgentError,
     NoCompatibleAgentError,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
+    from ai.backend.manager.sokovan.data import AgentOccupancy
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -40,6 +57,37 @@ class AgentInfo:
     scaling_group: str
     # Number of containers currently running on the agent
     container_count: int
+
+    @classmethod
+    def from_meta_and_occupancy(
+        cls,
+        meta: AgentMeta,
+        occupancy_map: Mapping[AgentId, AgentOccupancy],
+    ) -> AgentInfo:
+        """
+        Create an AgentInfo from agent metadata and occupancy mapping.
+
+        Args:
+            meta: Agent metadata containing static information
+            occupancy_map: Mapping of agent IDs to occupancy data
+
+        Returns:
+            AgentInfo instance with occupancy data looked up by agent ID
+        """
+        occupancy = occupancy_map.get(meta.id)
+        if occupancy:
+            occupied = ResourceSlot({sq.slot_name: sq.quantity for sq in occupancy.occupied_slots})
+        else:
+            occupied = ResourceSlot()
+        return cls(
+            agent_id=meta.id,
+            agent_addr=meta.addr,
+            architecture=meta.architecture,
+            scaling_group=meta.scaling_group,
+            available_slots=meta.available_slots,
+            occupied_slots=occupied,
+            container_count=occupancy.container_count if occupancy else 0,
+        )
 
 
 @dataclass
@@ -83,7 +131,7 @@ class AgentSelectionConfig:
     """Configuration for agent selection."""
 
     # Maximum number of containers allowed per agent
-    max_container_count: Optional[int]
+    max_container_count: int | None
     # Whether to enforce endpoint replica spreading (from sgroup_opts)
     enforce_spreading_endpoint_replica: bool = False
 
@@ -130,7 +178,9 @@ class AgentSelectionCriteria:
     # Mapping of kernel IDs to their resource specifications
     kernel_requirements: Mapping[UUID, KernelResourceSpec]
     # Kernel counts at endpoint for each agent (for concentrated selector spreading)
-    kernel_counts_at_endpoint: Optional[Mapping[AgentId, int]] = None
+    kernel_counts_at_endpoint: Mapping[AgentId, int] | None = None
+    # Agents that previously failed for this session (for deprioritization on retry)
+    failed_agent_ids: frozenset[AgentId] = frozenset()
 
     def get_resource_requirements(self) -> Sequence[ResourceRequirements]:
         """
@@ -265,7 +315,7 @@ class AgentSelector:
         agents: Sequence[AgentInfo],
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-        designated_agent_ids: Optional[list[AgentId]] = None,
+        designated_agent_ids: list[AgentId] | None = None,
     ) -> list[AgentSelection]:
         """
         Select agents for a batch of resource requirements.
@@ -338,7 +388,7 @@ class AgentSelector:
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-        designated_agent_ids: Optional[list[AgentId]] = None,
+        designated_agent_ids: list[AgentId] | None = None,
     ) -> AgentStateTracker:
         # First pass: filter by architecture (binary compatibility check)
         arch_compatible_trackers: list[AgentStateTracker] = []
@@ -377,7 +427,7 @@ class AgentSelector:
             )
             raise NoAvailableAgentError(f"no available agents. Details: {error_messages_summary}")
 
-        # Handle designated agent if specified
+        # Handle designated agent first (user's explicit choice takes precedence)
         if designated_agent_ids:
             for tracker in compatible_trackers:
                 if tracker.original_agent.agent_id in designated_agent_ids:
@@ -394,9 +444,39 @@ class AgentSelector:
                 f"Designated agent '{designated_agent_ids}' is not compatible. Details: {error_message}"
             )
 
-        # Use strategy to select from compatible trackers
+        # Third pass: deprioritize agents that previously failed for this session
+        candidate_trackers = compatible_trackers
+        if criteria.failed_agent_ids:
+            non_failed = [
+                tracker
+                for tracker in compatible_trackers
+                if tracker.original_agent.agent_id not in criteria.failed_agent_ids
+            ]
+            if non_failed:
+                excluded = [
+                    tracker.original_agent.agent_id
+                    for tracker in compatible_trackers
+                    if tracker.original_agent.agent_id in criteria.failed_agent_ids
+                ]
+                log.debug(
+                    "failed-agent filter(session:{}): excluding {} → candidates: {}",
+                    criteria.session_metadata.session_id,
+                    excluded,
+                    [tracker.original_agent.agent_id for tracker in non_failed],
+                )
+                candidate_trackers = non_failed
+            else:
+                log.debug(
+                    "failed-agent filter(session:{}): all {} compatible agents have failed, "
+                    "skipping filter to avoid blocking",
+                    criteria.session_metadata.session_id,
+                    len(compatible_trackers),
+                )
+            # If ALL compatible agents have failed, keep all of them to avoid blocking
+
+        # Use strategy to select from candidates
         return self._strategy.select_tracker_by_strategy(
-            compatible_trackers, resource_req, criteria, config
+            candidate_trackers, resource_req, criteria, config
         )
 
     def _check_tracker_compatibility(
@@ -438,8 +518,6 @@ class AgentSelector:
 
                 # Format mem as human readable (e.g., "2 GiB" instead of raw bytes)
                 if resource_name == "mem":
-                    from ai.backend.common.types import BinarySize
-
                     insufficient_details[resource_name] = (
                         str(BinarySize(requested)),
                         str(BinarySize(available)),

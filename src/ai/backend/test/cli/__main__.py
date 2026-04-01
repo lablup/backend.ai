@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
 from .context import CLIContext
 from .utils import CommaSeparatedChoice, CustomUsageArgsCommand
 
+if TYPE_CHECKING:
+    from ai.backend.test.testcases.spec_manager import TestSpecManager
+
 _DEFAULT_CONFIG_PATH = "configs/tester/tester.toml"
 
 
-def _spec_manager():
+def _spec_manager() -> TestSpecManager:
     """
     Returns the test specification manager for the CLI.
     """
@@ -124,7 +128,7 @@ def run_cli(
 
 @main.command()
 @click.pass_obj
-def get_all_specs(cli_ctx: CLIContext) -> None:
+def get_all_specs(_cli_ctx: CLIContext) -> None:
     spec_manager = _spec_manager()
     print("Available test specifications:")
     print("====================================")
@@ -143,7 +147,7 @@ def get_all_specs(cli_ctx: CLIContext) -> None:
 )
 @main.command(help="Run a specific test by its name")
 @click.pass_obj
-def run_test(cli_ctx: CLIContext, name: str, config_path: str) -> None:
+def run_test(_cli_ctx: CLIContext, name: str, config_path: str) -> None:
     import asyncio
 
     from ai.backend.test.tester.exporter import DefaultExporter
@@ -167,7 +171,7 @@ def run_test(cli_ctx: CLIContext, name: str, config_path: str) -> None:
 )
 @main.command(help="Run configured tests in the config file")
 @click.pass_obj
-def run(cli_ctx: CLIContext, config_path: str) -> None:
+def run(_cli_ctx: CLIContext, config_path: str) -> None:
     import asyncio
 
     from ai.backend.test.tester.exporter import DefaultExporter
@@ -191,7 +195,7 @@ def run(cli_ctx: CLIContext, config_path: str) -> None:
 )
 @main.command(help="Run all tests defined in the test specifications")
 @click.pass_obj
-def run_all(cli_ctx: CLIContext, config_path: str) -> None:
+def run_all(_cli_ctx: CLIContext, config_path: str) -> None:
     import asyncio
 
     from ai.backend.test.tester.exporter import DefaultExporter

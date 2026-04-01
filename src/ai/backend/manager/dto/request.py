@@ -1,5 +1,4 @@
 import uuid
-from typing import Optional
 
 from pydantic import Field
 
@@ -19,57 +18,57 @@ from ai.backend.manager.types import PaginationOptions, TriState
 
 
 class DelegateScanArtifactsReq(BaseRequestModel):
-    delegator_reservoir_id: Optional[uuid.UUID] = Field(
+    delegator_reservoir_id: uuid.UUID | None = Field(
         default=None, description="ID of the reservoir registry to delegate the scan request to"
     )
-    delegatee_target: Optional[DelegateeTarget] = Field(
+    delegatee_target: DelegateeTarget | None = Field(
         default=None,
         description="The unique identifier of the target reservoir to delegate the scan.",
     )
-    artifact_type: Optional[ArtifactType] = None
+    artifact_type: ArtifactType | None = None
     limit: int = Field(
         lt=ARTIFACT_MAX_SCAN_LIMIT,
         description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})",
     )
-    order: Optional[ModelSortKey] = None
-    search: Optional[str] = None
+    order: ModelSortKey | None = None
+    search: str | None = None
 
 
 class ScanArtifactsReq(BaseRequestModel):
-    registry_id: Optional[uuid.UUID] = Field(
+    registry_id: uuid.UUID | None = Field(
         default=None, description="The unique identifier of the artifact registry to scan."
     )
-    artifact_type: Optional[ArtifactType] = None
+    artifact_type: ArtifactType | None = None
     limit: int = Field(
         lt=ARTIFACT_MAX_SCAN_LIMIT,
         description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})",
     )
-    order: Optional[ModelSortKey] = None
-    search: Optional[str] = None
+    order: ModelSortKey | None = None
+    search: str | None = None
 
 
 class ScanArtifactsSyncReq(BaseRequestModel):
-    registry_id: Optional[uuid.UUID] = Field(
+    registry_id: uuid.UUID | None = Field(
         default=None, description="The unique identifier of the artifact registry to scan."
     )
-    artifact_type: Optional[ArtifactType] = None
+    artifact_type: ArtifactType | None = None
     limit: int = Field(
         lt=ARTIFACT_MAX_SCAN_LIMIT,
         description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})",
     )
-    order: Optional[ModelSortKey] = None
-    search: Optional[str] = None
+    order: ModelSortKey | None = None
+    search: str | None = None
 
 
 class SearchArtifactsReq(BaseRequestModel):
     pagination: PaginationOptions
-    ordering: Optional[ArtifactOrderingOptions] = None
-    filters: Optional[ArtifactFilterOptions] = None
+    ordering: ArtifactOrderingOptions | None = None
+    filters: ArtifactFilterOptions | None = None
 
 
 class ScanArtifactModelsReq(BaseRequestModel):
     models: list[ModelTarget] = Field(description="List of models to scan from the registry.")
-    registry_id: Optional[uuid.UUID] = Field(
+    registry_id: uuid.UUID | None = Field(
         default=None, description="The unique identifier of the artifact registry to scan."
     )
 
@@ -79,8 +78,8 @@ class ScanArtifactModelPathParam(BaseRequestModel):
 
 
 class ScanArtifactModelQueryParam(BaseRequestModel):
-    revision: Optional[str] = Field(description="The model revision to scan from the registry.")
-    registry_id: Optional[uuid.UUID] = Field(
+    revision: str | None = Field(description="The model revision to scan from the registry.")
+    registry_id: uuid.UUID | None = Field(
         default=None, description="The unique identifier of the artifact registry to scan."
     )
 
@@ -109,22 +108,42 @@ class RejectArtifactRevisionReq(BaseRequestModel):
     artifact_revision_id: uuid.UUID = Field(description="The artifact revision ID to reject.")
 
 
+class ImportArtifactsOptions(BaseRequestModel):
+    """Options for importing artifact revisions."""
+
+    force: bool = Field(
+        default=False, description="Force re-download regardless of digest freshness check."
+    )
+
+
 class DelegateImportArtifactsReq(BaseRequestModel):
     artifact_revision_ids: list[uuid.UUID] = Field(
         description="List of artifact revision IDs to delegate the import request."
     )
-    delegator_reservoir_id: Optional[uuid.UUID] = Field(
+    delegator_reservoir_id: uuid.UUID | None = Field(
         default=None, description="ID of the reservoir registry to delegate the import request to"
     )
-    delegatee_target: Optional[DelegateeTarget] = Field(
+    delegatee_target: DelegateeTarget | None = Field(
         default=None,
     )
-    artifact_type: Optional[ArtifactType]
+    artifact_type: ArtifactType | None
+    options: ImportArtifactsOptions = Field(
+        default_factory=ImportArtifactsOptions,
+        description="Options controlling import behavior such as forcing re-download.",
+    )
 
 
 class ImportArtifactsReq(BaseRequestModel):
     artifact_revision_ids: list[uuid.UUID] = Field(
         description="List of artifact revision IDs to import."
+    )
+    vfolder_id: uuid.UUID | None = Field(
+        default=None,
+        description="Optional vfolder ID to import artifacts directly into.",
+    )
+    options: ImportArtifactsOptions = Field(
+        default_factory=ImportArtifactsOptions,
+        description="Options controlling import behavior such as forcing re-download.",
     )
 
 
@@ -133,10 +152,10 @@ class UpdateArtifactReqPathParam(BaseRequestModel):
 
 
 class UpdateArtifactReqBodyParam(BaseRequestModel):
-    readonly: Optional[bool] = Field(
+    readonly: bool | None = Field(
         default=None, description="Whether the artifact should be readonly."
     )
-    description: Optional[str] = Field(default=None, description="Updated description")
+    description: str | None = Field(default=None, description="Updated description")
 
     def to_updater(self, artifact_id: uuid.UUID) -> Updater[ArtifactRow]:
         spec = ArtifactUpdaterSpec()

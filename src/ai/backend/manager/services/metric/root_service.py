@@ -1,4 +1,4 @@
-from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 
 from .container_metric import ContainerUtilizationMetricService
@@ -10,8 +10,9 @@ class UtilizationMetricService:
 
     def __init__(
         self,
-        config_provider: ManagerConfigProvider,
+        prometheus_client: PrometheusClient,
+        timewindow: str,
         metric_repository: MetricRepository,
     ) -> None:
-        self.container = ContainerUtilizationMetricService(config_provider)
+        self.container = ContainerUtilizationMetricService(prometheus_client, timewindow=timewindow)
         self._metric_repository = metric_repository

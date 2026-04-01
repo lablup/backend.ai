@@ -25,24 +25,28 @@ def test_aliased_key() -> None:
     with pytest.raises(t.DataError) as e:
         iv.check({"x": 1})
     err_data = e.value.as_dict()
+    assert isinstance(err_data, dict)
     assert "y" in err_data
     assert "is required" in err_data["y"]
 
     with pytest.raises(t.DataError) as e:
         iv.check({"y": 2})
     err_data = e.value.as_dict()
+    assert isinstance(err_data, dict)
     assert "x" in err_data
     assert "is required" in err_data["x"]
 
     with pytest.raises(t.DataError) as e:
         iv.check({"x": 1, "y": "string"})
     err_data = e.value.as_dict()
+    assert isinstance(err_data, dict)
     assert "y" in err_data
     assert "can't be converted to int" in err_data["y"]
 
     with pytest.raises(t.DataError) as e:
         iv.check({"x": 1, "Y": "string"})
     err_data = e.value.as_dict()
+    assert isinstance(err_data, dict)
     assert "Y" in err_data
     assert "can't be converted to int" in err_data["Y"]
 
@@ -60,27 +64,28 @@ def test_aliased_key() -> None:
     with pytest.raises(t.DataError) as e:
         iv.check({"z": 99})
     err_data = e.value.as_dict()
+    assert isinstance(err_data, dict)
     assert "z" in err_data
     assert "not allowed key" in err_data["z"]
 
 
 def test_multikey() -> None:
     iv = t.Dict({
-        tx.MultiKey("x"): t.List(t.Int),
-        t.Key("y"): t.Int,
+        tx.MultiKey("x"): t.List(t.ToInt),
+        t.Key("y"): t.ToInt,
     })
 
-    data: multidict.MultiDict = multidict.MultiDict()
-    data.add("x", 1)
-    data.add("x", 2)
-    data.add("y", 3)
+    data: multidict.MultiDict[str] = multidict.MultiDict()
+    data.add("x", "1")
+    data.add("x", "2")
+    data.add("y", "3")
     result = iv.check(data)
     assert result["x"] == [1, 2]
     assert result["y"] == 3
 
     data = multidict.MultiDict()
-    data.add("x", 1)
-    data.add("y", 3)
+    data.add("x", "1")
+    data.add("y", "3")
     result = iv.check(data)
     assert result["x"] == [1]
     assert result["y"] == 3
@@ -225,42 +230,42 @@ def test_host_port_pair() -> None:
     iv = tx.HostPortPair()
 
     p = iv.check(("127.0.0.1", 80))
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == IPv4Address("127.0.0.1")
     assert p.port == 80
 
     p = iv.check("127.0.0.1:80")
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == IPv4Address("127.0.0.1")
     assert p.port == 80
 
     p = iv.check({"host": "127.0.0.1", "port": 80})
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == IPv4Address("127.0.0.1")
     assert p.port == 80
 
     p = iv.check({"host": "127.0.0.1", "port": "80"})
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == IPv4Address("127.0.0.1")
     assert p.port == 80
 
     p = iv.check(("mydomain.com", 443))
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == "mydomain.com"
     assert p.port == 443
 
     p = iv.check("mydomain.com:443")
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == "mydomain.com"
     assert p.port == 443
 
     p = iv.check({"host": "mydomain.com", "port": 443})
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == "mydomain.com"
     assert p.port == 443
 
     p = iv.check({"host": "mydomain.com", "port": "443"})
-    assert isinstance(p, tx._HostPortPair)
+    assert isinstance(p, HostPortPair)
     assert p.host == "mydomain.com"
     assert p.port == 443
 
@@ -371,16 +376,16 @@ def test_slug_length() -> None:
     assert iv._max_length == 4  # type: ignore[attr-defined]
 
     iv = tx.Slug(max_length=4)
-    assert iv._min_length is None  # type: ignore[attr-defined]
-    assert iv._max_length == 4  # type: ignore[attr-defined]
+    assert iv._min_length is None
+    assert iv._max_length == 4
     assert iv.check("abc") == "abc"
     assert iv.check("abcd") == "abcd"
     with pytest.raises(t.DataError):
         iv.check("abcde")
 
     iv = tx.Slug(min_length=4)
-    assert iv._min_length == 4  # type: ignore[attr-defined]
-    assert iv._max_length is None  # type: ignore[attr-defined]
+    assert iv._min_length == 4
+    assert iv._max_length is None
     with pytest.raises(t.DataError):
         iv.check("abc")
     assert iv.check("abcd") == "abcd"
@@ -495,6 +500,8 @@ def test_json_string() -> None:
     assert iv.check("{}") == {}
     assert iv.check('{"a":123}') == {"a": 123}
     assert iv.check("[]") == []
+    assert iv.check({"a": 123}) == {"a": 123}
+    assert iv.check({}) == {}
     with pytest.raises(ValueError):
         iv.check("x")
 

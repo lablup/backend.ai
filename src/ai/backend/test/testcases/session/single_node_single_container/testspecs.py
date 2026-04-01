@@ -122,7 +122,7 @@ INTERACTIVE_SESSION_TEST_SPECS = {
             TestTag.SINGLE_NODE_SINGLE_CONTAINER,
         },
         template=BasicTestTemplate(
-            FileExistenceCheck(path=Path("."), checklist=["test-abc"])
+            FileExistenceCheck(path=Path(), checklist=["test-abc"])
         ).with_wrappers(KeypairAuthTemplate, InteractiveSessionWithBootstrapScriptTemplate),
         parametrizes={
             **CLUSTER_CONFIG_PARAM,

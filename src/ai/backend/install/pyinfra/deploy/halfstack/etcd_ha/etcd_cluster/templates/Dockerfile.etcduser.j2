@@ -1,0 +1,9 @@
+ARG ETCD_BASE_IMG
+FROM ${ETCD_BASE_IMG}
+ARG ETCD_GID
+ARG ETCD_UID
+ENV ETCD_GID=${ETCD_GID} \
+    ETCD_UID=${ETCD_UID}
+RUN addgroup --group --gid ${ETCD_GID} etcd && adduser --ingroup etcd --uid ${ETCD_UID} --disabled-password --no-create-home --gecos "" --shell /bin/sh etcd
+
+USER etcd

@@ -5,7 +5,7 @@ from .base import Base, IDColumn
 __all__: tuple[str, ...] = ("UserRow",)
 
 
-class UserRow(Base):
+class UserRow(Base):  # type: ignore[misc]
     __tablename__ = "users"
     uuid = IDColumn("uuid")
 

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 
 from .base import NotificationAction
 
@@ -17,11 +18,11 @@ class DeleteRuleAction(NotificationAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delete_rule"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.rule_id)
 
 
@@ -32,5 +33,5 @@ class DeleteRuleActionResult(BaseActionResult):
     deleted: bool
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

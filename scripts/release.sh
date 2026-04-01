@@ -27,6 +27,10 @@ pants check ::
 # Update VERSION file
 echo $TARGET_VERSION > VERSION
 
+# Freeze NEXT_RELEASE_VERSION to the actual version
+echo "Freezing NEXT_RELEASE_VERSION to ${TARGET_VERSION}..."
+sed -i'' -e "s/^NEXT_RELEASE_VERSION = .*/NEXT_RELEASE_VERSION = \"${TARGET_VERSION}\"/" src/ai/backend/common/meta/meta.py
+
 # Update the changelog
 LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier
 
@@ -36,6 +40,7 @@ LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]'
 ./backend.ai storage config generate-sample --overwrite --unmask-secrets
 ./backend.ai web config generate-sample --overwrite --unmask-secrets
 
+./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
 ./scripts/generate-graphql-schema.sh
 
 git add -A

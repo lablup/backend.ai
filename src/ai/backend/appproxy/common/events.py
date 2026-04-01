@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Any, Self, override
 
 from pydantic import TypeAdapter
 
@@ -16,14 +18,14 @@ class AppProxyCircuitEvent(AbstractBroadcastEvent):
     target_worker_authority: str
     circuits: list[Circuit]
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.target_worker_authority,
             TypeAdapter(list[Circuit]).dump_json(self.circuits).decode("utf-8"),
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             target_worker_authority=value[0],
             circuits=[Circuit(**r) for r in json.loads(value[1])],
@@ -35,11 +37,11 @@ class AppProxyCircuitEvent(AbstractBroadcastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return ",".join([str(c.id) for c in self.circuits])
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -49,7 +51,7 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
     circuit: Circuit
     routes: list[RouteInfo]
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.target_worker_authority,
             self.circuit.model_dump_json(),
@@ -57,7 +59,7 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             target_worker_authority=value[0],
             circuit=Circuit(**json.loads(value[1])),
@@ -75,11 +77,11 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return str(self.circuit.id)
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -88,14 +90,14 @@ class GenericWorkerEvent(AbstractAnycastEvent):
     worker_id: str
     reason: str
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             self.worker_id,
             self.reason,
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(value[0], value[1])
 
     @classmethod
@@ -104,11 +106,11 @@ class GenericWorkerEvent(AbstractAnycastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return self.worker_id
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -148,11 +150,11 @@ class WorkerTerminatedEvent(GenericWorkerEvent):
 
 
 class DoCheckWorkerLostEvent(AbstractAnycastEvent):
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
         return cls()
 
     @classmethod
@@ -166,20 +168,20 @@ class DoCheckWorkerLostEvent(AbstractAnycastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
 class DoCheckUnusedPortEvent(AbstractAnycastEvent):
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
         return cls()
 
     @classmethod
@@ -193,20 +195,20 @@ class DoCheckUnusedPortEvent(AbstractAnycastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
 class DoHealthCheckEvent(AbstractAnycastEvent):
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
         return cls()
 
     @classmethod
@@ -220,9 +222,9 @@ class DoHealthCheckEvent(AbstractAnycastEvent):
         return EventDomain.MODEL_ROUTE
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None

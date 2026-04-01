@@ -1,0 +1,27 @@
+#!/bin/bash
+set -euo pipefail
+
+BACKUP_DIR="{{ service_dir }}/backups"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+BACKUP_FILE="${BACKUP_DIR}/postgres_full_backup_${TIMESTAMP}.dump"
+CONTAINER_NAME="{{ container_name }}"
+DB_USER="{{ db_user }}"
+
+echo "Starting PostgreSQL full backup..."
+
+mkdir -p "${BACKUP_DIR}"
+if ! docker ps --format "table {{ '{{.Names}}' }}" | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Error: PostgreSQL container '${CONTAINER_NAME}' is not running"
+    exit 1
+fi
+
+docker exec "${CONTAINER_NAME}" pg_dumpall -U "${DB_USER}" > "${BACKUP_FILE}"
+gzip "${BACKUP_FILE}"
+
+echo "Full backup completed successfully!"
+echo "Backup file: ${BACKUP_FILE}.gz"
+
+echo "Cleaning up old backups (keeping last 7)..."
+find "${BACKUP_DIR}" -name "postgres_full_backup_*.dump.gz" -type f | sort -r | tail -n +8 | xargs -r rm -f
+
+echo "Backup process completed!"

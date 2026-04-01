@@ -1,0 +1,55 @@
+apiVersion: 1
+datasources:
+  - name: backendai-dashboard-prometheus
+    type: prometheus
+    access: proxy
+    uid: {{ prometheus_uid }}
+    url: http://{{ prometheus_host }}:{{ prometheus_port }}
+    isDefault: true
+    editable: true
+  - name: backendai-dashboard-pyroscope
+    type: grafana-pyroscope-datasource
+    access: proxy
+    uid: {{ pyroscope_uid }}
+    url: http://{{ pyroscope_host }}:{{ pyroscope_port }}
+    editable: true
+  - name: backendai-dashboard-loki
+    type: loki
+    access: proxy
+    uid: {{ loki_uid }}
+    url: http://{{ loki_host }}:{{ loki_port }}
+    editable: true
+  - name: backendai-dashboard-tempo
+    type: tempo
+    access: proxy
+    uid: {{ tempo_uid }}
+    url: http://{{ tempo_host }}:{{ tempo_port }}
+    editable: true
+  - name: backendai-core-db
+    type: postgres
+    access: proxy
+    uid: {{ postgres_core_uid }}
+    url: {{ postgres_host }}:{{ postgres_port }}
+    database: {{ postgres_database }}
+    user: {{ postgres_user }}
+    editable: true
+    secureJsonData:
+      password: {{ postgres_password }}
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: false
+  - name: backendai-cp-db
+    type: postgres
+    access: proxy
+    uid: {{ postgres_cp_uid }}
+    url: {{ postgres_host }}:{{ postgres_port }}
+    database: {{ postgres_database }}
+    user: {{ postgres_user }}
+    editable: true
+    secureJsonData:
+      password: {{ postgres_password }}
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: true

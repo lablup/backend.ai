@@ -5,7 +5,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
-from typing import TextIO
+from typing import Any, TextIO
 
 from ai.backend.common.dependencies.base import (
     DependencyComposer,
@@ -189,7 +189,9 @@ class VisualizingDependencyStack(DependencyStack):
         await self._stack.__aenter__()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool | None:
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
+    ) -> bool | None:
         """
         Exit the async context and cleanup resources in LIFO order.
         """

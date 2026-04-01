@@ -1,10 +1,12 @@
 import uuid
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
     ArtifactRevisionReadme,
@@ -16,21 +18,26 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 @dataclass
 class DelegateScanArtifactsAction(ArtifactAction):
-    delegator_reservoir_id: Optional[uuid.UUID]
-    artifact_type: Optional[ArtifactType]
-    search: Optional[str]
-    order: Optional[ModelSortKey]
-    delegatee_target: Optional[DelegateeTarget]
-    limit: Optional[int]
+    delegator_reservoir_id: uuid.UUID | None
+    artifact_type: ArtifactType | None
+    search: str | None
+    order: ModelSortKey | None
+    delegatee_target: DelegateeTarget | None
+    limit: int | None
 
     @override
-    def entity_id(self) -> Optional[str]:
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.ARTIFACT_SCAN
+
+    @override
+    def entity_id(self) -> str | None:
         return None
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delegate_scan"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass
@@ -41,5 +48,5 @@ class DelegateScanArtifactsActionResult(BaseActionResult):
     readme_data: dict[uuid.UUID, ArtifactRevisionReadme]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None

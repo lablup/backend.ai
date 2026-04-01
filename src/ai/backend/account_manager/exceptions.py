@@ -12,7 +12,7 @@ future UX improvements.
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 from aiohttp import web
 
@@ -27,12 +27,12 @@ class BackendError(web.HTTPError):
     error_title: str = "General Backend API Error."
 
     content_type: str
-    extra_msg: Optional[str]
+    extra_msg: str | None
 
     body_dict: dict[str, Any]
 
     def __init__(
-        self, extra_msg: str | None = None, extra_data: Optional[Any] = None, **kwargs
+        self, extra_msg: str | None = None, extra_data: Any | None = None, **kwargs: Any
     ) -> None:
         super().__init__(**kwargs)
         self.args = (self.status_code, self.reason, self.error_type)
@@ -73,7 +73,7 @@ class BackendError(web.HTTPError):
             lines.append(" -> extra_data: " + repr(self.extra_data))
         return "\n".join(lines)
 
-    def __reduce__(self) -> tuple:
+    def __reduce__(self) -> tuple[type[BackendError], tuple[Any, ...], dict[str, Any]]:
         return (
             type(self),
             (),  # empty the constructor args to make unpickler to use
@@ -95,9 +95,9 @@ class ObjectNotFound(BackendError, web.HTTPNotFound):
         self,
         *,
         extra_msg: str | None = None,
-        extra_data: Optional[Any] = None,
+        extra_data: Any | None = None,
         object_name: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         if object_name:
             self.object_name = object_name

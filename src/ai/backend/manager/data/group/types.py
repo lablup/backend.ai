@@ -5,8 +5,9 @@ import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Any, override
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import (
@@ -14,6 +15,7 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     ScopeType,
 )
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
@@ -23,7 +25,7 @@ class ProjectType(enum.StrEnum):
     MODEL_STORE = "model-store"
 
     @classmethod
-    def _missing_(cls, value: Any) -> Optional[ProjectType]:
+    def _missing_(cls, value: Any) -> ProjectType | None:
         if not isinstance(value, str):
             raise DataTransformationFailed(
                 f"ProjectType value must be a string, got {type(value).__name__}"
@@ -33,25 +35,26 @@ class ProjectType(enum.StrEnum):
                 return cls.GENERAL
             case "MODEL_STORE" | "MODEL-STORE":
                 return cls.MODEL_STORE
-        return None
+            case _:
+                return None
 
 
 @dataclass
 class GroupData:
     id: uuid.UUID = field(compare=False)
     name: str
-    description: Optional[str]
+    description: str | None
     is_active: bool | None
     created_at: datetime | None = field(compare=False)
     modified_at: datetime | None = field(compare=False)
-    integration_id: Optional[str]
+    integration_id: str | None
     domain_name: str
     total_resource_slots: ResourceSlot
     allowed_vfolder_hosts: VFolderHostPermissionMap
     dotfiles: bytes
     resource_policy: str
     type: ProjectType
-    container_registry: Optional[dict[str, str]]
+    container_registry: dict[str, str] | None
 
     def scope_id(self) -> ScopeId:
         return ScopeId(
@@ -62,9 +65,9 @@ class GroupData:
     def role_name(self) -> str:
         return f"project-{str(self.id)[:8]}-admin"
 
-    def entity_operations(self) -> Mapping[EntityType, Iterable[OperationType]]:
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
         return {
-            entity: OperationType.admin_operations()
+            entity.to_element(): OperationType.admin_operations()
             for entity in EntityType.admin_accessible_entity_types_in_project()
         }
 
@@ -104,3 +107,15 @@ class GroupModifier(PartialModifier):
         self.resource_policy.update_dict(to_update, "resource_policy")
         self.container_registry.update_dict(to_update, "container_registry")
         return to_update
+
+
+@dataclass
+class UnassignUserFailure:
+    user_id: uuid.UUID
+    reason: str
+
+
+@dataclass
+class UnassignUsersResult:
+    unassigned_users: list[UserData]
+    failures: list[UnassignUserFailure]

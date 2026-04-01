@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp
 import graphene
@@ -25,10 +25,10 @@ __all__ = (
     "StorageVolumeList",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class StorageVolume(graphene.ObjectType):
+class StorageVolume(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -55,7 +55,7 @@ class StorageVolume(graphene.ObjectType):
             proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(self.id)
             manager_client = ctx.storage_manager.get_manager_facing_client(proxy_name)
             storage_reply = await manager_client.get_volume_performance_metric(volume_name)
-            return storage_reply["metric"]
+            return cast(Mapping[str, Any], storage_reply["metric"])
         except aiohttp.ClientResponseError:
             return {}
 
@@ -84,7 +84,7 @@ class StorageVolume(graphene.ObjectType):
     async def load_count(
         cls,
         ctx: GraphQueryContext,
-        filter: Optional[str] = None,
+        filter: str | None = None,
     ) -> int:
         volumes = [*await ctx.storage_manager.get_all_volumes()]
         return len(volumes)
@@ -95,8 +95,8 @@ class StorageVolume(graphene.ObjectType):
         ctx: GraphQueryContext,
         limit: int,
         offset: int,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[StorageVolume]:
         # For consistency we add filter/order params here, but it's actually noop.
         if filter is not None or order is not None:
@@ -118,8 +118,8 @@ class StorageVolume(graphene.ObjectType):
         proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(id)
         try:
             proxy_info = ctx.storage_manager._proxies[proxy_name]
-        except KeyError:
-            raise ValueError(f"no such storage proxy: {proxy_name!r}")
+        except KeyError as e:
+            raise ValueError(f"no such storage proxy: {proxy_name!r}") from e
         async with proxy_info.session.request(
             "GET",
             proxy_info.manager_api_url / "volumes",
@@ -136,7 +136,7 @@ class StorageVolume(graphene.ObjectType):
                 )
 
 
-class StorageVolumeList(graphene.ObjectType):
+class StorageVolumeList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 

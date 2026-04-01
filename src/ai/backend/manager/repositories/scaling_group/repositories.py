@@ -11,7 +11,9 @@ class ScalingGroupRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = ScalingGroupRepository(args.db)
+        repository = ScalingGroupRepository(
+            args.db,
+        )
 
         return cls(
             repository=repository,

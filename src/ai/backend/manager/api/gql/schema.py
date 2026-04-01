@@ -1,11 +1,24 @@
 import strawberry
+from graphql.pyutils.undefined import Undefined as GraphQLUndefined
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
-from .agent_stats import (
+from ai.backend.common.api_handlers import Sentinel as BackendSentinel
+from ai.backend.manager.api.gql.extensions import (
+    GQLExceptionHandlerExtension,
+    GQLLoggingExtension,
+    GQLMetricExtension,
+    GQLValidationExtension,
+)
+
+from .agent import (
     agent_stats,
+    agents_v2,
 )
 from .app_config import (
+    admin_delete_domain_app_config,
+    admin_domain_app_config,
+    admin_upsert_domain_app_config,
     delete_domain_app_config,
     delete_user_app_config,
     domain_app_config,
@@ -35,7 +48,14 @@ from .artifact import (
     update_artifact,
 )
 from .artifact_registry import default_artifact_registry
+from .audit_log import admin_audit_logs_v2
 from .background_task import background_task_events
+from .container_registry import (
+    admin_container_registries_v2,
+    admin_create_container_registry_v2,
+    admin_delete_container_registry_v2,
+    admin_update_container_registry_v2,
+)
 from .deployment import (
     # Revision
     activate_deployment_revision,
@@ -46,7 +66,6 @@ from .deployment import (
     create_auto_scaling_rule,
     # Deployment
     create_model_deployment,
-    create_model_revision,
     delete_auto_scaling_rule,
     delete_model_deployment,
     deployment,
@@ -65,8 +84,50 @@ from .deployment import (
     routes,
     sync_replicas,
     update_auto_scaling_rule,
+    update_deployment_policy,
     update_model_deployment,
     update_route_traffic_status,
+)
+from .domain_v2 import (
+    admin_create_domain_v2,
+    admin_delete_domain_v2,
+    admin_domains_v2,
+    admin_purge_domain_v2,
+    admin_update_domain_v2,
+    domain_v2,
+    rg_domains_v2,
+)
+from .fair_share import (
+    admin_bulk_upsert_domain_fair_share_weight,
+    admin_bulk_upsert_project_fair_share_weight,
+    admin_bulk_upsert_user_fair_share_weight,
+    admin_domain_fair_share,
+    admin_domain_fair_shares,
+    admin_project_fair_share,
+    admin_project_fair_shares,
+    admin_upsert_domain_fair_share_weight,
+    admin_upsert_project_fair_share_weight,
+    admin_upsert_user_fair_share_weight,
+    admin_user_fair_share,
+    admin_user_fair_shares,
+    bulk_upsert_domain_fair_share_weight,
+    bulk_upsert_project_fair_share_weight,
+    bulk_upsert_user_fair_share_weight,
+    domain_fair_share,
+    domain_fair_shares,
+    project_fair_share,
+    project_fair_shares,
+    rg_domain_fair_share,
+    rg_domain_fair_shares,
+    rg_project_fair_share,
+    rg_project_fair_shares,
+    rg_user_fair_share,
+    rg_user_fair_shares,
+    upsert_domain_fair_share_weight,
+    upsert_project_fair_share_weight,
+    upsert_user_fair_share_weight,
+    user_fair_share,
+    user_fair_shares,
 )
 from .huggingface_registry import (
     create_huggingface_registry,
@@ -75,7 +136,54 @@ from .huggingface_registry import (
     huggingface_registry,
     update_huggingface_registry,
 )
+from .image import (
+    admin_image_aliases,
+    admin_images_v2,
+    container_registry_images_v2,
+    image_alias,
+    image_scoped_aliases,
+    image_v2,
+)
+from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
+from .keypair import (
+    admin_create_keypair_v2,
+    admin_delete_keypair_v2,
+    admin_keypair_v2,
+    admin_keypairs_v2,
+    admin_update_keypair_v2,
+    issue_my_keypair,
+    my_keypairs,
+    revoke_my_keypair,
+    switch_my_main_access_key,
+    update_my_keypair,
+)
+from .login_history import admin_login_history_v2, my_login_history_v2
+from .login_session import (
+    admin_login_sessions_v2,
+    admin_revoke_login_session,
+    my_login_sessions_v2,
+    my_revoke_login_session,
+)
+from .model_card import (
+    admin_create_model_card_v2,
+    admin_delete_model_card_v2,
+    admin_update_model_card_v2,
+    model_card_v2,
+    model_cards_v2,
+)
 from .notification import (
+    admin_create_notification_channel,
+    admin_create_notification_rule,
+    admin_delete_notification_channel,
+    admin_delete_notification_rule,
+    admin_notification_channel,
+    admin_notification_channels,
+    admin_notification_rule,
+    admin_notification_rules,
+    admin_update_notification_channel,
+    admin_update_notification_rule,
+    admin_validate_notification_channel,
+    admin_validate_notification_rule,
     create_notification_channel,
     create_notification_rule,
     delete_notification_channel,
@@ -99,6 +207,46 @@ from .object_storage import (
     object_storages,
     update_object_storage,
 )
+from .project_v2 import (
+    admin_create_project_v2,
+    admin_delete_project_v2,
+    admin_projects_v2,
+    admin_purge_project_v2,
+    admin_update_project_v2,
+    domain_projects_v2,
+    project_domain_v2,
+    project_v2,
+    unassign_users_from_project_v2,
+)
+from .prometheus_query_preset import (
+    admin_create_prometheus_query_preset,
+    admin_delete_prometheus_query_preset,
+    admin_modify_prometheus_query_preset,
+    admin_prometheus_query_preset,
+    admin_prometheus_query_preset_result,
+    admin_prometheus_query_presets,
+)
+from .rbac import (
+    admin_assign_role,
+    admin_bulk_assign_role,
+    admin_bulk_revoke_role,
+    admin_create_permission,
+    admin_create_role,
+    admin_delete_permission,
+    admin_delete_role,
+    admin_entities,
+    admin_permissions,
+    admin_purge_role,
+    admin_revoke_role,
+    admin_role,
+    admin_role_assignments,
+    admin_roles,
+    admin_update_permission,
+    admin_update_role,
+    my_roles,
+    rbac_entity_operation_combinations,
+    rbac_scope_entity_combinations,
+)
 from .reservoir_registry import (
     create_reservoir_registry,
     delete_reservoir_registry,
@@ -106,14 +254,130 @@ from .reservoir_registry import (
     reservoir_registry,
     update_reservoir_registry,
 )
-from .scaling_group import all_scaling_groups_v2, scaling_groups_v2
+from .resource_allocation import (
+    admin_domain_resource_allocation_v2,
+    admin_effective_resource_allocation_v2,
+    check_preset_availability_v2,
+    effective_resource_allocation_v2,
+    my_keypair_resource_allocation_v2,
+    project_resource_allocation_v2,
+    resource_group_resource_allocation_v2,
+)
+from .resource_group import (
+    admin_allowed_domains_for_resource_group_v2,
+    admin_allowed_projects_for_resource_group_v2,
+    admin_allowed_resource_groups_for_domain_v2,
+    admin_allowed_resource_groups_for_project_v2,
+    admin_create_resource_group_v2,
+    admin_delete_resource_group_v2,
+    admin_resource_group_v2,
+    admin_resource_groups,
+    admin_update_allowed_domains_for_resource_group_v2,
+    admin_update_allowed_projects_for_resource_group_v2,
+    admin_update_allowed_resource_groups_for_domain_v2,
+    admin_update_allowed_resource_groups_for_project_v2,
+    admin_update_resource_group,
+    admin_update_resource_group_fair_share_spec,
+    resource_groups,
+    update_resource_group_fair_share_spec,
+)
+from .resource_policy_v2 import (
+    admin_create_keypair_resource_policy_v2,
+    admin_create_project_resource_policy_v2,
+    admin_create_user_resource_policy_v2,
+    admin_delete_keypair_resource_policy_v2,
+    admin_delete_project_resource_policy_v2,
+    admin_delete_user_resource_policy_v2,
+    admin_keypair_resource_policies_v2,
+    admin_keypair_resource_policy_v2,
+    admin_project_resource_policies_v2,
+    admin_project_resource_policy_v2,
+    admin_update_keypair_resource_policy_v2,
+    admin_update_project_resource_policy_v2,
+    admin_update_user_resource_policy_v2,
+    admin_user_resource_policies_v2,
+    admin_user_resource_policy_v2,
+    my_keypair_resource_policy_v2,
+    my_user_resource_policy_v2,
+)
+from .resource_preset import (
+    admin_create_resource_preset_v2,
+    admin_delete_resource_preset_v2,
+    admin_resource_preset_v2,
+    admin_resource_presets_v2,
+    admin_update_resource_preset_v2,
+)
+from .resource_slot.resolver import resource_slot_type, resource_slot_types
+from .resource_usage import (
+    admin_domain_usage_buckets,
+    admin_project_usage_buckets,
+    admin_user_usage_buckets,
+    domain_usage_buckets,
+    project_usage_buckets,
+    rg_domain_usage_buckets,
+    rg_project_usage_buckets,
+    rg_user_usage_buckets,
+    user_usage_buckets,
+)
+from .runtime_variant import (
+    admin_create_runtime_variant,
+    admin_delete_runtime_variant,
+    admin_update_runtime_variant,
+    runtime_variant,
+    runtime_variants,
+)
+from .runtime_variant_preset import (
+    admin_create_runtime_variant_preset,
+    admin_delete_runtime_variant_preset,
+    admin_update_runtime_variant_preset,
+    runtime_variant_preset,
+    runtime_variant_presets,
+)
 from .scheduler import (
     scheduling_events_by_session,
+)
+from .scheduling_history import (
+    admin_deployment_histories,
+    admin_route_histories,
+    admin_session_scheduling_histories,
+    deployment_histories,
+    deployment_scoped_scheduling_histories,
+    route_histories,
+    route_scoped_scheduling_histories,
+    session_scheduling_histories,
+    session_scoped_scheduling_histories,
+)
+from .service_catalog import admin_service_catalogs
+from .session.resolver import (
+    admin_sessions_v2,
+    project_sessions_v2,
+    terminate_project_sessions_v2,
 )
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
 )
+from .user import (
+    # Mutations
+    admin_bulk_create_users_v2,
+    admin_bulk_purge_users_v2,
+    admin_bulk_update_users_v2,
+    admin_create_user_v2,
+    admin_delete_user_v2,
+    admin_delete_users_v2,
+    admin_purge_user_v2,
+    admin_update_user_v2,
+    # Queries
+    admin_user_v2,
+    admin_users_v2,
+    domain_users_v2,
+    my_client_ip,
+    my_user_v2,
+    project_users_v2,
+    update_my_allowed_client_ip,
+    update_user_v2,
+)
+from .vfolder_v2 import my_vfolders, project_vfolders
 from .vfs_storage import (
     create_vfs_storage,
     delete_vfs_storage,
@@ -125,11 +389,12 @@ from .vfs_storage import (
 
 @strawberry.type
 class Query:
+    agent_stats = agent_stats
+    agents_v2 = agents_v2
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
     artifact_revisions = artifact_revisions
-    domain_app_config = domain_app_config
     user_app_config = user_app_config
     merged_app_config = merged_app_config
     deployments = deployments
@@ -138,10 +403,6 @@ class Query:
     revision = revision
     replicas = replicas
     replica = replica
-    notification_channel = notification_channel
-    notification_channels = notification_channels
-    notification_rule = notification_rule
-    notification_rules = notification_rules
     notification_rule_types = notification_rule_types
     object_storage = object_storage
     object_storages = object_storages
@@ -151,14 +412,159 @@ class Query:
     huggingface_registries = huggingface_registries
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
-    scaling_groups_v2 = scaling_groups_v2
-    all_scaling_groups_v2 = all_scaling_groups_v2
+    image_v2 = image_v2
+    kernel_v2 = kernel_v2
+    image_alias = image_alias
+    # Admin APIs
+    admin_resource_groups = admin_resource_groups
+    admin_resource_group_v2 = admin_resource_group_v2
+    admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
+    admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
+    admin_allowed_domains_for_resource_group_v2 = admin_allowed_domains_for_resource_group_v2
+    admin_allowed_projects_for_resource_group_v2 = admin_allowed_projects_for_resource_group_v2
+    admin_service_catalogs = admin_service_catalogs
+    admin_session_scheduling_histories = admin_session_scheduling_histories
+    admin_deployment_histories = admin_deployment_histories
+    admin_route_histories = admin_route_histories
+    admin_notification_channel = admin_notification_channel
+    admin_notification_channels = admin_notification_channels
+    admin_notification_rule = admin_notification_rule
+    admin_notification_rules = admin_notification_rules
+    admin_domain_app_config = admin_domain_app_config
+    admin_domain_fair_share = admin_domain_fair_share
+    admin_domain_fair_shares = admin_domain_fair_shares
+    admin_project_fair_share = admin_project_fair_share
+    admin_project_fair_shares = admin_project_fair_shares
+    admin_user_fair_share = admin_user_fair_share
+    admin_user_fair_shares = admin_user_fair_shares
+    admin_domain_usage_buckets = admin_domain_usage_buckets
+    admin_project_usage_buckets = admin_project_usage_buckets
+    admin_user_usage_buckets = admin_user_usage_buckets
+    admin_images_v2 = admin_images_v2
+    admin_kernels_v2 = admin_kernels_v2
+    admin_audit_logs_v2 = admin_audit_logs_v2
+    admin_container_registries_v2 = admin_container_registries_v2
+    admin_login_sessions_v2 = admin_login_sessions_v2
+    admin_login_history_v2 = admin_login_history_v2
+    admin_sessions_v2 = admin_sessions_v2
+    project_sessions_v2 = project_sessions_v2
+    resource_slot_type = resource_slot_type
+    resource_slot_types = resource_slot_types
+    admin_image_aliases = admin_image_aliases
+    # Prometheus Query Preset Admin APIs
+    admin_prometheus_query_preset = admin_prometheus_query_preset
+    admin_prometheus_query_presets = admin_prometheus_query_presets
+    admin_prometheus_query_preset_result = admin_prometheus_query_preset_result
+    # RBAC Admin APIs
+    admin_role = admin_role
+    admin_roles = admin_roles
+    admin_permissions = admin_permissions
+    admin_role_assignments = admin_role_assignments
+    admin_entities = admin_entities
+    # Keypair self-service queries
+    my_keypairs = my_keypairs
+    # Keypair admin queries
+    admin_keypair_v2 = admin_keypair_v2
+    admin_keypairs_v2 = admin_keypairs_v2
+    # Login session/history self-service queries
+    my_login_sessions_v2 = my_login_sessions_v2
+    my_login_history_v2 = my_login_history_v2
+    # RBAC User APIs
+    my_roles = my_roles
+    rbac_scope_entity_combinations = rbac_scope_entity_combinations
+    rbac_entity_operation_combinations = rbac_entity_operation_combinations
+    # Session Scoped APIs
+    session_kernels_v2 = session_kernels_v2
+    # Resource Group Scoped APIs
+    rg_domain_fair_share = rg_domain_fair_share
+    rg_domain_fair_shares = rg_domain_fair_shares
+    rg_project_fair_share = rg_project_fair_share
+    rg_project_fair_shares = rg_project_fair_shares
+    rg_user_fair_share = rg_user_fair_share
+    rg_user_fair_shares = rg_user_fair_shares
+    rg_domain_usage_buckets = rg_domain_usage_buckets
+    rg_project_usage_buckets = rg_project_usage_buckets
+    rg_user_usage_buckets = rg_user_usage_buckets
+    # Container Registry Scoped APIs
+    container_registry_images_v2 = container_registry_images_v2
+    # Image Scoped APIs
+    image_scoped_aliases = image_scoped_aliases
+    # Entity Scoped APIs (added in 26.2.0)
+    session_scoped_scheduling_histories = session_scoped_scheduling_histories
+    deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories
+    route_scoped_scheduling_histories = route_scoped_scheduling_histories
+    # Legacy APIs (deprecated)
+    resource_groups = resource_groups
+    domain_app_config = domain_app_config
+    domain_fair_share = domain_fair_share
+    domain_fair_shares = domain_fair_shares
+    project_fair_share = project_fair_share
+    project_fair_shares = project_fair_shares
+    user_fair_share = user_fair_share
+    user_fair_shares = user_fair_shares
+    domain_usage_buckets = domain_usage_buckets
+    project_usage_buckets = project_usage_buckets
+    user_usage_buckets = user_usage_buckets
+    notification_channel = notification_channel
+    notification_channels = notification_channels
+    notification_rule = notification_rule
+    notification_rules = notification_rules
     default_artifact_registry = default_artifact_registry
-    agent_stats = agent_stats
     inference_runtime_configs = inference_runtime_configs
     inference_runtime_config = inference_runtime_config
     route = route
     routes = routes
+    session_scheduling_histories = session_scheduling_histories
+    deployment_histories = deployment_histories
+    route_histories = route_histories
+    # User V2 APIs
+    admin_user_v2 = admin_user_v2
+    admin_users_v2 = admin_users_v2
+    domain_users_v2 = domain_users_v2
+    my_client_ip = my_client_ip
+    my_user_v2 = my_user_v2
+    project_users_v2 = project_users_v2
+    # Domain V2 APIs
+    domain_v2 = domain_v2
+    admin_domains_v2 = admin_domains_v2
+    rg_domains_v2 = rg_domains_v2
+    # Project V2 APIs
+    project_v2 = project_v2
+    admin_projects_v2 = admin_projects_v2
+    domain_projects_v2 = domain_projects_v2
+    project_domain_v2 = project_domain_v2
+    # Resource Policy V2 APIs
+    admin_keypair_resource_policy_v2 = admin_keypair_resource_policy_v2
+    admin_keypair_resource_policies_v2 = admin_keypair_resource_policies_v2
+    admin_user_resource_policy_v2 = admin_user_resource_policy_v2
+    admin_user_resource_policies_v2 = admin_user_resource_policies_v2
+    admin_project_resource_policy_v2 = admin_project_resource_policy_v2
+    admin_project_resource_policies_v2 = admin_project_resource_policies_v2
+    my_keypair_resource_policy_v2 = my_keypair_resource_policy_v2
+    my_user_resource_policy_v2 = my_user_resource_policy_v2
+    # Resource Preset V2 APIs
+    admin_resource_presets_v2 = admin_resource_presets_v2
+    admin_resource_preset_v2 = admin_resource_preset_v2
+    # Runtime Variant APIs
+    runtime_variants = runtime_variants
+    runtime_variant = runtime_variant
+    # Runtime Variant Preset APIs
+    runtime_variant_presets = runtime_variant_presets
+    runtime_variant_preset = runtime_variant_preset
+    # Model Card APIs
+    model_cards_v2 = model_cards_v2
+    model_card_v2 = model_card_v2
+    # Resource Allocation V2 APIs
+    my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
+    project_resource_allocation_v2 = project_resource_allocation_v2
+    admin_domain_resource_allocation_v2 = admin_domain_resource_allocation_v2
+    resource_group_resource_allocation_v2 = resource_group_resource_allocation_v2
+    effective_resource_allocation_v2 = effective_resource_allocation_v2
+    admin_effective_resource_allocation_v2 = admin_effective_resource_allocation_v2
+    check_preset_availability_v2 = check_preset_availability_v2
+    # VFolder APIs
+    project_vfolders = project_vfolders
+    my_vfolders = my_vfolders
 
 
 @strawberry.type
@@ -166,9 +572,7 @@ class Mutation:
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
-    upsert_domain_app_config = upsert_domain_app_config
     upsert_user_app_config = upsert_user_app_config
-    delete_domain_app_config = delete_domain_app_config
     delete_user_app_config = delete_user_app_config
     delegate_scan_artifacts = delegate_scan_artifacts
     delegate_import_artifacts = delegate_import_artifacts
@@ -177,12 +581,29 @@ class Mutation:
     restore_artifacts = restore_artifacts
     cleanup_artifact_revisions = cleanup_artifact_revisions
     cancel_import_artifact = cancel_import_artifact
+    # Container Registry V2 APIs
+    admin_create_container_registry_v2 = admin_create_container_registry_v2
+    admin_update_container_registry_v2 = admin_update_container_registry_v2
+    admin_delete_container_registry_v2 = admin_delete_container_registry_v2
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
-    create_model_revision = create_model_revision
+    update_deployment_policy = update_deployment_policy
+    # Notification - Admin APIs
+    admin_create_notification_channel = admin_create_notification_channel
+    admin_update_notification_channel = admin_update_notification_channel
+    admin_delete_notification_channel = admin_delete_notification_channel
+    admin_validate_notification_channel = admin_validate_notification_channel
+    admin_create_notification_rule = admin_create_notification_rule
+    admin_update_notification_rule = admin_update_notification_rule
+    admin_delete_notification_rule = admin_delete_notification_rule
+    admin_validate_notification_rule = admin_validate_notification_rule
+    # App Config - Admin APIs
+    admin_upsert_domain_app_config = admin_upsert_domain_app_config
+    admin_delete_domain_app_config = admin_delete_domain_app_config
+    # Notification - Legacy (deprecated)
     create_notification_channel = create_notification_channel
     update_notification_channel = update_notification_channel
     delete_notification_channel = delete_notification_channel
@@ -191,6 +612,9 @@ class Mutation:
     update_notification_rule = update_notification_rule
     delete_notification_rule = delete_notification_rule
     validate_notification_rule = validate_notification_rule
+    # App Config - Legacy (deprecated)
+    upsert_domain_app_config = upsert_domain_app_config
+    delete_domain_app_config = delete_domain_app_config
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     create_auto_scaling_rule = create_auto_scaling_rule
@@ -215,6 +639,118 @@ class Mutation:
     create_access_token = create_access_token
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
+    # Fair Share - Admin APIs
+    admin_upsert_domain_fair_share_weight = admin_upsert_domain_fair_share_weight
+    admin_upsert_project_fair_share_weight = admin_upsert_project_fair_share_weight
+    admin_upsert_user_fair_share_weight = admin_upsert_user_fair_share_weight
+    admin_bulk_upsert_domain_fair_share_weight = admin_bulk_upsert_domain_fair_share_weight
+    admin_bulk_upsert_project_fair_share_weight = admin_bulk_upsert_project_fair_share_weight
+    admin_bulk_upsert_user_fair_share_weight = admin_bulk_upsert_user_fair_share_weight
+    # Fair Share - Legacy (deprecated)
+    upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
+    upsert_project_fair_share_weight = upsert_project_fair_share_weight
+    upsert_user_fair_share_weight = upsert_user_fair_share_weight
+    bulk_upsert_domain_fair_share_weight = bulk_upsert_domain_fair_share_weight
+    bulk_upsert_project_fair_share_weight = bulk_upsert_project_fair_share_weight
+    bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight
+    # Resource Group - Admin APIs
+    admin_update_resource_group_fair_share_spec = admin_update_resource_group_fair_share_spec
+    admin_update_resource_group = admin_update_resource_group
+    admin_create_resource_group_v2 = admin_create_resource_group_v2
+    admin_delete_resource_group_v2 = admin_delete_resource_group_v2
+    admin_update_allowed_resource_groups_for_domain_v2 = (
+        admin_update_allowed_resource_groups_for_domain_v2
+    )
+    admin_update_allowed_resource_groups_for_project_v2 = (
+        admin_update_allowed_resource_groups_for_project_v2
+    )
+    admin_update_allowed_domains_for_resource_group_v2 = (
+        admin_update_allowed_domains_for_resource_group_v2
+    )
+    admin_update_allowed_projects_for_resource_group_v2 = (
+        admin_update_allowed_projects_for_resource_group_v2
+    )
+    # Resource Group - Legacy (deprecated)
+    update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
+    # Domain V2 APIs
+    admin_create_domain_v2 = admin_create_domain_v2
+    admin_update_domain_v2 = admin_update_domain_v2
+    admin_delete_domain_v2 = admin_delete_domain_v2
+    admin_purge_domain_v2 = admin_purge_domain_v2
+    # Project V2 APIs
+    admin_create_project_v2 = admin_create_project_v2
+    admin_update_project_v2 = admin_update_project_v2
+    admin_delete_project_v2 = admin_delete_project_v2
+    admin_purge_project_v2 = admin_purge_project_v2
+    unassign_users_from_project_v2 = unassign_users_from_project_v2
+    # User V2 APIs
+    admin_create_user_v2 = admin_create_user_v2
+    admin_bulk_create_users_v2 = admin_bulk_create_users_v2
+    admin_bulk_update_users_v2 = admin_bulk_update_users_v2
+    admin_update_user_v2 = admin_update_user_v2
+    update_user_v2 = update_user_v2
+    admin_delete_user_v2 = admin_delete_user_v2
+    admin_delete_users_v2 = admin_delete_users_v2
+    admin_purge_user_v2 = admin_purge_user_v2
+    admin_bulk_purge_users_v2 = admin_bulk_purge_users_v2
+    # Keypair self-service mutations
+    issue_my_keypair = issue_my_keypair
+    revoke_my_keypair = revoke_my_keypair
+    switch_my_main_access_key = switch_my_main_access_key
+    update_my_keypair = update_my_keypair
+    # Keypair admin mutations
+    admin_create_keypair_v2 = admin_create_keypair_v2
+    admin_update_keypair_v2 = admin_update_keypair_v2
+    admin_delete_keypair_v2 = admin_delete_keypair_v2
+    # Login session mutations
+    admin_revoke_login_session = admin_revoke_login_session
+    my_revoke_login_session = my_revoke_login_session
+    # IP allowlist self-service mutation
+    update_my_allowed_client_ip = update_my_allowed_client_ip
+    # Prometheus Query Preset - Admin APIs
+    admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
+    admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
+    admin_delete_prometheus_query_preset = admin_delete_prometheus_query_preset
+    # RBAC Admin APIs
+    admin_create_role = admin_create_role
+    admin_update_role = admin_update_role
+    admin_delete_role = admin_delete_role
+    admin_purge_role = admin_purge_role
+    admin_create_permission = admin_create_permission
+    admin_update_permission = admin_update_permission
+    admin_delete_permission = admin_delete_permission
+    admin_assign_role = admin_assign_role
+    admin_revoke_role = admin_revoke_role
+    admin_bulk_assign_role = admin_bulk_assign_role
+    admin_bulk_revoke_role = admin_bulk_revoke_role
+    # Resource Policy V2 APIs
+    admin_create_keypair_resource_policy_v2 = admin_create_keypair_resource_policy_v2
+    admin_update_keypair_resource_policy_v2 = admin_update_keypair_resource_policy_v2
+    admin_delete_keypair_resource_policy_v2 = admin_delete_keypair_resource_policy_v2
+    admin_create_user_resource_policy_v2 = admin_create_user_resource_policy_v2
+    admin_update_user_resource_policy_v2 = admin_update_user_resource_policy_v2
+    admin_delete_user_resource_policy_v2 = admin_delete_user_resource_policy_v2
+    admin_create_project_resource_policy_v2 = admin_create_project_resource_policy_v2
+    admin_update_project_resource_policy_v2 = admin_update_project_resource_policy_v2
+    admin_delete_project_resource_policy_v2 = admin_delete_project_resource_policy_v2
+    # Resource Preset V2 APIs
+    admin_create_resource_preset_v2 = admin_create_resource_preset_v2
+    admin_update_resource_preset_v2 = admin_update_resource_preset_v2
+    admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
+    # Runtime Variant mutations
+    admin_create_runtime_variant = admin_create_runtime_variant
+    admin_update_runtime_variant = admin_update_runtime_variant
+    admin_delete_runtime_variant = admin_delete_runtime_variant
+    # Runtime Variant Preset mutations
+    admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
+    admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
+    admin_delete_runtime_variant_preset = admin_delete_runtime_variant_preset
+    # Model Card mutations
+    admin_create_model_card_v2 = admin_create_model_card_v2
+    admin_update_model_card_v2 = admin_update_model_card_v2
+    admin_delete_model_card_v2 = admin_delete_model_card_v2
+    # Session V2 mutations
+    terminate_project_sessions_v2 = terminate_project_sessions_v2
 
 
 @strawberry.type
@@ -229,6 +765,15 @@ class Subscription:
 
 class CustomizedSchema(Schema):
     def as_str(self) -> str:
+        # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
+        # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so
+        # replace any SENTINEL default with Undefined (= "no default" in the schema SDL).
+        for type_def in self._schema.type_map.values():
+            if not hasattr(type_def, "fields"):
+                continue
+            for field in type_def.fields.values():
+                if isinstance(getattr(field, "default_value", None), BackendSentinel):
+                    field.default_value = GraphQLUndefined
         sdl = super().as_str()
         sdl = sdl.replace("type PageInfo", "type PageInfo @shareable").replace(
             'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'
@@ -243,4 +788,10 @@ schema = CustomizedSchema(
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),
     federation_version="2.11",
+    extensions=[
+        GQLLoggingExtension,
+        GQLMetricExtension,
+        GQLValidationExtension,
+        GQLExceptionHandlerExtension,
+    ],
 )

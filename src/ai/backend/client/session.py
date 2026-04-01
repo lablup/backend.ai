@@ -11,7 +11,6 @@ from contextvars import Context, ContextVar, copy_context
 from typing import (
     Any,
     Literal,
-    Optional,
     TypeVar,
 )
 
@@ -22,7 +21,7 @@ from .config import MIN_API_VERSION, APIConfig, get_config, parse_api_version
 from .exceptions import APIVersionWarning, BackendAPIError, BackendClientError
 from .types import Sentinel, sentinel
 
-__all__ = (
+__all__: tuple[str, ...] = (
     "AsyncSession",
     "BaseSession",
     "Session",
@@ -99,14 +98,14 @@ async def _close_aiohttp_session(session: aiohttp.ClientSession) -> None:
                 orig_lost = proto.connection_lost
                 orig_eof_received = proto.eof_received
 
-                def connection_lost(exc):
+                def connection_lost(exc: Exception | None) -> None:
                     orig_lost(exc)
                     nonlocal transports
                     transports -= 1
                     if transports == 0:
                         all_is_lost.set()
 
-                def eof_received():
+                def eof_received() -> None:
                     try:
                         orig_eof_received()
                     except AttributeError:
@@ -125,7 +124,9 @@ _Item = TypeVar("_Item")
 
 
 class _SyncWorkerThread(threading.Thread):
-    work_queue: queue.Queue[tuple[AsyncIterator | Coroutine, Context] | Sentinel]
+    work_queue: queue.Queue[
+        tuple[AsyncIterator[Any] | Coroutine[Any, Any, Any], Context] | Sentinel
+    ]
     done_queue: queue.Queue[Any | Exception]
     stream_queue: queue.Queue[Any | Exception | Sentinel]
     stream_block: threading.Event
@@ -139,7 +140,7 @@ class _SyncWorkerThread(threading.Thread):
         "work_queue",
     )
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.work_queue = queue.Queue()
         self.done_queue = queue.Queue()
@@ -161,7 +162,7 @@ class _SyncWorkerThread(threading.Thread):
                 else:
                     try:
                         # FIXME: Once python/mypy#12756 is resolved, remove the type-ignore tag.
-                        result = ctx.run(loop.run_until_complete, coro)  # type: ignore
+                        result = ctx.run(loop.run_until_complete, coro)
                     except Exception as e:
                         self.done_queue.put_nowait(e)
                     else:
@@ -174,7 +175,7 @@ class _SyncWorkerThread(threading.Thread):
             loop.stop()
             loop.close()
 
-    def execute(self, coro: Coroutine) -> Any:
+    def execute(self, coro: Coroutine[Any, Any, Any]) -> Any:
         ctx = copy_context()  # preserve context for the worker thread
         try:
             self.work_queue.put((coro, ctx))
@@ -186,7 +187,7 @@ class _SyncWorkerThread(threading.Thread):
         finally:
             del ctx
 
-    async def agen_wrapper(self, agen):
+    async def agen_wrapper(self, agen: AsyncIterator[Any]) -> None:
         self.agen_shutdown = False
         try:
             async for item in agen:
@@ -220,7 +221,7 @@ class _SyncWorkerThread(threading.Thread):
         finally:
             del ctx
 
-    def interrupt_generator(self):
+    def interrupt_generator(self) -> None:
         self.agen_shutdown = True
         self.stream_block.set()
         self.stream_queue.put(sentinel)
@@ -243,6 +244,8 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Domain",
         "Dotfile",
         "EtcdConfig",
+        "Export",
+        "FairShare",
         "Group",
         "Image",
         "KeyPair",
@@ -254,7 +257,9 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Permission",
         "QuotaScope",
         "Resource",
+        "ResourceUsage",
         "ScalingGroup",
+        "SchedulingHistory",
         "ServerLog",
         "Service",
         "ServiceAutoScalingRule",
@@ -282,7 +287,7 @@ class BaseSession(metaclass=abc.ABCMeta):
     def __init__(
         self,
         *,
-        config: Optional[APIConfig] = None,
+        config: APIConfig | None = None,
         proxy_mode: bool = False,
     ) -> None:
         self._closed = False
@@ -300,6 +305,8 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.domain import Domain
         from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
+        from .func.export import Export
+        from .func.fair_share import FairShare
         from .func.group import Group
         from .func.image import Image
         from .func.keypair import KeyPair
@@ -310,7 +317,9 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.notification import Notification
         from .func.quota_scope import QuotaScope
         from .func.resource import Resource
+        from .func.resource_usage import ResourceUsage
         from .func.scaling_group import ScalingGroup
+        from .func.scheduling_history import SchedulingHistory
         from .func.server_log import ServerLog
         from .func.service import Service
         from .func.service_auto_scaling_rule import ServiceAutoScalingRule
@@ -354,6 +363,10 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Network = Network
         self.UserResourcePolicy = UserResourcePolicy
         self.Notification = Notification
+        self.SchedulingHistory = SchedulingHistory
+        self.Export = Export
+        self.FairShare = FairShare
+        self.ResourceUsage = ResourceUsage
 
     @property
     def proxy_mode(self) -> bool:
@@ -393,13 +406,13 @@ class BaseSession(metaclass=abc.ABCMeta):
     def __enter__(self) -> BaseSession:
         raise NotImplementedError
 
-    def __exit__(self, *exc_info) -> Literal[False]:
+    def __exit__(self, *exc_info: Any) -> Literal[False]:
         return False
 
     async def __aenter__(self) -> BaseSession:
         raise NotImplementedError
 
-    async def __aexit__(self, *exc_info) -> Literal[False]:
+    async def __aexit__(self, *exc_info: Any) -> Literal[False]:
         return False
 
 
@@ -415,7 +428,7 @@ class Session(BaseSession):
     def __init__(
         self,
         *,
-        config: Optional[APIConfig] = None,
+        config: APIConfig | None = None,
         proxy_mode: bool = False,
     ) -> None:
         super().__init__(config=config, proxy_mode=proxy_mode)
@@ -455,7 +468,7 @@ class Session(BaseSession):
         api_session.reset(self._context_token)
 
     @property
-    def worker_thread(self):
+    def worker_thread(self) -> _SyncWorkerThread:
         """
         The thread that internally executes the asynchronous implementations
         of the given API functions.
@@ -463,7 +476,8 @@ class Session(BaseSession):
         return self._worker_thread
 
     def __enter__(self) -> Session:
-        assert not self.closed, "Cannot reuse closed session"
+        if self.closed:
+            raise RuntimeError("Cannot reuse closed session")
         self.open()
         if self.config.announcement_handler:
             try:
@@ -475,7 +489,7 @@ class Session(BaseSession):
                 pass
         return self
 
-    def __exit__(self, *exc_info) -> Literal[False]:
+    def __exit__(self, *exc_info: Any) -> Literal[False]:
         self.close()
         return False  # raise up the inner exception
 
@@ -502,9 +516,9 @@ class AsyncSession(BaseSession):
     def __init__(
         self,
         *,
-        config: Optional[APIConfig] = None,
+        config: APIConfig | None = None,
         proxy_mode: bool = False,
-        aiohttp_session: Optional[aiohttp.ClientSession] = None,
+        aiohttp_session: aiohttp.ClientSession | None = None,
     ) -> None:
         super().__init__(config=config, proxy_mode=proxy_mode)
         if aiohttp_session is not None:
@@ -536,7 +550,8 @@ class AsyncSession(BaseSession):
         return self._aclose()
 
     async def __aenter__(self) -> AsyncSession:
-        assert not self.closed, "Cannot reuse closed session"
+        if self.closed:
+            raise RuntimeError("Cannot reuse closed session")
         await self.open()
         if self.config.announcement_handler:
             try:
@@ -548,14 +563,14 @@ class AsyncSession(BaseSession):
                 pass
         return self
 
-    async def __aexit__(self, *exc_info) -> Literal[False]:
+    async def __aexit__(self, *exc_info: Any) -> Literal[False]:
         await self.close()
         return False  # raise up the inner exception
 
 
 # TODO: Remove this after refactoring session management with contextvars
 @actxmgr
-async def set_api_context(session):
+async def set_api_context(session: BaseSession) -> AsyncIterator[None]:
     token = api_session.set(session)
     try:
         yield

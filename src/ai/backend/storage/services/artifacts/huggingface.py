@@ -7,12 +7,13 @@ import ssl
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any, Final, Optional, override
+from typing import Any, Final, override
 
 import aiohttp
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -40,6 +41,7 @@ from ai.backend.storage.client.huggingface import (
 )
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.context_types import ArtifactVerifierContext
+from ai.backend.storage.data.storage.types import ImportStepContext, StorageTarget
 from ai.backend.storage.errors import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
@@ -53,7 +55,6 @@ from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
     ImportPipeline,
     ImportStep,
-    ImportStepContext,
 )
 from ai.backend.storage.storages.storage_pool import StoragePool
 
@@ -76,7 +77,7 @@ _DOWNLOAD_RETRIABLE_ERROR = (
 @dataclass
 class _ProbeHeadInfo:
     total: int
-    etag: Optional[str]
+    etag: str | None
     accept_ranges: bool
 
 
@@ -84,26 +85,26 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
     _url: str
     _chunk_size: int
     _max_retries: int
-    _content_type: Optional[str]
+    _content_type: str | None
     _redis_client: ValkeyArtifactDownloadTrackingClient
     _model_id: str
     _revision: str
     _file_path: str
     _download_complete: bool
-    _progress_task: Optional[asyncio.Task[None]]
-    _token: Optional[str]
+    _progress_task: asyncio.Task[None] | None
+    _token: str | None
 
     def __init__(
         self,
         url: str,
         chunk_size: int,
         max_retries: int,
-        content_type: Optional[str],
+        content_type: str | None,
         redis_client: ValkeyArtifactDownloadTrackingClient,
         model_id: str,
         revision: str,
         file_path: str,
-        token: Optional[str] = None,
+        token: str | None = None,
     ) -> None:
         self._url = url
         self._chunk_size = chunk_size
@@ -314,7 +315,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
             await self._session.close()
 
     @override
-    def content_type(self) -> Optional[str]:
+    def content_type(self) -> str | None:
         return self._content_type
 
 
@@ -366,7 +367,7 @@ class HuggingFaceService:
         registry_name: str,
         limit: int,
         sort: ModelSortKey,
-        search: Optional[str] = None,
+        search: str | None = None,
     ) -> list[ModelData]:
         """List HuggingFace models with metadata.
 
@@ -427,7 +428,7 @@ class HuggingFaceService:
         self,
         registry_name: str,
         model: ModelTarget,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Get the commit hash for a specific model revision.
 
         Args:
@@ -537,8 +538,9 @@ class HuggingFaceService:
         self,
         registry_name: str,
         model: ModelTarget,
-        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+        storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
+        storage_prefix: str | None = None,
     ) -> None:
         """Import a HuggingFace model to storage using ImportPipeline.
 
@@ -547,13 +549,16 @@ class HuggingFaceService:
             model: HuggingFace model to import
             storage_step_mappings: Mapping of import steps to storage names
             pipeline: ImportPipeline configured for this request
+            storage_prefix: Custom prefix path for storing imported models.
+                If None, uses default path.
+                If "/", stores files at root.
 
         Raises:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
         success = False
-        verification_result: Optional[VerificationStepResult] = None
+        verification_result: VerificationStepResult | None = None
         try:
             # Create import context
             context = ImportStepContext(
@@ -562,6 +567,7 @@ class HuggingFaceService:
                 storage_pool=self._storage_pool,
                 storage_step_mappings=storage_step_mappings,
                 step_metadata={},
+                custom_storage_prefix=storage_prefix,
             )
 
             # Execute import pipeline
@@ -594,7 +600,7 @@ class HuggingFaceService:
                 )
             )
 
-    async def _download_readme_content(self, download_url: str) -> Optional[str]:
+    async def _download_readme_content(self, download_url: str) -> str | None:
         """Download README content from the given URL.
 
         Args:
@@ -618,20 +624,26 @@ class HuggingFaceService:
         self,
         registry_name: str,
         models: list[ModelTarget],
-        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+        storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
         pipeline: ImportPipeline,
+        storage_prefix: str | None = None,
     ) -> uuid.UUID:
         """Import multiple HuggingFace models to storage in batch.
 
         Args:
             registry_name: Name of the HuggingFace registry
             models: List of HuggingFace models to import
+            storage_step_mappings: Mapping of import steps to storage names
+            pipeline: Import pipeline to execute
+            storage_prefix: Custom prefix path for storing imported models.
+                If None, uses default path.
+                If "/", stores files at root.
 
         Raises:
             HuggingFaceAPIError: If API call fails
         """
 
-        async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
+        async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult[Any]:
             model_count = len(models)
             if not model_count:
                 log.warning("No models to import")
@@ -661,6 +673,7 @@ class HuggingFaceService:
                             model=model,
                             storage_step_mappings=storage_step_mappings,
                             pipeline=pipeline,
+                            storage_prefix=storage_prefix,
                         )
 
                         successful_models += 1
@@ -731,15 +744,15 @@ class HuggingFaceDownloadStep(ImportStep[None]):
 
     @override
     def stage_storage(self, context: ImportStepContext) -> AbstractStorage:
-        download_storage_name = context.storage_step_mappings.get(
+        download_storage_target: StorageTarget | None = context.storage_step_mappings.get(
             ArtifactStorageImportStep.DOWNLOAD
         )
-        if not download_storage_name:
+        if not download_storage_target:
             raise StorageStepRequiredStepNotProvided(
                 "No storage mapping provided for DOWNLOAD step cleanup"
             )
 
-        return context.storage_pool.get_storage(download_storage_name)
+        return download_storage_target.resolve_storage(context.storage_pool)
 
     def _make_scanner(self, registry_name: str) -> HuggingFaceScanner:
         config = self._registry_configs.get(registry_name)
@@ -765,10 +778,10 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         if not registry_config:
             raise RegistryNotFoundError(f"Unknown registry: {context.registry_name}")
 
-        download_storage_name = context.storage_step_mappings.get(
+        download_storage_target: StorageTarget | None = context.storage_step_mappings.get(
             ArtifactStorageImportStep.DOWNLOAD
         )
-        if not download_storage_name:
+        if not download_storage_target:
             raise StorageStepRequiredStepNotProvided(
                 "No storage mapping provided for DOWNLOAD step"
             )
@@ -795,30 +808,37 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             file_info_list=file_info_list,
         )
 
+        # Default prefix: {model_id}/{revision}
+        default_prefix = f"{context.model.model_id}/{revision}"
+
         downloaded_files: list[tuple[FileObjectData, str]] = []
         total_bytes = 0
 
         for file_info in file_infos:
+            storage_key = self._resolve_storage_key(context, default_prefix, file_info.path)
             storage_key = await self._download_file_to_storage(
                 file_info=file_info,
                 model=context.model,
-                storage_name=download_storage_name,
+                storage_target=download_storage_target,
                 storage_pool=context.storage_pool,
                 download_chunk_size=chunk_size,
                 redis_client=self._redis_client,
+                storage_key=storage_key,
                 token=registry_config.token,
             )
             downloaded_files.append((file_info, storage_key))
             total_bytes += file_info.size
 
         log.info(
-            f"Download completed: model={context.model}, files={len(downloaded_files)}, "
-            f"total_bytes={total_bytes}"
+            "Download completed: model={}, files={}, total_bytes={}",
+            context.model,
+            len(downloaded_files),
+            total_bytes,
         )
 
         return DownloadStepResult(
             downloaded_files=downloaded_files,
-            storage_name=download_storage_name,
+            storage_name=download_storage_target.name,
             total_bytes=total_bytes,
         )
 
@@ -827,17 +847,18 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         *,
         file_info: FileObjectData,
         model: ModelTarget,
-        storage_name: str,
+        storage_target: StorageTarget,
         storage_pool: AbstractStoragePool,
         download_chunk_size: int,
         redis_client: ValkeyArtifactDownloadTrackingClient,
-        token: Optional[str] = None,
+        storage_key: str,
+        token: str | None = None,
     ) -> str:
         """Download file from HuggingFace to specified storage"""
-        storage = storage_pool.get_storage(storage_name)
+        storage = storage_target.resolve_storage(storage_pool)
+        storage_name = storage_target.name
 
         revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
-        storage_key = f"{model.model_id}/{revision}/{file_info.path}"
 
         log.info(
             f"[download] Starting download to {storage_name}: file_path={file_info.path}, "
@@ -888,7 +909,7 @@ class HuggingFaceArchiveStep(ModelArchiveStep):
 def create_huggingface_import_pipeline(
     registry_configs: dict[str, Any],
     transfer_manager: StorageTransferManager,
-    storage_step_mappings: dict[ArtifactStorageImportStep, str],
+    storage_step_mappings: dict[ArtifactStorageImportStep, StorageTarget],
     artifact_verifier_ctx: ArtifactVerifierContext,
     event_producer: EventProducer,
     redis_client: ValkeyArtifactDownloadTrackingClient,

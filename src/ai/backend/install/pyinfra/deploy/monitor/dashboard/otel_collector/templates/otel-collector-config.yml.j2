@@ -1,0 +1,39 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 15s
+    send_batch_size: 512
+
+exporters:
+  loki:
+    endpoint: http://{{ loki_host }}:{{ loki_port }}/loki/api/v1/push
+  # Tempo exporter (currently commented out - will be enabled when Tempo is deployed)
+  # otlp/tempo:
+  #   endpoint: http://{{ tempo_host }}:{{ tempo_port }}
+  #   tls:
+  #     insecure: true
+  #     insecure_skip_verify: true
+
+service:
+  extensions: [health_check]
+  pipelines:
+    # Traces pipeline (currently disabled - will be enabled when Tempo is deployed)
+    # traces:
+    #   receivers: [otlp]
+    #   processors: [batch]
+    #   exporters: [otlp/tempo]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [loki]

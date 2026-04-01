@@ -1,20 +1,30 @@
 import logging
+import time
+import uuid
 from collections import ChainMap
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Optional, cast
+from typing import Any, cast
 
 from aiohttp import web
 from sqlalchemy import RowMapping
 
-from ai.backend.common.dto.manager.auth.field import AuthTokenType
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
+from ai.backend.common.clients.valkey_client.valkey_session.types import (
+    LoginSessionData,
+    LoginSessionInner,
+    LoginSessionTokenData,
+)
+from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
 from ai.backend.manager.errors.auth import (
+    ActiveLoginSessionExistsError,
     AuthorizationFailed,
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
@@ -34,12 +44,14 @@ from ai.backend.manager.models.keypair import (
     generate_ssh_keypair,
     validate_ssh_keypair,
 )
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import (
     INACTIVE_USER_STATUSES,
     UserRole,
     UserStatus,
     compare_to_hashed_password,
 )
+from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
@@ -53,6 +65,30 @@ from ai.backend.manager.services.auth.actions.get_role import GetRoleAction, Get
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
     GetSSHKeypairActionResult,
+)
+from ai.backend.manager.services.auth.actions.logout import LogoutAction, LogoutActionResult
+from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
+    ResolveAccessKeyScopeAction,
+    ResolveAccessKeyScopeResult,
+)
+from ai.backend.manager.services.auth.actions.resolve_user_scope import (
+    ResolveUserScopeAction,
+    ResolveUserScopeResult,
+)
+from ai.backend.manager.services.auth.actions.revoke_login_session import (
+    AdminRevokeLoginSessionAction,
+    MyRevokeLoginSessionAction,
+    RevokeLoginSessionActionResult,
+)
+from ai.backend.manager.services.auth.actions.search_login_history import (
+    AdminSearchLoginHistoryAction,
+    SearchLoginHistoryAction,
+    SearchLoginHistoryActionResult,
+)
+from ai.backend.manager.services.auth.actions.search_login_sessions import (
+    AdminSearchLoginSessionsAction,
+    SearchLoginSessionsAction,
+    SearchLoginSessionsActionResult,
 )
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
@@ -72,37 +108,58 @@ from ai.backend.manager.services.auth.actions.upload_ssh_keypair import (
     UploadSSHKeypairAction,
     UploadSSHKeypairActionResult,
 )
+from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+_FAILURE_MAP: dict[type[Exception], LoginAttemptResult] = {
+    AuthorizationFailed: LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
+    PasswordExpired: LoginAttemptResult.FAILED_PASSWORD_EXPIRED,
+    RejectedByHook: LoginAttemptResult.FAILED_REJECTED_BY_HOOK,
+    ActiveLoginSessionExistsError: LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
+}
+
+
+def _classify_failure(exc: Exception) -> LoginAttemptResult:
+    return _FAILURE_MAP.get(type(exc), LoginAttemptResult.FAILED_INVALID_CREDENTIALS)
 
 
 class AuthService:
     _hook_plugin_ctx: HookPluginContext
     _auth_repository: AuthRepository
     _config_provider: ManagerConfigProvider
+    _valkey_session_client: ValkeySessionClient
 
     def __init__(
         self,
         hook_plugin_ctx: HookPluginContext,
         auth_repository: AuthRepository,
         config_provider: ManagerConfigProvider,
+        valkey_session_client: ValkeySessionClient,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
         self._config_provider = config_provider
+        self._valkey_session_client = valkey_session_client
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
         if action.group_id is not None:
-            try:
-                # TODO: per-group role is not yet implemented.
-                await self._auth_repository.get_group_membership(action.group_id, action.user_id)
+            if action.is_superadmin:
+                # Superadmins have global access across all domains and groups.
                 group_role = "user"
-            except GroupMembershipNotFoundError:
-                raise ObjectNotFound(
-                    extra_msg="No such project or you are not the member of it.",
-                    object_name="project (user group)",
-                )
+            else:
+                try:
+                    # TODO: per-group role is not yet implemented.
+                    await self._auth_repository.get_group_membership(
+                        action.group_id, action.user_id
+                    )
+                    group_role = "user"
+                except GroupMembershipNotFoundError as e:
+                    raise ObjectNotFound(
+                        extra_msg="No such project or you are not the member of it.",
+                        object_name="project (user group)",
+                    ) from e
 
         return GetRoleActionResult(
             global_role="superadmin" if action.is_superadmin else "user",
@@ -112,48 +169,86 @@ class AuthService:
 
     async def authorize(self, action: AuthorizeAction) -> AuthorizeActionResult:
         if action.type != AuthTokenType.KEYPAIR:
-            # other types are not implemented yet.
             raise InvalidAPIParameters("Unsupported authorization type")
+        auth_config = self._config_provider.config.auth
+        user, active_sessions = await self._verify_user(action, auth_config)
 
+        try:
+            post_result = await self._post_check(action, user, active_sessions, auth_config)
+            if isinstance(post_result, AuthorizeActionResult):
+                return post_result
+            keypair_row, live_sessions = post_result
+
+            return await self._create_login_session(
+                action, user, keypair_row, live_sessions, auth_config
+            )
+        except (
+            AuthorizationFailed,
+            PasswordExpired,
+            RejectedByHook,
+            ActiveLoginSessionExistsError,
+        ) as e:
+            await self._record_login_failure(
+                user.uuid,
+                action.domain_name,
+                _classify_failure(e),
+            )
+            raise
+
+    async def _verify_user(
+        self,
+        action: AuthorizeAction,
+        auth_config: AuthConfig,
+    ) -> tuple[RowMapping, list[ActiveSessionInfo]]:
+        """Step 1: Verify user identity via hook or password."""
         params = action.hook_params
         hook_result = await self._hook_plugin_ctx.dispatch(
             "AUTHORIZE",
             (action.request, params),
             return_when=FIRST_COMPLETED,
         )
-        auth_config = self._config_provider.config.auth
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         if hook_result.result:
-            # Passed one of AUTHORIZED hook
             user = hook_result.result
-        else:
-            # No AUTHORIZE hook is defined (proceed with normal login)
-            target_password_info = PasswordInfo(
-                password=action.password,
-                algorithm=auth_config.password_hash_algorithm,
-                rounds=auth_config.password_hash_rounds,
-                salt_size=auth_config.password_hash_salt_size,
-            )
-            user = await self._auth_repository.check_credential_with_migration(
-                action.domain_name,
-                action.email,
-                target_password_info=target_password_info,
-            )
+            active_sessions = await self._auth_repository.get_active_session_tokens(user.uuid)
+            return user, active_sessions
+
+        target_password_info = PasswordInfo(
+            password=action.password,
+            algorithm=auth_config.password_hash_algorithm,
+            rounds=auth_config.password_hash_rounds,
+            salt_size=auth_config.password_hash_salt_size,
+        )
+        cred_result = await self._auth_repository.verify_credential(
+            action.domain_name,
+            action.email,
+            target_password_info=target_password_info,
+        )
+        return cred_result.user, cred_result.active_sessions
+
+    async def _post_check(
+        self,
+        action: AuthorizeAction,
+        user: RowMapping,
+        active_sessions: list[ActiveSessionInfo],
+        auth_config: AuthConfig,
+    ) -> tuple[Any, list[ActiveSessionInfo]] | AuthorizeActionResult:
+        """Step 2: User status checks, keypair lookup, POST_AUTHORIZE hook, Valkey cross-check."""
         if user.status == UserStatus.BEFORE_VERIFICATION:
             raise AuthorizationFailed("This account needs email verification.")
         if user.status in INACTIVE_USER_STATUSES:
             raise AuthorizationFailed("User credential mismatch.")
         await self._check_password_age(user, auth_config)
+
         user_row = await self._auth_repository.get_user_row_by_uuid(user.uuid)
         main_keypair_row = user_row.get_main_keypair_row()
         if main_keypair_row is None:
             raise AuthorizationFailed("No API keypairs found.")
-        # [Hooking point for POST_AUTHORIZE]
-        # The hook handlers should accept a tuple of the request, user, and keypair objects.
+
         hook_result = await self._hook_plugin_ctx.dispatch(
             "POST_AUTHORIZE",
-            (action.request, params, user, main_keypair_row.mapping),
+            (action.request, action.hook_params, user, main_keypair_row.mapping),
             return_when=FIRST_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -164,16 +259,87 @@ class AuthService:
                 authorization_result=None,
             )
 
+        # Cross-check active sessions with Valkey
+        live_sessions: list[ActiveSessionInfo] = []
+        for session_info in active_sessions:
+            if await self._valkey_session_client.get_login_session(session_info.session_token):
+                live_sessions.append(session_info)
+            else:
+                await self._auth_repository.invalidate_login_session_by_token(
+                    session_info.session_token
+                )
+
+        return main_keypair_row, live_sessions
+
+    async def _create_login_session(
+        self,
+        action: AuthorizeAction,
+        user: RowMapping,
+        keypair_row: Any,
+        live_sessions: list[ActiveSessionInfo],
+        auth_config: AuthConfig,
+    ) -> AuthorizeActionResult:
+        """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed."""
+        max_concurrent_sessions = 1
+        tokens_to_invalidate: list[str] | None = None
+        if action.force and len(live_sessions) >= max_concurrent_sessions:
+            sessions_to_remove = len(live_sessions) - max_concurrent_sessions + 1
+            tokens_to_invalidate = [s.session_token for s in live_sessions[:sessions_to_remove]]
+
+        session_result = await self._auth_repository.create_login_session(
+            user_id=user.uuid,
+            access_key=keypair_row.access_key,
+            domain_name=action.domain_name,
+            max_concurrent_sessions=max_concurrent_sessions,
+            tokens_to_invalidate=tokens_to_invalidate,
+        )
+
+        if tokens_to_invalidate:
+            for token in tokens_to_invalidate:
+                await self._valkey_session_client.delete_login_session(token)
+
+        session_data = LoginSessionData(
+            created=int(time.time()),
+            expiration_dt=int(time.time()) + auth_config.login_session_max_age,
+            session=LoginSessionInner(
+                authenticated=True,
+                token=LoginSessionTokenData(
+                    type="keypair",
+                    access_key=keypair_row.access_key,
+                    secret_key=keypair_row.secret_key or "",
+                    role=user.role,
+                    status=user.status,
+                ),
+            ),
+        )
+        await self._valkey_session_client.set_login_session(
+            session_result.session_token,
+            session_data.model_dump_json(),
+            auth_config.login_session_max_age,
+        )
+
         return AuthorizeActionResult(
             stream_response=None,
             authorization_result=AuthorizationResult(
-                access_key=main_keypair_row.access_key,
-                secret_key=main_keypair_row.secret_key or "",
+                access_key=keypair_row.access_key,
+                secret_key=keypair_row.secret_key or "",
                 user_id=user.uuid,
                 role=user.role,
                 status=user.status,
+                session_token=session_result.session_token,
             ),
         )
+
+    async def _record_login_failure(
+        self,
+        user_uuid: uuid.UUID,
+        domain_name: str,
+        result: LoginAttemptResult,
+    ) -> None:
+        try:
+            await self._auth_repository.record_login_history(user_uuid, domain_name, result)
+        except Exception:
+            log.warning("Failed to record login history: {} for user {}", result, user_uuid)
 
     async def signup(self, action: SignupAction) -> SignupActionResult:
         params = action.hook_params
@@ -185,7 +351,11 @@ class AuthService:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         # Merge the hook results as a single map.
-        user_data_overriden = ChainMap(*cast(Mapping, hook_result.result))
+        hook_results = cast(list[Mapping[str, Any]], hook_result.result or [])
+        # Convert Mapping to dict for ChainMap compatibility
+        user_data_overriden: ChainMap[str, Any] = ChainMap(*[
+            dict(result) for result in hook_results
+        ])
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
         # The hook handlers should accept the request and whole ``params` dict.
@@ -261,8 +431,8 @@ class AuthService:
                 group_name=group_name,
                 domain_name=action.domain_name,
             )
-        except UserCreationError:
-            raise InternalServerError("Error creating user account")
+        except UserCreationError as e:
+            raise InternalServerError("Error creating user account") from e
 
         # [Hooking point for POST_SIGNUP as one-way notification]
         # The hook handlers should accept a tuple of the user email,
@@ -280,6 +450,28 @@ class AuthService:
             secret_key=sk,
         )
 
+    async def logout(self, action: LogoutAction) -> LogoutActionResult:
+        await self._auth_repository.invalidate_login_session_by_token(action.session_token)
+        await self._valkey_session_client.delete_login_session(action.session_token)
+        return LogoutActionResult(success=True)
+
+    async def admin_revoke_login_session(
+        self, action: AdminRevokeLoginSessionAction
+    ) -> RevokeLoginSessionActionResult:
+        session_token = await self._auth_repository.revoke_login_session(action.session_id)
+        await self._valkey_session_client.delete_login_session(session_token)
+        return RevokeLoginSessionActionResult(success=True)
+
+    async def my_revoke_login_session(
+        self, action: MyRevokeLoginSessionAction
+    ) -> RevokeLoginSessionActionResult:
+        session_data = await self._auth_repository.get_login_session_by_id(action.session_id)
+        if session_data.user_id != action.user_id:
+            raise GenericForbidden("You can only revoke your own login sessions.")
+        session_token = await self._auth_repository.revoke_login_session(action.session_id)
+        await self._valkey_session_client.delete_login_session(session_token)
+        return RevokeLoginSessionActionResult(success=True)
+
     async def signout(self, action: SignoutAction) -> SignoutActionResult:
         if action.email != action.requester_email:
             raise GenericForbidden("Not the account owner")
@@ -289,6 +481,11 @@ class AuthService:
             email,
             action.password,
         )
+        # Get active session tokens before invalidating, for Valkey cleanup
+        active_sessions = await self._auth_repository.get_active_session_tokens(action.user_id)
+        await self._auth_repository.invalidate_user_login_sessions(action.user_id)
+        for session_info in active_sessions:
+            await self._valkey_session_client.delete_login_session(session_info.session_token)
         await self._auth_repository.deactivate_user_and_keypairs(email)
 
         return SignoutActionResult(success=True)
@@ -316,9 +513,9 @@ class AuthService:
                 email,
                 action.old_password,
             )
-        except AuthorizationFailed:
+        except AuthorizationFailed as e:
             log.info(log_fmt + ": old password mismatch", *log_args)
-            raise AuthorizationFailed("Old password mismatch")
+            raise AuthorizationFailed("Old password mismatch") from e
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
         # The hook handlers should accept the request and whole ``params` dict.
@@ -393,7 +590,7 @@ class AuthService:
 
     async def get_ssh_keypair(self, action: GetSSHKeypairAction) -> GetSSHKeypairActionResult:
         pubkey = await self._auth_repository.get_ssh_public_key(action.access_key)
-        return GetSSHKeypairActionResult(public_key=pubkey or "")
+        return GetSSHKeypairActionResult(public_key=pubkey or "", access_key=action.access_key)
 
     async def generate_ssh_keypair(
         self, action: GenerateSSHKeypairAction
@@ -405,7 +602,8 @@ class AuthService:
             ssh_keypair=SSHKeypair(
                 ssh_public_key=pubkey,
                 ssh_private_key=privkey,
-            )
+            ),
+            user_id=action.user_id,
         )
 
     async def upload_ssh_keypair(
@@ -424,16 +622,111 @@ class AuthService:
                 ssh_public_key=pubkey,
                 ssh_private_key=privkey,
             ),
+            user_id=action.user_id,
         )
 
-    async def _check_password_age(
-        self, user: RowMapping, auth_config: Optional[AuthConfig]
-    ) -> None:
+    async def resolve_access_key_scope(
+        self, action: ResolveAccessKeyScopeAction
+    ) -> ResolveAccessKeyScopeResult:
+        requester_ak = AccessKey(action.requester_access_key)
+        if (
+            action.owner_access_key is None
+            or action.owner_access_key == action.requester_access_key
+        ):
+            return ResolveAccessKeyScopeResult(
+                requester_access_key=requester_ak,
+                owner_access_key=requester_ak,
+            )
+        owner_ak = AccessKey(action.owner_access_key)
+        try:
+            (
+                owner_domain,
+                owner_role,
+            ) = await self._auth_repository.get_delegation_target_by_access_key(
+                action.owner_access_key,
+            )
+        except ValueError as e:
+            raise InvalidAPIParameters(str(e)) from e
+        try:
+            check_if_requester_is_eligible_to_act_as_target_user(
+                action.requester_role,
+                action.requester_domain,
+                owner_role,
+                owner_domain,
+            )
+        except RuntimeError as e:
+            raise GenericForbidden(str(e)) from e
+        return ResolveAccessKeyScopeResult(
+            requester_access_key=requester_ak,
+            owner_access_key=owner_ak,
+        )
+
+    async def resolve_user_scope(self, action: ResolveUserScopeAction) -> ResolveUserScopeResult:
+        if action.owner_user_email is None:
+            return ResolveUserScopeResult(
+                owner_uuid=action.requester_uuid,
+                owner_role=action.requester_role,
+            )
+        if not action.is_superadmin:
+            raise InvalidAPIParameters("Only superadmins may have user scopes.")
+        try:
+            (
+                owner_uuid,
+                owner_role,
+                owner_domain,
+            ) = await self._auth_repository.get_delegation_target_by_email(
+                action.owner_user_email,
+            )
+        except ValueError as e:
+            raise InvalidAPIParameters(str(e)) from e
+        try:
+            check_if_requester_is_eligible_to_act_as_target_user(
+                action.requester_role,
+                action.requester_domain,
+                owner_role,
+                owner_domain,
+            )
+        except RuntimeError as e:
+            raise GenericForbidden(str(e)) from e
+        return ResolveUserScopeResult(
+            owner_uuid=owner_uuid,
+            owner_role=owner_role,
+        )
+
+    async def admin_search_login_sessions(
+        self, action: AdminSearchLoginSessionsAction
+    ) -> SearchLoginSessionsActionResult:
+        result = await self._auth_repository.admin_search_login_sessions(querier=action.querier)
+        return SearchLoginSessionsActionResult(result=result)
+
+    async def search_login_sessions(
+        self, action: SearchLoginSessionsAction
+    ) -> SearchLoginSessionsActionResult:
+        result = await self._auth_repository.search_login_sessions(
+            scope=action.scope, querier=action.querier
+        )
+        return SearchLoginSessionsActionResult(result=result)
+
+    async def admin_search_login_history(
+        self, action: AdminSearchLoginHistoryAction
+    ) -> SearchLoginHistoryActionResult:
+        result = await self._auth_repository.admin_search_login_history(querier=action.querier)
+        return SearchLoginHistoryActionResult(result=result)
+
+    async def search_login_history(
+        self, action: SearchLoginHistoryAction
+    ) -> SearchLoginHistoryActionResult:
+        result = await self._auth_repository.search_login_history(
+            scope=action.scope, querier=action.querier
+        )
+        return SearchLoginHistoryActionResult(result=result)
+
+    async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:
         if (
             auth_config is not None
             and (max_password_age := auth_config.max_password_age) is not None
         ):
-            password_changed_at: Optional[datetime] = user.password_changed_at
+            password_changed_at: datetime | None = user.password_changed_at
             if password_changed_at is None:
                 return  # Skip check if password_changed_at is not set
 

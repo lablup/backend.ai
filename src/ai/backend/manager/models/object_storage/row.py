@@ -25,7 +25,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("ObjectStorageRow",)
 
 
-def _get_object_storage_association_artifact_join_cond():
+def _get_object_storage_association_artifact_join_cond() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.association_artifacts_storages import (
         AssociationArtifactsStorageRow,
     )
@@ -33,13 +33,13 @@ def _get_object_storage_association_artifact_join_cond():
     return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
-def _get_object_storage_namespace_join_cond():
+def _get_object_storage_namespace_join_cond() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 
     return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 
 
-class ObjectStorageRow(Base):
+class ObjectStorageRow(Base):  # type: ignore[misc]
     """
     Represents an object storage configuration.
     This model is used to store the details of object storage services

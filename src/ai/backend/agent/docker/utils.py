@@ -4,10 +4,10 @@ import logging
 import subprocess
 from collections.abc import Mapping
 from contextlib import closing
+from importlib.resources import files
 from pathlib import Path
-from typing import Any, Final, Optional
+from typing import Any, Final
 
-import pkg_resources
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 
@@ -28,7 +28,7 @@ class PersistentServiceContainer:
         image_ref: str,
         container_config: Mapping[str, Any],
         *,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         self.image_ref = image_ref
         arch = get_arch_name()
@@ -40,16 +40,18 @@ class PersistentServiceContainer:
         self.container_config = container_config
         self.img_version = int(
             Path(
-                pkg_resources.resource_filename(
-                    "ai.backend.agent.docker",
-                    f"{default_container_name}.version.txt",
+                str(
+                    files("ai.backend.agent.docker").joinpath(
+                        f"{default_container_name}.version.txt"
+                    )
                 )
             ).read_text()
         )
         self.img_path = Path(
-            pkg_resources.resource_filename(
-                "ai.backend.agent.docker",
-                f"{default_container_name}.img.{arch}.tar.gz",
+            str(
+                files("ai.backend.agent.docker").joinpath(
+                    f"{default_container_name}.img.{arch}.tar.gz"
+                )
             )
         )
 
@@ -172,7 +174,7 @@ class PersistentServiceContainer:
                         " to use a private tmp directory. To resolve, explicitly configure the"
                         " 'ipc-base-path' option in agent.toml to indicate a directory under"
                         " $HOME or a non-virtualized directory.",
-                    )
+                    ) from e
                 raise
 
     async def start(self) -> None:

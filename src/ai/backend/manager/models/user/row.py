@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import ipaddress
 import logging
 import uuid as uuid_mod
 from collections.abc import Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
-    Optional,
-    cast,
+    Any,
 )
 from uuid import UUID
 
@@ -17,11 +17,12 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relationship, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
-from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
+from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.base import (
@@ -77,73 +78,73 @@ INACTIVE_USER_STATUSES = (
 
 
 # Defined for avoiding circular import
-def _get_session_row_join_condition():
+def _get_session_row_join_condition() -> Any:
     from ai.backend.manager.models.session import SessionRow
 
     return UserRow.uuid == foreign(SessionRow.user_uuid)
 
 
-def _get_kernel_row_join_condition():
+def _get_kernel_row_join_condition() -> Any:
     from ai.backend.manager.models.kernel import KernelRow
 
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
-def _get_created_endpoints_join_condition():
+def _get_created_endpoints_join_condition() -> Any:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return foreign(EndpointRow.created_user) == UserRow.uuid
 
 
-def _get_owned_endpoints_join_condition():
+def _get_owned_endpoints_join_condition() -> Any:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return foreign(EndpointRow.session_owner) == UserRow.uuid
 
 
-def _get_vfolder_rows_join_condition():
+def _get_vfolder_rows_join_condition() -> Any:
     from ai.backend.manager.models.vfolder import VFolderRow
 
     return UserRow.uuid == foreign(VFolderRow.user)
 
 
-def _get_role_assignments_join_condition():
+def _get_role_assignments_join_condition() -> Any:
     from ai.backend.manager.models.rbac_models import UserRoleRow
 
     return UserRow.uuid == foreign(UserRoleRow.user_id)
 
 
-def _get_domain_join_condition():
+def _get_domain_join_condition() -> Any:
     from ai.backend.manager.models.domain import DomainRow
 
     return DomainRow.name == foreign(UserRow.domain_name)
 
 
-def _get_groups_join_condition():
+def _get_groups_join_condition() -> Any:
     from ai.backend.manager.models.group import AssocGroupUserRow
 
     return foreign(AssocGroupUserRow.user_id) == UserRow.uuid
 
 
-def _get_resource_policy_join_condition():
+def _get_resource_policy_join_condition() -> Any:
     from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 
     return UserResourcePolicyRow.name == foreign(UserRow.resource_policy)
 
 
-def _get_keypairs_join_condition():
+def _get_keypairs_join_condition() -> Any:
     from ai.backend.manager.models.keypair import KeyPairRow
 
     return foreign(KeyPairRow.user) == UserRow.uuid
 
 
-def _get_main_keypair_join_condition():
+def _get_main_keypair_join_condition() -> Any:
     from ai.backend.manager.models.keypair import KeyPairRow
 
     return KeyPairRow.access_key == foreign(UserRow.main_access_key)
 
 
-class UserRow(Base):
+class UserRow(Base):  # type: ignore[misc]
     __tablename__ = "users"
 
     uuid: Mapped[uuid_mod.UUID] = mapped_column(
@@ -199,9 +200,9 @@ class UserRow(Base):
     role: Mapped[UserRole | None] = mapped_column(
         "role", EnumValueType(UserRole), default=UserRole.USER, nullable=True
     )
-    allowed_client_ip: Mapped[list[ReadableCIDR] | None] = mapped_column(
-        "allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True
-    )
+    allowed_client_ip: Mapped[
+        list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] | None
+    ] = mapped_column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True)
     totp_key: Mapped[str | None] = mapped_column("totp_key", sa.String(length=32), nullable=True)
     totp_activated: Mapped[bool | None] = mapped_column(
         "totp_activated", sa.Boolean, server_default=sa.false(), default=False, nullable=True
@@ -379,14 +380,13 @@ class UserRow(Base):
             raise ObjectNotFound(f"User with id {user_uuid} not found")
         return rows[0]
 
-    def get_main_keypair_row(self) -> Optional[KeyPairRow]:
+    def get_main_keypair_row(self) -> KeyPairRow | None:
         # `cast()` requires import of KeyPairRow
-        from ai.backend.manager.models.keypair import KeyPairRow
 
-        keypair_candidate: Optional[KeyPairRow] = None
-        main_keypair_row = cast(Optional[KeyPairRow], self.main_keypair)
+        keypair_candidate: KeyPairRow | None = None
+        main_keypair_row = self.main_keypair
         if main_keypair_row is None:
-            keypair_rows = cast(list[KeyPairRow], self.keypairs)
+            keypair_rows = self.keypairs
             active_keypairs = [row for row in keypair_rows if row.is_active]
             for row in active_keypairs:
                 if keypair_candidate is None or not keypair_candidate.is_admin:
@@ -442,8 +442,8 @@ def by_user_uuid(
     user_uuid: UUID,
 ) -> QueryCondition:
     def _by_user_uuid(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(UserRow.uuid == user_uuid)
 
     return _by_user_uuid
@@ -453,8 +453,8 @@ def by_username(
     username: str,
 ) -> QueryCondition:
     def _by_username(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(UserRow.username == username)
 
     return _by_username
@@ -464,8 +464,8 @@ def by_user_email(
     email: str,
 ) -> QueryCondition:
     def _by_email(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(UserRow.email == email)
 
     return _by_email
@@ -524,15 +524,11 @@ async def check_credential_with_migration(
     try:
         if not _verify_password(target_password_info.password, row.password):
             raise AuthorizationFailed("User credential mismatch.")
-    except ValueError:
-        raise AuthorizationFailed("User credential mismatch.")
+    except ValueError as e:
+        raise AuthorizationFailed("User credential mismatch.") from e
 
     # Password is valid, check if we need to migrate the hash
     current_hash_info = HashInfo.from_hash_string(row.password)
-    if current_hash_info is None:
-        # Shouldn't happen since password was just verified
-        return row._mapping
-
     if target_password_info.need_migration(current_hash_info):
         # Re-hash the password with the new algorithm using the provided PasswordInfo
         # Update the user's password hash asynchronously
@@ -543,7 +539,8 @@ async def check_credential_with_migration(
                 .values(password=target_password_info)
             )
 
-    return row._mapping
+    row_mapping: sa.RowMapping = row._mapping
+    return row_mapping
 
 
 async def check_credential(
@@ -585,7 +582,8 @@ async def check_credential(
     try:
         if not _verify_password(password, row.password):
             raise AuthorizationFailed("User credential mismatch.")
-    except ValueError:
-        raise AuthorizationFailed("User credential mismatch.")
+    except ValueError as e:
+        raise AuthorizationFailed("User credential mismatch.") from e
 
-    return row._mapping
+    row_mapping: sa.RowMapping = row._mapping
+    return row_mapping

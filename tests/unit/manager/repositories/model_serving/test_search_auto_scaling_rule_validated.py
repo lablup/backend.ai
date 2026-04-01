@@ -1,5 +1,5 @@
 """
-Tests for search_auto_scaling_rules_validated functionality.
+Tests for search_auto_scaling_rules functionality.
 Tests the repository layer for searching auto scaling rules with real database.
 """
 
@@ -39,7 +39,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -58,7 +58,7 @@ from ai.backend.testutils.db import with_tables
 
 
 class TestSearchAutoScalingRulesValidated:
-    """Test cases for search_auto_scaling_rules_validated in ModelServingRepository."""
+    """Test cases for search_auto_scaling_rules in ModelServingRepository."""
 
     # =========================================================================
     # Fixtures
@@ -79,6 +79,7 @@ class TestSearchAutoScalingRulesValidated:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -127,7 +128,7 @@ class TestSearchAutoScalingRulesValidated:
         """Create a domain for testing"""
         name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(name=name, total_resource_slots={})
+            domain = DomainRow(name=name, total_resource_slots=ResourceSlot())
             db_sess.add(domain)
             await db_sess.flush()
 
@@ -188,7 +189,7 @@ class TestSearchAutoScalingRulesValidated:
                 id=group_id,
                 name=name,
                 domain_name=test_domain,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot(),
                 resource_policy=test_project_resource_policy,
             )
             db_sess.add(group)
@@ -307,6 +308,7 @@ class TestSearchAutoScalingRulesValidated:
                 model_mount_destination="/models",
                 runtime_variant=RuntimeVariant.CUSTOM,
                 lifecycle_stage=EndpointLifecycle.CREATED,
+                current_revision=uuid.uuid4(),
                 replicas=1,
                 resource_slots=ResourceSlot({"cpu": "1", "mem": "1g"}),
                 cluster_mode=ClusterMode.SINGLE_NODE,
@@ -404,7 +406,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -425,7 +427,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -449,7 +451,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -470,7 +472,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -491,7 +493,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -516,7 +518,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[EndpointAutoScalingRuleRow.threshold.asc()],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 
@@ -535,7 +537,7 @@ class TestSearchAutoScalingRulesValidated:
             orders=[EndpointAutoScalingRuleRow.metric_name.desc()],
         )
 
-        result = await model_serving_repository.search_auto_scaling_rules_validated(
+        result = await model_serving_repository.search_auto_scaling_rules(
             querier=querier,
         )
 

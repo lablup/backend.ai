@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseFieldModel
@@ -10,9 +8,7 @@ class VolumeMetaField(BaseFieldModel):
     volume_id: VolumeID = Field(description="Used to uniquely identify a volume for operations.")
     backend: str = Field(description="Specifies the storage backend to determine handling methods.")
     path: str = Field(description="Defines the volume's location for access and management.")
-    fsprefix: Optional[str] = Field(
-        description="Indicates the filesystem prefix for path resolution."
-    )
+    fsprefix: str | None = Field(description="Indicates the filesystem prefix for path resolution.")
     capabilities: list[str] = Field(
         description="Lists allowed operations like read or write access."
     )

@@ -1,6 +1,6 @@
 """Actions for app configuration service."""
 
-from .base import AppConfigAction
+from .base import AppConfigScopeAction, AppConfigScopeActionResult
 from .domain import (
     DeleteDomainConfigAction,
     DeleteDomainConfigActionResult,
@@ -20,7 +20,8 @@ from .user import (
 )
 
 __all__ = [
-    "AppConfigAction",
+    "AppConfigScopeAction",
+    "AppConfigScopeActionResult",
     # Domain config actions
     "GetDomainConfigAction",
     "GetDomainConfigActionResult",

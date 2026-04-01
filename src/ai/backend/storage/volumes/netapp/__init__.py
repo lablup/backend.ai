@@ -109,8 +109,8 @@ class QTreeQuotaModel(BaseQuotaModel):
                                 break
                         else:
                             raise TryAgain
-        except RetryError:
-            raise QuotaScopeNotFoundError
+        except RetryError as e:
+            raise QuotaScopeNotFoundError from e
 
         if options is not None:
             result = await self.netapp_client.set_quota_rule(
@@ -298,7 +298,7 @@ class XCPFSOpModel(BaseFSOpModel):
                     parts = tuple(map(os.fsdecode, line.rstrip(b"\n").split(b"\0")))
                     item_path = Path(*Path(parts[7]).parts[2:])
                     inner_relpath = item_path.relative_to(target_relpath)
-                    if inner_relpath == Path("."):  # exclude the top dir
+                    if inner_relpath == Path():  # exclude the top dir
                         continue
                     item_abspath = self.mount_path / target_relpath / inner_relpath
                     match int(parts[5]):

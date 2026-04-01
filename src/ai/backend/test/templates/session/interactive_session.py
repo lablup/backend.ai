@@ -2,7 +2,7 @@ import asyncio
 from abc import abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import Any, Optional, override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.client.session import AsyncSession
@@ -111,7 +111,7 @@ class _BaseInteractiveSessionTemplate(WrapperTestTemplate):
         spec_meta = TestSpecMetaContext.current()
         session_name = f"test_session_{spec_meta.test_id}"
         client_session = ClientSessionContext.current()
-        session_id: Optional[UUID] = None
+        session_id: UUID | None = None
 
         try:
             session_id = await self._verify_session_creation(client_session, session_name)

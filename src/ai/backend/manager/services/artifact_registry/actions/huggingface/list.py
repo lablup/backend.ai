@@ -1,27 +1,44 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
-from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.services.artifact_registry.actions.base import (
+    ArtifactRegistryScopeAction,
+    ArtifactRegistryScopeActionResult,
+)
 
 
 @dataclass
-class ListHuggingFaceRegistryAction(ArtifactRegistryAction):
-    @override
-    def entity_id(self) -> Optional[str]:
-        return None
-
+class ListHuggingFaceRegistryAction(ArtifactRegistryScopeAction):
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "list_huggingface_registries"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.GLOBAL
+
+    @override
+    def scope_id(self) -> str:
+        return ""
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.ARTIFACT_REGISTRY, "")
 
 
 @dataclass
-class ListHuggingFaceRegistryActionResult(BaseActionResult):
+class ListHuggingFaceRegistryActionResult(ArtifactRegistryScopeActionResult):
     data: list[HuggingFaceRegistryData]
 
     @override
-    def entity_id(self) -> Optional[str]:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.GLOBAL
+
+    @override
+    def scope_id(self) -> str:
+        return ""

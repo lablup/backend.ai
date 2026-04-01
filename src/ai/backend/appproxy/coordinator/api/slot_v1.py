@@ -23,7 +23,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .utils import auth_required
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SlotResponseModel(BaseModel):
@@ -86,11 +86,11 @@ async def list_slots(request: web.Request) -> PydanticResponse[list[SlotResponse
         ])
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

@@ -59,7 +59,7 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
     from ai.backend.manager.agent_cache import AgentRPCCache
     from ai.backend.manager.models.utils import create_async_engine
 
-    async def _impl():
+    async def _impl() -> None:
         bootstrap_config = await cli_ctx.get_bootstrap_config()
         manager_public_key, manager_secret_key = load_certificate(
             bootstrap_config.manager.rpc_auth_manager_keypair

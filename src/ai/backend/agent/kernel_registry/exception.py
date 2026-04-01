@@ -33,3 +33,16 @@ class KernelRegistryNotFound(BackendAIError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class KernelRecoveryDataParseError(BackendAIError):
+    error_type = "https://api.backend.ai/probs/kernel-recovery-data-parse-error"
+    error_title = "Failed to parse kernel recovery data"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+        )

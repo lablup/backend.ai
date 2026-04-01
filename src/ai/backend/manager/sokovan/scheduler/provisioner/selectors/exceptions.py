@@ -9,8 +9,8 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.types import AgentId, ResourceSlot
+from ai.backend.manager.sokovan.data import SchedulingPredicate
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
-from ai.backend.manager.sokovan.scheduler.types import SchedulingPredicate
 
 
 class AgentSelectionError(SchedulingError):

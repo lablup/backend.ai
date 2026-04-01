@@ -34,7 +34,7 @@ routestatus_choices = [v.value for v in LegacyRouteStatus]
 routestatus = postgresql.ENUM(*routestatus_choices, name="routestatus")
 
 
-def upgrade():
+def upgrade() -> None:
     routestatus.create(op.get_bind())
     op.add_column(
         "endpoints",
@@ -165,7 +165,7 @@ def upgrade():
     op.alter_column("endpoints", "url", nullable=True)
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_column("endpoints", "model_mount_destiation")
     op.drop_column("endpoints", "created_user")
     op.drop_column("endpoints", "session_owner")

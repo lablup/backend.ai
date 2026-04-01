@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from aiohttp import web
 
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
-from ai.backend.manager.api.types import CORSOptions, WebMiddleware
+from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 
 
 class WebappPlugin(AbstractPlugin, metaclass=ABCMeta):

@@ -39,3 +39,15 @@ def downgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_object_permissions")),
     )
+    # Restore index and constraint from 643deb439458 state
+    op.create_index(
+        "ix_role_id_entity_id",
+        "object_permissions",
+        ["status", "role_id", "entity_id"],
+        unique=False,
+    )
+    op.create_unique_constraint(
+        "uq_object_permissions_entity_id_operation",
+        "object_permissions",
+        ["entity_id", "operation"],
+    )

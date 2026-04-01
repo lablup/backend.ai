@@ -1,0 +1,154 @@
+[redis]
+# sentinel = [
+#     { host = "127.0.0.1", port = 9503 },
+#     { host = "127.0.0.1", port = 9504 },
+#     { host = "127.0.0.1", port = 9505 },
+# ]
+# service_name = "mymaster"
+password = "{{ redis_password }}"
+
+[redis.addr]
+host = "{{ redis_hostname }}"
+port = {{ redis_port }}
+
+[redis.redis_helper_config]
+socket_timeout = 5.0
+socket_connect_timeout = 2.0
+reconnect_poll_timeout = 0.3
+
+[proxy_worker]
+ipc_base_path = "{{ service_dir }}/tmp/backend.ai/ipc"
+event_loop = "asyncio"
+pid_file = "./worker.pid"
+user = {{ user_id }}
+group = {{ group_id }}
+coordinator_endpoint = "http://{{ coordinator_endpoint }}:{{ coordinator_port }}"
+# verify_coordinator_ssl_certificate = true
+authority = "{{ authority }}"
+tls_listen = false
+# tls_cert = "/etc/backend.ai/tls/cert.pem"
+# tls_privkey = "/etc/backend.ai/tls/privkey.pem"
+# tls_advertised = false
+aiomonitor_termui_port = {{ aiomonitor_termui_port }}
+aiomonitor_webui_port = {{ aiomonitor_webui_port }}
+# heartbeat_period = 10
+frontend_mode = "{{ frontend_mode }}"
+protocol = "{{ protocol }}"
+accepted_traffics = [
+    "{{ accepted_traffic }}",
+]
+# app_filters = [
+#     { key = "session.id", value = "CED03BE1-3ABE-4FAB-A23B-5CC9ABC60A04" },
+# ]
+filtered_apps_only = false
+# use_experimental_redis_event_dispatcher = false
+metric_access_allowed_hosts = "0.0.0.0/0"
+
+[proxy_worker.api_bind_addr]
+host = "0.0.0.0"
+port = {{ port }}
+
+[proxy_worker.api_advertised_addr]
+host = "{{ advertised_hostname }}"
+port = {{ port }}
+
+[proxy_worker.announce_addr]
+host = "{{ advertised_hostname }}"
+port = {{ port }}
+
+# [proxy_worker.wildcard_domain]
+# domain = ".example.proxy.backend.ai"
+# advertised_port = {{ port }}
+
+# [proxy_worker.wildcard_domain.bind_addr]
+# host = "0.0.0.0"
+# port = {{ port }}
+
+[proxy_worker.port_proxy]
+bind_host = "0.0.0.0"
+advertised_host = "{{ advertised_hostname }}"
+bind_port_range = [{{ app_port_start }}, {{ app_port_end }}]
+advertised_port_range = [{{ app_port_start }}, {{ app_port_end }}]
+
+{% if frontend_mode == "traefik" %}
+[proxy_worker.traefik]
+frontend_mode = "port"
+api_port = {{ traefik_api_port }}
+last_used_time_marker_directory = "{{ traefik_last_used_dir }}"
+
+[proxy_worker.traefik.port_proxy]
+advertised_host = "{{ advertised_hostname }}"
+port_range = [{{ app_port_start }}, {{ app_port_end }}]
+
+# [proxy_worker.traefik.wildcard_domain]
+# domain = ".example.proxy.backend.ai"
+# advertised_port = {{ port }}
+
+[proxy_worker.traefik.etcd]
+addr = { host = "{{ etcd_host }}", port = {{ etcd_port }} }
+namespace = "traefik"
+{% endif %}
+
+# [proxy_worker.http2]
+# nghttpx_path = "/usr/local/bin/nghttpx"
+# api_port_pool = [50000, 60000]
+
+[secrets]
+jwt_secret = "{{ jwt_secret }}"
+api_secret = "{{ shared_key }}"
+
+[permit_hash]
+secret = "{{ permit_hash_secret }}"
+digest_mod = "sha256"
+
+{%- if otel_collector_endpoint %}
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "{{ otel_collector_endpoint }}"
+{%- endif %}
+
+[logging]
+level = "INFO"
+drivers = ["console", "file"]
+
+[logging.pkg_ns]
+"" = "WARNING"
+"ai.backend" = "DEBUG"
+aiohttp = "WARNING"
+tests = "DEBUG"
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "worker.log"
+backup_count = 10
+rotation_size = "10M"
+format = "verbose"
+
+# [logging.logstash]
+# protocol = "tcp"
+# ssl_enabled = true
+# ssl_verify = true
+#
+# [logging.logstash.endpoint]
+# host = "127.0.0.1"
+# port = 8001
+#
+# [logging.graylog]
+# host = "127.0.0.1"
+# port = 8000
+# level = "INFO"
+# ssl_verify = true
+# ca_certs = "/etc/ssl/ca.pem"
+# keyfile = "/etc/backend.ai/graylog/privkey.pem"
+# certfile = "/etc/backend.ai/graylog/cert.pem"
+
+[debug]
+enabled = false
+asyncio = false
+enhanced_aiomonitor_task_info = false
+log_events = false

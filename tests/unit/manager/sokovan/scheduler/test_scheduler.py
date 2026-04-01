@@ -1,8 +1,8 @@
-"""Tests for the Scheduler class allocation methods."""
+"""Tests for the SessionProvisioner allocation methods."""
 
 import uuid
 from decimal import Decimal
-from typing import Optional, cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
@@ -15,10 +15,10 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
-from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
-    SessionLauncher,
-    SessionLauncherArgs,
+from ai.backend.manager.sokovan.data import (
+    KernelWorkload,
+    SchedulingConfig,
+    SessionWorkload,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
@@ -26,6 +26,7 @@ from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     AgentSelectionError,
+    NoCompatibleAgentError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentInfo,
@@ -35,27 +36,14 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
     AgentSelector,
     ResourceRequirements,
 )
-from ai.backend.manager.sokovan.scheduler.scheduler import (
-    Scheduler,
-    SchedulerArgs,
-)
-from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
-    SessionTerminator,
-    SessionTerminatorArgs,
-)
-from ai.backend.manager.sokovan.scheduler.types import (
-    KernelWorkload,
-    SchedulingConfig,
-    SessionWorkload,
-)
 
 
 def create_session_workload(
-    session_id: Optional[SessionId] = None,
+    session_id: SessionId | None = None,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-    kernels: Optional[list[KernelWorkload]] = None,
-    designated_agent_ids: Optional[list[AgentId]] = None,
-    **kwargs,
+    kernels: list[KernelWorkload] | None = None,
+    designated_agent_ids: list[AgentId] | None = None,
+    **kwargs: Any,
 ) -> SessionWorkload:
     """Create a SessionWorkload for testing."""
     # Set defaults for required fields
@@ -95,7 +83,7 @@ def create_session_workload(
 
 
 def create_kernel_workload(
-    kernel_id: Optional[uuid.UUID] = None,
+    kernel_id: uuid.UUID | None = None,
     cpu: Decimal = Decimal("1"),
     mem: Decimal = Decimal("1024"),
     architecture: str = "x86_64",
@@ -129,13 +117,13 @@ def create_agent_info(
     )
 
 
-class TestSchedulerAllocation:
+class TestProvisionerAllocation:
     """Test cases for the _allocate_workload method."""
 
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
         """Create a mock repository."""
-        repo = MagicMock(spec=ScheduleRepository)
+        repo = MagicMock()
         repo.get_scheduling_config = AsyncMock(
             return_value=SchedulingConfig(
                 max_container_count_per_agent=100,
@@ -143,6 +131,11 @@ class TestSchedulerAllocation:
             )
         )
         return repo
+
+    @pytest.fixture
+    def mock_fair_share_repository(self) -> MagicMock:
+        """Create a mock fair share repository."""
+        return MagicMock()
 
     @pytest.fixture
     def mock_agent_selector_with_verification(self) -> Mock:
@@ -155,7 +148,7 @@ class TestSchedulerAllocation:
             resource_req: ResourceRequirements,
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
-            designated_agent: Optional[AgentId],
+            designated_agent: AgentId | None,
         ) -> AgentInfo:
             try:
                 # Capture the state of agents at each call
@@ -201,10 +194,6 @@ class TestSchedulerAllocation:
                     max_available = available_cpu
 
             if not best_agent:
-                from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-                    NoCompatibleAgentError,
-                )
-
                 raise NoCompatibleAgentError("No suitable agent found")
 
             return best_agent
@@ -214,14 +203,10 @@ class TestSchedulerAllocation:
             agents: list[AgentInfo],
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
-            designated_agent: Optional[AgentId] = None,
+            designated_agent: AgentId | None = None,
         ) -> list[AgentSelection]:
             # Extract resource requirements from criteria
             resource_requirements = criteria.get_resource_requirements()
-            from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-                AgentSelection,
-            )
-
             selections = []
             for resource_req in resource_requirements:
                 # Use the single selection logic
@@ -249,56 +234,31 @@ class TestSchedulerAllocation:
         return selector
 
     @pytest.fixture
-    def scheduler(
-        self, mock_repository: MagicMock, mock_agent_selector_with_verification: Mock
-    ) -> Scheduler:
-        """Create a scheduler instance with mocked dependencies."""
+    def provisioner(
+        self,
+        mock_repository: MagicMock,
+        mock_fair_share_repository: MagicMock,
+        mock_agent_selector_with_verification: Mock,
+    ) -> SessionProvisioner:
+        """Create a provisioner instance with mocked dependencies."""
         mock_config_provider = MagicMock()
         mock_valkey_schedule = MagicMock()
-        mock_agent_pool = MagicMock()
-        provisioner = SessionProvisioner(
+        return SessionProvisioner(
             SessionProvisionerArgs(
                 validator=MagicMock(),
                 default_sequencer=MagicMock(),
                 default_agent_selector=mock_agent_selector_with_verification,
                 allocator=MagicMock(),
                 repository=mock_repository,
+                fair_share_repository=mock_fair_share_repository,
                 config_provider=mock_config_provider,
                 valkey_schedule=mock_valkey_schedule,
             )
         )
-        launcher = SessionLauncher(
-            SessionLauncherArgs(
-                repository=mock_repository,
-                agent_pool=mock_agent_pool,
-                network_plugin_ctx=MagicMock(),
-                config_provider=mock_config_provider,
-                valkey_schedule=mock_valkey_schedule,
-            )
-        )
-        terminator = SessionTerminator(
-            SessionTerminatorArgs(
-                repository=mock_repository,
-                agent_pool=mock_agent_pool,
-                valkey_schedule=mock_valkey_schedule,
-            )
-        )
-        args = SchedulerArgs(
-            provisioner=provisioner,
-            launcher=launcher,
-            terminator=terminator,
-            repository=mock_repository,
-            deployment_repository=MagicMock(),
-            config_provider=mock_config_provider,
-            lock_factory=MagicMock(),
-            agent_pool=mock_agent_pool,
-            network_plugin_ctx=MagicMock(),
-            event_producer=MagicMock(),
-            valkey_schedule=mock_valkey_schedule,
-        )
-        return Scheduler(args)
 
-    async def test_allocate_single_node_session_success(self, scheduler: Scheduler) -> None:
+    async def test_allocate_single_node_session_success(
+        self, provisioner: SessionProvisioner
+    ) -> None:
         """Test successful allocation of a single-node session."""
         # Create session workload with 3 kernels
         kernels = [
@@ -324,12 +284,12 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._provisioner._allocate_workload(
+        result = await provisioner._allocate_workload(
             workload,
             agents,
             selection_config,
             "default",
-            scheduler._provisioner._default_agent_selector,
+            provisioner._default_agent_selector,
         )
 
         # Verify result
@@ -363,11 +323,11 @@ class TestSchedulerAllocation:
         assert agents[0].container_count == 5  # 2 + 3
 
         # Verify selector was called once (aggregated for single-node)
-        mock_selector = cast(Mock, scheduler._provisioner._default_agent_selector)
+        mock_selector = cast(Mock, provisioner._default_agent_selector)
         assert mock_selector.select_agents_for_batch_requirements.call_count == 1
 
         # Check call_history if it was populated
-        mock_selector = cast(Mock, scheduler._provisioner._default_agent_selector)
+        mock_selector = cast(Mock, provisioner._default_agent_selector)
         if mock_selector.call_history:
             assert len(mock_selector.call_history) == 1
             call = mock_selector.call_history[0]
@@ -376,7 +336,9 @@ class TestSchedulerAllocation:
                 "mem": Decimal("3072"),
             })
 
-    async def test_allocate_multi_node_session_success(self, scheduler: Scheduler) -> None:
+    async def test_allocate_multi_node_session_success(
+        self, provisioner: SessionProvisioner
+    ) -> None:
         """Test successful allocation of a multi-node session."""
         # Create session workload with 3 kernels
         kernels = [
@@ -402,12 +364,12 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._provisioner._allocate_workload(
+        result = await provisioner._allocate_workload(
             workload,
             agents,
             selection_config,
             "default",
-            scheduler._provisioner._default_agent_selector,
+            provisioner._default_agent_selector,
         )
 
         # Verify result
@@ -441,7 +403,9 @@ class TestSchedulerAllocation:
         })  # 1 + 2
         assert agents[1].container_count == 1  # 0 + 1 kernel
 
-    async def test_agent_state_updates_affect_selection(self, scheduler: Scheduler) -> None:
+    async def test_agent_state_updates_affect_selection(
+        self, provisioner: SessionProvisioner
+    ) -> None:
         """Test that agent state updates affect subsequent selections."""
         # Create session with 3 kernels requiring 2 CPU each
         kernels = [
@@ -465,25 +429,21 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation - should raise NoCompatibleAgentError
-        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-            NoCompatibleAgentError,
-        )
-
         with pytest.raises(NoCompatibleAgentError):
-            await scheduler._provisioner._allocate_workload(
+            await provisioner._allocate_workload(
                 workload,
                 agents,
                 selection_config,
                 "default",
-                scheduler._provisioner._default_agent_selector,
+                provisioner._default_agent_selector,
             )
 
         # Verify selector was called once with 3 resource requirements
-        mock_selector = cast(Mock, scheduler._provisioner._default_agent_selector)
+        mock_selector = cast(Mock, provisioner._default_agent_selector)
         assert mock_selector.select_agents_for_batch_requirements.call_count == 1
 
         # Verify selector call history
-        mock_selector = cast(Mock, scheduler._provisioner._default_agent_selector)
+        mock_selector = cast(Mock, provisioner._default_agent_selector)
         call_history = mock_selector.call_history
         if not call_history:
             # If call_history wasn't populated due to the exception handling,
@@ -504,7 +464,7 @@ class TestSchedulerAllocation:
         assert call_history[2]["agent_states"][0]["available"]["cpu"] == Decimal("0")
         assert call_history[2]["agent_states"][1]["available"]["cpu"] == Decimal("1")
 
-    async def test_allocate_with_designated_agent(self, scheduler: Scheduler) -> None:
+    async def test_allocate_with_designated_agent(self, provisioner: SessionProvisioner) -> None:
         """Test allocation with a designated agent."""
         kernels = [create_kernel_workload()]
         designated_agent = AgentId("agent-2")
@@ -528,12 +488,8 @@ class TestSchedulerAllocation:
             agents: list[AgentInfo],
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
-            designated_agent_ids: Optional[list[AgentId]],
+            designated_agent_ids: list[AgentId] | None,
         ) -> list[AgentSelection]:
-            from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-                AgentSelection,
-            )
-
             resource_requirements = criteria.get_resource_requirements()
             selections = []
             if not designated_agent_ids:
@@ -552,16 +508,16 @@ class TestSchedulerAllocation:
                     raise AgentSelectionError("Designated agent not found")
             return selections
 
-        mock_selector = cast(Mock, scheduler._provisioner._default_agent_selector)
+        mock_selector = cast(Mock, provisioner._default_agent_selector)
         mock_selector.select_agents_for_batch_requirements.side_effect = return_designated_batch
 
         # Execute allocation
-        result = await scheduler._provisioner._allocate_workload(
+        result = await provisioner._allocate_workload(
             workload,
             agents,
             selection_config,
             "default",
-            scheduler._provisioner._default_agent_selector,
+            provisioner._default_agent_selector,
         )
 
         # Verify designated agent was selected
@@ -569,14 +525,14 @@ class TestSchedulerAllocation:
         assert result.kernel_allocations[0].agent_id == designated_agent
 
         # Verify designated_agent was passed to selector
-        mock_selector = cast(Mock, scheduler._provisioner._default_agent_selector)
+        mock_selector = cast(Mock, provisioner._default_agent_selector)
         selector_calls = mock_selector.select_agents_for_batch_requirements.call_args_list
         assert len(selector_calls) == 1
         assert selector_calls[0][0][3] == [
             designated_agent
         ]  # 4th argument (agents, criteria, config, designated_agent)
 
-    async def test_no_resource_requirements(self, scheduler: Scheduler):
+    async def test_no_resource_requirements(self, provisioner: SessionProvisioner) -> None:
         """Test handling of session with no kernels."""
         workload = create_session_workload(
             cluster_mode=ClusterMode.SINGLE_NODE,
@@ -590,12 +546,12 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._provisioner._allocate_workload(
+        result = await provisioner._allocate_workload(
             workload,
             agents,
             selection_config,
             "default",
-            scheduler._provisioner._default_agent_selector,
+            provisioner._default_agent_selector,
         )
 
         # Should return empty allocations
@@ -604,10 +560,10 @@ class TestSchedulerAllocation:
         assert len(result.agent_allocations) == 0
 
         # Should return empty list for empty kernels
-        mock_selector = cast(Mock, scheduler._provisioner._default_agent_selector)
+        mock_selector = cast(Mock, provisioner._default_agent_selector)
         assert mock_selector.select_agents_for_batch_requirements.call_count == 1
 
-    async def test_agent_selection_error(self, scheduler: Scheduler):
+    async def test_agent_selection_error(self, provisioner: SessionProvisioner) -> None:
         """Test handling of agent selection errors."""
         kernels = [create_kernel_workload(cpu=Decimal("100"))]  # Impossible requirement
         workload = create_session_workload(
@@ -622,20 +578,16 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation - should raise NoCompatibleAgentError
-        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-            NoCompatibleAgentError,
-        )
-
         with pytest.raises(NoCompatibleAgentError):
-            await scheduler._provisioner._allocate_workload(
+            await provisioner._allocate_workload(
                 workload,
                 agents,
                 selection_config,
                 "default",
-                scheduler._provisioner._default_agent_selector,
+                provisioner._default_agent_selector,
             )
 
-    async def test_multiple_kernels_same_agent(self, scheduler: Scheduler) -> None:
+    async def test_multiple_kernels_same_agent(self, provisioner: SessionProvisioner) -> None:
         """Test multi-node session where multiple kernels go to the same agent."""
         kernels = [
             create_kernel_workload(cpu=Decimal("1"), mem=Decimal("1024")),
@@ -655,12 +607,12 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._provisioner._allocate_workload(
+        result = await provisioner._allocate_workload(
             workload,
             agents,
             selection_config,
             "default",
-            scheduler._provisioner._default_agent_selector,
+            provisioner._default_agent_selector,
         )
 
         # Verify all kernels allocated to the same agent
@@ -681,7 +633,7 @@ class TestSchedulerAllocation:
         })
         assert agents[0].container_count == 3
 
-    async def test_concurrent_selection_isolation(self, scheduler: Scheduler) -> None:
+    async def test_concurrent_selection_isolation(self, provisioner: SessionProvisioner) -> None:
         """Test that modifications to agents don't affect other agent lists."""
         kernels = [create_kernel_workload(cpu=Decimal("2"))]
         workload = create_session_workload(
@@ -704,12 +656,12 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation for session 1
-        result1 = await scheduler._provisioner._allocate_workload(
+        result1 = await provisioner._allocate_workload(
             workload,
             agents_session1,
             selection_config,
             "default",
-            scheduler._provisioner._default_agent_selector,
+            provisioner._default_agent_selector,
         )
 
         assert result1 is not None
@@ -723,7 +675,7 @@ class TestSchedulerAllocation:
         assert agents_session2[0].container_count == 0
 
     async def test_empty_kernel_allocations_returns_proper_result(
-        self, scheduler: Scheduler
+        self, provisioner: SessionProvisioner
     ) -> None:
         """Test the bug fix for empty kernel allocations."""
         # This tests the fix for lines 223-225 where empty kernel_allocations
@@ -741,12 +693,12 @@ class TestSchedulerAllocation:
         )
 
         # Execute allocation
-        result = await scheduler._provisioner._allocate_workload(
+        result = await provisioner._allocate_workload(
             workload,
             agents,
             selection_config,
             "default",
-            scheduler._provisioner._default_agent_selector,
+            provisioner._default_agent_selector,
         )
 
         # With empty kernels, get_resource_requirements returns empty list

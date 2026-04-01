@@ -1,26 +1,27 @@
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.actions.app_service_base import SessionAppServiceAction
 
 
 @dataclass
-class ShutdownServiceAction(SessionAction):
+class ShutdownServiceAction(SessionAppServiceAction):
     session_name: str
     owner_access_key: AccessKey
     service_name: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "shutdown_service"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass
@@ -30,5 +31,5 @@ class ShutdownServiceActionResult(BaseActionResult):
     session_data: SessionData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_data.id)

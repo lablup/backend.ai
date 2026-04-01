@@ -1,7 +1,10 @@
 ---
-Author: -
+Author:
 Status: Accepted
-Created: -
+Created:
+Created-Version:
+Target-Version:
+Implemented-Version:
 ---
 
 # BEP-1010: GraphQL API Migration to Strawberry

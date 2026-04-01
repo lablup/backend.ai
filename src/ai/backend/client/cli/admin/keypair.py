@@ -68,7 +68,15 @@ def info(ctx: CLIContext) -> None:
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, user_id, is_active, filter_, order, offset, limit) -> None:
+def list(
+    ctx: CLIContext,
+    user_id: str | None,
+    is_active: bool | None,
+    filter_: str | None,
+    order: str | None,
+    offset: int,
+    limit: int | None,
+) -> None:
     """
     List keypairs.
     To show all keypairs or other user's, your access key must have the admin

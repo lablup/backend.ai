@@ -15,24 +15,24 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
     from ai.backend.manager.models.group import GroupRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = ("AssociationContainerRegistriesGroupsRow",)
 
 
-def _get_container_registry_join_condition():
+def _get_container_registry_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
     return ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)
 
 
-def _get_group_join_condition():
+def _get_group_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.group import GroupRow
 
     return GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
 
 
-class AssociationContainerRegistriesGroupsRow(Base):
+class AssociationContainerRegistriesGroupsRow(Base):  # type: ignore[misc]
     __tablename__ = "association_container_registries_groups"
     __table_args__ = (
         # constraint

@@ -1,5 +1,7 @@
 """Test agent selection with ResourceRequirements."""
 
+from __future__ import annotations
+
 import uuid
 from decimal import Decimal
 
@@ -12,6 +14,9 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated imp
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
     DispersedAgentSelector,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
+    NoAvailableAgentError,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentInfo,
     AgentSelectionConfig,
@@ -21,58 +26,14 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
     SessionMetadata,
 )
 
-from .conftest import create_agent_info
-
 
 class TestAgentSelectionWithResources:
     """Test agent selection using ResourceRequirements."""
 
-    @pytest.fixture
-    def agents_with_varied_resources(self) -> list[AgentInfo]:
-        """Create agents with varied resource availability."""
-        return [
-            create_agent_info(
-                agent_id="agent-low",
-                available_slots={
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("3"),
-                    "mem": Decimal("6144"),
-                },
-                container_count=3,
-            ),
-            create_agent_info(
-                agent_id="agent-medium",
-                available_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                },
-                container_count=2,
-            ),
-            create_agent_info(
-                agent_id="agent-high",
-                available_slots={
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("32768"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
-                },
-                container_count=1,
-            ),
-        ]
-
-    @pytest.mark.asyncio
     async def test_single_node_selection_with_aggregated_resources(
-        self, agents_with_varied_resources
-    ):
+        self,
+        agents_for_resource_requirements_test: list[AgentInfo],
+    ) -> None:
         """Test single-node selection with aggregated resources."""
         # Create session metadata
         session_metadata = SessionMetadata(
@@ -122,7 +83,7 @@ class TestAgentSelectionWithResources:
 
         # Use batch selection API
         selections = await selector.select_agents_for_batch_requirements(
-            agents_with_varied_resources,
+            agents_for_resource_requirements_test,
             criteria,
             config,
             designated_agent_ids=None,
@@ -135,9 +96,9 @@ class TestAgentSelectionWithResources:
         # Only agent-high has enough resources for aggregated requirements
         assert selected_agent.agent_id == AgentId("agent-high")
 
-    @pytest.mark.asyncio
     async def test_multi_node_selection_individual_resources(
-        self, agents_with_varied_resources: list[AgentInfo]
+        self,
+        agents_for_resource_requirements_test: list[AgentInfo],
     ) -> None:
         """Test multi-node selection with individual kernel resources."""
         session_metadata = SessionMetadata(
@@ -181,7 +142,7 @@ class TestAgentSelectionWithResources:
 
         # Use batch selection API
         selections = await selector.select_agents_for_batch_requirements(
-            agents_with_varied_resources,
+            agents_for_resource_requirements_test,
             criteria,
             config,
             designated_agent_ids=None,
@@ -195,22 +156,11 @@ class TestAgentSelectionWithResources:
         selected_agents = [sel.selected_agent.agent_id for sel in selections]
         assert all(agent_id is not None for agent_id in selected_agents)
 
-    @pytest.mark.asyncio
-    async def test_designated_agent_with_resource_requirements(self) -> None:
+    async def test_designated_agent_with_resource_requirements(
+        self,
+        agents_for_designated_agent_test: list[AgentInfo],
+    ) -> None:
         """Test designated agent selection respects resource requirements."""
-        agents = [
-            create_agent_info(
-                agent_id="designated",
-                available_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-                occupied_slots={"cpu": Decimal("0"), "mem": Decimal("0")},
-            ),
-            create_agent_info(
-                agent_id="other",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("0"), "mem": Decimal("0")},
-            ),
-        ]
-
         session_metadata = SessionMetadata(
             session_id=SessionId(uuid.uuid4()),
             session_type=SessionTypes.INTERACTIVE,
@@ -239,13 +189,9 @@ class TestAgentSelectionWithResources:
         selector = AgentSelector(strategy)
 
         # Try to select designated agent
-        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-            NoAvailableAgentError,
-        )
-
         with pytest.raises(NoAvailableAgentError) as exc_info:
             await selector.select_agents_for_batch_requirements(
-                agents,
+                agents_for_designated_agent_test,
                 criteria,
                 config,
                 designated_agent_ids=[AgentId("designated")],
@@ -255,24 +201,11 @@ class TestAgentSelectionWithResources:
         assert "Designated agent '['designated']' is not compatible" in str(exc_info.value)
         assert "insufficient resources" in str(exc_info.value)
 
-    @pytest.mark.asyncio
-    async def test_container_limit_with_resource_requirements(self) -> None:
+    async def test_container_limit_with_resource_requirements(
+        self,
+        agents_for_container_limit_test: list[AgentInfo],
+    ) -> None:
         """Test that container limits are respected with resource requirements."""
-        agents = [
-            create_agent_info(
-                agent_id="busy",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("0"), "mem": Decimal("0")},
-                container_count=10,  # At limit
-            ),
-            create_agent_info(
-                agent_id="available",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("0"), "mem": Decimal("0")},
-                container_count=5,
-            ),
-        ]
-
         kernel_id = uuid.uuid4()
         kernel_spec = KernelResourceSpec(
             requested_slots=ResourceSlot({
@@ -303,7 +236,7 @@ class TestAgentSelectionWithResources:
         selector = AgentSelector(strategy)
 
         selections = await selector.select_agents_for_batch_requirements(
-            agents,
+            agents_for_container_limit_test,
             criteria,
             config,
             designated_agent_ids=None,
@@ -313,22 +246,11 @@ class TestAgentSelectionWithResources:
         assert len(selections) == 1
         assert selections[0].selected_agent.agent_id == AgentId("available")
 
-    @pytest.mark.asyncio
-    async def test_architecture_mismatch_with_resource_requirements(self) -> None:
+    async def test_architecture_mismatch_with_resource_requirements(
+        self,
+        agents_for_architecture_test: list[AgentInfo],
+    ) -> None:
         """Test that architecture requirements are enforced."""
-        agents = [
-            create_agent_info(
-                agent_id="x86",
-                architecture="x86_64",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-            ),
-            create_agent_info(
-                agent_id="arm",
-                architecture="aarch64",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-            ),
-        ]
-
         kernel_id = uuid.uuid4()
         kernel_spec = KernelResourceSpec(
             requested_slots=ResourceSlot({
@@ -356,7 +278,7 @@ class TestAgentSelectionWithResources:
         selector = AgentSelector(strategy)
 
         selections = await selector.select_agents_for_batch_requirements(
-            agents,
+            agents_for_architecture_test,
             criteria,
             config,
             designated_agent_ids=None,

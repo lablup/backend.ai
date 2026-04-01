@@ -48,9 +48,9 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
     def select_tracker_by_strategy(
         self,
         trackers: Sequence[AgentStateTracker],
-        resource_req: ResourceRequirements,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
+        _resource_req: ResourceRequirements,
+        _criteria: AgentSelectionCriteria,
+        _config: AgentSelectionConfig,
     ) -> AgentStateTracker:
         """
         Select an agent tracker using round-robin.

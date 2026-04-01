@@ -6,11 +6,10 @@ import subprocess
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Optional, override
-
-import pkg_resources
+from typing import override
 
 from ai.backend.common.docker import KernelFeatures
 from ai.backend.common.stage.types import (
@@ -25,8 +24,8 @@ from .utils import ScratchUtil
 
 @dataclass
 class ContainerOwnershipConfig:
-    kernel_uid: Optional[int]
-    kernel_gid: Optional[int]
+    kernel_uid: int | None
+    kernel_gid: int | None
     supplementary_gids: set[int]
 
     fallback_kernel_uid: int
@@ -129,11 +128,11 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
             )
 
     def _create_sparse_file(self, name: str, size: int) -> None:
-        fd = os.open(name, os.O_CREAT, 0o644)
-        os.close(fd)
+        filepath = Path(name)
+        filepath.touch(mode=0o644, exist_ok=True)
         os.truncate(name, size)
         # Check that no space was allocated
-        stat = os.stat(name)
+        stat = filepath.stat()
         if stat.st_blocks != 0:
             raise RuntimeError("could not create sparse file")
 
@@ -186,20 +185,16 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
     def _clone_func(self, spec: ScratchSpec) -> None:
         work_dir = ScratchUtil.work_dir(spec.scratch_root, spec.kernel_id)
         jupyter_custom_css_path = Path(
-            pkg_resources.resource_filename("ai.backend.runner", "jupyter-custom.css")
+            str(files("ai.backend.runner").joinpath("jupyter-custom.css"))
         )
-        logo_path = Path(pkg_resources.resource_filename("ai.backend.runner", "logo.svg"))
-        font_path = Path(pkg_resources.resource_filename("ai.backend.runner", "roboto.ttf"))
-        font_italic_path = Path(
-            pkg_resources.resource_filename("ai.backend.runner", "roboto-italic.ttf")
-        )
-        bashrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".bashrc"))
-        bash_profile_path = Path(
-            pkg_resources.resource_filename("ai.backend.runner", ".bash_profile")
-        )
-        zshrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".zshrc"))
-        vimrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".vimrc"))
-        tmux_conf_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".tmux.conf"))
+        logo_path = Path(str(files("ai.backend.runner").joinpath("logo.svg")))
+        font_path = Path(str(files("ai.backend.runner").joinpath("roboto.ttf")))
+        font_italic_path = Path(str(files("ai.backend.runner").joinpath("roboto-italic.ttf")))
+        bashrc_path = Path(str(files("ai.backend.runner").joinpath(".bashrc")))
+        bash_profile_path = Path(str(files("ai.backend.runner").joinpath(".bash_profile")))
+        zshrc_path = Path(str(files("ai.backend.runner").joinpath(".zshrc")))
+        vimrc_path = Path(str(files("ai.backend.runner").joinpath(".vimrc")))
+        tmux_conf_path = Path(str(files("ai.backend.runner").joinpath(".tmux.conf")))
         jupyter_custom_dir = work_dir / ".jupyter" / "custom"
         jupyter_custom_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy(jupyter_custom_css_path.resolve(), jupyter_custom_dir / "custom.css")
@@ -229,8 +224,8 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
         paths: Iterable[Path],
         config: ContainerOwnershipConfig,
     ) -> None:
-        valid_uid: Optional[int]
-        valid_gid: Optional[int]
+        valid_uid: int | None
+        valid_gid: int | None
         if os.geteuid() == 0:  # only possible when I am root.
             if KernelFeatures.UID_MATCH in config.kernel_features:
                 valid_uid = (
@@ -248,7 +243,7 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
                 valid_gid = config.kernel_gid
             for p in paths:
                 if valid_uid is None or valid_gid is None:
-                    stat = os.stat(p)
+                    stat = p.stat()
                     valid_uid = stat.st_uid if valid_uid is None else valid_uid
                     valid_gid = stat.st_gid if valid_gid is None else valid_gid
                 os.chown(p, valid_uid, valid_gid)
@@ -301,7 +296,7 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
         exit_code = await umount.wait()
         if exit_code != 0:
             raise RuntimeError("umount failed")
-        await loop.run_in_executor(None, os.remove, str(scratch_file))
+        await loop.run_in_executor(None, scratch_file.unlink)
         await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
 

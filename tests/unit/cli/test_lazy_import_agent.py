@@ -3,7 +3,7 @@ from ai.backend.cli.loader import load_entry_points
 from .helper import check_module_loaded
 
 
-def test_lazy_import_agent_cli():
+def test_lazy_import_agent_cli() -> None:
     # The CLI commands and the `server` module should use lazy imports of their internal dependencies,
     # to reduce the startup time and avoid unnecessary indirect imports of 3rd-party dependencies.
     # (See lablup/backend.ai#663, lablup/backend.ai#5327)

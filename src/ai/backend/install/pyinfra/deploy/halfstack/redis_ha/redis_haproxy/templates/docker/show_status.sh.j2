@@ -1,0 +1,64 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+export HAPROXY_CONTAINER_NAME="{{ config.haproxy_container_name_prefix }}"
+export container_id=$(docker ps | grep "$HAPROXY_CONTAINER_NAME" | awk '{ print $1 }')
+
+echo "=== Redis HAProxy Status ==="
+echo "Cluster Name   : {{ config.name }}"
+echo "Service Port   : {{ config.haproxy_service_port }}"
+echo "Stats Port     : {{ config.haproxy_stat_port }}"
+echo "Container Name : $HAPROXY_CONTAINER_NAME"
+echo ""
+
+# Check HAProxy container status
+echo "=== HAProxy Service Status ==="
+if [ -z "$container_id" ]; then
+    echo "ERROR: HAProxy container not found for $HAPROXY_CONTAINER_NAME"
+    exit 1
+fi
+if [ ! -z "$container_id" ]; then
+    echo "Container ID   : $container_id"
+    echo "Container Status: $(docker ps --filter "id=$container_id" --format "{{ '{{.Status}}' }}")"
+
+    # Check HAProxy stats page availability
+    if command -v wget >/dev/null 2>&1; then
+        stats_check=$(timeout 5 wget -qO- "http://127.0.0.1:{{ config.haproxy_stat_port }}/stats" 2>/dev/null | grep -c "HAProxy")
+    elif command -v curl >/dev/null 2>&1; then
+        stats_check=$(timeout 5 curl -s "http://127.0.0.1:{{ config.haproxy_stat_port }}/stats" 2>/dev/null | grep -c "HAProxy")
+    else
+        # Try to connect to Redis through HAProxy as fallback
+        stats_check=$(timeout 5 redis-cli -h 127.0.0.1 -p {{ config.haproxy_service_port }} -a "{{ config.password }}" ping 2>/dev/null | grep -c "PONG")
+    fi
+    
+    if [ "$stats_check" -gt 0 ]; then
+        echo "HAProxy Status : Online"
+    else
+        echo "HAProxy Status : Offline"
+    fi
+else
+    echo "HAProxy Container: Not running"
+fi
+echo ""
+
+echo "=== Backend Server Status ==="
+if [ ! -z "$container_id" ]; then
+    # Use the HAProxy stats check script
+    if [ -f "./check_haproxy_redis.sh" ]; then
+        ./check_haproxy_redis.sh
+    else
+        echo "HAProxy stats check script not found"
+    fi
+else
+    echo "HAProxy container not running - checking Redis servers directly:"
+{% for node in config.cluster_nodes -%}
+    redis_{{ node.node_number }}_status=$(timeout 5 redis-cli -h {{ node.ip }} -p {{ node.port }} -a "{{ config.password }}" ping 2>/dev/null)
+    if [ "$redis_{{ node.node_number }}_status" = "PONG" ]; then
+        echo "Redis{{ node.node_number }} ({{ node.hostname }}:{{ node.port }}): Online"
+    else
+        echo "Redis{{ node.node_number }} ({{ node.hostname }}:{{ node.port }}): Offline"
+    fi
+{% endfor -%}
+fi
+echo ""

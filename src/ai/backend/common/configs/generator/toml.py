@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import textwrap
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -385,8 +387,6 @@ class TOMLGenerator:
         Returns:
             The converted value with proper type.
         """
-        import json
-
         type_lower = type_name.lower()
 
         # List conversion - parse JSON array string like '["a", "b"]'
@@ -475,8 +475,6 @@ class TOMLGenerator:
         Returns:
             List of TOML lines.
         """
-        from dataclasses import replace
-
         # Create modified children with injected examples
         modified_children: dict[str, FieldSchema] = {}
         for key, child_field in children.items():

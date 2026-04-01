@@ -1,37 +1,45 @@
 from abc import abstractmethod
-from typing import Optional, TypeVar, override
+from typing import TypeVar, override
 
-from ai.backend.manager.data.permission.types import OperationType
+from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.manager.data.permission.types import RBACElementRef
 
 from .base import BaseAction, BaseActionResult
 
 
 class BaseScopeAction(BaseAction):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @abstractmethod
-    def scope_type(self) -> str:
+    def scope_type(self) -> ScopeType:
         raise NotImplementedError
 
     @abstractmethod
     def scope_id(self) -> str:
         raise NotImplementedError
 
-    @classmethod
     @abstractmethod
-    def permission_operation_type(cls) -> OperationType:
+    def target_element(self) -> RBACElementRef:
+        """Return the RBAC element reference for the scope this action targets.
+
+        Used by RBAC validators to check whether the current user has the
+        required permission on this scope.
+
+        Implementations must construct the RBACElementRef directly from their
+        own fields — do not delegate to ``scope_type()`` / ``scope_id()``.
+        """
         raise NotImplementedError
 
 
 class BaseScopeActionResult(BaseActionResult):
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @abstractmethod
-    def scope_type(self) -> str:
+    def scope_type(self) -> ScopeType:
         raise NotImplementedError
 
     @abstractmethod

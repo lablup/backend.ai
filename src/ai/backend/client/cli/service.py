@@ -1,7 +1,7 @@
 import json
 import sys
 from collections.abc import Sequence
-from typing import Literal, Optional
+from typing import Literal
 from uuid import UUID
 
 import click
@@ -47,13 +47,17 @@ _default_routing_fields: Sequence[FieldSpec] = (
 
 def get_service_id(session: Session, name_or_id: str) -> UUID:
     try:
-        session.Service(name_or_id).info()
+        _ = session.Service(name_or_id).info()
     except (ValueError, BackendError):
-        services = session.Service.list(name=name_or_id)
+        result = session.Service.paginated_list(
+            fields=[service_fields["endpoint_id"], service_fields["name"]],
+            filter=f'name == "{name_or_id}"',
+            page_size=1,
+        )
         try:
-            return UUID(services[0]["id"])
-        except (KeyError, IndexError):
-            raise RuntimeError(f"Service {name_or_id!r} not found")
+            return UUID(result.items[0]["endpoint_id"])
+        except (KeyError, IndexError) as e:
+            raise RuntimeError(f"Service {name_or_id!r} not found") from e
     else:
         # When we can fetch the detail directly, it's a valid UUID.
         return UUID(name_or_id)
@@ -72,10 +76,10 @@ def service() -> None:
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
 def list(
     ctx: CLIContext,
-    filter_: Optional[str],
-    order: Optional[str],
+    filter_: str | None,
+    order: str | None,
     offset: int,
-    limit: Optional[int],
+    limit: int | None,
 ) -> None:
     """
     List the service endpoints.
@@ -285,24 +289,24 @@ def create(
     model_name_or_id: str,
     initial_session_count: int,
     *,
-    name: Optional[str],
-    model_version: Optional[str],
-    model_mount_destination: Optional[str],
+    name: str | None,
+    model_version: str | None,
+    model_mount_destination: str | None,
     env: Sequence[str],
     mount: Sequence[str],
-    startup_command: Optional[str],
+    startup_command: str | None,
     resources: Sequence[str],
     resource_opts: Sequence[str],
     cluster_size: int,
     cluster_mode: Literal["single-node", "multi-node"],
-    domain: Optional[str],
-    project: Optional[str],
-    bootstrap_script: Optional[str],
-    tag: Optional[str],
-    architecture: Optional[str],
-    scaling_group: Optional[str],
-    owner: Optional[str],
-    model_definition_path: Optional[str],
+    domain: str | None,
+    project: str | None,
+    bootstrap_script: str | None,
+    tag: str | None,
+    architecture: str | None,
+    scaling_group: str | None,
+    owner: str | None,
+    model_definition_path: str | None,
     public: bool,
     runtime_variant: RuntimeVariant,
 ) -> None:
@@ -481,22 +485,22 @@ def try_start(
     image: str,
     model_name_or_id: str,
     *,
-    name: Optional[str],
+    name: str | None,
     model_version: int,
-    model_mount_destination: Optional[str],
+    model_mount_destination: str | None,
     env: Sequence[str],
-    startup_command: Optional[str],
+    startup_command: str | None,
     resources: Sequence[str],
     resource_opts: Sequence[str],
     cluster_size: int,
     cluster_mode: ClusterMode,
-    domain: Optional[str],
-    project: Optional[str],
-    bootstrap_script: Optional[str],
-    tag: Optional[str],
-    architecture: Optional[str],
-    scaling_group: Optional[str],
-    owner: Optional[str],
+    domain: str | None,
+    project: str | None,
+    bootstrap_script: str | None,
+    tag: str | None,
+    architecture: str | None,
+    scaling_group: str | None,
+    owner: str | None,
     public: bool,
 ) -> None:
     """
@@ -548,7 +552,7 @@ def try_start(
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
-    async def try_start_tracker(bgtask_id):
+    async def try_start_tracker(bgtask_id: str) -> None:
         async with AsyncSession() as session:
             completion_msg_func = lambda: print_done("Model service validation started.")
             try:
@@ -584,7 +588,7 @@ def try_start(
                                         f"Task finished with {len(errors)} issues."
                                     )
             finally:
-                completion_msg_func()
+                completion_msg_func()  # type: ignore[no-untyped-call]
 
     asyncio_run(try_start_tracker(result["task_id"]))
 
@@ -601,7 +605,7 @@ def rm(ctx: CLIContext, service_name_or_id: str) -> None:
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).delete()
+            _ = session.Service(service_id).delete()
             print_done("Removed.")
         except Exception as e:
             ctx.output.print_error(e)
@@ -621,7 +625,7 @@ def sync(ctx: CLIContext, service_name_or_id: str) -> None:
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).sync()
+            _ = session.Service(service_id).sync()
             print_done("Done.")
         except Exception as e:
             ctx.output.print_error(e)
@@ -647,7 +651,7 @@ def scale(
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).scale(target_count)
+            _ = session.Service(service_id).scale(target_count)
             print_done("Triggered scaling.")
         except Exception as e:
             ctx.output.print_error(e)
@@ -728,7 +732,7 @@ def update_traffic_ratio(
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).update_traffic_ratio(route_id, ratio)
+            _ = session.Service(service_id).update_traffic_ratio(route_id, ratio)
             print_done("Done.")
         except Exception as e:
             ctx.output.print_error(e)
@@ -752,7 +756,7 @@ def downscale_route(ctx: CLIContext, service_name_or_id: str, route_id: UUID) ->
     with Session() as session:
         try:
             service_id = get_service_id(session, service_name_or_id)
-            session.Service(service_id).downscale_single_route(route_id)
+            _ = session.Service(service_id).downscale_single_route(route_id)
             print_done("Done.")
         except Exception as e:
             ctx.output.print_error(e)

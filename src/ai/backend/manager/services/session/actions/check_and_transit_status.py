@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.actions.action import BaseActionResult, BaseBatchActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.base import SessionAction, SessionBatchAction
 
@@ -20,13 +21,13 @@ class CheckAndTransitStatusAction(SessionAction):
     session_id: SessionId
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "check_and_transit_status"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -36,7 +37,7 @@ class CheckAndTransitStatusActionResult(BaseActionResult):
     session_data: SessionData
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_data.id)
 
 
@@ -53,8 +54,8 @@ class CheckAndTransitStatusBatchAction(SessionBatchAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "check_and_transit_status_multi"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

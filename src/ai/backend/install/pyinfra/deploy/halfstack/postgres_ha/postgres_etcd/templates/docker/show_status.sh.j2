@@ -1,0 +1,44 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+export ETCD_CONTAINER_NAME="{{ config.etcd_container_name_prefix }}-{{ pg_cluster_info.node_name }}"
+export etcd_docker_id=$(docker ps | grep "$ETCD_CONTAINER_NAME" | awk '{ print $1 }')
+
+if [ -z "$etcd_docker_id" ]; then
+    echo "ERROR: ETCD container not found for $ETCD_CONTAINER_NAME"
+    exit 1
+fi
+
+echo "=== ETCD Cluster Status ==="
+docker exec -e ETCDCTL_ENDPOINTS=$(docker exec $etcd_docker_id etcdctl member list | cut -d, -f5 | sed -e 's/ //g' | paste -sd ',') $etcd_docker_id etcdctl endpoint status --write-out table
+echo ""
+
+echo "=== Cluster Health ==="
+docker exec $etcd_docker_id etcdctl endpoint health --write-out table
+echo ""
+
+echo "=== Cluster Members ==="
+docker exec $etcd_docker_id etcdctl member list --write-out table
+echo ""
+
+echo "=== ETCD Key Statistics ==="
+echo "Total keys in ETCD:"
+TOTAL_KEYS=$(docker exec $etcd_docker_id etcdctl get --prefix "" --keys-only 2>/dev/null | wc -l)
+SERVICE_KEYS=$(docker exec $etcd_docker_id etcdctl get --prefix "/service/" --keys-only 2>/dev/null | wc -l)
+echo "  Total keys: $TOTAL_KEYS"
+echo "  Service keys (/service/): $SERVICE_KEYS"
+if [ "$SERVICE_KEYS" -gt 0 ]; then
+    echo "Service namespaces:"
+    docker exec $etcd_docker_id etcdctl get --prefix "/service/" --keys-only 2>/dev/null | cut -d'/' -f3 | sort | uniq -c | sed 's/^/    /'
+fi
+echo ""
+
+echo "=== Leader History ==="
+echo "Current leader ID: $(docker exec $etcd_docker_id etcdctl endpoint status --write-out json 2>/dev/null | jq -r '.[] | select(.Status.leader != null) | .Status.leader' | head -1)"
+echo "Leader election count: $(docker exec $etcd_docker_id etcdctl get /service/pg_cluster/leader --print-value-only 2>/dev/null | wc -l || echo "0")"
+echo ""
+
+echo "=== ETCD Logs (last 10 lines) ==="
+docker logs $etcd_docker_id --tail 10 2>/dev/null | grep -E "(leader|election|member)" || echo "No leader/election logs found"
+echo ""

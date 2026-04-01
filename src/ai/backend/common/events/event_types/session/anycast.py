@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import uuid
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Self, override
+from typing import Any, Self, override
 
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
@@ -11,12 +13,12 @@ from ai.backend.common.types import SessionExecutionStatus, SessionId
 
 class SessionLifecycleEvent(AbstractAnycastEvent):
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls()
 
     @classmethod
@@ -25,20 +27,12 @@ class SessionLifecycleEvent(AbstractAnycastEvent):
         return EventDomain.SESSION
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return None
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
-
-
-@dataclass
-class DoUpdateSessionStatusEvent(SessionLifecycleEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_update_session_status"
 
 
 @dataclass
@@ -51,11 +45,11 @@ class BaseSessionEvent(AbstractAnycastEvent):
         return EventDomain.SESSION
 
     @override
-    def domain_id(self) -> Optional[str]:
+    def domain_id(self) -> str | None:
         return str(self.session_id)
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -63,7 +57,7 @@ class BaseSessionEvent(AbstractAnycastEvent):
 class DoTerminateSessionEvent(BaseSessionEvent):
     reason: KernelLifecycleEventReason
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.session_id),
             self.reason,
@@ -71,7 +65,7 @@ class DoTerminateSessionEvent(BaseSessionEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple) -> Self:
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],
@@ -89,7 +83,7 @@ class SessionCreationEvent(BaseSessionEvent):
     reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.session_id),
             self.creation_id,
@@ -98,7 +92,7 @@ class SessionCreationEvent(BaseSessionEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],
@@ -106,7 +100,7 @@ class SessionCreationEvent(BaseSessionEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -119,27 +113,11 @@ class SessionEnqueuedAnycastEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionScheduledAnycastEvent(SessionCreationEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "session_scheduled"
-
-
-@dataclass
 class SessionCheckingPrecondAnycastEvent(SessionCreationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
         return "session_checking_precondition"
-
-
-@dataclass
-class SessionPreparingAnycastEvent(SessionCreationEvent):
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "session_preparing"
 
 
 @dataclass
@@ -163,7 +141,7 @@ class SessionTerminationEvent(BaseSessionEvent):
     reason: str = ""
 
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.session_id),
             self.reason,
@@ -171,14 +149,14 @@ class SessionTerminationEvent(BaseSessionEvent):
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -203,7 +181,7 @@ class SessionResultEvent(BaseSessionEvent):
     reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
     exit_code: int = -1
 
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.session_id),
             self.reason,
@@ -211,7 +189,7 @@ class SessionResultEvent(BaseSessionEvent):
         )
 
     @classmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
             value[1],
@@ -219,7 +197,7 @@ class SessionResultEvent(BaseSessionEvent):
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
 
@@ -242,18 +220,18 @@ class SessionFailureAnycastEvent(SessionResultEvent):
 @dataclass
 class BaseSessionExecutionEvent(BaseSessionEvent):
     @override
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[Any, ...]:
         return (str(self.session_id),)
 
     @classmethod
     @override
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
         )
 
     @override
-    def user_event(self) -> Optional[UserEvent]:
+    def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod

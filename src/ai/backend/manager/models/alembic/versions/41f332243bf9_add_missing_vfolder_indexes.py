@@ -15,7 +15,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.create_index(op.f("ix_vfolders_host"), "vfolders", ["host"], unique=False)
     op.create_index(
         op.f("ix_vfolders_ownership_type"), "vfolders", ["ownership_type"], unique=False
@@ -24,7 +24,7 @@ def upgrade():
     op.create_index(op.f("ix_vfolders_usage_mode"), "vfolders", ["usage_mode"], unique=False)
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_index(op.f("ix_vfolders_usage_mode"), table_name="vfolders")
     op.drop_index(op.f("ix_vfolders_status"), table_name="vfolders")
     op.drop_index(op.f("ix_vfolders_ownership_type"), table_name="vfolders")

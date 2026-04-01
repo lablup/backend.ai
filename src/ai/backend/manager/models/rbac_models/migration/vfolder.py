@@ -1,8 +1,8 @@
 import enum
 import uuid
 from collections.abc import Mapping
-from typing import Optional
 
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.models.vfolder import VFolderOwnershipType as OriginalVFolderOwnershipType
 from ai.backend.manager.models.vfolder import VFolderPermission as OriginalVFolderPermission
@@ -10,8 +10,8 @@ from ai.backend.manager.models.vfolder import VFolderPermission as OriginalVFold
 from .enums import (
     OperationType,
     RoleSource,
+    ScopeType,
 )
-from .types import ScopeId, ScopeType
 
 VFOLDER_ENTITY = EntityType.VFOLDER
 
@@ -68,9 +68,9 @@ role_source_to_operation: Mapping[RoleSource, set[OperationType]] = {
 
 def map_vfolder_entity_to_scope_id(
     ownership_type: VFolderOwnershipType,
-    user_id: Optional[uuid.UUID],
-    project_id: Optional[uuid.UUID],
-) -> Optional[ScopeId]:
+    user_id: uuid.UUID | None,
+    project_id: uuid.UUID | None,
+) -> ScopeId | None:
     """
     Map vfolder entity to ScopeId based on ownership type.
     """

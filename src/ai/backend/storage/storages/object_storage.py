@@ -38,6 +38,11 @@ class ObjectStorage(AbstractStorage):
     _presigned_upload_config: PresignedUploadConfig
     _presigned_download_config: PresignedDownloadConfig
 
+    @property
+    @override
+    def name(self) -> str:
+        return self._name
+
     def __init__(self, name: str, cfg: ObjectStorageConfig) -> None:
         self._name = name
         self._endpoint = cfg.endpoint

@@ -1,14 +1,17 @@
 """Tests for DownloadStep implementations."""
 
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from aiohttp import ClientError, ClientResponseError
 from aioresponses import aioresponses
+from huggingface_hub.hf_api import RepoFile
 
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
@@ -18,7 +21,7 @@ from ai.backend.common.data.storage.registries.types import (
 from ai.backend.common.data.storage.types import (
     ArtifactStorageImportStep,
 )
-from ai.backend.storage.client.huggingface import HuggingFaceClient
+from ai.backend.storage.client.huggingface import HuggingFaceClient, HuggingFaceScanner
 from ai.backend.storage.client.manager import ManagerHTTPClientPool
 from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
@@ -26,6 +29,7 @@ from ai.backend.storage.config.unified import (
     ReservoirClientConfig,
     ReservoirConfig,
 )
+from ai.backend.storage.data.storage.types import ImportStepContext, StorageTarget
 from ai.backend.storage.errors import (
     ArtifactStorageEmptyError,
     HuggingFaceAPIError,
@@ -37,7 +41,6 @@ from ai.backend.storage.errors import (
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceDownloadStep,
     HuggingFaceFileDownloadStreamReader,
-    HuggingFaceScanner,
 )
 from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirDownloadStep,
@@ -45,7 +48,6 @@ from ai.backend.storage.services.artifacts.reservoir import (
 from ai.backend.storage.services.artifacts.storage_transfer import StorageTransferManager
 from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
-    ImportStepContext,
 )
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
@@ -239,8 +241,8 @@ def mock_import_step_context(
 ) -> ImportStepContext:
     """Mock ImportStepContext."""
     storage_step_mappings = {
-        ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-        ArtifactStorageImportStep.ARCHIVE: "test_storage",
+        ArtifactStorageImportStep.DOWNLOAD: StorageTarget.from_storage_name("test_storage"),
+        ArtifactStorageImportStep.ARCHIVE: StorageTarget.from_storage_name("test_storage"),
     }
 
     return ImportStepContext(
@@ -314,7 +316,6 @@ class TestHuggingFaceDownloadStep:
         with pytest.raises(RegistryNotFoundError):
             hf_download_step._make_scanner("nonexistent_registry")
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_models")
     async def test_scan_models_success(
         self,
@@ -350,7 +351,6 @@ class TestHuggingFaceDownloadStep:
             expand=["gated"],
         )
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_models")
     async def test_scan_models_api_error(
         self, mock_list_models: MagicMock, hf_download_step: HuggingFaceDownloadStep
@@ -362,7 +362,6 @@ class TestHuggingFaceDownloadStep:
         with pytest.raises(HuggingFaceAPIError):
             await scanner.scan_models(limit=10, sort=ModelSortKey.DOWNLOADS)
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_success(
         self, mock_model_info: MagicMock, hf_download_step: HuggingFaceDownloadStep
@@ -390,7 +389,6 @@ class TestHuggingFaceDownloadStep:
             "microsoft/DialoGPT-medium", revision="main", token="test_token"
         )
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_not_found(
         self, mock_model_info: MagicMock, hf_download_step: HuggingFaceDownloadStep
@@ -403,7 +401,6 @@ class TestHuggingFaceDownloadStep:
             model_target = ModelTarget(model_id="nonexistent/model")
             await scanner.scan_model(model=model_target)
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_api_error(
         self, mock_model_info: MagicMock, hf_download_step: HuggingFaceDownloadStep
@@ -416,7 +413,6 @@ class TestHuggingFaceDownloadStep:
             model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
             await scanner.scan_model(model=model_target)
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_repo_files")
     async def test_list_model_files_success(
         self,
@@ -428,8 +424,6 @@ class TestHuggingFaceDownloadStep:
         mock_list_repo_files.return_value = ["config.json"]
 
         # Mock the RepoFile object properly
-        from huggingface_hub.hf_api import RepoFile
-
         mock_repo_file = MagicMock(spec=RepoFile)
         mock_repo_file.path = "config.json"
         mock_repo_file.size = 285
@@ -452,7 +446,6 @@ class TestHuggingFaceDownloadStep:
                 assert files[0].size == 285
                 assert files[0].type == "file"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_repo_files")
     async def test_list_model_files_api_error(
         self, mock_list_repo_files: MagicMock, hf_download_step: HuggingFaceDownloadStep
@@ -466,7 +459,6 @@ class TestHuggingFaceDownloadStep:
         with pytest.raises(HuggingFaceAPIError):
             await scanner.list_model_files_info(model=model_target)
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.hf_hub_url")
     async def test_get_download_url_success(
         self, mock_hf_hub_url: MagicMock, hf_download_step: HuggingFaceDownloadStep
@@ -492,7 +484,6 @@ class TestHuggingFaceDownloadStep:
             repo_type="model",
         )
 
-    @pytest.mark.asyncio
     async def test_import_models_batch_success(
         self,
         hf_download_step: HuggingFaceDownloadStep,
@@ -520,7 +511,6 @@ class TestHuggingFaceDownloadStep:
                 assert result.storage_name == "test_storage"
                 mock_download_upload.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
     async def test_make_download_file_stream_success(
         self,
@@ -534,7 +524,7 @@ class TestHuggingFaceDownloadStep:
         mock_client_session.return_value = mock_session
 
         # Create an async generator for iter_chunked
-        async def mock_iter_chunked(chunk_size):
+        async def mock_iter_chunked(chunk_size: int) -> AsyncIterator[bytes]:
             yield b"chunk1"
             yield b"chunk2"
 
@@ -543,7 +533,7 @@ class TestHuggingFaceDownloadStep:
         mock_response.content.iter_chunked = mock_iter_chunked
 
         # Mock headers.get to return different values for different headers
-        def mock_headers_get(key, default=None):
+        def mock_headers_get(key: str, default: str | None = None) -> str | None:
             if key == "Content-Length":
                 return "12"  # Total size matches our chunks
             if key == "ETag" or key == "Accept-Ranges":
@@ -593,7 +583,6 @@ class TestHuggingFaceDownloadStep:
         assert "Authorization" not in headers
         assert headers["Accept-Encoding"] == "identity"
 
-    @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
     async def test_make_download_file_stream_http_error(
         self,
@@ -606,16 +595,16 @@ class TestHuggingFaceDownloadStep:
         mock_client_session.return_value = mock_session
 
         # Create an async generator that immediately raises a non-retriable error
-        async def mock_iter_chunked_error(chunk_size):
+        async def mock_iter_chunked_error(chunk_size: int) -> AsyncIterator[bytes]:
             raise RuntimeError("HTTP 404 Not Found")
-            yield  # Never reached, but needed for generator syntax
+            yield  # type: ignore[unreachable]  # Never reached, but needed for generator syntax
 
         # Configure response with error status
         mock_response.status = 404
         mock_response.content.iter_chunked = mock_iter_chunked_error
 
         # Mock headers.get to return valid Content-Length for HEAD probe, but defaults for others
-        def mock_headers_get(key, default=None):
+        def mock_headers_get(key: str, default: str | None = None) -> str | None:
             if key == "Content-Length":
                 return "100"  # Valid content length for HEAD probe
             return default
@@ -636,7 +625,6 @@ class TestHuggingFaceDownloadStep:
             async for chunk in download_stream.read():
                 pass
 
-    @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
     async def test_make_download_file_stream_client_error(
         self,
@@ -661,7 +649,6 @@ class TestHuggingFaceDownloadStep:
             async for chunk in download_stream.read():
                 pass
 
-    @pytest.mark.asyncio
     async def test_probe_head_raises_on_http_error(
         self,
         hf_stream_reader: HuggingFaceFileDownloadStreamReader,
@@ -674,7 +661,6 @@ class TestHuggingFaceDownloadStep:
                 async for _ in hf_stream_reader.read():
                     pass
 
-    @pytest.mark.asyncio
     async def test_upload_model_file_success(
         self,
         hf_download_step: HuggingFaceDownloadStep,
@@ -694,10 +680,11 @@ class TestHuggingFaceDownloadStep:
             await hf_download_step._download_file_to_storage(
                 file_info=mock_file_info,
                 model=mock_import_step_context.model,
-                storage_name="test_storage",
+                storage_target=StorageTarget.from_storage_name("test_storage"),
                 storage_pool=mock_import_step_context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
                 redis_client=mock_redis_client,
+                storage_key="test_storage_key",
             )
 
             # Verify the stream reader was created with correct parameters
@@ -717,7 +704,6 @@ class TestHuggingFaceDownloadStep:
             mock_storage = mock_storage_pool.get_storage.return_value
             mock_storage.stream_upload.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_upload_model_file_upload_failure(
         self,
         hf_download_step: HuggingFaceDownloadStep,
@@ -742,13 +728,13 @@ class TestHuggingFaceDownloadStep:
                 await hf_download_step._download_file_to_storage(
                     file_info=mock_file_info,
                     model=mock_import_step_context.model,
-                    storage_name="test_storage",
+                    storage_target=StorageTarget.from_storage_name("test_storage"),
                     storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
                     redis_client=mock_redis_client,
+                    storage_key="test_storage_key",
                 )
 
-    @pytest.mark.asyncio
     async def test_upload_model_file_no_storage_service(
         self,
         mock_registry_configs: dict[str, HuggingfaceConfig],
@@ -763,8 +749,8 @@ class TestHuggingFaceDownloadStep:
             registry_name="test_registry",
             storage_pool=None,  # type: ignore
             storage_step_mappings={
-                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-                ArtifactStorageImportStep.ARCHIVE: "test_storage",
+                ArtifactStorageImportStep.DOWNLOAD: StorageTarget.from_storage_name("test_storage"),
+                ArtifactStorageImportStep.ARCHIVE: StorageTarget.from_storage_name("test_storage"),
             },
             step_metadata={},
         )
@@ -779,13 +765,13 @@ class TestHuggingFaceDownloadStep:
             await step._download_file_to_storage(
                 file_info=mock_file_info,
                 model=context.model,
-                storage_name="test_storage",
+                storage_target=StorageTarget.from_storage_name("test_storage"),
                 storage_pool=context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
                 redis_client=mock_redis_client,
+                storage_key="test_storage_key",
             )
 
-    @pytest.mark.asyncio
     async def test_upload_model_file_exception(
         self,
         hf_download_step: HuggingFaceDownloadStep,
@@ -809,10 +795,11 @@ class TestHuggingFaceDownloadStep:
                 await hf_download_step._download_file_to_storage(
                     file_info=mock_file_info,
                     model=mock_import_step_context.model,
-                    storage_name="test_storage",
+                    storage_target=StorageTarget.from_storage_name("test_storage"),
                     storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
                     redis_client=mock_redis_client,
+                    storage_key="test_storage_key",
                 )
 
 
@@ -840,7 +827,7 @@ class TestReservoirDownloadStep:
         """Test S3 client creation with storage not found."""
 
         # Configure mock to raise KeyError for unknown storage
-        def mock_get_storage(name: str):
+        def mock_get_storage(name: str) -> object:
             if name == "test_storage":
                 return mock_storage_pool.get_storage("test_storage")
             raise KeyError(name)
@@ -868,7 +855,6 @@ class TestReservoirDownloadStep:
         with pytest.raises(ObjectStorageBucketNotFoundError):
             reservoir_download_step._get_s3_client(mock_storage_pool, "test_storage")
 
-    @pytest.mark.asyncio
     async def test_list_all_keys_and_sizes_success(
         self, reservoir_download_step: ReservoirDownloadStep
     ) -> None:
@@ -882,8 +868,6 @@ class TestReservoirDownloadStep:
             )
 
             # Create a mock S3Client for testing
-            from unittest.mock import Mock
-
             mock_s3_client = Mock()
 
             keys, size_map, total = await reservoir_download_step._list_all_keys_and_sizes(
@@ -898,7 +882,6 @@ class TestReservoirDownloadStep:
             assert size_map["config.json"] == 500
             assert total == 1500
 
-    @pytest.mark.asyncio
     async def test_list_all_keys_and_sizes_empty_bucket(
         self, reservoir_download_step: ReservoirDownloadStep
     ) -> None:
@@ -908,8 +891,6 @@ class TestReservoirDownloadStep:
             mock_list_keys.return_value = ([], {}, 0)
 
             # Create a mock S3Client for testing
-            from unittest.mock import Mock
-
             mock_s3_client = Mock()
 
             keys, size_map, total = await reservoir_download_step._list_all_keys_and_sizes(
@@ -920,7 +901,6 @@ class TestReservoirDownloadStep:
             assert len(size_map) == 0
             assert total == 0
 
-    @pytest.mark.asyncio
     async def test_stream_bucket_to_bucket_success(
         self,
         reservoir_download_step: ReservoirDownloadStep,
@@ -954,7 +934,7 @@ class TestReservoirDownloadStep:
             mock_s3_client_class.return_value = mock_src_client
 
             # Mock download stream
-            async def mock_download_stream(key, chunk_size):
+            async def mock_download_stream(key: str, chunk_size: int) -> AsyncIterator[bytes]:
                 yield b"chunk1"
                 yield b"chunk2"
 
@@ -983,7 +963,6 @@ class TestReservoirDownloadStep:
             mock_list_keys.assert_called_once()
             assert mock_dst_client.upload_stream.call_count == 2
 
-    @pytest.mark.asyncio
     async def test_stream_bucket_to_bucket_no_objects(
         self,
         reservoir_download_step: ReservoirDownloadStep,
@@ -1007,7 +986,6 @@ class TestReservoirDownloadStep:
                     key_prefix="models/",
                 )
 
-    @pytest.mark.asyncio
     async def test_import_model_success(
         self,
         reservoir_download_step: ReservoirDownloadStep,
@@ -1037,7 +1015,6 @@ class TestReservoirDownloadStep:
             assert len(result.downloaded_files) == 2
             mock_stream.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_import_model_no_registry_config(
         self,
         mock_storage_pool: MagicMock,
@@ -1065,7 +1042,6 @@ class TestReservoirDownloadStep:
         with pytest.raises(ReservoirStorageConfigInvalidError):
             await step.execute(mock_import_step_context, None)
 
-    @pytest.mark.asyncio
     async def test_import_models_batch_success(
         self,
         reservoir_download_step: ReservoirDownloadStep,
@@ -1089,7 +1065,6 @@ class TestReservoirDownloadStep:
             assert len(result.downloaded_files) == 1
             mock_stream.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_import_models_batch_empty_models(
         self,
         reservoir_download_step: ReservoirDownloadStep,

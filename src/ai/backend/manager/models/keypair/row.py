@@ -6,7 +6,7 @@ import secrets
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, Self, TypedDict
+from typing import TYPE_CHECKING, Self, TypedDict
 
 import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature
@@ -21,7 +21,7 @@ from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import AccessKey, SecretKey
-from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
+from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData, KeyPairSecrets
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
     GUID,
@@ -49,13 +49,13 @@ MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 
 # Defined for avoiding circular import
-def _get_session_row_join_condition():
+def _get_session_row_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.session import SessionRow
 
     return KeyPairRow.access_key == foreign(SessionRow.access_key)
 
 
-class KeyPairRow(Base):
+class KeyPairRow(Base):  # type: ignore[misc]
     __tablename__ = "keypairs"
 
     user_id: Mapped[str | None] = mapped_column("user_id", sa.String(length=256), index=True)
@@ -142,7 +142,7 @@ class KeyPairRow(Base):
     def from_creator(
         cls,
         creator: KeyPairCreator,
-        generated_data: GeneratedKeyPairData,
+        generated_data: KeyPairSecrets,
         user_id: uuid.UUID,
         email: str,
     ) -> Self:
@@ -177,6 +177,8 @@ class KeyPairRow(Base):
             ssh_private_key=self.ssh_private_key,
             dotfiles=self.dotfiles if self.dotfiles else b"\x90",
             bootstrap_script=self.bootstrap_script,
+            last_used=self.last_used,
+            num_queries=self.num_queries if self.num_queries is not None else 0,
         )
 
 
@@ -244,10 +246,10 @@ def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, o
     }
 
 
-def generate_keypair_data() -> GeneratedKeyPairData:
+def generate_keypair_data() -> KeyPairSecrets:
     ak, sk = generate_keypair()
     pubkey, privkey = generate_ssh_keypair()
-    return GeneratedKeyPairData(
+    return KeyPairSecrets(
         access_key=ak,
         secret_key=sk,
         ssh_public_key=pubkey,
@@ -282,9 +284,7 @@ def _check_ed25519_keypair(
     public_key.verify(signature, test_message)
 
 
-def validate_ssh_keypair(
-    private_key_value: str, public_key_value: str
-) -> tuple[bool, Optional[str]]:
+def validate_ssh_keypair(private_key_value: str, public_key_value: str) -> tuple[bool, str | None]:
     """
     Validate RSA keypair for SSH/SFTP connection.
     Args:

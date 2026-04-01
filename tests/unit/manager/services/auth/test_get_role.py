@@ -11,16 +11,21 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 @pytest.fixture
-def mock_auth_repository():
+def mock_auth_repository() -> AsyncMock:
     return AsyncMock(spec=AuthRepository)
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
+def auth_service(
+    mock_hook_plugin_ctx: AsyncMock,
+    mock_auth_repository: AsyncMock,
+    mock_config_provider: AsyncMock,
+) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
+        valkey_session_client=AsyncMock(),
     )
 
 
@@ -32,7 +37,6 @@ def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provide
         ("domain admin", False, True, "user", "admin"),
     ],
 )
-@pytest.mark.asyncio
 async def test_get_role_simple_cases(
     auth_service: AuthService,
     description: str,
@@ -40,7 +44,7 @@ async def test_get_role_simple_cases(
     is_admin: bool,
     expected_global: str,
     expected_domain: str,
-):
+) -> None:
     """Test role retrieval for simple cases without group logic"""
     action = GetRoleAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
@@ -56,11 +60,10 @@ async def test_get_role_simple_cases(
     assert result.group_role is None
 
 
-@pytest.mark.asyncio
 async def test_get_role_with_valid_group_membership(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test role retrieval for user with valid group membership"""
     group_id = UUID("87654321-4321-8765-4321-876543218765")
     user_id = UUID("12345678-1234-5678-1234-567812345678")
@@ -85,11 +88,10 @@ async def test_get_role_with_valid_group_membership(
     assert result.group_role == "user"  # TODO: per-group role is not yet implemented
 
 
-@pytest.mark.asyncio
 async def test_get_role_without_group_membership_raises_error(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test role retrieval fails for user without group membership"""
     invalid_group_id = UUID("99999999-9999-9999-9999-999999999999")
     user_id = UUID("12345678-1234-5678-1234-567812345678")
@@ -110,11 +112,10 @@ async def test_get_role_without_group_membership_raises_error(
         await auth_service.get_role(action)
 
 
-@pytest.mark.asyncio
 async def test_get_role_verifies_correct_parameters(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
-):
+) -> None:
     """Test that get_role passes correct parameters to repository"""
     user_id = UUID("abcdef12-3456-7890-abcd-ef1234567890")
     group_id = UUID("fedcba98-7654-3210-fedc-ba9876543210")

@@ -19,7 +19,7 @@ class InternalDataRule(SessionPreparerRule):
     def prepare(
         self,
         spec: SessionCreationSpec,
-        context: SessionCreationContext,
+        _context: SessionCreationContext,
         preparation_data: dict[str, Any],
     ) -> None:
         """Prepare internal data."""

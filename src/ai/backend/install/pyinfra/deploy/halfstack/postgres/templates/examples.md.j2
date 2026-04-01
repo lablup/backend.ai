@@ -1,0 +1,56 @@
+## Create another role in DB
+
+Let's say we create a role named `bai` (db `backend`) with password `bai-passwd`.
+```sql
+echo "CREATE ROLE bai WITH LOGIN PASSWORD 'bai-passwd';"
+echo "CREATE DATABASE backend;"
+echo "GRANT ALL PRIVILEGES ON DATABASE backend TO bai;"
+echo "\c backend"
+echo "GRANT ALL ON SCHEMA public TO bai;"
+```
+
+Let's say we create a role named `wsproxy` with password `wsproxy-passwd`.
+```sql
+echo "CREATE ROLE wsproxy WITH LOGIN PASSWORD 'wsproxy-passwd';"
+echo "CREATE DATABASE wsproxy;"
+echo "GRANT ALL PRIVILEGES ON DATABASE wsproxy TO wsproxy;"
+echo "\c wsproxy"
+echo "GRANT ALL ON SCHEMA public TO wsproxy;"
+echo "GRANT CREATE ON DATABASE wsproxy TO wsproxy;"
+```
+
+
+## Create a read-only role in DB
+
+Let's say both the role and the password is `ronly`, and allow the role to
+access the `backend` database.
+```sql
+CREATE USER ronly WITH LOGIN PASSWORD 'ronly';
+GRANT CONNECT ON DATABASE backend TO ronly;
+\c backend;
+GRANT USAGE ON SCHEMA public TO ronly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public to ronly;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO ronly;
+```
+
+
+## Backup and restore a database
+
+Note that the dump should be run on the primary DB.
+
+To dump and restore all databases:
+```shell
+# dump
+docker exec -t <container-id> pg_dumpall -U postgres > db_all.sql
+# restore
+docker exec -i <container-id> psql -U postgres < db_all.sql
+```
+
+If you want to dump a specific database, let's say `backend`, you can do it like:
+```shell
+# dump
+docker exec -t <container-id> pg_dump -U postgres -d backend -F c -v > db_backend.dump
+# restore (database `backend` should be created before restoring the dump file)
+docker exec -i <container-id> psql -U postgres -c "CREATE DATABASE backend;"`
+cat db_backend.dump | docker exec -i <container-id> pg_restore -U postgres -d backend
+```

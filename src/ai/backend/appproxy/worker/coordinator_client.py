@@ -1,4 +1,5 @@
 import logging
+from typing import Any, cast
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
@@ -26,7 +27,7 @@ from .types import (
     RootContext,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _get_coordinator_session(root_ctx: RootContext) -> aiohttp.ClientSession:
@@ -57,7 +58,7 @@ async def get_circuit_info(root_ctx: RootContext, request_id: str, circuit_id: s
             return Circuit.from_serialized_circuit(SerializableCircuit(**body))
     except aiohttp.ClientResponseError as e:
         if e.code == 404:
-            raise ObjectNotFound(object_name="worker:circuit")
+            raise ObjectNotFound(object_name="worker:circuit") from e
         log.exception("error while communicating with coordinator:")
         raise InternalServerError from e
 
@@ -74,7 +75,7 @@ async def list_worker_circuits(root_ctx: RootContext, request_id: str) -> list[C
             ]
     except aiohttp.ClientResponseError as e:
         if e.code == 404:
-            raise ObjectNotFound(object_name="worker:worker")
+            raise ObjectNotFound(object_name="worker:worker") from e
         log.exception("error while communicating with coordinator:")
         raise InternalServerError from e
 
@@ -87,7 +88,7 @@ async def destroy_circuit(root_ctx: RootContext, request_id: str, circuit_id: st
             resp.raise_for_status()
     except aiohttp.ClientResponseError as e:
         if e.code == 404:
-            raise ObjectNotFound(object_name="worker:circuit")
+            raise ObjectNotFound(object_name="worker:circuit") from e
         log.exception("error while communicating with coordinator:")
         raise InternalServerError from e
 
@@ -104,7 +105,7 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
         frontend_mode = local_config.proxy_worker.traefik.frontend_mode
     else:
         frontend_mode = local_config.proxy_worker.frontend_mode
-    body: dict = {
+    body: dict[str, Any] = {
         "authority": local_config.proxy_worker.authority,
         "frontend_mode": frontend_mode,
         "protocol": local_config.proxy_worker.protocol,
@@ -171,7 +172,7 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
                 "Joined to coordinator {}",
                 root_ctx.local_config.proxy_worker.coordinator_endpoint,
             )
-            return body["slots"]
+            return cast(list[Slot], body["slots"])
     except aiohttp.ClientResponseError as e:
         log.exception("")
         if e.status == 400:

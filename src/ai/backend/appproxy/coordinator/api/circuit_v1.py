@@ -20,7 +20,7 @@ from ai.backend.logging import BraceStyleAdapter
 from .types import StubResponseModel
 from .utils import auth_required
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @auth_required("worker")
@@ -48,11 +48,11 @@ async def clear_circuit(request: web.Request) -> PydanticResponse[StubResponseMo
         return PydanticResponse(StubResponseModel(success=True))
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

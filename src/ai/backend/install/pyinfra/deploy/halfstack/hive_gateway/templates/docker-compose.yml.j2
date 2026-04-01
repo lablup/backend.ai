@@ -1,0 +1,84 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  extra_hosts:
+    # Map manager hostname alias to actual IP
+    - "{{ manager_hostname }}:{{ manager_ip }}"
+{%- if is_ha_mode %}
+{%- for node in cluster_nodes %}
+    - "{{ node.hostname }}:{{ node.ip }}"
+{%- endfor %}
+{%- endif %}
+  restart: unless-stopped
+
+{%- set svc_name = "apollo-router" if router_type == "apollo" else "hive-gateway" %}
+
+services:
+  # Main service: GraphQL Federation Router
+{%- if router_type == "apollo" %}
+  # Apollo Router (Backend.AI 25.15.x)
+  {{ svc_name }}:
+    <<: *base
+    image: {{ apollo_container_image }}
+    container_name: bai-{{ svc_name }}
+    ports:
+      - "{{ gateway_port }}:4000"
+    command: ["--config", "/gateway/router.yaml", "--supergraph", "/gateway/supergraph.graphql"]
+    volumes:
+      - ./supergraph.graphql:/gateway/supergraph.graphql:ro
+      - ./router.yaml:/gateway/router.yaml:ro
+    healthcheck:
+      # Apollo Router image has no curl/wget; check health port (8088=0x1F98) via /proc/net/tcp
+      test: ["CMD-SHELL", "grep -q ':1F98' /proc/net/tcp || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+{%- else %}
+  # Hive Gateway (Backend.AI post-25.15)
+  {{ svc_name }}:
+    <<: *base
+    image: {{ container_image }}
+    container_name: bai-{{ svc_name }}
+    ports:
+      - "{{ gateway_port }}:4000"
+    command: ["supergraph"]
+    environment:
+      - HOST=0.0.0.0
+      - PORT=4000
+    volumes:
+      - ./supergraph.graphql:/gateway/supergraph.graphql:ro
+      - ./gateway.config.ts:/gateway/gateway.config.ts:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:4000/healthcheck || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+{%- endif %}
+
+{%- if is_ha_mode %}
+
+  # HAProxy load balancer for HA mode
+  {{ svc_name }}-lb:
+    <<: *base
+    image: {{ haproxy_container_image }}
+    container_name: bai-{{ svc_name }}-lb
+    ports:
+      - "{{ haproxy_port }}:4000"   # GraphQL endpoint
+      - "7902:7999"                  # HAProxy stats
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:7999/stats || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      {{ svc_name }}:
+        condition: service_healthy
+{%- endif %}

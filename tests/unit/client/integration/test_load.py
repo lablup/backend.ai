@@ -9,6 +9,7 @@ import multiprocessing
 import secrets
 import time
 from statistics import mean, median, stdev
+from typing import Any
 
 import pytest
 
@@ -31,13 +32,13 @@ println("wow")
 """
 
 
-def print_stat(msg, times_taken):
+def print_stat(msg: str, times_taken: list[float]) -> None:
     print(
         f"{msg}: mean {mean(times_taken):.2f} secs, median {median(times_taken):.2f} secs, stdev {stdev(times_taken):.2f}"
     )
 
 
-def run_create_kernel(_idx):
+def run_create_kernel(_idx: int) -> tuple[float, Any]:
     begin = time.monotonic()
     try:
         k = ComputeSession.get_or_create("python3")
@@ -51,9 +52,9 @@ def run_create_kernel(_idx):
     return t, ret
 
 
-def create_kernels(concurrency, parallel=False):
-    kernel_ids = []
-    times_taken = []
+def create_kernels(concurrency: int, parallel: bool = False) -> list[Any]:
+    kernel_ids: list[Any] = []
+    times_taken: list[float] = []
 
     if parallel:
         pool = multiprocessing.Pool(concurrency)
@@ -71,10 +72,10 @@ def create_kernels(concurrency, parallel=False):
     return kernel_ids
 
 
-def run_execute_code(kid):
+def run_execute_code(kid: Any) -> float | None:
     if kid is not None:
         begin = time.monotonic()
-        console = []
+        console: list[Any] = []
         run_id = secrets.token_hex(8)
         while True:
             result = ComputeSession(kid).execute(run_id, sample_code)
@@ -88,8 +89,8 @@ def run_execute_code(kid):
     return None
 
 
-def execute_codes(kernel_ids, parallel=False):
-    times_taken = []
+def execute_codes(kernel_ids: list[Any], parallel: bool = False) -> None:
+    times_taken: list[float] = []
 
     if parallel:
         pool = multiprocessing.Pool(len(kernel_ids))
@@ -106,18 +107,18 @@ def execute_codes(kernel_ids, parallel=False):
     print_stat("execute_code", times_taken)
 
 
-def run_restart_kernel(kid):
+def run_restart_kernel(kid: Any) -> float | None:
     # 2nd params is currently ignored.
     if kid is not None:
         begin = time.monotonic()
-        ComputeSession(kid).restart()
+        ComputeSession(kid).restart()  # type: ignore[unused-coroutine]
         end = time.monotonic()
         return end - begin
     return None
 
 
-def restart_kernels(kernel_ids, parallel=False):
-    times_taken = []
+def restart_kernels(kernel_ids: list[Any], parallel: bool = False) -> None:
+    times_taken: list[float] = []
 
     if parallel:
         pool = multiprocessing.Pool(len(kernel_ids))
@@ -134,17 +135,17 @@ def restart_kernels(kernel_ids, parallel=False):
     print_stat("restart_kernel", times_taken)
 
 
-def run_destroy_kernel(kid):
+def run_destroy_kernel(kid: Any) -> float | None:
     if kid is not None:
         begin = time.monotonic()
-        ComputeSession(kid).destroy()
+        ComputeSession(kid).destroy()  # type: ignore[unused-coroutine]
         end = time.monotonic()
         return end - begin
     return None
 
 
-def destroy_kernels(kernel_ids, parallel=False):
-    times_taken = []
+def destroy_kernels(kernel_ids: list[Any], parallel: bool = False) -> None:
+    times_taken: list[float] = []
 
     if parallel:
         pool = multiprocessing.Pool(len(kernel_ids))
@@ -170,7 +171,9 @@ def destroy_kernels(kernel_ids, parallel=False):
         (5, True, True),
     ],
 )
-def test_high_load_requests(capsys, defconfig, concurrency, parallel, restart):
+def test_high_load_requests(
+    capsys: Any, defconfig: Any, concurrency: int, parallel: bool, restart: bool
+) -> None:
     """
     Tests creation and use of multiple concurrent kernels in various ways.
 

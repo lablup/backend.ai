@@ -152,11 +152,11 @@ async def get_circuit_statistics(request: web.Request) -> PydanticResponse[Circu
     )
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

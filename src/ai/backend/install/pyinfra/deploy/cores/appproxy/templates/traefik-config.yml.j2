@@ -1,0 +1,33 @@
+entryPoints:
+{%- for port in range(port_start, port_end + 1) %}
+  portproxy_{{ port }}:
+    address: 0.0.0.0:{{ port }}
+{%- endfor %}
+
+  traefik:
+    address: 0.0.0.0:{{ api_port }}
+
+api:
+  insecure: true
+
+metrics:
+  prometheus:
+    entryPoint: traefik
+
+providers:
+  etcd:
+    rootKey: "traefik/worker_{{ authority }}"
+    endpoints:
+    - {{ etcd_host }}:{{ etcd_port }}
+  # file:
+  #   filename: "{{ traefik_dir }}/tls.yml"
+
+experimental:
+  localPlugins:
+    appproxy-traefik-plugin:
+      moduleName: backend.ai/appproxy-traefik-plugin
+      settings:
+        mounts:
+        - "{{ home_dir }}/appproxy/traefik:/appproxy-traefik"
+    appproxy-traefik-plugin-go:
+      moduleName: backend.ai/appproxy-traefik-plugin-go

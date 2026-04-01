@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional, override
+from typing import Any, override
 
+import sqlalchemy as sa
+from sqlalchemy import cast, func
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import array as pg_array
+
+from ai.backend.manager.data.scaling_group.types import PreemptionConfig as DataPreemptionConfig
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -118,6 +126,9 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
     scheduler_opts: OptionalState[ScalingGroupOpts] = field(
         default_factory=OptionalState[ScalingGroupOpts].nop
     )
+    preemption_config: OptionalState[DataPreemptionConfig] = field(
+        default_factory=OptionalState[DataPreemptionConfig].nop
+    )
 
     @property
     @override
@@ -130,6 +141,40 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
         self.scheduler.update_dict(to_update, "scheduler")
         if (scheduler_opts := self.scheduler_opts.optional_value()) is not None:
             to_update["scheduler_opts"] = scheduler_opts
+        if (preemption := self.preemption_config.optional_value()) is not None:
+            preemption_dict = {
+                "preemptible_priority": preemption.preemptible_priority,
+                "order": preemption.order.value,
+                "mode": preemption.mode.value,
+            }
+            to_update["scheduler_opts"] = func.jsonb_set(
+                sa.literal_column("scheduler_opts"),
+                pg_array(["preemption"]),
+                cast(json.dumps(preemption_dict), JSONB),
+            )
+        return to_update
+
+
+@dataclass
+class ResourceGroupFairShareUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
+    """UpdaterSpec for scaling group fair share configuration updates.
+
+    Maps to FairShareScalingGroupSpec in types.
+    """
+
+    fair_share_spec: TriState[FairShareScalingGroupSpec] = field(
+        default_factory=TriState[FairShareScalingGroupSpec].nop
+    )
+
+    @property
+    @override
+    def row_class(self) -> type[ScalingGroupRow]:
+        return ScalingGroupRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.fair_share_spec.update_dict(to_update, "fair_share_spec")
         return to_update
 
 
@@ -137,15 +182,16 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
 class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
     """Composite UpdaterSpec for scaling group updates.
 
-    Combines status, metadata, network, driver, and scheduler updates.
+    Combines status, metadata, network, driver, scheduler, and fair_share updates.
     Maps to ScalingGroupV2GQL structure in GraphQL types.
     """
 
-    status: Optional[ScalingGroupStatusUpdaterSpec] = None
-    metadata: Optional[ScalingGroupMetadataUpdaterSpec] = None
-    network: Optional[ScalingGroupNetworkConfigUpdaterSpec] = None
-    driver: Optional[ScalingGroupDriverConfigUpdaterSpec] = None
-    scheduler: Optional[ScalingGroupSchedulerConfigUpdaterSpec] = None
+    status: ScalingGroupStatusUpdaterSpec | None = None
+    metadata: ScalingGroupMetadataUpdaterSpec | None = None
+    network: ScalingGroupNetworkConfigUpdaterSpec | None = None
+    driver: ScalingGroupDriverConfigUpdaterSpec | None = None
+    scheduler: ScalingGroupSchedulerConfigUpdaterSpec | None = None
+    fair_share: ResourceGroupFairShareUpdaterSpec | None = None
 
     @property
     @override
@@ -165,4 +211,6 @@ class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
             to_update.update(self.driver.build_values())
         if self.scheduler:
             to_update.update(self.scheduler.build_values())
+        if self.fair_share:
+            to_update.update(self.fair_share.build_values())
         return to_update

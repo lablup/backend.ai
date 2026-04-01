@@ -1,9 +1,20 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    RouteStatus,
+)
+from ai.backend.manager.data.deployment.types import (
+    DeploymentWithHistory as DeploymentWithHistory,
+)
+
+if TYPE_CHECKING:
+    from ai.backend.manager.data.deployment.types import DeploymentInfoWithRoutes, RouteInfo
 
 
 class DeploymentLifecycleType(StrEnum):
@@ -11,23 +22,30 @@ class DeploymentLifecycleType(StrEnum):
     CHECK_REPLICA = "check_replica"
     SCALING = "scaling"
     RECONCILE = "reconcile"
+    DEPLOYING = "deploying"
     DESTROYING = "destroying"
 
 
 @dataclass
 class DeploymentExecutionError:
-    deployment_info: DeploymentInfo
+    deployment_info: DeploymentWithHistory
     reason: str
     error_detail: str
+    error_code: str | None = None
 
 
 @dataclass
 class DeploymentExecutionResult:
-    """Result of a deployment execution operation."""
+    """Result of a deployment execution operation.
 
-    successes: list[DeploymentInfo] = field(default_factory=list)
-    errors: list[DeploymentExecutionError] = field(default_factory=list)
-    skipped: list[DeploymentInfo] = field(default_factory=list)
+    Follows the session coordinator pattern: handlers report what happened
+    (successes, failures, skipped), and the coordinator applies policy
+    (retry count, timeout) to classify failures into need_retry/expired/give_up.
+    """
+
+    successes: list[DeploymentWithHistory] = field(default_factory=list)
+    failures: list[DeploymentExecutionError] = field(default_factory=list)
+    skipped: list[DeploymentWithHistory] = field(default_factory=list)
 
 
 @dataclass
@@ -35,10 +53,10 @@ class AutoScalingDecision:
     """Decision made by autoscaling evaluation."""
 
     should_scale: bool
-    new_replica_count: Optional[int] = None
-    triggered_rule_id: Optional[UUID] = None
-    scaling_direction: Optional[str] = None  # "up" or "down"
-    reason: Optional[str] = None
+    new_replica_count: int | None = None
+    triggered_rule_id: UUID | None = None
+    scaling_direction: str | None = None  # "up" or "down"
+    reason: str | None = None
 
 
 @dataclass
@@ -58,14 +76,16 @@ class RouteCreationSpec:
 
     # Extension methods for DeploymentInfo compatibility
     @staticmethod
-    def get_target_replicas_from_deployment(deployment_info) -> int:
+    def get_target_replicas_from_deployment(deployment_info: DeploymentInfo) -> int:
         """Get the target number of replicas for a DeploymentInfo."""
         # DeploymentInfo has replica_spec.replica_count
         return deployment_info.replica_spec.replica_count
 
     # Extension methods for DeploymentInfoWithRoutes compatibility
     @staticmethod
-    def get_healthy_route_count_from_deployment(deployment_with_routes) -> int:
+    def get_healthy_route_count_from_deployment(
+        deployment_with_routes: DeploymentInfoWithRoutes,
+    ) -> int:
         """Get the count of healthy routes."""
         return sum(
             1
@@ -74,7 +94,9 @@ class RouteCreationSpec:
         )
 
     @staticmethod
-    def get_routes_to_remove_from_deployment(deployment_with_routes, target_count: int):
+    def get_routes_to_remove_from_deployment(
+        deployment_with_routes: DeploymentInfoWithRoutes, target_count: int
+    ) -> list[RouteInfo]:
         """Get routes that should be removed to reach target count."""
         healthy_routes = [
             r

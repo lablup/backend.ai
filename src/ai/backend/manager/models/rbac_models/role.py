@@ -30,29 +30,22 @@ from ai.backend.manager.models.base import (
 
 if TYPE_CHECKING:
     from .permission.object_permission import ObjectPermissionRow
-    from .permission.permission_group import PermissionGroupRow
     from .user_role import UserRoleRow
 
 
-def _get_mapped_user_role_rows_join_condition():
+def _get_mapped_user_role_rows_join_condition() -> sa.ColumnElement[bool]:
     from .user_role import UserRoleRow
 
     return RoleRow.id == foreign(UserRoleRow.role_id)
 
 
-def _get_object_permission_rows_join_condition():
+def _get_object_permission_rows_join_condition() -> sa.ColumnElement[bool]:
     from .permission.object_permission import ObjectPermissionRow
 
     return RoleRow.id == foreign(ObjectPermissionRow.role_id)
 
 
-def _get_permission_group_rows_join_condition():
-    from .permission.permission_group import PermissionGroupRow
-
-    return RoleRow.id == foreign(PermissionGroupRow.role_id)
-
-
-class RoleRow(Base):
+class RoleRow(Base):  # type: ignore[misc]
     __tablename__ = "roles"
     __table_args__ = (sa.Index("ix_id_status", "id", "status"),)
 
@@ -78,8 +71,12 @@ class RoleRow(Base):
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at", sa.DateTime(timezone=True), nullable=True
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        onupdate=sa.func.now(),
+        nullable=False,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(
         "deleted_at", sa.DateTime(timezone=True), nullable=True
@@ -94,11 +91,7 @@ class RoleRow(Base):
         "ObjectPermissionRow",
         back_populates="role_row",
         primaryjoin=_get_object_permission_rows_join_condition,
-    )
-    permission_group_rows: Mapped[list[PermissionGroupRow]] = relationship(
-        "PermissionGroupRow",
-        back_populates="role_row",
-        primaryjoin=_get_permission_group_rows_join_condition,
+        viewonly=True,
     )
 
     def to_data(self) -> RoleData:
@@ -108,7 +101,7 @@ class RoleRow(Base):
             source=self.source,
             status=self.status,
             created_at=self.created_at,
-            updated_at=self.updated_at or self.created_at,
+            updated_at=self.updated_at,
             deleted_at=self.deleted_at,
             description=self.description,
         )
@@ -121,9 +114,8 @@ class RoleRow(Base):
             source=self.source,
             status=self.status,
             created_at=self.created_at,
-            updated_at=self.updated_at or self.created_at,
+            updated_at=self.updated_at,
             deleted_at=self.deleted_at,
             description=self.description,
-            permission_groups=[pg_row.to_extended_data() for pg_row in self.permission_group_rows],
             object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
         )

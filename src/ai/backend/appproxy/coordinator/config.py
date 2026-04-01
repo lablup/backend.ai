@@ -684,7 +684,7 @@ class ServerConfig(BaseSchema):
     ]
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=EtcdConfig),  # type: ignore[arg-type]
+        Field(default_factory=EtcdConfig),
         BackendAIConfigMeta(
             description=(
                 "etcd connection configuration for distributed coordination and configuration management. "
@@ -696,7 +696,7 @@ class ServerConfig(BaseSchema):
     ]
     pyroscope: Annotated[
         PyroscopeConfig,
-        Field(default_factory=PyroscopeConfig),  # type: ignore[arg-type]
+        Field(default_factory=PyroscopeConfig),
         BackendAIConfigMeta(
             description=(
                 "Pyroscope continuous profiling configuration for production performance analysis. "
@@ -742,6 +742,6 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
             file=sys.stderr,
         )
         print(pformat(e), file=sys.stderr)
-        raise click.Abort()
+        raise click.Abort() from e
     else:
         return server_config

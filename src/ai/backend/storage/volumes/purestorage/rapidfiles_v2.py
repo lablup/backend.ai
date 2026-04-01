@@ -44,7 +44,7 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
                 os.fsencode(dst_path),
             ])
         except CalledProcessError as e:
-            raise PureStorageCommandFailedError(f'"pcopy" command failed: {e.stderr}')
+            raise PureStorageCommandFailedError(f'"pcopy" command failed: {e.stderr}') from e
 
     def scan_tree(
         self,
@@ -117,6 +117,7 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
             raise SubprocessStdoutNotAvailableError("pdu process stdout is not available")
         try:
             # TODO: check slowdowns when there are millions of files
+            line: bytes = b""
             while True:
                 try:
                     line = await proc.stdout.readuntil(b"\0")

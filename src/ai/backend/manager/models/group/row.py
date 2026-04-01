@@ -8,17 +8,15 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
-    TypeAlias,
     TypedDict,
-    cast,
     overload,
     override,
 )
 
 import sqlalchemy as sa
 import trafaret as t
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
@@ -30,7 +28,6 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common import msgpack
@@ -85,19 +82,19 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _get_networks_join_condition():
+def _get_networks_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.network import NetworkRow
 
     return GroupRow.id == foreign(NetworkRow.project)
 
 
-def _get_vfolder_rows_join_condition():
+def _get_vfolder_rows_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.vfolder import VFolderRow
 
     return GroupRow.id == foreign(VFolderRow.group)
 
 
-def _get_association_container_registries_groups_join_condition():
+def _get_association_container_registries_groups_join_condition() -> sa.ColumnElement[bool]:
     return GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
 
 
@@ -124,7 +121,7 @@ container_registry_iv = t.Dict({}) | t.Dict({
 })
 
 
-class AssocGroupUserRow(Base):
+class AssocGroupUserRow(Base):  # type: ignore[misc]
     __tablename__ = "association_groups_users"
     __table_args__ = (
         sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
@@ -155,7 +152,7 @@ class AssocGroupUserRow(Base):
 association_groups_users = AssocGroupUserRow.__table__
 
 
-class GroupRow(Base):
+class GroupRow(Base):  # type: ignore[misc]
     __tablename__ = "groups"
     __table_args__ = (
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
@@ -189,13 +186,13 @@ class GroupRow(Base):
     )
     # TODO: separate resource-related fields with new domain resource policy table when needed.
     total_resource_slots: Mapped[ResourceSlot] = mapped_column(
-        "total_resource_slots", ResourceSlotColumn(), default=dict, nullable=False
+        "total_resource_slots", ResourceSlotColumn(), default=ResourceSlot, nullable=False
     )
     allowed_vfolder_hosts: Mapped[VFolderHostPermissionMap] = mapped_column(
         "allowed_vfolder_hosts",
         VFolderHostPermissionColumn(),
         nullable=False,
-        default=dict,
+        default=VFolderHostPermissionMap,
     )
     # dotfiles column, \x90 means empty list in msgpack
     dotfiles: Mapped[bytes] = mapped_column(
@@ -213,7 +210,7 @@ class GroupRow(Base):
         nullable=False,
         default=ProjectType.GENERAL,
     )
-    container_registry: Mapped[dict | None] = mapped_column(
+    container_registry: Mapped[dict[str, Any] | None] = mapped_column(
         "container_registry",
         StructuredJSONColumn(container_registry_iv),
         nullable=True,
@@ -358,8 +355,8 @@ groups = GroupRow.__table__
 
 def by_id(project_id: uuid.UUID) -> QueryCondition:
     def _by_id(
-        query_stmt: sa.sql.Select,
-    ) -> sa.sql.Select:
+        query_stmt: sa.sql.Select[Any],
+    ) -> sa.sql.Select[Any]:
         return query_stmt.where(GroupRow.id == project_id)
 
     return _by_id
@@ -369,7 +366,7 @@ def by_id(project_id: uuid.UUID) -> QueryCondition:
 class ProjectModel(RBACModel[ProjectPermission]):
     id: uuid.UUID
     name: str
-    description: Optional[str]
+    description: str | None
     is_active: bool | None
     created_at: datetime | None
     modified_at: datetime | None
@@ -416,7 +413,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def container_registry(self) -> dict | None:
+    def container_registry(self) -> dict[str, Any] | None:
         return self._container_registry
 
     @classmethod
@@ -456,16 +453,23 @@ async def resolve_group_name_or_id(
     db_conn: SAConnection,
     domain_name: str,
     value: str | uuid.UUID,
-) -> Optional[uuid.UUID]:
+) -> uuid.UUID | None:
     match value:
         case uuid.UUID():
             cond = groups.c.id == value
         case str():
-            cond = groups.c.name == value
+            # Try to parse as UUID first
+            # If successful, query by ID; otherwise treat as group name
+            try:
+                parsed_uuid = uuid.UUID(value)
+                cond = groups.c.id == parsed_uuid
+            except ValueError:
+                cond = groups.c.name == value
         case _:
             raise TypeError("unexpected type for group_name_or_id")
     query = _build_group_query(cond, domain_name)
-    return await db_conn.scalar(query)
+    result: uuid.UUID | None = await db_conn.scalar(query)
+    return result
 
 
 @overload
@@ -512,7 +516,7 @@ class GroupDotfile(TypedDict):
 
 async def query_group_dotfiles(
     db_conn: SAConnection,
-    group_id: GUID | uuid.UUID,
+    group_id: GUID[uuid.UUID] | uuid.UUID,
 ) -> tuple[list[GroupDotfile], int]:
     query = sa.select(groups.c.dotfiles).select_from(groups).where(groups.c.id == group_id)
     packed_dotfile = await db_conn.scalar(query)
@@ -524,7 +528,7 @@ async def query_group_dotfiles(
 
 async def query_group_domain(
     db_conn: SAConnection,
-    group_id: GUID | uuid.UUID,
+    group_id: GUID[uuid.UUID] | uuid.UUID,
 ) -> str | None:
     query = sa.select(groups.c.domain_name).select_from(groups).where(groups.c.id == group_id)
     return await db_conn.scalar(query)
@@ -547,7 +551,7 @@ PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
 ])
 MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([ProjectPermission.READ_ATTRIBUTE])
 
-WhereClauseType: TypeAlias = (
+type WhereClauseType = (
     sa.sql.expression.BinaryExpression[Any]
     | sa.sql.expression.BooleanClauseList
     | sa.sql.elements.ColumnElement[bool]
@@ -593,7 +597,7 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
             )
         return cond
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
@@ -601,7 +605,7 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
 
     async def calculate_final_permission(self, rbac_obj: GroupRow) -> frozenset[ProjectPermission]:
         project_row = rbac_obj
-        project_id = cast(uuid.UUID, project_row.id)
+        project_id = project_row.id
         permissions: frozenset[ProjectPermission] = frozenset()
 
         if (
@@ -672,7 +676,7 @@ class ProjectPermissionContextBuilder(
         return ProjectPermissionContext()
 
     async def build_ctx_in_container_registry_scope(
-        self, ctx: ClientContext, scope: ContainerRegistryScope
+        self, _ctx: ClientContext, scope: ContainerRegistryScope
     ) -> ProjectPermissionContext:
         permissions = MEMBER_PERMISSIONS
         return ProjectPermissionContext(
@@ -718,8 +722,8 @@ class ProjectPermissionContextBuilder(
 async def get_projects(
     target_scope: ScopeType,
     requested_permission: ProjectPermission,
-    project_id: Optional[uuid.UUID] = None,
-    project_name: Optional[str] = None,
+    project_id: uuid.UUID | None = None,
+    project_name: str | None = None,
     *,
     ctx: ClientContext,
     db_conn: SAConnection,
@@ -746,7 +750,7 @@ async def get_permission_ctx(
     ctx: ClientContext,
     requested_permission: ProjectPermission,
     target_scope: ScopeType,
-    container_registry_scope: Optional[ContainerRegistryScope] = None,
+    container_registry_scope: ContainerRegistryScope | None = None,
 ) -> ProjectPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ProjectPermissionContextBuilder(db_session)

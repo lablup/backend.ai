@@ -8,7 +8,7 @@ import asyncio
 import logging
 import os
 import urllib.parse
-from collections.abc import Mapping, MutableMapping
+from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
 from http import HTTPStatus
@@ -29,16 +29,34 @@ import zipstream
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.api_handlers import (
+    APIStreamResponse,
+    QueryParam,
+    stream_api_handler,
+)
+from ai.backend.common.dto.storage.request import (
+    ArchiveDownloadQueryParams,
+    ArchiveDownloadTokenData,
+)
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
+from ai.backend.common.typed_validators import PydanticJWTValidator
 from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage import __version__
-from ai.backend.storage.errors import InvalidAPIParameters
+from ai.backend.storage.dto.context import StorageRootCtx
+from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
+from ai.backend.storage.services.file_stream.zip import (
+    ZipArchiveStreamReader,
+)
 from ai.backend.storage.types import SENTINEL
-from ai.backend.storage.utils import CheckParamSource, check_params
+from ai.backend.storage.utils import (
+    CheckParamSource,
+    build_attachment_headers,
+    check_params,
+)
 
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
@@ -162,7 +180,7 @@ async def download(request: web.Request) -> web.StreamResponse:
             file_path.resolve().relative_to(vfpath)
             if not file_path.exists():
                 raise FileNotFoundError
-        except (ValueError, FileNotFoundError):
+        except (ValueError, FileNotFoundError) as e:
             raise web.HTTPNotFound(
                 body=dump_json_str(
                     {
@@ -171,7 +189,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                     },
                 ),
                 content_type="application/problem+json",
-            )
+            ) from e
         if not file_path.is_file():
             if params["archive"]:
                 # Download directory as an archive when archive param is set.
@@ -179,7 +197,7 @@ async def download(request: web.Request) -> web.StreamResponse:
             raise InvalidAPIParameters(extra_msg="The file is not a regular file.")
         if request.method == "HEAD":
             ifrange: datetime | None = request.if_range
-            mtime = os.stat(file_path).st_mtime
+            mtime = file_path.stat().st_mtime
             last_mdt = datetime.fromtimestamp(mtime, tz=UTC)
             resp_status = 200
             if ifrange is not None and mtime <= ifrange.timestamp():
@@ -224,17 +242,19 @@ async def download_directory_as_archive(
     Serve a directory as a zip archive on the fly.
     """
 
-    def _iter2aiter(iter):
+    def _iter2aiter(iter: Iterator[Any]) -> AsyncGenerator[Any, None]:
         """Iterable to async iterable"""
 
-        def _consume(loop, iter, q):
+        def _consume(
+            _loop: asyncio.AbstractEventLoop, iter: Iterator[Any], q: janus.SyncQueue[Any]
+        ) -> None:
             for item in iter:
                 q.put(item)
             q.put(SENTINEL)
 
-        async def _aiter():
+        async def _aiter() -> AsyncGenerator[Any, None]:
             loop = asyncio.get_running_loop()
-            q = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
+            q: janus.Queue[Any] = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
             try:
                 fut = loop.run_in_executor(None, lambda: _consume(loop, iter, q.sync_q))
                 while True:
@@ -346,6 +366,26 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             vfpath = volume.mangle_vfpath(token_data["vfid"])
             upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
 
+            # TUS protocol requires Upload-Offset validation before appending data
+            upload_offset_header = request.headers.get("Upload-Offset")
+            if upload_offset_header is None:
+                raise InvalidAPIParameters(
+                    "Missing required Upload-Offset header for TUS PATCH request"
+                )
+
+            try:
+                client_offset = int(upload_offset_header)
+            except ValueError as e:
+                raise InvalidAPIParameters(
+                    f"Invalid Upload-Offset header value: {upload_offset_header}"
+                ) from e
+
+            actual_offset = int(headers["Upload-Offset"])
+            if client_offset != actual_offset:
+                raise UploadOffsetMismatchError(
+                    f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
+                )
+
             async with AsyncFileWriter(
                 target_filename=upload_temp_path,
                 access_mode="ab",
@@ -400,7 +440,7 @@ async def tus_options(request: web.Request) -> web.Response:
 
 
 async def prepare_tus_session_headers(
-    request: web.Request,
+    _request: web.Request,
     token_data: Mapping[str, Any],
     volume: AbstractVolume,
 ) -> MutableMapping[str, str]:
@@ -432,6 +472,48 @@ async def prepare_tus_session_headers(
     return headers
 
 
+class DownloadHandler:
+    """Handler class for download operations following manager's api_handler pattern.
+
+    Future refactoring: When StreamReader class is settled and if we decide to put
+    Reader class in api_handler, we will refactor this to receive StreamReader as
+    interface, which decouples handler logic from aiohttp web.Request/Response objects
+    for better testability and separation of concerns.
+    """
+
+    def __init__(self, secret: str) -> None:
+        self._jwt_validator = PydanticJWTValidator(secret=secret)
+
+    @stream_api_handler
+    async def download_archive(
+        self,
+        query: QueryParam[ArchiveDownloadQueryParams],
+        ctx: StorageRootCtx,
+    ) -> APIStreamResponse:
+        """Stream multiple files/directories as a ZIP archive."""
+        token_data = self._jwt_validator.validate(query.parsed.token, ArchiveDownloadTokenData)
+
+        async with ctx.root_ctx.get_volume(token_data.volume) as volume:
+            vfolder_root = volume.sanitize_vfpath(token_data.virtual_folder_id)
+            sanitized: list[Path] = [
+                (vfolder_root / relpath).resolve() for relpath in token_data.files
+            ]
+            for file_path, relpath in zip(sanitized, token_data.files, strict=True):
+                if not file_path.is_relative_to(vfolder_root):
+                    raise InvalidAPIParameters(
+                        extra_msg=f"Path escapes vfolder boundary: {relpath}"
+                    )
+                if not file_path.exists():
+                    raise web.HTTPNotFound(reason=f"File not found: {relpath}")
+
+            reader = ZipArchiveStreamReader(vfolder_root)
+            reader.add_entries(sanitized)
+
+            filename = token_data.filename if token_data.filename is not None else reader.filename()
+            headers = build_attachment_headers(filename, reader.content_type())
+            return APIStreamResponse(body=reader, status=HTTPStatus.OK, headers=headers)
+
+
 async def init_client_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
@@ -440,8 +522,12 @@ async def init_client_app(ctx: RootContext) -> web.Application:
         ]
     )
     app["ctx"] = ctx
+
+    # Initialize handler instances
+    download_handler = DownloadHandler(secret=ctx.local_config.storage_proxy.secret)
+
     cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=True,
             allow_methods="*",
             expose_headers="*",
@@ -453,6 +539,8 @@ async def init_client_app(ctx: RootContext) -> web.Application:
     r.add_route("GET", check_status)
     r = cors.add(app.router.add_resource("/download"))
     r.add_route("GET", download)
+    r = cors.add(app.router.add_resource("/download-archive"))
+    r.add_route("GET", download_handler.download_archive)
     # tus handlers handle CORS by themselves
     r = app.router.add_resource("/upload")
     r.add_route("OPTIONS", tus_options)

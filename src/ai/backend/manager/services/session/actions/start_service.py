@@ -1,30 +1,31 @@
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Any, override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.actions.app_service_base import SessionAppServiceAction
 
 
 @dataclass
-class StartServiceAction(SessionAction):
+class StartServiceAction(SessionAppServiceAction):
     session_name: str
     access_key: AccessKey
     service: str
     login_session_token: Any
-    port: Optional[int]
-    arguments: Optional[str]  # json_string
-    envs: Optional[str]  # json_string
+    port: int | None
+    arguments: str | None  # json_string
+    envs: str | None  # json_string
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return None
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "start_service"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass
@@ -36,5 +37,5 @@ class StartServiceActionResult(BaseActionResult):
     wsproxy_addr: str
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.session_data.id)

@@ -20,7 +20,7 @@ class TestValkeyImageClient:
     @pytest.fixture
     async def valkey_image_client(
         self,
-        redis_container,
+        redis_container: tuple[str, HostPortPairModel],
     ) -> AsyncGenerator[ValkeyImageClient, None]:
         """Valkey client that auto-cleans installed image data after each test"""
         hostport_pair: HostPortPairModel = redis_container[1]
@@ -106,7 +106,6 @@ class TestValkeyImageClient:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_add_and_get_agent_installed_images(
         self,
         valkey_image_client: ValkeyImageClient,
@@ -128,7 +127,6 @@ class TestValkeyImageClient:
             assert result[idx].digest == expected_image.digest
             assert result[idx].architecture == expected_image.architecture
 
-    @pytest.mark.asyncio
     async def test_get_agent_installed_images_nonexistent(
         self,
         valkey_image_client: ValkeyImageClient,
@@ -140,7 +138,6 @@ class TestValkeyImageClient:
 
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_add_agent_installed_images_overwrite(
         self,
         valkey_image_client: ValkeyImageClient,

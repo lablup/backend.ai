@@ -4,8 +4,11 @@ Note: These are data containers, not CreatorSpec implementations.
 For row creation, use EndpointCreatorSpec from repositories/model_serving/creators.py
 """
 
+from __future__ import annotations
+
+import dataclasses
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING
 
 from pydantic import AnyUrl
 
@@ -20,6 +23,9 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceConfig,
 )
 
+if TYPE_CHECKING:
+    from ai.backend.manager.data.deployment.types import ModelRevisionSpec
+
 
 @dataclass
 class ModelServiceCreator:
@@ -31,9 +37,9 @@ class ModelServiceCreator:
 
     service_name: str
     replicas: int
-    image: Optional[str]
+    image: str | None
     runtime_variant: RuntimeVariant
-    architecture: Optional[str]
+    architecture: str | None
     group_name: str
     domain_name: str
     cluster_size: int
@@ -42,10 +48,24 @@ class ModelServiceCreator:
     config: ServiceConfig
     sudo_session_enabled: bool
     model_service_prepare_ctx: ModelServicePrepareCtx
-    tag: Optional[str] = None
-    startup_command: Optional[str] = None
-    bootstrap_script: Optional[str] = None
-    callback_url: Optional[AnyUrl] = None
+    tag: str | None = None
+    startup_command: str | None = None
+    bootstrap_script: str | None = None
+    callback_url: AnyUrl | None = None
+
+    def with_revision(self, revision: ModelRevisionSpec) -> ModelServiceCreator:
+        """Return a new creator with revision results applied."""
+        overrided_service_config = dataclasses.replace(
+            self.config,
+            resources=dict(revision.resource_spec.resource_slots),
+            environ=revision.execution.environ,
+        )
+        return dataclasses.replace(
+            self,
+            image=revision.image_identifier.canonical,
+            architecture=revision.image_identifier.architecture,
+            config=overrided_service_config,
+        )
 
 
 @dataclass
@@ -62,5 +82,5 @@ class EndpointAutoScalingRuleCreator:
     comparator: AutoScalingMetricComparator
     step_size: int
     cooldown_seconds: int
-    min_replicas: Optional[int] = None
-    max_replicas: Optional[int] = None
+    min_replicas: int | None = None
+    max_replicas: int | None = None

@@ -11,7 +11,7 @@ class VFolderDeleteAndRestoreSuccess(TestCode):
         try:
             await client_session.VFolder(str(vfolder_meta.name)).delete()
         except Exception as e:
-            raise AssertionError(f"Failed to delete vfolder: {e}")
+            raise AssertionError(f"Failed to delete vfolder: {e}") from e
 
         vfolder_info = await client_session.VFolder(str(vfolder_meta.name)).info()
         assert vfolder_info["status"] == "delete-pending", (
@@ -21,7 +21,7 @@ class VFolderDeleteAndRestoreSuccess(TestCode):
         try:
             await client_session.VFolder(str(vfolder_meta.name)).restore()
         except Exception as e:
-            raise AssertionError(f"Failed to restore vfolder: {e}")
+            raise AssertionError(f"Failed to restore vfolder: {e}") from e
 
         vfolder_info = await client_session.VFolder(str(vfolder_meta.name)).info()
         assert vfolder_info["status"] == "ready", "VFolder is not restored successfully"

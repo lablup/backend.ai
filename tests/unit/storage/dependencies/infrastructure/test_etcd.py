@@ -4,11 +4,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.storage.config.unified import EtcdConfig, StorageProxyUnifiedConfig
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 from ai.backend.storage.dependencies.infrastructure.etcd import EtcdProvider
-from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
 class TestEtcdProvider:
@@ -34,7 +35,6 @@ class TestEtcdProvider:
         return config
 
     @pytest.mark.integration
-    @pytest.mark.asyncio
     async def test_provide_etcd_client(
         self,
         storage_config: StorageProxyUnifiedConfig,
@@ -50,7 +50,6 @@ class TestEtcdProvider:
             assert value == "test_value"
 
     @pytest.mark.integration
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         storage_config: StorageProxyUnifiedConfig,

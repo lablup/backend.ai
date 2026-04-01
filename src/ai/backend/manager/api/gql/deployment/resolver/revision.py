@@ -2,25 +2,29 @@
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
-import strawberry
 from strawberry import ID, Info
+from strawberry.relay import PageInfo
 from strawberry.scalars import JSON
 
-from ai.backend.manager.api.gql.base import resolve_global_id
-from ai.backend.manager.api.gql.deployment.fetcher.revision import fetch_revisions
+from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchRevisionsInput
+from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
+from ai.backend.manager.api.gql.deployment.types.policy import DeploymentPolicyGQL
 from ai.backend.manager.api.gql.deployment.types.revision import (
     ActivateRevisionInputGQL,
     ActivateRevisionPayloadGQL,
     AddRevisionInput,
     AddRevisionPayload,
-    CreateRevisionInput,
-    CreateRevisionPayload,
     ModelRevision,
     ModelRevisionConnection,
+    ModelRevisionEdge,
     ModelRevisionFilter,
     ModelRevisionOrderBy,
 )
@@ -31,62 +35,71 @@ from ai.backend.manager.data.deployment.inference_runtime_config import (
     SGLangRuntimeConfig,
     VLLMRuntimeConfig,
 )
-from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
-    AddModelRevisionAction,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
-    CreateModelRevisionAction,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
-    GetRevisionByIdAction,
-)
-from ai.backend.manager.services.deployment.actions.revision_operations.activate_revision import (
-    ActivateRevisionAction,
-)
 
 # Query resolvers
 
 
-@strawberry.field(description="Added in 25.16.0")
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="List revisions with optional filtering and pagination (admin, all deployments).",
+    )
+)  # type: ignore[misc]
 async def revisions(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ModelRevisionFilter] = None,
-    order_by: Optional[list[ModelRevisionOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-) -> ModelRevisionConnection:
-    """List revisions with optional filtering and pagination."""
-    return await fetch_revisions(
-        info=info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    filter: ModelRevisionFilter | None = None,
+    order_by: list[ModelRevisionOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ModelRevisionConnection | None:
+    """List revisions with optional filtering and pagination (admin, all deployments)."""
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+    payload = await info.context.adapters.deployment.admin_search_revisions(
+        AdminSearchRevisionsInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [ModelRevision.from_pydantic(item) for item in payload.items]
+    edges = [ModelRevisionEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return ModelRevisionConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
     )
 
 
-@strawberry.field(description="Added in 25.16.0")
-async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision:
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.16.0", description="Get a specific revision by ID.")
+)  # type: ignore[misc]
+async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
     """Get a specific revision by ID."""
     _, revision_id = resolve_global_id(id)
-    processor = info.context.processors.deployment
-    result = await processor.get_revision_by_id.wait_for_complete(
-        GetRevisionByIdAction(revision_id=UUID(revision_id))
+    node = await info.context.adapters.deployment.get_revision(UUID(revision_id))
+    return ModelRevision.from_pydantic(node)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.16.0", description="Get JSON Schema for inference runtime configuration"
     )
-    return ModelRevision.from_dataclass(result.data)
-
-
-@strawberry.field(
-    description="Added in 25.16.0. Get JSON Schema for inference runtime configuration"
-)
+)  # type: ignore[misc]
 async def inference_runtime_config(name: str) -> JSON:
     match name.lower():
         case "vllm":
@@ -103,9 +116,12 @@ async def inference_runtime_config(name: str) -> JSON:
             }
 
 
-@strawberry.field(
-    description="Added in 25.16.0 Get configuration JSON Schemas for all inference runtimes"
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Get configuration JSON Schemas for all inference runtimes.",
+    )
+)  # type: ignore[misc]
 async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
     return {
         "vllm": VLLMRuntimeConfig.to_json_schema(),
@@ -118,59 +134,32 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.16.0")
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Add model revision."))  # type: ignore[misc]
 async def add_model_revision(
     input: AddRevisionInput, info: Info[StrawberryGQLContext]
 ) -> AddRevisionPayload:
     """Add a model revision to a deployment."""
-    processor = info.context.processors.deployment
-    result = await processor.add_model_revision.wait_for_complete(
-        AddModelRevisionAction(
-            model_deployment_id=UUID(input.deployment_id), adder=input.to_model_revision_creator()
-        )
+    payload = await info.context.adapters.deployment.add_revision(input.to_pydantic())
+    return AddRevisionPayload(revision=ModelRevision.from_pydantic(payload.revision))
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Activate a specific revision to be the current revision",
     )
-
-    return AddRevisionPayload(revision=ModelRevision.from_dataclass(result.revision))
-
-
-@strawberry.mutation(
-    description="Added in 25.16.0. Create model revision which is not attached to any deployment."
-)
-async def create_model_revision(
-    input: CreateRevisionInput, info: Info[StrawberryGQLContext]
-) -> CreateRevisionPayload:
-    """Create a new model revision without attaching it to any deployment."""
-    processor = info.context.processors.deployment
-    result = await processor.create_model_revision.wait_for_complete(
-        CreateModelRevisionAction(creator=input.to_model_revision_creator())
-    )
-
-    return CreateRevisionPayload(revision=ModelRevision.from_dataclass(result.revision))
-
-
-@strawberry.mutation(
-    description="Added in 25.19.0. Activate a specific revision to be the current revision."
-)
+)  # type: ignore[misc]
 async def activate_deployment_revision(
     input: ActivateRevisionInputGQL,
     info: Info[StrawberryGQLContext, None],
 ) -> ActivateRevisionPayloadGQL:
     """Activate a revision to be the current revision for a deployment."""
-    _, deployment_id = resolve_global_id(input.deployment_id)
-    _, revision_id = resolve_global_id(input.revision_id)
-
-    processor = info.context.processors.deployment
-    result = await processor.activate_revision.wait_for_complete(
-        ActivateRevisionAction(
-            deployment_id=UUID(deployment_id),
-            revision_id=UUID(revision_id),
-        )
-    )
-
+    payload = await info.context.adapters.deployment.activate_revision(input.to_pydantic())
     return ActivateRevisionPayloadGQL(
-        deployment=ModelDeployment.from_dataclass(result.deployment),
-        previous_revision_id=(
-            ID(str(result.previous_revision_id)) if result.previous_revision_id else None
-        ),
-        activated_revision_id=ID(str(result.activated_revision_id)),
+        deployment=ModelDeployment.from_pydantic(payload.deployment),
+        previous_revision_id=ID(str(payload.previous_revision_id))
+        if payload.previous_revision_id
+        else None,
+        activated_revision_id=ID(str(payload.activated_revision_id)),
+        deployment_policy=DeploymentPolicyGQL.from_pydantic(payload.deployment_policy),
     )

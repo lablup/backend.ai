@@ -1,7 +1,7 @@
 import logging
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Coroutine, Mapping, MutableMapping, Sequence
-from typing import Any, NamedTuple, Optional
+from typing import Any, NamedTuple
 
 from aiohttp import web
 
@@ -27,7 +27,7 @@ class MetadataPluginRoute(NamedTuple):
     method: str
     route: str
     route_handler: Callable[[web.Request], Coroutine[Any, Any, web.Response]]
-    route_name: Optional[str]
+    route_name: str | None
 
 
 class MetadataPlugin(AbstractPlugin, metaclass=ABCMeta):
@@ -40,7 +40,7 @@ class MetadataPlugin(AbstractPlugin, metaclass=ABCMeta):
     application lifecycle handlers attached to the returned app instance.
     """
 
-    route_prefix: Optional[str]
+    route_prefix: str | None
 
     @abstractmethod
     async def prepare_app(self) -> NewMetadataPluginResponse:

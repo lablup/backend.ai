@@ -12,30 +12,25 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.deployment.types import (
-    DeploymentHistoryData,
     DeploymentHistoryListResult,
-    RouteHistoryData,
     RouteHistoryListResult,
 )
 from ai.backend.manager.data.kernel.types import (
-    KernelSchedulingHistoryData,
     KernelSchedulingHistoryListResult,
 )
 from ai.backend.manager.data.session.types import (
-    SessionSchedulingHistoryData,
     SessionSchedulingHistoryListResult,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base import BatchQuerier
 
 from .db_source import SchedulingHistoryDBSource
+from .types import (
+    DeploymentHistorySearchScope,
+    RouteHistorySearchScope,
+    SessionSchedulingHistorySearchScope,
+)
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.scheduling_history import (
-        DeploymentHistoryRow,
-        KernelSchedulingHistoryRow,
-        RouteHistoryRow,
-        SessionSchedulingHistoryRow,
-    )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__ = ("SchedulingHistoryRepository",)
@@ -58,40 +53,35 @@ scheduling_history_repository_resilience = Resilience(
 
 
 class SchedulingHistoryRepository:
-    """Repository for scheduling history data access."""
+    """Repository for scheduling history data access (read-only)."""
 
     _db_source: SchedulingHistoryDBSource
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = SchedulingHistoryDBSource(db)
 
-    # ========== Session History ==========
-
-    @scheduling_history_repository_resilience.apply()
-    async def record_session_history(
-        self,
-        creator: Creator[SessionSchedulingHistoryRow],
-    ) -> SessionSchedulingHistoryData:
-        """Record session scheduling history with merge logic."""
-        return await self._db_source.record_session_history(creator)
+    # ========== Session History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
     async def search_session_history(
         self,
         querier: BatchQuerier,
     ) -> SessionSchedulingHistoryListResult:
-        """Search session scheduling history with pagination."""
+        """Search session scheduling history with pagination (admin API)."""
         return await self._db_source.search_session_history(querier)
 
-    # ========== Kernel History ==========
+    # ========== Session History (Scoped) ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def record_kernel_history(
+    async def search_session_scoped_history(
         self,
-        creator: Creator[KernelSchedulingHistoryRow],
-    ) -> KernelSchedulingHistoryData:
-        """Record kernel scheduling history with merge logic."""
-        return await self._db_source.record_kernel_history(creator)
+        querier: BatchQuerier,
+        scope: SessionSchedulingHistorySearchScope,
+    ) -> SessionSchedulingHistoryListResult:
+        """Search session scheduling history within scope."""
+        return await self._db_source.search_session_scoped_history(querier, scope)
+
+    # ========== Kernel History ==========
 
     @scheduling_history_repository_resilience.apply()
     async def search_kernel_history(
@@ -101,38 +91,44 @@ class SchedulingHistoryRepository:
         """Search kernel scheduling history with pagination."""
         return await self._db_source.search_kernel_history(querier)
 
-    # ========== Deployment History ==========
-
-    @scheduling_history_repository_resilience.apply()
-    async def record_deployment_history(
-        self,
-        creator: Creator[DeploymentHistoryRow],
-    ) -> DeploymentHistoryData:
-        """Record deployment history with merge logic."""
-        return await self._db_source.record_deployment_history(creator)
+    # ========== Deployment History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
     async def search_deployment_history(
         self,
         querier: BatchQuerier,
     ) -> DeploymentHistoryListResult:
-        """Search deployment history with pagination."""
+        """Search deployment history with pagination (admin API)."""
         return await self._db_source.search_deployment_history(querier)
 
-    # ========== Route History ==========
+    # ========== Deployment History (Scoped) ==========
 
     @scheduling_history_repository_resilience.apply()
-    async def record_route_history(
+    async def search_deployment_scoped_history(
         self,
-        creator: Creator[RouteHistoryRow],
-    ) -> RouteHistoryData:
-        """Record route history with merge logic."""
-        return await self._db_source.record_route_history(creator)
+        querier: BatchQuerier,
+        scope: DeploymentHistorySearchScope,
+    ) -> DeploymentHistoryListResult:
+        """Search deployment history within scope."""
+        return await self._db_source.search_deployment_scoped_history(querier, scope)
+
+    # ========== Route History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
     async def search_route_history(
         self,
         querier: BatchQuerier,
     ) -> RouteHistoryListResult:
-        """Search route history with pagination."""
+        """Search route history with pagination (admin API)."""
         return await self._db_source.search_route_history(querier)
+
+    # ========== Route History (Scoped) ==========
+
+    @scheduling_history_repository_resilience.apply()
+    async def search_route_scoped_history(
+        self,
+        querier: BatchQuerier,
+        scope: RouteHistorySearchScope,
+    ) -> RouteHistoryListResult:
+        """Search route history within scope."""
+        return await self._db_source.search_route_scoped_history(querier, scope)

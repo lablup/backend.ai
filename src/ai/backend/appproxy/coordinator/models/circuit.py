@@ -1,8 +1,9 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+import jwt
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,7 +45,7 @@ __all__ = [
 ]
 
 
-class Circuit(Base, BaseMixin):
+class Circuit(Base, BaseMixin):  # type: ignore[misc]
     __tablename__ = "circuits"
 
     """
@@ -114,8 +115,8 @@ class Circuit(Base, BaseMixin):
         cls,
         session: AsyncSession,
         circuit_id: UUID,
-        load_worker=True,
-        load_endpoint=True,
+        load_worker: bool = True,
+        load_endpoint: bool = True,
     ) -> "Circuit":
         query = sa.select(Circuit).where(Circuit.id == circuit_id)
         if load_worker:
@@ -132,8 +133,8 @@ class Circuit(Base, BaseMixin):
         cls,
         session: AsyncSession,
         endpoint_id: UUID,
-        load_worker=True,
-        load_endpoint=True,
+        load_worker: bool = True,
+        load_endpoint: bool = True,
     ) -> "Circuit":
         query = sa.select(Circuit).where(Circuit.endpoint_id == endpoint_id)
         if load_worker:
@@ -149,8 +150,8 @@ class Circuit(Base, BaseMixin):
     async def list_circuits(
         cls,
         session: AsyncSession,
-        load_worker=True,
-        load_endpoint=True,
+        load_worker: bool = True,
+        load_endpoint: bool = True,
     ) -> Sequence["Circuit"]:
         query = sa.select(Circuit)
         if load_worker:
@@ -189,8 +190,8 @@ class Circuit(Base, BaseMixin):
         cls,
         session: AsyncSession,
         endpoint_id: UUID,
-        load_worker=True,
-        load_endpoint=True,
+        load_worker: bool = True,
+        load_endpoint: bool = True,
     ) -> "Circuit":
         query = sa.select(Circuit).where(Circuit.endpoint_id == endpoint_id)
         if load_worker:
@@ -247,7 +248,7 @@ class Circuit(Base, BaseMixin):
 
         return c
 
-    async def get_endpoint_url(self, session: Optional[AsyncSession] = None) -> URL:
+    async def get_endpoint_url(self, session: AsyncSession | None = None) -> URL:
         from .worker import Worker
 
         worker: Worker = (
@@ -268,6 +269,7 @@ class Circuit(Base, BaseMixin):
             case _:
                 raise UnsupportedProtocol(self.protocol.name)
 
+        hostname: str
         match self.frontend_mode:
             case FrontendMode.WILDCARD_DOMAIN:
                 if not self.subdomain or not worker.wildcard_domain:
@@ -421,6 +423,20 @@ class Circuit(Base, BaseMixin):
 
                 return did_update_status
         return False
+
+    async def generate_jwt(
+        self, db_sess: AsyncSession, jwt_secret: str, created_user: UUID, exp: datetime
+    ) -> str:
+        payload = dict(self.dump_model())
+
+        # inject extra information
+        payload["app_url"] = str(await self.get_endpoint_url(session=db_sess))
+        payload["user"] = str(created_user)
+        payload["exp"] = exp
+        # mask unrelated & sensitive information
+        del payload["route_info"]
+
+        return jwt.encode(payload, jwt_secret, algorithm="HS256")
 
     @property
     def traefik_services(self) -> dict[str, Any]:

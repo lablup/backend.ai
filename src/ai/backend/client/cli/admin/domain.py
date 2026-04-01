@@ -14,7 +14,7 @@ from . import admin
 
 
 @admin.group()
-def domain():
+def domain() -> None:
     """
     Domain administration commands.
     """

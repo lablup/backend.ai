@@ -1,18 +1,24 @@
+import re
 import uuid
+from collections.abc import Mapping
+from datetime import datetime
+from enum import StrEnum
 from pathlib import PurePosixPath
-from typing import Optional
 
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
-from ai.backend.common.data.storage.types import ArtifactStorageImportStep
+from ai.backend.common.data.storage.types import (
+    ArtifactStorageImportStep,
+    ArtifactStorageTarget,
+)
 from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.common.types import QuotaConfig
 
 
 class QuotaScopeReq(BaseRequestModel):
-    options: Optional[QuotaConfig] = Field(
+    options: QuotaConfig | None = Field(
         default=None,
         description="The options for the quota scope.",
     )
@@ -119,7 +125,7 @@ class PresignedDownloadObjectReq(BaseRequestModel):
     key: str = Field(
         description="The object key (path) within the bucket to download the file from."
     )
-    expiration: Optional[int] = Field(default=None, description="Token expiration time in seconds")
+    expiration: int | None = Field(default=None, description="Token expiration time in seconds")
 
 
 class GetObjectMetaReq(BaseRequestModel):
@@ -158,7 +164,7 @@ class HuggingFaceScanModelsReq(BaseRequestModel):
         """,
         examples=["downloads", "likes", "created", "modified"],
     )
-    search: Optional[str] = Field(
+    search: str | None = Field(
         default=None,
         description="""
         Search query to filter models by name, description, or tags.
@@ -193,7 +199,7 @@ class HuggingFaceScanModelsSyncReq(BaseRequestModel):
         """,
         examples=["downloads", "likes", "created", "modified"],
     )
-    search: Optional[str] = Field(
+    search: str | None = Field(
         default=None,
         description="""
         Search query to filter models by name, description, or tags.
@@ -247,6 +253,51 @@ class HuggingFaceRetrieveModelReqQueryParam(BaseRequestModel):
     revision: str = Field(description="The model revision to scan from the registry.")
 
 
+class StorageMappingResolverData(BaseRequestModel):
+    """
+    Storage target configuration for model import.
+
+    Provides two ways to specify storage targets:
+    - storage_step_mappings: Simple string-based storage names (resolved via storage pool)
+    - storage_step_target_mappings: Structured targets (NamedStorageTarget or VFolderStorageTarget)
+
+    Both can be provided; they will be merged with storage_step_target_mappings taking precedence.
+    """
+
+    storage_step_mappings: Mapping[ArtifactStorageImportStep, str] | None = Field(
+        default=None,
+        description="""
+        Deprecated.
+        Mapping of import steps to storage names (string-based).
+        These will be resolved via storage pool lookup.
+        """,
+        examples=[
+            {"download": "fast-storage", "archive": "long-term-storage"},
+        ],
+    )
+
+    storage_step_target_mappings: (
+        Mapping[ArtifactStorageImportStep, ArtifactStorageTarget] | None
+    ) = Field(
+        default=None,
+        description="""
+        Mapping of import steps to structured storage targets.
+        Each target can be either a NamedStorageTarget or a VFolderStorageTarget object.
+        Takes precedence over storage_step_mappings for the same step.
+        """,
+        examples=[
+            {
+                "download": {"storage_name": "fast-storage"},
+                "archive": {"storage_name": "long-term-storage"},
+            },
+            {
+                "download": {"vfolder_id": "xxx", "volume_name": "volume1"},
+                "archive": {"vfolder_id": "xxx", "volume_name": "volume1"},
+            },
+        ],
+    )
+
+
 class HuggingFaceImportModelsReq(BaseRequestModel):
     """Request for batch importing multiple HuggingFace models to storage."""
 
@@ -269,13 +320,50 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=["huggingface", "my-huggingface"],
     )
-    storage_step_mappings: dict[ArtifactStorageImportStep, str] = Field(
+    storage_step_mappings: Mapping[ArtifactStorageImportStep, str] | None = Field(
+        default=None,
         description="""
-        Optional mapping of import steps to specific storage backends.
-        If provided, overrides storage_name for step-wise storage selection.
-        If None, storage_name is used for all steps.
+        Deprecated. Use storage_step_target_mappings instead.
+        Mapping of import steps to storage names (string-based).
+        These will be resolved via storage pool lookup.
         """,
-        examples=[{"download": "fast-storage", "archive": "long-term-storage"}],
+        examples=[
+            {"download": "fast-storage", "archive": "long-term-storage"},
+        ],
+    )
+    storage_step_target_mappings: (
+        Mapping[ArtifactStorageImportStep, ArtifactStorageTarget] | None
+    ) = Field(
+        default=None,
+        description="""
+        Mapping of import steps to structured storage targets.
+        Each target can be either a NamedStorageTarget or a VFolderStorageTarget object.
+        Takes precedence over storage_step_mappings for the same step.
+        """,
+        examples=[
+            {
+                "download": {"storage_name": "fast-storage"},
+                "archive": {"storage_name": "long-term-storage"},
+            },
+            {
+                "download": {"vfolder_id": "xxx", "volume_name": "volume1"},
+                "archive": {"vfolder_id": "xxx", "volume_name": "volume1"},
+            },
+        ],
+    )
+    storage_prefix: str | None = Field(
+        default=None,
+        description="""
+        Custom prefix path for storing imported artifacts.
+        - If not specified (None): Uses the artifact-type-specific default path.
+          For models, the default is `{model_id}/{revision}`
+          (e.g., "microsoft/DialoGPT-medium/main/").
+          Default paths for other artifact types (PACKAGE, IMAGE) are not yet defined.
+        - If set to "/": Files will be stored at the root without any prefix.
+        - If set to a custom value (e.g., "my-models"): Files will be stored under
+          the specified custom prefix.
+        """,
+        examples=["my-models", "custom/path", "/"],
     )
 
 
@@ -299,7 +387,7 @@ class HuggingFaceGetCommitHashReqQueryParam(BaseRequestModel):
         """,
         examples=["huggingface", "my-huggingface-registry"],
     )
-    revision: Optional[str] = Field(
+    revision: str | None = Field(
         default=None,
         description="The revision (branch/tag) of the model.",
         examples=["main", "v1.0"],
@@ -328,18 +416,55 @@ class ReservoirImportModelsReq(BaseRequestModel):
         """,
         examples=["reservoir", "my-reservoir"],
     )
-    storage_step_mappings: dict[ArtifactStorageImportStep, str] = Field(
+    storage_step_mappings: Mapping[ArtifactStorageImportStep, str] | None = Field(
+        default=None,
         description="""
-        Optional mapping of import steps to specific storage backends.
-        If provided, overrides storage_name for step-wise storage selection.
-        If None, storage_name is used for all steps.
+        Deprecated. Use storage_step_target_mappings instead.
+        Mapping of import steps to storage names (string-based).
+        These will be resolved via storage pool lookup.
         """,
-        examples=[{"download": "fast-storage", "archive": "long-term-storage"}],
+        examples=[
+            {"download": "fast-storage", "archive": "long-term-storage"},
+        ],
+    )
+    storage_step_target_mappings: (
+        Mapping[ArtifactStorageImportStep, ArtifactStorageTarget] | None
+    ) = Field(
+        default=None,
+        description="""
+        Mapping of import steps to structured storage targets.
+        Each target can be either a NamedStorageTarget or a VFolderStorageTarget object.
+        Takes precedence over storage_step_mappings for the same step.
+        """,
+        examples=[
+            {
+                "download": {"storage_name": "fast-storage"},
+                "archive": {"storage_name": "long-term-storage"},
+            },
+            {
+                "download": {"vfolder_id": "xxx", "volume_name": "volume1"},
+                "archive": {"vfolder_id": "xxx", "volume_name": "volume1"},
+            },
+        ],
     )
     # Used by storage proxy to fetch verification results from remote reservoir.
     # Must have 1:1 correspondence with the models list.
     artifact_revision_ids: list[str] = Field(
         description="Artifact revision IDs corresponding to each model in the models list.",
+    )
+    storage_prefix: str | None = Field(
+        default=None,
+        description="""
+        Custom prefix path for storing imported artifacts.
+        - If not specified (None): Uses the artifact-type-specific default path.
+          For models, the default is `{model_id}/{revision}`
+          (e.g., "microsoft/DialoGPT-medium/main/").
+          Default paths for other artifact types (PACKAGE, IMAGE) are not yet defined.
+        - If set to "/": Files will be stored at the root without any prefix.
+        - If set to a custom value (e.g., "my-models"): Files will be stored under
+          the specified custom prefix.
+        """,
+        examples=["my-models", "custom/path", "/"],
     )
 
 
@@ -367,7 +492,7 @@ class VFSUploadFileReq(BaseRequestModel):
     """
 
     filepath: str = Field(description="The file path within VFS storage to upload the file to.")
-    content_type: Optional[str] = Field(
+    content_type: str | None = Field(
         default=None, description="MIME type of the file being uploaded (optional for VFS)."
     )
 
@@ -412,3 +537,102 @@ class GetVerificationResultReq(BaseRequestModel):
     artifact_revision_id: uuid.UUID = Field(
         description="The artifact revision ID to get verification result."
     )
+
+
+# Client-facing API token operation types
+class TokenOperationType(StrEnum):
+    DOWNLOAD = "download"
+    UPLOAD = "upload"
+
+
+# Matches control characters (0x00-0x1F, 0x7F) and path separators (/ \).
+_UNSAFE_FILENAME_RE = re.compile(r"[\x00-\x1f\x7f/\\]")
+
+
+# Client-facing API request models for download archive endpoint
+class ArchiveDownloadTokenData(BaseModel):
+    """Pydantic model for validating the JWT payload of archive download tokens."""
+
+    operation: TokenOperationType = Field(
+        description="The type of storage operation this token authorizes.",
+    )
+    volume: str = Field(
+        description="Volume name where the virtual folder is located.",
+    )
+    virtual_folder_id: VFolderIDField = Field(
+        description="The virtual folder ID that this token grants access to.",
+    )
+    files: list[str] = Field(
+        min_length=1,
+        description="List of relative file paths within the virtual folder to include in the archive.",
+    )
+    filename: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Custom filename for the downloaded ZIP archive. Defaults to 'archive.zip' when omitted.",
+    )
+    exp: datetime = Field(
+        description="Token expiration time as a Unix timestamp.",
+    )
+    model_config = ConfigDict(extra="allow")  # allow JWT-intrinsic keys
+
+    @field_validator("filename", mode="after")
+    @classmethod
+    def _validate_filename(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Filename must not be empty or whitespace-only.")
+        if v in (".", ".."):
+            raise ValueError("Filename must not be a relative path segment ('.' or '..').")
+        if _UNSAFE_FILENAME_RE.search(v):
+            raise ValueError(
+                "Filename must not contain control characters or path separators (/ or \\)."
+            )
+        return v
+
+    @field_serializer("exp")
+    def serialize_exp(self, exp: datetime) -> int:
+        """JWT standard requires exp to be Unix timestamp (integer)."""
+        return int(exp.timestamp())
+
+
+class ArchiveDownloadQueryParams(BaseRequestModel):
+    """Pydantic model for archive download endpoint query parameters."""
+
+    token: str = Field(description="JWT token containing download authorization")
+
+
+class CreateArchiveDownloadSessionRequest(BaseRequestModel):
+    """Request for creating an archive download session (JWT token generation)."""
+
+    volume: str = Field(
+        description="Volume name where the virtual folder is located.",
+    )
+    virtual_folder_id: VFolderIDField = Field(
+        description="The virtual folder ID containing the files to archive for download.",
+    )
+    files: list[str] = Field(
+        min_length=1,
+        description="List of relative file paths within the virtual folder to include in the archive.",
+    )
+    filename: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Custom filename for the downloaded ZIP archive. Defaults to 'archive.zip' when omitted.",
+    )
+
+    @field_validator("filename", mode="after")
+    @classmethod
+    def _validate_filename(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Filename must not be empty or whitespace-only.")
+        if v in (".", ".."):
+            raise ValueError("Filename must not be a relative path segment ('.' or '..').")
+        if _UNSAFE_FILENAME_RE.search(v):
+            raise ValueError(
+                "Filename must not contain control characters or path separators (/ or \\)."
+            )
+        return v

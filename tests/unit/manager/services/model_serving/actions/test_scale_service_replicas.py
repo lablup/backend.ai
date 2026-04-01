@@ -1,11 +1,18 @@
+from __future__ import annotations
+
 import uuid
-from typing import cast
+from collections.abc import Iterator
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.data.model_serving.types import RequesterCtx
-from ai.backend.manager.models.user import UserRole
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
+from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
@@ -16,69 +23,113 @@ from ai.backend.manager.services.model_serving.exceptions import (
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
 )
+from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.testutils.scenario import ScenarioBase
 
 
-@pytest.fixture
-def mock_check_requester_access_scale(mocker, auto_scaling_service):
-    mock = mocker.patch.object(
-        auto_scaling_service,
-        "check_requester_access",
-        new_callable=AsyncMock,
-    )
-    mock.return_value = None
-    return mock
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_force_scale(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "get_endpoint_by_id_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_update_endpoint_replicas_force(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.admin_repository,
-        "update_endpoint_replicas_force",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_get_endpoint_by_id_validated_scale(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.repository,
-        "get_endpoint_by_id_validated",
-        new_callable=AsyncMock,
-    )
-
-
-@pytest.fixture
-def mock_update_endpoint_replicas_validated(mocker, mock_repositories):
-    return mocker.patch.object(
-        mock_repositories.repository,
-        "update_endpoint_replicas_validated",
-        new_callable=AsyncMock,
-    )
-
-
 class TestScaleServiceReplicas:
+    @pytest.fixture
+    def user_data(self) -> UserData:
+        return UserData(
+            user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+
+    @pytest.fixture(autouse=True)
+    def set_user_context(self, user_data: UserData) -> Iterator[None]:
+        with with_user(user_data):
+            yield
+
+    @pytest.fixture
+    def mock_action_monitor(self) -> MagicMock:
+        return MagicMock(spec=ActionMonitor)
+
+    @pytest.fixture
+    def mock_repositories(self) -> MagicMock:
+        mock = MagicMock(spec=ModelServingRepositories)
+        mock.repository = MagicMock(spec=ModelServingRepository)
+        return mock
+
+    @pytest.fixture
+    def auto_scaling_service(
+        self,
+        mock_repositories: MagicMock,
+    ) -> AutoScalingService:
+        return AutoScalingService(
+            repository=mock_repositories.repository,
+        )
+
+    @pytest.fixture
+    def auto_scaling_processors(
+        self,
+        mock_action_monitor: MagicMock,
+        auto_scaling_service: AutoScalingService,
+        mock_action_validators: ActionValidators,
+    ) -> ModelServingAutoScalingProcessors:
+        return ModelServingAutoScalingProcessors(
+            service=auto_scaling_service,
+            action_monitors=[mock_action_monitor],
+            validators=mock_action_validators,
+        )
+
+    @pytest.fixture
+    def mock_check_user_access_scale(self, mocker: Any, auto_scaling_service: Any) -> AsyncMock:
+        mock = cast(
+            AsyncMock,
+            mocker.patch.object(
+                auto_scaling_service,
+                "check_user_access",
+                new_callable=AsyncMock,
+            ),
+        )
+        mock.return_value = None
+        return mock
+
+    @pytest.fixture
+    def mock_get_endpoint_by_id_scale(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_by_id",
+                new_callable=AsyncMock,
+            ),
+        )
+
+    @pytest.fixture
+    def mock_get_endpoint_access_validation_data_scale(
+        self, mocker: Any, mock_repositories: Any
+    ) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "get_endpoint_access_validation_data",
+                new_callable=AsyncMock,
+            ),
+        )
+
+    @pytest.fixture
+    def mock_update_endpoint_replicas(self, mocker: Any, mock_repositories: Any) -> AsyncMock:
+        return cast(
+            AsyncMock,
+            mocker.patch.object(
+                mock_repositories.repository,
+                "update_endpoint_replicas",
+                new_callable=AsyncMock,
+            ),
+        )
+
     @pytest.mark.parametrize(
         "scenario",
         [
             ScenarioBase.success(
                 "scale up",
                 ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     max_session_count_per_model_session=100,
                     service_id=uuid.UUID("99999999-9999-9999-9999-999999999999"),
                     to=5,
@@ -91,12 +142,6 @@ class TestScaleServiceReplicas:
             ScenarioBase.success(
                 "scale down",
                 ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     max_session_count_per_model_session=100,
                     service_id=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
                     to=1,
@@ -109,12 +154,6 @@ class TestScaleServiceReplicas:
             ScenarioBase.success(
                 "zero scale",
                 ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     max_session_count_per_model_session=100,
                     service_id=uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
                     to=0,
@@ -124,33 +163,9 @@ class TestScaleServiceReplicas:
                     target_count=0,
                 ),
             ),
-            ScenarioBase.success(
-                "SUPERADMIN scale up",
-                ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.SUPERADMIN,
-                        domain_name="default",
-                    ),
-                    max_session_count_per_model_session=100,
-                    service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-                    to=10,
-                ),
-                ScaleServiceReplicasActionResult(
-                    current_route_count=3,
-                    target_count=10,
-                ),
-            ),
             ScenarioBase.failure(
                 "non-existent service",
                 ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     max_session_count_per_model_session=100,
                     service_id=uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc"),
                     to=5,
@@ -160,12 +175,6 @@ class TestScaleServiceReplicas:
             ScenarioBase.failure(
                 "update operation failed",
                 ScaleServiceReplicasAction(
-                    requester_ctx=RequesterCtx(
-                        is_authorized=True,
-                        user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                        user_role=UserRole.USER,
-                        domain_name="default",
-                    ),
                     max_session_count_per_model_session=100,
                     service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
                     to=3,
@@ -174,51 +183,55 @@ class TestScaleServiceReplicas:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_scale_service_replicas(
         self,
         scenario: ScenarioBase[ScaleServiceReplicasAction, ScaleServiceReplicasActionResult],
+        user_data: UserData,
         auto_scaling_processors: ModelServingAutoScalingProcessors,
-        mock_check_requester_access_scale,
-        mock_get_endpoint_by_id_force_scale,
-        mock_update_endpoint_replicas_force,
-        mock_get_endpoint_by_id_validated_scale,
-        mock_update_endpoint_replicas_validated,
-    ):
+        mock_check_user_access_scale: AsyncMock,
+        mock_get_endpoint_by_id_scale: AsyncMock,
+        mock_get_endpoint_access_validation_data_scale: AsyncMock,
+        mock_update_endpoint_replicas: AsyncMock,
+    ) -> None:
         expected = cast(ScaleServiceReplicasActionResult, scenario.expected)
+        action = scenario.input
 
         # Mock endpoint data based on scenario
         if scenario.description in ["scale up", "scale down", "zero scale"]:
+            mock_validation_data = MagicMock(
+                session_owner_id=user_data.user_id,
+                session_owner_role=UserRole(user_data.role),
+                domain=user_data.domain_name,
+            )
+            mock_get_endpoint_access_validation_data_scale.return_value = mock_validation_data
             mock_endpoint = MagicMock(
-                id=scenario.input.service_id,
+                id=action.service_id,
                 routings=[MagicMock() for _ in range(expected.current_route_count)],
             )
-            mock_get_endpoint_by_id_validated_scale.return_value = mock_endpoint
-            mock_update_endpoint_replicas_validated.return_value = True
-
-        elif scenario.description == "SUPERADMIN scale up":
-            mock_endpoint = MagicMock(
-                id=scenario.input.service_id,
-                routings=[MagicMock() for _ in range(expected.current_route_count)],
-            )
-            mock_get_endpoint_by_id_force_scale.return_value = mock_endpoint
-            mock_update_endpoint_replicas_force.return_value = True
+            mock_get_endpoint_by_id_scale.return_value = mock_endpoint
+            mock_update_endpoint_replicas.return_value = True
 
         elif scenario.description == "non-existent service":
-            if scenario.input.requester_ctx.user_role == UserRole.SUPERADMIN:
-                mock_get_endpoint_by_id_force_scale.return_value = None
-            else:
-                mock_get_endpoint_by_id_validated_scale.return_value = None
+            mock_get_endpoint_access_validation_data_scale.return_value = None
+            mock_get_endpoint_by_id_scale.return_value = None
 
         elif scenario.description == "update operation failed":
+            mock_validation_data = MagicMock(
+                session_owner_id=user_data.user_id,
+                session_owner_role=UserRole(user_data.role),
+                domain=user_data.domain_name,
+            )
+            mock_get_endpoint_access_validation_data_scale.return_value = mock_validation_data
             mock_endpoint = MagicMock(
-                id=scenario.input.service_id,
+                id=action.service_id,
                 routings=[MagicMock() for _ in range(2)],
             )
-            mock_get_endpoint_by_id_validated_scale.return_value = mock_endpoint
-            mock_update_endpoint_replicas_validated.return_value = False
+            mock_get_endpoint_by_id_scale.return_value = mock_endpoint
+            mock_update_endpoint_replicas.return_value = False
 
-        async def scale_service_replicas(action: ScaleServiceReplicasAction):
+        async def scale_service_replicas(
+            action: ScaleServiceReplicasAction,
+        ) -> ScaleServiceReplicasActionResult:
             return await auto_scaling_processors.scale_service_replicas.wait_for_complete(action)
 
         await scenario.test(scale_service_replicas)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 import pytest
@@ -6,7 +8,7 @@ from ai.backend.client.config import APIConfig, set_config
 
 
 @pytest.fixture(autouse=True)
-def defconfig():
+def defconfig() -> APIConfig:
     endpoint = os.environ.get("BACKEND_TEST_ENDPOINT", "http://127.0.0.1:8081")
     access_key = os.environ.get("BACKEND_TEST_ADMIN_ACCESS_KEY", "AKIAIOSFODNN7EXAMPLE")
     secret_key = os.environ.get(
@@ -18,7 +20,7 @@ def defconfig():
 
 
 @pytest.fixture
-def userconfig():
+def userconfig() -> APIConfig:
     endpoint = os.environ.get("BACKEND_TEST_ENDPOINT", "http://127.0.0.1:8081")
     access_key = os.environ.get("BACKEND_TEST_USER_ACCESS_KEY", "AKIANABBDUSEREXAMPLE")
     secret_key = os.environ.get(
@@ -30,15 +32,15 @@ def userconfig():
 
 
 @pytest.fixture
-def example_keypair(defconfig):
+def example_keypair(defconfig: APIConfig) -> tuple[str, str]:
     return (defconfig.access_key, defconfig.secret_key)
 
 
 @pytest.fixture
-def user_keypair(userconfig):
+def user_keypair(userconfig: APIConfig) -> tuple[str, str]:
     return (userconfig.access_key, userconfig.secret_key)
 
 
 @pytest.fixture
-def dummy_endpoint(defconfig):
+def dummy_endpoint(defconfig: APIConfig) -> str:
     return str(defconfig.endpoint) + "/"

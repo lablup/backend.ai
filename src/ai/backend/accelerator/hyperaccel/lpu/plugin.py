@@ -5,7 +5,6 @@ from pathlib import Path
 from pprint import pformat
 from typing import (
     Any,
-    Optional,
 )
 
 import aiodocker
@@ -58,7 +57,7 @@ class LPUPlugin(AbstractComputePlugin):
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
 
-    _all_devices: Optional[list[LPUDevice]]
+    _all_devices: list[LPUDevice] | None
 
     async def init(self, context: Any = None) -> None:
         self._all_devices = None

@@ -4,7 +4,7 @@ import datetime
 import decimal
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Optional, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 from uuid import UUID
 
 import graphene
@@ -15,8 +15,8 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined, UndefinedType
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.exception import InvalidAPIParameters
@@ -41,9 +41,7 @@ from ai.backend.manager.data.model_serving.modifier import (
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
-    RequesterCtx,
 )
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.errors.common import (
     GenericForbidden,
     ObjectNotFound,
@@ -59,8 +57,9 @@ from ai.backend.manager.models.endpoint import (
     EndpointTokenRow,
 )
 from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.updater import Updater
@@ -109,7 +108,7 @@ AutoScalingMetricComparatorGQLEnum = graphene.Enum.from_enum(
 
 
 @graphene_federation.key("id")
-class EndpointAutoScalingRuleNode(graphene.ObjectType):
+class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 25.1.0."
@@ -208,8 +207,8 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
             raw_rule_id = rule_id
         try:
             _rule_id = RuleId(UUID(raw_rule_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             rule_row = await EndpointAutoScalingRuleRow.get(
@@ -278,12 +277,12 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
                 raw_endpoint_id = endpoint
             try:
                 _endpoint_id = EndpointId(UUID(raw_endpoint_id))
-            except ValueError:
-                raise ObjectNotFound(object_name="Endpoint")
+            except ValueError as e:
+                raise ObjectNotFound(object_name="Endpoint") from e
             try:
                 row = await EndpointRow.get(db_session, _endpoint_id)
-            except NoResultFound:
-                raise ObjectNotFound(object_name="Endpoint")
+            except NoResultFound as e:
+                raise ObjectNotFound(object_name="Endpoint") from e
 
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
@@ -296,6 +295,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
                         raise GenericForbidden
 
             query = query.filter(EndpointAutoScalingRuleRow.endpoint == _endpoint_id)
+            cnt_query = cnt_query.where(EndpointAutoScalingRuleRow.endpoint == _endpoint_id)
             group_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(graph_ctx, row) for row in group_rows]
             total_cnt = await db_session.scalar(cnt_query)
@@ -308,7 +308,7 @@ class EndpointAutoScalingRuleConnection(Connection):
         description = "Added in 25.1.0."
 
 
-class EndpointAutoScalingRuleInput(graphene.InputObjectType):
+class EndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.1.0."
 
@@ -327,11 +327,8 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
     min_replicas = graphene.Int()
     max_replicas = graphene.Int()
 
-    def to_action(
-        self, requester_ctx: RequesterCtx, endpoint_id: EndpointId
-    ) -> CreateEndpointAutoScalingRuleAction:
+    def to_action(self, endpoint_id: EndpointId) -> CreateEndpointAutoScalingRuleAction:
         return CreateEndpointAutoScalingRuleAction(
-            requester_ctx=requester_ctx,
             endpoint_id=endpoint_id,
             creator=EndpointAutoScalingRuleCreator(
                 metric_source=AutoScalingMetricSource(self.metric_source),
@@ -346,7 +343,7 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
         )
 
 
-class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
+class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ignore[misc]
     class Meta:
         description = "Added in 25.1.0."
 
@@ -365,11 +362,9 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
     min_replicas = graphene.Int()
     max_replicas = graphene.Int()
 
-    def to_action(
-        self, requester_ctx: RequesterCtx, id: RuleId
-    ) -> ModifyEndpointAutoScalingRuleAction:
+    def to_action(self, id: RuleId) -> ModifyEndpointAutoScalingRuleAction:
         def convert_to_decimal(
-            value: Optional[str] | UndefinedType,
+            value: str | None | UndefinedType,
         ) -> decimal.Decimal | UndefinedType:
             if isinstance(value, UndefinedType):
                 return value
@@ -378,8 +373,8 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
 
             try:
                 return decimal.Decimal(value)
-            except decimal.InvalidOperation:
-                raise InvalidAPIParameters(f"Cannot convert {value} to Decimal")
+            except decimal.InvalidOperation as e:
+                raise InvalidAPIParameters(f"Cannot convert {value} to Decimal") from e
 
         spec = EndpointAutoScalingRuleUpdaterSpec(
             metric_source=OptionalState.from_graphql(
@@ -412,13 +407,12 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
             ),
         )
         return ModifyEndpointAutoScalingRuleAction(
-            requester_ctx=requester_ctx,
             id=id,
             updater=Updater(spec=spec, pk_value=id),
         )
 
 
-class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
+class CreateEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -435,7 +429,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         endpoint: str,
         props: EndpointAutoScalingRuleInput,
@@ -446,16 +440,10 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
             raw_endpoint_id = endpoint
         try:
             _endpoint_id = EndpointId(UUID(raw_endpoint_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint") from e
 
         action = props.to_action(
-            requester_ctx=RequesterCtx(
-                is_authorized=None,
-                user_id=info.context.user["uuid"],
-                user_role=info.context.user["role"],
-                domain_name=info.context.user["domain_name"],
-            ),
             endpoint_id=_endpoint_id,
         )
 
@@ -472,7 +460,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
         )
 
 
-class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
+class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -489,7 +477,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
         props: ModifyEndpointAutoScalingRuleInput,
@@ -499,17 +487,11 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
             rule_id = id
         try:
             _rule_id = RuleId(UUID(rule_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(
-            requester_ctx=RequesterCtx(
-                is_authorized=None,
-                user_id=graph_ctx.user["uuid"],
-                user_role=graph_ctx.user["role"],
-                domain_name=graph_ctx.user["domain_name"],
-            ),
             id=_rule_id,
         )
 
@@ -526,7 +508,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
         )
 
 
-class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
+class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -541,25 +523,19 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
     ) -> Self:
         _, rule_id = AsyncNode.resolve_global_id(info, id)
         try:
             _rule_id = RuleId(UUID(rule_id))
-        except ValueError:
-            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
+        except ValueError as e:
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule") from e
 
         graph_ctx: GraphQueryContext = info.context
 
         action = DeleteEndpointAutoScalingRuleAction(
-            requester_ctx=RequesterCtx(
-                is_authorized=None,
-                user_id=graph_ctx.user["uuid"],
-                user_role=graph_ctx.user["role"],
-                domain_name=graph_ctx.user["domain_name"],
-            ),
             id=_rule_id,
         )
 
@@ -575,7 +551,7 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
         )
 
 
-class RuntimeVariantInfo(graphene.ObjectType):
+class RuntimeVariantInfo(graphene.ObjectType):  # type: ignore[misc]
     """Added in 24.03.5."""
 
     name = graphene.String()
@@ -586,7 +562,7 @@ class RuntimeVariantInfo(graphene.ObjectType):
         return cls(name=enum.value, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
 
 
-class Endpoint(graphene.ObjectType):
+class Endpoint(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -684,10 +660,10 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def from_row(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         row: EndpointRow,
     ) -> Self:
-        creator = cast(Optional[UserRow], row.created_user_row)
+        creator = cast(UserRow | None, row.created_user_row)
         return cls(
             endpoint_id=row.id,
             # image="", # deprecated, row.image_object.name,
@@ -724,13 +700,13 @@ class Endpoint(graphene.ObjectType):
             created_at=row.created_at,
             destroyed_at=row.destroyed_at,
             retries=row.retries,
-            routings=[await Routing.from_row(None, r, endpoint=row) for r in row.routings],
+            routings=[await Routing.from_row(ctx, r, endpoint=row) for r in row.routings],
             lifecycle_stage=row.lifecycle_stage.name,
             runtime_variant=RuntimeVariantInfo.from_enum(row.runtime_variant),
         )
 
     @classmethod
-    def from_dto(cls, ctx, dto: Optional[EndpointData]) -> Optional[Self]:
+    def from_dto(cls, ctx: GraphQueryContext, dto: EndpointData | None) -> Self | None:
         if dto is None:
             return None
         return cls(
@@ -774,12 +750,12 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_count(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         project: UUID | None = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
+        filter: str | None = None,
     ) -> int:
         query = sa.select(sa.func.count()).select_from(
             sa.join(
@@ -801,20 +777,20 @@ class Endpoint(graphene.ObjectType):
 
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
         cls,
-        ctx,  #: GraphQueryContext,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
-        project: Optional[UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
+        project: UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
@@ -856,14 +832,14 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_all(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
-        project: Optional[UUID] = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
+        project: UUID | None = None,
     ) -> Sequence[Self]:
         async with ctx.db.begin_readonly_session() as session:
-            rows = await EndpointRow.list(
+            rows = await EndpointRow.list_endpoint(
                 session,
                 project=project,
                 domain=domain_name,
@@ -877,11 +853,11 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_item(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         endpoint_id: UUID,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
         project: UUID | None = None,
     ) -> Self:
         """
@@ -901,8 +877,8 @@ class Endpoint(graphene.ObjectType):
                     load_session_owner=True,
                 )
                 return await cls.from_row(ctx, row)
-        except NoResultFound:
-            raise EndpointNotFound
+        except NoResultFound as e:
+            raise EndpointNotFound from e
 
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         match self.lifecycle_stage:
@@ -911,30 +887,18 @@ class Endpoint(graphene.ObjectType):
             case EndpointLifecycle.DESTROYING.name:
                 return EndpointStatus.DESTROYING
             case _:
-                if len(self.routings) == 0:
-                    return EndpointStatus.READY
-                if self.retries > SERVICE_MAX_RETRIES:
+                active_route_status_names = {s.name for s in RouteStatus.active_route_statuses()}
+                active_routings = [
+                    r for r in self.routings if r.status in active_route_status_names
+                ]
+                healthy_count = sum(
+                    1 for r in active_routings if r.status == RouteStatus.HEALTHY.name
+                )
+                if healthy_count == 0:
                     return EndpointStatus.UNHEALTHY
-                if (spawned_service_count := len([r for r in self.routings])) > 0:
-                    healthy_service_count = len([
-                        r for r in self.routings if r.status == RouteStatus.HEALTHY.name
-                    ])
-                    if healthy_service_count == spawned_service_count:
-                        return EndpointStatus.HEALTHY
-                    if healthy_service_count == 0:
-                        return EndpointStatus.UNHEALTHY
-                    problematic_service_count = len([
-                        r
-                        for r in self.routings
-                        if r.status
-                        in (
-                            RouteStatus.UNHEALTHY.name,
-                            RouteStatus.DEGRADED.name,
-                        )
-                    ])
-                    if problematic_service_count > 0:
-                        return EndpointStatus.DEGRADED
-                return EndpointStatus.PROVISIONING
+                if healthy_count == len(active_routings):
+                    return EndpointStatus.HEALTHY
+                return EndpointStatus.DEGRADED
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
         if not self.model:
@@ -988,22 +952,22 @@ class Endpoint(graphene.ObjectType):
 
         return errors
 
-    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx, "EndpointStatistics.by_endpoint"
         )
-        return await loader.load(self.endpoint_id)
+        return cast(Mapping[str, Any] | None, await loader.load(self.endpoint_id))
 
 
-class EndpointList(graphene.ObjectType):
+class EndpointList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(Endpoint, required=True)
 
 
-class ExtraMountInput(graphene.InputObjectType):
+class ExtraMountInput(graphene.InputObjectType):  # type: ignore[misc]
     """Added in 24.03.4."""
 
     vfolder_id = graphene.String()
@@ -1027,7 +991,7 @@ class ExtraMountInput(graphene.InputObjectType):
         )
 
 
-class ModifyEndpointInput(graphene.InputObjectType):
+class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
     resource_slots = graphene.JSONString()
     resource_opts = graphene.JSONString()
     cluster_mode = graphene.String()
@@ -1050,18 +1014,16 @@ class ModifyEndpointInput(graphene.InputObjectType):
     environ = graphene.JSONString(description="Added in 24.03.5.")
     runtime_variant = graphene.String(description="Added in 24.03.5.")
 
-    def to_action(
-        self, requester_ctx: RequesterCtx, endpoint_id: uuid.UUID, info: graphene.ResolveInfo
-    ) -> ModifyEndpointAction:
+    def to_action(self, endpoint_id: uuid.UUID, info: graphene.ResolveInfo) -> ModifyEndpointAction:
         def create_image_ref_from_input(graphene_image_input: ImageRefType) -> ImageRef:
-            registry: OptionalState = OptionalState.nop()
+            registry: OptionalState[str] = OptionalState.nop()
             if (
                 graphene_image_input.registry is not Undefined
                 and graphene_image_input.registry is not None
             ):
                 registry = OptionalState.update(graphene_image_input.registry)
 
-            architecture: OptionalState = OptionalState.nop()
+            architecture: OptionalState[str] = OptionalState.nop()
             if (
                 graphene_image_input.architecture is not Undefined
                 and graphene_image_input.architecture is not None
@@ -1071,7 +1033,7 @@ class ModifyEndpointInput(graphene.InputObjectType):
             return ImageRef(graphene_image_input.name, registry, architecture)
 
         def convert_runtime_variant(
-            value: Optional[str] | UndefinedType,
+            value: str | None | UndefinedType,
         ) -> RuntimeVariant | UndefinedType:
             if isinstance(value, UndefinedType):
                 return value
@@ -1080,8 +1042,8 @@ class ModifyEndpointInput(graphene.InputObjectType):
 
             try:
                 return RuntimeVariant(value)
-            except KeyError:
-                raise InvalidAPIParameters(f"Unsupported runtime {self.runtime_variant}")
+            except KeyError as e:
+                raise InvalidAPIParameters(f"Unsupported runtime {self.runtime_variant}") from e
 
         if self.desired_session_count is not Undefined and self.replicas is not Undefined:
             raise InvalidAPIParameters(
@@ -1135,13 +1097,12 @@ class ModifyEndpointInput(graphene.InputObjectType):
             ),
         )
         return ModifyEndpointAction(
-            requester_ctx=requester_ctx,
             endpoint_id=endpoint_id,
             updater=Updater(spec=spec, pk_value=endpoint_id),
         )
 
 
-class ModifyEndpoint(graphene.Mutation):
+class ModifyEndpoint(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -1155,7 +1116,7 @@ class ModifyEndpoint(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         endpoint_id: UUID,
         props: ModifyEndpointInput,
@@ -1163,12 +1124,6 @@ class ModifyEndpoint(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(
-            requester_ctx=RequesterCtx(
-                is_authorized=None,
-                user_role=graph_ctx.user["role"],
-                user_id=graph_ctx.user["uuid"],
-                domain_name=graph_ctx.user["domain_name"],
-            ),
             endpoint_id=endpoint_id,
             info=info,
         )
@@ -1183,7 +1138,7 @@ class ModifyEndpoint(graphene.Mutation):
 
 
 @graphene_federation.key("token")
-class EndpointToken(graphene.ObjectType):
+class EndpointToken(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -1199,7 +1154,7 @@ class EndpointToken(graphene.ObjectType):
     @classmethod
     async def from_row(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         row: EndpointTokenRow,
     ) -> Self:
         return cls(
@@ -1214,12 +1169,12 @@ class EndpointToken(graphene.ObjectType):
     @classmethod
     async def load_count(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
-        endpoint_id: Optional[UUID] = None,
-        project: Optional[UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
+        endpoint_id: UUID | None = None,
+        project: UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
     ) -> int:
         query = sa.select(sa.func.count()).select_from(EndpointTokenRow)
         if endpoint_id is not None:
@@ -1232,21 +1187,21 @@ class EndpointToken(graphene.ObjectType):
             query = query.filter(EndpointTokenRow.session_owner == user_uuid)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         limit: int,
         offset: int,
         *,
-        endpoint_id: Optional[UUID] = None,
+        endpoint_id: UUID | None = None,
         filter: str | None = None,
         order: str | None = None,
-        project: Optional[UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
+        project: UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointTokenRow)
@@ -1280,9 +1235,9 @@ class EndpointToken(graphene.ObjectType):
         ctx: GraphQueryContext,
         endpoint_id: UUID,
         *,
-        project: Optional[UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
+        project: UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
     ) -> Sequence[Self]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointTokenRow.list(
@@ -1297,20 +1252,20 @@ class EndpointToken(graphene.ObjectType):
     @classmethod
     async def load_item(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         token: str,
         *,
-        project: Optional[UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[UUID] = None,
+        project: UUID | None = None,
+        domain_name: str | None = None,
+        user_uuid: UUID | None = None,
     ) -> Self:
         try:
             async with ctx.db.begin_readonly_session() as session:
                 row = await EndpointTokenRow.get(
                     session, token, project=project, domain=domain_name, user_uuid=user_uuid
                 )
-        except NoResultFound:
-            raise EndpointTokenNotFound
+        except NoResultFound as e:
+            raise EndpointTokenNotFound from e
         return await cls.from_row(ctx, row)
 
     async def resolve_valid_until(
@@ -1330,7 +1285,7 @@ class EndpointToken(graphene.ObjectType):
         return datetime.datetime.fromtimestamp(decoded["exp"], tz=tzutc())
 
 
-class EndpointTokenList(graphene.ObjectType):
+class EndpointTokenList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 

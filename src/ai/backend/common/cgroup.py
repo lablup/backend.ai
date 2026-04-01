@@ -13,7 +13,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 import aiohttp
 
@@ -27,7 +27,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @dataclass
 class CgroupVersion:
-    version: Literal["v1"] | Literal["v2"]
+    version: Literal["1"] | Literal["2"]
     driver: Literal["systemd"] | Literal["cgroupfs"]
 
 
@@ -75,7 +75,7 @@ def get_cgroup_of_pid(controller: str, pid: PID) -> str:
     raise RuntimeError(f"could not find the cgroup of PID {pid}")
 
 
-def get_container_id_of_cgroup(cgroup: str) -> Optional[str]:
+def get_container_id_of_cgroup(cgroup: str) -> str | None:
     # cgroupfs driver: docker/<id>
     cgroupfs_prefix = "docker/"
     if cgroup.startswith(cgroupfs_prefix):
@@ -91,6 +91,7 @@ def get_container_id_of_cgroup(cgroup: str) -> Optional[str]:
 async def get_container_pids(cid: ContainerId) -> list[int]:
     cgroup_version = await get_docker_cgroup_version()
     log.debug("Cgroup version: {}, {}", cgroup_version.version, cgroup_version.driver)
+    tasks_path: Path
     match (cgroup_version.version, cgroup_version.driver):
         case ("2", "systemd"):
             tasks_path = Path(f"/sys/fs/cgroup/system.slice/docker-{cid}.scope/cgroup.procs")
@@ -98,7 +99,5 @@ async def get_container_pids(cid: ContainerId) -> list[int]:
             tasks_path = Path(f"/sys/fs/cgroup/docker/{cid}/cgroup.procs")
         case ("1", _):
             tasks_path = Path(f"/sys/fs/cgroup/pids/docker/{cid}/tasks")
-        case _:
-            raise RuntimeError("Should not reach here")
     tasks = await asyncio.get_running_loop().run_in_executor(None, tasks_path.read_text)
     return [*map(int, tasks.splitlines())]

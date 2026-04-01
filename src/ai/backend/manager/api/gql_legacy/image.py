@@ -6,7 +6,6 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
     overload,
@@ -74,23 +73,21 @@ from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
+    ForgetImageByIdAction,
 )
-from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.get_all_images import GetAllImagesAction
-from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
-from ai.backend.manager.services.image.actions.get_image_by_identifier import (
-    GetImageByIdentifierAction,
-)
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
 )
-from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
+from ai.backend.manager.services.image.actions.get_images import (
+    GetImageByIdAction,
+    GetImageByIdentifierAction,
     GetImagesByCanonicalsAction,
 )
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
 )
-from ai.backend.manager.services.image.actions.purge_image_by_id import PurgeImageByIdAction
+from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
 )
@@ -171,7 +168,7 @@ ImageStatusType = graphene.Enum.from_enum(ImageStatus, description="Added in 25.
 ImageTypeEnum = graphene.Enum.from_enum(ImageType, description="Added in 25.12.0.")
 
 
-class Image(graphene.ObjectType):
+class Image(graphene.ObjectType):  # type: ignore[misc]
     id = graphene.UUID()
     name = graphene.String(deprecation_reason="Deprecated since 24.12.0. use `namespace` instead")
     namespace = graphene.String(description="Added in 24.12.0.")
@@ -236,14 +233,13 @@ class Image(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_names: Sequence[str],
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> list[Self]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         result = await graph_ctx.processors.image.get_images_by_canonicals.wait_for_complete(
             GetImagesByCanonicalsAction(
                 image_canonicals=list(image_names),
-                user_role=graph_ctx.user["role"],
                 image_status=filter_by_statuses,
             )
         )
@@ -257,8 +253,8 @@ class Image(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_refs: Sequence[ImageRef],
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
-    ) -> Sequence[Optional[Image]]:
+        filter_by_statuses: list[ImageStatus] | None = None,
+    ) -> Sequence[Image | None]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         image_names = [x.canonical for x in image_refs]
@@ -269,14 +265,13 @@ class Image(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         id: UUID,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> Image:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         result = await ctx.processors.image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(
-                image_id=id,
-                user_role=ctx.user["role"],
+                image_id=ImageID(id),
                 image_status=filter_by_statuses,
             )
         )
@@ -288,14 +283,13 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         reference: str,
         architecture: str,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> Image:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         result = await ctx.processors.image.get_image_by_identifier.wait_for_complete(
             GetImageByIdentifierAction(
                 image_identifier=ImageIdentifier(reference, architecture),
-                user_role=ctx.user["role"],
                 image_status=filter_by_statuses,
             )
         )
@@ -307,7 +301,7 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         types: set[ImageLoadFilter] | None = None,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> Sequence[Image]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -335,6 +329,9 @@ class Image(graphene.ObjectType):
             )
             result = await conn.execute(query)
             allowed_docker_registries = result.scalar()
+
+        if allowed_docker_registries is None:
+            return []
 
         filtered_items: list[Image] = [
             item for item in items if item.registry in allowed_docker_registries
@@ -388,7 +385,7 @@ class Image(graphene.ObjectType):
         return False
 
 
-class ImagePermissionValueField(graphene.Scalar):
+class ImagePermissionValueField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 25.3.0. One of {[val.value for val in ImagePermission]}."
 
@@ -397,7 +394,9 @@ class ImagePermissionValueField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None):
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> ImagePermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return ImagePermission(node.value)
         return None
@@ -408,7 +407,7 @@ class ImagePermissionValueField(graphene.Scalar):
 
 
 @graphene_federation.key("id")
-class ImageNode(graphene.ObjectType):
+class ImageNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -471,7 +470,7 @@ class ImageNode(graphene.ObjectType):
             graph_ctx, self._batch_load_installed_agents
         )
         agent_ids = await loader.load(self.row_id)
-        agent_ids = cast(Optional[set[AgentId]], agent_ids)
+        agent_ids = cast(set[AgentId] | None, agent_ids)
         return agent_ids is not None and len(agent_ids) > 0
 
     @classmethod
@@ -479,7 +478,7 @@ class ImageNode(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         name_and_arch: Sequence[tuple[str, str]],
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> Sequence[Sequence[ImageNode]]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -506,7 +505,7 @@ class ImageNode(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_ids: Sequence[ImageIdentifier],
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
     ) -> Sequence[Sequence[ImageNode]]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -522,22 +521,30 @@ class ImageNode(graphene.ObjectType):
     @overload
     @classmethod
     def from_row(
-        cls, graph_ctx, row: ImageRow, *, permissions: Optional[Iterable[ImagePermission]] = None
+        cls,
+        graph_ctx: GraphQueryContext,
+        row: ImageRow,
+        *,
+        permissions: Iterable[ImagePermission] | None = None,
     ) -> ImageNode: ...
 
     @overload
     @classmethod
     def from_row(
-        cls, graph_ctx, row: None, *, permissions: Optional[Iterable[ImagePermission]] = None
+        cls,
+        graph_ctx: GraphQueryContext,
+        row: None,
+        *,
+        permissions: Iterable[ImagePermission] | None = None,
     ) -> None: ...
 
     @classmethod
     def from_row(
         cls,
-        graph_ctx,
-        row: Optional[ImageRow],
+        graph_ctx: GraphQueryContext,
+        row: ImageRow | None,
         *,
-        permissions: Optional[Iterable[ImagePermission]] = None,
+        permissions: Iterable[ImagePermission] | None = None,
     ) -> ImageNode | None:
         if row is None:
             return None
@@ -575,9 +582,11 @@ class ImageNode(graphene.ObjectType):
 
     @classmethod
     def from_legacy_image(
-        cls, image: Image, *, permissions: Optional[Iterable[ImagePermission]] = None
+        cls, image: Image, *, permissions: Iterable[ImagePermission] | None = None
     ) -> ImageNode:
-        labels: dict[str, str] = {kvpair.key: kvpair.value for kvpair in cast(list, image.labels)}
+        labels: dict[str, str] = {
+            kvpair.key: kvpair.value for kvpair in cast(list[Any], image.labels)
+        }
         image_type = labels.get(LabelName.ROLE, ImageType.COMPUTE.value)
         return cls(
             id=image.id,
@@ -611,7 +620,7 @@ class ImageNode(graphene.ObjectType):
         id: ResolvedGlobalID,
         scope_id: ScopeType,
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
 
         _, image_id = id
@@ -648,14 +657,14 @@ class ImageNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         permission: ImagePermission,
-        filter_by_statuses: Optional[list[ImageStatus]] = None,
-        filter_expr: Optional[str] = None,
-        order_expr: Optional[str] = None,
-        offset: Optional[int] = None,
-        after: Optional[str] = None,
-        first: Optional[int] = None,
-        before: Optional[str] = None,
-        last: Optional[int] = None,
+        filter_by_statuses: list[ImageStatus] | None = None,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
@@ -719,13 +728,12 @@ class ImageNode(graphene.ObjectType):
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     # TODO: Introduce access control logic considering scope and permission
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> Image:
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> Image:
         ctx: GraphQueryContext = info.context
         _, image_id = AsyncNode.resolve_global_id(info, self.id)
         action_result = await ctx.processors.image.get_image_by_id.wait_for_complete(
             GetImageByIdAction(
-                image_id=UUID(image_id),
-                user_role=ctx.user["role"],
+                image_id=ImageID(UUID(image_id)),
                 image_status=None,
             )
         )
@@ -739,7 +747,7 @@ class ImageConnection(Connection):
         description = "Added in 25.3.0."
 
 
-class ForgetImageById(graphene.Mutation):
+class ForgetImageById(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.03.0."""
 
     allowed_roles = (
@@ -767,11 +775,7 @@ class ForgetImageById(graphene.Mutation):
         ctx: GraphQueryContext = info.context
 
         result = await ctx.processors.image.forget_image_by_id.wait_for_complete(
-            ForgetImageByIdAction(
-                user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
-                image_id=image_uuid,
-            )
+            ForgetImageByIdAction(image_id=ImageID(image_uuid))
         )
 
         return ForgetImageById(
@@ -779,7 +783,7 @@ class ForgetImageById(graphene.Mutation):
         )
 
 
-class ForgetImage(graphene.Mutation):
+class ForgetImage(graphene.Mutation):  # type: ignore[misc]
     """
     Deprecated since 25.4.0. Use `forget_image_by_id` instead.
     """
@@ -792,7 +796,10 @@ class ForgetImage(graphene.Mutation):
 
     class Arguments:
         reference = graphene.String(required=True)
-        architecture = graphene.String(default_value=DEFAULT_IMAGE_ARCH)
+        architecture = graphene.String(
+            default_value=None,
+            description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
+        )
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -803,17 +810,16 @@ class ForgetImage(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         reference: str,
-        architecture: str,
+        architecture: str | None,
     ) -> ForgetImage:
         log.info("forget image {0} by API request", reference)
         ctx: GraphQueryContext = info.context
+        arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
         result = await ctx.processors.image.forget_image.wait_for_complete(
             ForgetImageAction(
-                user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
                 reference=reference,
-                architecture=architecture,
+                architecture=arch,
             )
         )
 
@@ -822,7 +828,7 @@ class ForgetImage(graphene.Mutation):
         )
 
 
-class PurgeImageOptions(graphene.InputObjectType):
+class PurgeImageOptions(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.10.0.
     """
@@ -833,7 +839,7 @@ class PurgeImageOptions(graphene.InputObjectType):
     )
 
 
-class PurgeImageById(graphene.Mutation):
+class PurgeImageById(graphene.Mutation):  # type: ignore[misc]
     """Added in 25.4.0."""
 
     allowed_roles = (
@@ -865,25 +871,21 @@ class PurgeImageById(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.purge_image_by_id.wait_for_complete(
             PurgeImageByIdAction(
-                user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
-                image_id=image_uuid,
+                image_id=ImageID(image_uuid),
             )
         )
 
         if options.remove_from_registry:
             await ctx.processors.image.untag_image_from_registry.wait_for_complete(
                 UntagImageFromRegistryAction(
-                    user_id=ctx.user["uuid"],
-                    client_role=ctx.user["role"],
-                    image_id=image_uuid,
+                    image_id=ImageID(image_uuid),
                 )
             )
 
         return PurgeImageById(image=ImageNode.from_row(ctx, ImageRow.from_dataclass(result.image)))
 
 
-class UntagImageFromRegistry(graphene.Mutation):
+class UntagImageFromRegistry(graphene.Mutation):  # type: ignore[misc]
     """Deprecated since 25.10.0. Use `purge_image_by_id` with `remove_from_registry` option instead."""
 
     allowed_roles = (
@@ -911,9 +913,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.untag_image_from_registry.wait_for_complete(
             UntagImageFromRegistryAction(
-                user_id=ctx.user["uuid"],
-                client_role=ctx.user["role"],
-                image_id=image_uuid,
+                image_id=ImageID(image_uuid),
             )
         )
 
@@ -922,7 +922,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         )
 
 
-class PreloadImage(graphene.Mutation):
+class PreloadImage(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -943,7 +943,7 @@ class PreloadImage(graphene.Mutation):
         return PreloadImage(ok=False, msg="Not implemented.", task_id=None)
 
 
-class UnloadImage(graphene.Mutation):
+class UnloadImage(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -964,7 +964,7 @@ class UnloadImage(graphene.Mutation):
         return UnloadImage(ok=False, msg="Not implemented.", task_id=None)
 
 
-class RescanImages(graphene.Mutation):
+class RescanImages(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -979,8 +979,8 @@ class RescanImages(graphene.Mutation):
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        registry: Optional[str] = None,
-        project: Optional[str] = None,
+        registry: str | None = None,
+        project: str | None = None,
     ) -> RescanImages:
         log.info(
             "rescanning docker registry {0} by API request",
@@ -988,7 +988,7 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult:
+        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult[Any]:
             if registry is None:
                 all_registries = await ctx.processors.container_registry.load_all_container_registries.wait_for_complete(
                     LoadAllContainerRegistriesAction()
@@ -1029,13 +1029,16 @@ class RescanImages(graphene.Mutation):
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
-class AliasImage(graphene.Mutation):
+class AliasImage(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
         alias = graphene.String(required=True)
         target = graphene.String(required=True)
-        architecture = graphene.String(default_value=DEFAULT_IMAGE_ARCH)
+        architecture = graphene.String(
+            default_value=None,
+            description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
+        )
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -1046,15 +1049,16 @@ class AliasImage(graphene.Mutation):
         info: graphene.ResolveInfo,
         alias: str,
         target: str,
-        architecture: str,
+        architecture: str | None,
     ) -> AliasImage:
         log.info("alias image {0} -> {1} by API request", alias, target)
         ctx: GraphQueryContext = info.context
+        arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
         await ctx.processors.image.alias_image.wait_for_complete(
             AliasImageAction(
                 image_canonical=target,
-                architecture=architecture,
+                architecture=arch,
                 alias=alias,
             )
         )
@@ -1062,7 +1066,7 @@ class AliasImage(graphene.Mutation):
         return AliasImage(ok=True, msg="")
 
 
-class DealiasImage(graphene.Mutation):
+class DealiasImage(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1089,7 +1093,7 @@ class DealiasImage(graphene.Mutation):
         return DealiasImage(ok=True, msg="")
 
 
-class ClearImages(graphene.Mutation):
+class ClearImages(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -1127,7 +1131,7 @@ class ClearImages(graphene.Mutation):
         return ClearImages(ok=True, msg="")
 
 
-class ModifyImageInput(graphene.InputObjectType):
+class ModifyImageInput(graphene.InputObjectType):  # type: ignore[misc]
     name = graphene.String(required=False)
     registry = graphene.String(required=False)
     image = graphene.String(required=False)
@@ -1147,9 +1151,17 @@ class ModifyImageInput(graphene.InputObjectType):
             resources_data = {}
             for limit_option in self.resource_limits:
                 limit_data = {}
-                if limit_option.min is not Undefined and len(limit_option.min) > 0:
+                if (
+                    limit_option.min is not Undefined
+                    and limit_option.min is not None
+                    and len(limit_option.min) > 0
+                ):
                     limit_data["min"] = limit_option.min
-                if limit_option.max is not Undefined and len(limit_option.max) > 0:
+                if (
+                    limit_option.max is not Undefined
+                    and limit_option.max is not None
+                    and len(limit_option.max) > 0
+                ):
                     limit_data["max"] = limit_option.max
                 resources_data[limit_option.key] = limit_data
 
@@ -1178,12 +1190,16 @@ class ModifyImageInput(graphene.InputObjectType):
         )
 
 
-class ModifyImage(graphene.Mutation):
+class ModifyImage(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
         target = graphene.String(required=True, default_value=None)
-        architecture = graphene.String(required=False, default_value=DEFAULT_IMAGE_ARCH)
+        architecture = graphene.String(
+            required=False,
+            default_value=None,
+            description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
+        )
         props = ModifyImageInput(required=True)
 
     ok = graphene.Boolean()
@@ -1194,16 +1210,17 @@ class ModifyImage(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         target: str,
-        architecture: str,
+        architecture: str | None,
         props: ModifyImageInput,
     ) -> AliasImage:
         ctx: GraphQueryContext = info.context
         log.info("modify image {0} by API request", target)
+        arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
         await ctx.processors.image.modify_image.wait_for_complete(
             ModifyImageAction(
                 target=target,
-                architecture=architecture,
+                architecture=arch,
                 updater_spec=props.to_updater_spec(),
             )
         )
@@ -1211,7 +1228,7 @@ class ModifyImage(graphene.Mutation):
         return ModifyImage(ok=True, msg="")
 
 
-class PurgeImagesKey(graphene.InputObjectType):
+class PurgeImagesKey(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -1220,7 +1237,7 @@ class PurgeImagesKey(graphene.InputObjectType):
     images = graphene.List(ImageRefType, required=True)
 
 
-class PurgeImagesOptions(graphene.InputObjectType):
+class PurgeImagesOptions(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -1234,7 +1251,7 @@ class PurgeImagesOptions(graphene.InputObjectType):
     )
 
 
-class PurgeImagesPayload(graphene.ObjectType):
+class PurgeImagesPayload(graphene.ObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -1243,7 +1260,7 @@ class PurgeImagesPayload(graphene.ObjectType):
     allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
 
 
-class PurgeImages(graphene.Mutation):
+class PurgeImages(graphene.Mutation):  # type: ignore[misc]
     """
     Added in 25.4.0.
     """
@@ -1296,16 +1313,20 @@ class PurgeImages(graphene.Mutation):
         return PurgeImagesPayload(task_id=task_id)
 
 
-class ClearImageCustomResourceLimitKey(graphene.InputObjectType):
+class ClearImageCustomResourceLimitKey(graphene.InputObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
 
     image_canonical = graphene.String(required=True)
-    architecture = graphene.String(required=True, default_value=DEFAULT_IMAGE_ARCH)
+    architecture = graphene.String(
+        required=False,
+        default_value=None,
+        description="Changed to nullable in 26.1. If not provided, defaults to the Manager's architecture.",
+    )
 
 
-class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
+class ClearImageCustomResourceLimitPayload(graphene.ObjectType):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -1314,7 +1335,7 @@ class ClearImageCustomResourceLimitPayload(graphene.ObjectType):
     allowed_roles = (UserRole.SUPERADMIN,)
 
 
-class ClearImageCustomResourceLimit(graphene.Mutation):
+class ClearImageCustomResourceLimit(graphene.Mutation):  # type: ignore[misc]
     """
     Added in 25.6.0.
     """
@@ -1330,14 +1351,15 @@ class ClearImageCustomResourceLimit(graphene.Mutation):
         info: graphene.ResolveInfo,
         key: ClearImageCustomResourceLimitKey,
     ) -> ClearImageCustomResourceLimitPayload:
+        arch = key.architecture if key.architecture is not None else DEFAULT_IMAGE_ARCH
         log.info(
-            f'clear custom resource limits for image "{key.image_canonical}" ({key.architecture}) by API request',
+            f'clear custom resource limits for image "{key.image_canonical}" ({arch}) by API request',
         )
         ctx: GraphQueryContext = info.context
         result = await ctx.processors.image.clear_image_custom_resource_limit.wait_for_complete(
             ClearImageCustomResourceLimitAction(
                 image_canonical=key.image_canonical,
-                architecture=key.architecture,
+                architecture=arch,
             )
         )
         return ClearImageCustomResourceLimitPayload(

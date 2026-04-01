@@ -12,10 +12,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Final,
-    Generic,
-    Optional,
     Self,
-    TypeAlias,
     TypeVar,
 )
 from uuid import UUID
@@ -39,6 +36,12 @@ from ai.backend.common.metrics.metric import (
     EventMetricObserver,
     SystemMetricObserver,
 )
+from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
+from ai.backend.common.metrics.safe import (
+    SafeCounter,
+    SafeGauge,
+    SafeHistogram,
+)
 from ai.backend.common.types import (
     MetricKey,
     MetricValue,
@@ -54,7 +57,7 @@ if TYPE_CHECKING:
 
 
 class ProxyMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     _upstream_request_sent_http: prometheus_client.Counter
     _upstream_response_received_http: prometheus_client.Counter
@@ -80,104 +83,107 @@ class ProxyMetricObserver:
     _connection_total_traffics_tcp: prometheus_client.Histogram
 
     def __init__(self) -> None:
-        self._upstream_request_sent_http = prometheus_client.Counter(
+        self._upstream_request_sent_http = SafeCounter(
             name="appproxy_upstream_request_sent_http",
             labelnames=["remote"],
             documentation="Total number of HTTP requests sent to upstream",
         )
         self._upstream_request_sent_http.labels(remote="").inc(0)
-        self._upstream_response_received_http = prometheus_client.Counter(
+        self._upstream_response_received_http = SafeCounter(
             name="appproxy_upstream_response_received_http",
             labelnames=["remote"],
             documentation="Total number of HTTP responses received from upstream",
         )
         self._upstream_response_received_http.labels(remote="").inc(0)
-        self._requests_received_http = prometheus_client.Counter(
+        self._requests_received_http = SafeCounter(
             name="appproxy_requests_received_http",
             labelnames=["remote"],
             documentation="Total number of HTTP requests received from downstream",
         )
         self._requests_received_http.labels(remote="").inc(0)
-        self._responses_sent_http = prometheus_client.Counter(
+        self._responses_sent_http = SafeCounter(
             name="appproxy_responses_sent_http",
             labelnames=["remote"],
             documentation="Total number of HTTP responses sent to downstream",
         )
         self._responses_sent_http.labels(remote="").inc(0)
-        self._pending_requests_http = prometheus_client.Gauge(
+        self._pending_requests_http = SafeGauge(
             name="appproxy_pending_requests_http",
             labelnames=["remote"],
             documentation="Ongoing HTTP proxy requests initiated by downstream",
+            multiprocess_mode="livesum",
         )
         self._pending_requests_http.labels(remote="").set(0)
-        self._proxy_request_iteration_duration_http = prometheus_client.Histogram(
+        self._proxy_request_iteration_duration_http = SafeHistogram(
             name="appproxy_proxy_request_iteration_duration_http",
             labelnames=["remote"],
             documentation="Total seconds taken to complete each HTTP proxy request",
         )
-        self._request_body_size_http = prometheus_client.Histogram(
+        self._request_body_size_http = SafeHistogram(
             name="appproxy_request_body_size_http",
             labelnames=["remote"],
             documentation="Request body size measured for each HTTP proxy request",
         )
-        self._response_body_size_http = prometheus_client.Histogram(
+        self._response_body_size_http = SafeHistogram(
             name="appproxy_response_body_size_http",
             labelnames=["remote"],
             documentation="Byte length of the response body generated from upstream HTTP response",
         )
-        self._connections_established_ws = prometheus_client.Counter(
+        self._connections_established_ws = SafeCounter(
             name="appproxy_connections_established_ws",
             documentation="Total number of WebSocket connections established",
         )
         self._connections_established_ws.inc(0)
-        self._connections_closed_ws = prometheus_client.Counter(
+        self._connections_closed_ws = SafeCounter(
             name="appproxy_connections_closed_ws",
             documentation="Total number of WebSocket connections closed",
         )
         self._connections_closed_ws.inc(0)
-        self._pending_connections_ws = prometheus_client.Gauge(
+        self._pending_connections_ws = SafeGauge(
             name="appproxy_pending_connections_ws",
             documentation="Ongoing WebSocket proxy connections",
+            multiprocess_mode="livesum",
         )
         self._pending_connections_ws.set(0)
-        self._proxy_request_iteration_duration_ws = prometheus_client.Histogram(
+        self._proxy_request_iteration_duration_ws = SafeHistogram(
             name="appproxy_proxy_request_iteration_duration_ws",
             documentation="Total seconds taken to complete each WebSocket proxy request",
         )
-        self._connection_processed_traffics_ws = prometheus_client.Counter(
+        self._connection_processed_traffics_ws = SafeCounter(
             name="appproxy_connection_processed_traffics_ws",
             documentation="Number of bytes transferred from each WebSocket connection bidirectionally, updated on-the-fly",
         )
         self._connection_processed_traffics_ws.inc(0)
-        self._connection_total_traffics_ws = prometheus_client.Histogram(
+        self._connection_total_traffics_ws = SafeHistogram(
             name="appproxy_connection_total_traffics_ws",
             documentation="Number of bytes transferred from each WebSocket connection bidirectionally, updated after WebSocket connection closes",
         )
-        self._connections_established_tcp = prometheus_client.Counter(
+        self._connections_established_tcp = SafeCounter(
             name="appproxy_connections_established_tcp",
             documentation="Total number of TCP connections established",
         )
         self._connections_established_tcp.inc(0)
-        self._connections_closed_tcp = prometheus_client.Counter(
+        self._connections_closed_tcp = SafeCounter(
             name="appproxy_connections_closed_tcp",
             documentation="Total number of TCP connections closed",
         )
         self._connections_closed_tcp.inc(0)
-        self._pending_connections_tcp = prometheus_client.Gauge(
+        self._pending_connections_tcp = SafeGauge(
             name="appproxy_pending_connections_tcp",
             documentation="Ongoing TCP proxy connections",
+            multiprocess_mode="livesum",
         )
         self._pending_connections_tcp.set(0)
-        self._proxy_request_iteration_duration_tcp = prometheus_client.Histogram(
+        self._proxy_request_iteration_duration_tcp = SafeHistogram(
             name="appproxy_proxy_request_iteration_duration_tcp",
             documentation="Total seconds taken to complete each TCP proxy request",
         )
-        self._connection_processed_traffics_tcp = prometheus_client.Counter(
+        self._connection_processed_traffics_tcp = SafeCounter(
             name="appproxy_connection_processed_traffics_tcp",
             documentation="Number of bytes transferred from each TCP connection bidirectionally, updated on-the-fly",
         )
         self._connection_processed_traffics_tcp.inc(0)
-        self._connection_total_traffics_tcp = prometheus_client.Histogram(
+        self._connection_total_traffics_tcp = SafeHistogram(
             name="appproxy_connection_total_traffics_tcp",
             documentation="Number of bytes transferred from each TCP connection bidirectionally, updated on-the-fly",
         )
@@ -232,7 +238,7 @@ class ProxyMetricObserver:
 
 
 class CircuitMetricObserver:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     @classmethod
     def instance(cls) -> Self:
@@ -244,16 +250,17 @@ class CircuitMetricObserver:
     _alive_circuits: prometheus_client.Gauge
 
     def __init__(self) -> None:
-        self._circuits_created = prometheus_client.Counter(
+        self._circuits_created = SafeCounter(
             name="appproxy_circuits_created",
             labelnames=["protocol"],
             documentation="Total number of AppProxy circuits created on this Worker. `endpoint_id` is provided only when circuit is INFERENCE type. `user_id` is provided only when circuit is INTERACTIVE type.",
         )
         self._circuits_created.labels(protocol="").inc(0)
-        self._alive_circuits = prometheus_client.Gauge(
+        self._alive_circuits = SafeGauge(
             name="appproxy_alive_circuits",
             labelnames=["protocol"],
             documentation="Total number of AppProxy circuits created on this Worker. `endpoint_id` is provided only when circuit is INFERENCE type. `user_id` is provided only when circuit is INTERACTIVE type.",
+            multiprocess_mode="livesum",
         )
         self._alive_circuits.labels(protocol="").set(0)
 
@@ -266,7 +273,7 @@ class CircuitMetricObserver:
 
 
 class WorkerMetricRegistry:
-    _instance: Optional[Self] = None
+    _instance: Self | None = None
 
     api: APIMetricObserver
     proxy: ProxyMetricObserver
@@ -282,14 +289,14 @@ class WorkerMetricRegistry:
         self.system = SystemMetricObserver.instance()
 
     @classmethod
-    def instance(cls):
+    def instance(cls) -> Self:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
 
     def to_prometheus(self) -> str:
         self.system.observe()
-        return prometheus_client.generate_latest().decode("utf-8")
+        return generate_latest_multiprocess().decode("utf-8")
 
 
 @dataclass
@@ -305,7 +312,7 @@ class PrometheusMetrics:
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class RootContext:
     pidx: int
-    proxy_frontend: BaseFrontend
+    proxy_frontend: BaseFrontend[Any, Any]
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
     valkey_live: ValkeyLiveClient
@@ -320,7 +327,7 @@ class RootContext:
     health_probe: HealthProbe
 
 
-CleanupContext: TypeAlias = Callable[["RootContext"], AbstractAsyncContextManager[None]]
+type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 TCircuitKey = TypeVar("TCircuitKey", int, str)
 
 
@@ -367,7 +374,7 @@ class Circuit(SerializableCircuit):
         MetricKey, dict[UUID, Metric | HistogramMetric]
     ]  # [Metric Key:[Route id: Metric]] pair
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._app_inference_metrics = {}
         self._replica_inference_metrics = {}
@@ -444,21 +451,21 @@ class MetricTypes(enum.Enum):
 @dataclass
 class Measurement:
     value: Decimal
-    capacity: Optional[Decimal] = dataclasses.field(default=None)
+    capacity: Decimal | None = dataclasses.field(default=None)
 
 
 @dataclass
 class HistogramMeasurement:
     buckets: Mapping[str, Decimal]
-    count: Optional[int] = dataclasses.field(default=None)
-    sum: Optional[Decimal] = dataclasses.field(default=None)
+    count: int | None = dataclasses.field(default=None)
+    sum: Decimal | None = dataclasses.field(default=None)
 
 
 TMeasurement = TypeVar("TMeasurement", bound=Measurement | HistogramMeasurement)
 
 
 @dataclass
-class InferenceMeasurement(Generic[TMeasurement]):
+class InferenceMeasurement[TMeasurement: Measurement | HistogramMeasurement]:
     """
     Collection of per-inference framework statistics for a specific metric.
     """
@@ -489,7 +496,7 @@ class MovingStatistics:
     _max: Decimal
     _last: list[tuple[Decimal, float]]
 
-    def __init__(self, initial_value: Optional[Decimal] = None) -> None:
+    def __init__(self, initial_value: Decimal | None = None) -> None:
         self._last = []
         if initial_value is None:
             self._sum = Decimal(0)
@@ -504,7 +511,7 @@ class MovingStatistics:
             point = (initial_value, time.perf_counter())
             self._last.append(point)
 
-    def update(self, value: Decimal):
+    def update(self, value: Decimal) -> None:
         self._sum += value
         self._min = min(self._min, value)
         self._max = max(self._max, value)
@@ -566,10 +573,10 @@ class Metric:
     stats: MovingStatistics
     stats_filter: frozenset[str]
     current: Decimal
-    capacity: Optional[Decimal] = None
-    current_hook: Optional[Callable[[Metric], Decimal]] = None
+    capacity: Decimal | None = None
+    current_hook: Callable[[Metric], Decimal] | None = None
 
-    def update(self, value: Measurement):
+    def update(self, value: Measurement) -> None:
         if value.capacity is not None:
             self.capacity = value.capacity
         self.stats.update(value.value)
@@ -581,7 +588,7 @@ class Metric:
         q = Decimal("0.000")
         q_pct = Decimal("0.00")
         return {
-            "__type": self.type.name,  # type: ignore
+            "__type": self.type.name,
             "current": str(remove_exponent(self.current.quantize(q))),
             "capacity": (
                 str(remove_exponent(self.capacity.quantize(q)))
@@ -611,17 +618,17 @@ class HistogramMetric:
     key: str
     threshold_unit: str
     buckets: Mapping[str, Decimal]
-    count: Optional[int]
-    sum: Optional[Decimal]
+    count: int | None
+    sum: Decimal | None
 
     type = MetricTypes.HISTOGRAM
 
     def update(
         self,
         buckets: Mapping[str, Decimal],
-        count: Optional[int] = None,
-        sum: Optional[Decimal] = None,
-    ):
+        count: int | None = None,
+        sum: Decimal | None = None,
+    ) -> None:
         self.buckets = buckets
         self.count = count
         self.sum = sum

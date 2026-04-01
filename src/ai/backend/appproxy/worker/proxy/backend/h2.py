@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 import aiohttp
 from yarl import URL
@@ -16,7 +17,7 @@ class BackendConfig:
 class H2Backend(BaseBackend):
     api_endpoint: URL
 
-    def __init__(self, api_endpoint: URL, *args, **kwargs) -> None:
+    def __init__(self, api_endpoint: URL, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.api_endpoint = api_endpoint
 

@@ -4,8 +4,9 @@ import secrets
 import shutil
 import subprocess
 from collections import defaultdict
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Generator
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import aiodocker
@@ -15,6 +16,7 @@ from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.resources import ResourceAllocator
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common import config
+from ai.backend.common import config as common_config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import HostPortPair
@@ -22,7 +24,6 @@ from ai.backend.logging import LocalLogger
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat, LogLevel
 from ai.backend.testutils.bootstrap import (  # noqa: F401
-    HostPortPairModel,
     etcd_container,
     redis_container,
     sync_file_lock,
@@ -31,18 +32,25 @@ from ai.backend.testutils.pants import get_parallel_slot
 
 
 @pytest.fixture(scope="session")
-def test_id():
+def test_id() -> str:
     return f"testing-{secrets.token_urlsafe(8)}"
 
 
 @pytest.fixture(scope="session")
-def logging_config():
+def logging_config() -> Generator[LoggingConfig, None, None]:
     config = LoggingConfig(
+        version=1,
+        disable_existing_loggers=False,
+        handlers={},
+        loggers={},
         drivers=[LogDriver.CONSOLE],
         console=ConsoleConfig(
             colored=None,
             format=LogFormat.VERBOSE,
         ),
+        file=None,
+        logstash=None,
+        graylog=None,
         level=LogLevel.DEBUG,
         pkg_ns={
             "": LogLevel.INFO,
@@ -60,15 +68,16 @@ def logging_config():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def patch_dummy_agent_config():
+def patch_dummy_agent_config() -> Generator[None, None, None]:
     """Patch read_from_file to provide default config for DummyAgent in tests."""
-    from ai.backend.common import config as common_config
 
     original_read_from_file = common_config.read_from_file
 
-    def patched_read_from_file(path, filesystem_type=""):
+    def patched_read_from_file(
+        toml_path: Path | str | None, daemon_name: str
+    ) -> tuple[dict[str, Any], Path]:
         # Check if this is the dummy agent config file
-        if "agent.dummy.toml" in str(path):
+        if toml_path and "agent.dummy.toml" in str(toml_path):
             # Return minimal config structure - trafaret will fill in defaults
             return (
                 {
@@ -76,10 +85,10 @@ def patch_dummy_agent_config():
                     "kernel-creation-ctx": {"delay": {}},
                     "kernel": {"delay": {}},
                 },
-                None,
+                Path(str(toml_path)),
             )
         # Otherwise use original function
-        return original_read_from_file(path, filesystem_type)
+        return original_read_from_file(toml_path, daemon_name)
 
     # Manual patching for session scope
     common_config.read_from_file = patched_read_from_file
@@ -89,7 +98,12 @@ def patch_dummy_agent_config():
 
 
 @pytest.fixture(scope="session")
-def local_config(test_id, logging_config, etcd_container, redis_container):  # noqa: F811
+def local_config(
+    test_id: str,
+    logging_config: LoggingConfig,
+    etcd_container: Any,  # noqa: F811
+    redis_container: Any,  # noqa: F811
+) -> Generator[AgentUnifiedConfig, None, None]:
     ipc_base_path = Path.cwd() / f".tmp/{test_id}/agent-ipc"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"
@@ -157,7 +171,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
     }
     server_config = AgentUnifiedConfig.model_validate(raw_server_config)
 
-    def _override_if_exists(src: dict, dst: dict, key: str) -> None:
+    def _override_if_exists(src: dict[str, Any], dst: dict[str, Any], key: str) -> None:
         sentinel = object()
         if (val := src.get(key, sentinel)) is not sentinel:
             dst[key] = val
@@ -179,7 +193,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
 
 
 @pytest.fixture(scope="session", autouse=True)
-def test_local_instance_id(session_mocker, test_id):
+def test_local_instance_id(session_mocker: Any, test_id: str) -> Generator[None, None, None]:
     mock_generate_local_instance_id = session_mocker.patch(
         "ai.backend.agent.agent.generate_local_instance_id",
     )
@@ -188,8 +202,8 @@ def test_local_instance_id(session_mocker, test_id):
 
 
 @pytest.fixture(scope="session")
-def prepare_images():
-    async def pull():
+def prepare_images() -> None:
+    async def pull() -> None:
         docker = aiodocker.Docker()
         images_to_pull = [
             "alpine:3.8",
@@ -209,6 +223,7 @@ def prepare_images():
     # Here we cannot just use "event_loop" fixture because this fixture
     # is session-scoped and pytest does not allow calling function-scoped fixtuers
     # from session-scoped fixtures.
+    old_loop: asyncio.AbstractEventLoop | None = None
     try:
         old_loop = asyncio.get_event_loop()
     except RuntimeError as exc:
@@ -217,11 +232,12 @@ def prepare_images():
     try:
         asyncio.run(pull())
     finally:
-        asyncio.set_event_loop(old_loop)
+        if old_loop is not None:
+            asyncio.set_event_loop(old_loop)
 
 
 @pytest.fixture(scope="session")
-def socket_relay_image():
+def socket_relay_image() -> None:
     # Since pulling all LFS files takes too much GitHub storage bandwidth in CI,
     # we fetch the only required image for tests on demand.
     build_root = os.environ.get("BACKEND_BUILD_ROOT", os.getcwd())
@@ -249,7 +265,7 @@ def socket_relay_image():
 
 
 @pytest.fixture
-async def docker():
+async def docker() -> AsyncIterator[aiodocker.Docker]:
     docker = aiodocker.Docker()
     try:
         yield docker
@@ -258,11 +274,11 @@ async def docker():
 
 
 @pytest.fixture
-async def create_container(test_id, docker):
+async def create_container(test_id: str, docker: aiodocker.Docker) -> AsyncIterator[Any]:
     container = None
     cont_id = secrets.token_urlsafe(4)
 
-    async def _create_container(config):
+    async def _create_container(config: dict[str, Any]) -> Any:
         nonlocal container
         container = await docker.containers.create_or_replace(
             config=config,
@@ -278,7 +294,7 @@ async def create_container(test_id, docker):
 
 
 @pytest.fixture
-def mock_resource_allocator(mocker) -> AsyncMock:
+def mock_resource_allocator(mocker: Any) -> AsyncMock:
     """
     Mock ResourceAllocator to avoid real resource scanning in tests.
 
@@ -307,9 +323,9 @@ def mock_resource_allocator(mocker) -> AsyncMock:
 @pytest.fixture
 async def agent_runtime(
     local_config: AgentUnifiedConfig,
-    etcd,
-    mocker,
-    mock_resource_allocator,
+    etcd: Any,
+    mocker: Any,
+    mock_resource_allocator: AsyncMock,
 ) -> AsyncIterator[AgentRuntime]:
     """
     Create a real AgentRuntime instance for integration testing.

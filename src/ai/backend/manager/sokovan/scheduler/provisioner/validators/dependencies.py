@@ -2,7 +2,7 @@
 
 from ai.backend.common.types import SessionResult
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.sokovan.scheduler.types import SessionWorkload, SystemSnapshot
+from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
 
 from .exceptions import DependenciesNotSatisfied
 from .validator import ValidatorRule

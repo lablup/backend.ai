@@ -195,6 +195,75 @@ class ResourcePresetNotFound(ObjectNotFound):
         )
 
 
+class RuntimeVariantNotFound(ObjectNotFound):
+    object_name = "runtime variant"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RUNTIME_VARIANT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class RuntimeVariantConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-runtime-variant"
+    error_title = "Duplicate Runtime Variant"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RUNTIME_VARIANT,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class RuntimeVariantPresetNotFound(ObjectNotFound):
+    object_name = "runtime variant preset"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RUNTIME_VARIANT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class RuntimeVariantPresetConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-runtime-variant-preset"
+    error_title = "Duplicate Runtime Variant Preset"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RUNTIME_VARIANT,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class ModelCardNotFound(ObjectNotFound):
+    object_name = "model card"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_CARD,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ModelCardConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/duplicate-model-card"
+    error_title = "Duplicate Model Card"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_CARD,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class AgentNotFound(ObjectNotFound):
     object_name = "agent"
 

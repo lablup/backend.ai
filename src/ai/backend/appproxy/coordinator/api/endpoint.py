@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import aiohttp_cors
-import jwt
 import sqlalchemy as sa
 from aiohttp import web
 from pydantic import AnyUrl, BaseModel, Field
@@ -21,6 +20,7 @@ from ai.backend.appproxy.common.types import (
     FrontendMode,
     ProxyProtocol,
     PydanticResponse,
+    SessionConfig,
     WebMiddleware,
 )
 from ai.backend.appproxy.common.utils import (
@@ -34,7 +34,7 @@ from ai.backend.appproxy.coordinator.models.worker import add_circuit
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.config import ModelHealthCheck
 
-from .types import SessionConfig, StubResponseModel
+from .types import StubResponseModel
 from .utils import auth_required
 
 if TYPE_CHECKING:
@@ -297,21 +297,17 @@ async def generate_endpoint_api_token(
         circuit: Circuit = await Circuit.find_by_endpoint(
             sess, UUID(request.match_info["endpoint_id"]), load_worker=False, load_endpoint=False
         )
-        payload = dict(circuit.dump_model())
-        payload["config"] = {}
-        payload["app_url"] = str(await circuit.get_endpoint_url(session=sess))
-
-    payload["user"] = str(params.user_uuid)
-    payload["exp"] = params.exp
-    encoded_jwt = jwt.encode(payload, root_ctx.local_config.secrets.jwt_secret, algorithm="HS256")
+        encoded_jwt = await circuit.generate_jwt(
+            sess, root_ctx.local_config.secrets.jwt_secret, params.user_uuid, params.exp
+        )
     return PydanticResponse(EndpointAPITokenResponseModel(token=encoded_jwt))
 
 
-async def init(app: web.Application) -> None:
+async def init(_app: web.Application) -> None:
     pass
 
 
-async def shutdown(app: web.Application) -> None:
+async def shutdown(_app: web.Application) -> None:
     pass
 
 

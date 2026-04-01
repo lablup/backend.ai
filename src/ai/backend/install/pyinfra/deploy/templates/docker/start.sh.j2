@@ -1,0 +1,19 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+elif command_exists "docker-compose"; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+else
+    echo "Error: Neither 'docker compose' nor 'docker-compose' found."
+    exit 1
+fi
+
+$DOCKER_COMPOSE_CMD up -d
+[ -f ./apply_pids_limit_to_existing_docker.sh ] && ./apply_pids_limit_to_existing_docker.sh || true

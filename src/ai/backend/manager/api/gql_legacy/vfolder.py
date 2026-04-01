@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
     Self,
     cast,
 )
@@ -27,6 +26,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import VFolderNotFound
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -35,7 +35,6 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.errors.storage import (
     ModelCardParseError,
@@ -44,8 +43,9 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
 )
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.minilang.ordering import OrderSpecItem, QueryOrderParser
-from ai.backend.manager.models.minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
@@ -104,7 +104,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class VFolderPermissionValueField(graphene.Scalar):
+class VFolderPermissionValueField(graphene.Scalar):  # type: ignore[misc]
     class Meta:
         description = f"Added in 24.09.0. One of {[val.value for val in VFolderRBACPermission]}."
 
@@ -113,7 +113,9 @@ class VFolderPermissionValueField(graphene.Scalar):
         return val.value
 
     @staticmethod
-    def parse_literal(node: Any, _variables=None):
+    def parse_literal(
+        node: Any, _variables: dict[str, Any] | None = None
+    ) -> VFolderRBACPermission | None:
         if isinstance(node, graphql.language.ast.StringValueNode):
             return VFolderRBACPermission(node.value)
         return None
@@ -124,7 +126,7 @@ class VFolderPermissionValueField(graphene.Scalar):
 
 
 @graphene_federation.key("id")
-class VirtualFolderNode(graphene.ObjectType):
+class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
         description = "Added in 24.03.4"
@@ -218,9 +220,9 @@ class VirtualFolderNode(graphene.ObjectType):
             return self.created_at
 
         try:
-            return dtparse(self.created_at)
+            return dtparse(cast(str, self.created_at))
         except ParserError:
-            return self.created_at
+            return cast(datetime, self.created_at)
 
     @classmethod
     def from_row(
@@ -228,7 +230,7 @@ class VirtualFolderNode(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         row: VFolderRow,
         *,
-        permissions: Optional[Iterable[VFolderRBACPermission]] = None,
+        permissions: Iterable[VFolderRBACPermission] | None = None,
     ) -> Self:
         result = cls(
             id=row.id,
@@ -280,9 +282,9 @@ class VirtualFolderNode(graphene.ObjectType):
         cls,
         info: graphene.ResolveInfo,
         id: str,
-        scope_id: Optional[ScopeType] = None,
+        scope_id: ScopeType | None = None,
         permission: VFolderRBACPermission = VFolderRBACPermission.READ_ATTRIBUTE,
-    ) -> Optional[Self]:
+    ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(VFolderRow).options(
@@ -303,7 +305,6 @@ class VirtualFolderNode(graphene.ObjectType):
             query = query.where(sa.and_(cond, VFolderRow.id == uuid.UUID(vfolder_row_id)))
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 vfolder_row = await db_session.scalar(query)
-                vfolder_row = cast(Optional[VFolderRow], vfolder_row)
         if vfolder_row is None:
             return None
         return cls.from_row(
@@ -438,7 +439,9 @@ class VirtualFolderNode(graphene.ObjectType):
         ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> VirtualFolderNode:
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> VirtualFolderNode:
         vfolder_node = await VirtualFolderNode.get_node(info, self.id)
         if vfolder_node is None:
             raise VFolderNotFound(f"Virtual folder not found: {self.id}")
@@ -451,7 +454,7 @@ class VirtualFolderConnection(Connection):
         description = "Added in 24.03.4"
 
 
-class ModelCard(graphene.ObjectType):
+class ModelCard(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -541,18 +544,18 @@ class ModelCard(graphene.ObjectType):
         info: graphene.ResolveInfo,
     ) -> datetime:
         try:
-            return dtparse(self.created_at)
+            return dtparse(cast(str, self.created_at))
         except (TypeError, ParserError):
-            return self.created_at
+            return cast(datetime, self.created_at)
 
     def resolve_modified_at(
         self,
         info: graphene.ResolveInfo,
     ) -> datetime:
         try:
-            return dtparse(self.modified_at)
+            return dtparse(cast(str, self.modified_at))
         except (TypeError, ParserError):
-            return self.modified_at
+            return cast(datetime, self.modified_at)
 
     @classmethod
     def parse_model(
@@ -584,7 +587,7 @@ class ModelCard(graphene.ObjectType):
             title=metadata.get("title") or vfolder_row.name,
             version=metadata.get("version") or "",
             created_at=metadata.get("created") or vfolder_row.created_at,
-            modified_at=metadata.get("last_modified") or vfolder_row.created_at,
+            modified_at=metadata.get("last_modified") or vfolder_row.last_used,
             description=metadata.get("description") or "",
             task=metadata.get("task") or "",
             architecture=metadata.get("architecture") or "",
@@ -598,9 +601,7 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def from_row(
-        cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow
-    ) -> Optional[Self]:
+    async def from_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self | None:
         try:
             return await cls.parse_row(graph_ctx, vfolder_row)
         except Exception as e:
@@ -669,7 +670,7 @@ class ModelCard(graphene.ObjectType):
             except t.DataError as e:
                 raise ModelCardParseError(
                     extra_msg=f"Failed to validate model definition file (data:{model_definition_dict}, detail:{e!s})"
-                )
+                ) from e
             if model_definition is None:
                 raise DataTransformationFailed(
                     "Model definition validation returned None unexpectedly"
@@ -808,7 +809,7 @@ class ModelCardConnection(Connection):
 # Legacy GraphQL classes (moved from models.vfolder.row)
 
 
-class VirtualFolder(graphene.ObjectType):
+class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -837,7 +838,7 @@ class VirtualFolder(graphene.ObjectType):
     status = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow | None) -> Optional[Self]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any] | VFolderRow | None) -> Self | None:
         match row:
             case None:
                 return None
@@ -984,10 +985,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
     ) -> int:
         from ai.backend.manager.models.group import groups
         from ai.backend.manager.models.user import users
@@ -1007,7 +1008,7 @@ class VirtualFolder(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -1016,11 +1017,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> Sequence[VirtualFolder]:
         from ai.backend.manager.models.group import groups
         from ai.backend.manager.models.user import users
@@ -1061,11 +1062,11 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         ids: list[uuid.UUID],
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-    ) -> Sequence[Optional[VirtualFolder]]:
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+    ) -> Sequence[VirtualFolder | None]:
         query = (
             sa.select(VFolderRow)
             .where(VFolderRow.id.in_(ids))
@@ -1097,8 +1098,8 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         user_uuids: Sequence[uuid.UUID],
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
         from ai.backend.manager.models.user import users
 
@@ -1129,10 +1130,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
     ) -> int:
         from ai.backend.manager.models.user import users
 
@@ -1158,7 +1159,7 @@ class VirtualFolder(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice_invited(
@@ -1167,11 +1168,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> list[VirtualFolder]:
         from ai.backend.manager.models.user import users
 
@@ -1214,10 +1215,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
     ) -> int:
         from ai.backend.manager.models.group import association_groups_users as agus
         from ai.backend.manager.models.group import groups
@@ -1239,7 +1240,7 @@ class VirtualFolder(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice_project(
@@ -1248,11 +1249,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: Optional[str] = None,
-        group_id: Optional[uuid.UUID] = None,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> list[VirtualFolder]:
         from ai.backend.manager.models.group import association_groups_users as agus
         from ai.backend.manager.models.group import groups
@@ -1291,14 +1292,14 @@ class VirtualFolder(graphene.ObjectType):
             ]
 
 
-class VirtualFolderList(graphene.ObjectType):
+class VirtualFolderList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(VirtualFolder, required=True)
 
 
-class VirtualFolderPermissionGQL(graphene.ObjectType):
+class VirtualFolderPermissionGQL(graphene.ObjectType):  # type: ignore[misc]
     """Legacy VirtualFolderPermission GraphQL type (renamed to avoid conflict with VFolderPermission enum)."""
 
     class Meta:
@@ -1312,7 +1313,9 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
     user_email = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[VirtualFolderPermissionGQL]:
+    def from_row(
+        cls, ctx: GraphQueryContext, row: Row[Any] | None
+    ) -> VirtualFolderPermissionGQL | None:
         if row is None:
             return None
         return cls(
@@ -1344,8 +1347,8 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
     ) -> int:
         from ai.backend.manager.models.user import users
 
@@ -1360,7 +1363,7 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return result.scalar()
+            return result.scalar() or 0
 
     @classmethod
     async def load_slice(
@@ -1369,9 +1372,9 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        user_id: Optional[uuid.UUID] = None,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
     ) -> list[VirtualFolderPermissionGQL]:
         from ai.backend.manager.models.user import users
 
@@ -1406,20 +1409,20 @@ class VirtualFolderPermissionGQL(graphene.ObjectType):
 VirtualFolderPermission = VirtualFolderPermissionGQL
 
 
-class VirtualFolderPermissionList(graphene.ObjectType):
+class VirtualFolderPermissionList(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (PaginatedList,)
 
     items = graphene.List(VirtualFolderPermissionGQL, required=True)
 
 
-class QuotaDetails(graphene.ObjectType):
+class QuotaDetails(graphene.ObjectType):  # type: ignore[misc]
     usage_bytes = BigInt(required=False)
     usage_count = BigInt(required=False)
     hard_limit_bytes = BigInt(required=False)
 
 
-class QuotaScope(graphene.ObjectType):
+class QuotaScope(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
@@ -1438,7 +1441,7 @@ class QuotaScope(graphene.ObjectType):
     def resolve_id(self, info: graphene.ResolveInfo) -> str:
         return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
-    async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_details(self, info: graphene.ResolveInfo) -> int | None:
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(
             self.storage_host_name
@@ -1455,7 +1458,7 @@ class QuotaScope(graphene.ObjectType):
                 hard_limit_bytes=quota_config["limit_bytes"] or None,
                 usage_count=None,  # TODO: Implement
             )
-        except QuotaScopeNotFoundError:
+        except QuotaScopeNotFoundError as e:
             qsid = QuotaScopeID.parse(self.quota_scope_id)
             async with graph_ctx.db.begin_readonly_session() as sess:
                 await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
@@ -1465,14 +1468,26 @@ class QuotaScope(graphene.ObjectType):
                         .where(UserRow.uuid == qsid.scope_id)
                         .options(selectinload(UserRow.resource_policy_row))
                     )
+                    result = await sess.scalar(query)
+                    if result is None:
+                        raise QuotaScopeNotFoundError(
+                            f"User not found for quota scope id: {self.quota_scope_id}"
+                        ) from e
+                    resource_policy_constraint: int | None = (
+                        result.resource_policy_row.max_quota_scope_size
+                    )
                 else:
                     query = (
                         sa.select(GroupRow)
                         .where(GroupRow.id == qsid.scope_id)
                         .options(selectinload(GroupRow.resource_policy_row))
                     )
-                result = await sess.scalar(query)
-                resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
+                    result = await sess.scalar(query)
+                    if result is None:
+                        raise QuotaScopeNotFoundError(
+                            f"Group not found for quota scope id: {self.quota_scope_id}"
+                        ) from e
+                    resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
                 if resource_policy_constraint is not None and resource_policy_constraint < 0:
                     resource_policy_constraint = None
 
@@ -1483,11 +1498,11 @@ class QuotaScope(graphene.ObjectType):
             )
 
 
-class QuotaScopeInput(graphene.InputObjectType):
+class QuotaScopeInput(graphene.InputObjectType):  # type: ignore[misc]
     hard_limit_bytes = BigInt(required=False)
 
 
-class SetQuotaScope(graphene.Mutation):
+class SetQuotaScope(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
@@ -1503,7 +1518,7 @@ class SetQuotaScope(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         quota_scope_id: str,
         storage_host_name: str,
@@ -1537,7 +1552,7 @@ class SetQuotaScope(graphene.Mutation):
         )
 
 
-class UnsetQuotaScope(graphene.Mutation):
+class UnsetQuotaScope(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
@@ -1552,7 +1567,7 @@ class UnsetQuotaScope(graphene.Mutation):
     @classmethod
     async def mutate(
         cls,
-        root,
+        root: Any,
         info: graphene.ResolveInfo,
         quota_scope_id: str,
         storage_host_name: str,

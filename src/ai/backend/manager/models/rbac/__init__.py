@@ -5,7 +5,7 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Generic, Optional, Self, TypeAlias, TypeVar, cast
+from typing import Any, Self, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,7 +44,7 @@ class PredefinedRole(enum.StrEnum):
     MEMBER = enum.auto()
 
 
-_EMPTY_FSET: frozenset = frozenset()
+_EMPTY_FSET: frozenset[Any] = frozenset()
 
 
 async def get_predefined_roles_in_scope(
@@ -362,7 +362,7 @@ class UserScope(BaseScope):
         return cls(uuid.UUID(raw_user_id))
 
 
-ScopeType: TypeAlias = SystemScope | DomainScope | ProjectScope | UserScope
+type ScopeType = SystemScope | DomainScope | ProjectScope | UserScope
 
 
 def deserialize_scope(val: str) -> ScopeType:
@@ -455,9 +455,7 @@ ObjectIDType = TypeVar("ObjectIDType")
 
 
 @dataclass
-class AbstractPermissionContext(
-    Generic[PermissionType, ObjectType, ObjectIDType], metaclass=ABCMeta
-):
+class AbstractPermissionContext[PermissionType, ObjectType, ObjectIDType](metaclass=ABCMeta):
     """
     Define permissions under given User, Project or Domain scopes.
     Each field of this class represents a mapping of ["accessible scope id", "permissions under the scope"].
@@ -547,7 +545,7 @@ class AbstractPermissionContext(
         return self
 
     @abstractmethod
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         pass
 
     @abstractmethod
@@ -558,12 +556,10 @@ class AbstractPermissionContext(
         pass
 
 
-PermissionContextType = TypeVar("PermissionContextType", bound=AbstractPermissionContext)
-
-
-class AbstractPermissionContextBuilder(
-    Generic[PermissionType, PermissionContextType], metaclass=ABCMeta
-):
+class AbstractPermissionContextBuilder[
+    PermissionType: BasePermission,
+    PermissionContextType: AbstractPermissionContext[Any, Any, Any],
+](metaclass=ABCMeta):
     @abstractmethod
     async def calculate_permission(
         self,
@@ -606,6 +602,7 @@ class AbstractPermissionContextBuilder(
         target_scope: ScopeType,
         requested_permission: PermissionType,
     ) -> PermissionContextType:
+        permission_ctx: PermissionContextType
         match target_scope:
             case SystemScope():
                 permission_ctx = await self.build_ctx_in_system_scope(ctx)
@@ -678,22 +675,26 @@ class AbstractPermissionContextBuilder(
         pass
 
 
-class RBACModel(Generic[PermissionType]):
+class RBACModel[PermissionType: BasePermission]:
     @property
     @abstractmethod
     def permissions(self) -> Container[PermissionType]:
         pass
 
 
-T_RBACModel = TypeVar("T_RBACModel", bound=RBACModel)
+T_RBACModel = TypeVar("T_RBACModel", bound=RBACModel[Any])
 T_PropertyReturn = TypeVar("T_PropertyReturn")
 
 
-def required_permission(permission: PermissionType):
+def required_permission[PermissionType: BasePermission](
+    permission: PermissionType,
+) -> Callable[
+    [Callable[[T_RBACModel], T_PropertyReturn]], Callable[[T_RBACModel], T_PropertyReturn | None]
+]:
     def wrapper(
         property_func: Callable[[T_RBACModel], T_PropertyReturn],
-    ) -> Callable[[T_RBACModel], Optional[T_PropertyReturn]]:
-        def wrapped(self: T_RBACModel) -> Optional[T_PropertyReturn]:
+    ) -> Callable[[T_RBACModel], T_PropertyReturn | None]:
+        def wrapped(self: T_RBACModel) -> T_PropertyReturn | None:
             if permission in self.permissions:
                 return property_func(self)
             return None

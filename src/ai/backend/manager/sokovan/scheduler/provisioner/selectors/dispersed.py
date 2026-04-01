@@ -53,8 +53,8 @@ class DispersedAgentSelector(AbstractAgentSelector):
         self,
         trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
+        _criteria: AgentSelectionCriteria,
+        _config: AgentSelectionConfig,
     ) -> AgentStateTracker:
         """
         Select an agent tracker to disperse workloads.

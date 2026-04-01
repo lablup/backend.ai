@@ -8,7 +8,6 @@ Create Date: 2024-10-23 20:56:36.513421
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.engine.reflection import Inspector
 
 # revision identifiers, used by Alembic.
 revision = "e9e574a6e22d"
@@ -19,7 +18,7 @@ depends_on = None
 
 def upgrade() -> None:
     conn = op.get_bind()
-    inspector = Inspector.from_engine(conn)
+    inspector = sa.inspect(conn)
     columns = [col["name"] for col in inspector.get_columns("container_registries")]
 
     # Prevent error in case the extra column was created using a previously modified migration script.

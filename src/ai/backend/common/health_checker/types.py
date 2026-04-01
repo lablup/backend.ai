@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import NewType, Optional
+from typing import NewType
 
 # Service group is a string identifier with type safety
 # Allows components to define their own service groups while maintaining type safety
@@ -45,6 +45,10 @@ CID_ETCD: ComponentId = ComponentId("etcd")
 # Built-in component IDs for container
 CID_DOCKER: ComponentId = ComponentId("docker")
 
+# Prometheus metrics
+PROMETHEUS: ServiceGroup = ServiceGroup("prometheus")
+CID_PROMETHEUS_METRICS: ComponentId = ComponentId("metrics")
+
 
 @dataclass(frozen=True)
 class HealthCheckKey:
@@ -68,7 +72,7 @@ class ComponentHealthStatus:
 
     is_healthy: bool
     last_checked_at: datetime
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 @dataclass

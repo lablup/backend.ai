@@ -1,6 +1,7 @@
 """Scheduling controller for managing session lifecycle and scheduling operations."""
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
@@ -44,6 +45,7 @@ from .resolvers.scaling_group_resolver import ScalingGroupResolver
 from .validators import (
     ClusterValidationRule,
     ContainerLimitRule,
+    InferenceModelFolderRule,
     MountNameValidationRule,
     PublicPrivateFilterRule,
     ScalingGroupFilter,
@@ -118,6 +120,7 @@ class SchedulingController:
             ServicePortRule(),
             ClusterValidationRule(),
             MountNameValidationRule(),
+            InferenceModelFolderRule(),
         ]
         self._validator = SessionValidator(validator_rules)
 
@@ -240,12 +243,16 @@ class SchedulingController:
                 creation_context,
             )
 
+            # Get DB time for session enqueue timestamp
+            enqueue_time = await self._repository.get_db_now()
+
             # Prepare session data with calculated resources
             session_data = await self._preparer.prepare(
                 session_spec,
                 validated_scaling_group,
                 creation_context,
                 calculated_resources,
+                enqueue_time,
             )
 
         hook_result = await self._hook_plugin_ctx.dispatch(
@@ -279,7 +286,7 @@ class SchedulingController:
         ])
 
         try:
-            await self.mark_scheduling_needed(ScheduleType.SCHEDULE)
+            await self.mark_scheduling_needed([ScheduleType.SCHEDULE])
         except Exception as e:
             log.warning(
                 "Failed to request scheduling for session {}: {}",
@@ -292,49 +299,60 @@ class SchedulingController:
         )
         return session_id
 
-    async def mark_scheduling_needed(self, schedule_type: ScheduleType) -> None:
+    async def mark_scheduling_needed(self, schedule_types: Sequence[ScheduleType]) -> None:
         """
-        Request a scheduling operation for the next cycle.
+        Request scheduling operations for the next cycle.
 
         This is the public interface for requesting scheduling operations.
         The actual scheduling will be handled internally by the coordinator.
 
         Args:
-            schedule_type: Type of scheduling to request
+            schedule_types: Types of scheduling to request
         """
-        await self._valkey_schedule.mark_schedule_needed(schedule_type.value)
-        log.debug("Requested scheduling for type: {}", schedule_type.value)
+        if not schedule_types:
+            return
+        await self._valkey_schedule.mark_schedules_needed_batch([st.value for st in schedule_types])
+        log.debug(
+            "Requested scheduling for type(s): {}",
+            ", ".join(st.value for st in schedule_types),
+        )
 
     async def mark_sessions_for_termination(
         self,
         session_ids: list[SessionId],
         reason: str = "USER_REQUESTED",
+        *,
+        forced: bool = False,
     ) -> MarkTerminatingResult:
         """
         Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
 
-        This method handles the lifecycle management of sessions by marking them
-        for termination, which will be processed by the scheduler's terminate_sessions method.
-        It also automatically requests TERMINATE scheduling if sessions were processed.
+        When forced=True, sessions skip TERMINATING and go directly to TERMINATED so the manager
+        immediately considers the session done and frees resources.
 
         Args:
             session_ids: List of session IDs to terminate
             reason: Reason for termination
+            forced: If True, skip TERMINATING and set directly to TERMINATED
 
         Returns:
             MarkTerminatingResult with categorized session statuses
         """
-        result = await self._repository.mark_sessions_terminating(session_ids, reason)
+        result = await self._repository.mark_sessions_terminating(
+            session_ids, reason, forced=forced
+        )
 
         if result.has_processed():
             log.info(
-                "Marked {} sessions for termination (cancelled: {}, terminating: {})",
+                "Marked {} sessions for termination"
+                " (cancelled: {}, terminating: {}, force_terminated: {})",
                 result.processed_count(),
                 len(result.cancelled_sessions),
                 len(result.terminating_sessions),
+                len(result.force_terminated_sessions),
             )
 
-            # Broadcast status events for cancelled and terminating sessions
+            # Broadcast status events for cancelled, terminating, and force-terminated sessions
             broadcast_events: list[AbstractBroadcastEvent] = [
                 SchedulingBroadcastEvent(
                     session_id=session_id,
@@ -353,6 +371,15 @@ class SchedulingController:
                 )
                 for session_id in result.terminating_sessions
             ])
+            broadcast_events.extend([
+                SchedulingBroadcastEvent(
+                    session_id=session_id,
+                    creation_id="",
+                    status_transition=str(SessionStatus.TERMINATED),
+                    reason=reason,
+                )
+                for session_id in result.force_terminated_sessions
+            ])
             if broadcast_events:
                 await self._event_producer.broadcast_events_batch(broadcast_events)
             # Record metric for termination attempts
@@ -361,7 +388,8 @@ class SchedulingController:
                 count=result.processed_count(),
             )
             # Request termination scheduling for the next cycle
-            await self.mark_scheduling_needed(ScheduleType.TERMINATE)
+            # For force-terminated sessions, agents still need cleanup RPCs
+            await self.mark_scheduling_needed([ScheduleType.TERMINATE])
 
         return result
 
@@ -392,7 +420,7 @@ class SchedulingController:
                 spec.resource_spec.resource_slots, available_resource_slots
             )
         except ValueError as e:
-            raise InvalidAPIParameters(f"Invalid resource allocation: {e}")
+            raise InvalidAPIParameters(f"Invalid resource allocation: {e}") from e
         # Validate Image
         user = current_user()
         if user is None:

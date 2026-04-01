@@ -1,0 +1,40 @@
+#!/bin/bash
+set -euo pipefail
+
+BACKUP_DIR="{{ service_dir }}/backups"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+NODE_NAME="{{ etcd_cluster_info.node_name }}"
+BACKUP_FILE="/backups/etcd_snapshot_${NODE_NAME}_${TIMESTAMP}.db"
+CONTAINER_NAME="{{ config.container_name_prefix }}-{{ etcd_cluster_info.node_name }}"
+
+echo "Starting etcd snapshot backup for Backend.AI ETCD cluster..."
+echo "Node: ${NODE_NAME}"
+echo "Container: ${CONTAINER_NAME}"
+
+mkdir -p "${BACKUP_DIR}"
+sudo chown $(id -u):$(id -g) "${BACKUP_DIR}"
+
+if ! docker ps --format "table {{ '{{.Names}}' }}" | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Error: etcd container '${CONTAINER_NAME}' is not running"
+    exit 1
+fi
+
+echo "Creating snapshot..."
+docker exec "${CONTAINER_NAME}" etcdctl snapshot save "${BACKUP_FILE}"
+
+echo "Compressing snapshot..."
+sudo chown $(id -u):$(id -g) "${BACKUP_DIR}/etcd_snapshot_${NODE_NAME}_${TIMESTAMP}.db"
+gzip "${BACKUP_DIR}/etcd_snapshot_${NODE_NAME}_${TIMESTAMP}.db"
+
+echo "Snapshot backup completed successfully!"
+echo "Backup file: ${BACKUP_DIR}/etcd_snapshot_${NODE_NAME}_${TIMESTAMP}.db.gz"
+
+echo "Cleaning up old backups (keeping last 7)..."
+find "${BACKUP_DIR}" -name "etcd_snapshot_${NODE_NAME}_*.db.gz" -type f | sort -r | tail -n +8 | xargs -r rm -f
+
+echo ""
+echo "Backup process completed!"
+echo ""
+echo "NOTE: This is a backup of node '${NODE_NAME}' in a multi-node ETCD cluster."
+echo "For disaster recovery, you only need one backup from any healthy cluster member."
+echo "All ETCD nodes contain the same replicated data."

@@ -77,7 +77,9 @@ class Tables:
 
 class RoleCreator:
     @classmethod
-    def _create_self_roles(cls, db_conn: Connection, rows: Sequence[Row]) -> dict[str, uuid.UUID]:
+    def _create_self_roles(
+        cls, db_conn: Connection, rows: Sequence[Row[Any]]
+    ) -> dict[str, uuid.UUID]:
         roles_table = get_roles_table()
         role_inputs: list[dict[str, Any]] = []
         role_name_user_id_map: dict[str, uuid.UUID] = {}
@@ -121,7 +123,9 @@ class RoleCreator:
         insert_if_data_exists(db_conn, get_permissions_table(), permission_inputs)
 
     @classmethod
-    def _query_user_row(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_user_row(
+        cls, db_conn: Connection, offset: int, page_size: int
+    ) -> Sequence[Row[Any]]:
         """
         Query all user rows with pagination.
         """
@@ -176,7 +180,9 @@ class RoleMapper:
         insert_if_data_exists(db_conn, user_roles_table, user_role_inputs)
 
     @classmethod
-    def _query_user_row(cls, db_conn: Connection, offset: int, page_size: int) -> list[Row]:
+    def _query_user_row(
+        cls, db_conn: Connection, offset: int, page_size: int
+    ) -> Sequence[Row[Any]]:
         """
         Query all user rows with pagination.
         """

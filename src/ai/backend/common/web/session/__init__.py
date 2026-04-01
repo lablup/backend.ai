@@ -110,7 +110,7 @@ class Session(MutableMapping[str, Any]):
         return self._new
 
     @property
-    def identity(self) -> Any | None:  # type: ignore[misc]
+    def identity(self) -> Any | None:
         return self._identity
 
     @property

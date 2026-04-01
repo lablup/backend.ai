@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -30,7 +32,7 @@ class _RemainingTimeCalculationTestConfig:
     now: datetime
     idle_baseline: datetime
     timeout_period: timedelta
-    grace_period_end: Optional[datetime]
+    grace_period_end: datetime | None
     expected_remaining: float
 
 
@@ -82,7 +84,6 @@ class _RemainingTimeCalculationTestConfig:
         ),
     ],
 )
-@pytest.mark.asyncio
 async def test_remaining_time_calculation(
     remaining_time_config: _RemainingTimeCalculationTestConfig,
 ) -> None:
@@ -133,7 +134,6 @@ class TestNewUserGracePeriodChecker:
         """Mock kernel table - user table joined data as mock row"""
         return mock_row(user_created_at=base_time)
 
-    @pytest.mark.asyncio
     async def test_new_user_grace_period(
         self,
         grace_period_checker: NewUserGracePeriodChecker,
@@ -229,7 +229,7 @@ class TestNetworkTimeoutIdleChecker:
         test_valkey_live: AsyncMock,
         mock_event_producer: AsyncMock,
         test_valkey_stat: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> NetworkTimeoutIdleChecker:
         """Create NetworkTimeoutIdleChecker based on scenario"""
         # Setup time
@@ -260,7 +260,6 @@ class TestNetworkTimeoutIdleChecker:
         ],
         ids=["positive", "negative"],
     )
-    @pytest.mark.asyncio
     async def test_network_timeout_without_grace(
         self,
         scenario: _NetworkTimeoutScenario,
@@ -301,7 +300,7 @@ class TestNetworkTimeoutIdleChecker:
         test_valkey_live: AsyncMock,
         mock_event_producer: AsyncMock,
         test_valkey_stat: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> NetworkTimeoutIdleChecker:
         """Create NetworkTimeoutIdleChecker based on scenario"""
         # Setup time
@@ -353,7 +352,6 @@ class TestNetworkTimeoutIdleChecker:
         ],
         ids=["positive", "negative"],
     )
-    @pytest.mark.asyncio
     async def test_network_timeout_with_grace(
         self,
         scenario: _NetworkTimeoutWithGraceScenario,
@@ -477,7 +475,7 @@ class TestSessionLifetimeChecker:
         valkey_live: AsyncMock,
         valkey_stat: AsyncMock,
         event_producer: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> SessionLifetimeChecker:
         """SessionLifetimeChecker with time configured based on test_config"""
         # Setup time: session created at base_time, current time = base_time + elapsed
@@ -516,7 +514,6 @@ class TestSessionLifetimeChecker:
         ],
         ids=["positive_20s_remaining", "negative_timeout_exceeded"],
     )
-    @pytest.mark.asyncio
     async def test_session_lifetime_without_grace(
         self,
         test_config: _SessionLifetimeTestConfig,
@@ -569,7 +566,6 @@ class TestSessionLifetimeChecker:
         ],
         ids=["grace_positive_15s_remaining", "grace_negative_exceeded"],
     )
-    @pytest.mark.asyncio
     async def test_session_lifetime_with_grace(
         self,
         test_config: _SessionLifetimeTestConfig,
@@ -796,7 +792,6 @@ class TestUtilizationIdleChecker:
         ],
         ids=["mem_70pct_cpu_10pct", "mem_25pct_cpu_85pct"],
     )
-    @pytest.mark.asyncio
     async def test_utilization_current(
         self,
         current_test_config: _UtilizationCurrentTestConfig,
@@ -809,8 +804,8 @@ class TestUtilizationIdleChecker:
         expected_utilization = {
             "cpu_util": current_test_config.expected_cpu_util,
             "mem": current_test_config.expected_mem_util,
-            "cuda_mem": 0.0,
-            "cuda_util": 0.0,
+            "cuda_mem": None,
+            "cuda_util": None,
         }
 
         # When
@@ -832,7 +827,7 @@ class TestUtilizationIdleChecker:
         valkey_live: AsyncMock,
         valkey_stat: AsyncMock,
         event_producer: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> UtilizationIdleChecker:
         """UtilizationIdleChecker configured based on grace_test_config"""
         # Time setup: elapsed time since kernel created
@@ -856,7 +851,7 @@ class TestUtilizationIdleChecker:
         # Set it to time_window seconds ago so do_idle_check becomes True
         util_first_collected = now.timestamp() - grace_test_config.time_window_seconds
 
-        async def get_live_data_side_effect(key: str):
+        async def get_live_data_side_effect(key: str) -> bytes | None:
             if key.endswith(".util_first_collected"):
                 return str(util_first_collected).encode()
             if key.endswith(".util_last_collected"):
@@ -959,7 +954,6 @@ class TestUtilizationIdleChecker:
             "within_grace_low_util",
         ],
     )
-    @pytest.mark.asyncio
     async def test_utilization_checker_with_grace_period(
         self,
         grace_test_config: _UtilizationGracePeriodTestConfig,
@@ -1008,7 +1002,7 @@ class TestUtilizationIdleChecker:
         valkey_live: AsyncMock,
         valkey_stat: AsyncMock,
         event_producer: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> UtilizationIdleChecker:
         """UtilizationIdleChecker configured based on test_config"""
         # Time setup: elapsed time since kernel created
@@ -1064,7 +1058,6 @@ class TestUtilizationIdleChecker:
         ],
         ids=["positive_10s", "negative_alive_utilization"],
     )
-    @pytest.mark.asyncio
     async def test_utilization_sufficient_without_grace_period(
         self,
         test_config: _UtilizationIdleTestConfig,
@@ -1134,7 +1127,7 @@ class TestUtilizationIdleChecker:
         valkey_live: AsyncMock,
         valkey_stat: AsyncMock,
         event_producer: AsyncMock,
-        mocker,
+        mocker: Any,
     ) -> UtilizationIdleChecker:
         """UtilizationIdleChecker configured based on insufficient_test_config"""
         # Time setup: elapsed time since kernel created
@@ -1191,7 +1184,6 @@ class TestUtilizationIdleChecker:
         ],
         ids=["low_util_5pct_threshold_50pct"],
     )
-    @pytest.mark.asyncio
     async def test_utilization_insufficient_without_grace_period(
         self,
         insufficient_test_config: _UtilizationInsufficientTestConfig,
@@ -1207,7 +1199,7 @@ class TestUtilizationIdleChecker:
         util_first_collected_time = base_time.timestamp()
 
         # Setup side_effect using key inspection
-        def mock_get_live_data_side_effect(key: str) -> Optional[bytes]:
+        def mock_get_live_data_side_effect(key: str) -> bytes | None:
             if ".util_first_collected" in key:
                 return f"{util_first_collected_time:.06f}".encode()
             if ".util_series" in key:
@@ -1243,3 +1235,91 @@ class TestUtilizationIdleChecker:
         assert should_alive is insufficient_test_config.expected_alive
         assert remaining == insufficient_test_config.expected_remaining
         assert util_info is not None
+
+    # Test 5: Missing metrics should be excluded from idle decision
+    @pytest.fixture
+    async def missing_cpu_stat_checker(
+        self,
+        base_time: datetime,
+        valkey_live: AsyncMock,
+        valkey_stat: AsyncMock,
+        event_producer: AsyncMock,
+        mocker: Any,
+    ) -> UtilizationIdleChecker:
+        """UtilizationIdleChecker where cpu_util stat is missing from live_stat.
+
+        Simulates a scenario where stat collection fails for cpu_util
+        but memory is collected normally with sufficient utilization.
+        Uses OR operator so that if cpu_util were treated as 0.0
+        (old behavior), the session would be falsely terminated.
+        """
+        elapsed_seconds = 50
+        time_window_seconds = 15
+        now = base_time + timedelta(seconds=elapsed_seconds)
+        valkey_live.get_server_time.return_value = now.timestamp()
+        mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
+
+        # live_stat has Memory but NO cpu_util key
+        live_stat = {
+            "mem": {"current": "5.0", "pct": "10.0"},
+        }
+        valkey_stat.get_kernel_statistics.return_value = live_stat
+
+        util_first_collected = now.timestamp() - time_window_seconds
+
+        def get_live_data_side_effect(key: str) -> bytes | None:
+            if ".util_first_collected" in key:
+                return f"{util_first_collected:.06f}".encode()
+            if ".util_series" in key:
+                return msgpack.packb({"cpu_util": [], "mem": []})
+            if ".utilization_extra" in key:
+                return msgpack.packb({"resources": {}})
+            if ".utilization" in key:
+                return msgpack.packb(-1)
+            return None
+
+        valkey_live.get_live_data.side_effect = get_live_data_side_effect
+
+        checker = UtilizationIdleChecker(
+            IdleCheckerArgs(
+                event_producer=event_producer,
+                redis_live=valkey_live,
+                valkey_stat_client=valkey_stat,
+            )
+        )
+        await checker.populate_config({
+            "initial-grace-period": "0",
+            "resource-thresholds": {
+                "cpu_util": {"average": "10"},
+                "mem": {"average": "10"},
+            },
+            "thresholds-check-operator": "or",
+            "time-window": str(time_window_seconds),
+        })
+        return checker
+
+    async def test_missing_metrics_excluded_from_idle_decision(
+        self,
+        missing_cpu_stat_checker: UtilizationIdleChecker,
+        utilization_kernel_row: Any,
+        session_id: SessionId,
+        db_connection: AsyncMock,
+    ) -> None:
+        """Test that missing metrics (stat collection failure) are excluded from idle check.
+
+        With OR operator, ALL configured metrics must exceed their thresholds for
+        the session to stay alive. If missing cpu_util were treated as 0.0
+        (old behavior), the session would be falsely terminated because
+        0.0 < threshold (10%). With the fix, missing metrics are excluded from
+        the decision, so only memory (above 10%) is checked.
+        """
+        # When
+        should_alive = await missing_cpu_stat_checker.check_idleness(
+            utilization_kernel_row,
+            db_connection,
+            mock_row(idle_timeout=15),
+        )
+
+        # Then - session should stay alive because cpu_util is excluded,
+        # not treated as 0.0
+        assert should_alive is True

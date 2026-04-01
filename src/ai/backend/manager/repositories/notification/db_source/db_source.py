@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationChannelListResult,
     NotificationRuleData,
     NotificationRuleListResult,
-    NotificationRuleType,
 )
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
@@ -26,9 +26,11 @@ from ai.backend.manager.models.notification import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    Creator,
     execute_batch_querier,
-    execute_creator,
+)
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
@@ -62,7 +64,7 @@ class NotificationDBSource:
         enabled_only: bool = True,
     ) -> list[NotificationRuleData]:
         """Retrieves all notification rules that match the given rule type."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             rows = await self._fetch_matching_rules(db_sess, rule_type, enabled_only)
             return [row.to_data() for row in rows]
 
@@ -93,11 +95,11 @@ class NotificationDBSource:
 
     async def create_channel(
         self,
-        creator: Creator[NotificationChannelRow],
+        creator: RBACEntityCreator[NotificationChannelRow],
     ) -> NotificationChannelData:
         """Creates a new notification channel."""
         async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             return result.row.to_data()
 
     async def update_channel(
@@ -118,15 +120,15 @@ class NotificationDBSource:
         async with self._db.begin_session() as db_sess:
             stmt = sa.delete(NotificationChannelRow).where(NotificationChannelRow.id == channel_id)
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def create_rule(
         self,
-        creator: Creator[NotificationRuleRow],
+        creator: RBACEntityCreator[NotificationRuleRow],
     ) -> NotificationRuleData:
         """Creates a new notification rule."""
         async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             # Explicitly load the channel relationship for to_data()
             stmt = (
                 sa.select(NotificationRuleRow)
@@ -162,11 +164,11 @@ class NotificationDBSource:
         async with self._db.begin_session() as db_sess:
             stmt = sa.delete(NotificationRuleRow).where(NotificationRuleRow.id == rule_id)
             result = await db_sess.execute(stmt)
-            return cast(CursorResult, result).rowcount > 0
+            return cast(CursorResult[Any], result).rowcount > 0
 
     async def get_channel_by_id(self, channel_id: UUID) -> NotificationChannelData:
         """Retrieves a notification channel by ID."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             row = await db_sess.get(NotificationChannelRow, channel_id)
             if not row:
                 raise NotificationChannelNotFound(f"Notification channel {channel_id} not found")
@@ -174,7 +176,7 @@ class NotificationDBSource:
 
     async def get_rule_by_id(self, rule_id: UUID) -> NotificationRuleData:
         """Retrieves a notification rule by ID."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             stmt = (
                 sa.select(NotificationRuleRow)
                 .where(NotificationRuleRow.id == rule_id)

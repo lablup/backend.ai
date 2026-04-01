@@ -5,6 +5,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import (
+    Any,
     cast,
     override,
 )
@@ -15,7 +16,6 @@ from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from ai.backend.common.types import (
     VFolderHostPermission,
-    VFolderHostPermissionMap,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import (
@@ -114,7 +114,7 @@ class PermissionContext(AbstractPermissionContext[StorageHostPermission, str, st
     def host_to_permissions_map(self) -> StorageHostToPermissionMap:
         return self.object_id_to_additional_permission_map
 
-    async def build_query(self) -> sa.sql.Select | None:
+    async def build_query(self) -> sa.sql.Select[Any] | None:
         return None
 
     async def calculate_final_permission(self, rbac_obj: str) -> frozenset[StorageHostPermission]:
@@ -171,13 +171,13 @@ class PermissionContextBuilder(
             .where(DomainRow.name == scope.domain_name)
             .options(load_only(DomainRow.allowed_vfolder_hosts))
         )
-        domain_row = cast(DomainRow | None, await self.db_session.scalar(stmt))
+        domain_row = await self.db_session.scalar(stmt)
         if domain_row is None:
             return PermissionContext()
-        host_permissions = cast(VFolderHostPermissionMap, domain_row.allowed_vfolder_hosts)
+        host_permissions = domain_row.allowed_vfolder_hosts
         return PermissionContext(
             object_id_to_additional_permission_map={
-                host: _legacy_vf_perms_to_host_rbac_perms(perms)
+                host: _legacy_vf_perms_to_host_rbac_perms(list(perms))
                 for host, perms in host_permissions.items()
             }
         )
@@ -200,13 +200,13 @@ class PermissionContextBuilder(
             .where(GroupRow.id == scope.project_id)
             .options(load_only(GroupRow.allowed_vfolder_hosts))
         )
-        project_row = cast(GroupRow | None, await self.db_session.scalar(stmt))
+        project_row = await self.db_session.scalar(stmt)
         if project_row is None:
             return PermissionContext()
-        host_permissions = cast(VFolderHostPermissionMap, project_row.allowed_vfolder_hosts)
+        host_permissions = project_row.allowed_vfolder_hosts
         return PermissionContext(
             object_id_to_additional_permission_map={
-                host: _legacy_vf_perms_to_host_rbac_perms(perms)
+                host: _legacy_vf_perms_to_host_rbac_perms(list(perms))
                 for host, perms in host_permissions.items()
             }
         )
@@ -228,7 +228,7 @@ class PermissionContextBuilder(
             .where(UserRow.uuid == scope.user_id)
             .options(
                 selectinload(UserRow.keypairs).options(
-                    joinedload(KeyPairRow.resource_policy).options(
+                    joinedload(KeyPairRow.resource_policy_row).options(
                         load_only(KeyPairResourcePolicyRow.allowed_vfolder_hosts)
                     )
                 )
@@ -243,13 +243,13 @@ class PermissionContextBuilder(
         ] = defaultdict(frozenset)
 
         for keypair in user_row.keypairs:
-            resource_policy = cast(KeyPairResourcePolicyRow | None, keypair.resource_policy)
-            if resource_policy is None:
+            resource_policy_row: KeyPairResourcePolicyRow | None = keypair.resource_policy_row
+            if resource_policy_row is None:
                 continue
-            host_permissions = cast(VFolderHostPermissionMap, resource_policy.allowed_vfolder_hosts)
+            host_permissions = resource_policy_row.allowed_vfolder_hosts
             for host, perms in host_permissions.items():
                 object_id_to_additional_permission_map[host] |= _legacy_vf_perms_to_host_rbac_perms(
-                    perms
+                    list(perms)
                 )
 
         return PermissionContext(

@@ -155,7 +155,6 @@ Selects the optimal agent to run a session.
 | ConcentratedSelector | Maximize utilization by concentrating resources |
 | DispersedSelector | Ensure high availability by dispersing resources |
 | RoundRobinSelector | Sequential agent rotation |
-| LegacySelector | Legacy scheduler compatible selector |
 
 → Details: [selectors/README.md](./selectors/README.md)
 

@@ -1,40 +1,54 @@
+import asyncio
 import logging
+import math
 import uuid
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import (
-    Optional,
+    Any,
     cast,
 )
 
 import aiohttp
+import msgpack
+import yarl
 from aiohttp import hdrs, web
 from sqlalchemy import exc as sa_exc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermission,
+    VFolderHostPermissionMap,
     VFolderID,
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
+    VFolderCreateParams,
     VFolderData,
+    VFolderMountPermission,
 )
-from ai.backend.manager.errors.common import Forbidden, ObjectNotFound
+from ai.backend.manager.errors.common import Forbidden, InternalServerError, ObjectNotFound
+from ai.backend.manager.errors.kernel import BackendAgentError
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
+    TooManyVFoldersFound,
     UnexpectedStorageProxyResponseError,
     VFolderAlreadyExists,
+    VFolderBadRequest,
     VFolderCreationFailure,
     VFolderFilterStatusFailed,
     VFolderFilterStatusNotAvailable,
     VFolderGone,
     VFolderInvalidParameter,
     VFolderNotFound,
+    VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import ProjectType
@@ -63,6 +77,8 @@ from ai.backend.manager.services.vfolder.actions.base import (
     DeleteForeverVFolderActionResult,
     ForceDeleteVFolderAction,
     ForceDeleteVFolderActionResult,
+    GetAccessibleVFolderAction,
+    GetAccessibleVFolderActionResult,
     GetTaskLogsAction,
     GetTaskLogsActionResult,
     GetVFolderAction,
@@ -71,10 +87,49 @@ from ai.backend.manager.services.vfolder.actions.base import (
     ListVFolderActionResult,
     MoveToTrashVFolderAction,
     MoveToTrashVFolderActionResult,
+    PurgeVFolderAction,
+    PurgeVFolderActionResult,
     RestoreVFolderFromTrashAction,
     RestoreVFolderFromTrashActionResult,
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.search_in_project import (
+    SearchVFoldersInProjectAction,
+    SearchVFoldersInProjectActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
+    SearchUserVFoldersAction,
+    SearchUserVFoldersActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.storage_ops import (
+    ChangeVFolderOwnershipAction,
+    ChangeVFolderOwnershipActionResult,
+    GetFstabContentsAction,
+    GetFstabContentsActionResult,
+    GetQuotaAction,
+    GetQuotaActionResult,
+    GetVFolderUsageAction,
+    GetVFolderUsageActionResult,
+    GetVFolderUsedBytesAction,
+    GetVFolderUsedBytesActionResult,
+    GetVolumePerfMetricAction,
+    GetVolumePerfMetricActionResult,
+    ListAllHostsAction,
+    ListAllHostsActionResult,
+    ListAllowedTypesAction,
+    ListAllowedTypesActionResult,
+    ListHostsAction,
+    ListHostsActionResult,
+    ListMountsAction,
+    ListMountsActionResult,
+    MountHostAction,
+    MountHostActionResult,
+    MountResultData,
+    UmountHostAction,
+    UmountHostActionResult,
+    UpdateQuotaAction,
+    UpdateQuotaActionResult,
 )
 from ai.backend.manager.services.vfolder.types import (
     VFolderBaseInfo,
@@ -82,7 +137,7 @@ from ai.backend.manager.services.vfolder.types import (
     VFolderUsageInfo,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def _check_vfolder_status(
@@ -102,24 +157,30 @@ async def _check_vfolder_status(
 
 class VFolderService:
     _config_provider: ManagerConfigProvider
+    _etcd: AsyncEtcd
     _storage_manager: StorageSessionManager
     _background_task_manager: BackgroundTaskManager
     _vfolder_repository: VfolderRepository
     _user_repository: UserRepository
+    _valkey_stat_client: ValkeyStatClient
 
     def __init__(
         self,
         config_provider: ManagerConfigProvider,
+        etcd: AsyncEtcd,
         storage_manager: StorageSessionManager,
         background_task_manager: BackgroundTaskManager,
         vfolder_repository: VfolderRepository,
         user_repository: UserRepository,
+        valkey_stat_client: ValkeyStatClient,
     ) -> None:
         self._config_provider = config_provider
+        self._etcd = etcd
         self._storage_manager = storage_manager
         self._vfolder_repository = vfolder_repository
         self._user_repository = user_repository
         self._background_task_manager = background_task_manager
+        self._valkey_stat_client = valkey_stat_client
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role
@@ -151,11 +212,11 @@ class VFolderService:
             if action.group_id_or_name is not None:
                 raise VFolderInvalidParameter("dot-prefixed vfolders cannot be a group folder.")
 
-        group_uuid: Optional[uuid.UUID] = None
-        group_type: Optional[ProjectType] = None
+        group_uuid: uuid.UUID | None = None
+        group_type: ProjectType | None = None
         max_vfolder_count: int
         max_quota_scope_size: int
-        container_uid: Optional[int] = None
+        container_uid: int | None = None
 
         # Get resource information using repository
         match group_id_or_name:
@@ -266,8 +327,6 @@ class VFolderService:
             action.mount_permission = VFolderPermission.READ_ONLY
 
         # Use repository to create VFolder
-        from ai.backend.manager.data.vfolder.types import VFolderCreateParams
-
         params = VFolderCreateParams(
             id=folder_id,
             name=action.name,
@@ -291,8 +350,8 @@ class VFolderService:
             await self._vfolder_repository.create_vfolder_with_permission(
                 params, create_owner_permission=create_owner_permission
             )
-        except sa_exc.DataError:
-            raise VFolderInvalidParameter
+        except sa_exc.DataError as e:
+            raise VFolderInvalidParameter from e
 
         return CreateVFolderActionResult(
             id=folder_id,
@@ -449,7 +508,9 @@ class VFolderService:
                     host=access_info.vfolder_data.host,
                     status=access_info.vfolder_data.status,
                     unmanaged_path=access_info.vfolder_data.unmanaged_path,
-                    mount_permission=access_info.effective_permission,
+                    # None means owner, who has full permissions
+                    mount_permission=access_info.effective_permission
+                    or VFolderMountPermission.RW_DELETE,
                     usage_mode=access_info.vfolder_data.usage_mode,
                     created_at=access_info.vfolder_data.created_at,
                     cloneable=access_info.vfolder_data.cloneable,
@@ -470,6 +531,34 @@ class VFolderService:
             vfolders=vfolders,
             _scope_type=action.scope_type(),
             _scope_id=action.scope_id(),
+        )
+
+    async def search_in_project(
+        self, action: SearchVFoldersInProjectAction
+    ) -> SearchVFoldersInProjectActionResult:
+        """Search vfolders scoped to a project."""
+        result = await self._vfolder_repository.search_in_project(action.querier, action.scope)
+        return SearchVFoldersInProjectActionResult(
+            project_id=action.scope.project_id,
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_user_vfolders(
+        self, action: SearchUserVFoldersAction
+    ) -> SearchUserVFoldersActionResult:
+        """Search vfolders owned by a specific user."""
+        result = await self._vfolder_repository.search_user_vfolders(
+            querier=action.querier, scope=action.scope
+        )
+        return SearchUserVFoldersActionResult(
+            user_id=action.scope.user_id,
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def move_to_trash(
@@ -531,6 +620,11 @@ class VFolderService:
         await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
+
+    async def purge(self, action: PurgeVFolderAction) -> PurgeVFolderActionResult:
+        """Purge a DELETE_COMPLETE vfolder from DB (admin only)."""
+        data = await self._vfolder_repository.purge_vfolder(action.purger)
+        return PurgeVFolderActionResult(vfolder_uuid=data.id)
 
     async def force_delete(
         self, action: ForceDeleteVFolderAction
@@ -616,7 +710,7 @@ class VFolderService:
             )
 
         allowed_vfolder_hosts = await self._vfolder_repository.get_allowed_vfolder_hosts(
-            action.requester_user_uuid, source_vfolder_data.group
+            action.requester_user_uuid, None
         )
 
         # Check host permissions using the user's actual resource policy
@@ -651,7 +745,27 @@ class VFolderService:
 
         # Create source and target VFolderID
         source_folder_id = VFolderID(source_vfolder_data.quota_scope_id, source_vfolder_data.id)
-        target_quota_scope_id = "..."  # TODO: implement
+
+        # Resolve target quota scope: use the provided one or default to requester's user scope
+        if action.target_quota_scope_id is not None:
+            target_quota_scope_id = action.target_quota_scope_id
+            # TODO: Support cloning to project quota scope.
+            #  Project quota scopes exist and project vfolders can be cloned,
+            #  but cloning *into* a project folder is not yet supported
+            #  the clone result is always created as a user-owned vfolder
+            if target_quota_scope_id.scope_type != QuotaScopeType.USER:
+                raise VFolderInvalidParameter("Clone target must be a user quota scope.")
+            await self._vfolder_repository.validate_quota_scope_access(
+                target_quota_scope_id,
+                UserIdentity(
+                    user_uuid=action.requester_user_uuid,
+                    user_role=user_role,
+                    user_email=requester_email,
+                    domain_name=user_domain_name,
+                ),
+            )
+        else:
+            target_quota_scope_id = QuotaScopeID(QuotaScopeType.USER, action.requester_user_uuid)
 
         # Create VFolderCloneInfo for the cloning operation
         vfolder_clone_info = VFolderCloneInfo(
@@ -738,8 +852,509 @@ class VFolderService:
                 await response.write(chunk)
 
         except aiohttp.ClientResponseError as e:
-            raise UnexpectedStorageProxyResponseError(status=e.status, extra_msg=e.message)
+            raise UnexpectedStorageProxyResponseError(status=e.status, extra_msg=e.message) from e
         finally:
             if prepared:
                 await response.write_eof()
         return GetTaskLogsActionResult(response=response, vfolder_data=log_vfolder_data)
+
+    async def list_allowed_types(
+        self, action: ListAllowedTypesAction
+    ) -> ListAllowedTypesActionResult:
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        return ListAllowedTypesActionResult(allowed_types=list(allowed_vfolder_types))
+
+    async def list_all_hosts(self, action: ListAllHostsAction) -> ListAllHostsActionResult:
+        all_volumes = await self._storage_manager.get_all_volumes()
+        all_hosts = {
+            f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
+        }
+        default_host = self._config_provider.config.volumes.default_host
+        if default_host not in all_hosts:
+            default_host = None
+        return ListAllHostsActionResult(default=default_host, allowed=sorted(all_hosts))
+
+    async def get_volume_perf_metric(
+        self, action: GetVolumePerfMetricAction
+    ) -> GetVolumePerfMetricActionResult:
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(action.folder_host)
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.get_volume_performance_metric(volume_name)
+        return GetVolumePerfMetricActionResult(data=dict(storage_reply))
+
+    async def get_usage(self, action: GetVFolderUsageAction) -> GetVFolderUsageActionResult:
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            action.folder_host, is_unmanaged(action.unmanaged_path)
+        )
+        client = self._storage_manager.get_manager_facing_client(proxy_name)
+        usage = await client.get_folder_usage(volume_name, action.vfolder_id)
+        return GetVFolderUsageActionResult(data=dict(usage))
+
+    async def get_used_bytes(
+        self, action: GetVFolderUsedBytesAction
+    ) -> GetVFolderUsedBytesActionResult:
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            action.folder_host, is_unmanaged(action.unmanaged_path)
+        )
+        client = self._storage_manager.get_manager_facing_client(proxy_name)
+        usage = await client.get_used_bytes(volume_name, action.vfolder_id)
+        return GetVFolderUsedBytesActionResult(data=dict(usage))
+
+    async def list_hosts(self, action: ListHostsAction) -> ListHostsActionResult:
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        allowed_hosts = await self._vfolder_repository.get_allowed_hosts_for_listing(
+            user_uuid=action.user_uuid,
+            domain_name=action.domain_name,
+            group_id=action.group_id,
+            resource_policy=action.resource_policy,
+            allowed_vfolder_types=list(allowed_vfolder_types),
+        )
+        all_volumes = await self._storage_manager.get_all_volumes()
+        all_hosts = {
+            f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
+        }
+        allowed_hosts = VFolderHostPermissionMap({
+            host: perms for host, perms in allowed_hosts.items() if host in all_hosts
+        })
+
+        default_host = self._config_provider.config.volumes.default_host
+        if default_host not in allowed_hosts:
+            default_host = None
+
+        volumes = [
+            (proxy_name, volume_data)
+            for proxy_name, volume_data in all_volumes
+            if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+        ]
+
+        fetch_volume_tasks = [
+            self._fetch_exposed_volume_fields(proxy_name, volume_data["name"])
+            for proxy_name, volume_data in volumes
+        ]
+        get_sftp_tasks = [
+            self._storage_manager.get_sftp_scaling_groups(proxy_name)
+            for proxy_name, volume_data in volumes
+        ]
+
+        fetch_results, sftp_results = await asyncio.gather(
+            asyncio.gather(*fetch_volume_tasks),
+            asyncio.gather(*get_sftp_tasks),
+        )
+
+        volume_info: dict[str, Any] = {}
+        for (proxy_name, volume_data), usage, sftp_scaling_groups in zip(
+            volumes,
+            fetch_results,
+            sftp_results,
+            strict=True,
+        ):
+            host_key = f"{proxy_name}:{volume_data['name']}"
+            volume_info[host_key] = {
+                "backend": volume_data["backend"],
+                "capabilities": volume_data["capabilities"],
+                "usage": usage,
+                "sftp_scaling_groups": sftp_scaling_groups,
+            }
+
+        return ListHostsActionResult(
+            default=default_host,
+            allowed=sorted(allowed_hosts),
+            volume_info=volume_info,
+        )
+
+    async def _fetch_exposed_volume_fields(
+        self,
+        proxy_name: str,
+        volume_name: str,
+    ) -> dict[str, int | float]:
+        """Fetch exposed volume usage fields (percentage, used_bytes, capacity_bytes)."""
+        volume_usage: dict[str, int | float] = {}
+        exposed = self._storage_manager._exposed_volume_info
+
+        show_percentage = "percentage" in exposed
+        show_used = "used_bytes" in exposed
+        show_total = "capacity_bytes" in exposed
+
+        if show_percentage or show_used or show_total:
+            volume_usage_cache = await self._valkey_stat_client.get_volume_usage(
+                proxy_name, volume_name
+            )
+            if volume_usage_cache:
+                volume_usage = msgpack.unpackb(volume_usage_cache)
+            else:
+                manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+                storage_reply = await manager_client.get_fs_usage(volume_name)
+                storage_used_bytes = storage_reply["used_bytes"]
+                storage_capacity_bytes = storage_reply["capacity_bytes"]
+
+                if show_used:
+                    volume_usage["used"] = storage_used_bytes
+                if show_total:
+                    volume_usage["total"] = storage_capacity_bytes
+                if show_percentage:
+                    try:
+                        volume_usage["percentage"] = storage_used_bytes / storage_capacity_bytes
+                    except ZeroDivisionError:
+                        volume_usage["percentage"] = 0.0
+
+        return volume_usage
+
+    async def get_quota(self, action: GetQuotaAction) -> GetQuotaActionResult:
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            action.folder_host, is_unmanaged(action.unmanaged_path)
+        )
+
+        if action.user_role != UserRole.SUPERADMIN:
+            allowed_vfolder_types = (
+                await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+            )
+            await self._vfolder_repository.check_vfolder_accessible(
+                vfolder_id=action.vfolder_id,
+                user_uuid=action.user_uuid,
+                user_role=action.user_role,
+                domain_name=action.domain_name,
+                allowed_vfolder_types=list(allowed_vfolder_types),
+            )
+
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.get_volume_quota(volume_name, action.vfid)
+        return GetQuotaActionResult(data=dict(storage_reply))
+
+    async def update_quota(self, action: UpdateQuotaAction) -> UpdateQuotaActionResult:
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            action.folder_host, is_unmanaged(action.unmanaged_path)
+        )
+        quota = action.size_bytes
+
+        if action.user_role != UserRole.SUPERADMIN:
+            allowed_vfolder_types = (
+                await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+            )
+            await self._vfolder_repository.ensure_host_permission_allowed(
+                action.folder_host,
+                permission=VFolderHostPermission.MODIFY,
+                allowed_vfolder_types=list(allowed_vfolder_types),
+                user_uuid=action.user_uuid,
+                resource_policy=action.resource_policy,
+                domain_name=action.domain_name,
+            )
+            await self._vfolder_repository.check_vfolder_accessible(
+                vfolder_id=action.vfolder_id,
+                user_uuid=action.user_uuid,
+                user_role=action.user_role,
+                domain_name=action.domain_name,
+                allowed_vfolder_types=list(allowed_vfolder_types),
+            )
+
+        max_quota_scope_size = action.resource_policy.get("max_quota_scope_size", 0)
+        if max_quota_scope_size > 0 and (quota <= 0 or quota > max_quota_scope_size):
+            quota = max_quota_scope_size
+
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.update_volume_quota(volume_name, action.vfid, quota)
+
+        await self._vfolder_repository.update_vfolder_max_size(
+            action.vfolder_id, math.ceil(quota / 2**20)
+        )
+
+        return UpdateQuotaActionResult(size_bytes=quota)
+
+    async def change_vfolder_ownership(
+        self, action: ChangeVFolderOwnershipAction
+    ) -> ChangeVFolderOwnershipActionResult:
+        await self._vfolder_repository.change_vfolder_ownership(
+            action.vfolder_id, action.user_email
+        )
+        return ChangeVFolderOwnershipActionResult()
+
+    # ------------------------------------------------------------------
+    # Mount operations (superadmin-only, agent watcher orchestration)
+    # ------------------------------------------------------------------
+
+    async def _get_watcher_info(self, agent_id: str) -> dict[str, Any]:
+        """Get watcher connection info for an agent."""
+        token = self._config_provider.config.watcher.token
+        if token is None:
+            token = "insecure"
+        agent_ip = await self._etcd.get(f"nodes/agents/{agent_id}/ip")
+        raw_watcher_port = await self._etcd.get(
+            f"nodes/agents/{agent_id}/watcher_port",
+        )
+        watcher_port = 6099 if raw_watcher_port is None else int(raw_watcher_port)
+        addr = yarl.URL(f"http://{agent_ip}:{watcher_port}")
+        return {
+            "addr": addr,
+            "token": token,
+        }
+
+    async def _get_mount_prefix(self) -> str:
+        mount_prefix = await self._config_provider.legacy_etcd_config_loader.get_raw(
+            "volumes/_mount"
+        )
+        if mount_prefix is None:
+            mount_prefix = "/mnt"
+        return mount_prefix
+
+    async def list_mounts(self, action: ListMountsAction) -> ListMountsActionResult:
+        """List mount points from manager, storage proxy, and agents."""
+        mount_prefix = await self._get_mount_prefix()
+        _ = mount_prefix  # mount_prefix used contextually by caller if needed
+
+        all_volumes = [*await self._storage_manager.get_all_volumes()]
+        all_mounts: list[Any] = [volume_data["path"] for _proxy_name, volume_data in all_volumes]
+        all_vfolder_hosts = [
+            f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
+        ]
+
+        manager_result = MountResultData(
+            success=True,
+            mounts=all_mounts,
+            message="(legacy)",
+        )
+        storage_proxy_result = MountResultData(
+            success=True,
+            mounts=[list(pair) for pair in zip(all_vfolder_hosts, all_mounts, strict=True)],
+            message="",
+        )
+
+        agent_ids = await self._vfolder_repository.get_alive_agent_ids()
+
+        async def _fetch_mounts(
+            sema: asyncio.Semaphore,
+            sess: aiohttp.ClientSession,
+            agent_id: str,
+        ) -> tuple[str, MountResultData]:
+            async with sema:
+                watcher_info = await self._get_watcher_info(agent_id)
+                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+                url = watcher_info["addr"] / "mounts"
+                async with sess.get(url, headers=headers) as watcher_resp:
+                    if watcher_resp.status == 200:
+                        data = MountResultData(
+                            success=True,
+                            mounts=await watcher_resp.json(),
+                            message="",
+                        )
+                    else:
+                        data = MountResultData(
+                            success=False,
+                            mounts=[],
+                            message=await watcher_resp.text(),
+                        )
+                    return (agent_id, data)
+
+        agents_result: dict[str, MountResultData] = {}
+        client_timeout = aiohttp.ClientTimeout(total=10.0)
+        async with aiohttp.ClientSession(timeout=client_timeout) as sess:
+            sema = asyncio.Semaphore(8)
+            mounts = await asyncio.gather(
+                *[_fetch_mounts(sema, sess, aid) for aid in agent_ids],
+                return_exceptions=True,
+            )
+            for mount in mounts:
+                if isinstance(mount, BaseException):
+                    continue
+                agents_result[mount[0]] = mount[1]
+
+        return ListMountsActionResult(
+            manager=manager_result,
+            storage_proxy=storage_proxy_result,
+            agents=agents_result,
+        )
+
+    async def mount_host(self, action: MountHostAction) -> MountHostActionResult:
+        """Mount a filesystem on agents via agent watchers."""
+        manager_result = MountResultData(
+            success=True,
+            message="Managers do not have mountpoints since v20.09.",
+        )
+
+        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.scaling_group)
+
+        mount_params = {
+            "fs_location": action.fs_location,
+            "name": action.name,
+            "fs_type": action.fs_type,
+            "options": action.options,
+            "scaling_group": action.scaling_group,
+            "fstab_path": action.fstab_path,
+            "edit_fstab": action.edit_fstab,
+        }
+
+        async def _mount(
+            sema: asyncio.Semaphore,
+            sess: aiohttp.ClientSession,
+            agent_id: str,
+        ) -> tuple[str, MountResultData]:
+            async with sema:
+                watcher_info = await self._get_watcher_info(agent_id)
+                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+                url = watcher_info["addr"] / "mounts"
+                async with sess.post(url, json=mount_params, headers=headers) as resp:
+                    if resp.status == 200:
+                        data = MountResultData(
+                            success=True,
+                            message=await resp.text(),
+                        )
+                    else:
+                        data = MountResultData(
+                            success=False,
+                            message=await resp.text(),
+                        )
+                    return (agent_id, data)
+
+        agents_result: dict[str, MountResultData] = {}
+        client_timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=client_timeout) as sess:
+            sema = asyncio.Semaphore(8)
+            mount_results = await asyncio.gather(
+                *[_mount(sema, sess, aid) for aid in agent_ids],
+                return_exceptions=True,
+            )
+            for mount_result in mount_results:
+                if isinstance(mount_result, BaseException):
+                    continue
+                agents_result[mount_result[0]] = mount_result[1]
+
+        return MountHostActionResult(
+            manager=manager_result,
+            agents=agents_result,
+        )
+
+    async def umount_host(self, action: UmountHostAction) -> UmountHostActionResult:
+        """Unmount a filesystem from agents via agent watchers."""
+        mount_prefix = await self._get_mount_prefix()
+        mountpoint = Path(mount_prefix) / action.name
+        if Path(mount_prefix) == mountpoint:
+            raise VFolderBadRequest("Mount prefix and mountpoint cannot be the same")
+
+        # Check that no active kernel is using this mount
+        mounted_names = await self._vfolder_repository.get_active_kernel_mount_names()
+        if action.name in mounted_names:
+            raise VFolderOperationFailed("Target host is used in sessions")
+
+        agent_ids = await self._vfolder_repository.get_alive_agent_ids(action.scaling_group)
+
+        manager_result = MountResultData(
+            success=True,
+            message="Managers do not have mountpoints since v20.09.",
+        )
+
+        umount_params = {
+            "name": action.name,
+            "scaling_group": action.scaling_group,
+            "fstab_path": action.fstab_path,
+            "edit_fstab": action.edit_fstab,
+        }
+
+        async def _umount(
+            sema: asyncio.Semaphore,
+            sess: aiohttp.ClientSession,
+            agent_id: str,
+        ) -> tuple[str, MountResultData]:
+            async with sema:
+                watcher_info = await self._get_watcher_info(agent_id)
+                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+                url = watcher_info["addr"] / "mounts"
+                async with sess.delete(url, json=umount_params, headers=headers) as resp:
+                    if resp.status == 200:
+                        data = MountResultData(
+                            success=True,
+                            message=await resp.text(),
+                        )
+                    else:
+                        data = MountResultData(
+                            success=False,
+                            message=await resp.text(),
+                        )
+                    return (agent_id, data)
+
+        agents_result: dict[str, MountResultData] = {}
+        client_timeout = aiohttp.ClientTimeout(total=10.0)
+        async with aiohttp.ClientSession(timeout=client_timeout) as sess:
+            sema = asyncio.Semaphore(8)
+            umount_results = await asyncio.gather(
+                *[_umount(sema, sess, aid) for aid in agent_ids],
+                return_exceptions=True,
+            )
+            for umount_result in umount_results:
+                if isinstance(umount_result, BaseException):
+                    continue
+                agents_result[umount_result[0]] = umount_result[1]
+
+        return UmountHostActionResult(
+            manager=manager_result,
+            agents=agents_result,
+        )
+
+    async def get_fstab_contents(
+        self, action: GetFstabContentsAction
+    ) -> GetFstabContentsActionResult:
+        """Get fstab contents from an agent watcher or return a manager stub."""
+        fstab_path = action.fstab_path if action.fstab_path is not None else "/etc/fstab"
+        if action.agent_id is None:
+            return GetFstabContentsActionResult(
+                content=(
+                    "# Since Backend.AI 20.09, reading the manager fstab is no longer supported."
+                ),
+                node="manager",
+                node_id="manager",
+            )
+
+        watcher_info = await self._get_watcher_info(action.agent_id)
+        try:
+            client_timeout = aiohttp.ClientTimeout(total=10.0)
+            async with aiohttp.ClientSession(timeout=client_timeout) as sess:
+                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
+                url = watcher_info["addr"] / "fstab"
+                params = {"fstab_path": fstab_path}
+                async with sess.get(url, headers=headers, params=params) as resp:
+                    if resp.status == 200:
+                        content = await resp.text()
+                        return GetFstabContentsActionResult(
+                            content=content,
+                            node="agent",
+                            node_id=action.agent_id,
+                        )
+                    message = await resp.text()
+                    raise BackendAgentError(
+                        "FAILURE",
+                        f"({resp.status}: {resp.reason}) {message}",
+                    )
+        except asyncio.CancelledError:
+            raise
+        except BackendAgentError:
+            raise
+        except TimeoutError as e:
+            raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent") from e
+        except Exception as e:
+            raise InternalServerError from e
+
+    async def get_accessible_vfolder(
+        self, action: GetAccessibleVFolderAction
+    ) -> GetAccessibleVFolderActionResult:
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        entries = await self._vfolder_repository.get_accessible_rows(
+            user_uuid=action.user_uuid,
+            user_role=action.user_role,
+            domain_name=action.domain_name,
+            is_admin=action.is_admin,
+            allowed_vfolder_types=allowed_vfolder_types,
+            perm=action.perm,
+            folder_id_or_name=action.folder_id_or_name,
+            allow_privileged_access=action.allow_privileged_access,
+        )
+        if len(entries) == 0:
+            raise VFolderNotFound(extra_data=action.folder_id_or_name)
+        if len(entries) > 1:
+            raise TooManyVFoldersFound(entries)
+        row = entries[0]
+        if action.required_status is not None:
+            await _check_vfolder_status(row["status"], action.required_status)
+        return GetAccessibleVFolderActionResult(row=row)

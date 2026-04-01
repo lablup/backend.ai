@@ -41,7 +41,7 @@ class RootContext(BaseContext):
     metadata_plugin_ctx: MetadataPluginContext
 
 
-async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
+async def on_prepare(_request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
 
@@ -83,7 +83,7 @@ async def container_resolver_middleware(
     return await handler(request)
 
 
-async def list_versions(request: web.Request) -> web.Response:
+async def list_versions(_request: web.Request) -> web.Response:
     return web.Response(body="latest/")
 
 
@@ -150,7 +150,7 @@ class MetadataServer(aobject):
             structure_pointer = self.route_structure
             for component in components:
                 if structure_pointer.get(component) is None:
-                    raise web.HTTPNotFound
+                    raise web.HTTPNotFound from None
                 structure_pointer = structure_pointer[component]
             resources = []
             for k, v in structure_pointer.items():
@@ -172,7 +172,7 @@ class MetadataServer(aobject):
     ) -> None:
         subapp.on_response_prepare.append(on_prepare)
 
-        async def _set_root_ctx(subapp: web.Application):
+        async def _set_root_ctx(subapp: web.Application) -> None:
             # Allow subapp's access to the root app properties.
             # These are the public APIs exposed to plugins as well.
             subapp["_root.context"] = root_app["_root.context"]

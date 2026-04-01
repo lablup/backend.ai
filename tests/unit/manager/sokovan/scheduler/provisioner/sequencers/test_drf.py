@@ -3,9 +3,8 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
-from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.drf import DRFSequencer
-from ai.backend.manager.sokovan.scheduler.types import (
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
+from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     KeypairOccupancy,
     PendingSessionSnapshot,
@@ -15,9 +14,14 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionWorkload,
     SystemSnapshot,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.drf import DRFSequencer
 
 
 class TestDRFSequencer:
+    @pytest.fixture
+    def scaling_group(self) -> str:
+        return "default"
+
     @pytest.fixture
     def sequencer(self) -> DRFSequencer:
         return DRFSequencer()
@@ -59,17 +63,26 @@ class TestDRFSequencer:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("20"), mem=Decimal("10")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("20")),
+                            SlotQuantity("mem", Decimal("10")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),  # dominant share: 20%
                     AccessKey("user2"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("30")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("10")),
+                            SlotQuantity("mem", Decimal("30")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),  # dominant share: 30%
                     AccessKey("user3"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("5")),
+                            SlotQuantity("mem", Decimal("5")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),  # dominant share: 5%
@@ -98,20 +111,17 @@ class TestDRFSequencer:
             known_slot_types={},
         )
 
-    @pytest.mark.asyncio
     async def test_name(self, sequencer: DRFSequencer) -> None:
         assert sequencer.name == "DRFSequencer"
 
-    @pytest.mark.asyncio
     async def test_empty_workload(
-        self, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
+        self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
-        result = sequencer.sequence(empty_system_snapshot, [])
+        result = await sequencer.sequence(scaling_group, empty_system_snapshot, [])
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_single_user_workloads(
-        self, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
+        self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
         workloads = [
             SessionWorkload(
@@ -136,16 +146,16 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = sequencer.sequence(empty_system_snapshot, workloads)
+        result = await sequencer.sequence(scaling_group, empty_system_snapshot, workloads)
 
         # With no existing allocations, order should be preserved
         assert len(result) == 2
         assert result[0] == workloads[0]
         assert result[1] == workloads[1]
 
-    @pytest.mark.asyncio
     async def test_multiple_users_different_dominant_shares(
         self,
+        scaling_group: str,
         sequencer: DRFSequencer,
         system_snapshot_with_allocations: SystemSnapshot,
     ) -> None:
@@ -182,7 +192,9 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = sequencer.sequence(system_snapshot_with_allocations, workloads)
+        result = await sequencer.sequence(
+            scaling_group, system_snapshot_with_allocations, workloads
+        )
 
         # Should be ordered by dominant share (ascending): user3 (5%), user1 (20%), user2 (30%)
         assert len(result) == 3
@@ -190,9 +202,8 @@ class TestDRFSequencer:
         assert result[1].access_key == AccessKey("user1")
         assert result[2].access_key == AccessKey("user2")
 
-    @pytest.mark.asyncio
     async def test_multiple_users_same_dominant_share(
-        self, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
+        self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
         # All users have no existing allocations (0% dominant share)
         workloads = [
@@ -228,7 +239,7 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = sequencer.sequence(empty_system_snapshot, workloads)
+        result = await sequencer.sequence(scaling_group, empty_system_snapshot, workloads)
 
         # With same dominant share, order should be preserved
         assert len(result) == 3
@@ -236,9 +247,9 @@ class TestDRFSequencer:
         assert result[1] == workloads[1]
         assert result[2] == workloads[2]
 
-    @pytest.mark.asyncio
     async def test_new_user_gets_priority(
         self,
+        scaling_group: str,
         sequencer: DRFSequencer,
         system_snapshot_with_allocations: SystemSnapshot,
     ) -> None:
@@ -265,16 +276,17 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = sequencer.sequence(system_snapshot_with_allocations, workloads)
+        result = await sequencer.sequence(
+            scaling_group, system_snapshot_with_allocations, workloads
+        )
 
         # New user with 0% dominant share should get priority
         assert len(result) == 2
         assert result[0].access_key == AccessKey("new_user")
         assert result[1].access_key == AccessKey("user2")
 
-    @pytest.mark.asyncio
     async def test_dominant_share_calculation_with_zero_capacity(
-        self, sequencer: DRFSequencer
+        self, scaling_group: str, sequencer: DRFSequencer
     ) -> None:
         # Test edge case where some resource has zero capacity
         system_snapshot = SystemSnapshot(
@@ -284,7 +296,10 @@ class TestDRFSequencer:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("50"), mem=Decimal("10")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("50")),
+                            SlotQuantity("mem", Decimal("10")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),
@@ -327,5 +342,5 @@ class TestDRFSequencer:
         ]
 
         # Should not crash when dividing by zero capacity
-        result = sequencer.sequence(system_snapshot, workloads)
+        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
         assert len(result) == 1

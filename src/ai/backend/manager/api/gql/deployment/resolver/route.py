@@ -2,93 +2,132 @@
 
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
-import strawberry
 from strawberry import ID, Info
+from strawberry.relay import PageInfo
 
-from ai.backend.manager.api.gql.base import resolve_global_id
-from ai.backend.manager.api.gql.deployment.fetcher.route import fetch_routes
+from ai.backend.common.data.model_deployment.types import (
+    RouteStatus as RouteStatusCommon,
+)
+from ai.backend.common.data.model_deployment.types import (
+    RouteTrafficStatus as RouteTrafficStatusCommon,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteFilter as RouteFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    SearchRoutesInput,
+)
+from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.deployment.types.route import (
     Route,
     RouteConnection,
+    RouteEdge,
     RouteFilter,
     RouteOrderBy,
     UpdateRouteTrafficStatusInputGQL,
     UpdateRouteTrafficStatusPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.deployment.types import RouteTrafficStatus as RouteTrafficStatusEnum
-from ai.backend.manager.repositories.deployment.options import RouteConditions
-from ai.backend.manager.services.deployment.actions.route import (
-    UpdateRouteTrafficStatusAction,
+from ai.backend.manager.data.deployment.types import (
+    RouteSearchScope,
 )
+
+
+def _route_filter_to_dto(filter: RouteFilter) -> RouteFilterDTO:
+    return RouteFilterDTO(
+        status=[RouteStatusCommon(s.value) for s in filter.status] if filter.status else None,  # type: ignore[attr-defined]
+        traffic_status=[RouteTrafficStatusCommon(s.value) for s in filter.traffic_status]  # type: ignore[attr-defined]
+        if filter.traffic_status
+        else None,
+        AND=[_route_filter_to_dto(f) for f in filter.AND] if filter.AND else None,
+        OR=[_route_filter_to_dto(f) for f in filter.OR] if filter.OR else None,
+        NOT=[_route_filter_to_dto(f) for f in filter.NOT] if filter.NOT else None,
+    )
+
 
 # Query resolvers
 
 
-@strawberry.field(
-    description="Added in 25.19.0. List routes for a deployment with optional filters."
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="List routes for a deployment with optional filters."
+    )
+)  # type: ignore[misc]
 async def routes(
     info: Info[StrawberryGQLContext],
     deployment_id: ID,
-    filter: Optional[RouteFilter] = None,
-    order_by: Optional[list[RouteOrderBy]] = None,
-    before: Optional[str] = None,
-    after: Optional[str] = None,
-    first: Optional[int] = None,
-    last: Optional[int] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-) -> RouteConnection:
+    filter: RouteFilter | None = None,
+    order_by: list[RouteOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> RouteConnection | None:
     """List routes for a deployment with optional filters."""
     _, endpoint_id = resolve_global_id(deployment_id)
-    return await fetch_routes(
-        info=info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
-        base_conditions=[RouteConditions.by_endpoint_id(UUID(endpoint_id))],
+    pydantic_filter = _route_filter_to_dto(filter) if filter else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+    payload = await info.context.adapters.deployment.search_routes(
+        scope=RouteSearchScope(deployment_id=UUID(endpoint_id)),
+        input=SearchRoutesInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    nodes = [Route.from_pydantic(item) for item in payload.items]
+    edges = [RouteEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return RouteConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
     )
 
 
-@strawberry.field(description="Added in 25.19.0. Get a specific route by ID.")
-async def route(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Route]:
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.19.0", description="Get a specific route by ID.")
+)  # type: ignore[misc]
+async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
     """Get a specific route by ID."""
     _, route_id = resolve_global_id(id)
-
-    route_info = await info.context.data_loaders.route_loader.load(UUID(route_id))
-    if route_info is None:
-        return None
-    return Route.from_dataclass(route_info)
+    return await info.context.data_loaders.route_loader.load(UUID(route_id))
 
 
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.19.0. Update the traffic status of a route.")
+@gql_mutation(
+    BackendAIGQLMeta(added_version="25.19.0", description="Update the traffic status of a route")
+)  # type: ignore[misc]
 async def update_route_traffic_status(
     input: UpdateRouteTrafficStatusInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> UpdateRouteTrafficStatusPayloadGQL:
     """Update route traffic status (ACTIVE/INACTIVE)."""
     _, route_id = resolve_global_id(input.route_id)
-
-    processor = info.context.processors.deployment
-    result = await processor.update_route_traffic_status.wait_for_complete(
-        UpdateRouteTrafficStatusAction(
-            route_id=UUID(route_id),
-            traffic_status=RouteTrafficStatusEnum(input.traffic_status.value),
-        )
+    route_node = await info.context.adapters.deployment.update_route_traffic(
+        UUID(route_id),
+        RouteTrafficStatusCommon(input.traffic_status.value),  # type: ignore[attr-defined]
     )
-
     return UpdateRouteTrafficStatusPayloadGQL(
-        route=Route.from_dataclass(result.route),
+        route=Route.from_pydantic(route_node),
     )

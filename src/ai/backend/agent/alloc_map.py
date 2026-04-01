@@ -4,6 +4,7 @@ import enum
 import fnmatch
 import itertools
 import logging
+import math
 import operator
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
@@ -11,7 +12,7 @@ from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import ROUND_DOWN, Decimal
 from typing import (
     TYPE_CHECKING,
-    Optional,
+    Any,
     TypeVar,
     final,
 )
@@ -54,7 +55,7 @@ class DeviceSlotInfo:
     amount: Decimal
 
 
-def distribute(num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
+def distribute[T](num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
     base, extra = divmod(num_items, len(groups))
     return dict(
         zip(
@@ -65,7 +66,7 @@ def distribute(num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
     )
 
 
-def round_down(from_dec: Decimal, with_dec: Decimal):
+def round_down(from_dec: Decimal, with_dec: Decimal) -> Decimal:
     remainder = from_dec.remainder_near(with_dec)
     if remainder < 0:
         remainder += with_dec
@@ -81,9 +82,9 @@ class AbstractAllocMap(metaclass=ABCMeta):
     def __init__(
         self,
         *,
-        device_slots: Optional[Mapping[DeviceId, DeviceSlotInfo]] = None,
-        device_mask: Optional[Iterable[DeviceId]] = None,
-        exclusive_slot_types: Optional[Iterable[SlotName]] = None,
+        device_slots: Mapping[DeviceId, DeviceSlotInfo] | None = None,
+        device_mask: Iterable[DeviceId] | None = None,
+        exclusive_slot_types: Iterable[SlotName] | None = None,
     ) -> None:
         self.exclusive_slot_types = exclusive_slot_types or {}
         self.device_slots = device_slots or {}
@@ -126,7 +127,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
 
     @final
     def get_current_allocations(
-        self, affinity_hint: Optional[AffinityHint], slot_name: SlotName
+        self, affinity_hint: AffinityHint | None, slot_name: SlotName
     ) -> Sequence[tuple[DeviceId, Decimal]]:
         device_name = DeviceName(slot_name.partition(".")[0])
 
@@ -221,7 +222,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
     def update_affinity_hint(
         self,
         device_alloc: Mapping[DeviceId, Decimal],
-        affinity_hint: Optional[AffinityHint] = None,
+        affinity_hint: AffinityHint | None = None,
     ) -> None:
         if affinity_hint is None:
             return
@@ -239,8 +240,8 @@ class AbstractAllocMap(metaclass=ABCMeta):
         self,
         slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         """
         Allocate the given amount of resources.
@@ -287,9 +288,9 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
 
     def __init__(
         self,
-        *args,
+        *args: Any,
         allocation_strategy: AllocationStrategy = AllocationStrategy.EVENLY,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         self.allocation_strategy = allocation_strategy
         self._allocate_impl = {
@@ -302,8 +303,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         self,
         slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         # prune zero alloc slots
         requested_slots = {k: v for k, v in slots.items() if v > 0}
@@ -338,8 +339,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         self,
         requested_slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
         for slot_name, requested_alloc in requested_slots.items():
@@ -391,8 +392,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         self,
         requested_slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
 
@@ -498,11 +499,11 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
 class FractionAllocMap(AbstractAllocMap):
     def __init__(
         self,
-        *args,
+        *args: Any,
         allocation_strategy: AllocationStrategy = AllocationStrategy.EVENLY,
         quantum_size: Decimal = Decimal("0.01"),
         enforce_physical_continuity: bool = True,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         self.allocation_strategy = allocation_strategy
         self.quantum_size = quantum_size
@@ -519,8 +520,8 @@ class FractionAllocMap(AbstractAllocMap):
         self,
         slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
         min_memory: Decimal = Decimal("0.01"),
         allow_resource_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
@@ -568,7 +569,7 @@ class FractionAllocMap(AbstractAllocMap):
         sorted_dev_allocs: Sequence[tuple[DeviceId, Decimal]],
         alloc: Decimal,
         *,
-        context_tag: Optional[str] = None,
+        context_tag: str | None = None,
     ) -> None:
         if len(sorted_dev_allocs) == 0:
             raise FractionalResourceFragmented(
@@ -578,25 +579,58 @@ class FractionAllocMap(AbstractAllocMap):
                 requested_alloc=alloc,
                 dev_allocs=sorted_dev_allocs,
             )
-        most_free_dev_id, most_free_device_alloc = sorted_dev_allocs[0]
-        most_free_device_allocatable = (
-            self.device_slots[most_free_dev_id].amount - most_free_device_alloc
+
+        if alloc <= 0:
+            raise InvalidResourceArgument("Allocation amount must be positive.")
+
+        # NOTE: This logic assumes a single node with homogeneous devices (same capacity).
+        # Heterogeneous device mixes or multi-node setups require a separate strategy.
+        device_capacity = self.device_slots[sorted_dev_allocs[0][0]].amount
+        quantum = self.quantum_size
+        min_n = math.ceil(alloc / device_capacity)
+        total_devices = len(sorted_dev_allocs)
+
+        # Pre-compute free capacity for each device (sorted by free desc).
+        dev_free = [
+            self.device_slots[dev_id].amount - current_alloc
+            for dev_id, current_alloc in sorted_dev_allocs
+        ]
+
+        # - Single-device requests (alloc <= capacity): must fit on 1 device, no splitting.
+        # - Multi-device requests (alloc > capacity): try N = min_n, min_n+1, ..., total_devices.
+        #   For each N, compute per-device share D = round_down(alloc / N, quantum).
+        #   Some devices receive D + quantum (to cover the shortfall from rounding).
+        #   Accept if enough devices can hold their respective share.
+        max_n = min_n if alloc <= device_capacity else total_devices
+        for n in range(min_n, max_n + 1):
+            per_device_share = round_down(alloc / Decimal(n), quantum)
+            shortfall = alloc - per_device_share * n
+            extra_devices = math.ceil(shortfall / quantum) if shortfall > 0 else 0
+            high_share = per_device_share + quantum
+            high_count = 0
+            low_count = 0
+            for free in dev_free:
+                if free >= high_share:
+                    high_count += 1
+                elif free >= per_device_share:
+                    low_count += 1
+            if high_count >= extra_devices and (high_count + low_count) >= n:
+                return
+
+        raise FractionalResourceFragmented(
+            "FractionAllocMap: refusing to create kernel with fractional resource fragmented!",
+            context_tag=context_tag,
+            slot_name=slot_name,
+            requested_alloc=alloc,
+            dev_allocs=sorted_dev_allocs,
         )
-        if most_free_device_allocatable < alloc:
-            raise FractionalResourceFragmented(
-                "FractionAllocMap: refusing to create kernel with fractional resource fragmented!",
-                context_tag=context_tag,
-                slot_name=slot_name,
-                requested_alloc=alloc,
-                dev_allocs=sorted_dev_allocs,
-            )
 
     def _allocate_by_filling(
         self,
         requested_slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
         min_memory: Decimal = Decimal(0.01),
         allow_slot_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
@@ -665,8 +699,8 @@ class FractionAllocMap(AbstractAllocMap):
         self,
         requested_slots: Mapping[SlotName, Decimal],
         *,
-        affinity_hint: Optional[AffinityHint] = None,
-        context_tag: Optional[str] = None,
+        affinity_hint: AffinityHint | None = None,
+        context_tag: str | None = None,
         min_memory: Decimal = Decimal(0.01),
         allow_slot_fragmentation: bool = True,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
@@ -701,9 +735,12 @@ class FractionAllocMap(AbstractAllocMap):
             allocation: dict[DeviceId, Decimal],
         ) -> None:
             n_devices = len(dev_allocs)
+            if n_devices == 0:
+                return
+            dev_allocation = (remaining_alloc / n_devices).quantize(
+                self.digits, rounding=ROUND_DOWN
+            )
             for dev_id, _ in dev_allocs:
-                dev_allocation = remaining_alloc / n_devices
-                dev_allocation = dev_allocation.quantize(self.digits, rounding=ROUND_DOWN)
                 allocation[dev_id] = dev_allocation
 
             # need to take care of decimals
@@ -719,7 +756,7 @@ class FractionAllocMap(AbstractAllocMap):
         def allocate_across_devices(
             dev_allocs: list[tuple[DeviceId, Decimal]],
             remaining_alloc: Decimal,
-            slot_name: SlotName,
+            _slot_name: SlotName,
         ) -> dict[DeviceId, Decimal]:
             slot_allocation: dict[DeviceId, Decimal] = {}
             n_devices = len(dev_allocs)

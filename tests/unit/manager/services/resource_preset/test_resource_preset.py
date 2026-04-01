@@ -3,6 +3,8 @@ Simple tests for Resource Preset Service functionality based on test scenarios.
 Tests the core resource preset service actions to verify compatibility with test scenarios.
 """
 
+from __future__ import annotations
+
 import uuid
 from decimal import Decimal
 from typing import Any
@@ -16,6 +18,7 @@ from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
     SlotName,
+    SlotQuantity,
     SlotTypes,
     current_resource_slots,
 )
@@ -27,7 +30,11 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
+from ai.backend.manager.repositories.resource_preset.db_source.types import (
+    PresetAllocatabilityData,
+)
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
+from ai.backend.manager.repositories.resource_preset.types import CheckPresetsResult
 from ai.backend.manager.repositories.resource_preset.updaters import ResourcePresetUpdaterSpec
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
@@ -90,15 +97,16 @@ class TestResourcePresetServiceCompatibility:
         }
 
     @pytest.fixture
-    def resource_preset_service(self, mock_dependencies) -> ResourcePresetService:
+    def resource_preset_service(self, mock_dependencies: dict[str, Any]) -> ResourcePresetService:
         """Create ResourcePresetService instance with mocked dependencies."""
         return ResourcePresetService(
             resource_preset_repository=mock_dependencies["resource_preset_repository"],
         )
 
-    @pytest.mark.asyncio
     async def test_create_preset_action_structure(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test that CreateResourcePresetAction has the expected structure from test scenarios."""
         # Mock successful preset creation
@@ -133,9 +141,10 @@ class TestResourcePresetServiceCompatibility:
         assert result.resource_preset.name == "cpu-small"
         mock_dependencies["resource_preset_repository"].create_preset_validated.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_create_gpu_preset_with_scaling_group(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test GPU preset creation with scaling group."""
         mock_preset_data = ResourcePresetData(
@@ -176,8 +185,9 @@ class TestResourcePresetServiceCompatibility:
         assert isinstance(result, CreateResourcePresetActionResult)
         assert result.resource_preset.scaling_group_name == "gpu-cluster"
 
-    @pytest.mark.asyncio
-    async def test_create_preset_missing_intrinsic_slots(self, resource_preset_service) -> None:
+    async def test_create_preset_missing_intrinsic_slots(
+        self, resource_preset_service: ResourcePresetService
+    ) -> None:
         """Test preset creation fails when missing intrinsic slots."""
         action = CreateResourcePresetAction(
             creator=Creator(
@@ -193,9 +203,10 @@ class TestResourcePresetServiceCompatibility:
         with pytest.raises(InvalidAPIParameters):
             await resource_preset_service.create_preset(action)
 
-    @pytest.mark.asyncio
     async def test_create_duplicate_preset(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test duplicate preset name raises ResourcePresetConflict."""
 
@@ -217,9 +228,10 @@ class TestResourcePresetServiceCompatibility:
         with pytest.raises(ResourcePresetConflict):
             await resource_preset_service.create_preset(action)
 
-    @pytest.mark.asyncio
     async def test_modify_preset_action_structure(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test that ModifyResourcePresetAction supports the expected modifications."""
         mock_preset_data = ResourcePresetData(
@@ -252,9 +264,10 @@ class TestResourcePresetServiceCompatibility:
         assert result.resource_preset is not None
         mock_dependencies["resource_preset_repository"].modify_preset_validated.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_modify_preset_name_change(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test preset name modification."""
         preset_id = uuid.uuid4()
@@ -283,8 +296,9 @@ class TestResourcePresetServiceCompatibility:
 
         assert result.resource_preset.name == "cpu-medium"
 
-    @pytest.mark.asyncio
-    async def test_modify_preset_missing_identifiers(self, resource_preset_service) -> None:
+    async def test_modify_preset_missing_identifiers(
+        self, resource_preset_service: ResourcePresetService
+    ) -> None:
         """Test modify fails when neither name nor id provided."""
         action = ModifyResourcePresetAction(
             name=None,
@@ -298,9 +312,10 @@ class TestResourcePresetServiceCompatibility:
         with pytest.raises(InvalidAPIParameters):
             await resource_preset_service.modify_preset(action)
 
-    @pytest.mark.asyncio
     async def test_delete_preset_action_structure(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test that DeleteResourcePresetAction works as expected."""
         mock_preset_data = ResourcePresetData(
@@ -323,9 +338,10 @@ class TestResourcePresetServiceCompatibility:
         assert result.resource_preset is not None
         mock_dependencies["resource_preset_repository"].delete_preset_validated.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_delete_nonexistent_preset(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test delete non-existent preset raises ObjectNotFound."""
         mock_dependencies["resource_preset_repository"].delete_preset_validated = AsyncMock(
@@ -337,9 +353,10 @@ class TestResourcePresetServiceCompatibility:
         with pytest.raises(ObjectNotFound):
             await resource_preset_service.delete_preset(action)
 
-    @pytest.mark.asyncio
     async def test_list_presets_action_structure(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test that ListResourcePresetsAction returns expected structure."""
         mock_presets = [
@@ -383,9 +400,10 @@ class TestResourcePresetServiceCompatibility:
         assert "memory" in result.presets[0]["resource_slots"]  # Normalized slot
         assert "gpu" in result.presets[0]["resource_slots"]  # Default value
 
-    @pytest.mark.asyncio
     async def test_check_presets_with_sufficient_resources(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test check presets when resources are sufficient."""
         action = CheckResourcePresetsAction(
@@ -410,7 +428,12 @@ class TestResourcePresetServiceCompatibility:
         assert result.group_limits is not None
         assert len(result.presets) > 0
 
-    async def _setup_check_presets_mocks(self, service, deps, action) -> None:
+    async def _setup_check_presets_mocks(
+        self,
+        service: ResourcePresetService,
+        deps: dict[str, Any],
+        action: CheckResourcePresetsAction,
+    ) -> None:
         """Helper to setup complex mocks for check_presets tests."""
         # Mock database connection
         mock_conn = AsyncMock()
@@ -431,13 +454,6 @@ class TestResourcePresetServiceCompatibility:
         mock_conn.scalar = AsyncMock(return_value={"cpu": "200", "mem": "200G", "gpu": "20"})
 
         # Mock scaling group query - this is now handled by repository
-        from ai.backend.common.types import ResourceSlot
-        from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-        from ai.backend.manager.repositories.resource_preset.db_source.types import (
-            PresetAllocatabilityData,
-        )
-        from ai.backend.manager.repositories.resource_preset.types import CheckPresetsResult
-
         # Create mock preset data
         preset_data = ResourcePresetData(
             id=uuid.uuid4(),
@@ -450,22 +466,50 @@ class TestResourcePresetServiceCompatibility:
         # Create mock result that the repository would return
         mock_check_result = CheckPresetsResult(
             presets=[PresetAllocatabilityData(preset=preset_data, allocatable=True)],
-            keypair_limits=ResourceSlot({"cpu": "100", "mem": "100G", "gpu": "10"}),
-            keypair_using=ResourceSlot({"cpu": "10", "mem": "10G", "gpu": "1"}),
-            keypair_remaining=ResourceSlot({"cpu": "90", "mem": "90G", "gpu": "9"}),
-            group_limits=ResourceSlot({"cpu": "100", "mem": "100G", "gpu": "10"}),
-            group_using=ResourceSlot({"cpu": "5", "mem": "5G"}),
-            group_remaining=ResourceSlot({"cpu": "95", "mem": "95G", "gpu": "10"}),
-            scaling_group_remaining=ResourceSlot({"cpu": "1000", "mem": "1000G", "gpu": "100"}),
+            keypair_limits=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("107374182400")),
+                SlotQuantity("gpu", Decimal("10")),
+            ],
+            keypair_using=[
+                SlotQuantity("cpu", Decimal("10")),
+                SlotQuantity("mem", Decimal("10737418240")),
+                SlotQuantity("gpu", Decimal("1")),
+            ],
+            keypair_remaining=[
+                SlotQuantity("cpu", Decimal("90")),
+                SlotQuantity("mem", Decimal("96636764160")),
+                SlotQuantity("gpu", Decimal("9")),
+            ],
+            group_limits=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("107374182400")),
+                SlotQuantity("gpu", Decimal("10")),
+            ],
+            group_using=[
+                SlotQuantity("cpu", Decimal("5")),
+                SlotQuantity("mem", Decimal("5368709120")),
+            ],
+            group_remaining=[
+                SlotQuantity("cpu", Decimal("95")),
+                SlotQuantity("mem", Decimal("102005473280")),
+                SlotQuantity("gpu", Decimal("10")),
+            ],
+            scaling_group_remaining=[
+                SlotQuantity("cpu", Decimal("1000")),
+                SlotQuantity("mem", Decimal("1073741824000")),
+                SlotQuantity("gpu", Decimal("100")),
+            ],
             scaling_groups={},
         )
 
         # Mock the repository's check_presets method directly
         deps["resource_preset_repository"].check_presets = AsyncMock(return_value=mock_check_result)
 
-    @pytest.mark.asyncio
     async def test_custom_resource_types_support(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test support for custom resource types like NPU/TPU."""
         mock_preset_data = ResourcePresetData(
@@ -501,9 +545,10 @@ class TestResourcePresetServiceCompatibility:
         assert result.resource_preset.resource_slots.data["npu"] == Decimal("2")
         assert result.resource_preset.resource_slots.data["tpu"] == Decimal("1")
 
-    @pytest.mark.asyncio
     async def test_shared_memory_adjustment(
-        self, resource_preset_service, mock_dependencies
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
     ) -> None:
         """Test shared memory adjustment in preset modification."""
         mock_preset_data = ResourcePresetData(
@@ -537,3 +582,167 @@ class TestResourcePresetServiceCompatibility:
         result = await resource_preset_service.modify_preset(action)
 
         assert result.resource_preset.shared_memory == BinarySize(BinarySize.from_str("4G"))
+
+    async def test_modify_preset_partial_slots_no_intrinsic_raises_error(
+        self,
+        resource_preset_service: ResourcePresetService,
+    ) -> None:
+        """Test modify fails when resource_slots provided without intrinsic slots."""
+        action = ModifyResourcePresetAction(
+            name="existing-preset",
+            id=None,
+            updater=Updater(
+                spec=ResourcePresetUpdaterSpec(
+                    resource_slots=OptionalState.update(ResourceSlot({"gpu": "1"}))
+                ),
+                pk_value="existing-preset",
+            ),
+        )
+
+        with pytest.raises(InvalidAPIParameters):
+            await resource_preset_service.modify_preset(action)
+
+    async def test_delete_preset_missing_identifiers(
+        self,
+        resource_preset_service: ResourcePresetService,
+    ) -> None:
+        """Test delete fails when neither name nor id provided."""
+        action = DeleteResourcePresetAction(name=None, id=None)
+
+        with pytest.raises(InvalidAPIParameters):
+            await resource_preset_service.delete_preset(action)
+
+    async def test_delete_preset_by_id(
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
+    ) -> None:
+        """Test delete by id returns ResourcePresetData."""
+        preset_id = uuid.uuid4()
+        mock_preset_data = ResourcePresetData(
+            id=preset_id,
+            name="to-delete",
+            resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
+            shared_memory=None,
+            scaling_group_name=None,
+        )
+
+        mock_dependencies["resource_preset_repository"].delete_preset_validated = AsyncMock(
+            return_value=mock_preset_data
+        )
+
+        action = DeleteResourcePresetAction(name=None, id=preset_id)
+
+        result = await resource_preset_service.delete_preset(action)
+
+        assert isinstance(result, DeleteResourcePresetActionResult)
+        assert result.resource_preset.id == preset_id
+
+    async def test_list_presets_filters_by_scaling_group(
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
+    ) -> None:
+        """Test list presets filters by specific scaling_group."""
+        gpu_preset = ResourcePresetData(
+            id=uuid.uuid4(),
+            name="gpu-standard",
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("4"),
+                "mem": Decimal("17179869184"),
+                "gpu": Decimal("1"),
+            }),
+            shared_memory=None,
+            scaling_group_name="gpu-cluster",
+        )
+
+        mock_dependencies["resource_preset_repository"].list_presets = AsyncMock(
+            return_value=[gpu_preset]
+        )
+
+        action = ListResourcePresetsAction(
+            access_key="test-key",
+            scaling_group="gpu-cluster",
+        )
+
+        result = await resource_preset_service.list_presets(action)
+
+        assert len(result.presets) == 1
+        assert result.presets[0]["name"] == "gpu-standard"
+        mock_dependencies["resource_preset_repository"].list_presets.assert_called_once_with(
+            "gpu-cluster"
+        )
+
+    async def test_check_presets_keypair_and_group_limits(
+        self,
+        resource_preset_service: ResourcePresetService,
+        mock_dependencies: dict[str, Any],
+    ) -> None:
+        """Test check presets returns keypair/group limits/using/remaining details."""
+        preset_data = ResourcePresetData(
+            id=uuid.uuid4(),
+            name="test-preset",
+            resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
+            shared_memory=None,
+            scaling_group_name=None,
+        )
+
+        mock_check_result = CheckPresetsResult(
+            presets=[PresetAllocatabilityData(preset=preset_data, allocatable=True)],
+            keypair_limits=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("107374182400")),
+            ],
+            keypair_using=[
+                SlotQuantity("cpu", Decimal("10")),
+                SlotQuantity("mem", Decimal("10737418240")),
+            ],
+            keypair_remaining=[
+                SlotQuantity("cpu", Decimal("90")),
+                SlotQuantity("mem", Decimal("96636764160")),
+            ],
+            group_limits=[
+                SlotQuantity("cpu", Decimal("50")),
+                SlotQuantity("mem", Decimal("53687091200")),
+            ],
+            group_using=[
+                SlotQuantity("cpu", Decimal("5")),
+                SlotQuantity("mem", Decimal("5368709120")),
+            ],
+            group_remaining=[
+                SlotQuantity("cpu", Decimal("45")),
+                SlotQuantity("mem", Decimal("48318382080")),
+            ],
+            scaling_group_remaining=[
+                SlotQuantity("cpu", Decimal("1000")),
+                SlotQuantity("mem", Decimal("1073741824000")),
+            ],
+            scaling_groups={},
+        )
+
+        mock_dependencies["resource_preset_repository"].check_presets = AsyncMock(
+            return_value=mock_check_result
+        )
+
+        action = CheckResourcePresetsAction(
+            access_key=AccessKey("test-key"),
+            resource_policy={
+                "total_resource_slots": {"cpu": "100", "mem": "100G"},
+                "default_for_unspecified": "UNLIMITED",
+            },
+            domain_name="default",
+            group="default",
+            user_id=uuid.uuid4(),
+            scaling_group=None,
+        )
+
+        result = await resource_preset_service.check_presets(action)
+
+        assert isinstance(result, CheckResourcePresetsActionResult)
+        assert len(result.keypair_limits) == 2
+        assert len(result.keypair_using) == 2
+        assert len(result.keypair_remaining) == 2
+        assert len(result.group_limits) == 2
+        assert len(result.group_using) == 2
+        assert len(result.group_remaining) == 2
+        assert len(result.presets) == 1

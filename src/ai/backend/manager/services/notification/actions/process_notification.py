@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 
 from .base import NotificationAction
 
@@ -27,13 +28,13 @@ class ProcessNotificationAction(NotificationAction):
     notification_data: NotifiableMessage
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.rule_type)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "process_notification"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass
@@ -46,5 +47,5 @@ class ProcessNotificationActionResult(BaseActionResult):
     errors: list[BaseException]
 
     @override
-    def entity_id(self) -> Optional[str]:
+    def entity_id(self) -> str | None:
         return str(self.rule_type)

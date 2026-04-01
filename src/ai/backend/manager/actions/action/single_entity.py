@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import TypeVar, override
 
-from ai.backend.common.data.permission.types import OperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 
 from .base import BaseAction, BaseActionResult
 from .types import FieldData
@@ -17,17 +17,24 @@ class BaseSingleEntityAction(BaseAction):
         raise NotImplementedError
 
     @abstractmethod
+    def target_element(self) -> RBACElementRef:
+        """Return the RBAC element reference for the entity this action targets.
+
+        Used by RBAC validators to check whether the current user has the
+        required permission on this entity.
+
+        Implementations must construct the RBACElementRef directly from their
+        own fields — do not delegate to ``target_entity_id()``.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def field_data(self) -> FieldData | None:
         """
         Returns field data containing the field type and ID when the action's
         target exists as a field of another entity.
         Returns None if this entity is not a field.
         """
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def permission_operation_type(cls) -> OperationType:
         raise NotImplementedError
 
 

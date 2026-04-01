@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
@@ -111,10 +112,9 @@ class TestAgentHeartbeatEvent:
         ],
         ids=["old_agent_string_keys", "new_agent_slotname_keys", "mixed_keys"],
     )
-    @pytest.mark.asyncio
     async def test_serialization_deserialization_round_trip_with_different_key_formats(
         self,
-        agent_info_dict: dict,
+        agent_info_dict: dict[str, Any],
         expected_slot_keys: dict[SlotName, SlotTypes],
     ) -> None:
         """Test event serialization and deserialization with different slot key formats (backward compatibility)."""

@@ -11,15 +11,14 @@ import zipfile
 from collections.abc import Iterable, Iterator
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
-from typing import Optional
 
 log = logging.getLogger(__spec__.name)
 
 
 def scan_entrypoints(
     group_name: str,
-    allowlist: Optional[set[str]] = None,
-    blocklist: Optional[set[str]] = None,
+    allowlist: set[str] | None = None,
+    blocklist: set[str] | None = None,
 ) -> Iterator[EntryPoint]:
     if blocklist is None:
         blocklist = set()
@@ -105,7 +104,8 @@ def _glob(
     match_patterns: Iterable[str] | None = None,
 ) -> Iterator[Path]:
     q: collections.deque[tuple[Path, bool]] = collections.deque()
-    assert base_path.is_dir()
+    if not base_path.is_dir():
+        raise ValueError(f"{base_path} is not a directory")
     q.append((base_path, False))
     while q:
         search_path, suffix_match = q.pop()
@@ -236,7 +236,7 @@ def prepare_wheelhouse(base_dir: Path | None = None) -> None:
             sys.path.append(decoded_path)
 
 
-def find_build_root(path: Optional[Path] = None) -> Path:
+def find_build_root(path: Path | None = None) -> Path:
     if env_build_root := os.environ.get("BACKEND_BUILD_ROOT", None):
         return Path(env_build_root)
     cwd = Path.cwd() if path is None else path

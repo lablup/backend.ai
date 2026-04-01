@@ -1,5 +1,10 @@
 """
 VFolderID type adapter for Pydantic.
+
+Note: VFolderID now has native Pydantic support via __get_pydantic_core_schema__.
+When used with Pydantic, that method takes precedence over these annotations.
+The annotations below serve as documentation and allow future extensions with
+non-Pydantic metadata.
 """
 
 from __future__ import annotations
@@ -25,6 +30,8 @@ def _serialize_vfolder_id(v: VFolderID) -> str:
     return str(v)
 
 
+# VFolderID has __get_pydantic_core_schema__, so Pydantic uses that.
+# These annotations serve as documentation and allow future non-Pydantic extensions.
 VFolderIDField = Annotated[
     VFolderID,
     BeforeValidator(_parse_vfolder_id),

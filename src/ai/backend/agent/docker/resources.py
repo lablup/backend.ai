@@ -2,7 +2,7 @@ import logging
 from collections.abc import Mapping, MutableMapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import aiofiles
 
@@ -40,10 +40,12 @@ async def load_resources(
     if "cpu" not in compute_plugin_ctx.plugins:
         cpu_config = await etcd.get_prefix("config/plugins/cpu")
         cpu_plugin = CPUPlugin(cpu_config, local_config)
+        await cpu_plugin.init()
         compute_plugin_ctx.attach_intrinsic_device(cpu_plugin)
     if "mem" not in compute_plugin_ctx.plugins:
         memory_config = await etcd.get_prefix("config/plugins/memory")
         memory_plugin = MemoryPlugin(memory_config, local_config)
+        await memory_plugin.init()
         compute_plugin_ctx.attach_intrinsic_device(memory_plugin)
     for plugin_name, plugin_instance in compute_plugin_ctx.plugins.items():
         if not all(
@@ -83,7 +85,9 @@ async def scan_available_resources(
     return slots
 
 
-async def get_resource_spec_from_container(container_info) -> Optional[KernelResourceSpec]:
+async def get_resource_spec_from_container(
+    container_info: Mapping[str, Any],
+) -> KernelResourceSpec | None:
     for mount in container_info["HostConfig"]["Mounts"]:
         if mount["Target"] == "/home/config":
             async with aiofiles.open(Path(mount["Source"]) / "resource.txt") as f:

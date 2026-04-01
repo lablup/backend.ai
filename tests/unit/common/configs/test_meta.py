@@ -137,14 +137,15 @@ class TestGetFieldMeta:
                 BackendAIAPIMeta(
                     description="Session name",
                     added_version="25.1.0",
-                    example="my-session",
+                    example=ConfigExample(local="my-session", prod="my-session"),
                 ),
             ]
 
         meta = get_field_meta(SampleRequest, "session_name")
         assert meta is not None
         assert isinstance(meta, BackendAIAPIMeta)
-        assert meta.example == "my-session"
+        assert meta.example is not None
+        assert meta.example.local == "my-session"
 
     def test_field_without_meta(self) -> None:
         class SampleModel(BaseModel):

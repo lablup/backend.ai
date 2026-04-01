@@ -6,29 +6,52 @@ Tests the service layer with mocked repositories.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
 from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.data.kernel.types import (
+    ClusterConfig,
+    ImageInfo,
+    KernelInfo,
+    KernelListResult,
+    KernelStatus,
+    LifecycleStatus,
+    Metadata,
+    Metrics,
+    NetworkConfig,
+    RelatedSessionInfo,
+    ResourceInfo,
+    RuntimeConfig,
+    UserPermission,
+)
+from ai.backend.manager.data.session.types import SessionData, SessionListResult, SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
-from ai.backend.manager.repositories.session.admin_repository import AdminSessionRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.services.session.actions.check_and_transit_status import (
+    CheckAndTransitStatusAction,
+    CheckAndTransitStatusActionResult,
+)
 from ai.backend.manager.services.session.actions.complete import (
     CompleteAction,
     CompleteActionResult,
@@ -39,6 +62,15 @@ from ai.backend.manager.services.session.actions.destroy_session import (
 from ai.backend.manager.services.session.actions.download_files import (
     DownloadFilesAction,
     DownloadFilesActionResult,
+)
+from ai.backend.manager.services.session.actions.execute_session import (
+    ExecuteSessionAction,
+    ExecuteSessionActionParams,
+    ExecuteSessionActionResult,
+)
+from ai.backend.manager.services.session.actions.get_container_logs import (
+    GetContainerLogsAction,
+    GetContainerLogsActionResult,
 )
 from ai.backend.manager.services.session.actions.get_direct_access_info import (
     GetDirectAccessInfoAction,
@@ -51,6 +83,14 @@ from ai.backend.manager.services.session.actions.get_session_info import (
 from ai.backend.manager.services.session.actions.get_status_history import (
     GetStatusHistoryAction,
 )
+from ai.backend.manager.services.session.actions.interrupt_session import (
+    InterruptSessionAction,
+    InterruptSessionActionResult,
+)
+from ai.backend.manager.services.session.actions.list_files import (
+    ListFilesAction,
+    ListFilesActionResult,
+)
 from ai.backend.manager.services.session.actions.match_sessions import MatchSessionsAction
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
@@ -60,9 +100,15 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.search import SearchSessionsAction
+from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
     ShutdownServiceActionResult,
+)
+from ai.backend.manager.services.session.actions.upload_files import (
+    UploadFilesAction,
+    UploadFilesActionResult,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 
@@ -73,12 +119,6 @@ from ai.backend.manager.services.session.service import SessionService, SessionS
 def mock_session_repository() -> MagicMock:
     """Create mocked session repository."""
     return MagicMock(spec=SessionRepository)
-
-
-@pytest.fixture
-def mock_admin_session_repository() -> MagicMock:
-    """Create mocked admin session repository."""
-    return MagicMock(spec=AdminSessionRepository)
 
 
 @pytest.fixture
@@ -128,9 +168,14 @@ def mock_scheduling_controller() -> MagicMock:
 
 
 @pytest.fixture
+def mock_appproxy_client_pool() -> MagicMock:
+    """Create mocked AppProxy client pool."""
+    return MagicMock()
+
+
+@pytest.fixture
 async def session_service(
     mock_session_repository: MagicMock,
-    mock_admin_session_repository: MagicMock,
     mock_agent_registry: MagicMock,
     mock_event_fetcher: MagicMock,
     mock_background_task_manager: MagicMock,
@@ -138,6 +183,7 @@ async def session_service(
     mock_error_monitor: MagicMock,
     mock_idle_checker_host: MagicMock,
     mock_scheduling_controller: MagicMock,
+    mock_appproxy_client_pool: MagicMock,
 ) -> SessionService:
     """Create SessionService with mocked dependencies."""
     args = SessionServiceArgs(
@@ -148,8 +194,8 @@ async def session_service(
         error_monitor=mock_error_monitor,
         idle_checker_host=mock_idle_checker_host,
         session_repository=mock_session_repository,
-        admin_session_repository=mock_admin_session_repository,
         scheduling_controller=mock_scheduling_controller,
+        appproxy_client_pool=mock_appproxy_client_pool,
     )
     return SessionService(args)
 
@@ -167,9 +213,23 @@ def sample_access_key() -> AccessKey:
 
 
 @pytest.fixture
+def sample_user_id() -> UUID:
+    """Create sample user ID."""
+    return uuid4()
+
+
+@pytest.fixture
+def sample_group_id() -> UUID:
+    """Create sample group ID."""
+    return uuid4()
+
+
+@pytest.fixture
 def sample_session_data(
     sample_session_id: SessionId,
     sample_access_key: AccessKey,
+    sample_user_id: UUID,
+    sample_group_id: UUID,
 ) -> SessionData:
     """Create sample session data."""
     return SessionData(
@@ -178,12 +238,13 @@ def sample_session_data(
         name="test-session",
         session_type=SessionTypes.INTERACTIVE,
         priority=0,
+        is_preemptible=True,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,
         agent_ids=["i-ubuntu"],
         domain_name="default",
-        group_id=UUID("2de2b969-1d04-48a6-af16-0bc8adb3c831"),
-        user_uuid=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+        group_id=sample_group_id,
+        user_uuid=sample_user_id,
         access_key=sample_access_key,
         images=["cr.backend.ai/stable/python:latest"],
         tag=None,
@@ -219,7 +280,6 @@ def sample_session_data(
 # ==================== MatchSessions Tests ====================
 
 
-@pytest.mark.asyncio
 class TestMatchSessions:
     """Test cases for SessionService.match_sessions"""
 
@@ -229,6 +289,7 @@ class TestMatchSessions:
         mock_session_repository: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully matching sessions"""
         mock_session_repository.match_sessions = AsyncMock(return_value=[sample_session_data])
@@ -236,6 +297,7 @@ class TestMatchSessions:
         action = MatchSessionsAction(
             id_or_name_prefix="test",
             owner_access_key=sample_access_key,
+            user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
 
@@ -250,6 +312,7 @@ class TestMatchSessions:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test matching sessions when none found"""
         mock_session_repository.match_sessions = AsyncMock(return_value=[])
@@ -257,6 +320,7 @@ class TestMatchSessions:
         action = MatchSessionsAction(
             id_or_name_prefix="nonexistent",
             owner_access_key=sample_access_key,
+            user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
 
@@ -267,6 +331,8 @@ class TestMatchSessions:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
+        sample_group_id: UUID,
     ) -> None:
         """Test matching multiple sessions"""
         sessions = [
@@ -276,12 +342,13 @@ class TestMatchSessions:
                 name=f"test-session-{i}",
                 session_type=SessionTypes.INTERACTIVE,
                 priority=0,
+                is_preemptible=True,
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
                 agent_ids=[],
                 domain_name="default",
-                group_id=UUID("2de2b969-1d04-48a6-af16-0bc8adb3c831"),
-                user_uuid=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+                group_id=sample_group_id,
+                user_uuid=sample_user_id,
                 access_key=sample_access_key,
                 images=["python:latest"],
                 tag=None,
@@ -319,6 +386,7 @@ class TestMatchSessions:
         action = MatchSessionsAction(
             id_or_name_prefix="test",
             owner_access_key=sample_access_key,
+            user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
 
@@ -330,7 +398,6 @@ class TestMatchSessions:
 # ==================== GetStatusHistory Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetStatusHistory:
     """Test cases for SessionService.get_status_history"""
 
@@ -408,7 +475,6 @@ class TestGetStatusHistory:
 # ==================== DestroySession Tests ====================
 
 
-@pytest.mark.asyncio
 class TestDestroySession:
     """Test cases for SessionService.destroy_session"""
 
@@ -426,6 +492,7 @@ class TestDestroySession:
             return_value=MarkTerminatingResult(
                 cancelled_sessions=[sample_session_id],
                 terminating_sessions=[],
+                force_terminated_sessions=[],
                 skipped_sessions=[],
             )
         )
@@ -453,12 +520,48 @@ class TestDestroySession:
         sample_session_id: SessionId,
         sample_access_key: AccessKey,
     ) -> None:
-        """Test successfully destroying session (terminated status)"""
+        """Test successfully destroying session (terminated status via normal termination)"""
         mock_session_repository.get_target_session_ids = AsyncMock(return_value=[sample_session_id])
         mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(
             return_value=MarkTerminatingResult(
                 cancelled_sessions=[],
                 terminating_sessions=[sample_session_id],
+                force_terminated_sessions=[],
+                skipped_sessions=[],
+            )
+        )
+
+        action = DestroySessionAction(
+            user_role=UserRole.USER,
+            session_name="test-session",
+            forced=False,
+            recursive=False,
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.destroy_session(action)
+
+        assert result.result == {"stats": {"status": "terminated"}}
+        mock_scheduling_controller.mark_sessions_for_termination.assert_called_once_with(
+            [sample_session_id],
+            reason="user-requested",
+            forced=False,
+        )
+
+    async def test_force_terminate_directly_terminated(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test force-terminate skips TERMINATING and goes directly to TERMINATED"""
+        mock_session_repository.get_target_session_ids = AsyncMock(return_value=[sample_session_id])
+        mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(
+            return_value=MarkTerminatingResult(
+                cancelled_sessions=[],
+                terminating_sessions=[],
+                force_terminated_sessions=[sample_session_id],
                 skipped_sessions=[],
             )
         )
@@ -473,6 +576,11 @@ class TestDestroySession:
         result = await session_service.destroy_session(action)
 
         assert result.result == {"stats": {"status": "terminated"}}
+        mock_scheduling_controller.mark_sessions_for_termination.assert_called_once_with(
+            [sample_session_id],
+            reason="force-terminated",
+            forced=True,
+        )
 
     async def test_recursive_destroy(
         self,
@@ -488,6 +596,7 @@ class TestDestroySession:
             return_value=MarkTerminatingResult(
                 cancelled_sessions=session_ids,
                 terminating_sessions=[],
+                force_terminated_sessions=[],
                 skipped_sessions=[],
             )
         )
@@ -519,6 +628,7 @@ class TestDestroySession:
             return_value=MarkTerminatingResult(
                 cancelled_sessions=[],
                 terminating_sessions=[],
+                force_terminated_sessions=[],
                 skipped_sessions=[],
             )
         )
@@ -538,7 +648,6 @@ class TestDestroySession:
 # ==================== Complete Tests ====================
 
 
-@pytest.mark.asyncio
 class TestComplete:
     """Test cases for SessionService.complete"""
 
@@ -604,35 +713,30 @@ class TestComplete:
 # ==================== GetSessionInfo Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetSessionInfo:
     """Test cases for SessionService.get_session_info"""
 
-    async def test_success(
+    @pytest.fixture
+    def mock_running_session(
         self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
-        mock_idle_checker_host: MagicMock,
-        sample_session_data: SessionData,
         sample_session_id: SessionId,
-        sample_access_key: AccessKey,
-    ) -> None:
-        """Test successfully getting session info"""
-        # Create a mock session with main_kernel
+        sample_user_id: UUID,
+        sample_group_id: UUID,
+        sample_session_data: SessionData,
+    ) -> MagicMock:
         mock_kernel = MagicMock()
         mock_kernel.image = "cr.backend.ai/stable/python:latest"
         mock_kernel.architecture = "x86_64"
         mock_kernel.registry = "cr.backend.ai"
-        mock_kernel.container_id = str(uuid4())
+        mock_kernel.container_id = "a" * 64
         mock_kernel.occupied_slots = ResourceSlot({"cpu": 1, "mem": 1024})
         mock_kernel.occupied_shares = {}
 
         mock_session = MagicMock()
         mock_session.id = sample_session_id
         mock_session.domain_name = "default"
-        mock_session.group_id = UUID("2de2b969-1d04-48a6-af16-0bc8adb3c831")
-        mock_session.user_uuid = UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4")
+        mock_session.group_id = sample_group_id
+        mock_session.user_uuid = sample_user_id
         mock_session.tag = None
         mock_session.main_kernel = mock_kernel
         mock_session.occupying_slots = ResourceSlot({"cpu": 1, "mem": 1024})
@@ -647,9 +751,19 @@ class TestGetSessionInfo:
         mock_session.num_queries = 0
         mock_session.last_stat = None
         mock_session.to_dataclass.return_value = sample_session_data
+        return mock_session
 
-        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
-        mock_idle_checker_host.get_idle_check_report = AsyncMock(return_value={})
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        mock_running_session: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test successfully getting session info"""
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_running_session)
 
         action = GetSessionInfoAction(
             session_name="test-session",
@@ -661,9 +775,32 @@ class TestGetSessionInfo:
         assert result.session_info is not None
         assert result.session_info.domain_name == "default"
         assert result.session_info.image == "cr.backend.ai/stable/python:latest"
+        assert result.session_info.container_id is not None
+        assert result.session_info.container_id == "a" * 64
         assert result.session_data == sample_session_data
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_running_session)
+
+    async def test_success_with_no_container_id(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_running_session: MagicMock,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test getting session info when container_id is None (pre-RUNNING state)"""
+        mock_running_session.main_kernel.container_id = None
+        mock_running_session.status = SessionStatus.PENDING
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_running_session)
+
+        action = GetSessionInfoAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.get_session_info(action)
+
+        assert isinstance(result, GetSessionInfoActionResult)
+        assert result.session_info.container_id is None
 
     async def test_session_not_found(
         self,
@@ -688,7 +825,6 @@ class TestGetSessionInfo:
 # ==================== DownloadFiles Tests ====================
 
 
-@pytest.mark.asyncio
 class TestDownloadFiles:
     """Test cases for SessionService.download_files"""
 
@@ -699,6 +835,7 @@ class TestDownloadFiles:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully downloading files"""
         mock_session = MagicMock()
@@ -707,7 +844,7 @@ class TestDownloadFiles:
         mock_agent_registry.download_file = AsyncMock(return_value=b"file content")
 
         action = DownloadFilesAction(
-            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            user_id=sample_user_id,
             session_name="test-session",
             owner_access_key=sample_access_key,
             files=["test_file.txt"],
@@ -726,6 +863,7 @@ class TestDownloadFiles:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test downloading files when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -733,7 +871,7 @@ class TestDownloadFiles:
         )
 
         action = DownloadFilesAction(
-            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            user_id=sample_user_id,
             session_name="nonexistent",
             owner_access_key=sample_access_key,
             files=["test_file.txt"],
@@ -748,16 +886,15 @@ class TestDownloadFiles:
         mock_session_repository: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test downloading too many files raises error"""
-        from ai.backend.manager.errors.storage import VFolderBadRequest
-
         mock_session = MagicMock()
         mock_session.to_dataclass.return_value = sample_session_data
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
 
         action = DownloadFilesAction(
-            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            user_id=sample_user_id,
             session_name="test-session",
             owner_access_key=sample_access_key,
             files=["file1.txt", "file2.txt", "file3.txt", "file4.txt", "file5.txt", "file6.txt"],
@@ -770,7 +907,6 @@ class TestDownloadFiles:
 # ==================== GetDirectAccessInfo Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetDirectAccessInfo:
     """Test cases for SessionService.get_direct_access_info"""
 
@@ -823,7 +959,6 @@ class TestGetDirectAccessInfo:
 # ==================== RenameSession Tests ====================
 
 
-@pytest.mark.asyncio
 class TestRenameSession:
     """Test cases for SessionService.rename_session"""
 
@@ -861,8 +996,6 @@ class TestRenameSession:
         sample_access_key: AccessKey,
     ) -> None:
         """Test renaming non-running session raises error"""
-        from ai.backend.common.exception import InvalidAPIParameters
-
         mock_session = MagicMock()
         mock_session.status = SessionStatus.PENDING  # Not running
         mock_session_repository.update_session_name = AsyncMock(return_value=mock_session)
@@ -880,7 +1013,6 @@ class TestRenameSession:
 # ==================== RestartSession Tests ====================
 
 
-@pytest.mark.asyncio
 class TestRestartSession:
     """Test cases for SessionService.restart_session"""
 
@@ -934,7 +1066,6 @@ class TestRestartSession:
 # ==================== ShutdownService Tests ====================
 
 
-@pytest.mark.asyncio
 class TestShutdownService:
     """Test cases for SessionService.shutdown_service"""
 
@@ -989,7 +1120,6 @@ class TestShutdownService:
 # ==================== UploadFiles Tests ====================
 
 
-@pytest.mark.asyncio
 class TestUploadFiles:
     """Test cases for SessionService.upload_files"""
 
@@ -1002,8 +1132,6 @@ class TestUploadFiles:
         sample_access_key: AccessKey,
     ) -> None:
         """Test successfully uploading files"""
-        from aiohttp.multipart import BodyPartReader
-
         # Create a mock reader
         mock_file = MagicMock(spec=BodyPartReader)
         mock_file.filename = "test_file.txt"
@@ -1012,7 +1140,7 @@ class TestUploadFiles:
         mock_reader = MagicMock()
         call_count = 0
 
-        async def mock_next():
+        async def mock_next() -> MagicMock | None:
             nonlocal call_count
             if call_count == 0:
                 call_count += 1
@@ -1025,11 +1153,6 @@ class TestUploadFiles:
         mock_session.to_dataclass.return_value = sample_session_data
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
         mock_agent_registry.upload_file = AsyncMock()
-
-        from ai.backend.manager.services.session.actions.upload_files import (
-            UploadFilesAction,
-            UploadFilesActionResult,
-        )
 
         action = UploadFilesAction(
             session_name="test-session",
@@ -1056,10 +1179,6 @@ class TestUploadFiles:
         mock_reader = MagicMock()
         mock_reader.next = AsyncMock(return_value=None)
 
-        from ai.backend.manager.services.session.actions.upload_files import (
-            UploadFilesAction,
-        )
-
         action = UploadFilesAction(
             session_name="nonexistent",
             owner_access_key=sample_access_key,
@@ -1073,7 +1192,6 @@ class TestUploadFiles:
 # ==================== Execute Tests ====================
 
 
-@pytest.mark.asyncio
 class TestExecute:
     """Test cases for SessionService.execute"""
 
@@ -1099,12 +1217,6 @@ class TestExecute:
         mock_session.to_dataclass.return_value = sample_session_data
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
         mock_agent_registry.execute = AsyncMock(return_value=expected_execute_response)
-
-        from ai.backend.manager.services.session.actions.execute_session import (
-            ExecuteSessionAction,
-            ExecuteSessionActionParams,
-            ExecuteSessionActionResult,
-        )
 
         params = ExecuteSessionActionParams(
             mode="query",
@@ -1139,11 +1251,6 @@ class TestExecute:
             side_effect=SessionNotFound("Session not found")
         )
 
-        from ai.backend.manager.services.session.actions.execute_session import (
-            ExecuteSessionAction,
-            ExecuteSessionActionParams,
-        )
-
         params = ExecuteSessionActionParams(
             mode="query",
             options=None,
@@ -1164,7 +1271,6 @@ class TestExecute:
 # ==================== Interrupt Tests ====================
 
 
-@pytest.mark.asyncio
 class TestInterrupt:
     """Test cases for SessionService.interrupt"""
 
@@ -1181,11 +1287,6 @@ class TestInterrupt:
         mock_session.to_dataclass.return_value = sample_session_data
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
         mock_agent_registry.interrupt_session = AsyncMock(return_value={})
-
-        from ai.backend.manager.services.session.actions.interrupt_session import (
-            InterruptSessionAction,
-            InterruptSessionActionResult,
-        )
 
         action = InterruptSessionAction(
             session_name="test-session",
@@ -1210,10 +1311,6 @@ class TestInterrupt:
             side_effect=SessionNotFound("Session not found")
         )
 
-        from ai.backend.manager.services.session.actions.interrupt_session import (
-            InterruptSessionAction,
-        )
-
         action = InterruptSessionAction(
             session_name="nonexistent",
             owner_access_key=sample_access_key,
@@ -1226,7 +1323,6 @@ class TestInterrupt:
 # ==================== ListFiles Tests ====================
 
 
-@pytest.mark.asyncio
 class TestListFiles:
     """Test cases for SessionService.list_files"""
 
@@ -1237,6 +1333,7 @@ class TestListFiles:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully listing files"""
         expected_files = {"files": ["file1.txt", "file2.py"]}
@@ -1246,13 +1343,8 @@ class TestListFiles:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
         mock_agent_registry.list_files = AsyncMock(return_value=expected_files)
 
-        from ai.backend.manager.services.session.actions.list_files import (
-            ListFilesAction,
-            ListFilesActionResult,
-        )
-
         action = ListFilesAction(
-            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            user_id=sample_user_id,
             path="/home/work",
             session_name="test-session",
             owner_access_key=sample_access_key,
@@ -1270,18 +1362,15 @@ class TestListFiles:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test listing files when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
             side_effect=SessionNotFound("Session not found")
         )
 
-        from ai.backend.manager.services.session.actions.list_files import (
-            ListFilesAction,
-        )
-
         action = ListFilesAction(
-            user_id=UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
+            user_id=sample_user_id,
             path="/home/work",
             session_name="nonexistent",
             owner_access_key=sample_access_key,
@@ -1294,7 +1383,6 @@ class TestListFiles:
 # ==================== GetContainerLogs Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetContainerLogs:
     """Test cases for SessionService.get_container_logs"""
 
@@ -1316,11 +1404,6 @@ class TestGetContainerLogs:
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
         mock_agent_registry.get_logs_from_agent = AsyncMock(return_value=agent_logs)
 
-        from ai.backend.manager.services.session.actions.get_container_logs import (
-            GetContainerLogsAction,
-            GetContainerLogsActionResult,
-        )
-
         action = GetContainerLogsAction(
             session_name="test-session",
             owner_access_key=sample_access_key,
@@ -1331,7 +1414,7 @@ class TestGetContainerLogs:
         assert isinstance(result, GetContainerLogsActionResult)
         assert result.session_data == sample_session_data
         # Result is wrapped as {"result": {"logs": <agent_logs>}}
-        assert result.result["result"]["logs"] == agent_logs
+        assert cast(dict[str, Any], result.result)["result"]["logs"] == agent_logs
         mock_session_repository.get_session_validated.assert_called_once()
         mock_agent_registry.get_logs_from_agent.assert_called_once()
 
@@ -1346,10 +1429,6 @@ class TestGetContainerLogs:
             side_effect=SessionNotFound("Session not found")
         )
 
-        from ai.backend.manager.services.session.actions.get_container_logs import (
-            GetContainerLogsAction,
-        )
-
         action = GetContainerLogsAction(
             session_name="nonexistent",
             owner_access_key=sample_access_key,
@@ -1358,3 +1437,438 @@ class TestGetContainerLogs:
 
         with pytest.raises(SessionNotFound):
             await session_service.get_container_logs(action)
+
+
+# ==================== CheckAndTransitStatus Tests ====================
+
+
+class TestCheckAndTransitStatus:
+    """Test cases for SessionService.check_and_transit_status"""
+
+    @pytest.fixture
+    def other_user_id(self) -> UUID:
+        """Create another user ID for ownership tests."""
+        return uuid4()
+
+    @pytest.fixture
+    def mock_session_for_transit(self, sample_session_id: SessionId) -> MagicMock:
+        """Create a mock session for transit status tests."""
+        mock_session = MagicMock()
+        mock_session.id = sample_session_id
+        mock_session.status = SessionStatus.RUNNING
+        mock_session.to_dataclass.return_value = MagicMock()
+        return mock_session
+
+    @pytest.fixture
+    def setup_transit_mocks(
+        self,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        mock_session_for_transit: MagicMock,
+    ) -> MagicMock:
+        """Setup common mocks for transit status tests that expect successful transit."""
+        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session_for_transit)
+        mock_session_repository.get_session_owner = AsyncMock(return_value=None)
+
+        mock_agent_registry.session_lifecycle_mgr = MagicMock()
+        mock_agent_registry.session_lifecycle_mgr.transit_session_status = AsyncMock(
+            return_value=[(mock_session_for_transit, True)]
+        )
+        mock_agent_registry.session_lifecycle_mgr.deregister_status_updatable_session = AsyncMock()
+
+        return mock_session_for_transit
+
+    async def test_check_and_transit_status_as_superadmin_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_id: SessionId,
+        sample_user_id: UUID,
+        other_user_id: UUID,
+        setup_transit_mocks: MagicMock,
+    ) -> None:
+        """Test SUPERADMIN can transit status of other user's session."""
+        setup_transit_mocks.user_uuid = other_user_id  # Different user owns the session
+
+        action = CheckAndTransitStatusAction(
+            user_id=sample_user_id,
+            user_role=UserRole.SUPERADMIN,
+            session_id=sample_session_id,
+        )
+        result = await session_service.check_and_transit_status(action)
+
+        assert isinstance(result, CheckAndTransitStatusActionResult)
+        assert sample_session_id in result.result
+        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
+
+    async def test_check_and_transit_status_as_admin_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_id: SessionId,
+        sample_user_id: UUID,
+        other_user_id: UUID,
+        setup_transit_mocks: MagicMock,
+    ) -> None:
+        """Test ADMIN can transit status of other user's session."""
+        setup_transit_mocks.user_uuid = other_user_id  # Different user owns the session
+
+        action = CheckAndTransitStatusAction(
+            user_id=sample_user_id,
+            user_role=UserRole.ADMIN,
+            session_id=sample_session_id,
+        )
+        result = await session_service.check_and_transit_status(action)
+
+        assert isinstance(result, CheckAndTransitStatusActionResult)
+        assert sample_session_id in result.result
+        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
+
+    async def test_check_and_transit_status_as_user_own_session_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_id: SessionId,
+        sample_user_id: UUID,
+        setup_transit_mocks: MagicMock,
+    ) -> None:
+        """Test USER can transit status of their own session."""
+        setup_transit_mocks.user_uuid = sample_user_id  # Same user owns the session
+
+        action = CheckAndTransitStatusAction(
+            user_id=sample_user_id,
+            user_role=UserRole.USER,
+            session_id=sample_session_id,
+        )
+        result = await session_service.check_and_transit_status(action)
+
+        assert isinstance(result, CheckAndTransitStatusActionResult)
+        assert sample_session_id in result.result
+        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
+
+    async def test_check_and_transit_status_as_user_other_session_skipped(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_session_id: SessionId,
+        sample_user_id: UUID,
+        other_user_id: UUID,
+        mock_session_for_transit: MagicMock,
+    ) -> None:
+        """Test USER cannot transit status of other user's session (returns empty result)."""
+        mock_session_for_transit.user_uuid = other_user_id  # Different user owns the session
+        mock_session_repository.get_session_by_id = AsyncMock(return_value=mock_session_for_transit)
+
+        action = CheckAndTransitStatusAction(
+            user_id=sample_user_id,
+            user_role=UserRole.USER,
+            session_id=sample_session_id,
+        )
+        result = await session_service.check_and_transit_status(action)
+
+        assert isinstance(result, CheckAndTransitStatusActionResult)
+        # Result should be empty when user tries to transit other's session
+        assert result.result == {}
+        mock_session_repository.get_session_by_id.assert_called_once_with(sample_session_id)
+        # transit_session_status should NOT be called
+        mock_agent_registry.session_lifecycle_mgr.transit_session_status.assert_not_called()
+
+    async def test_check_and_transit_status_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_id: SessionId,
+        sample_user_id: UUID,
+    ) -> None:
+        """Test check_and_transit_status raises SessionNotFound for non-existent session."""
+        mock_session_repository.get_session_by_id = AsyncMock(return_value=None)
+
+        action = CheckAndTransitStatusAction(
+            user_id=sample_user_id,
+            user_role=UserRole.SUPERADMIN,
+            session_id=sample_session_id,
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.check_and_transit_status(action)
+
+
+# ==================== Search Tests ====================
+
+
+class TestSearch:
+    """Test cases for SessionService.search"""
+
+    async def test_search_sessions(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_data: SessionData,
+        sample_user_id: UUID,
+    ) -> None:
+        """Test searching sessions with querier"""
+        mock_session_repository.search = AsyncMock(
+            return_value=SessionListResult(
+                items=[sample_session_data],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchSessionsAction(querier=querier, user_id=sample_user_id)
+        result = await session_service.search(action)
+
+        assert result.data == [sample_session_data]
+        assert result.total_count == 1
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
+        mock_session_repository.search.assert_called_once_with(querier)
+
+    async def test_search_sessions_empty_result(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_user_id: UUID,
+    ) -> None:
+        """Test searching sessions when no results are found"""
+        mock_session_repository.search = AsyncMock(
+            return_value=SessionListResult(
+                items=[],
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchSessionsAction(querier=querier, user_id=sample_user_id)
+        result = await session_service.search(action)
+
+        assert result.data == []
+        assert result.total_count == 0
+
+    async def test_search_sessions_with_pagination(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_data: SessionData,
+        sample_user_id: UUID,
+    ) -> None:
+        """Test searching sessions with pagination"""
+        mock_session_repository.search = AsyncMock(
+            return_value=SessionListResult(
+                items=[sample_session_data],
+                total_count=25,
+                has_next_page=True,
+                has_previous_page=True,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=10),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchSessionsAction(querier=querier, user_id=sample_user_id)
+        result = await session_service.search(action)
+
+        assert result.total_count == 25
+        assert result.has_next_page is True
+        assert result.has_previous_page is True
+
+
+# ==================== SearchKernels Tests ====================
+
+
+class TestSearchKernels:
+    """Test cases for SessionService.search_kernels"""
+
+    @pytest.fixture
+    def sample_kernel_info(self) -> KernelInfo:
+        """Create sample kernel info data"""
+        kernel_id = KernelId(uuid4())
+        session_id = uuid4()
+        user_id = uuid4()
+        group_id = uuid4()
+
+        return KernelInfo(
+            id=kernel_id,
+            session=RelatedSessionInfo(
+                session_id=str(session_id),
+                creation_id="test-creation-id",
+                name="test-session",
+                session_type=SessionTypes.INTERACTIVE,
+            ),
+            user_permission=UserPermission(
+                user_uuid=user_id,
+                access_key="TESTKEY",
+                domain_name="default",
+                group_id=group_id,
+                uid=1000,
+                main_gid=1000,
+                gids=[1000],
+            ),
+            image=ImageInfo(
+                identifier=None,
+                registry="cr.backend.ai",
+                tag="latest",
+                architecture="x86_64",
+            ),
+            network=NetworkConfig(
+                kernel_host="localhost",
+                repl_in_port=2000,
+                repl_out_port=2001,
+                stdin_port=2002,
+                stdout_port=2003,
+                service_ports=None,
+                preopen_ports=None,
+                use_host_network=False,
+            ),
+            cluster=ClusterConfig(
+                cluster_mode="single-node",
+                cluster_size=1,
+                cluster_role="main",
+                cluster_idx=0,
+                local_rank=0,
+                cluster_hostname="main",
+            ),
+            resource=ResourceInfo(
+                scaling_group="default",
+                agent="test-agent",
+                agent_addr="localhost:6001",
+                container_id="container-123",
+                occupied_slots=ResourceSlot({"cpu": "1", "mem": "1G"}),
+                requested_slots=ResourceSlot({"cpu": "1", "mem": "1G"}),
+                occupied_shares={},
+                attached_devices={},
+                resource_opts={},
+            ),
+            runtime=RuntimeConfig(
+                environ=None,
+                mounts=None,
+                mount_map=None,
+                vfolder_mounts=None,
+                bootstrap_script=None,
+                startup_command=None,
+            ),
+            lifecycle=LifecycleStatus(
+                status=KernelStatus.RUNNING,
+                result=SessionResult.UNDEFINED,
+                created_at=datetime.now(tzutc()),
+                terminated_at=None,
+                starts_at=None,
+                status_changed=datetime.now(tzutc()),
+                status_info=None,
+                status_data=None,
+                status_history=None,
+                last_seen=datetime.now(tzutc()),
+                last_observed_at=None,
+            ),
+            metrics=Metrics(
+                num_queries=0,
+                last_stat=None,
+                container_log=None,
+            ),
+            metadata=Metadata(
+                callback_url=None,
+                internal_data=None,
+            ),
+        )
+
+    async def test_search_kernels(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_kernel_info: KernelInfo,
+        sample_user_id: UUID,
+    ) -> None:
+        """Test searching kernels with querier"""
+        mock_session_repository.search_kernels = AsyncMock(
+            return_value=KernelListResult(
+                items=[sample_kernel_info],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchKernelsAction(querier=querier, user_id=sample_user_id)
+        result = await session_service.search_kernels(action)
+
+        assert result.data == [sample_kernel_info]
+        assert result.total_count == 1
+        assert result.has_next_page is False
+        assert result.has_previous_page is False
+        mock_session_repository.search_kernels.assert_called_once_with(querier)
+
+    async def test_search_kernels_empty_result(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_user_id: UUID,
+    ) -> None:
+        """Test searching kernels when no results are found"""
+        mock_session_repository.search_kernels = AsyncMock(
+            return_value=KernelListResult(
+                items=[],
+                total_count=0,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchKernelsAction(querier=querier, user_id=sample_user_id)
+        result = await session_service.search_kernels(action)
+
+        assert result.data == []
+        assert result.total_count == 0
+
+    async def test_search_kernels_with_pagination(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_kernel_info: KernelInfo,
+        sample_user_id: UUID,
+    ) -> None:
+        """Test searching kernels with pagination"""
+        mock_session_repository.search_kernels = AsyncMock(
+            return_value=KernelListResult(
+                items=[sample_kernel_info],
+                total_count=25,
+                has_next_page=True,
+                has_previous_page=True,
+            )
+        )
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=10),
+            conditions=[],
+            orders=[],
+        )
+        action = SearchKernelsAction(querier=querier, user_id=sample_user_id)
+        result = await session_service.search_kernels(action)
+
+        assert result.total_count == 25
+        assert result.has_next_page is True
+        assert result.has_previous_page is True

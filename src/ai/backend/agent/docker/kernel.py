@@ -11,13 +11,13 @@ import re
 import shutil
 import subprocess
 import textwrap
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
+from importlib.resources import files
 from pathlib import Path, PurePosixPath
-from typing import Any, Final, Optional, cast, override
+from typing import Any, Final, cast, override
 
 import aiohttp
 import janus
-import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
@@ -29,12 +29,12 @@ from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.agent.utils import closing_async, get_arch_name
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.lock import FileLock
-from ai.backend.common.types import CommitStatus, KernelId, Sentinel
-from ai.backend.common.utils import current_loop
+from ai.backend.common.types import CommitStatus, KernelId, Sentinel, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
@@ -82,7 +82,7 @@ class DockerKernel(AbstractKernel):
     def __getstate__(self) -> Mapping[str, Any]:
         return super().__getstate__()
 
-    def __setstate__(self, props) -> None:
+    def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         if "network_driver" not in props:
             props["network_driver"] = "bridge"
         super().__setstate__(props)
@@ -110,13 +110,13 @@ class DockerKernel(AbstractKernel):
         return CodeCompletionResp(result=result)
 
     @override
-    async def check_status(self):
+    async def check_status(self) -> dict[str, Any] | None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_and_get_status()
 
     @override
-    async def get_logs(self):
+    async def get_logs(self) -> dict[str, Any]:
         container_id = self.data["container_id"]
         async with closing_async(Docker()) as docker:
             container = await docker.containers.get(container_id)
@@ -124,14 +124,14 @@ class DockerKernel(AbstractKernel):
         return {"logs": "".join(logs)}
 
     @override
-    async def interrupt_kernel(self):
+    async def interrupt_kernel(self) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
     @override
-    async def start_service(self, service: str, opts: Mapping[str, Any]):
+    async def start_service(self, service: str, opts: Mapping[str, Any]) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         if self.data.get("block_service_ports", False):
@@ -153,19 +153,19 @@ class DockerKernel(AbstractKernel):
         })
 
     @override
-    async def start_model_service(self, model_service: Mapping[str, Any]):
+    async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_start_model_service(model_service)
 
     @override
-    async def shutdown_service(self, service: str):
+    async def shutdown_service(self, service: str) -> None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_shutdown_service(service)
 
     @override
-    async def get_service_apps(self):
+    async def get_service_apps(self) -> dict[str, Any]:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         return await self.runner.feed_service_apps()
@@ -186,8 +186,8 @@ class DockerKernel(AbstractKernel):
     @override
     async def commit(
         self,
-        kernel_id,
-        subdir,
+        kernel_id: KernelId,
+        subdir: str,
         *,
         canonical: str | None = None,
         filename: str | None = None,
@@ -204,8 +204,8 @@ class DockerKernel(AbstractKernel):
         try:
             Path(path).mkdir(exist_ok=True, parents=True)
             Path(lock_path).parent.mkdir(exist_ok=True, parents=True)
-        except ValueError:  # parent_path does not start with work_dir!
-            raise ValueError("malformed committed path.")
+        except ValueError as e:  # parent_path does not start with work_dir!
+            raise ValueError("malformed committed path.") from e
 
         def _write_chunks(
             fileobj: gzip.GzipFile,
@@ -295,7 +295,7 @@ class DockerKernel(AbstractKernel):
             log.warning("Session is already being committed.")
 
     @override
-    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
+    async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
         loop = current_loop()
         host_work_dir: Path = (
             self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
@@ -304,7 +304,7 @@ class DockerKernel(AbstractKernel):
         if not host_abspath.is_relative_to(host_work_dir):
             raise PermissionError("Not allowed to upload files outside /home/work")
 
-        def _write_to_disk():
+        def _write_to_disk() -> None:
             host_abspath.parent.mkdir(parents=True, exist_ok=True)
             host_abspath.write_bytes(filedata)
 
@@ -313,10 +313,10 @@ class DockerKernel(AbstractKernel):
         except OSError as e:
             raise RuntimeError(
                 f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
-            )
+            ) from e
 
     @override
-    async def download_file(self, container_path: os.PathLike | str) -> bytes:
+    async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
         container_id = self.data["container_id"]
 
         container_home_path = PurePosixPath("/home/work")
@@ -339,12 +339,13 @@ class DockerKernel(AbstractKernel):
                         raise ValueError("Too large archive file exceeding 1 MiB")
                     tar_fobj.seek(0, io.SEEK_SET)
                     tarbytes = tar_fobj.read()
-            except DockerError:
-                raise RuntimeError(f"Could not download the archive to: {container_abspath}")
+            except DockerError as e:
+                raise RuntimeError(f"Could not download the archive to: {container_abspath}") from e
+
         return tarbytes
 
     @override
-    async def download_single(self, container_path: os.PathLike | str) -> bytes:
+    async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
         container_id = self.data["container_id"]
 
         container_home_path = PurePosixPath("/home/work")
@@ -378,12 +379,13 @@ class DockerKernel(AbstractKernel):
                         )
                     # FYI: To get the size of extracted file, seek and tell with inner_fobj.
                     content_bytes = inner_fobj.read()
-            except DockerError:
-                raise RuntimeError(f"Could not download the archive to: {container_abspath}")
+            except DockerError as e:
+                raise RuntimeError(f"Could not download the archive to: {container_abspath}") from e
+
         return content_bytes
 
     @override
-    async def list_files(self, container_path: os.PathLike | str):
+    async def list_files(self, container_path: os.PathLike[str] | str) -> dict[str, Any]:
         container_id = self.data["container_id"]
 
         # Confine the lookable paths in the home directory
@@ -437,7 +439,7 @@ class DockerKernel(AbstractKernel):
         return {"files": out, "errors": err, "abspath": str(container_path)}
 
     @override
-    async def notify_event(self, evdata: AgentEventData):
+    async def notify_event(self, evdata: AgentEventData) -> None:
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         await self.runner.feed_event(evdata)
@@ -450,15 +452,15 @@ class DockerCodeRunner(AbstractCodeRunner):
 
     def __init__(
         self,
-        kernel_id,
-        session_id,
-        event_producer,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        event_producer: EventProducer,
         *,
-        kernel_host,
-        repl_in_port,
-        repl_out_port,
-        exec_timeout=0,
-        client_features=None,
+        kernel_host: str,
+        repl_in_port: int,
+        repl_out_port: int,
+        exec_timeout: int = 0,
+        client_features: frozenset[str] | None = None,
     ) -> None:
         super().__init__(
             kernel_id,
@@ -480,13 +482,15 @@ class DockerCodeRunner(AbstractCodeRunner):
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
 
-async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[str, Optional[str]]:
+async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[str, str | None]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(
         Path(
-            pkg_resources.resource_filename(
-                f"ai.backend.krunner.{entrypoint_name}", f"./krunner-version.{distro}.txt"
+            str(
+                files(f"ai.backend.krunner.{entrypoint_name}").joinpath(
+                    f"./krunner-version.{distro}.txt"
+                )
             )
         )
         .read_text()
@@ -503,8 +507,8 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                 break
         else:
             log.info("preparing the Docker image for krunner extractor...")
-            extractor_archive = pkg_resources.resource_filename(
-                "ai.backend.runner", f"krunner-extractor.img.{arch}.tar.xz"
+            extractor_archive = str(
+                files("ai.backend.runner").joinpath(f"krunner-extractor.img.{arch}.tar.xz")
             )
             with lzma.open(extractor_archive, "rb") as reader:
                 image_tar = reader.read()
@@ -518,8 +522,8 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
         log.info("checking krunner-env for {}...", distro)
         do_create = False
         try:
-            vol = DockerVolume(docker, volume_name)
-            await vol.show()
+            vol = DockerVolume(docker, volume_name)  # type: ignore[no-untyped-call]
+            await vol.show()  # type: ignore[no-untyped-call]
             # Instead of checking the version from txt files inside the volume,
             # we check the version via the volume name and its existence.
             # This is because:
@@ -530,20 +534,22 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                 do_create = True
         if do_create:
             archive_path = Path(
-                pkg_resources.resource_filename(
-                    f"ai.backend.krunner.{entrypoint_name}", f"krunner-env.{distro}.{arch}.tar.xz"
+                str(
+                    files(f"ai.backend.krunner.{entrypoint_name}").joinpath(
+                        f"krunner-env.{distro}.{arch}.tar.xz"
+                    )
                 )
             ).resolve()
             if not archive_path.exists():
                 log.warning("krunner environment for {} ({}) is not supported!", distro, arch)
             else:
                 log.info("populating {} volume version {}", volume_name, current_version)
-                await docker.volumes.create({
+                await docker.volumes.create({  # type: ignore[no-untyped-call]
                     "Name": volume_name,
                     "Driver": "local",
                 })
                 extractor_path = Path(
-                    pkg_resources.resource_filename("ai.backend.runner", "krunner-extractor.sh")
+                    str(files("ai.backend.runner").joinpath("krunner-extractor.sh"))
                 ).resolve()
                 proc = await asyncio.create_subprocess_exec(*[
                     "docker",
@@ -563,6 +569,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
                 ])
                 if await proc.wait() != 0:
                     raise RuntimeError("extracting krunner environment has failed!")
+
     except Exception:
         log.exception("unexpected error")
         return distro, None
@@ -571,7 +578,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> tuple[s
     return distro, volume_name
 
 
-async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, str]:
+async def prepare_krunner_env(_local_config: Mapping[str, Any]) -> Mapping[str, str]:
     """
     Check if the volume "backendai-krunner.{distro}.{arch}" exists and is up-to-date.
     If not, automatically create it and update its content from the packaged pre-built krunner
@@ -585,12 +592,7 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, s
         plugin = entrypoint.load()
         await plugin.init({})  # currently does nothing
         provided_versions = (
-            Path(
-                pkg_resources.resource_filename(
-                    f"ai.backend.krunner.{entrypoint.name}",
-                    "versions.txt",
-                )
-            )
+            Path(str(files(f"ai.backend.krunner.{entrypoint.name}").joinpath("versions.txt")))
             .read_text()
             .splitlines()
         )
@@ -627,11 +629,12 @@ async def prepare_kernel_metadata_uri_handling(local_config: AgentUnifiedConfig)
     if local_config.agent.docker_mode == "linuxkit":
         # Docker Desktop mode
         arch = get_arch_name()
-        proxy_worker_binary = pkg_resources.resource_filename(
-            "ai.backend.agent.docker", f"linuxkit-metadata-proxy-worker.{arch}.bin"
+        proxy_worker_binary = str(
+            files("ai.backend.agent.docker").joinpath(f"linuxkit-metadata-proxy-worker.{arch}.bin")
         )
-        shutil.copyfile(proxy_worker_binary, "/tmp/backend.ai/linuxkit-metadata-proxy")
-        os.chmod("/tmp/backend.ai/linuxkit-metadata-proxy", 0o755)
+        proxy_path = Path("/tmp/backend.ai/linuxkit-metadata-proxy")
+        shutil.copyfile(proxy_worker_binary, proxy_path)
+        proxy_path.chmod(0o755)
         server_port = local_config.agent.metadata_server_port
         # Prepare proxy worker container
         proxy_worker_container = PersistentServiceContainer(

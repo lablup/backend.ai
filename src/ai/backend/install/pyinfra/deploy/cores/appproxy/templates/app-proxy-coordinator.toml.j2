@@ -1,0 +1,125 @@
+[db]
+type = "postgresql"
+name = "{{ db_name }}"
+user = "{{ db_user }}"
+password = "{{ db_password }}"
+pool_size = 16
+max_overflow = 128
+
+[db.addr]
+host = "{{ db_hostname }}"
+port = {{ db_port }}
+
+[redis]
+# sentinel = [
+#     { host = "127.0.0.1", port = 9503 },
+#     { host = "127.0.0.1", port = 9504 },
+#     { host = "127.0.0.1", port = 9505 },
+# ]
+# service_name = "mymaster"
+password = "{{ redis_password }}"
+
+[redis.addr]
+host = "{{ redis_hostname }}"
+port = {{ redis_port }}
+
+[redis.redis_helper_config]
+socket_timeout = 5.0
+socket_connect_timeout = 2.0
+reconnect_poll_timeout = 0.3
+
+[proxy_coordinator]
+ipc_base_path = "{{ service_dir }}/tmp/backend.ai/ipc"
+event_loop = "asyncio"
+pid_file = "./coordinator.pid"
+user = {{ user_id }}
+group = {{ group_id }}
+tls_listen = false
+# tls_cert = "/etc/backend.ai/tls/cert.pem"
+# tls_privkey = "/etc/backend.ai/tls/privkey.pem"
+# tls_advertised = false
+# worker_heartbeat_timeout = 30
+aiomonitor_termui_port = 28500
+aiomonitor_webui_port = 29500
+allow_unauthorized_configure_request = true
+unused_circuit_collection_timeout = 28800
+# use_experimental_redis_event_dispatcher = false
+enable_traefik = {{ enable_traefik|lower }}
+metric_access_allowed_hosts = "0.0.0.0/0"
+
+[proxy_coordinator.advertised_addr]
+host = "{{ advertised_hostname }}"
+port = {{ port }}
+
+[proxy_coordinator.bind_addr]
+host = "0.0.0.0"
+port = {{ port }}
+
+[proxy_coordinator.announce_addr]
+host = "{{ advertised_hostname }}"
+port = {{ port }}
+
+{% if enable_traefik %}
+[proxy_coordinator.traefik.etcd]
+addr = { host = "{{ etcd_host }}", port = {{ etcd_port }} }
+namespace = "traefik"
+{% endif %}
+
+[secrets]
+jwt_secret = "{{ jwt_secret }}"
+api_secret = "{{ shared_key }}"
+
+[permit_hash]
+secret = "{{ permit_hash_secret }}"
+digest_mod = "sha256"
+
+{%- if otel_collector_endpoint %}
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "{{ otel_collector_endpoint }}"
+{%- endif %}
+
+[logging]
+level = "INFO"
+drivers = ["console", "file"]
+
+[logging.pkg_ns]
+"" = "WARNING"
+"ai.backend" = "INFO"
+tests = "DEBUG"
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "coordinator.log"
+backup_count = 10
+rotation_size = "10M"
+format = "verbose"
+
+# [logging.logstash]
+# protocol = "tcp"
+# ssl_enabled = true
+# ssl_verify = true
+#
+# [logging.logstash.endpoint]
+# host = "127.0.0.1"
+# port = 8001
+#
+# [logging.graylog]
+# protocol = "tcp"
+# ssl_enabled = true
+# ssl_verify = true
+#
+# [logging.graylog.endpoint]
+# host = "127.0.0.1"
+# port = 8001
+
+[debug]
+enabled = false
+asyncio = false
+enhanced_aiomonitor_task_info = false
+log_events = false

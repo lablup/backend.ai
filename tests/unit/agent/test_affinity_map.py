@@ -23,7 +23,7 @@ from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
 class DummyDevice(AbstractComputeDevice):
     extra_prop1: str
 
-    def __init__(self, *args, extra_prop1: str = "zzz", **kwargs):
+    def __init__(self, *args: Any, extra_prop1: str = "zzz", **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.extra_prop1 = extra_prop1
 
@@ -38,7 +38,7 @@ class DummyDevice(AbstractComputeDevice):
 class CPUDevice(AbstractComputeDevice):
     extra_prop1: str
 
-    def __init__(self, *args, extra_prop1: str = "yyy", **kwargs):
+    def __init__(self, *args: Any, extra_prop1: str = "yyy", **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.extra_prop1 = extra_prop1
 
@@ -487,7 +487,8 @@ def test_affinity_map_secondary_allocation_integrated(
         affinity_hint=affinity_hint,
     )
     assert affinity_hint.devices is not None, "update_affinity_hint() should have been called."
-    per_node_cuda_alloc: MutableMapping[int, int] = defaultdict(int)
+    # mypy doesn't track that allocate() mutates affinity_hint.devices via side effect
+    per_node_cuda_alloc: MutableMapping[int, int] = defaultdict(int)  # type: ignore[unreachable]
     for dev_id, alloc in alloc_map.allocations[SlotName("cuda")].items():
         if dev_id == "x0":
             per_node_cuda_alloc[0] += int(alloc)

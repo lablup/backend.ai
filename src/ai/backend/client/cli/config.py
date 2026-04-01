@@ -16,13 +16,13 @@ from .pretty import print_done, print_error, print_fail, print_warn
 
 
 @main.command()
-def config():
+def config() -> None:
     """
     Shows the current configuration.
     """
     config = get_config()
     click.echo(
-        "API endpoint: {0} (mode: {1})".format(
+        "API endpoint: {} (mode: {})".format(
             click.style(str(config.endpoint), bold=True),
             click.style(str(config.endpoint_type), fg="cyan", bold=True),
         )
@@ -41,7 +41,7 @@ def config():
                 click.echo("Server version: (failed to fetch)")
             else:
                 click.echo(
-                    "Server version: {0} (API: {1})".format(
+                    "Server version: {} (API: {})".format(
                         versions.get("manager", "pre-19.03"),
                         versions["version"],
                     )
@@ -65,7 +65,7 @@ def config():
         ).exists():
             sess_config = json.loads((local_state_path / "config.json").read_text())
             click.echo(
-                'Username: "{0}"'.format(click.style(sess_config.get("username", ""), bold=True))
+                'Username: "{}"'.format(click.style(sess_config.get("username", ""), bold=True))
             )
             nrows += 1
     else:
@@ -88,20 +88,20 @@ def config():
                 versions = sess.System.get_versions()
             except BackendClientError:
                 click.echo(
-                    "Server version: {0}".format(
+                    "Server version: {}".format(
                         click.style("(failed to fetch)", fg="red", bold=True),
                     )
                 )
             else:
                 click.echo(
-                    "Server version: {0} (API: {1})".format(
+                    "Server version: {} (API: {})".format(
                         click.style(versions.get("manager", "pre-19.03"), bold=True),
                         click.style(versions["version"], bold=True),
                     )
                 )
             click.echo("\u001b[2K", nl=False)
             click.echo(
-                "Negotiated API version: {0}".format(
+                "Negotiated API version: {}".format(
                     click.style(f"v{sess.api_version[0]}.{sess.api_version[1]}", bold=True),
                 )
             )
@@ -112,7 +112,7 @@ def config():
 
 
 @main.command()
-def login():
+def login() -> None:
     """
     Log-in to the console API proxy.
     It stores the current session cookie in the OS-default
@@ -151,7 +151,7 @@ def login():
 
 
 @main.command()
-def logout():
+def logout() -> None:
     """
     Log-out from the console API proxy and clears the local cookie data.
     """
@@ -162,7 +162,7 @@ def logout():
 
     with Session() as session:
         try:
-            session.Auth.logout()
+            _ = session.Auth.logout()
             print_done("Logout done.")
             try:
                 (local_state_path / "cookie.dat").unlink()
@@ -177,7 +177,7 @@ def logout():
 @click.argument("old_password", metavar="OLD_PASSWORD")
 @click.argument("new_password", metavar="NEW_PASSWORD")
 @click.argument("new_password2", metavar="NEW_PASSWORD2")
-def update_password(old_password, new_password, new_password2):
+def update_password(old_password: str, new_password: str, new_password2: str) -> None:
     """
     Update user's password.
     """
@@ -188,7 +188,7 @@ def update_password(old_password, new_password, new_password2):
 
     with Session() as session:
         try:
-            session.Auth.update_password(old_password, new_password, new_password2)
+            _ = session.Auth.update_password(old_password, new_password, new_password2)
             print_done("Password updated.")
         except Exception as e:
             print_error(e)
@@ -199,7 +199,9 @@ def update_password(old_password, new_password, new_password2):
 @click.argument("user_id", metavar="USER_ID")
 @click.argument("current_password", metavar="CURRENT_PASSWORD")
 @click.argument("new_password", metavar="NEW_PASSWORD")
-def update_password_no_auth(domain, user_id, current_password, new_password):
+def update_password_no_auth(
+    domain: str, user_id: str, current_password: str, new_password: str
+) -> None:
     """
     Update user's password. This is used to update `EXPIRED` password only.
     """
@@ -207,11 +209,11 @@ def update_password_no_auth(domain, user_id, current_password, new_password):
         try:
             config = get_config()
             if config.endpoint_type == "session":
-                session.Auth.update_password_no_auth_in_session(
+                _ = session.Auth.update_password_no_auth_in_session(
                     user_id, current_password, new_password
                 )
             else:
-                session.Auth.update_password_no_auth(
+                _ = session.Auth.update_password_no_auth(
                     domain, user_id, current_password, new_password
                 )
             print_done("Password updated.")

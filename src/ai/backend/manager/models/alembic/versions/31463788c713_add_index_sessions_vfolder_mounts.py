@@ -15,7 +15,7 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
+def upgrade() -> None:
     op.create_index(
         "ix_sessions_vfolder_mounts",
         "sessions",
@@ -25,5 +25,5 @@ def upgrade():
     )
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_index("ix_sessions_vfolder_mounts", table_name="sessions", postgresql_using="gin")

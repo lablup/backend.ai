@@ -5,7 +5,7 @@ from collections.abc import Iterable, Iterator, Mapping, MutableMapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import MappingProxyType, TracebackType
-from typing import Any, LiteralString, TypeAlias, TypedDict, cast, override
+from typing import Any, LiteralString, TypedDict, cast, override
 
 from ai.backend.logging.otel import OpenTelemetrySpec
 
@@ -31,10 +31,10 @@ def _register_custom_loglevels() -> None:
 
 
 # Taken from the typeshed module for logging
-_SysExcInfoType: TypeAlias = (
+type _SysExcInfoType = (
     tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None]
 )
-_ExcInfoType: TypeAlias = None | bool | _SysExcInfoType | BaseException
+type _ExcInfoType = None | bool | _SysExcInfoType | BaseException
 
 
 class ContextKWArgs(TypedDict):
@@ -68,12 +68,12 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
         self,
         level: int,
         msg: object,
-        *args,
+        *args: Any,
         exc_info: _ExcInfoType = None,
         stack_info: bool = False,
         stacklevel: int = 1,
         extra: Mapping[str, object] | None = None,
-        **user_kwargs,
+        **user_kwargs: Any,
     ) -> None:
         if self.isEnabledFor(level):
             context_kwargs: ContextKWArgs = {
@@ -83,7 +83,8 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
                 "extra": extra,
             }
             msg, context_kwargs = self.process(msg, context_kwargs)  # type: ignore
-            assert isinstance(msg, str)
+            if not isinstance(msg, str):
+                raise TypeError("msg must be a string after processing")
             user_kwargs["extra"] = context_kwargs["extra"]
             self.logger._log(level, BraceMessage(msg, args, user_kwargs), (), **context_kwargs)
 
@@ -103,12 +104,12 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
     def trace(
         self,
         msg: LiteralString,
-        *args,
+        *args: Any,
         exc_info: _ExcInfoType = None,
         stack_info: bool = False,
         stacklevel: int = 1,
         extra: Mapping[str, object] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         self.log(
             _TRACE_LEVEL,
@@ -123,9 +124,10 @@ class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
 
     @classmethod
     def apply_otel(cls, spec: OpenTelemetrySpec) -> None:
-        from .otel import apply_otel_loggers
+        from .otel import apply_otel_loggers, apply_otel_tracer
 
         apply_otel_loggers(cls._loggers, spec)
+        apply_otel_tracer(spec)
 
 
 def enforce_debug_logging(loggers: Iterable[str]) -> None:

@@ -18,6 +18,13 @@ from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.loaders import load_local_config
 from ai.backend.storage.types import VFolderID
 from ai.backend.storage.volumes.abc import AbstractVolume
+from ai.backend.storage.volumes.cephfs import CephFSVolume
+from ai.backend.storage.volumes.gpfs import GPFSVolume
+from ai.backend.storage.volumes.netapp import NetAppVolume
+from ai.backend.storage.volumes.purestorage import FlashBladeVolume
+from ai.backend.storage.volumes.vfs import BaseVolume
+from ai.backend.storage.volumes.weka import WekaVolume
+from ai.backend.storage.volumes.xfs import XfsVolume
 from ai.backend.testutils.bootstrap import minio_container  # noqa: F401
 
 
@@ -33,21 +40,22 @@ def vfroot() -> Iterator[Path]:
 
 
 @pytest.fixture
-def local_volume(vfroot) -> Iterator[Path]:
+def local_volume(vfroot: Path) -> Iterator[Path]:
     volume = vfroot / "local"
     volume.mkdir(parents=True, exist_ok=True)
     yield volume
 
 
 @pytest.fixture
-def mock_etcd() -> Iterator[AsyncEtcd]:
-    yield AsyncEtcd(
+async def mock_etcd() -> AsyncIterator[AsyncEtcd]:
+    async with AsyncEtcd(
         addrs=[HostPortPair("", 0)],
         namespace="",
         scope_prefix_map={
             ConfigScopes.GLOBAL: "",
         },
-    )
+    ) as etcd:
+        yield etcd
 
 
 def has_backend(backend_name: str) -> dict[str, Any] | None:
@@ -73,9 +81,9 @@ def has_backend(backend_name: str) -> dict[str, Any] | None:
     ]
 )
 async def volume(
-    request,
-    local_volume,
-    mock_etcd,
+    request: Any,
+    local_volume: Path,
+    mock_etcd: AsyncEtcd,
 ) -> AsyncIterator[AbstractVolume]:
     volume_cls: type[AbstractVolume]
     backend_options = {}
@@ -88,32 +96,18 @@ async def volume(
         volume_path = Path(backend_config["path"])
     match request.param:
         case "cephfs":
-            from ai.backend.storage.volumes.cephfs import CephFSVolume
-
             volume_cls = CephFSVolume
         case "gpfs":
-            from ai.backend.storage.volumes.gpfs import GPFSVolume
-
             volume_cls = GPFSVolume
         case "netapp":
-            from ai.backend.storage.volumes.netapp import NetAppVolume
-
             volume_cls = NetAppVolume
         case "purestorage":
-            from ai.backend.storage.volumes.purestorage import FlashBladeVolume
-
             volume_cls = FlashBladeVolume
         case "vfs":
-            from ai.backend.storage.volumes.vfs import BaseVolume
-
             volume_cls = BaseVolume
         case "weka":
-            from ai.backend.storage.volumes.weka import WekaVolume
-
             volume_cls = WekaVolume
         case "xfs":
-            from ai.backend.storage.volumes.xfs import XfsVolume
-
             volume_cls = XfsVolume
         case _:
             raise RuntimeError(f"Unknown volume backend: {request.param}")
@@ -150,7 +144,7 @@ async def empty_vfolder(volume: AbstractVolume) -> AsyncIterator[VFolderID]:
 
 
 @pytest.fixture
-async def s3_client(minio_container):  # noqa: F811
+async def s3_client(minio_container: Any) -> AsyncIterator[S3Client]:  # noqa: F811
     """Create S3Client instance for testing with MinIO container"""
     container_id, host_port = minio_container
 
@@ -178,4 +172,4 @@ async def s3_client(minio_container):  # noqa: F811
             if e.response["Error"]["Code"] != "BucketAlreadyOwnedByYou":
                 raise
 
-    return client
+    yield client

@@ -4,7 +4,7 @@ import secrets
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Optional, Self
+from typing import Any, Self
 from uuid import UUID
 
 import yarl
@@ -21,8 +21,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.manager.data.deployment.types import DeploymentInfo
-from ai.backend.manager.errors.deployment import DeploymentHasNoTargetRevision
+from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionSpec
 from ai.backend.manager.models.network import NetworkRow, NetworkType
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.types import UserScope
@@ -42,8 +41,8 @@ class UserContext:
 class ContainerUserContext:
     """Container user UID/GID information."""
 
-    uid: Optional[int]
-    main_gid: Optional[int]
+    uid: int | None
+    main_gid: int | None
     supplementary_gids: list[int]
 
 
@@ -87,35 +86,35 @@ class SessionCreationSpec:
     cluster_mode: ClusterMode
     cluster_size: int
     priority: int
-    resource_policy: dict
+    resource_policy: dict[str, Any]
     kernel_specs: list[KernelEnqueueingConfig]
-    creation_spec: dict
+    creation_spec: dict[str, Any]
 
     # Optional parameters
-    scaling_group: Optional[str] = None
-    session_tag: Optional[str] = None
-    starts_at: Optional[datetime] = None
-    batch_timeout: Optional[timedelta] = None
-    dependency_sessions: Optional[list[SessionId]] = None
-    callback_url: Optional[yarl.URL] = None
-    route_id: Optional[UUID] = None
+    is_preemptible: bool = True
+    scaling_group: str | None = None
+    session_tag: str | None = None
+    starts_at: datetime | None = None
+    batch_timeout: timedelta | None = None
+    dependency_sessions: list[SessionId] | None = None
+    callback_url: yarl.URL | None = None
+    route_id: UUID | None = None
     sudo_session_enabled: bool = False
-    network: Optional[NetworkRow] = None
-    designated_agent_list: Optional[list[str]] = None
-    internal_data: Optional[dict] = None
+    network: NetworkRow | None = None
+    designated_agent_list: list[str] | None = None
+    internal_data: dict[str, Any] | None = None
     public_sgroup_only: bool = True
     startup_command: str | None = None
 
     @classmethod
     def from_deployment_info(
-        cls, deployment_info: DeploymentInfo, context: DeploymentContext, route_id: UUID
+        cls,
+        deployment_info: DeploymentInfo,
+        context: DeploymentContext,
+        route_id: UUID,
+        target_revision: ModelRevisionSpec,
     ) -> Self:
         session_creation_id = secrets.token_urlsafe(16)
-        target_revision = deployment_info.target_revision()
-        if target_revision is None:
-            raise DeploymentHasNoTargetRevision(
-                "Deployment has no target revision for session creation"
-            )
 
         # Prepare mount spec
         mount_spec = target_revision.mounts.to_mount_spec()
@@ -212,19 +211,19 @@ class KernelEnqueueData:
     image: str  # Canonical image name
     architecture: str
     registry: str
-    tag: Optional[str]
-    starts_at: Optional[datetime]
+    tag: str | None
+    starts_at: datetime | None
     status: str  # KernelStatus.PENDING
     status_history: dict[str, str]
     occupied_slots: ResourceSlot
     requested_slots: ResourceSlot
-    occupied_shares: dict
-    resource_opts: dict
+    occupied_shares: dict[str, Any]
+    resource_opts: dict[str, Any]
     environ: list[str]  # List of "KEY=VALUE" strings
-    bootstrap_script: Optional[str]
-    startup_command: Optional[str]
+    bootstrap_script: str | None
+    startup_command: str | None
     internal_data: dict[str, Any]
-    callback_url: Optional[yarl.URL]
+    callback_url: yarl.URL | None
     mounts: list[str]  # Legacy field for compatibility
     vfolder_mounts: list[VFolderMount]
     preopen_ports: list[int]
@@ -237,8 +236,8 @@ class KernelEnqueueData:
     stdout_port: int = 0
 
     # Container user info
-    uid: Optional[int] = field(default=None)
-    main_gid: Optional[int] = field(default=None)
+    uid: int | None = field(default=None)
+    main_gid: int | None = field(default=None)
     gids: list[int] = field(default_factory=list)
 
 
@@ -262,23 +261,24 @@ class SessionEnqueueData:
     cluster_mode: str  # Store as string for DB
     cluster_size: int
     priority: int
+    is_preemptible: bool
     status: str  # SessionStatus.PENDING
     status_history: dict[str, str]
     requested_slots: ResourceSlot
     occupying_slots: ResourceSlot
     vfolder_mounts: list[VFolderMount]
     environ: dict[str, str]
-    tag: Optional[str]
-    starts_at: Optional[datetime]
-    batch_timeout: Optional[int]  # seconds
-    callback_url: Optional[yarl.URL]
+    tag: str | None
+    starts_at: datetime | None
+    batch_timeout: int | None  # seconds
+    callback_url: yarl.URL | None
     images: list[str]
-    designated_agent_list: Optional[list[str]]
-    network_type: Optional[NetworkType] = None
-    network_id: Optional[str] = None
-    bootstrap_script: Optional[str] = None
+    designated_agent_list: list[str] | None
+    network_type: NetworkType | None = None
+    network_id: str | None = None
+    bootstrap_script: str | None = None
     use_host_network: bool = False
-    timeout: Optional[int] = None
+    timeout: int | None = None
     startup_command: str | None = None
 
 
@@ -295,7 +295,7 @@ class ScalingGroupNetworkInfo:
     """Network configuration from scaling group."""
 
     use_host_network: bool
-    wsproxy_addr: Optional[str] = None
+    wsproxy_addr: str | None = None
 
 
 @dataclass
@@ -308,7 +308,7 @@ class ImageInfo:
     labels: dict[str, Any]
     # Resource spec maps slot names to {"min": value, "max": value}
     # Values can be strings (for BinarySize), numbers, or None
-    resource_spec: dict[str, dict[str, Optional[str | int | Decimal]]]
+    resource_spec: dict[str, dict[str, str | int | Decimal | None]]
 
 
 @dataclass
@@ -324,8 +324,8 @@ class AllowedScalingGroup:
 class ContainerUserInfo:
     """User container UID/GID information."""
 
-    uid: Optional[int] = None
-    main_gid: Optional[int] = None
+    uid: int | None = None
+    main_gid: int | None = None
     supplementary_gids: list[int] = field(default_factory=list)
 
 

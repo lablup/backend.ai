@@ -1,11 +1,12 @@
 import enum
-from dataclasses import dataclass, field
-from typing import (
-    Optional,
-)
+from dataclasses import dataclass
+from typing import Self
 from uuid import UUID
 
 from pydantic import BaseModel
+
+from ai.backend.common.dto.clients.prometheus.response import MetricResponseInfo
+from ai.backend.common.exception import InvalidAPIParameters
 
 
 class ValueType(enum.StrEnum):
@@ -28,14 +29,32 @@ class MetricQueryParameter(BaseModel):
 @dataclass
 class ContainerMetricResponseInfo:
     value_type: str
-    container_metric_name: Optional[str]
-    agent_id: Optional[str]
-    instance: Optional[str]
-    job: Optional[str]
-    kernel_id: Optional[str]
-    owner_project_id: Optional[str]
-    owner_user_id: Optional[str]
-    session_id: Optional[str]
+    container_metric_name: str | None
+    agent_id: str | None
+    instance: str | None
+    job: str | None
+    kernel_id: str | None
+    owner_project_id: str | None
+    owner_user_id: str | None
+    session_id: str | None
+
+    @classmethod
+    def from_metric_response_info(cls, info: MetricResponseInfo) -> Self:
+        if info.value_type is None:
+            raise InvalidAPIParameters(
+                f"Missing required label 'value_type' for container metric (metric={info.name!r})"
+            )
+        return cls(
+            value_type=info.value_type,
+            container_metric_name=info.container_metric_name,
+            agent_id=info.agent_id,
+            instance=info.instance,
+            job=info.job,
+            kernel_id=info.kernel_id,
+            owner_project_id=info.owner_project_id,
+            owner_user_id=info.owner_user_id,
+            session_id=info.session_id,
+        )
 
 
 @dataclass
@@ -48,11 +67,11 @@ class MetricResultValue:
 class ContainerMetricOptionalLabel:
     value_type: ValueType
 
-    agent_id: Optional[str] = None
-    kernel_id: Optional[UUID] = None
-    session_id: Optional[UUID] = None
-    user_id: Optional[UUID] = None
-    project_id: Optional[UUID] = None
+    agent_id: str | None = None
+    kernel_id: UUID | None = None
+    session_id: UUID | None = None
+    user_id: UUID | None = None
+    project_id: UUID | None = None
 
 
 @dataclass
@@ -81,22 +100,3 @@ class UtilizationMetricType(enum.Enum):
     Represents a difference of changes calculated from underlying gauge/accumulation values
     (e.g., Utilization msec from CPU usage)
     """
-
-
-@dataclass(kw_only=True)
-class MetricSpecForQuery:
-    metric_name: str
-    metric_type: UtilizationMetricType
-    timewindow: str
-    sum_by: list[str] = field(default_factory=list)
-    labels: list[str] = field(default_factory=list)
-
-    def str_sum_by(self) -> str:
-        if not self.sum_by:
-            return ""
-        return f"sum by ({','.join(self.sum_by)})"
-
-    def str_labels(self) -> str:
-        if not self.labels:
-            return ""
-        return f"{{{','.join(self.labels)}}}"

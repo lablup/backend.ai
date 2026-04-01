@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 from ai.backend.common.etcd import AsyncEtcd
 
@@ -15,7 +15,7 @@ class TraefikEtcd(AsyncEtcd):
         return k.removeprefix(prefix)
 
 
-def convert_to_etcd_dict(item: Any) -> dict:
+def convert_to_etcd_dict(item: Any) -> dict[str, Any]:
     def _convert(obj: Any) -> Any:
         if isinstance(obj, list):
             return {str(idx): item for idx, item in enumerate(obj)}
@@ -23,4 +23,4 @@ def convert_to_etcd_dict(item: Any) -> dict:
             return {k: _convert(v) for k, v in obj.items()}
         return obj
 
-    return _convert(item)
+    return cast(dict[str, Any], _convert(item))

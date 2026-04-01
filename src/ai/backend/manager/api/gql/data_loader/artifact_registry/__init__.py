@@ -1,7 +1,0 @@
-from __future__ import annotations
-
-from .loader import load_artifact_registries_by_ids
-
-__all__ = [
-    "load_artifact_registries_by_ids",
-]
