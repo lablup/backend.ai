@@ -59,6 +59,42 @@ To ease the process, Backend.AI injects the following environment variables into
      - The zero-based global index of the current container within the entire cluster session.
      - ``0``
 
+Distributed Training Environment Variables
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For cluster sessions with more than one container, the following environment variables are
+automatically derived from the ``BACKENDAI_*`` cluster variables at container startup to
+support distributed training with PyTorch and TensorFlow.
+
+These variables are **not set** for single-container sessions. If a user or image bootstrap
+script sets any of these variables before the entrypoint runs, the user-provided value takes
+precedence (i.e., no override).
+
+.. list-table::
+   :header-rows: 1
+
+   * - Environment Variable
+     - Meaning
+     - Examples
+   * - ``WORLD_SIZE``
+     - Total number of containers participating in the cluster session. Derived from ``BACKENDAI_CLUSTER_SIZE``.
+     - ``4``
+   * - ``RANK``
+     - Zero-based global index of the current container within the cluster. Derived from ``BACKENDAI_CLUSTER_LOCAL_RANK``.
+     - ``0``
+   * - ``LOCAL_RANK``
+     - Zero-based local index of the current container. Derived from ``BACKENDAI_CLUSTER_LOCAL_RANK``.
+     - ``0``
+   * - ``MASTER_ADDR``
+     - Hostname of the main container coordinating the cluster session. Derived from the first entry in ``BACKENDAI_CLUSTER_HOSTS``.
+     - ``main1``
+   * - ``MASTER_PORT``
+     - Port number used for distributed communication. Defaults to ``29500`` (PyTorch convention). Override with ``BACKENDAI_DIST_MASTER_PORT``.
+     - ``29500``
+   * - ``TF_CONFIG``
+     - JSON-formatted TensorFlow cluster configuration for this container.
+     - ``{"cluster": {"worker": ["main1:29500", "sub1:29500"]}, "task": {"type": "worker", "index": 0}}``
+
 
 Network Security and Isolation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
