@@ -153,7 +153,13 @@ class CloneVFolderReq(BaseRequestModel):
         ),
     )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
-    usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
+    usage_mode: VFolderUsageMode | None = Field(
+        default=None,
+        description=(
+            "Usage mode for the cloned vfolder. "
+            "If not specified, inherits the source vfolder's usage mode."
+        ),
+    )
     permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
 
     @field_validator("target_quota_scope_id", mode="before")

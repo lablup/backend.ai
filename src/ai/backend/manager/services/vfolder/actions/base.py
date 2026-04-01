@@ -507,7 +507,7 @@ class CloneVFolderAction(VFolderSingleEntityAction):
     target_host: str | None
     target_quota_scope_id: QuotaScopeID | None
     cloneable: bool
-    usage_mode: VFolderUsageMode
+    usage_mode: VFolderUsageMode | None
     mount_permission: VFolderPermission
 
     @override

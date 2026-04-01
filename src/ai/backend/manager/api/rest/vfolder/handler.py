@@ -1613,7 +1613,7 @@ class VFolderHandler:
             req.request.match_info["name"],
             params.target_name,
             params.target_host,
-            params.usage_mode.value,
+            params.usage_mode.value if params.usage_mode is not None else None,
             params.permission.value,
         )
 

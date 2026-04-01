@@ -767,6 +767,9 @@ class VFolderService:
         else:
             target_quota_scope_id = QuotaScopeID(QuotaScopeType.USER, action.requester_user_uuid)
 
+        # Inherit source vfolder's usage_mode if not explicitly specified
+        resolved_usage_mode = action.usage_mode or source_vfolder_data.usage_mode
+
         # Create VFolderCloneInfo for the cloning operation
         vfolder_clone_info = VFolderCloneInfo(
             source_vfolder_id=source_folder_id,
@@ -776,7 +779,7 @@ class VFolderService:
             target_quota_scope_id=target_quota_scope_id,
             target_vfolder_name=action.target_name,
             target_host=target_folder_host,
-            usage_mode=action.usage_mode,
+            usage_mode=resolved_usage_mode,
             permission=action.mount_permission,
             email=requester_email,
             user_id=action.requester_user_uuid,
@@ -796,7 +799,7 @@ class VFolderService:
             target_vfolder_id=target_folder_id,
             target_vfolder_name=action.target_name,
             target_vfolder_host=target_folder_host,
-            usage_mode=action.usage_mode,
+            usage_mode=resolved_usage_mode,
             mount_permission=action.mount_permission,
             creator_email=requester_email,
             ownership_type=VFolderOwnershipType.USER,
