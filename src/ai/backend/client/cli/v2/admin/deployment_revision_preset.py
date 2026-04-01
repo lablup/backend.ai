@@ -131,22 +131,27 @@ def get(preset_id: uuid.UUID) -> None:
 
 
 @deployment_revision_preset.command()
-@click.argument("body", type=str)
-def create(body: str) -> None:
+@click.argument("payload", type=str)
+def create(payload: str) -> None:
     """Create a deployment revision preset.
 
-    BODY is a JSON string. Example:
-    '{"runtime_variant_id":"<uuid>","name":"preset-1"}'
+    PAYLOAD is a JSON string or @file path containing the input body.
     """
+    from pathlib import Path
+
     from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
         CreateDeploymentRevisionPresetInput,
     )
 
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError as e:
-        click.echo(f"Invalid JSON: {e}", err=True)
-        sys.exit(1)
+    if payload.startswith("@"):
+        with Path(payload[1:]).open() as f:
+            data = json.load(f)
+    else:
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError as e:
+            click.echo(f"Invalid JSON: {e}", err=True)
+            sys.exit(1)
 
     input_dto = _build_dto(CreateDeploymentRevisionPresetInput, data)
 
@@ -163,18 +168,27 @@ def create(body: str) -> None:
 
 @deployment_revision_preset.command()
 @click.argument("preset_id", type=click.UUID)
-@click.argument("body", type=str)
-def update(preset_id: uuid.UUID, body: str) -> None:
-    """Update a deployment revision preset."""
+@click.argument("payload", type=str)
+def update(preset_id: uuid.UUID, payload: str) -> None:
+    """Update a deployment revision preset.
+
+    PAYLOAD is a JSON string or @file path containing the update body.
+    """
+    from pathlib import Path
+
     from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
         UpdateDeploymentRevisionPresetInput,
     )
 
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError as e:
-        click.echo(f"Invalid JSON: {e}", err=True)
-        sys.exit(1)
+    if payload.startswith("@"):
+        with Path(payload[1:]).open() as f:
+            data = json.load(f)
+    else:
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError as e:
+            click.echo(f"Invalid JSON: {e}", err=True)
+            sys.exit(1)
 
     data["id"] = str(preset_id)
     input_dto = _build_dto(UpdateDeploymentRevisionPresetInput, data)
