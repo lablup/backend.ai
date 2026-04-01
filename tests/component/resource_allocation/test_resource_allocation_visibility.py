@@ -44,6 +44,9 @@ from ai.backend.manager.repositories.resource_allocation.repository import (
 from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
+from ai.backend.manager.repositories.scaling_group.repository import (
+    ScalingGroupRepository,
+)
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.resource_allocation.processors import (
     ResourceAllocationProcessors,
@@ -141,9 +144,11 @@ class TestHideAgentsVisibility:
             valkey_stat=valkey_clients.stat,
             config_provider=config_provider_hide_agents,
         )
+        sg_repo = ScalingGroupRepository(db=database_engine)
         service = ResourceAllocationService(
             resource_allocation_repository=ra_repo,
             resource_preset_repository=rp_repo,
+            scaling_group_repository=sg_repo,
         )
         return ResourceAllocationProcessors(
             service=service,
@@ -271,9 +276,11 @@ class TestGroupResourceVisibility:
             valkey_stat=valkey_clients.stat,
             config_provider=config_provider_no_grv,
         )
+        sg_repo = ScalingGroupRepository(db=database_engine)
         service = ResourceAllocationService(
             resource_allocation_repository=ra_repo,
             resource_preset_repository=rp_repo,
+            scaling_group_repository=sg_repo,
         )
         return ResourceAllocationProcessors(
             service=service,
