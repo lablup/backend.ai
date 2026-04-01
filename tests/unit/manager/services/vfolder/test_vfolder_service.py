@@ -416,17 +416,6 @@ class TestVFolderServiceCloneUsageModeInheritance:
     ) -> None:
         """When usage_mode is None, clone should inherit source vfolder's usage_mode."""
         source_vfolder_data.usage_mode = source_usage_mode
-        mock_repo.list_accessible_vfolders = AsyncMock(
-            return_value=VFolderListResult(
-                vfolders=[
-                    VFolderAccessInfo(
-                        vfolder_data=source_vfolder_data,
-                        is_owner=True,
-                        effective_permission=VFolderMountPermission.READ_WRITE,
-                    ),
-                ],
-            )
-        )
 
         action = CloneVFolderAction(
             requester_user_uuid=user_uuid,
