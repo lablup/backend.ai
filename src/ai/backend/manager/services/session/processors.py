@@ -2,6 +2,7 @@ from typing import cast, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
@@ -156,10 +157,10 @@ class SessionProcessors(AbstractProcessorPackage):
         CreateFromTemplateActionResult,
     ]
     enqueue_session: ActionProcessor[EnqueueSessionAction, EnqueueSessionActionResult]
-    destroy_session: ActionProcessor[DestroySessionAction, DestroySessionActionResult]
+    destroy_session: SingleEntityActionProcessor[DestroySessionAction, DestroySessionActionResult]
     download_file: ActionProcessor[DownloadFileAction, DownloadFileActionResult]
     download_files: ActionProcessor[DownloadFilesAction, DownloadFilesActionResult]
-    execute_session: ActionProcessor[ExecuteSessionAction, ExecuteSessionActionResult]
+    execute_session: SingleEntityActionProcessor[ExecuteSessionAction, ExecuteSessionActionResult]
     get_abusing_report: ActionProcessor[GetAbusingReportAction, GetAbusingReportActionResult]
     get_commit_status: ActionProcessor[GetCommitStatusAction, GetCommitStatusActionResult]
     get_container_logs: ActionProcessor[GetContainerLogsAction, GetContainerLogsActionResult]
@@ -167,7 +168,7 @@ class SessionProcessors(AbstractProcessorPackage):
     get_direct_access_info: ActionProcessor[
         GetDirectAccessInfoAction, GetDirectAccessInfoActionResult
     ]
-    get_session_info: ActionProcessor[GetSessionInfoAction, GetSessionInfoActionResult]
+    get_session_info: SingleEntityActionProcessor[GetSessionInfoAction, GetSessionInfoActionResult]
     get_status_history: ActionProcessor[GetStatusHistoryAction, GetStatusHistoryActionResult]
     interrupt: ActionProcessor[InterruptSessionAction, InterruptSessionActionResult]
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
@@ -186,7 +187,7 @@ class SessionProcessors(AbstractProcessorPackage):
         TerminateSessionsInProjectAction, TerminateSessionsInProjectActionResult
     ]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
-    modify_session: ActionProcessor[ModifySessionAction, ModifySessionActionResult]
+    modify_session: SingleEntityActionProcessor[ModifySessionAction, ModifySessionActionResult]
     check_and_transit_status: ActionProcessor[
         CheckAndTransitStatusAction, CheckAndTransitStatusActionResult
     ]
@@ -274,25 +275,26 @@ class SessionProcessors(AbstractProcessorPackage):
         )
 
         # Single entity actions with RBAC validation
-        self.destroy_session = ActionProcessor(
+        rbac_single_entity_validators = [single_entity_validator]
+        self.destroy_session = SingleEntityActionProcessor(
             service.destroy_session,
             action_monitors,
-            validators=[cast(ActionValidator, single_entity_validator)],
+            validators=rbac_single_entity_validators,
         )
-        self.execute_session = ActionProcessor(
+        self.execute_session = SingleEntityActionProcessor(
             service.execute_session,
             action_monitors,
-            validators=[cast(ActionValidator, single_entity_validator)],
+            validators=rbac_single_entity_validators,
         )
-        self.get_session_info = ActionProcessor(
+        self.get_session_info = SingleEntityActionProcessor(
             service.get_session_info,
             action_monitors,
-            validators=[cast(ActionValidator, single_entity_validator)],
+            validators=rbac_single_entity_validators,
         )
-        self.modify_session = ActionProcessor(
+        self.modify_session = SingleEntityActionProcessor(
             service.modify_session,
             action_monitors,
-            validators=[cast(ActionValidator, single_entity_validator)],
+            validators=rbac_single_entity_validators,
         )
 
     @override
