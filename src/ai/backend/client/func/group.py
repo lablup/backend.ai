@@ -21,7 +21,7 @@ _default_list_fields = (
     group_fields["name"],
     group_fields["is_active"],
     group_fields["created_at"],
-    group_fields["integration_name"],
+    group_fields["integration_id"],
 )
 _default_detail_fields = (
     group_fields["id"],
@@ -32,7 +32,7 @@ _default_detail_fields = (
     group_fields["domain_name"],
     group_fields["total_resource_slots"],
     group_fields["allowed_vfolder_hosts"],
-    group_fields["integration_name"],
+    group_fields["integration_id"],
 )
 
 
@@ -136,7 +136,7 @@ class Group(BaseFunction):
         is_active: bool = True,
         total_resource_slots: str | None = None,
         allowed_vfolder_hosts: str | None = None,
-        integration_name: str | None = None,
+        integration_id: str | None = None,
         _fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict[str, Any]:
         """
@@ -162,7 +162,7 @@ class Group(BaseFunction):
             "domain_name": domain_name,
             "total_resource_slots": total_resource_slots,
             "allowed_vfolder_hosts": allowed_vfolder_hosts,
-            "integration_name": integration_name,
+            "integration_id": integration_id,
         }
         variables = {
             "name": name,
@@ -182,7 +182,7 @@ class Group(BaseFunction):
         is_active: bool | Undefined = undefined,
         total_resource_slots: str | None | Undefined = undefined,
         allowed_vfolder_hosts: str | None | Undefined = undefined,
-        integration_name: str | Undefined = undefined,
+        integration_id: str | Undefined = undefined,
         _fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict[str, Any]:
         """
@@ -202,7 +202,7 @@ class Group(BaseFunction):
         set_if_set(inputs, "is_active", is_active)
         set_if_set(inputs, "total_resource_slots", total_resource_slots)
         set_if_set(inputs, "allowed_vfolder_hosts", allowed_vfolder_hosts)
-        set_if_set(inputs, "integration_name", integration_name)
+        set_if_set(inputs, "integration_id", integration_id)
         variables = {
             "gid": gid,
             "input": inputs,

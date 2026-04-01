@@ -152,7 +152,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString()
     allowed_docker_registries = graphene.List(lambda: graphene.String)
     dotfiles = Bytes()
-    integration_name = graphene.String()
+    integration_id = graphene.String()
 
     # Dynamic fields.
     scaling_groups = PaginatedConnectionField(ScalingGroupConnection)
@@ -176,7 +176,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             ),
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
-            integration_name=obj.integration_name,  # RBACModel uses integration_name
+            integration_id=obj.integration_name,  # RBACModel uses integration_name
         )
 
     @classmethod
@@ -198,7 +198,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             ),
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
-            integration_name=obj.integration_name,
+            integration_id=obj.integration_id,
         )
 
     @classmethod
@@ -214,7 +214,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=dto.allowed_docker_registries,
             dotfiles=dto.dotfiles,
-            integration_name=dto.integration_name,  # DomainData uses integration_name
+            integration_id=dto.integration_name,  # DomainData uses integration_name
         )
 
     async def resolve_scaling_groups(
@@ -372,7 +372,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
     allowed_docker_registries = graphene.List(
         lambda: graphene.String, required=False, default_value=[]
     )
-    integration_name = graphene.String(required=False, default_value=None)
+    integration_id = graphene.String(required=False, default_value=None)
     dotfiles = Bytes(required=False, default_value=b"\x90")
 
     scaling_groups = graphene.List(lambda: graphene.String, required=False)
@@ -394,7 +394,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
                     else None,
                     allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
                     allowed_docker_registries=value_or_none(self.allowed_docker_registries),
-                    integration_name=value_or_none(self.integration_name),
+                    integration_name=value_or_none(self.integration_id),
                     dotfiles=value_or_none(self.dotfiles),
                 )
             ),
@@ -451,7 +451,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
     total_resource_slots = graphene.JSONString(required=False)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     allowed_docker_registries = graphene.List(lambda: graphene.String, required=False)
-    integration_name = graphene.String(required=False)
+    integration_id = graphene.String(required=False)
     dotfiles = Bytes(required=False)
     sgroups_to_add = graphene.List(lambda: graphene.String, required=False)
     sgroups_to_remove = graphene.List(lambda: graphene.String, required=False)
@@ -484,7 +484,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
                 self.allowed_vfolder_hosts,
             ),
             integration_name=TriState[str].from_graphql(
-                self.integration_name,
+                self.integration_id,
             ),
             dotfiles=OptionalState[bytes].from_graphql(
                 self.dotfiles,
@@ -550,7 +550,7 @@ class Domain(graphene.ObjectType):  # type: ignore[misc]
     total_resource_slots = graphene.JSONString()
     allowed_vfolder_hosts = graphene.JSONString()
     allowed_docker_registries = graphene.List(lambda: graphene.String)
-    integration_name = graphene.String()
+    integration_id = graphene.String()
 
     # Dynamic fields.
     scaling_groups = graphene.List(lambda: graphene.String)
@@ -574,7 +574,7 @@ class Domain(graphene.ObjectType):  # type: ignore[misc]
             ),
             allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=row.allowed_docker_registries,
-            integration_name=row.integration_name,
+            integration_id=row.integration_id,
         )
 
     @classmethod
@@ -590,7 +590,7 @@ class Domain(graphene.ObjectType):  # type: ignore[misc]
             else {},
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=dto.allowed_docker_registries,
-            integration_name=dto.integration_name,  # DomainData uses integration_name
+            integration_id=dto.integration_name,  # DomainData uses integration_name
         )
 
     @classmethod
@@ -640,7 +640,7 @@ class DomainInput(graphene.InputObjectType):  # type: ignore[misc]
     allowed_docker_registries = graphene.List(
         lambda: graphene.String, required=False, default_value=[]
     )
-    integration_name = graphene.String(required=False, default_value=None)
+    integration_id = graphene.String(required=False, default_value=None)
 
     def to_action(self, domain_name: str, user_info: UserInfo) -> CreateDomainAction:
         def value_or_none(value: Any) -> Any:
@@ -655,7 +655,7 @@ class DomainInput(graphene.InputObjectType):  # type: ignore[misc]
                     total_resource_slots=value_or_none(self.total_resource_slots),
                     allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
                     allowed_docker_registries=value_or_none(self.allowed_docker_registries),
-                    integration_name=value_or_none(self.integration_name),
+                    integration_name=value_or_none(self.integration_id),
                 )
             ),
             user_info=user_info,
@@ -669,7 +669,7 @@ class ModifyDomainInput(graphene.InputObjectType):  # type: ignore[misc]
     total_resource_slots = graphene.JSONString(required=False)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     allowed_docker_registries = graphene.List(lambda: graphene.String, required=False)
-    integration_name = graphene.String(required=False)
+    integration_id = graphene.String(required=False)
 
     def _convert_field(
         self, field_value: Any, converter: Callable[[Any], Any] | None = None
@@ -700,7 +700,7 @@ class ModifyDomainInput(graphene.InputObjectType):  # type: ignore[misc]
             allowed_docker_registries=OptionalState[list[str]].from_graphql(
                 self.allowed_docker_registries,
             ),
-            integration_name=TriState[str].from_graphql(self.integration_name),
+            integration_name=TriState[str].from_graphql(self.integration_id),
         )
         return ModifyDomainAction(
             user_info=user_info,

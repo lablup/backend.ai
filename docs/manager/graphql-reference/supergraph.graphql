@@ -2562,7 +2562,7 @@ input CreateDomainNodeInput
   total_resource_slots: JSONString = "{}"
   allowed_vfolder_hosts: JSONString = "{}"
   allowed_docker_registries: [String] = []
-  integration_name: String = null
+  integration_id: String = null
   dotfiles: Bytes = "90"
   scaling_groups: [String]
 }
@@ -3782,7 +3782,7 @@ type Domain
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
-  integration_name: String
+  integration_id: String
   scaling_groups: [String]
 }
 
@@ -3983,7 +3983,7 @@ input DomainInput
   total_resource_slots: JSONString = "{}"
   allowed_vfolder_hosts: JSONString = "{}"
   allowed_docker_registries: [String] = []
-  integration_name: String = null
+  integration_id: String = null
 }
 
 """
@@ -4021,7 +4021,7 @@ type DomainNode implements Node
   allowed_vfolder_hosts: JSONString @join__field(graph: GRAPHENE)
   allowed_docker_registries: [String] @join__field(graph: GRAPHENE)
   dotfiles: Bytes @join__field(graph: GRAPHENE)
-  integration_name: String @join__field(graph: GRAPHENE)
+  integration_id: String @join__field(graph: GRAPHENE)
   scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalingGroupConnection @join__field(graph: GRAPHENE)
 }
 
@@ -4891,7 +4891,7 @@ type Group
   domain_name: String
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
-  integration_name: String
+  integration_id: String
   resource_policy: String
 
   """Added in 24.03.0."""
@@ -4937,7 +4937,7 @@ input GroupInput
   domain_name: String!
   total_resource_slots: JSONString = "{}"
   allowed_vfolder_hosts: JSONString = "{}"
-  integration_name: String = ""
+  integration_id: String = ""
   resource_policy: String = "default"
 
   """Added in 24.03.0"""
@@ -4962,7 +4962,7 @@ type GroupNode implements Node
   domain_name: String @join__field(graph: GRAPHENE)
   total_resource_slots: JSONString @join__field(graph: GRAPHENE)
   allowed_vfolder_hosts: JSONString @join__field(graph: GRAPHENE)
-  integration_name: String @join__field(graph: GRAPHENE)
+  integration_id: String @join__field(graph: GRAPHENE)
   resource_policy: String @join__field(graph: GRAPHENE)
 
   """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
@@ -7162,7 +7162,7 @@ input ModifyDomainInput
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
-  integration_name: String
+  integration_id: String
 }
 
 """Added in 24.12.0."""
@@ -7183,7 +7183,7 @@ input ModifyDomainNodeInput
   total_resource_slots: JSONString
   allowed_vfolder_hosts: JSONString
   allowed_docker_registries: [String]
-  integration_name: String
+  integration_id: String
   dotfiles: Bytes
   sgroups_to_add: [String]
   sgroups_to_remove: [String]
@@ -7275,7 +7275,7 @@ input ModifyGroupInput
   user_update_mode: String
   user_uuids: [String]
   allowed_vfolder_hosts: JSONString
-  integration_name: String
+  integration_id: String
   resource_policy: String
 
   """Added in 24.03.0"""
