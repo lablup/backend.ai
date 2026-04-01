@@ -125,6 +125,12 @@ def vfolder_processors_mock() -> VFolderProcessors:
 
 
 @pytest.fixture()
+def session_repository(database_engine: ExtendedAsyncSAEngine) -> SessionRepository:
+    """SessionRepository for use in SessionHandler."""
+    return SessionRepository(database_engine)
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     config_provider: ManagerConfigProvider,
@@ -132,6 +138,7 @@ def server_module_registries(
     session_processors: SessionProcessors,
     agent_processors_mock: AgentProcessors,
     vfolder_processors_mock: VFolderProcessors,
+    session_repository: SessionRepository,
 ) -> list[RouteRegistry]:
     """Load only the modules required for session component tests."""
     return [
@@ -142,6 +149,7 @@ def server_module_registries(
                 agent=agent_processors_mock,
                 vfolder=vfolder_processors_mock,
                 config_provider=config_provider,
+                session_repository=session_repository,
             ),
             route_deps,
         ),

@@ -1,5 +1,5 @@
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.permission.types import RBACElementType
@@ -28,7 +28,7 @@ class ExecuteSessionAction(SessionSingleEntityAction):
     api_version: tuple[Any, ...]
     owner_access_key: AccessKey
     params: ExecuteSessionActionParams
-    session_id: uuid.UUID | None = field(default=None)
+    session_id: uuid.UUID
 
     @override
     @classmethod
@@ -37,14 +37,10 @@ class ExecuteSessionAction(SessionSingleEntityAction):
 
     @override
     def target_entity_id(self) -> str:
-        if self.session_id is None:
-            raise ValueError("session_id is required for RBAC validation but was not set")
         return str(self.session_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        if self.session_id is None:
-            raise ValueError("session_id is required for RBAC validation but was not set")
         return RBACElementRef(RBACElementType.SESSION, str(self.session_id))
 
 

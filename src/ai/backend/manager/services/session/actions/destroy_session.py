@@ -1,5 +1,5 @@
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.permission.types import RBACElementType
@@ -21,7 +21,7 @@ class DestroySessionAction(SessionSingleEntityAction):
     forced: bool
     recursive: bool
     owner_access_key: AccessKey
-    session_id: uuid.UUID | None = field(default=None)
+    session_id: uuid.UUID
 
     @override
     @classmethod
@@ -33,14 +33,10 @@ class DestroySessionAction(SessionSingleEntityAction):
 
     @override
     def target_entity_id(self) -> str:
-        if self.session_id is None:
-            raise ValueError("session_id is required for RBAC validation but was not set")
         return str(self.session_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        if self.session_id is None:
-            raise ValueError("session_id is required for RBAC validation but was not set")
         return RBACElementRef(RBACElementType.SESSION, str(self.session_id))
 
 
@@ -48,8 +44,9 @@ class DestroySessionAction(SessionSingleEntityAction):
 class DestroySessionActionResult(SessionSingleEntityActionResult):
     # TODO: Add proper type
     result: Any
+    session_id: uuid.UUID
 
     # TODO: Change this to `entity_ids`
     @override
     def target_entity_id(self) -> str:
-        return ""
+        return str(self.session_id)
