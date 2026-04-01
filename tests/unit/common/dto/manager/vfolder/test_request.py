@@ -155,7 +155,7 @@ class TestCloneVFolderReq:
         assert req.target_name == "clone-folder"
         assert req.target_host is None
         assert req.cloneable is False
-        assert req.usage_mode == VFolderUsageMode.GENERAL
+        assert req.usage_mode is None
         assert req.permission == VFolderPermissionField.READ_WRITE
 
     def test_target_host_alias(self) -> None:
