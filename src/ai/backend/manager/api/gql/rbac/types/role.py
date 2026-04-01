@@ -492,7 +492,7 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     name: str
     description: str | None = None
     source: RoleSourceGQL = RoleSourceGQL.CUSTOM
-    scope: ScopeInputGQL | None = None
+    scopes: list[ScopeInputGQL] | None = None
 
 
 @gql_pydantic_input(

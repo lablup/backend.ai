@@ -1,7 +1,7 @@
 import logging
 import uuid
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -94,7 +94,7 @@ class CreateRoleInput:
 
     creator: Creator[RoleRow]
     object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation]
-    scope_ref: RBACElementRef | None = None
+    scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
 
 
 class PermissionDBSource:
@@ -108,7 +108,7 @@ class PermissionDBSource:
         Create a new role with object permissions.
 
         All related entities are created in a single transaction.
-        When scope_ref is provided, the role is also registered in
+        When scope_refs is non-empty, the role is also registered in
         association_scopes_entities via RBACEntityCreator.
 
         Args:
@@ -118,11 +118,12 @@ class PermissionDBSource:
             Created role row
         """
         async with self._db.begin_session() as db_session:
-            if input_data.scope_ref is not None:
+            if input_data.scope_refs:
                 rbac_creator = RBACEntityCreator(
                     spec=input_data.creator.spec,
                     element_type=RBACElementType.ROLE,
-                    scope_ref=input_data.scope_ref,
+                    scope_ref=input_data.scope_refs[0],
+                    additional_scope_refs=input_data.scope_refs[1:],
                 )
                 role_row = (await execute_rbac_entity_creator(db_session, rbac_creator)).row
             else:

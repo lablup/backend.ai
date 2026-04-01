@@ -521,12 +521,13 @@ class RBACAdapter(BaseAdapter):
 
     async def create(self, input: CreateRoleInput) -> CreateRolePayload:
         """Create a new role."""
-        scope_ref: RBACElementRef | None = None
-        if input.scope is not None:
-            scope_ref = RBACElementRef(
-                element_type=RBACElementType(input.scope.scope_type),
-                element_id=input.scope.scope_id,
+        scope_refs = [
+            RBACElementRef(
+                element_type=RBACElementType(s.scope_type),
+                element_id=s.scope_id,
             )
+            for s in (input.scopes or [])
+        ]
         creator = Creator(
             spec=RoleCreatorSpec(
                 name=input.name,
@@ -536,7 +537,7 @@ class RBACAdapter(BaseAdapter):
             )
         )
         action_result = await self._processors.permission_controller.create_role.wait_for_complete(
-            CreateRoleAction(creator=creator, scope_ref=scope_ref)
+            CreateRoleAction(creator=creator, scope_refs=scope_refs)
         )
         return CreateRolePayload(role=self._role_data_to_node(action_result.data))
 

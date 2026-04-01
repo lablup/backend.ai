@@ -20,7 +20,7 @@ class CreateRoleAction(RoleAction):
     object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation] = field(
         default_factory=tuple
     )
-    scope_ref: RBACElementRef | None = None
+    scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
 
     @override
     def entity_id(self) -> str | None:
