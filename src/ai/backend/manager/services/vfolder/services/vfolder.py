@@ -769,9 +769,7 @@ class VFolderService:
 
         # Inherit source vfolder's usage_mode if not explicitly specified
         resolved_usage_mode = (
-            action.usage_mode
-            if action.usage_mode is not None
-            else source_vfolder_data.usage_mode
+            action.usage_mode if action.usage_mode is not None else source_vfolder_data.usage_mode
         )
 
         # Create VFolderCloneInfo for the cloning operation
