@@ -10,7 +10,10 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.user.types import UserData
-from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    SearchVFoldersInput,
+    VFolderFilter,
+)
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
 from ai.backend.manager.data.vfolder.types import (
@@ -214,3 +217,34 @@ class TestVFolderAdapterProjectSearch:
         assert len(result.items) == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
+
+
+class TestVFolderAdapterConvertFilter:
+    """Tests for VFolderAdapter._convert_vfolder_filter() cloneable handling."""
+
+    @pytest.fixture
+    def adapter(self) -> VFolderAdapter:
+        return VFolderAdapter(MagicMock())
+
+    @pytest.mark.parametrize("value", [True, False])
+    def test_cloneable_filter_produces_condition(
+        self, adapter: VFolderAdapter, value: bool
+    ) -> None:
+        """cloneable filter produces exactly one callable condition."""
+        f = VFolderFilter(cloneable=value)
+        conditions = adapter._convert_vfolder_filter(f)
+        assert len(conditions) == 1
+        assert callable(conditions[0])
+
+    def test_no_cloneable_produces_no_conditions(self, adapter: VFolderAdapter) -> None:
+        """No cloneable filter produces no conditions."""
+        f = VFolderFilter()
+        conditions = adapter._convert_vfolder_filter(f)
+        assert len(conditions) == 0
+
+    def test_cloneable_true_sql_references_column(self, adapter: VFolderAdapter) -> None:
+        """cloneable=True generates SQL referencing vfolders.cloneable."""
+        f = VFolderFilter(cloneable=True)
+        conditions = adapter._convert_vfolder_filter(f)
+        sql = str(conditions[0]().compile(compile_kwargs={"literal_binds": True}))
+        assert "vfolders.cloneable" in sql

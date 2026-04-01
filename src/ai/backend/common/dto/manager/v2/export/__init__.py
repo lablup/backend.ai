@@ -26,7 +26,6 @@ from ai.backend.common.dto.manager.v2.export.response import (
     ListExportReportsPayload,
 )
 from ai.backend.common.dto.manager.v2.export.types import (
-    BooleanFilter,
     ExportFieldInfoNode,
     ExportReportInfoNode,
     ExportReportKey,
@@ -35,7 +34,6 @@ from ai.backend.common.dto.manager.v2.export.types import (
 
 __all__ = (
     # Types (enums + sub-models)
-    "BooleanFilter",
     "ExportFieldInfoNode",
     "ExportReportInfoNode",
     "ExportReportKey",

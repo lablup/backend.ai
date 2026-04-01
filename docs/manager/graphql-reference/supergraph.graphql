@@ -17302,6 +17302,7 @@ input VFolderFilter
   host: StringFilter = null
   status: VFolderOperationStatusFilter = null
   usageMode: VFolderUsageModeFilter = null
+  cloneable: Boolean = null
   createdAt: DateTimeFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null

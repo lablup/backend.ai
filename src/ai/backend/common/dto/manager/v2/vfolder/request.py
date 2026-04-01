@@ -258,6 +258,7 @@ class VFolderFilter(BaseRequestModel):
     usage_mode: VFolderUsageModeFilter | None = Field(
         default=None, description="Filter by usage mode."
     )
+    cloneable: bool | None = Field(default=None, description="Filter by cloneable flag.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
     AND: list[VFolderFilter] | None = Field(default=None, description="AND logical combinator.")
     OR: list[VFolderFilter] | None = Field(default=None, description="OR logical combinator.")
