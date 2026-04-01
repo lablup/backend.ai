@@ -71,6 +71,7 @@ class RouteHistoryDTO(BaseResponseModel):
     id: UUID
     route_id: UUID
     deployment_id: UUID
+    category: str = ""
     phase: str
     from_status: str | None = None
     to_status: str | None = None

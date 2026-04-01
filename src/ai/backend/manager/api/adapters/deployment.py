@@ -344,6 +344,8 @@ class DeploymentAdapter(BaseAdapter):
     ) -> CreateDeploymentPayload:
         """Create a new deployment."""
         initial_revision = input.initial_revision
+        if initial_revision is None:
+            raise ValueError("initial_revision is required for deployment creation")
         mounts_creator = VFolderMountsCreator(
             model_vfolder_id=initial_revision.model_mount_config.vfolder_id,
             model_definition_path=initial_revision.model_mount_config.definition_path,

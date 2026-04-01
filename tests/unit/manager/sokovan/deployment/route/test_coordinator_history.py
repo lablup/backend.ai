@@ -10,7 +10,7 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
@@ -38,6 +38,7 @@ def sample_route_data() -> RouteData:
         endpoint_id=uuid4(),
         session_id=None,
         status=RouteStatus.PROVISIONING,
+        health_status=RouteHealthStatus.NOT_CHECKED,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
         revision_id=uuid4(),
@@ -131,7 +132,7 @@ def mock_handler_with_success(
     mock.name = MagicMock(return_value="provisioning")
     mock.lock_id = None
     mock.target_statuses = MagicMock(return_value=[RouteStatus.PROVISIONING])
-    mock.next_status = MagicMock(return_value=RouteStatus.HEALTHY)
+    mock.next_status = MagicMock(return_value=RouteStatus.RUNNING)
     mock.failure_status = MagicMock(return_value=None)
     mock.stale_status = MagicMock(return_value=None)
     mock.execute = AsyncMock(
@@ -154,7 +155,7 @@ def mock_handler_with_failure(
     mock.name = MagicMock(return_value="provisioning")
     mock.lock_id = None
     mock.target_statuses = MagicMock(return_value=[RouteStatus.PROVISIONING])
-    mock.next_status = MagicMock(return_value=RouteStatus.HEALTHY)
+    mock.next_status = MagicMock(return_value=RouteStatus.RUNNING)
     mock.failure_status = MagicMock(return_value=RouteStatus.FAILED_TO_START)
     mock.stale_status = MagicMock(return_value=None)
     mock.execute = AsyncMock(
@@ -176,10 +177,10 @@ def mock_handler_with_stale(
     mock = MagicMock(spec=RouteHandler)
     mock.name = MagicMock(return_value="health_check")
     mock.lock_id = None
-    mock.target_statuses = MagicMock(return_value=[RouteStatus.HEALTHY])
+    mock.target_statuses = MagicMock(return_value=[RouteStatus.RUNNING])
     mock.next_status = MagicMock(return_value=None)
     mock.failure_status = MagicMock(return_value=None)
-    mock.stale_status = MagicMock(return_value=RouteStatus.UNHEALTHY)
+    mock.stale_status = MagicMock(return_value=RouteHealthStatus.UNHEALTHY)
     mock.execute = AsyncMock(
         return_value=RouteExecutionResult(
             successes=[],
@@ -198,7 +199,7 @@ def mock_handler_with_empty_result() -> MagicMock:
     mock.name = MagicMock(return_value="provisioning")
     mock.lock_id = None
     mock.target_statuses = MagicMock(return_value=[RouteStatus.PROVISIONING])
-    mock.next_status = MagicMock(return_value=RouteStatus.HEALTHY)
+    mock.next_status = MagicMock(return_value=RouteStatus.RUNNING)
     mock.failure_status = MagicMock(return_value=None)
     mock.stale_status = MagicMock(return_value=None)
     mock.execute = AsyncMock(return_value=RouteExecutionResult())
@@ -325,7 +326,8 @@ class TestProcessRouteLifecycle:
                     route_id=uuid4(),
                     endpoint_id=uuid4(),
                     session_id=None,
-                    status=RouteStatus.HEALTHY,
+                    status=RouteStatus.RUNNING,
+                    health_status=RouteHealthStatus.HEALTHY,
                     traffic_ratio=1.0,
                     created_at=datetime.now(tzutc()),
                     revision_id=uuid4(),

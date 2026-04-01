@@ -3243,7 +3243,7 @@ class TestRouteOperations:
         # Update the route status
         updater = Updater(
             spec=RouteStatusUpdaterSpec(
-                status=OptionalState.update(RouteStatus.HEALTHY),
+                status=OptionalState.update(RouteStatus.RUNNING),
                 traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
             ),
             pk_value=route_id,
@@ -3257,7 +3257,7 @@ class TestRouteOperations:
             query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
             db_result = await db_sess.execute(query)
             route = db_result.scalar_one()
-            assert route.status == RouteStatus.HEALTHY
+            assert route.status == RouteStatus.RUNNING
             assert route.traffic_status == RouteTrafficStatus.INACTIVE
 
     async def test_update_route_with_unified_spec(
@@ -3291,7 +3291,7 @@ class TestRouteOperations:
         # Update the route using unified spec (excluding session to avoid FK constraint)
         updater = Updater(
             spec=RouteUpdaterSpec(
-                status=OptionalState.update(RouteStatus.HEALTHY),
+                status=OptionalState.update(RouteStatus.RUNNING),
                 traffic_status=OptionalState.update(RouteTrafficStatus.ACTIVE),
                 traffic_ratio=OptionalState.update(0.5),
             ),
@@ -3306,7 +3306,7 @@ class TestRouteOperations:
             query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
             db_result = await db_sess.execute(query)
             route = db_result.scalar_one()
-            assert route.status == RouteStatus.HEALTHY
+            assert route.status == RouteStatus.RUNNING
             assert route.traffic_status == RouteTrafficStatus.ACTIVE
             assert route.traffic_ratio == 0.5
 
@@ -3318,7 +3318,7 @@ class TestRouteOperations:
         nonexistent_id = uuid.uuid4()
         updater = Updater(
             spec=RouteStatusUpdaterSpec(
-                status=OptionalState.update(RouteStatus.HEALTHY),
+                status=OptionalState.update(RouteStatus.RUNNING),
             ),
             pk_value=nonexistent_id,
         )
