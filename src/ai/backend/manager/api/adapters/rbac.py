@@ -33,11 +33,14 @@ from ai.backend.common.dto.manager.v2.rbac import (
     CreateRoleInput,
     CreateRolePayload,
     DeleteRolePayload,
+    EntityActionInfo,
     EntityNode,
+    OperationInfo,
     PermissionNode,
     PurgeRolePayload,
     RoleAssignmentNode,
     RoleNode,
+    ScopeEntityOperationCombinationInfo,
     UpdateRoleInput,
     UpdateRolePayload,
 )
@@ -107,6 +110,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
+from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY, build_operation_description
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.association_scopes_entities import (
@@ -469,6 +473,41 @@ class RBACAdapter(BaseAdapter):
             for item in action_result.result.items
         }
         return [result_map.get(pair) for pair in pairs]
+
+    # ------------------------------------------------------------------ permission matrix
+
+    def get_permission_matrix(self) -> list[ScopeEntityOperationCombinationInfo]:
+        """Return the complete RBAC scope-entity-operation permission matrix."""
+        scope_entity_ops: dict[RBACElementType, dict[RBACElementType, list[OperationInfo]]] = {}
+        for action_cls in RBAC_ACTION_REGISTRY:
+            scope = action_cls.permission_scope()
+            perm = action_cls.required_permission()
+            name = action_cls.action_name()
+            desc = build_operation_description(name, perm.element_type)
+            entity_map = scope_entity_ops.setdefault(scope, {})
+            entity_map.setdefault(perm.element_type, []).append(
+                OperationInfo(
+                    operation=name.value,
+                    description=desc,
+                    required_permission=OperationTypeDTO(perm.operation.value),
+                )
+            )
+        return [
+            ScopeEntityOperationCombinationInfo(
+                scope_type=RBACElementTypeDTO(scope.value),
+                entities=sorted(
+                    [
+                        EntityActionInfo(
+                            entity_type=RBACElementTypeDTO(entity.value),
+                            actions=sorted(ops, key=lambda o: o.operation),
+                        )
+                        for entity, ops in entity_map.items()
+                    ],
+                    key=lambda e: e.entity_type,
+                ),
+            )
+            for scope, entity_map in sorted(scope_entity_ops.items(), key=lambda e: e[0].value)
+        ]
 
     # ------------------------------------------------------------------ create
 

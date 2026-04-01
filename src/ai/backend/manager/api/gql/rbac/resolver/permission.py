@@ -22,6 +22,7 @@ from ai.backend.manager.api.gql.rbac.types import (
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
+    EntityActionInfoGQL,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
     OperationTypeGQL,
@@ -31,6 +32,7 @@ from ai.backend.manager.api.gql.rbac.types import (
     PermissionOrderBy,
     RBACElementTypeGQL,
     ScopeEntityCombinationGQL,
+    ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
 )
 from ai.backend.manager.api.gql.rbac.types.permission import PermissionEdge
@@ -136,6 +138,47 @@ async def rbac_entity_operation_combinations(
             operations=sorted(ops, key=lambda o: o.operation),
         )
         for entity, ops in sorted(entity_ops.items(), key=lambda e: e[0].value)
+    ]
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="List complete RBAC scope-entity-operation combinations (permission matrix).",
+    )
+)  # type: ignore[misc]
+async def rbac_permission_matrix(
+    info: Info[StrawberryGQLContext],
+) -> list[ScopeEntityOperationCombinationGQL]:
+    scope_entity_ops: dict[RBACElementType, dict[RBACElementType, list[OperationInfoGQL]]] = {}
+    for action_cls in RBAC_ACTION_REGISTRY:
+        scope = action_cls.permission_scope()
+        perm = action_cls.required_permission()
+        name = action_cls.action_name()
+        desc = build_operation_description(name, perm.element_type)
+        entity_map = scope_entity_ops.setdefault(scope, {})
+        entity_map.setdefault(perm.element_type, []).append(
+            OperationInfoGQL(
+                operation=name.value,
+                description=desc,
+                required_permission=OperationTypeGQL(perm.operation.value),
+            )
+        )
+    return [
+        ScopeEntityOperationCombinationGQL(
+            scope_type=RBACElementTypeGQL(scope.value),
+            entities=sorted(
+                [
+                    EntityActionInfoGQL(
+                        entity_type=RBACElementTypeGQL(entity.value),
+                        actions=sorted(ops, key=lambda o: o.operation),
+                    )
+                    for entity, ops in entity_map.items()
+                ],
+                key=lambda e: e.entity_type.value,  # type: ignore[attr-defined]
+            ),
+        )
+        for scope, entity_map in sorted(scope_entity_ops.items(), key=lambda e: e[0].value)
     ]
 
 
