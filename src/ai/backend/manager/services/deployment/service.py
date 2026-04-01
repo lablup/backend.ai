@@ -384,12 +384,27 @@ class DeploymentService:
             creator, action.creator.policy
         )
 
+        # Create initial revision via the same path as add_model_revision
+        # to ensure preset/merge/resolve logic is applied consistently.
+        await self.add_model_revision(
+            AddModelRevisionAction(
+                model_deployment_id=deployment_info.id,
+                adder=action.creator.model_revision,
+            )
+        )
+
         # Mark lifecycle needed to start provisioning
         await self._deployment_controller.mark_lifecycle_needed(
             DeploymentLifecycleType.CHECK_PENDING
         )
 
-        return CreateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))
+        # Re-fetch deployment info to include the created revision
+        updated_deployment_info = await self._deployment_repository.get_endpoint_info(
+            deployment_info.id
+        )
+        return CreateDeploymentActionResult(
+            data=_convert_deployment_info_to_data(updated_deployment_info)
+        )
 
     async def create_legacy_deployment(
         self, action: CreateLegacyDeploymentAction
