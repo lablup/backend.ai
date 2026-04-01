@@ -222,14 +222,12 @@ class TestCheckDeploymentSurgeResources:
             updated_at=datetime.now(UTC),
         )
         deployment_info = _make_deployment_info(policy=policy)
-        mock_deployment_repository.get_revision = AsyncMock(
-            return_value=_make_revision_data(resource_slots=case.resource_slots)
-        )
+        revision_data = _make_revision_data(resource_slots=case.resource_slots)
         mock_scaling_group_repository.get_resource_info = AsyncMock(
             return_value=_make_resource_info(case.free_slots)
         )
 
-        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        result = await controller.check_deployment_surge_resources(deployment_info, revision_data)
         assert result.sufficient is case.expected_sufficient
         if not case.expected_sufficient:
             assert result.shortfall is not None
@@ -253,8 +251,9 @@ class TestCheckDeploymentSurgeResources:
             updated_at=datetime.now(UTC),
         )
         deployment_info = _make_deployment_info(policy=policy)
+        revision_data = _make_revision_data(resource_slots={"cpu": Decimal("1")})
 
-        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        result = await controller.check_deployment_surge_resources(deployment_info, revision_data)
         assert result.sufficient is True
         mock_scaling_group_repository.get_resource_info.assert_not_called()
 
@@ -276,10 +275,8 @@ class TestCheckDeploymentSurgeResources:
             updated_at=datetime.now(UTC),
         )
         deployment_info = _make_deployment_info(policy=policy)
-        mock_deployment_repository.get_revision = AsyncMock(
-            return_value=_make_revision_data(
-                resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-            )
+        revision_data = _make_revision_data(
+            resource_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
         )
         # CPU is sufficient (10) but mem is insufficient (2048)
         mock_scaling_group_repository.get_resource_info = AsyncMock(
@@ -289,7 +286,7 @@ class TestCheckDeploymentSurgeResources:
             })
         )
 
-        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        result = await controller.check_deployment_surge_resources(deployment_info, revision_data)
         assert result.sufficient is False
         assert result.shortfall is not None
         assert any("mem" in d for d in result.shortfall.insufficient_slots)
@@ -313,14 +310,12 @@ class TestCheckDeploymentSurgeResources:
             updated_at=datetime.now(UTC),
         )
         deployment_info = _make_deployment_info(policy=policy, resource_group="my-gpu-group")
-        mock_deployment_repository.get_revision = AsyncMock(
-            return_value=_make_revision_data(resource_slots={"cpu": Decimal("1")}),
-        )
+        revision_data = _make_revision_data(resource_slots={"cpu": Decimal("1")})
         mock_scaling_group_repository.get_resource_info = AsyncMock(
             return_value=_make_resource_info({"cpu": Decimal("100")})
         )
 
-        await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        await controller.check_deployment_surge_resources(deployment_info, revision_data)
         mock_scaling_group_repository.get_resource_info.assert_called_once_with("my-gpu-group")
 
     @pytest.mark.parametrize(
@@ -334,6 +329,7 @@ class TestCheckDeploymentSurgeResources:
                 resource_slots={"cpu": Decimal("4")},
                 free_slots={"cpu": Decimal("6")},
                 expected_sufficient=False,
+                expected_surge_count=1,
                 cluster_size=2,
             ),
             SurgeResourceCase(
@@ -344,6 +340,7 @@ class TestCheckDeploymentSurgeResources:
                 resource_slots={"cpu": Decimal("4")},
                 free_slots={"cpu": Decimal("10")},
                 expected_sufficient=True,
+                expected_surge_count=1,
                 cluster_size=2,
             ),
         ],
@@ -370,15 +367,13 @@ class TestCheckDeploymentSurgeResources:
             updated_at=datetime.now(UTC),
         )
         deployment_info = _make_deployment_info(policy=policy)
-        mock_deployment_repository.get_revision = AsyncMock(
-            return_value=_make_revision_data(
-                resource_slots=case.resource_slots,
-                cluster_size=case.cluster_size,
-            )
+        revision_data = _make_revision_data(
+            resource_slots=case.resource_slots,
+            cluster_size=case.cluster_size,
         )
         mock_scaling_group_repository.get_resource_info = AsyncMock(
             return_value=_make_resource_info(case.free_slots)
         )
 
-        result = await controller.check_deployment_surge_resources(deployment_info, REVISION_ID)
+        result = await controller.check_deployment_surge_resources(deployment_info, revision_data)
         assert result.sufficient is case.expected_sufficient

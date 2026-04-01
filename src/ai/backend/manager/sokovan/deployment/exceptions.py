@@ -96,10 +96,10 @@ class DeploymentAlreadyInProgress(DeploymentError):
 
 
 class InsufficientSurgeResources(DeploymentError):
-    """Raised when rolling update max_surge requires more resources than available."""
+    """Raised when a deployment surge requires more resources than currently available."""
 
     error_type = "https://api.backend.ai/probs/insufficient-surge-resources"
-    error_title = "Insufficient resources for rolling update surge."
+    error_title = "Insufficient resources for deployment surge."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(

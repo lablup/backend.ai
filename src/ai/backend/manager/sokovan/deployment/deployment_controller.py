@@ -18,6 +18,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentPolicyData,
+    ModelRevisionData,
     RouteInfo,
     RouteSearchResult,
     RouteTrafficStatus,
@@ -273,7 +274,7 @@ class DeploymentController:
     async def check_deployment_surge_resources(
         self,
         deployment_info: DeploymentInfo,
-        revision_id: uuid.UUID,
+        revision_data: ModelRevisionData,
     ) -> SurgeResourceCheckResult:
         """Check whether the scaling group has enough free resources for the deployment surge.
 
@@ -285,12 +286,12 @@ class DeploymentController:
           old and new routes coexist until traffic is switched.
 
         This is called once at the start of ``activate_revision`` as a pre-flight check.
-        The underlying query computes actual resource usage from kernel allocations,
-        which is relatively expensive.
+        It uses ``ScalingGroupRepository.get_resource_info()`` to aggregate current
+        free capacity for the scaling group from the ``agent_resources`` data.
 
         Args:
             deployment_info: Current deployment information
-            revision_id: ID of the revision being activated
+            revision_data: Revision data (already fetched by the caller)
 
         Returns:
             SurgeResourceCheckResult with ``sufficient=True`` when resources are adequate,
@@ -305,7 +306,6 @@ class DeploymentController:
         if surge_count == 0:
             return SurgeResourceCheckResult(sufficient=True)
 
-        revision_data = await self._deployment_repository.get_revision(revision_id)
         per_route_slots = revision_data.resource_config.resource_slot
         cluster_size = revision_data.cluster_config.size
         total_surge = surge_count * cluster_size

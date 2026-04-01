@@ -821,7 +821,7 @@ class DeploymentService:
             ActivateRevisionActionResult: Result containing the updated deployment
         """
         # 1. Validate revision exists (raises exception if not found)
-        _revision = await self._deployment_repository.get_revision(action.revision_id)
+        revision = await self._deployment_repository.get_revision(action.revision_id)
 
         # 2. Validate deployment state
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
@@ -838,7 +838,7 @@ class DeploymentService:
 
         # 3. Validate deployment surge resource availability
         surge_check = await self._deployment_controller.check_deployment_surge_resources(
-            deployment_info, action.revision_id
+            deployment_info, revision
         )
         if not surge_check.sufficient:
             if surge_check.shortfall is None:
