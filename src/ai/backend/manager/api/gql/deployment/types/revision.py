@@ -847,7 +847,7 @@ class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Options for the add_model_revision mutation.",
-        added_version="26.4.0",
+        added_version=NEXT_RELEASE_VERSION,
     ),
     name="AddRevisionOptions",
 )
