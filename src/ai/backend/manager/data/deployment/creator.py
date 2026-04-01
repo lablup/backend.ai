@@ -137,5 +137,5 @@ class NewDeploymentCreator:
     metadata: DeploymentMetadata
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
-    model_revision: ModelRevisionCreator
+    model_revision: ModelRevisionCreator | None = None
     policy: DeploymentPolicyConfig | None = None

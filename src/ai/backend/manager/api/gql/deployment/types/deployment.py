@@ -558,7 +558,7 @@ class CreateDeploymentInput(PydanticInputMixin[CreateDeploymentInputDTO]):
     network_access: ModelDeploymentNetworkAccessInput
     default_deployment_strategy: DeploymentStrategyInputGQL
     desired_replica_count: int
-    initial_revision: CreateRevisionInput
+    initial_revision: CreateRevisionInput | None = None
 
 
 @gql_pydantic_input(

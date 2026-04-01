@@ -364,7 +364,10 @@ class CreateDeploymentInput(BaseRequestModel):
         description="Deployment strategy configuration"
     )
     desired_replica_count: int = Field(ge=0, description="Desired number of replicas")
-    initial_revision: CreateRevisionInputDTO = Field(description="Initial revision configuration")
+    initial_revision: CreateRevisionInputDTO | None = Field(
+        default=None,
+        description="Initial revision configuration. If omitted, deployment is created without a revision and must be added later via add_revision.",
+    )
 
 
 class UpdateDeploymentInput(BaseRequestModel):

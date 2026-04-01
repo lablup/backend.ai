@@ -327,7 +327,33 @@ class DeploymentService:
         # Build CreatorSpec from action data
         metadata = action.creator.metadata
         revision = action.creator.model_revision
-        mounts = revision.mounts
+
+        # Build revision fields for EndpointRow only if initial_revision is provided
+        revision_fields: ModelRevisionFields | None = None
+        if revision is not None:
+            mounts = revision.mounts
+            revision_fields = ModelRevisionFields(
+                image_id=revision.image_id,
+                resource=DeploymentResourceFields(
+                    cluster_mode=revision.resource_spec.cluster_mode,
+                    cluster_size=revision.resource_spec.cluster_size,
+                    resource_slots=ResourceSlot(revision.resource_spec.resource_slots),
+                    resource_opts=revision.resource_spec.resource_opts,
+                ),
+                mounts=DeploymentMountFields(
+                    model_vfolder_id=mounts.model_vfolder_id,
+                    model_mount_destination=mounts.model_mount_destination,
+                    model_definition_path=mounts.model_definition_path,
+                    extra_mounts=(),
+                ),
+                execution=DeploymentExecutionFields(
+                    runtime_variant=revision.execution.runtime_variant,
+                    startup_command=revision.execution.startup_command,
+                    bootstrap_script=revision.execution.bootstrap_script,
+                    environ=revision.execution.environ,
+                    callback_url=revision.execution.callback_url,
+                ),
+            )
 
         creator_spec = DeploymentCreatorSpec(
             metadata=DeploymentMetadataFields(
@@ -348,28 +374,7 @@ class DeploymentService:
                 open_to_public=action.creator.network.open_to_public,
                 url=action.creator.network.url,
             ),
-            revision=ModelRevisionFields(
-                image_id=revision.image_id,
-                resource=DeploymentResourceFields(
-                    cluster_mode=revision.resource_spec.cluster_mode,
-                    cluster_size=revision.resource_spec.cluster_size,
-                    resource_slots=ResourceSlot(revision.resource_spec.resource_slots),
-                    resource_opts=revision.resource_spec.resource_opts,
-                ),
-                mounts=DeploymentMountFields(
-                    model_vfolder_id=mounts.model_vfolder_id,
-                    model_mount_destination=mounts.model_mount_destination,
-                    model_definition_path=mounts.model_definition_path,
-                    extra_mounts=(),  # TODO: Convert MountInfo to VFolderMount
-                ),
-                execution=DeploymentExecutionFields(
-                    runtime_variant=revision.execution.runtime_variant,
-                    startup_command=revision.execution.startup_command,
-                    bootstrap_script=revision.execution.bootstrap_script,
-                    environ=revision.execution.environ,
-                    callback_url=revision.execution.callback_url,
-                ),
-            ),
+            revision=revision_fields,
         )
         creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
             spec=creator_spec,
@@ -385,18 +390,16 @@ class DeploymentService:
             creator, action.creator.policy
         )
 
-        # Create initial revision via the same path as add_model_revision
+        # Create initial revision if provided, via the same path as add_model_revision
         # to ensure preset/merge/resolve logic is applied consistently.
-        # Force auto_activate for initial revision so deployment starts provisioning.
-        initial_revision_creator = dataclasses.replace(
-            action.creator.model_revision, auto_activate=True
-        )
-        await self.add_model_revision(
-            AddModelRevisionAction(
-                model_deployment_id=deployment_info.id,
-                adder=initial_revision_creator,
+        if revision is not None:
+            initial_revision_creator = dataclasses.replace(revision, auto_activate=True)
+            await self.add_model_revision(
+                AddModelRevisionAction(
+                    model_deployment_id=deployment_info.id,
+                    adder=initial_revision_creator,
+                )
             )
-        )
 
         # Re-fetch deployment info to include the created revision
         updated_deployment_info = await self._deployment_repository.get_endpoint_info(
