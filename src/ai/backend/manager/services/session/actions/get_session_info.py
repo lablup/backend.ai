@@ -1,34 +1,48 @@
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 from typing import override
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.base import (
+    SessionSingleEntityAction,
+    SessionSingleEntityActionResult,
+)
 from ai.backend.manager.services.session.types import LegacySessionInfo
 
 
 @dataclass
-class GetSessionInfoAction(SessionAction):
+class GetSessionInfoAction(SessionSingleEntityAction):
     session_name: str
     owner_access_key: AccessKey
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    session_id: uuid.UUID | None = field(default=None)
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @override
+    def target_entity_id(self) -> str:
+        if self.session_id is None:
+            raise ValueError("session_id is required for RBAC validation but was not set")
+        return str(self.session_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        if self.session_id is None:
+            raise ValueError("session_id is required for RBAC validation but was not set")
+        return RBACElementRef(RBACElementType.SESSION, str(self.session_id))
+
 
 @dataclass
-class GetSessionInfoActionResult(BaseActionResult):
+class GetSessionInfoActionResult(SessionSingleEntityActionResult):
     session_info: LegacySessionInfo
     session_data: SessionData
 
     @override
-    def entity_id(self) -> str | None:
+    def target_entity_id(self) -> str:
         return str(self.session_data.id)
