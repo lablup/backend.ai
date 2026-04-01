@@ -29,28 +29,40 @@ class PresetValueInfo(BaseResponseModel):
     value: str = Field(description="Value for this preset.")
 
 
-class DeploymentRevisionPresetNode(BaseResponseModel):
-    id: UUID = Field(description="Preset ID.")
-    runtime_variant_id: UUID = Field(description="Runtime variant ID.")
-    name: str = Field(description="Preset name.")
-    description: str | None = Field(default=None, description="Description.")
-    rank: int = Field(description="Display order rank.")
-    image: str | None = Field(default=None, description="Container image reference.")
-    model_definition: dict[str, Any] | None = Field(
-        default=None, description="Model definition configuration."
-    )
+class PresetResourceAllocation(BaseResponseModel):
     resource_slots: list[ResourceSlotEntryInfo] = Field(
         default_factory=list, description="Resource slot allocations."
     )
     resource_opts: list[ResourceOptsEntryInfo] = Field(
         default_factory=list, description="Additional resource options."
     )
-    cluster_mode: str = Field(description="Cluster mode.")
-    cluster_size: int = Field(description="Cluster size.")
+
+
+class PresetExecutionSpec(BaseResponseModel):
+    image: str | None = Field(default=None, description="Container image reference.")
     startup_command: str | None = Field(default=None, description="Startup command.")
     bootstrap_script: str | None = Field(default=None, description="Bootstrap script.")
     environ: list[EnvironEntryInfo] = Field(
         default_factory=list, description="Environment variables."
+    )
+
+
+class PresetClusterSpec(BaseResponseModel):
+    cluster_mode: str = Field(description="Cluster mode.")
+    cluster_size: int = Field(description="Cluster size.")
+
+
+class DeploymentRevisionPresetNode(BaseResponseModel):
+    id: UUID = Field(description="Preset ID.")
+    runtime_variant_id: UUID = Field(description="Runtime variant ID.")
+    name: str = Field(description="Preset name.")
+    description: str | None = Field(default=None, description="Description.")
+    rank: int = Field(description="Display order rank.")
+    cluster: PresetClusterSpec = Field(description="Cluster configuration.")
+    resource: PresetResourceAllocation = Field(description="Resource allocation.")
+    execution: PresetExecutionSpec = Field(description="Execution configuration.")
+    model_definition: dict[str, Any] | None = Field(
+        default=None, description="Model definition configuration."
     )
     preset_values: list[PresetValueInfo] = Field(default_factory=list, description="Preset values.")
     created_at: datetime = Field(description="Creation timestamp.")

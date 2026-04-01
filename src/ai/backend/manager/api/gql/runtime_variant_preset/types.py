@@ -25,6 +25,9 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     DeleteRuntimeVariantPresetPayload as DeletePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
+    PresetTargetSpec as PresetTargetSpecDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     RuntimeVariantPresetNode as NodeDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
@@ -58,6 +61,21 @@ class RuntimeVariantPresetOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Preset target specification defining how the value is applied.",
+    ),
+    model=PresetTargetSpecDTO,
+    name="PresetTargetSpec",
+)
+class PresetTargetSpecGQL(PydanticOutputMixin[PresetTargetSpecDTO]):
+    preset_target: str = gql_field(description="Target: env or args.")
+    value_type: str = gql_field(description="Value type: str, int, float, bool.")
+    default_value: str | None = gql_field(description="Default value.")
+    key: str = gql_field(description="Env key or args flag.")
+
+
 @gql_node_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
@@ -72,10 +90,6 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     name: str = gql_field(description="Preset name.")
     description: str | None = gql_field(description="Description.")
     rank: int = gql_field(description="Display order rank.")
-    preset_target: str = gql_field(description="Target: env or args.")
-    value_type: str = gql_field(description="Value type.")
-    default_value: str | None = gql_field(description="Default value.")
-    key: str = gql_field(description="Env key or args flag.")
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime | None = gql_field(description="Last update timestamp.")
 

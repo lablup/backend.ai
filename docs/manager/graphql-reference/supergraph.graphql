@@ -4262,21 +4262,6 @@ type DeploymentRevisionPreset implements Node
   """Display order rank."""
   rank: Int!
 
-  """Container image reference."""
-  image: String
-
-  """Cluster mode."""
-  clusterMode: String!
-
-  """Cluster size."""
-  clusterSize: Int!
-
-  """Startup command."""
-  startupCommand: String
-
-  """Bootstrap script."""
-  bootstrapScript: String
-
   """Creation timestamp."""
   createdAt: DateTime!
 
@@ -7547,36 +7532,6 @@ type ModelCardV2 implements Node
 
   """Creator user ID."""
   creatorId: UUID!
-
-  """Author."""
-  author: String
-
-  """Title."""
-  title: String
-
-  """Model version."""
-  modelVersion: String
-
-  """Description."""
-  description: String
-
-  """Task type."""
-  task: String
-
-  """Category."""
-  category: String
-
-  """Architecture."""
-  architecture: String
-
-  """Frameworks."""
-  framework: [String!]!
-
-  """Labels."""
-  label: [String!]!
-
-  """License."""
-  license: String
 
   """README content."""
   readme: String
@@ -13885,18 +13840,6 @@ type RuntimeVariantPreset implements Node
 
   """Display order rank."""
   rank: Int!
-
-  """Target: env or args."""
-  presetTarget: String!
-
-  """Value type."""
-  valueType: String!
-
-  """Default value."""
-  defaultValue: String
-
-  """Env key or args flag."""
-  key: String!
 
   """Creation timestamp."""
   createdAt: DateTime!

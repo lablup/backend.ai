@@ -106,11 +106,6 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
     name: str = gql_field(description="Preset name.")
     description: str | None = gql_field(description="Description.")
     rank: int = gql_field(description="Display order rank.")
-    image: str | None = gql_field(description="Container image reference.")
-    cluster_mode: str = gql_field(description="Cluster mode.")
-    cluster_size: int = gql_field(description="Cluster size.")
-    startup_command: str | None = gql_field(description="Startup command.")
-    bootstrap_script: str | None = gql_field(description="Bootstrap script.")
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime | None = gql_field(description="Last update timestamp.")
 

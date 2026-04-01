@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     CreateRuntimeVariantPresetPayload,
     DeleteRuntimeVariantPresetPayload,
+    PresetTargetSpec,
     RuntimeVariantPresetNode,
     SearchRuntimeVariantPresetsPayload,
     UpdateRuntimeVariantPresetPayload,
@@ -225,10 +226,12 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             name=data.name,
             description=data.description,
             rank=data.rank,
-            preset_target=data.preset_target,
-            value_type=data.value_type,
-            default_value=data.default_value,
-            key=data.key,
+            target_spec=PresetTargetSpec(
+                preset_target=data.preset_target,
+                value_type=data.value_type,
+                default_value=data.default_value,
+                key=data.key,
+            ),
             created_at=data.created_at,
             updated_at=data.updated_at,
         )
