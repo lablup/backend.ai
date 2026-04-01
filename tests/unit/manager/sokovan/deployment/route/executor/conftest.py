@@ -150,7 +150,6 @@ def _create_route_data(
     endpoint_id: UUID | None = None,
     session_id: SessionId | None = None,
     status: RouteStatus = RouteStatus.PROVISIONING,
-    revision_id: UUID | None = None,
 ) -> RouteData:
     """Create RouteData for tests."""
     return RouteData(
@@ -160,7 +159,7 @@ def _create_route_data(
         status=status,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
-        revision_id=revision_id,
+        revision_id=uuid4(),
     )
 
 

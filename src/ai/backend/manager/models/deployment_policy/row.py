@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -8,9 +9,10 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
@@ -34,25 +36,51 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RollingUpdateSpec(BaseModel):
-    """Specification for rolling update deployment strategy."""
+    """Specification for rolling update deployment strategy.
 
-    max_surge: int = Field(default=1, ge=0)
-    max_unavailable: int = Field(default=0, ge=0)
+    ``max_surge`` and ``max_unavailable`` are :class:`IntOrPercent` objects.
+    Percentage values are resolved to absolute counts at execution time via
+    :meth:`resolve_max_surge` / :meth:`resolve_max_unavailable`.
+    """
+
+    max_surge: IntOrPercent = Field(default_factory=lambda: IntOrPercent(percent=0.5))
+    max_unavailable: IntOrPercent = Field(default_factory=lambda: IntOrPercent(percent=0.0))
 
     @model_validator(mode="after")
     def _validate_progress_is_possible(self) -> RollingUpdateSpec:
         """Ensure at least one of max_surge or max_unavailable is positive.
 
-        If both are zero, the rolling update FSM cannot make progress:
+        If both are zero the rolling update FSM cannot make progress:
         it cannot create new routes (would exceed max_total) nor terminate
         old routes (would fall below min_available), causing a deadlock.
         """
-        if self.max_surge == 0 and self.max_unavailable == 0:
+        if self.max_surge.is_zero and self.max_unavailable.is_zero:
             raise ValueError(
                 "At least one of max_surge or max_unavailable must be positive; "
                 "otherwise the rolling update cannot make progress."
             )
         return self
+
+    def resolve_max_surge(self, desired_replicas: int) -> int:
+        """Resolve max_surge to an absolute count (rounds up for percentages)."""
+        return self._resolve(self.max_surge, desired_replicas, round_up=True)
+
+    def resolve_max_unavailable(self, desired_replicas: int) -> int:
+        """Resolve max_unavailable to an absolute count (rounds down for percentages)."""
+        return self._resolve(self.max_unavailable, desired_replicas, round_up=False)
+
+    @staticmethod
+    def _resolve(value: IntOrPercent, total: int, *, round_up: bool) -> int:
+        """Convert an IntOrPercent to an absolute replica count.
+
+        For count, returns the value as-is.
+        For percent, multiplies by total and rounds up (ceil) or down (floor)
+        following Kubernetes rolling-update semantics.
+        """
+        if value.count is not None:
+            return value.count
+        result = total * (value.percent or 0.0)
+        return math.ceil(result) if round_up else math.floor(result)
 
 
 class BlueGreenSpec(BaseModel):
@@ -63,12 +91,6 @@ class BlueGreenSpec(BaseModel):
 
 
 DeploymentStrategySpec = RollingUpdateSpec | BlueGreenSpec
-
-
-def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.endpoint import EndpointRow
-
-    return foreign(DeploymentPolicyRow.endpoint) == EndpointRow.id
 
 
 class DeploymentPolicyRow(Base):  # type: ignore[misc]
@@ -90,7 +112,12 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    endpoint: Mapped[uuid.UUID] = mapped_column("endpoint", GUID, nullable=False)
+    endpoint: Mapped[uuid.UUID] = mapped_column(
+        "endpoint",
+        GUID,
+        sa.ForeignKey("endpoints.id", name="fk_deployment_policies_endpoint", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     # Deployment strategy
     strategy: Mapped[DeploymentStrategy] = mapped_column(
@@ -122,11 +149,10 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
-    # Relationships (without FK constraints)
     endpoint_row: Mapped[EndpointRow | None] = relationship(
         "EndpointRow",
         back_populates="deployment_policy",
-        primaryjoin=_get_endpoint_join_condition,
+        foreign_keys=[endpoint],
         uselist=False,
     )
 

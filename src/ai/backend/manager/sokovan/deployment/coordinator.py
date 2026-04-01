@@ -85,8 +85,8 @@ type HandlerKey = tuple[DeploymentLifecycleType, DeploymentLifecycleSubStep | No
 
 # Timeout thresholds for deployment lifecycle statuses (seconds).
 _DEPLOYMENT_STATUS_TIMEOUT_MAP: dict[EndpointLifecycle, float] = {
-    EndpointLifecycle.DEPLOYING: 1800.0,  # 30 minutes
-    EndpointLifecycle.SCALING: 1800.0,  # 30 minutes
+    EndpointLifecycle.DEPLOYING: 3600.0,  # 1 hour
+    EndpointLifecycle.SCALING: 3600.0,  # 1 hour
 }
 
 

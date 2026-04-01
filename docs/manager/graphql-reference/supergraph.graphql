@@ -112,6 +112,9 @@ type ActivateRevisionPayload
 
   """ID of the newly activated revision"""
   activatedRevisionId: ID!
+
+  """The deployment policy applied during activation"""
+  deploymentPolicy: DeploymentPolicy!
 }
 
 """
@@ -2785,6 +2788,25 @@ type CreateDeploymentPayload
   deployment: ModelDeployment!
 }
 
+"""Added in UNRELEASED. Create deployment revision preset input."""
+input CreateDeploymentRevisionPresetInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Runtime variant ID."""
+  runtimeVariantId: UUID!
+
+  """Preset name."""
+  name: String!
+}
+
+"""Added in UNRELEASED. Create deployment revision preset payload."""
+type CreateDeploymentRevisionPresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The created preset."""
+  preset: DeploymentRevisionPreset!
+}
+
 type CreateDomain
   @join__type(graph: GRAPHENE)
 {
@@ -2955,6 +2977,31 @@ type CreateKeypairResourcePolicyPayloadGQL
 {
   """Created keypair resource policy."""
   keypairResourcePolicy: KeypairResourcePolicyV2!
+}
+
+"""Added in UNRELEASED. Create model card payload."""
+type CreateModelCardPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The created model card."""
+  modelCard: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Create model card input."""
+input CreateModelCardV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """Model card name."""
+  name: String!
+
+  """VFolder ID."""
+  vfolderId: UUID!
+
+  """Project ID."""
+  projectId: UUID!
+
+  """Domain name."""
+  domainName: String!
 }
 
 """Added in 24.12.0."""
@@ -3254,6 +3301,59 @@ input CreateRoleInput
   name: String!
   description: String = null
   source: RoleSource! = CUSTOM
+}
+
+"""Added in UNRELEASED. Input for creating a runtime variant."""
+input CreateRuntimeVariantInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Unique name."""
+  name: String!
+
+  """Description."""
+  description: String = null
+}
+
+"""Added in UNRELEASED. Payload for runtime variant creation."""
+type CreateRuntimeVariantPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The created runtime variant."""
+  runtimeVariant: RuntimeVariant!
+}
+
+"""Added in UNRELEASED. Create preset input."""
+input CreateRuntimeVariantPresetInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Runtime variant ID."""
+  runtimeVariantId: UUID!
+
+  """Preset name."""
+  name: String!
+
+  """Description."""
+  description: String = null
+
+  """env or args."""
+  presetTarget: String!
+
+  """str, int, float, bool."""
+  valueType: String!
+
+  """Default value."""
+  defaultValue: String = null
+
+  """Env key or args flag."""
+  key: String!
+}
+
+"""Added in UNRELEASED. Create preset payload."""
+type CreateRuntimeVariantPresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The created preset."""
+  preset: RuntimeVariantPreset!
 }
 
 type CreateScalingGroup
@@ -3654,6 +3754,14 @@ type DeleteDeploymentPayload
   id: ID!
 }
 
+"""Added in UNRELEASED. Delete deployment revision preset payload."""
+type DeleteDeploymentRevisionPresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted preset."""
+  id: UUID!
+}
+
 """Instead of deleting the domain, just mark it as inactive."""
 type DeleteDomain
   @join__type(graph: GRAPHENE)
@@ -3738,6 +3846,14 @@ type DeleteKeypairResourcePolicyPayloadGQL
 {
   """Name of the deleted keypair resource policy."""
   name: String!
+}
+
+"""Added in UNRELEASED. Delete model card payload."""
+type DeleteModelCardPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted model card."""
+  id: UUID!
 }
 
 """Added in 24.12.0."""
@@ -3889,6 +4005,22 @@ type DeleteRolePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted role"""
+  id: UUID!
+}
+
+"""Added in UNRELEASED. Payload for runtime variant deletion."""
+type DeleteRuntimeVariantPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted runtime variant."""
+  id: UUID!
+}
+
+"""Added in UNRELEASED. Delete preset payload."""
+type DeleteRuntimeVariantPresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted preset."""
   id: UUID!
 }
 
@@ -4105,6 +4237,107 @@ type DeploymentPolicy implements Node
   strategySpec: DeploymentStrategySpec!
   createdAt: DateTime!
   updatedAt: DateTime!
+}
+
+"""Added in UNRELEASED. A deployment revision preset entity."""
+type DeploymentRevisionPreset implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Preset ID."""
+  rowId: UUID!
+
+  """Runtime variant ID."""
+  runtimeVariantId: UUID!
+
+  """Preset name."""
+  name: String!
+
+  """Description."""
+  description: String
+
+  """Display order rank."""
+  rank: Int!
+
+  """Container image reference."""
+  image: String
+
+  """Cluster mode."""
+  clusterMode: String!
+
+  """Cluster size."""
+  clusterSize: Int!
+
+  """Startup command."""
+  startupCommand: String
+
+  """Bootstrap script."""
+  bootstrapScript: String
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of deployment revision presets."""
+type DeploymentRevisionPresetConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [DeploymentRevisionPresetEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type DeploymentRevisionPresetEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: DeploymentRevisionPreset!
+}
+
+"""Added in UNRELEASED. Filter for deployment revision presets."""
+input DeploymentRevisionPresetFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Name filter."""
+  name: StringFilter = null
+
+  """Variant ID filter."""
+  runtimeVariantId: UUID = null
+}
+
+"""
+Added in UNRELEASED. Order specification for deployment revision presets.
+"""
+input DeploymentRevisionPresetOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: DeploymentRevisionPresetOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for deployment revision presets."""
+enum DeploymentRevisionPresetOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  RANK @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 24.09.0. Scope for deployment scheduling history query"""
@@ -6126,6 +6359,17 @@ input IntFilter
 }
 
 """
+Added in UNRELEASED. Input for a rolling-update budget value (oneOf).
+Provide exactly one of 'count' (absolute replica count) or 'percent' (0.0-1.0 fraction).
+"""
+input IntOrPercentInput
+  @join__type(graph: STRAWBERRY)
+{
+  count: Int
+  percent: Float
+}
+
+"""
 Added in 26.2.0. Payload returned after issuing a new keypair. The secret_key is only shown once.
 """
 type IssueMyKeypairPayload
@@ -7278,6 +7522,147 @@ type ModelCardEdge
   cursor: String!
 }
 
+"""Added in UNRELEASED. A model card entity."""
+type ModelCardV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Model card ID."""
+  rowId: UUID!
+
+  """Model card name."""
+  name: String!
+
+  """VFolder ID."""
+  vfolderId: UUID!
+
+  """Domain name."""
+  domainName: String!
+
+  """Project ID."""
+  projectId: UUID!
+
+  """Creator user ID."""
+  creatorId: UUID!
+
+  """Author."""
+  author: String
+
+  """Title."""
+  title: String
+
+  """Model version."""
+  modelVersion: String
+
+  """Description."""
+  description: String
+
+  """Task type."""
+  task: String
+
+  """Category."""
+  category: String
+
+  """Architecture."""
+  architecture: String
+
+  """Frameworks."""
+  framework: [String!]!
+
+  """Labels."""
+  label: [String!]!
+
+  """License."""
+  license: String
+
+  """README content."""
+  readme: String
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of model cards."""
+type ModelCardV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelCardV2Edge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelCardV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Filter for model cards."""
+input ModelCardV2Filter
+  @join__type(graph: STRAWBERRY)
+{
+  """Name filter."""
+  name: StringFilter = null
+
+  """Domain filter."""
+  domainName: String = null
+
+  """Project filter."""
+  projectId: UUID = null
+}
+
+"""Added in UNRELEASED. Order specification."""
+input ModelCardV2OrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: ModelCardV2OrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for model cards."""
+enum ModelCardV2OrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. Configuration for a single model in the model definition.
+"""
+type ModelConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the model."""
+  name: String!
+
+  """Path to the model file."""
+  modelPath: String!
+
+  """Configuration for the model service."""
+  service: ModelServiceConfig
+
+  """Metadata about the model."""
+  metadata: ModelMetadata
+}
+
 """
 Added in 26.4.0. Configuration for a single model within a model definition.
 """
@@ -7295,6 +7680,16 @@ input ModelConfigInput
 
   """Metadata about the model."""
   metadata: ModelMetadataInput = null
+}
+
+"""
+Added in UNRELEASED. Model definition containing one or more model entries.
+"""
+type ModelDefinition
+  @join__type(graph: STRAWBERRY)
+{
+  """List of models in the model definition."""
+  models: [ModelConfig!]!
 }
 
 """
@@ -7414,6 +7809,29 @@ input ModelDeploymentNetworkAccessInput
   openToPublic: Boolean! = false
 }
 
+"""Added in UNRELEASED. Health check configuration for a model service."""
+type ModelHealthCheck
+  @join__type(graph: STRAWBERRY)
+{
+  """Interval in seconds between health checks."""
+  interval: Float!
+
+  """Path to check for health status."""
+  path: String!
+
+  """Maximum number of retries for health check."""
+  maxRetries: Int!
+
+  """Maximum time in seconds to wait for a health check response."""
+  maxWaitTime: Float!
+
+  """Expected HTTP status code for a healthy response."""
+  expectedStatusCode: Int!
+
+  """Initial delay in seconds before the first health check."""
+  initialDelay: Float!
+}
+
 """Added in 26.4.0. Health check configuration for a model service."""
 input ModelHealthCheckInput
   @join__type(graph: STRAWBERRY)
@@ -7435,6 +7853,50 @@ input ModelHealthCheckInput
 
   """Initial delay in seconds before the first health check."""
   initialDelay: Float! = 60
+}
+
+"""Added in UNRELEASED. Metadata describing a model entry."""
+type ModelMetadata
+  @join__type(graph: STRAWBERRY)
+{
+  """Author of the model."""
+  author: String
+
+  """Title of the model."""
+  title: String
+
+  """Version identifier of the model."""
+  version: JSON
+
+  """Creation date of the model."""
+  created: String
+
+  """Last modification date of the model."""
+  lastModified: String
+
+  """Description of the model."""
+  description: String
+
+  """Task type of the model."""
+  task: String
+
+  """Category of the model."""
+  category: String
+
+  """Architecture metadata for the model."""
+  architecture: String
+
+  """Frameworks used by the model."""
+  framework: [String!]
+
+  """Labels attached to the model."""
+  label: [String!]
+
+  """License of the model."""
+  license: String
+
+  """Minimum resource requirements for the model."""
+  minResource: JSON
 }
 
 """
@@ -7592,6 +8054,11 @@ type ModelRevision implements Node
   """Model data mount configuration."""
   modelMountConfig: ModelMountConfig
 
+  """
+  Added in UNRELEASED. Resolved model definition stored for this revision.
+  """
+  modelDefinition: ModelDefinition
+
   """Additional volume folder mounts."""
   extraMounts: [ExtraVFolderMountInfoGQL!]!
 
@@ -7672,6 +8139,28 @@ input ModelRuntimeConfigInput
 
   """Environment variables for the service."""
   environ: EnvironmentVariablesInput = null
+}
+
+"""Added in UNRELEASED. Service configuration for a model entry."""
+type ModelServiceConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of pre-start actions to execute before starting the model service.
+  """
+  preStartActions: [PreStartAction!]!
+
+  """Command to start the model service."""
+  startCommand: JSON!
+
+  """Shell to use if start_command is a string."""
+  shell: String!
+
+  """Port number for the model service."""
+  port: Int!
+
+  """Health check configuration for the model service."""
+  healthCheck: ModelHealthCheck
 }
 
 """
@@ -8660,7 +9149,7 @@ type Mutation
   addModelRevision(input: AddRevisionInput!): AddRevisionPayload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.4.0. Create or update the deployment policy for a given deployment (upsert semantics). If the deployment already has a policy, it is replaced entirely with the new configuration
+  Added in UNRELEASED. Create or update the deployment policy for a given deployment (upsert semantics). If the deployment already has a policy, it is replaced entirely with the new configuration
   """
   updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
 
@@ -8952,6 +9441,11 @@ type Mutation
   adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayloadGQL! @join__field(graph: STRAWBERRY)
 
   """
+  Added in UNRELEASED. Unassign users from a project. RBAC validates project admin permission.
+  """
+  unassignUsersFromProjectV2(projectId: UUID!, input: UnassignUsersFromProjectInput!): UnassignUsersFromProjectPayload! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user
   """
   adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload! @join__field(graph: STRAWBERRY)
@@ -9129,6 +9623,48 @@ type Mutation
 
   """Added in UNRELEASED. Delete a resource preset (admin only)."""
   adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Create a new runtime variant (superadmin only)."""
+  adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Update a runtime variant (superadmin only)."""
+  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a runtime variant (superadmin only)."""
+  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Create a runtime variant preset (superadmin only).
+  """
+  adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Update a runtime variant preset (superadmin only).
+  """
+  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Delete a runtime variant preset (superadmin only).
+  """
+  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Create a deployment revision preset."""
+  createDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Update a deployment revision preset."""
+  updateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a deployment revision preset."""
+  deleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Create a model card (admin only)."""
+  adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Update a model card (admin only)."""
+  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a model card (admin only)."""
+  adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload! @join__field(graph: STRAWBERRY)
@@ -9702,6 +10238,19 @@ type PresetAvailabilityV2
 
   """Whether this preset can be used for session creation."""
   available: Boolean!
+}
+
+"""
+Added in UNRELEASED. A pre-start action to execute before starting the model service.
+"""
+type PreStartAction
+  @join__type(graph: STRAWBERRY)
+{
+  """The name of the pre-start action to execute."""
+  action: String!
+
+  """Arguments for the pre-start action."""
+  args: JSON!
 }
 
 """
@@ -11215,6 +11764,11 @@ type Query
   adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection! @join__field(graph: STRAWBERRY)
 
   """
+  Added in UNRELEASED. List sessions within a specific project. Requires project membership or higher privileges.
+  """
+  projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
   """
   resourceSlotType(slotName: String!): ResourceSlotType @join__field(graph: STRAWBERRY)
@@ -11540,6 +12094,30 @@ type Query
   """Added in UNRELEASED. Get a single resource preset by ID (admin only)."""
   adminResourcePresetV2(id: UUID!): ResourcePresetV2 @join__field(graph: STRAWBERRY)
 
+  """Added in UNRELEASED. Search runtime variants."""
+  runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get a single runtime variant by ID."""
+  runtimeVariant(id: UUID!): RuntimeVariant @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Search runtime variant presets."""
+  runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get a single runtime variant preset by ID."""
+  runtimeVariantPreset(id: UUID!): RuntimeVariantPreset @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Search deployment revision presets."""
+  deploymentRevisionPresets(filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get a single deployment revision preset by ID."""
+  deploymentRevisionPreset(id: UUID!): DeploymentRevisionPreset @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Search model cards."""
+  modelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get a single model card by ID."""
+  modelCardV2(id: UUID!): ModelCardV2 @join__field(graph: STRAWBERRY)
+
   """
   Added in UNRELEASED. Get my keypair resource allocation (current user).
   """
@@ -11568,6 +12146,14 @@ type Query
   Added in UNRELEASED. Check which resource presets are available for session creation.
   """
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. List virtual folders within a specific project."""
+  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Search virtual folders accessible to the current user with pagination and filtering.
+  """
+  myVfolders(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
 }
 
 """
@@ -12954,12 +13540,14 @@ input RoleStatusFilter
   notIn: [RoleStatus!] = null
 }
 
-"""Added in 25.19.0. Configuration for rolling update strategy."""
+"""
+Added in 25.19.0. Configuration for rolling update strategy. Defaults: max_surge=50%, max_unavailable=0%.
+"""
 input RollingUpdateConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  maxSurge: Int! = 1
-  maxUnavailable: Int! = 0
+  maxSurge: IntOrPercentInput
+  maxUnavailable: IntOrPercentInput
 }
 
 """Added in 25.19.0. Represents a route for a model deployment."""
@@ -13193,12 +13781,182 @@ type RoutingList implements PaginatedList
   total_count: Int!
 }
 
+"""Added in UNRELEASED. A runtime variant entity."""
+type RuntimeVariant implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Runtime variant ID."""
+  rowId: UUID!
+
+  """Unique name."""
+  name: String!
+
+  """Description."""
+  description: String
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of runtime variants."""
+type RuntimeVariantConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RuntimeVariantEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RuntimeVariantEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RuntimeVariant!
+}
+
+"""Added in UNRELEASED. Filter for runtime variants."""
+input RuntimeVariantFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Name filter."""
+  name: StringFilter = null
+}
+
 """Added in 24.03.5."""
 type RuntimeVariantInfo
   @join__type(graph: GRAPHENE)
 {
   name: String
   human_readable_name: String
+}
+
+"""Added in UNRELEASED. Order specification."""
+input RuntimeVariantOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: RuntimeVariantOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for runtime variants."""
+enum RuntimeVariantOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in UNRELEASED. A runtime variant preset entity."""
+type RuntimeVariantPreset implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Preset ID."""
+  rowId: UUID!
+
+  """Runtime variant ID."""
+  runtimeVariantId: UUID!
+
+  """Preset name."""
+  name: String!
+
+  """Description."""
+  description: String
+
+  """Display order rank."""
+  rank: Int!
+
+  """Target: env or args."""
+  presetTarget: String!
+
+  """Value type."""
+  valueType: String!
+
+  """Default value."""
+  defaultValue: String
+
+  """Env key or args flag."""
+  key: String!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of runtime variant presets."""
+type RuntimeVariantPresetConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RuntimeVariantPresetEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RuntimeVariantPresetEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RuntimeVariantPreset!
+}
+
+"""Added in UNRELEASED. Filter for presets."""
+input RuntimeVariantPresetFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Name filter."""
+  name: StringFilter = null
+
+  """Variant ID filter."""
+  runtimeVariantId: UUID = null
+}
+
+"""Added in UNRELEASED. Order specification."""
+input RuntimeVariantPresetOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: RuntimeVariantPresetOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for runtime variant presets."""
+enum RuntimeVariantPresetOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  RANK @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 type ScalingGroup
@@ -14326,6 +15084,38 @@ input TrafficStatusFilter
   equals: TrafficStatus = null
 }
 
+"""
+Added in UNRELEASED. Error information for a user that failed to be unassigned.
+"""
+type UnassignUserError
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the user that failed to be unassigned."""
+  userId: UUID!
+
+  """Error message describing the failure reason."""
+  message: String!
+}
+
+"""Added in UNRELEASED. Input for unassigning users from a project."""
+input UnassignUsersFromProjectInput
+  @join__type(graph: STRAWBERRY)
+{
+  """List of user UUIDs to unassign from the project."""
+  userIds: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for user unassignment from project."""
+type UnassignUsersFromProjectPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """List of users that were unassigned from the project."""
+  unassignedUsers: [UserV2!]!
+
+  """List of errors for users that could not be unassigned."""
+  failed: [UnassignUserError!]!
+}
+
 type UnloadImage
   @join__type(graph: GRAPHENE)
 {
@@ -14558,7 +15348,7 @@ type UpdateDeploymentPayload
 }
 
 """
-Added in 26.4.0. Input for creating or updating a deployment policy (upsert semantics).
+Added in UNRELEASED. Input for creating or updating a deployment policy (upsert semantics).
 Specify the target deployment_id and the desired strategy type.
 Exactly one of rolling_update or blue_green must be provided,
 matching the chosen strategy type.
@@ -14574,13 +15364,38 @@ input UpdateDeploymentPolicyInput
 }
 
 """
-Added in 26.4.0. Result payload returned after creating or updating a deployment policy. Contains the full deployment_policy object reflecting the applied configuration.
+Added in UNRELEASED. Result payload returned after creating or updating a deployment policy. Contains the full deployment_policy object reflecting the applied configuration.
 """
 type UpdateDeploymentPolicyPayload
   @join__type(graph: STRAWBERRY)
 {
   """The updated deployment policy"""
   deploymentPolicy: DeploymentPolicy!
+}
+
+"""Added in UNRELEASED. Update deployment revision preset input."""
+input UpdateDeploymentRevisionPresetInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Preset ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """New rank."""
+  rank: Int = null
+}
+
+"""Added in UNRELEASED. Update deployment revision preset payload."""
+type UpdateDeploymentRevisionPresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated preset."""
+  preset: DeploymentRevisionPreset!
 }
 
 """
@@ -14668,6 +15483,28 @@ type UpdateKeypairResourcePolicyPayloadGQL
 {
   """Updated keypair resource policy."""
   keypairResourcePolicy: KeypairResourcePolicyV2!
+}
+
+"""Added in UNRELEASED. Update model card payload."""
+type UpdateModelCardPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated model card."""
+  modelCard: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Update model card input."""
+input UpdateModelCardV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """Model card ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
 }
 
 """
@@ -15006,6 +15843,65 @@ type UpdateRouteTrafficStatusPayload
 {
   """The updated route"""
   route: Route!
+}
+
+"""Added in UNRELEASED. Input for updating a runtime variant."""
+input UpdateRuntimeVariantInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Runtime variant ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+}
+
+"""Added in UNRELEASED. Payload for runtime variant update."""
+type UpdateRuntimeVariantPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated runtime variant."""
+  runtimeVariant: RuntimeVariant!
+}
+
+"""Added in UNRELEASED. Update preset input."""
+input UpdateRuntimeVariantPresetInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Preset ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """New rank."""
+  rank: Int = null
+
+  """New target."""
+  presetTarget: String = null
+
+  """New value type."""
+  valueType: String = null
+
+  """New default value."""
+  defaultValue: String = null
+
+  """New key."""
+  key: String = null
+}
+
+"""Added in UNRELEASED. Update preset payload."""
+type UpdateRuntimeVariantPresetPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated preset."""
+  preset: RuntimeVariantPreset!
 }
 
 """
@@ -16325,6 +17221,94 @@ type ValidateNotificationRulePayload
 }
 
 """
+Added in UNRELEASED. Virtual folder entity with structured field groups. Provides comprehensive vfolder information organized into logical categories: metadata (descriptive), permission (access control), and usage (storage statistics). Owner and creator are resolved as Node references.
+"""
+type VFolder implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """
+  Current operation status. READY, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
+  """
+  status: VFolderOperationStatus!
+
+  """Storage host where the virtual folder is physically located."""
+  host: String!
+
+  """
+  Descriptive metadata including name, usage mode, quota scope, timestamps, and clone eligibility.
+  """
+  metadata: VFolderMetadataInfo!
+
+  """Access control including permission level and ownership type."""
+  accessControl: VFolderAccessControlInfo!
+
+  """
+  Ownership context including scalar IDs (userId, projectId, creatorEmail) and full node resolvers (user, project, creator).
+  """
+  ownership: VFolderOwnershipInfo!
+
+  """Path for unmanaged virtual folders."""
+  unmanagedPath: String
+}
+
+"""
+Added in UNRELEASED. Access control information for a virtual folder. Includes the mount permission level (read-only, read-write, read-write-delete) and ownership type (user or project).
+"""
+type VFolderAccessControlInfo
+  @join__type(graph: STRAWBERRY)
+{
+  permission: VFolderMountPermission!
+  ownershipType: VFolderOwnershipType!
+}
+
+"""
+Added in UNRELEASED. Paginated connection for virtual folder records. Provides relay-style cursor-based pagination for efficient traversal of vfolder data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
+"""
+type VFolderConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [VFolderEdge!]!
+
+  """Total number of virtual folder records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type VFolderEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: VFolder!
+}
+
+"""
+Added in UNRELEASED. Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input VFolderFilter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  host: StringFilter = null
+  status: VFolderOperationStatusFilter = null
+  usageMode: VFolderUsageModeFilter = null
+  createdAt: DateTimeFilter = null
+  AND: [VFolderFilter!] = null
+  OR: [VFolderFilter!] = null
+  NOT: [VFolderFilter!] = null
+}
+
+"""
 Added in 26.2.0. Storage host permission configuration. Defines what operations are allowed for a specific storage host.
 """
 type VFolderHostPermissionEntry
@@ -16365,10 +17349,136 @@ enum VFolderHostPermissionV2
 }
 
 """
+Added in UNRELEASED. Descriptive metadata for a virtual folder. Includes the folder name, usage mode, quota scope, timestamps, and clone eligibility.
+"""
+type VFolderMetadataInfo
+  @join__type(graph: STRAWBERRY)
+{
+  name: String!
+  usageMode: VFolderUsageMode!
+  quotaScopeId: String
+  createdAt: DateTime!
+  lastUsed: DateTime
+  cloneable: Boolean!
+}
+
+"""Added in UNRELEASED. Mount permission level for a virtual folder."""
+enum VFolderMountPermission
+  @join__type(graph: STRAWBERRY)
+{
+  READ_ONLY @join__enumValue(graph: STRAWBERRY)
+  READ_WRITE @join__enumValue(graph: STRAWBERRY)
+  RW_DELETE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in UNRELEASED. Operation status of a virtual folder."""
+enum VFolderOperationStatus
+  @join__type(graph: STRAWBERRY)
+{
+  READY @join__enumValue(graph: STRAWBERRY)
+  CLONING @join__enumValue(graph: STRAWBERRY)
+  DELETE_PENDING @join__enumValue(graph: STRAWBERRY)
+  DELETE_ONGOING @join__enumValue(graph: STRAWBERRY)
+  DELETE_COMPLETE @join__enumValue(graph: STRAWBERRY)
+  DELETE_ERROR @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. Filter for VFolder operation status enum fields. Supports in and not_in operations.
+"""
+input VFolderOperationStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """The in field."""
+  in: [VFolderOperationStatus!] = null
+
+  """Exclude statuses not in this list."""
+  notIn: [VFolderOperationStatus!] = null
+}
+
+"""
+Added in UNRELEASED. Specifies ordering for virtual folder query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
+"""
+input VFolderOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: VFolderOrderField! = CREATED_AT
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering virtual folder query results. NAME: Order by folder name alphabetically. CREATED_AT: Order by creation timestamp. STATUS: Order by operation status. USAGE_MODE: Order by usage mode. HOST: Order by storage host.
+"""
+enum VFolderOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
+  USAGE_MODE @join__enumValue(graph: STRAWBERRY)
+  HOST @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. Ownership context for a virtual folder. Provides both scalar IDs (userId, projectId, creatorEmail) for lightweight access and full node resolvers (user, project, creator) for detailed entity information.
+"""
+type VFolderOwnershipInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """The user who owns this virtual folder. Null for project-owned folders."""
+  user: UserV2
+
+  """
+  The project that owns this virtual folder. Null for user-owned folders.
+  """
+  project: ProjectV2
+
+  """The user who originally created this virtual folder."""
+  creator: UserV2
+  userId: UUID
+  projectId: UUID
+  creatorEmail: String
+}
+
+"""
+Added in UNRELEASED. Ownership type of a virtual folder (USER or GROUP).
+"""
+enum VFolderOwnershipType
+  @join__type(graph: STRAWBERRY)
+{
+  USER @join__enumValue(graph: STRAWBERRY)
+  GROUP @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
 Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
 """
 scalar VFolderPermissionValueField
   @join__type(graph: GRAPHENE)
+
+"""
+Added in UNRELEASED. Usage mode of a virtual folder (GENERAL, MODEL, DATA).
+"""
+enum VFolderUsageMode
+  @join__type(graph: STRAWBERRY)
+{
+  GENERAL @join__enumValue(graph: STRAWBERRY)
+  MODEL @join__enumValue(graph: STRAWBERRY)
+  DATA @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. Filter for VFolder usage mode enum fields. Supports in and not_in operations.
+"""
+input VFolderUsageModeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """The in field."""
+  in: [VFolderUsageMode!] = null
+
+  """Exclude usage modes not in this list."""
+  notIn: [VFolderUsageMode!] = null
+}
 
 """Added in 25.16.0. VFS Storage configuration."""
 type VFSStorage implements Node

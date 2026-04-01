@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from strawberry import ID
+from strawberry import ID, UNSET
 from strawberry.relay import NodeID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -28,6 +28,10 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentStrategySpecInfo,
     RollingUpdateStrategySpecInfo,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    IntOrPercent as IntOrPercentDTO,
+)
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -49,6 +53,42 @@ DeploymentStrategyTypeGQL: type[DeploymentStrategy] = gql_enum(
     DeploymentStrategy,
     name="DeploymentStrategyType",
 )
+
+
+# ========== IntOrPercent types ==========
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=dedent_strip("""
+            A rolling-update budget value: either an absolute count or a percentage.
+            Exactly one of 'count' or 'percent' is non-null.
+        """),
+    ),
+    model=IntOrPercentDTO,
+    name="IntOrPercent",
+)
+class IntOrPercentGQL:
+    count: int | None
+    percent: float | None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=dedent_strip("""
+            Input for a rolling-update budget value (oneOf).
+            Provide exactly one of 'count' (absolute replica count) or 'percent' (0.0-1.0 fraction).
+        """),
+    ),
+    name="IntOrPercentInput",
+    one_of=True,
+)
+class IntOrPercentInputGQL(PydanticInputMixin[IntOrPercentDTO]):
+    count: int | None = UNSET
+    percent: float | None = UNSET
+
 
 # ========== Output Types (Response) ==========
 
@@ -75,8 +115,8 @@ class DeploymentStrategySpecGQL:
 )
 class RollingUpdateStrategySpecGQL(DeploymentStrategySpecGQL):
     strategy: DeploymentStrategyTypeGQL
-    max_surge: int
-    max_unavailable: int
+    max_surge: IntOrPercentGQL
+    max_unavailable: IntOrPercentGQL
 
 
 @gql_pydantic_type(
@@ -109,13 +149,14 @@ class DeploymentPolicyGQL(PydanticNodeMixin[DeploymentPolicyNodeDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Configuration for rolling update strategy.", added_version="25.19.0"
+        description="Configuration for rolling update strategy. Defaults: max_surge=50%, max_unavailable=0%.",
+        added_version="25.19.0",
     ),
     name="RollingUpdateConfigInput",
 )
 class RollingUpdateConfigInputGQL(PydanticInputMixin[RollingUpdateConfigInputDTO]):
-    max_surge: int = 1
-    max_unavailable: int = 0
+    max_surge: IntOrPercentInputGQL | None = UNSET
+    max_unavailable: IntOrPercentInputGQL | None = UNSET
 
 
 @gql_pydantic_input(
@@ -141,7 +182,7 @@ class BlueGreenConfigInputGQL(PydanticInputMixin[BlueGreenConfigInputDTO]):
             matching the chosen strategy type.
             If a policy already exists for the deployment, it is replaced entirely.
         """),
-        added_version="26.4.0",
+        added_version=NEXT_RELEASE_VERSION,
     ),
     name="UpdateDeploymentPolicyInput",
 )
@@ -154,7 +195,7 @@ class UpdateDeploymentPolicyInputGQL(PydanticInputMixin[UpsertDeploymentPolicyIn
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Result payload returned after creating or updating a deployment policy. Contains the full deployment_policy object reflecting the applied configuration.",
     ),
     model=UpdateDeploymentPolicyPayloadDTO,

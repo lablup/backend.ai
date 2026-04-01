@@ -273,6 +273,7 @@ class TestGroupDBSourceDeleteEndpoints:
                     domain=test_domain,
                     project=test_group,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
                 session.add(routing)
 
@@ -356,6 +357,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 domain=test_domain,
                 project=test_group,
                 traffic_ratio=1.0,
+                revision=uuid.uuid4(),
             )
             session.add(routing)
 
@@ -493,6 +495,7 @@ class TestGroupDBSourceDeleteEndpoints:
                     domain=test_domain,
                     project=test_group,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
                 session.add(routing)
 

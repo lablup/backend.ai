@@ -21,6 +21,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.deployment import DeploymentHasNoTargetRevision
 from ai.backend.manager.models.deployment_policy import DeploymentStrategySpec, RollingUpdateSpec
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -170,8 +171,8 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
             )
             return StrategyCycleResult(sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING)
 
-        max_surge = spec.max_surge  # extra routes allowed above desired
-        max_unavailable = spec.max_unavailable  # routes allowed to be down
+        max_surge = spec.resolve_max_surge(desired)  # extra routes allowed above desired
+        max_unavailable = spec.resolve_max_unavailable(desired)  # routes allowed to be down
 
         max_total = desired + max_surge  # upper bound on simultaneous routes
         current_total = (
@@ -257,6 +258,10 @@ def _build_route_creators(
     count: int,
 ) -> list[RBACEntityCreator[RoutingRow]]:
     """Build route creator specs for new revision routes."""
+    if deployment.deploying_revision_id is None:
+        raise DeploymentHasNoTargetRevision(
+            f"Cannot create routes: deployment {deployment.id} has no deploying revision"
+        )
     creators: list[RBACEntityCreator[RoutingRow]] = []
     for _ in range(count):
         spec = RouteCreatorSpec(

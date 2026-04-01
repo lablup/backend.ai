@@ -395,7 +395,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             count=payload.total_count,
         )
 
-    # TODO: Add `vfolder_mounts` dynamic field (VFolderV2 connection type needed)
+    # TODO: Add `vfolder_mounts` dynamic field (VFolder connection type needed)
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

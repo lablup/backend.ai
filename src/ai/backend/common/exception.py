@@ -182,6 +182,7 @@ class ErrorDomain(enum.StrEnum):
     DATABASE = "database"
     USER_RESOURCE_POLICY = "user-resource-policy"
     PROMETHEUS_QUERY_PRESET = "prometheus-query-preset"
+    RUNTIME_VARIANT = "runtime-variant"
 
     EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
 

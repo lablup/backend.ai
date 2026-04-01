@@ -255,20 +255,23 @@ class DeploymentDBSource:
 
             # Create deployment policy if provided
             if policy_config is not None:
-                policy_spec = DeploymentPolicyCreatorSpec(
+                policy_creator_spec = DeploymentPolicyCreatorSpec(
                     endpoint_id=endpoint.id,
                     strategy=policy_config.strategy,
                     strategy_spec=policy_config.strategy_spec,
                 )
-                policy_creator = RBACEntityCreator(
-                    spec=policy_spec,
-                    element_type=RBACElementType.DEPLOYMENT_POLICY,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.MODEL_DEPLOYMENT,
-                        element_id=str(endpoint.id),
-                    ),
-                )
-                await execute_rbac_entity_creator(db_sess, policy_creator)
+            else:
+                policy_creator_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
+            policy_creator = RBACEntityCreator(
+                spec=policy_creator_spec,
+                element_type=RBACElementType.DEPLOYMENT_POLICY,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(endpoint.id),
+                ),
+            )
+            await execute_rbac_entity_creator(db_sess, policy_creator)
+            await db_sess.flush()
 
             stmt = (
                 sa.select(EndpointRow)
@@ -337,15 +340,19 @@ class DeploymentDBSource:
 
             # Create deployment policy if provided
             if spec.policy is not None:
-                policy_creator = RBACEntityCreator(
-                    spec=spec.policy,
-                    element_type=RBACElementType.DEPLOYMENT_POLICY,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.MODEL_DEPLOYMENT,
-                        element_id=str(endpoint.id),
-                    ),
-                )
-                await execute_rbac_entity_creator(db_sess, policy_creator)
+                policy_spec = spec.policy
+            else:
+                policy_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
+            policy_creator = RBACEntityCreator(
+                spec=policy_spec,
+                element_type=RBACElementType.DEPLOYMENT_POLICY,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(endpoint.id),
+                ),
+            )
+            await execute_rbac_entity_creator(db_sess, policy_creator)
+            await db_sess.flush()
 
             stmt = (
                 sa.select(EndpointRow)

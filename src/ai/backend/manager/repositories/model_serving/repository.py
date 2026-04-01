@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -39,6 +40,7 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceSearchResult,
     UserData,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.errors.common import ObjectNotFound
@@ -78,6 +80,7 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
+from ai.backend.manager.repositories.deployment.creators import DeploymentPolicyCreatorSpec
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import (
@@ -219,9 +222,24 @@ class ModelServingRepository:
         """
         async with self._db.begin_session() as db_sess:
             result = await execute_rbac_entity_creator(db_sess, creator)
+            endpoint = result.row
+
+            # Create default rolling deployment policy
+            policy_creator_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
+            policy_creator = RBACEntityCreator(
+                spec=policy_creator_spec,
+                element_type=RBACElementType.DEPLOYMENT_POLICY,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(endpoint.id),
+                ),
+            )
+            await execute_rbac_entity_creator(db_sess, policy_creator)
+            await db_sess.flush()
+
             endpoint_row = await EndpointRow.get(
                 db_sess,
-                result.row.id,
+                endpoint.id,
                 load_created_user=True,
                 load_session_owner=True,
                 load_image=True,

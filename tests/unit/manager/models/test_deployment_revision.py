@@ -265,7 +265,7 @@ class TestDeploymentRevisionRow:
         test_image: ImageRow,
         test_scaling_group: ScalingGroupRow,
     ) -> AsyncGenerator[EndpointRow, None]:
-        """Create test endpoint without an initial revision."""
+        """Create test endpoint without an initial deployment revision."""
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",

@@ -28,6 +28,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
     VFolderData,
@@ -96,6 +97,10 @@ from ai.backend.manager.services.vfolder.actions.base import (
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
+    SearchUserVFoldersAction,
+    SearchUserVFoldersActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
@@ -541,6 +546,21 @@ class VFolderService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def search_user_vfolders(
+        self, action: SearchUserVFoldersAction
+    ) -> SearchUserVFoldersActionResult:
+        """Search vfolders owned by a specific user."""
+        result = await self._vfolder_repository.search_user_vfolders(
+            querier=action.querier, scope=action.scope
+        )
+        return SearchUserVFoldersActionResult(
+            user_id=action.scope.user_id,
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def move_to_trash(
         self, action: MoveToTrashVFolderAction
     ) -> MoveToTrashVFolderActionResult:
@@ -725,7 +745,27 @@ class VFolderService:
 
         # Create source and target VFolderID
         source_folder_id = VFolderID(source_vfolder_data.quota_scope_id, source_vfolder_data.id)
-        target_quota_scope_id = "..."  # TODO: implement
+
+        # Resolve target quota scope: use the provided one or default to requester's user scope
+        if action.target_quota_scope_id is not None:
+            target_quota_scope_id = action.target_quota_scope_id
+            # TODO: Support cloning to project quota scope.
+            #  Project quota scopes exist and project vfolders can be cloned,
+            #  but cloning *into* a project folder is not yet supported
+            #  the clone result is always created as a user-owned vfolder
+            if target_quota_scope_id.scope_type != QuotaScopeType.USER:
+                raise VFolderInvalidParameter("Clone target must be a user quota scope.")
+            await self._vfolder_repository.validate_quota_scope_access(
+                target_quota_scope_id,
+                UserIdentity(
+                    user_uuid=action.requester_user_uuid,
+                    user_role=user_role,
+                    user_email=requester_email,
+                    domain_name=user_domain_name,
+                ),
+            )
+        else:
+            target_quota_scope_id = QuotaScopeID(QuotaScopeType.USER, action.requester_user_uuid)
 
         # Create VFolderCloneInfo for the cloning operation
         vfolder_clone_info = VFolderCloneInfo(

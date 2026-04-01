@@ -275,7 +275,7 @@ class VFolderCloneInfo(NamedTuple):
     domain_name: str
 
     # Target Vfolder infos
-    target_quota_scope_id: str
+    target_quota_scope_id: QuotaScopeID
     target_vfolder_name: str
     target_host: str
     usage_mode: VFolderUsageMode

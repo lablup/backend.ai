@@ -20,11 +20,16 @@ from .resolver import (
     create_access_token,
     # Auto Scaling
     create_auto_scaling_rule,
+    # Revision Preset
+    create_deployment_revision_preset,
     # Deployment
     create_model_deployment,
     delete_auto_scaling_rule,
+    delete_deployment_revision_preset,
     delete_model_deployment,
     deployment,
+    deployment_revision_preset,
+    deployment_revision_presets,
     deployment_status_changed,
     deployments,
     inference_runtime_config,
@@ -42,6 +47,7 @@ from .resolver import (
     update_auto_scaling_rule,
     # Policy
     update_deployment_policy,
+    update_deployment_revision_preset,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -289,4 +295,10 @@ __all__ = [
     "route",
     "routes",
     "update_route_traffic_status",
+    # Resolvers - Revision Preset
+    "create_deployment_revision_preset",
+    "delete_deployment_revision_preset",
+    "deployment_revision_preset",
+    "deployment_revision_presets",
+    "update_deployment_revision_preset",
 ]

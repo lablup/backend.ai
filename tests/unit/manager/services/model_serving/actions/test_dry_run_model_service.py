@@ -541,7 +541,7 @@ class TestDryRunModelServiceActionWithRevision:
         assert result.config.environ == revision_spec_with_no_environ.execution.environ
 
 
-class TestDryRunWithServiceDefinitionOverrides:
+class TestDryRunWithDeploymentConfigOverrides:
     @pytest.fixture
     def user_data(self) -> UserData:
         return UserData(
@@ -625,8 +625,8 @@ class TestDryRunWithServiceDefinitionOverrides:
         return mock
 
     @pytest.fixture
-    def revision_from_service_definition(self) -> ModelRevisionSpec:
-        """Revision spec that would come from service definition via RevisionGenerator."""
+    def revision_from_deployment_config(self) -> ModelRevisionSpec:
+        """Revision spec that would come from deployment config via RevisionGenerator."""
         return ModelRevisionSpec(
             image_identifier=ImageIdentifier(
                 canonical="service-def-image:v1",
@@ -645,17 +645,17 @@ class TestDryRunWithServiceDefinitionOverrides:
             execution=ExecutionSpec(
                 runtime_variant=RuntimeVariant.CUSTOM,
                 startup_command=None,
-                environ={"SERVICE_DEF_VAR": "from-service-definition"},
+                environ={"SERVICE_DEF_VAR": "from-deployment-config"},
             ),
         )
 
     @pytest.fixture
     def mock_revision_generator_registry(
-        self, revision_from_service_definition: ModelRevisionSpec
+        self, revision_from_deployment_config: ModelRevisionSpec
     ) -> MagicMock:
         mock = MagicMock(spec=RevisionGeneratorRegistry)
         mock_generator = MagicMock()
-        mock_generator.generate_revision = AsyncMock(return_value=revision_from_service_definition)
+        mock_generator.generate_revision = AsyncMock(return_value=revision_from_deployment_config)
         mock.get.return_value = mock_generator
         return mock
 
@@ -760,7 +760,7 @@ class TestDryRunWithServiceDefinitionOverrides:
 
     @pytest.fixture
     def action_with_api_request_values(self) -> DryRunModelServiceAction:
-        """Action with values DIFFERENT from service definition."""
+        """Action with values DIFFERENT from deployment config."""
         return DryRunModelServiceAction(
             service_name="test-model-v1.0",
             replicas=1,
@@ -804,16 +804,16 @@ class TestDryRunWithServiceDefinitionOverrides:
             ),
         )
 
-    async def test_service_definition_overrides_applied(
+    async def test_deployment_config_overrides_applied(
         self,
         model_serving_processors: ModelServingProcessors,
         action_with_api_request_values: DryRunModelServiceAction,
-        revision_from_service_definition: ModelRevisionSpec,
+        revision_from_deployment_config: ModelRevisionSpec,
         expected_task_id: uuid.UUID,
         mock_scheduling_controller: MagicMock,
         mock_resolve_image_for_endpoint_creation: AsyncMock,
     ) -> None:
-        """Verify dry run applies service definition overrides from RevisionGenerator."""
+        """Verify dry run applies deployment config overrides from RevisionGenerator."""
         result = await model_serving_processors.dry_run_model_service.wait_for_complete(
             action_with_api_request_values
         )
@@ -823,11 +823,11 @@ class TestDryRunWithServiceDefinitionOverrides:
         image_identifiers = mock_resolve_image_for_endpoint_creation.call_args[0][0]
         assert (
             image_identifiers[0].canonical
-            == revision_from_service_definition.image_identifier.canonical
+            == revision_from_deployment_config.image_identifier.canonical
         )
         assert (
             image_identifiers[0].architecture
-            == revision_from_service_definition.image_identifier.architecture
+            == revision_from_deployment_config.image_identifier.architecture
         )
 
         # Verify session spec uses revision values (not API request values)
@@ -835,10 +835,10 @@ class TestDryRunWithServiceDefinitionOverrides:
         session_spec = mock_scheduling_controller.enqueue_session.call_args[0][0]
         kernel_creation_config = session_spec.kernel_specs[0]["creation_config"]
 
-        expected_resources = dict(revision_from_service_definition.resource_spec.resource_slots)
+        expected_resources = dict(revision_from_deployment_config.resource_spec.resource_slots)
         assert kernel_creation_config["resources"] == expected_resources
 
-        expected_environ = revision_from_service_definition.execution.environ
+        expected_environ = revision_from_deployment_config.execution.environ
         assert kernel_creation_config["environ"] == expected_environ
 
         # Verify successful completion

@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
     AutoScalingRuleOrderField,
     DeploymentOrderField,
+    IntOrPercent,
     OrderDirection,
     ReplicaOrderField,
     RevisionOrderField,
@@ -32,6 +33,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
 from ai.backend.common.types import AutoScalingMetricSource, ClusterMode, RuntimeVariant
+from ai.backend.common.utils import dedent_strip
 
 __all__ = (
     "AccessTokenFilter",
@@ -243,13 +245,37 @@ class ModelDeploymentNetworkAccessInput(BaseRequestModel):
 
 
 class RollingUpdateConfigInput(BaseRequestModel):
-    """Input for rolling update configuration."""
+    """Input for rolling update configuration.
 
-    max_surge: int = Field(
-        default=1, ge=0, description="Maximum number of extra replicas during update"
+    ``max_surge`` and ``max_unavailable`` are :class:`IntOrPercent` objects (oneOf):
+
+    - ``{"count": 2}``        — absolute replica count
+    - ``{"percent": 0.25}``   — fraction of desired replicas (0.0-1.0)
+    """
+
+    max_surge: IntOrPercent = Field(
+        default_factory=lambda: IntOrPercent(percent=0.5),
+        description=dedent_strip("""
+            Maximum number of extra replicas that can be created
+            during a rolling update.
+            Defaults to 50% of desired replicas.
+        """),
+        examples=[
+            {"count": 2},
+            {"percent": 0.25},
+        ],
     )
-    max_unavailable: int = Field(
-        default=0, ge=0, description="Maximum number of unavailable replicas during update"
+    max_unavailable: IntOrPercent = Field(
+        default_factory=lambda: IntOrPercent(percent=0.0),
+        description=dedent_strip("""
+            Maximum number of replicas that can be unavailable
+            during a rolling update.
+            Defaults to 0%.
+        """),
+        examples=[
+            {"count": 0},
+            {"percent": 0.0},
+        ],
     )
 
 

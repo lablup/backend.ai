@@ -12,11 +12,12 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 from .types import (
-    VFolderBasicInfo,
+    VFolderAccessControlInfo,
     VFolderInvitationState,
-    VFolderOwnerInfo,
+    VFolderMetadataInfo,
+    VFolderOperationStatusField,
+    VFolderOwnershipInfo,
     VFolderPermissionField,
-    VFolderPermissionInfo,
     VFolderUsageInfo,
 )
 
@@ -39,6 +40,7 @@ __all__ = (
     "VFolderCompactNode",
     "VFolderInvitationNode",
     "VFolderNode",
+    "SearchVFoldersPayload",
 )
 
 
@@ -50,9 +52,12 @@ __all__ = (
 class VFolderNode(BaseResponseModel):
     """Node model representing a virtual folder entity with nested sub-models."""
 
-    basic: VFolderBasicInfo = Field(description="Core identity fields")
-    permission: VFolderPermissionInfo = Field(description="Permission and ownership fields")
-    owner: VFolderOwnerInfo = Field(description="Owner context fields")
+    id: UUID = Field(description="Unique identifier of the virtual folder")
+    status: VFolderOperationStatusField = Field(description="Current operation status")
+    host: str = Field(description="Storage host where the virtual folder is located")
+    metadata: VFolderMetadataInfo = Field(description="Descriptive metadata fields")
+    access_control: VFolderAccessControlInfo = Field(description="Access control fields")
+    ownership: VFolderOwnershipInfo = Field(description="Ownership context fields")
     usage: VFolderUsageInfo | None = Field(
         default=None,
         description="Usage statistics; None for list responses where usage is not loaded",
@@ -200,3 +205,17 @@ class UnshareVFolderPayload(BaseResponseModel):
     unshared_emails: list[str] = Field(
         description="List of email addresses that were unshared from"
     )
+
+
+# ============================================================
+# Search Payload Models
+# ============================================================
+
+
+class SearchVFoldersPayload(BaseResponseModel):
+    """Payload for vfolder search (shared by admin and scoped searches)."""
+
+    items: list[VFolderNode] = Field(description="List of vfolder nodes.")
+    total_count: int = Field(description="Total number of records matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")

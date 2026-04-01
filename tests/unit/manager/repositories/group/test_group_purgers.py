@@ -354,6 +354,7 @@ class TestGroupPurgersIntegration:
                     project=sample_group.id,
                     status=RouteStatus.TERMINATED,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
                 session.add(routing)
                 routings.append(routing)

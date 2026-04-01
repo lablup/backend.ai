@@ -317,52 +317,72 @@ class Context(metaclass=ABCMeta):
     async def install_halfstack(self) -> None:
         self.log_header("Installing halfstack...")
 
-        self.log_header("Generating supergraph.graphql via rover CLI...")
-
-        rover_path = await self._ensure_rover_installed()
-
-        # Accept ELv2 license for supergraph compose.
-        # Although we add this to ~/.bashrc during installation, it won't take effect
-        # in the current session, so we must pass it explicitly to the subprocess.
-        env = os.environ.copy()
-        env["APOLLO_ELV2_LICENSE"] = "accept"
-
-        compose_cmd = [
-            rover_path,
-            "supergraph",
-            "compose",
-            "--config",
-            "configs/graphql/supergraph.yaml",
-        ]
-        output_path = "docs/manager/graphql-reference/supergraph.graphql"
-
-        proc = await asyncio.create_subprocess_exec(
-            *compose_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(f"Failed to compose supergraph schema:\n{stderr.decode()}")
-
-        def _write_supergraph() -> None:
-            with Path(output_path).open("wb") as f:
-                f.write(stdout)
-
-        await asyncio.to_thread(_write_supergraph)
-        self.log_header(f"Wrote supergraph schema to {output_path}")
-
         base_path = self.install_info.base_path
 
+        # Copy gateway config from package resources
         with self.resource_path("ai.backend.install.configs", "gateway.config.ts") as src_gateway:
             dst_gateway = base_path / "gateway.config.ts"
             shutil.copy(src_gateway, dst_gateway)
             self.log_header(f"Copied gateway.config.ts -> {dst_gateway}")
 
-        dst_supergraph = base_path / "supergraph.graphql"
-        shutil.copy(Path(output_path), dst_supergraph)
-        self.log_header(f"Copied supergraph.graphql -> {dst_supergraph}")
+        # Generate or copy supergraph.graphql based on install type
+        if self.install_info.type == InstallType.SOURCE:
+            # Develop mode: generate supergraph using rover CLI
+            self.log_header("Generating supergraph.graphql via rover CLI...")
+
+            rover_path = await self._ensure_rover_installed()
+
+            # Accept ELv2 license for supergraph compose.
+            # Although we add this to ~/.bashrc during installation, it won't take effect
+            # in the current session, so we must pass it explicitly to the subprocess.
+            env = os.environ.copy()
+            env["APOLLO_ELV2_LICENSE"] = "accept"
+
+            compose_cmd = [
+                rover_path,
+                "supergraph",
+                "compose",
+                "--config",
+                "configs/graphql/supergraph.yaml",
+            ]
+            output_path = "docs/manager/graphql-reference/supergraph.graphql"
+
+            proc = await asyncio.create_subprocess_exec(
+                *compose_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+            )
+            stdout, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise RuntimeError(f"Failed to compose supergraph schema:\n{stderr.decode()}")
+
+            def _write_supergraph() -> None:
+                with Path(output_path).open("wb") as f:
+                    f.write(stdout)
+
+            await asyncio.to_thread(_write_supergraph)
+            self.log_header(f"Wrote supergraph schema to {output_path}")
+
+            dst_supergraph = base_path / "supergraph.graphql"
+            shutil.copy(Path(output_path), dst_supergraph)
+            self.log_header(f"Copied supergraph.graphql -> {dst_supergraph}")
+        else:
+            # Package mode: download supergraph from GitHub releases
+            from ai.backend.install import __version__
+
+            self.log_header("Downloading supergraph.graphql from GitHub releases...")
+
+            # Construct URL for the release version
+            version_tag = f"v{__version__}"
+            url = (
+                f"https://raw.githubusercontent.com/lablup/backend.ai/{version_tag}/"
+                "docs/manager/graphql-reference/supergraph.graphql"
+            )
+
+            dst_supergraph = base_path / "supergraph.graphql"
+            await wget(url, dst_supergraph)
+            self.log_header(f"Downloaded supergraph.graphql -> {dst_supergraph}")
 
         dst_compose_path = self.copy_config("docker-compose.yml")
         self.copy_config("prometheus.yaml")

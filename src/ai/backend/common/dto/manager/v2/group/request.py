@@ -29,6 +29,7 @@ __all__ = (
     "GroupOrder",
     "PurgeGroupInput",
     "SearchGroupsRequest",
+    "UnassignUsersFromProjectInput",
     "UpdateGroupInput",
 )
 
@@ -166,3 +167,9 @@ class AssignUsersToProjectInput(BaseRequestModel):
     """Input for assigning users to a project."""
 
     user_ids: list[UUID] = Field(description="List of user UUIDs to assign to the project.")
+
+
+class UnassignUsersFromProjectInput(BaseRequestModel):
+    """Input for unassigning users from a project."""
+
+    user_ids: list[UUID] = Field(description="List of user UUIDs to unassign from the project.")

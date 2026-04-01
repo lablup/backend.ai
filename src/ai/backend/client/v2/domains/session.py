@@ -143,11 +143,10 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: RenameSessionRequest,
     ) -> None:
-        params = request.model_dump(mode="json", exclude_none=True)
         await self._client.typed_request_no_content(
             "POST",
             f"{_BASE_PATH}/{session_name}/rename",
-            params={k: str(v) for k, v in params.items()},
+            request=request,
         )
 
     async def interrupt(

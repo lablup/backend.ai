@@ -10,6 +10,7 @@ import yarl
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
@@ -217,6 +218,11 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 runtime_variant=self.runtime_variant,
                 callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
             ),
+            model_definition=(
+                ModelDefinition.model_validate(self.model_definition)
+                if self.model_definition is not None
+                else None
+            ),
         )
 
     def to_data(self) -> ModelRevisionData:
@@ -244,6 +250,11 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             ),
             created_at=self.created_at,
             image_id=self.image,
+            model_definition=(
+                ModelDefinition.model_validate(self.model_definition)
+                if self.model_definition is not None
+                else None
+            ),
             extra_vfolder_mounts=[
                 ExtraVFolderMountData(
                     vfolder_id=mount.vfid.folder_id,

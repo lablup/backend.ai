@@ -9,6 +9,8 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
+from pydantic import BaseModel, Field, model_validator
+
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -42,11 +44,17 @@ __all__ = (
     "EnvironmentVariableEntryInfoDTO",
     "EnvironmentVariablesInfoDTO",
     "ExtraVFolderMountGQLDTO",
+    "ModelConfigInfoDTO",
     "ModelDeploymentStatus",
+    "ModelDefinitionInfoDTO",
+    "ModelHealthCheckInfoDTO",
     "ModelMountConfigInfoDTO",
+    "ModelMetadataInfoDTO",
     "ModelRuntimeConfigInfoDTO",
+    "ModelServiceConfigInfoDTO",
     "NetworkConfigInfo",
     "OrderDirection",
+    "PreStartActionInfoDTO",
     "ReplicaOrderField",
     "ReplicaStateInfo",
     "ResourceConfigInfoDTO",
@@ -57,6 +65,7 @@ __all__ = (
     "RouteStatus",
     "RouteTrafficStatus",
     "RuntimeVariant",
+    "IntOrPercent",
 )
 
 
@@ -81,6 +90,41 @@ class RouteOrderField(StrEnum):
     CREATED_AT = "created_at"
     STATUS = "status"
     TRAFFIC_RATIO = "traffic_ratio"
+
+
+class IntOrPercent(BaseModel):
+    """A rolling-update budget value: either an absolute count or a percentage.
+
+    Exactly one of ``count`` or ``percent`` must be provided (oneOf semantics).
+
+    - ``{"count": 2}``        — absolute replica count
+    - ``{"percent": 0.25}``   — fraction of desired replicas (0.0-1.0)
+    """
+
+    count: int | None = Field(default=None, ge=0)
+    percent: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _validate_one_of(self) -> IntOrPercent:
+        has_count = self.count is not None
+        has_percent = self.percent is not None
+        if has_count == has_percent:
+            raise ValueError("Exactly one of 'count' or 'percent' must be provided.")
+        return self
+
+    @property
+    def is_count(self) -> bool:
+        return self.count is not None
+
+    @property
+    def is_percent(self) -> bool:
+        return self.percent is not None
+
+    @property
+    def is_zero(self) -> bool:
+        if self.count is not None:
+            return self.count == 0
+        return self.percent == 0.0
 
 
 class DeploymentBasicInfo(BaseResponseModel):
@@ -129,8 +173,8 @@ class ReplicaStateInfo(BaseResponseModel):
 class RollingUpdateConfigInfo(BaseResponseModel):
     """Rolling update policy configuration."""
 
-    max_surge: int
-    max_unavailable: int
+    max_surge: IntOrPercent
+    max_unavailable: IntOrPercent
 
 
 class BlueGreenConfigInfo(BaseResponseModel):
@@ -162,8 +206,8 @@ class DeploymentStrategySpecInfo(BaseResponseModel):
 class RollingUpdateStrategySpecInfo(DeploymentStrategySpecInfo):
     """Rolling update strategy spec — matches RollingUpdateStrategySpecGQL structure."""
 
-    max_surge: int
-    max_unavailable: int
+    max_surge: IntOrPercent
+    max_unavailable: IntOrPercent
 
 
 class BlueGreenStrategySpecInfo(DeploymentStrategySpecInfo):
@@ -203,6 +247,92 @@ class EnvironmentVariablesInfoDTO(BaseResponseModel):
     """A collection of environment variable entries."""
 
     entries: list[EnvironmentVariableEntryInfoDTO]
+
+
+class PreStartActionInfoDTO(BaseResponseModel):
+    """Output DTO for a pre-start action in model definition."""
+
+    action: str = Field(description="The name of the pre-start action to execute.")
+    args: dict[str, Any] = Field(
+        default_factory=dict, description="Arguments for the pre-start action."
+    )
+
+
+class ModelHealthCheckInfoDTO(BaseResponseModel):
+    """Output DTO for model health check configuration."""
+
+    interval: float = Field(description="Interval in seconds between health checks.")
+    path: str = Field(description="Path to check for health status.")
+    max_retries: int = Field(description="Maximum number of retries for health check.")
+    max_wait_time: float = Field(
+        description="Maximum time in seconds to wait for a health check response."
+    )
+    expected_status_code: int = Field(
+        description="Expected HTTP status code for a healthy response."
+    )
+    initial_delay: float = Field(
+        description="Initial delay in seconds before the first health check."
+    )
+
+
+class ModelServiceConfigInfoDTO(BaseResponseModel):
+    """Output DTO for model service configuration."""
+
+    pre_start_actions: list[PreStartActionInfoDTO] = Field(
+        default_factory=list,
+        description="List of pre-start actions to execute before starting the model service.",
+    )
+    start_command: str | list[str] = Field(description="Command to start the model service.")
+    shell: str = Field(
+        default="/bin/bash", description="Shell to use if start_command is a string."
+    )
+    port: int = Field(description="Port number for the model service.")
+    health_check: ModelHealthCheckInfoDTO | None = Field(
+        default=None, description="Health check configuration for the model service."
+    )
+
+
+class ModelMetadataInfoDTO(BaseResponseModel):
+    """Output DTO for model metadata."""
+
+    author: str | None = Field(default=None, description="Author of the model.")
+    title: str | None = Field(default=None, description="Title of the model.")
+    version: int | str | None = Field(default=None, description="Version identifier of the model.")
+    created: str | None = Field(default=None, description="Creation date of the model.")
+    last_modified: str | None = Field(
+        default=None, description="Last modification date of the model."
+    )
+    description: str | None = Field(default=None, description="Description of the model.")
+    task: str | None = Field(default=None, description="Task type of the model.")
+    category: str | None = Field(default=None, description="Category of the model.")
+    architecture: str | None = Field(
+        default=None, description="Architecture metadata for the model."
+    )
+    framework: list[str] | None = Field(default=None, description="Frameworks used by the model.")
+    label: list[str] | None = Field(default=None, description="Labels attached to the model.")
+    license: str | None = Field(default=None, description="License of the model.")
+    min_resource: dict[str, Any] | None = Field(
+        default=None, description="Minimum resource requirements for the model."
+    )
+
+
+class ModelConfigInfoDTO(BaseResponseModel):
+    """Output DTO for a single model entry in model definition."""
+
+    name: str = Field(description="Name of the model.")
+    model_path: str = Field(description="Path to the model file.")
+    service: ModelServiceConfigInfoDTO | None = Field(
+        default=None, description="Configuration for the model service."
+    )
+    metadata: ModelMetadataInfoDTO | None = Field(
+        default=None, description="Metadata about the model."
+    )
+
+
+class ModelDefinitionInfoDTO(BaseResponseModel):
+    """Output DTO for model definition."""
+
+    models: list[ModelConfigInfoDTO] = Field(description="List of models in the model definition.")
 
 
 class ClusterConfigInfoDTO(BaseResponseModel):

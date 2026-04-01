@@ -18,7 +18,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
 from ai.backend.manager.errors.deployment import (
-    DeploymentHasNoTargetRevision,
     EndpointNotFound,
     RouteSessionNotFound,
     RouteSessionTerminated,
@@ -399,22 +398,11 @@ class RouteExecutor:
                 if deployment is None:
                     raise EndpointNotFound(f"Deployment not found for endpoint {route.endpoint_id}")
 
-                target_revision_id = (
-                    route.revision_id
-                    or deployment.deploying_revision_id
-                    or deployment.current_revision_id
-                )
-                if target_revision_id is None:
-                    raise DeploymentHasNoTargetRevision(
-                        f"No target revision found for route {route.route_id} "
-                        f"(endpoint {route.endpoint_id})"
-                    )
-
                 deployment_context = await self._deployment_repo.fetch_deployment_context(
                     deployment,
-                    revision_id=target_revision_id,
+                    revision_id=route.revision_id,
                 )
-                target_revision = deployment.resolve_revision_spec(target_revision_id)
+                target_revision = deployment.resolve_revision_spec(route.revision_id)
 
                 # Create session with full context
                 return await self._scheduling_controller.enqueue_session(

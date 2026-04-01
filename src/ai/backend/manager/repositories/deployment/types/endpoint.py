@@ -56,7 +56,7 @@ class RouteData:
     status: RouteStatus
     traffic_ratio: float
     created_at: datetime
-    revision_id: uuid.UUID | None = None
+    revision_id: uuid.UUID
     updated_at: datetime | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
 

@@ -15,6 +15,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     AccessKey,
@@ -598,6 +599,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 domain=test_domain_name,
                 project=test_group_id,
                 traffic_ratio=1.0,
+                revision=uuid.uuid4(),
             )
             db_sess.add(route)
             await db_sess.commit()
@@ -672,6 +674,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 domain=test_domain_name,
                 project=test_group_id,
                 traffic_ratio=1.0,
+                revision=uuid.uuid4(),
             )
             db_sess.add(route)
             await db_sess.flush()
@@ -818,6 +821,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     domain=test_domain_name,
                     project=test_group_id,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
                 db_sess.add(route)
                 route_ids.add(route_id)
@@ -2457,7 +2461,10 @@ class TestDeploymentPolicyOperations:
         spec = DeploymentPolicyUpserterSpec(
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
-            strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
+            strategy_spec=RollingUpdateSpec(
+                max_surge=IntOrPercent(count=1),
+                max_unavailable=IntOrPercent(count=0),
+            ),
         )
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
         return result.data
@@ -2515,7 +2522,10 @@ class TestDeploymentPolicyOperations:
         assert result.id == test_deployment_policy_data.id
         assert result.endpoint == test_endpoint_id
         assert result.strategy == DeploymentStrategy.ROLLING
-        assert result.strategy_spec == RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        assert result.strategy_spec == RollingUpdateSpec(
+            max_surge=IntOrPercent(count=1),
+            max_unavailable=IntOrPercent(count=0),
+        )
 
     async def test_get_deployment_policy_not_found(
         self,
@@ -2755,10 +2765,28 @@ class TestSearchDeploymentPolicies:
         """Create deployment policies for all sample endpoints."""
         policies: list[DeploymentPolicyData] = []
         strategies: list[tuple[DeploymentStrategy, RollingUpdateSpec | BlueGreenSpec]] = [
-            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=1, max_unavailable=0)),
-            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=2, max_unavailable=1)),
+            (
+                DeploymentStrategy.ROLLING,
+                RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=1),
+                    max_unavailable=IntOrPercent(count=0),
+                ),
+            ),
+            (
+                DeploymentStrategy.ROLLING,
+                RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=2),
+                    max_unavailable=IntOrPercent(count=1),
+                ),
+            ),
             (DeploymentStrategy.BLUE_GREEN, BlueGreenSpec(auto_promote=True)),
-            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=0, max_unavailable=1)),
+            (
+                DeploymentStrategy.ROLLING,
+                RollingUpdateSpec(
+                    max_surge=IntOrPercent(count=0),
+                    max_unavailable=IntOrPercent(count=1),
+                ),
+            ),
         ]
         for eid, (strategy, spec) in zip(sample_endpoint_ids, strategies, strict=False):
             result = await deployment_repository.upsert_deployment_policy(
@@ -3166,8 +3194,8 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
+            revision_id=uuid.uuid4(),
             traffic_ratio=1.0,
-            revision_id=None,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
         creator = RBACEntityCreator(
@@ -3200,6 +3228,7 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
+            revision_id=uuid.uuid4(),
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3247,6 +3276,7 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
+            revision_id=uuid.uuid4(),
         )
         creator = RBACEntityCreator(
             spec=spec,

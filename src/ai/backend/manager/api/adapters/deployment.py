@@ -81,6 +81,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
     ExtraVFolderMountGQLDTO,
+    ModelDefinitionInfoDTO,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
     OrderDirection,
@@ -524,6 +525,7 @@ class DeploymentAdapter(BaseAdapter):
             deployment=self._deployment_data_to_dto(action_result.deployment),
             previous_revision_id=action_result.previous_revision_id,
             activated_revision_id=action_result.activated_revision_id,
+            deployment_policy=self._policy_data_to_dto(action_result.deployment_policy),
         )
 
     async def delete(self, input: DeleteDeploymentInput) -> DeleteDeploymentPayload:
@@ -728,10 +730,13 @@ class DeploymentAdapter(BaseAdapter):
         match input.strategy:
             case DeploymentStrategy.ROLLING:
                 rolling = input.rolling_update
-                strategy_spec = RollingUpdateSpec(
-                    max_surge=rolling.max_surge if rolling is not None else 1,
-                    max_unavailable=rolling.max_unavailable if rolling is not None else 0,
-                )
+                if rolling is not None:
+                    strategy_spec = RollingUpdateSpec(
+                        max_surge=rolling.max_surge,
+                        max_unavailable=rolling.max_unavailable,
+                    )
+                else:
+                    strategy_spec = RollingUpdateSpec()
             case DeploymentStrategy.BLUE_GREEN:
                 bg = input.blue_green
                 strategy_spec = BlueGreenSpec(
@@ -1475,6 +1480,13 @@ class DeploymentAdapter(BaseAdapter):
                 environ=environ_dto,
             ),
             model_mount_config=model_mount_config_dto,
+            model_definition=(
+                ModelDefinitionInfoDTO.model_validate(
+                    data.model_definition.model_dump(by_alias=False)
+                )
+                if data.model_definition is not None
+                else None
+            ),
             created_at=data.created_at,
             extra_mounts=[
                 ExtraVFolderMountGQLDTO(

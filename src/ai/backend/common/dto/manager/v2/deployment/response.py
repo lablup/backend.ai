@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentPolicyInfo,
     DeploymentStrategyInfoDTO,
     ExtraVFolderMountGQLDTO,
+    ModelDefinitionInfoDTO,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
     ReplicaStateInfo,
@@ -90,6 +91,9 @@ class RevisionNode(BaseResponseModel):
     model_runtime_config: ModelRuntimeConfigInfoDTO = Field(description="Runtime configuration")
     model_mount_config: ModelMountConfigInfoDTO | None = Field(
         default=None, description="Model mount configuration"
+    )
+    model_definition: ModelDefinitionInfoDTO | None = Field(
+        default=None, description="Model definition configuration"
     )
     created_at: datetime = Field(description="Creation timestamp")
     extra_mounts: list[ExtraVFolderMountGQLDTO] = Field(
@@ -358,6 +362,9 @@ class ActivateRevisionPayload(BaseResponseModel):
         default=None, description="ID of the previously active revision"
     )
     activated_revision_id: UUID = Field(description="ID of the newly activated revision")
+    deployment_policy: DeploymentPolicyNode = Field(
+        description="The deployment policy applied during activation"
+    )
 
 
 class UpdateRouteTrafficStatusPayload(BaseResponseModel):

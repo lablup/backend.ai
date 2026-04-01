@@ -24,8 +24,8 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
     session_owner_id: uuid.UUID
     domain: str
     project_id: uuid.UUID
+    revision_id: uuid.UUID
     traffic_ratio: float = 1.0
-    revision_id: uuid.UUID | None = None
     traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE
 
     @override

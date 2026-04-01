@@ -27,6 +27,8 @@ __all__ = (
     "ProjectStorageInfo",
     "PurgeProjectPayload",
     "SearchProjectsPayload",
+    "UnassignUserError",
+    "UnassignUsersFromProjectPayload",
     "VFolderHostPermissionEntry",
 )
 
@@ -175,3 +177,22 @@ class AdminSearchGroupsPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of groups matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class UnassignUserError(BaseResponseModel):
+    """Error information for a user that failed to be unassigned."""
+
+    user_id: UUID = Field(description="UUID of the user that failed to be unassigned.")
+    message: str = Field(description="Error message describing the failure reason.")
+
+
+class UnassignUsersFromProjectPayload(BaseResponseModel):
+    """Payload for user unassignment from project."""
+
+    unassigned_users: list[UserNode] = Field(
+        description="List of users that were unassigned from the project.",
+    )
+    failed: list[UnassignUserError] = Field(
+        default_factory=list,
+        description="List of errors for users that could not be unassigned.",
+    )

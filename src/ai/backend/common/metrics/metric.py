@@ -447,6 +447,7 @@ class LayerType(enum.StrEnum):
     STORAGE_NAMESPACE_REPOSITORY = "storage_namespace_repository"
     USER_REPOSITORY = "user_repository"
     USER_RESOURCE_POLICY_REPOSITORY = "user_resource_policy_repository"
+    VFOLDER_ADMIN_REPOSITORY = "vfolder_admin_repository"
     VFOLDER_REPOSITORY = "vfolder_repository"
     VFS_STORAGE_REPOSITORY = "vfs_storage_repository"
     FAIR_SHARE_REPOSITORY = "fair_share_repository"

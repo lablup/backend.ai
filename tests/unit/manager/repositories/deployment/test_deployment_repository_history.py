@@ -839,6 +839,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 project=test_group_id,
                 status=RouteStatus.PROVISIONING,
                 traffic_ratio=1.0,
+                revision=uuid.uuid4(),
             )
             db_sess.add(route)
             await db_sess.commit()
@@ -1463,6 +1464,7 @@ class TestRouteHistoryMergeLogic:
                     project=group_id,
                     status=RouteStatus.PROVISIONING,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
             )
 

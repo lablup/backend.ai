@@ -106,7 +106,9 @@ class ServiceConfigModel(BaseRequestModel):
     resources: dict[str, str | int] | None = Field(
         default=None, examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}]
     )
-    resource_opts: dict[str, str | int | bool] = Field(examples=[{"shmem": "2g"}], default={})
+    resource_opts: dict[str, str | int | bool] | None = Field(
+        examples=[{"shmem": "2g"}], default=None
+    )
 
 
 class NewServiceRequestModel(BaseRequestModel):
