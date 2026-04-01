@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ai.backend.agent.docker.intrinsic import (
-    CPUPlugin,
     ContainerNetStat,
+    CPUPlugin,
     MemoryPlugin,
     read_proc_net_dev,
 )
