@@ -178,6 +178,10 @@ class CreateRevisionInputDTO(BaseRequestModel):
     """Input for a deployment revision (nested structure matching GQL CreateRevisionInput)."""
 
     name: str | None = Field(default=None, description="Revision name")
+    revision_preset_id: UUID | None = Field(
+        default=None,
+        description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
+    )
     cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
     resource_config: ResourceConfigInput = Field(description="Resource configuration")
     image: ImageInput = Field(description="Container image")
@@ -196,6 +200,10 @@ class AddRevisionGQLInputDTO(BaseRequestModel):
     """Input for adding a revision via GQL (flat structure matching GQL AddRevisionInput)."""
 
     name: str | None = Field(default=None, description="Revision name")
+    revision_preset_id: UUID | None = Field(
+        default=None,
+        description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
+    )
     deployment_id: UUID = Field(description="Deployment ID")
     cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
     resource_config: ResourceConfigInput = Field(description="Resource configuration")
@@ -304,6 +312,10 @@ class RevisionInput(BaseRequestModel):
     """Input for a deployment revision."""
 
     name: str | None = Field(default=None, description="Revision name")
+    revision_preset_id: UUID | None = Field(
+        default=None,
+        description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
+    )
     image_id: UUID = Field(description="Container image ID")
     cluster_mode: ClusterMode = Field(description="Cluster mode for the revision")
     cluster_size: int = Field(default=1, ge=1, description="Number of nodes in the cluster")

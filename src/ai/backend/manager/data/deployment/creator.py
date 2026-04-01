@@ -41,6 +41,7 @@ class ModelRevisionCreator:
     mounts: VFolderMountsCreator
     execution: ExecutionSpec
     model_definition: ModelDefinition | None
+    revision_preset_id: UUID | None = None
 
 
 @dataclass

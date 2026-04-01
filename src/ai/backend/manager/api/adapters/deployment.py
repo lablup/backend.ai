@@ -368,6 +368,7 @@ class DeploymentAdapter(BaseAdapter):
             ),
             mounts=mounts_creator,
             model_definition=initial_revision.model_definition,
+            revision_preset_id=initial_revision.revision_preset_id,
             execution=ExecutionSpec(
                 runtime_variant=RuntimeVariant(
                     initial_revision.model_runtime_config.runtime_variant
@@ -798,6 +799,7 @@ class DeploymentAdapter(BaseAdapter):
                 inference_runtime_config=input.model_runtime_config.inference_runtime_config,
             ),
             model_definition=input.model_definition,
+            revision_preset_id=input.revision_preset_id,
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(model_deployment_id=input.deployment_id, adder=adder)

@@ -369,6 +369,7 @@ def create_services(args: ServiceArgs) -> Services:
                     enable_model_definition_override=args.config_provider.config.deployment.enable_model_definition_override,
                 )
             ),
+            deployment_revision_preset_repository=repositories.deployment_revision_preset.repository,
         ),
         storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),
         audit_log=AuditLogService(repositories.audit_log.repository),

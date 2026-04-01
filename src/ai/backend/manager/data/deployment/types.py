@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import enum
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -368,6 +369,64 @@ class ModelRevisionSpecDraft(ConfiguredModel):
     resource_spec: ResourceSpecDraft
     mounts: MountMetadata
     execution: ExecutionSpec
+
+
+@dataclass
+class RevisionDraft:
+    """Intermediate representation for revision creation with all fields optional.
+
+    Three drafts are created from different sources and merged with priority:
+    model_definition (base) → preset (override) → request (highest priority).
+    Only non-None fields participate in the merge.
+    """
+
+    image_id: UUID | None = None
+    resource_slots: Mapping[str, Any] | None = None
+    resource_opts: Mapping[str, Any] | None = None
+    cluster_mode: ClusterMode | None = None
+    cluster_size: int | None = None
+    startup_command: str | None = None
+    bootstrap_script: str | None = None
+    environ: dict[str, str] | None = None
+    runtime_variant: RuntimeVariant | None = None
+    model_definition: ModelDefinition | None = None
+
+
+def merge_revision_drafts(*drafts: RevisionDraft) -> RevisionDraft:
+    """Merge multiple RevisionDrafts with later drafts taking priority.
+
+    For most fields: later non-None value overwrites earlier.
+    For environ: dict merge (later keys overwrite earlier keys).
+    """
+    result = RevisionDraft()
+    merged_environ: dict[str, str] = {}
+
+    for draft in drafts:
+        if draft.image_id is not None:
+            result = dataclasses.replace(result, image_id=draft.image_id)
+        if draft.resource_slots is not None:
+            result = dataclasses.replace(result, resource_slots=draft.resource_slots)
+        if draft.resource_opts is not None:
+            result = dataclasses.replace(result, resource_opts=draft.resource_opts)
+        if draft.cluster_mode is not None:
+            result = dataclasses.replace(result, cluster_mode=draft.cluster_mode)
+        if draft.cluster_size is not None:
+            result = dataclasses.replace(result, cluster_size=draft.cluster_size)
+        if draft.startup_command is not None:
+            result = dataclasses.replace(result, startup_command=draft.startup_command)
+        if draft.bootstrap_script is not None:
+            result = dataclasses.replace(result, bootstrap_script=draft.bootstrap_script)
+        if draft.environ is not None:
+            merged_environ.update(draft.environ)
+        if draft.runtime_variant is not None:
+            result = dataclasses.replace(result, runtime_variant=draft.runtime_variant)
+        if draft.model_definition is not None:
+            result = dataclasses.replace(result, model_definition=draft.model_definition)
+
+    if merged_environ:
+        result = dataclasses.replace(result, environ=merged_environ)
+
+    return result
 
 
 @dataclass

@@ -765,6 +765,13 @@ class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionDTO]):
 )
 class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
     name: str | None = None
+    revision_preset_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
+        ),
+        default=None,
+    )
     cluster_config: ClusterConfigInput
     resource_config: ResourceConfigInput
     image: ImageInput
@@ -787,6 +794,13 @@ class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
 )
 class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
     name: str | None = None
+    revision_preset_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
+        ),
+        default=None,
+    )
     deployment_id: ID
     cluster_config: ClusterConfigInput
     resource_config: ResourceConfigInput

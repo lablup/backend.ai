@@ -14,6 +14,7 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import (
+    ClusterMode,
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -22,6 +23,7 @@ from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
     DeploymentLifecycleSubStep,
+    ExecutionSpec,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
@@ -33,7 +35,10 @@ from ai.backend.manager.data.deployment.types import (
     MountMetadata,
     ReplicaStateData,
     ResourceConfigData,
+    ResourceSpec,
+    RevisionDraft,
     RouteInfo,
+    merge_revision_drafts,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
@@ -55,6 +60,9 @@ from ai.backend.manager.repositories.deployment.creators import (
     ModelRevisionFields,
 )
 from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
+from ai.backend.manager.repositories.deployment_revision_preset.repository import (
+    DeploymentRevisionPresetRepository,
+)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
@@ -283,6 +291,7 @@ class DeploymentService:
     _deployment_repository: DeploymentRepository
     _revision_generator_registry: RevisionGeneratorRegistry
     _model_definition_generator_registry: ModelDefinitionGeneratorRegistry
+    _deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
 
     def __init__(
         self,
@@ -290,12 +299,14 @@ class DeploymentService:
         deployment_repository: DeploymentRepository,
         revision_generator_registry: RevisionGeneratorRegistry,
         model_definition_generator_registry: ModelDefinitionGeneratorRegistry,
+        deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None = None,
     ) -> None:
         """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
         self._deployment_repository = deployment_repository
         self._revision_generator_registry = revision_generator_registry
         self._model_definition_generator_registry = model_definition_generator_registry
+        self._deployment_revision_preset_repository = deployment_revision_preset_repository
 
     # ========== Deployment CRUD ==========
 
@@ -524,6 +535,85 @@ class DeploymentService:
 
     # ========== Revision Operations ==========
 
+    async def _apply_preset(
+        self,
+        creator: ModelRevisionCreator,
+    ) -> ModelRevisionCreator:
+        """Apply DeploymentRevisionPreset values to the creator if revision_preset_id is specified.
+
+        Creates a RevisionDraft from the preset, another from the request (creator),
+        and merges them with request taking priority over preset.
+        Returns a new ModelRevisionCreator with merged values.
+        """
+        if not creator.revision_preset_id or not self._deployment_revision_preset_repository:
+            return creator
+
+        preset_data = await self._deployment_revision_preset_repository.get_by_id(
+            creator.revision_preset_id,
+        )
+
+        preset_draft = RevisionDraft(
+            image_id=None,
+            resource_slots={s.resource_type: s.quantity for s in preset_data.resource_slots},
+            resource_opts={o.name: o.value for o in preset_data.resource_opts},
+            cluster_mode=ClusterMode(preset_data.cluster_mode)
+            if preset_data.cluster_mode
+            else None,
+            cluster_size=preset_data.cluster_size,
+            startup_command=preset_data.startup_command,
+            bootstrap_script=preset_data.bootstrap_script,
+            environ={e.key: e.value for e in preset_data.environ},
+            model_definition=(
+                ModelDefinition(**preset_data.model_definition)
+                if preset_data.model_definition
+                else None
+            ),
+        )
+
+        request_draft = RevisionDraft(
+            image_id=creator.image_id,
+            resource_slots=(
+                dict(creator.resource_spec.resource_slots)
+                if creator.resource_spec.resource_slots
+                else None
+            ),
+            resource_opts=(
+                dict(creator.resource_spec.resource_opts)
+                if creator.resource_spec.resource_opts
+                else None
+            ),
+            cluster_mode=creator.resource_spec.cluster_mode,
+            cluster_size=creator.resource_spec.cluster_size,
+            startup_command=creator.execution.startup_command,
+            bootstrap_script=creator.execution.bootstrap_script,
+            environ=creator.execution.environ,
+            runtime_variant=creator.execution.runtime_variant,
+            model_definition=creator.model_definition,
+        )
+
+        merged = merge_revision_drafts(preset_draft, request_draft)
+
+        return ModelRevisionCreator(
+            image_id=merged.image_id or creator.image_id,
+            resource_spec=ResourceSpec(
+                cluster_mode=merged.cluster_mode or creator.resource_spec.cluster_mode,
+                cluster_size=merged.cluster_size or creator.resource_spec.cluster_size,
+                resource_slots=merged.resource_slots or creator.resource_spec.resource_slots,
+                resource_opts=merged.resource_opts,
+            ),
+            mounts=creator.mounts,
+            execution=ExecutionSpec(
+                startup_command=merged.startup_command,
+                bootstrap_script=merged.bootstrap_script,
+                environ=merged.environ,
+                runtime_variant=merged.runtime_variant or creator.execution.runtime_variant,
+                callback_url=creator.execution.callback_url,
+                inference_runtime_config=creator.execution.inference_runtime_config,
+            ),
+            model_definition=merged.model_definition,
+            revision_preset_id=creator.revision_preset_id,
+        )
+
     async def _merge_deployment_config(
         self,
         revision_creator: ModelRevisionCreator,
@@ -620,7 +710,8 @@ class DeploymentService:
         log.info("Adding model revision to deployment {}", deployment_id)
 
         endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
-        merged_creator = await self._merge_deployment_config(action.adder)
+        preset_applied = await self._apply_preset(action.adder)
+        merged_creator = await self._merge_deployment_config(preset_applied)
         resolved_model_definition = await self._resolve_model_definition(merged_creator)
 
         spec = DeploymentRevisionCreatorSpec(
