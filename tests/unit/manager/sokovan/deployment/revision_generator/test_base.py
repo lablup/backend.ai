@@ -385,6 +385,17 @@ class TestLoadDeploymentConfig:
 
 
 @dataclass
+class _ResolveVariantTestCase:
+    """Test case for runtime variant resolution."""
+
+    id: str
+    runtime_variants: list[RuntimeVariant] | None
+    requested_variant: RuntimeVariant | Sentinel
+    expected_variant: RuntimeVariant | None = None
+    expected_error: type[Exception] | None = None
+
+
+@dataclass
 class _MergeRevisionTestCase:
     """Test case for merge_revision."""
 
@@ -686,100 +697,99 @@ class TestMergeRevision:
         return _make
 
     @pytest.mark.parametrize(
-        ("runtime_variants", "requested_variant", "expected_variant"),
+        "test_case",
         [
-            pytest.param(
-                [RuntimeVariant.VLLM],
-                Sentinel.TOKEN,
-                RuntimeVariant.VLLM,
+            _ResolveVariantTestCase(
                 id="single_variant_used_when_unset",
+                runtime_variants=[RuntimeVariant.VLLM],
+                requested_variant=Sentinel.TOKEN,
+                expected_variant=RuntimeVariant.VLLM,
             ),
-            pytest.param(
-                [RuntimeVariant.VLLM],
-                RuntimeVariant.VLLM,
-                RuntimeVariant.VLLM,
+            _ResolveVariantTestCase(
                 id="user_choice_matches_single_variant",
+                runtime_variants=[RuntimeVariant.VLLM],
+                requested_variant=RuntimeVariant.VLLM,
+                expected_variant=RuntimeVariant.VLLM,
             ),
-            pytest.param(
-                [RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
-                RuntimeVariant.SGLANG,
-                RuntimeVariant.SGLANG,
+            _ResolveVariantTestCase(
                 id="multiple_variants_valid_choice",
+                runtime_variants=[RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
+                requested_variant=RuntimeVariant.SGLANG,
+                expected_variant=RuntimeVariant.SGLANG,
             ),
-            pytest.param(
-                None,
-                RuntimeVariant.CUSTOM,
-                RuntimeVariant.CUSTOM,
+            _ResolveVariantTestCase(
                 id="no_constraint_keeps_user_choice",
+                runtime_variants=None,
+                requested_variant=RuntimeVariant.CUSTOM,
+                expected_variant=RuntimeVariant.CUSTOM,
             ),
-            pytest.param(
-                None,
-                Sentinel.TOKEN,
-                RuntimeVariant.CUSTOM,
+            _ResolveVariantTestCase(
                 id="no_constraint_unset_defaults_to_custom",
+                runtime_variants=None,
+                requested_variant=Sentinel.TOKEN,
+                expected_variant=RuntimeVariant.CUSTOM,
             ),
         ],
+        ids=lambda tc: tc.id,
     )
     def test_resolve_runtime_variant_success(
         self,
+        test_case: _ResolveVariantTestCase,
         base_generator: BaseRevisionGenerator,
         make_draft_with_variant: Callable[[RuntimeVariant | Sentinel], ModelRevisionSpecDraft],
-        runtime_variants: list[RuntimeVariant] | None,
-        requested_variant: RuntimeVariant | Sentinel,
-        expected_variant: RuntimeVariant,
     ) -> None:
         """Test successful runtime variant resolution through merge_revision."""
         deployment_config = DeploymentConfig(
-            runtime_variants=runtime_variants,
+            runtime_variants=test_case.runtime_variants,
             environment=ImageEnvironment(image="img:latest", architecture="x86_64"),
             resource_slots={"cpu": 4},
         )
-        draft = make_draft_with_variant(requested_variant)
+        draft = make_draft_with_variant(test_case.requested_variant)
 
         result = base_generator.merge_revision(draft, deployment_config)
 
-        assert result.execution.runtime_variant == expected_variant
+        assert result.execution.runtime_variant == test_case.expected_variant
 
     @pytest.mark.parametrize(
-        ("runtime_variants", "requested_variant", "expected_error"),
+        "test_case",
         [
-            pytest.param(
-                [RuntimeVariant.VLLM],
-                RuntimeVariant.SGLANG,
-                RuntimeVariantNotAllowed,
+            _ResolveVariantTestCase(
                 id="user_choice_not_in_single_variant_list",
+                runtime_variants=[RuntimeVariant.VLLM],
+                requested_variant=RuntimeVariant.SGLANG,
+                expected_error=RuntimeVariantNotAllowed,
             ),
-            pytest.param(
-                [RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
-                RuntimeVariant.NIM,
-                RuntimeVariantNotAllowed,
+            _ResolveVariantTestCase(
                 id="user_choice_not_in_multi_variant_list",
+                runtime_variants=[RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
+                requested_variant=RuntimeVariant.NIM,
+                expected_error=RuntimeVariantNotAllowed,
             ),
-            pytest.param(
-                [RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
-                Sentinel.TOKEN,
-                RuntimeVariantNotSpecified,
+            _ResolveVariantTestCase(
                 id="multi_variant_unset_requires_selection",
+                runtime_variants=[RuntimeVariant.VLLM, RuntimeVariant.SGLANG],
+                requested_variant=Sentinel.TOKEN,
+                expected_error=RuntimeVariantNotSpecified,
             ),
         ],
+        ids=lambda tc: tc.id,
     )
     def test_resolve_runtime_variant_error(
         self,
+        test_case: _ResolveVariantTestCase,
         base_generator: BaseRevisionGenerator,
         make_draft_with_variant: Callable[[RuntimeVariant | Sentinel], ModelRevisionSpecDraft],
-        runtime_variants: list[RuntimeVariant],
-        requested_variant: RuntimeVariant | Sentinel,
-        expected_error: type[Exception],
     ) -> None:
         """Test runtime variant resolution errors through merge_revision."""
+        assert test_case.expected_error is not None
         deployment_config = DeploymentConfig(
-            runtime_variants=runtime_variants,
+            runtime_variants=test_case.runtime_variants,
             environment=ImageEnvironment(image="img:latest", architecture="x86_64"),
             resource_slots={"cpu": 4},
         )
-        draft = make_draft_with_variant(requested_variant)
+        draft = make_draft_with_variant(test_case.requested_variant)
 
-        with pytest.raises(expected_error):
+        with pytest.raises(test_case.expected_error):
             base_generator.merge_revision(draft, deployment_config)
 
 
