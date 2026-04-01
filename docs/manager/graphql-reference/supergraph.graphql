@@ -3307,10 +3307,12 @@ input CreateRoleInput
 input CreateRuntimeVariantInput
   @join__type(graph: STRAWBERRY)
 {
-  """Unique name."""
+  """
+  Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang').
+  """
   name: String!
 
-  """Description."""
+  """Human-readable description of the runtime engine."""
   description: String = null
 }
 
@@ -3326,25 +3328,29 @@ type CreateRuntimeVariantPayloadGQL
 input CreateRuntimeVariantPresetInput
   @join__type(graph: STRAWBERRY)
 {
-  """Runtime variant ID."""
+  """The runtime variant this preset belongs to."""
   runtimeVariantId: UUID!
 
-  """Preset name."""
+  """Human-readable name of the configurable parameter."""
   name: String!
 
-  """Description."""
+  """Detailed explanation of what this parameter controls."""
   description: String = null
 
-  """env or args."""
+  """
+  How the value is applied: 'env' for environment variable, 'args' for command-line argument.
+  """
   presetTarget: String!
 
-  """str, int, float, bool."""
+  """Data type for validation (e.g., 'str', 'int', 'float', 'bool')."""
   valueType: String!
 
-  """Default value."""
+  """The default value shown to users when creating a deployment."""
   defaultValue: String = null
 
-  """Env key or args flag."""
+  """
+  For 'env' target, the environment variable name; for 'args' target, the CLI flag name.
+  """
   key: String!
 }
 
@@ -4239,7 +4245,9 @@ type DeploymentPolicy implements Node
   updatedAt: DateTime!
 }
 
-"""Added in UNRELEASED. A deployment revision preset entity."""
+"""
+Added in UNRELEASED. A reusable deployment configuration template. Users select a preset when deploying a model to automatically populate resource allocation, execution settings, and runtime-specific parameters. Each preset is designed for a specific runtime variant and captures the full configuration needed to launch an inference service.
+"""
 type DeploymentRevisionPreset implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -4247,40 +4255,50 @@ type DeploymentRevisionPreset implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Preset ID."""
+  """The unique database identifier of this deployment preset."""
   rowId: UUID!
 
-  """Runtime variant ID."""
+  """The runtime variant this preset is designed for (e.g., vLLM, SGLang)."""
   runtimeVariantId: UUID!
 
-  """Preset name."""
+  """Display name of this deployment configuration template."""
   name: String!
 
-  """Description."""
+  """Detailed explanation of when and why to use this preset configuration."""
   description: String
 
-  """Display order rank."""
+  """
+  Display ordering among presets of the same runtime variant, with lower values shown first.
+  """
   rank: Int!
 
-  """Cluster configuration."""
+  """
+  Cluster topology settings defining single-node or multi-node deployment.
+  """
   cluster: PresetClusterSpec!
 
-  """Resource allocation."""
+  """Compute resource allocation including CPU, memory, and accelerators."""
   resource: PresetResourceAllocation!
 
-  """Execution specification."""
+  """
+  Container execution configuration including image, startup command, and environment.
+  """
   execution: PresetExecutionSpec!
 
-  """Model definition configuration."""
+  """
+  Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.
+  """
   modelDefinition: ModelDefinition
 
-  """Preset values."""
+  """
+  List of runtime variant preset values applied when using this deployment preset to auto-configure runtime parameters.
+  """
   presetValues: [DeploymentRevisionPresetValueEntry!]!
 
-  """Creation timestamp."""
+  """Timestamp when this deployment preset was created."""
   createdAt: DateTime!
 
-  """Last update timestamp."""
+  """Timestamp of the last modification to this deployment preset."""
   updatedAt: DateTime
 }
 
@@ -4340,7 +4358,9 @@ enum DeploymentRevisionPresetOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in UNRELEASED. A preset value entry."""
+"""
+Added in UNRELEASED. A mapping of a runtime variant preset to a specific value, used to auto-configure runtime parameters when this deployment preset is applied.
+"""
 type DeploymentRevisionPresetValueEntry
   @join__type(graph: STRAWBERRY)
 {
@@ -7533,7 +7553,9 @@ type ModelCardEdge
   cursor: String!
 }
 
-"""Added in UNRELEASED. A model card entity."""
+"""
+Added in UNRELEASED. Represents a registered AI model with metadata extracted from model-definition.yaml. A model card links to a VFolder containing the actual model files and belongs to a MODEL_STORE type project for access control scoping.
+"""
 type ModelCardV2 implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -7541,34 +7563,44 @@ type ModelCardV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Model card ID."""
+  """The unique database identifier of this model card."""
   rowId: UUID!
 
-  """Model card name."""
+  """Display name of the registered model."""
   name: String!
 
-  """VFolder ID."""
+  """
+  The VFolder that stores the actual model files, weights, and configuration.
+  """
   vfolderId: UUID!
 
-  """Domain name."""
+  """
+  The domain this model card belongs to, used for access control scoping.
+  """
   domainName: String!
 
-  """Project ID."""
+  """
+  The MODEL_STORE type project this model card is associated with for access control.
+  """
   projectId: UUID!
 
-  """Creator user ID."""
+  """The user who registered this model card."""
   creatorId: UUID!
 
-  """Model metadata."""
+  """
+  Model metadata including authorship, classification, framework info, and licensing extracted from model-definition.yaml.
+  """
   metadata: ModelCardV2Metadata!
 
-  """README content."""
+  """
+  README content from the model VFolder, typically containing usage instructions and model documentation.
+  """
   readme: String
 
-  """Creation timestamp."""
+  """Timestamp when this model card was registered."""
   createdAt: DateTime!
 
-  """Last update timestamp."""
+  """Timestamp of the last modification to this model card."""
   updatedAt: DateTime
 }
 
@@ -7610,7 +7642,7 @@ input ModelCardV2Filter
 }
 
 """
-Added in UNRELEASED. Model card metadata including author, version, and classification info.
+Added in UNRELEASED. Metadata extracted from the model-definition.yaml file in the model VFolder. Contains authorship, classification, and framework information used for discovery and compatibility checks.
 """
 type ModelCardV2Metadata
   @join__type(graph: STRAWBERRY)
@@ -10243,7 +10275,7 @@ type PresetAvailabilityV2
 }
 
 """
-Added in UNRELEASED. Cluster configuration for a deployment revision preset.
+Added in UNRELEASED. Cluster topology settings for the deployment, defining whether the inference workload runs on a single node or is distributed across multiple nodes.
 """
 type PresetClusterSpec
   @join__type(graph: STRAWBERRY)
@@ -10256,7 +10288,7 @@ type PresetClusterSpec
 }
 
 """
-Added in UNRELEASED. Execution specification for a deployment revision preset.
+Added in UNRELEASED. Container execution configuration for the deployment, including the inference server image, startup commands, and environment variables.
 """
 type PresetExecutionSpec
   @join__type(graph: STRAWBERRY)
@@ -10275,7 +10307,7 @@ type PresetExecutionSpec
 }
 
 """
-Added in UNRELEASED. Resource allocation for a deployment revision preset.
+Added in UNRELEASED. Compute resource allocation for the deployment, specifying CPU, memory, and accelerator requirements along with additional resource options.
 """
 type PresetResourceAllocation
   @join__type(graph: STRAWBERRY)
@@ -10288,7 +10320,7 @@ type PresetResourceAllocation
 }
 
 """
-Added in UNRELEASED. Preset target specification defining how the value is applied.
+Added in UNRELEASED. Specifies how a runtime variant preset value is applied to the inference container, either as an environment variable or a command-line argument.
 """
 type PresetTargetSpec
   @join__type(graph: STRAWBERRY)
@@ -13847,7 +13879,9 @@ type RoutingList implements PaginatedList
   total_count: Int!
 }
 
-"""Added in UNRELEASED. A runtime variant entity."""
+"""
+Added in UNRELEASED. Represents an inference runtime engine definition (e.g., vLLM, SGLang, NIM, TGI). Previously hardcoded as an enum, runtime variants are now managed as dynamic database entities to allow administrators to register and configure new inference runtimes without code changes.
+"""
 type RuntimeVariant implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -13855,19 +13889,23 @@ type RuntimeVariant implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Runtime variant ID."""
+  """The unique database identifier of this runtime variant."""
   rowId: UUID!
 
-  """Unique name."""
+  """
+  Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang', 'nim', 'tgi').
+  """
   name: String!
 
-  """Description."""
+  """
+  Human-readable description explaining the runtime engine and its typical use cases.
+  """
   description: String
 
-  """Creation timestamp."""
+  """Timestamp when this runtime variant was registered."""
   createdAt: DateTime!
 
-  """Last update timestamp."""
+  """Timestamp of the last modification to this runtime variant."""
   updatedAt: DateTime
 }
 
@@ -13929,7 +13967,9 @@ enum RuntimeVariantOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in UNRELEASED. A runtime variant preset entity."""
+"""
+Added in UNRELEASED. Defines a configurable parameter for a runtime variant. Each preset maps a user-facing setting (e.g., tensor parallelism, quantization) to either an environment variable or a command-line argument that is applied to the inference container.
+"""
 type RuntimeVariantPreset implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -13937,28 +13977,36 @@ type RuntimeVariantPreset implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Preset ID."""
+  """The unique database identifier of this preset."""
   rowId: UUID!
 
-  """Runtime variant ID."""
+  """The runtime variant this preset belongs to."""
   runtimeVariantId: UUID!
 
-  """Preset name."""
+  """
+  Human-readable name of the configurable parameter (e.g., 'Tensor Parallel Size', 'Quantization').
+  """
   name: String!
 
-  """Description."""
+  """
+  Detailed explanation of what this parameter controls and how it affects inference behavior.
+  """
   description: String
 
-  """Display order rank."""
+  """
+  Display ordering among presets of the same runtime variant, with lower values shown first.
+  """
   rank: Int!
 
-  """Preset target specification."""
+  """
+  Specification defining how the user-provided value is applied to the inference container.
+  """
   targetSpec: PresetTargetSpec!
 
-  """Creation timestamp."""
+  """Timestamp when this preset was created."""
   createdAt: DateTime!
 
-  """Last update timestamp."""
+  """Timestamp of the last modification to this preset."""
   updatedAt: DateTime
 }
 
