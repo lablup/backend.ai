@@ -740,6 +740,7 @@ class SessionHandler:
             session_name,
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.NONE,
+            allow_stale=True,
         )
         result = await self._session.destroy_session.wait_for_complete(
             DestroySessionAction(
