@@ -211,7 +211,7 @@ class AddRevisionOptions(BaseRequestModel):
 
 
 class AddRevisionGQLInputDTO(BaseRequestModel):
-    """Input for adding a revision via GQL (flat structure matching GQL AddRevisionInput)."""
+    """Input for adding a revision. Used by both GQL and REST v2 APIs."""
 
     name: str | None = Field(default=None, description="Revision name")
     revision_preset_id: UUID | None = Field(

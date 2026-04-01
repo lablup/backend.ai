@@ -59,7 +59,6 @@ from ai.backend.manager.services.deployment.actions.deployment_policy import (
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
-    AddModelRevisionOptions,
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
@@ -585,48 +584,6 @@ class TestAddModelRevision(ModelRevisionFixtures):
         spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
         assert spec.model_definition is not None
         assert spec.model_definition == sample_model_definition
-
-    async def test_add_model_revision_without_activate_does_not_call_activate(
-        self,
-        processors: DeploymentProcessors,
-        deployment_service: DeploymentService,
-        deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
-    ) -> None:
-        """When activate option is False (default), activate_revision should not be called."""
-        deployment_service.activate_revision = AsyncMock()
-
-        action = AddModelRevisionAction(
-            model_deployment_id=deployment_id,
-            adder=revision_creator,
-        )
-        await processors.add_model_revision.wait_for_complete(action)
-
-        deployment_service.activate_revision.assert_not_called()
-
-    async def test_add_model_revision_with_activate_calls_activate_revision(
-        self,
-        processors: DeploymentProcessors,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
-        revision_data: ModelRevisionData,
-    ) -> None:
-        """When activate option is True, activate_revision should be called with correct args."""
-        deployment_service.activate_revision = AsyncMock()
-
-        action = AddModelRevisionAction(
-            model_deployment_id=deployment_id,
-            adder=revision_creator,
-            options=AddModelRevisionOptions(activate=True),
-        )
-        await processors.add_model_revision.wait_for_complete(action)
-
-        deployment_service.activate_revision.assert_called_once()
-        activate_action = deployment_service.activate_revision.call_args[0][0]
-        assert activate_action.deployment_id == deployment_id
-        assert activate_action.revision_id == revision_data.id
 
 
 class TestDeploymentConfigMerge(ModelRevisionFixtures):

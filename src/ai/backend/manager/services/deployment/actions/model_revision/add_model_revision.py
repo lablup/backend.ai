@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
@@ -11,16 +11,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.base import (
 )
 
 
-@dataclass(frozen=True)
-class AddModelRevisionOptions:
-    activate: bool = False
-
-
 @dataclass
 class AddModelRevisionAction(ModelRevisionBaseAction):
     model_deployment_id: UUID
     adder: ModelRevisionCreator
-    options: AddModelRevisionOptions = field(default_factory=AddModelRevisionOptions)
 
     @override
     def entity_id(self) -> str | None:
