@@ -2960,6 +2960,31 @@ type CreateKeypairResourcePolicyPayloadGQL
   keypairResourcePolicy: KeypairResourcePolicyV2!
 }
 
+"""Added in UNRELEASED. Create model card payload."""
+type CreateModelCardPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The created model card."""
+  modelCard: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Create model card input."""
+input CreateModelCardV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """Model card name."""
+  name: String!
+
+  """VFolder ID."""
+  vfolderId: UUID!
+
+  """Project ID."""
+  projectId: UUID!
+
+  """Domain name."""
+  domainName: String!
+}
+
 """Added in 24.12.0."""
 type CreateNetwork
   @join__type(graph: GRAPHENE)
@@ -3794,6 +3819,14 @@ type DeleteKeypairResourcePolicyPayloadGQL
 {
   """Name of the deleted keypair resource policy."""
   name: String!
+}
+
+"""Added in UNRELEASED. Delete model card payload."""
+type DeleteModelCardPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted model card."""
+  id: UUID!
 }
 
 """Added in 24.12.0."""
@@ -7361,6 +7394,128 @@ type ModelCardEdge
   cursor: String!
 }
 
+"""Added in UNRELEASED. A model card entity."""
+type ModelCardV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Model card ID."""
+  rowId: UUID!
+
+  """Model card name."""
+  name: String!
+
+  """VFolder ID."""
+  vfolderId: UUID!
+
+  """Domain name."""
+  domainName: String!
+
+  """Project ID."""
+  projectId: UUID!
+
+  """Creator user ID."""
+  creatorId: UUID!
+
+  """Author."""
+  author: String
+
+  """Title."""
+  title: String
+
+  """Model version."""
+  modelVersion: String
+
+  """Description."""
+  description: String
+
+  """Task type."""
+  task: String
+
+  """Category."""
+  category: String
+
+  """Architecture."""
+  architecture: String
+
+  """Frameworks."""
+  framework: [String!]!
+
+  """Labels."""
+  label: [String!]!
+
+  """License."""
+  license: String
+
+  """README content."""
+  readme: String
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of model cards."""
+type ModelCardV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelCardV2Edge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelCardV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Filter for model cards."""
+input ModelCardV2Filter
+  @join__type(graph: STRAWBERRY)
+{
+  """Name filter."""
+  name: StringFilter = null
+
+  """Domain filter."""
+  domainName: String = null
+
+  """Project filter."""
+  projectId: UUID = null
+}
+
+"""Added in UNRELEASED. Order specification."""
+input ModelCardV2OrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: ModelCardV2OrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for model cards."""
+enum ModelCardV2OrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
 """
 Added in UNRELEASED. Configuration for a single model in the model definition.
 """
@@ -9364,6 +9519,15 @@ type Mutation
   Added in UNRELEASED. Delete a runtime variant preset (superadmin only).
   """
   adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Create a model card (admin only)."""
+  adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Update a model card (admin only)."""
+  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete a model card (admin only)."""
+  adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload! @join__field(graph: STRAWBERRY)
@@ -11804,6 +11968,12 @@ type Query
 
   """Added in UNRELEASED. Get a single runtime variant preset by ID."""
   runtimeVariantPreset(id: UUID!): RuntimeVariantPreset @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Search model cards."""
+  modelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get a single model card by ID."""
+  modelCardV2(id: UUID!): ModelCardV2 @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Get my keypair resource allocation (current user).
@@ -15145,6 +15315,28 @@ type UpdateKeypairResourcePolicyPayloadGQL
 {
   """Updated keypair resource policy."""
   keypairResourcePolicy: KeypairResourcePolicyV2!
+}
+
+"""Added in UNRELEASED. Update model card payload."""
+type UpdateModelCardPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated model card."""
+  modelCard: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Update model card input."""
+input UpdateModelCardV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """Model card ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
 }
 
 """

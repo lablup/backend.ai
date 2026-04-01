@@ -1719,6 +1719,27 @@ type CreateKeypairResourcePolicyPayloadGQL {
   keypairResourcePolicy: KeypairResourcePolicyV2!
 }
 
+"""Added in UNRELEASED. Create model card payload."""
+type CreateModelCardPayloadGQL {
+  """The created model card."""
+  modelCard: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Create model card input."""
+input CreateModelCardV2Input {
+  """Model card name."""
+  name: String!
+
+  """VFolder ID."""
+  vfolderId: UUID!
+
+  """Project ID."""
+  projectId: UUID!
+
+  """Domain name."""
+  domainName: String!
+}
+
 """Added in 24.09.0. Input for creating a notification channel"""
 input CreateNotificationChannelInput {
   name: String!
@@ -2247,6 +2268,12 @@ type DeleteHuggingFaceRegistryPayload {
 type DeleteKeypairResourcePolicyPayloadGQL {
   """Name of the deleted keypair resource policy."""
   name: String!
+}
+
+"""Added in UNRELEASED. Delete model card payload."""
+type DeleteModelCardPayloadGQL {
+  """ID of the deleted model card."""
+  id: UUID!
 }
 
 """Added in 24.09.0. Input for deleting a notification channel"""
@@ -4416,6 +4443,115 @@ input MetricLabelEntryInput {
   value: String!
 }
 
+"""Added in UNRELEASED. A model card entity."""
+type ModelCardV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Model card ID."""
+  rowId: UUID!
+
+  """Model card name."""
+  name: String!
+
+  """VFolder ID."""
+  vfolderId: UUID!
+
+  """Domain name."""
+  domainName: String!
+
+  """Project ID."""
+  projectId: UUID!
+
+  """Creator user ID."""
+  creatorId: UUID!
+
+  """Author."""
+  author: String
+
+  """Title."""
+  title: String
+
+  """Model version."""
+  modelVersion: String
+
+  """Description."""
+  description: String
+
+  """Task type."""
+  task: String
+
+  """Category."""
+  category: String
+
+  """Architecture."""
+  architecture: String
+
+  """Frameworks."""
+  framework: [String!]!
+
+  """Labels."""
+  label: [String!]!
+
+  """License."""
+  license: String
+
+  """README content."""
+  readme: String
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Paginated list of model cards."""
+type ModelCardV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelCardV2Edge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelCardV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Filter for model cards."""
+input ModelCardV2Filter {
+  """Name filter."""
+  name: StringFilter = null
+
+  """Domain filter."""
+  domainName: String = null
+
+  """Project filter."""
+  projectId: UUID = null
+}
+
+"""Added in UNRELEASED. Order specification."""
+input ModelCardV2OrderBy {
+  """Field to order by."""
+  field: ModelCardV2OrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in UNRELEASED. Order fields for model cards."""
+enum ModelCardV2OrderField {
+  NAME
+  CREATED_AT
+}
+
 """
 Added in UNRELEASED. Configuration for a single model in the model definition.
 """
@@ -5526,6 +5662,15 @@ type Mutation {
   Added in UNRELEASED. Delete a runtime variant preset (superadmin only).
   """
   adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL!
+
+  """Added in UNRELEASED. Create a model card (admin only)."""
+  adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL!
+
+  """Added in UNRELEASED. Update a model card (admin only)."""
+  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayloadGQL!
+
+  """Added in UNRELEASED. Delete a model card (admin only)."""
+  adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL!
 
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload!
@@ -7209,6 +7354,12 @@ type Query {
 
   """Added in UNRELEASED. Get a single runtime variant preset by ID."""
   runtimeVariantPreset(id: UUID!): RuntimeVariantPreset
+
+  """Added in UNRELEASED. Search model cards."""
+  modelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+
+  """Added in UNRELEASED. Get a single model card by ID."""
+  modelCardV2(id: UUID!): ModelCardV2
 
   """
   Added in UNRELEASED. Get my keypair resource allocation (current user).
@@ -9768,6 +9919,24 @@ Added in UNRELEASED. Payload for keypair resource policy update mutation.
 type UpdateKeypairResourcePolicyPayloadGQL {
   """Updated keypair resource policy."""
   keypairResourcePolicy: KeypairResourcePolicyV2!
+}
+
+"""Added in UNRELEASED. Update model card payload."""
+type UpdateModelCardPayloadGQL {
+  """The updated model card."""
+  modelCard: ModelCardV2!
+}
+
+"""Added in UNRELEASED. Update model card input."""
+input UpdateModelCardV2Input {
+  """Model card ID."""
+  id: UUID!
+
+  """New name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
 }
 
 """

@@ -18,11 +18,11 @@ from ai.backend.manager.api.gql.model_card.types import (
     CreateModelCardInputGQL,
     CreateModelCardPayloadGQL,
     DeleteModelCardPayloadGQL,
-    ModelCardConnection,
-    ModelCardEdge,
     ModelCardFilterGQL,
     ModelCardGQL,
     ModelCardOrderByGQL,
+    ModelCardV2Connection,
+    ModelCardV2Edge,
     UpdateModelCardInputGQL,
     UpdateModelCardPayloadGQL,
 )
@@ -36,7 +36,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         description="Search model cards.",
     )
 )  # type: ignore[misc]
-async def model_cards(
+async def model_cards_v2(
     info: Info[StrawberryGQLContext],
     filter: ModelCardFilterGQL | None = None,
     order_by: list[ModelCardOrderByGQL] | None = None,
@@ -46,7 +46,7 @@ async def model_cards(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ModelCardConnection | None:
+) -> ModelCardV2Connection | None:
     filter_dto: ModelCardFilter | None = filter.to_pydantic() if filter else None
     orders_dto: list[ModelCardOrder] | None = None
     if order_by:
@@ -71,13 +71,13 @@ async def model_cards(
 
     result = await info.context.adapters.model_card.search(search_input)
     edges = [
-        ModelCardEdge(
+        ModelCardV2Edge(
             node=ModelCardGQL.from_pydantic(item),
             cursor=str(item.id),
         )
         for item in result.items
     ]
-    return ModelCardConnection(
+    return ModelCardV2Connection(
         edges=edges,
         page_info=PageInfo(
             has_next_page=result.has_next_page,
@@ -95,7 +95,7 @@ async def model_cards(
         description="Get a single model card by ID.",
     )
 )  # type: ignore[misc]
-async def model_card(
+async def model_card_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> ModelCardGQL | None:
@@ -109,7 +109,7 @@ async def model_card(
         description="Create a model card (admin only).",
     )
 )  # type: ignore[misc]
-async def admin_create_model_card(
+async def admin_create_model_card_v2(
     info: Info[StrawberryGQLContext],
     input: CreateModelCardInputGQL,
 ) -> CreateModelCardPayloadGQL:
@@ -125,7 +125,7 @@ async def admin_create_model_card(
         description="Update a model card (admin only).",
     )
 )  # type: ignore[misc]
-async def admin_update_model_card(
+async def admin_update_model_card_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateModelCardInputGQL,
 ) -> UpdateModelCardPayloadGQL:
@@ -141,7 +141,7 @@ async def admin_update_model_card(
         description="Delete a model card (admin only).",
     )
 )  # type: ignore[misc]
-async def admin_delete_model_card(
+async def admin_delete_model_card_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> DeleteModelCardPayloadGQL:

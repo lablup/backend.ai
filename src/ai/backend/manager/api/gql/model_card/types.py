@@ -50,7 +50,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
         added_version=NEXT_RELEASE_VERSION,
         description="Order fields for model cards.",
     ),
-    name="ModelCardOrderField",
+    name="ModelCardV2OrderField",
 )
 class ModelCardOrderFieldGQL(StrEnum):
     NAME = "name"
@@ -87,7 +87,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     updated_at: datetime | None = gql_field(description="Last update timestamp.")
 
 
-ModelCardEdge = Edge[ModelCardGQL]
+ModelCardV2Edge = Edge[ModelCardGQL]
 
 
 @gql_connection_type(
@@ -96,7 +96,7 @@ ModelCardEdge = Edge[ModelCardGQL]
         description="Paginated list of model cards.",
     )
 )
-class ModelCardConnection(Connection[ModelCardGQL]):
+class ModelCardV2Connection(Connection[ModelCardGQL]):
     count: int
 
     def __init__(self, *args, count: int, **kwargs) -> None:  # type: ignore[no-untyped-def]
@@ -106,7 +106,7 @@ class ModelCardConnection(Connection[ModelCardGQL]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter for model cards."),
-    name="ModelCardFilter",
+    name="ModelCardV2Filter",
 )
 class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
@@ -116,7 +116,7 @@ class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Order specification."),
-    name="ModelCardOrderBy",
+    name="ModelCardV2OrderBy",
 )
 class ModelCardOrderByGQL(PydanticInputMixin[OrderDTO]):
     field: ModelCardOrderFieldGQL = gql_field(description="Field to order by.")
@@ -125,7 +125,7 @@ class ModelCardOrderByGQL(PydanticInputMixin[OrderDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Create model card input."),
-    name="CreateModelCardInput",
+    name="CreateModelCardV2Input",
 )
 class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
     name: str = gql_field(description="Model card name.")
@@ -136,7 +136,7 @@ class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Update model card input."),
-    name="UpdateModelCardInput",
+    name="UpdateModelCardV2Input",
 )
 class UpdateModelCardInputGQL(PydanticInputMixin[UpdateInputDTO]):
     id: UUID = gql_field(description="Model card ID.")
