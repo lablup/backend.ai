@@ -21,6 +21,8 @@ down_revision = "af1b9ec86adb"
 branch_labels = None
 depends_on = None
 
+BATCH_SIZE = 1000
+
 
 def upgrade() -> None:
     conn = op.get_bind()
@@ -43,8 +45,8 @@ def upgrade() -> None:
     ]
 
     if inputs:
-        for i in range(0, len(inputs), 1000):
-            batch = inputs[i : i + 1000]
+        for i in range(0, len(inputs), BATCH_SIZE):
+            batch = inputs[i : i + BATCH_SIZE]
             stmt = (
                 pg_insert(ase_table)
                 .values(batch)
@@ -56,4 +58,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
     ase_table = get_association_scopes_entities_table()
-    conn.execute(sa.delete(ase_table).where(ase_table.c.entity_type == "role"))
+    conn.execute(
+        sa.delete(ase_table).where(
+            ase_table.c.scope_type == "project",
+            ase_table.c.entity_type == "role",
+        )
+    )
