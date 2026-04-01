@@ -30,7 +30,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
-from ai.backend.manager.data.scaling_group.types import ResourceInfo
+from ai.backend.manager.data.scaling_group.types import AgentFreeResource, ResourceInfo
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -117,6 +117,14 @@ def deployment_processors(
             used=[SlotQuantity(k, Decimal(0)) for k in mock_available_slots],
             free=[SlotQuantity(k, v) for k, v in mock_available_slots.items()],
         )
+    )
+    mock_scaling_group_repository.get_per_agent_free_resources = AsyncMock(
+        return_value=[
+            AgentFreeResource(
+                agent_id="mock-agent",
+                free_slots={k: SlotQuantity(k, v) for k, v in mock_available_slots.items()},
+            )
+        ]
     )
     deployment_controller = DeploymentController(
         DeploymentControllerArgs(
