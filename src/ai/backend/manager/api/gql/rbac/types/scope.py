@@ -9,9 +9,7 @@ from __future__ import annotations
 
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RBACElementTypeDTO,
-)
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    ScopeInput as ScopeInputDTO,
+    ScopeInputDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (

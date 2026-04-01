@@ -14,10 +14,8 @@ from ai.backend.common.dto.manager.v2.rbac.response import PermissionNode
 from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO, RBACElementTypeDTO
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
 from ai.backend.manager.api.gql.rbac.types import PermissionGQL, UpdatePermissionInput
-from ai.backend.manager.api.gql.rbac.types.permission import (
-    OperationTypeGQL,
-    RBACElementTypeGQL,
-)
+from ai.backend.manager.api.gql.rbac.types.permission import OperationTypeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL
 
 
 def _make_permission_node(

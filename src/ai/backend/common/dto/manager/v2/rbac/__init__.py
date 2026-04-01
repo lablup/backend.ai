@@ -67,7 +67,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatus,
     RoleStatusDTO,
     RoleStatusFilter,
-    ScopeInput,
+    ScopeInputDTO,
 )
 
 __all__ = (
@@ -89,7 +89,7 @@ __all__ = (
     "RoleStatus",
     "RoleStatusDTO",
     "RoleStatusFilter",
-    "ScopeInput",
+    "ScopeInputDTO",
     # Input models (request)
     "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",

@@ -17,7 +17,7 @@ from .types import (
     RoleSourceFilter,
     RoleStatus,
     RoleStatusFilter,
-    ScopeInput,
+    ScopeInputDTO,
 )
 
 __all__ = (
@@ -55,7 +55,7 @@ class CreateRoleInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=256, description="Role name")
     description: str | None = Field(default=None, description="Role description")
     source: RoleSource = Field(default=RoleSource.CUSTOM, description="Role source")
-    scope: ScopeInput | None = Field(default=None, description="Scope to register the role in")
+    scope: ScopeInputDTO | None = Field(default=None, description="Scope to register the role in")
 
     @field_validator("name")
     @classmethod
