@@ -47,7 +47,34 @@ def upgrade() -> None:
             END
     """)
 
-    # 4. Add category, from_health_status, to_health_status to route_history
+    # 4. Add replica connection info to routings
+    op.execute("""
+        ALTER TABLE routings
+        ADD COLUMN IF NOT EXISTS replica_host VARCHAR(256)
+    """)
+    op.execute("""
+        ALTER TABLE routings
+        ADD COLUMN IF NOT EXISTS replica_port INTEGER
+    """)
+
+    # 5. Backfill replica_host/replica_port from kernels for existing running routes
+    op.execute("""
+        UPDATE routings r SET
+            replica_host = k.kernel_host,
+            replica_port = (
+                SELECT (sp->>'host_ports')::jsonb->>0
+                FROM jsonb_array_elements(k.service_ports::jsonb) sp
+                WHERE (sp->>'is_inference')::boolean = true
+                LIMIT 1
+            )::integer
+        FROM kernels k
+        WHERE k.session_id = r.session
+          AND k.cluster_role = 'main'
+          AND r.status = 'running'
+          AND r.replica_host IS NULL
+    """)
+
+    # 6. Add category, from_health_status, to_health_status to route_history
     op.execute("""
         ALTER TABLE route_history
         ADD COLUMN IF NOT EXISTS category VARCHAR(32) NOT NULL DEFAULT 'lifecycle'
@@ -63,6 +90,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Remove replica connection info
+    op.execute("ALTER TABLE routings DROP COLUMN IF EXISTS replica_port")
+    op.execute("ALTER TABLE routings DROP COLUMN IF EXISTS replica_host")
+
     # Remove route_history columns
     op.execute("ALTER TABLE route_history DROP COLUMN IF EXISTS to_health_status")
     op.execute("ALTER TABLE route_history DROP COLUMN IF EXISTS from_health_status")

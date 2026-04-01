@@ -1064,6 +1064,8 @@ class DeploymentDBSource:
                     traffic_ratio=row.traffic_ratio,
                     created_at=row.created_at,
                     revision_id=row.revision,
+                    replica_host=row.replica_host,
+                    replica_port=row.replica_port,
                     error_data=row.error_data or {},
                 )
                 for row in rows
@@ -1645,6 +1647,8 @@ class DeploymentDBSource:
                     traffic_ratio=row.traffic_ratio,
                     created_at=row.created_at,
                     revision_id=row.revision,
+                    replica_host=row.replica_host,
+                    replica_port=row.replica_port,
                     error_data=row.error_data or {},
                 )
                 route_data_list.append(route_data)

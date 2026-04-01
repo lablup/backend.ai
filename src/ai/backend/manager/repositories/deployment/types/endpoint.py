@@ -58,6 +58,8 @@ class RouteData:
     traffic_ratio: float
     created_at: datetime
     revision_id: uuid.UUID
+    replica_host: str | None = None
+    replica_port: int | None = None
     updated_at: datetime | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
 

@@ -102,6 +102,12 @@ class RoutingRow(Base):  # type: ignore[misc]
         "error_data", pgsql.JSONB(), nullable=True, default=sa.null()
     )
 
+    # Replica connection info (populated when provisioning completes)
+    replica_host: Mapped[str | None] = mapped_column(
+        "replica_host", sa.String(length=256), nullable=True
+    )
+    replica_port: Mapped[int | None] = mapped_column("replica_port", sa.Integer, nullable=True)
+
     # Revision reference without FK (relationship only)
     revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
     traffic_status: Mapped[RouteTrafficStatus] = mapped_column(
