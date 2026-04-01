@@ -413,12 +413,20 @@ class TestVFolderServiceCloneUsageModeInheritance:
         "case",
         [
             # None → inherit from source
-            CloneUsageModeCase(VFolderUsageMode.MODEL, None, VFolderUsageMode.MODEL),
-            CloneUsageModeCase(VFolderUsageMode.GENERAL, None, VFolderUsageMode.GENERAL),
-            CloneUsageModeCase(VFolderUsageMode.DATA, None, VFolderUsageMode.DATA),
+            CloneUsageModeCase(
+                source=VFolderUsageMode.MODEL, request=None, expected=VFolderUsageMode.MODEL
+            ),
+            CloneUsageModeCase(
+                source=VFolderUsageMode.GENERAL, request=None, expected=VFolderUsageMode.GENERAL
+            ),
+            CloneUsageModeCase(
+                source=VFolderUsageMode.DATA, request=None, expected=VFolderUsageMode.DATA
+            ),
             # explicit → override source
             CloneUsageModeCase(
-                VFolderUsageMode.MODEL, VFolderUsageMode.GENERAL, VFolderUsageMode.GENERAL
+                source=VFolderUsageMode.MODEL,
+                request=VFolderUsageMode.GENERAL,
+                expected=VFolderUsageMode.GENERAL,
             ),
         ],
     )
