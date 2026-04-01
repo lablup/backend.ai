@@ -58,11 +58,47 @@ REV_PRESET=$(./bai admin deployment revision-preset create "{
 REV_PRESET_ID=$(echo "$REV_PRESET" | python3 -c "import sys,json; print(json.load(sys.stdin)['preset']['id'])")
 echo "  Created: vllm-4gpu revision preset ($REV_PRESET_ID)"
 
+echo ""
+echo "--- A-3: Create CPU-only preset with health check (for E2E route testing) ---"
+
+CPU_PRESET=$(./bai admin deployment revision-preset create "{
+  \"runtime_variant_id\": \"$VLLM_VARIANT_ID\",
+  \"name\": \"e2e-cpu-healthcheck\",
+  \"description\": \"CPU-only preset with serve.py health check for E2E testing\",
+  \"image\": \"$IMAGE_ID\",
+  \"resource_slots\": [
+    {\"resource_type\": \"cpu\", \"quantity\": \"1\"},
+    {\"resource_type\": \"mem\", \"quantity\": \"1g\"}
+  ],
+  \"startup_command\": \"python /models/serve.py\",
+  \"model_definition\": {
+    \"models\": [{
+      \"name\": \"test-model\",
+      \"model_path\": \"/models\",
+      \"service\": {
+        \"start_command\": \"python /models/serve.py\",
+        \"port\": 8000,
+        \"health_check\": {
+          \"path\": \"/health\",
+          \"interval\": 5,
+          \"max_retries\": 3,
+          \"expected_status_code\": 200
+        }
+      }
+    }]
+  },
+  \"cluster_mode\": \"single-node\",
+  \"cluster_size\": 1
+}" 2>&1)
+CPU_PRESET_ID=$(echo "$CPU_PRESET" | python3 -c "import sys,json; print(json.load(sys.stdin)['preset']['id'])")
+echo "  Created: cpu-healthcheck preset ($CPU_PRESET_ID)"
+
 # Export for subsequent scripts
-export TP_PRESET_ID GPU_MEM_PRESET_ID REV_PRESET_ID
+export TP_PRESET_ID GPU_MEM_PRESET_ID REV_PRESET_ID CPU_PRESET_ID
 
 echo ""
 echo "--- Setup complete ---"
 echo "  TP_PRESET_ID:      $TP_PRESET_ID"
 echo "  GPU_MEM_PRESET_ID: $GPU_MEM_PRESET_ID"
 echo "  REV_PRESET_ID:     $REV_PRESET_ID"
+echo "  CPU_PRESET_ID:     $CPU_PRESET_ID"

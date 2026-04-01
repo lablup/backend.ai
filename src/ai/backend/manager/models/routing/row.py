@@ -25,6 +25,7 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
+    StrEnumType,
 )
 
 if TYPE_CHECKING:
@@ -83,7 +84,7 @@ class RoutingRow(Base):  # type: ignore[misc]
     )
     health_status: Mapped[RouteHealthStatus] = mapped_column(
         "health_status",
-        EnumValueType(RouteHealthStatus),
+        StrEnumType(RouteHealthStatus),
         nullable=False,
         default=RouteHealthStatus.NOT_CHECKED,
         server_default=sa.text("'not_checked'"),

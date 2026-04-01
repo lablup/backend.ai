@@ -7,7 +7,7 @@ set -euo pipefail
 source "$(dirname "$0")/00-env.sh"
 
 echo "--- Cleanup: Deployments ---"
-for name in e2e-manual-deploy e2e-preset-deploy e2e-override-deploy; do
+for name in e2e-manual-deploy e2e-preset-deploy e2e-override-deploy e2e-route-health; do
   DEP_ID=$(./bai admin deployment search --name-contains "$name" --limit 1 2>&1 \
     | python3 -c "import sys,json; items=json.load(sys.stdin)['items']; print(items[0]['id'] if items else '')" 2>/dev/null)
   if [ -n "$DEP_ID" ]; then
@@ -16,7 +16,7 @@ for name in e2e-manual-deploy e2e-preset-deploy e2e-override-deploy; do
 done
 
 echo "--- Cleanup: Deployment revision presets ---"
-for name in e2e-vllm-4gpu; do
+for name in e2e-vllm-4gpu e2e-cpu-healthcheck; do
   PRESET_ID=$(./bai admin deployment revision-preset search --name-contains "$name" --limit 1 2>&1 \
     | python3 -c "import sys,json; items=json.load(sys.stdin)['items']; print(items[0]['id'] if items else '')" 2>/dev/null)
   if [ -n "$PRESET_ID" ]; then

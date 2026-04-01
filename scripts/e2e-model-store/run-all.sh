@@ -37,6 +37,7 @@ run_scenario "$SCRIPT_DIR/03-deploy-with-preset.sh"
 run_scenario "$SCRIPT_DIR/04-deploy-preset-override.sh"
 run_scenario "$SCRIPT_DIR/05-add-revision-with-preset.sh"
 run_scenario "$SCRIPT_DIR/06-revision-lifecycle.sh"
+run_scenario "$SCRIPT_DIR/07-route-health-lifecycle.sh"
 
 echo ""
 echo "================================================================"

@@ -53,6 +53,7 @@ class HealthCheckRouteHandler(RouteHandler):
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
             health=[
+                RouteHealthStatus.NOT_CHECKED,
                 RouteHealthStatus.HEALTHY,
                 RouteHealthStatus.UNHEALTHY,
                 RouteHealthStatus.DEGRADED,
