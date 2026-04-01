@@ -9725,7 +9725,7 @@ type ScopeEntityOperationCombination {
 }
 
 """
-Added in 26.3.0. Scope reference for associating an entity with a scope.
+Added in UNRELEASED. Scope reference for associating an entity with a scope.
 """
 input ScopeInput {
   scopeType: RBACElementType!
