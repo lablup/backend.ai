@@ -132,6 +132,7 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -520,6 +521,12 @@ class RBACAdapter(BaseAdapter):
 
     async def create(self, input: CreateRoleInput) -> CreateRolePayload:
         """Create a new role."""
+        scope_ref: RBACElementRef | None = None
+        if input.scope is not None:
+            scope_ref = RBACElementRef(
+                element_type=RBACElementType(input.scope.scope_type),
+                element_id=input.scope.scope_id,
+            )
         creator = Creator(
             spec=RoleCreatorSpec(
                 name=input.name,
@@ -529,7 +536,7 @@ class RBACAdapter(BaseAdapter):
             )
         )
         action_result = await self._processors.permission_controller.create_role.wait_for_complete(
-            CreateRoleAction(creator=creator)
+            CreateRoleAction(creator=creator, scope_ref=scope_ref)
         )
         return CreateRolePayload(role=self._role_data_to_node(action_result.data))
 

@@ -100,6 +100,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.rbac.types.scope import ScopeInputGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -491,6 +492,7 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     name: str
     description: str | None = None
     source: RoleSourceGQL = RoleSourceGQL.CUSTOM
+    scope: ScopeInputGQL | None = None
 
 
 @gql_pydantic_input(

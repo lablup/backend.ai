@@ -11,7 +11,14 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 
-from .types import OrderDirection, RoleSource, RoleSourceFilter, RoleStatus, RoleStatusFilter
+from .types import (
+    OrderDirection,
+    RoleSource,
+    RoleSourceFilter,
+    RoleStatus,
+    RoleStatusFilter,
+    ScopeInput,
+)
 
 __all__ = (
     "AdminSearchEntitiesGQLInput",
@@ -48,6 +55,7 @@ class CreateRoleInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=256, description="Role name")
     description: str | None = Field(default=None, description="Role description")
     source: RoleSource = Field(default=RoleSource.CUSTOM, description="Role source")
+    scope: ScopeInput | None = Field(default=None, description="Scope to register the role in")
 
     @field_validator("name")
     @classmethod

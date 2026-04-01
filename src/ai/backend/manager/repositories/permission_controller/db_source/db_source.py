@@ -71,6 +71,10 @@ from ai.backend.manager.repositories.base.creator import (
 )
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     ObjectPermissionCreatorSpec,
@@ -90,6 +94,7 @@ class CreateRoleInput:
 
     creator: Creator[RoleRow]
     object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation]
+    scope_ref: RBACElementRef | None = None
 
 
 class PermissionDBSource:
@@ -103,6 +108,8 @@ class PermissionDBSource:
         Create a new role with object permissions.
 
         All related entities are created in a single transaction.
+        When scope_ref is provided, the role is also registered in
+        association_scopes_entities via RBACEntityCreator.
 
         Args:
             input_data: Input containing creator and object permissions
@@ -111,9 +118,15 @@ class PermissionDBSource:
             Created role row
         """
         async with self._db.begin_session() as db_session:
-            # 1. Create role
-            result = await execute_creator(db_session, input_data.creator)
-            role_row = result.row
+            if input_data.scope_ref is not None:
+                rbac_creator = RBACEntityCreator(
+                    spec=input_data.creator.spec,
+                    element_type=RBACElementType.ROLE,
+                    scope_ref=input_data.scope_ref,
+                )
+                role_row = (await execute_rbac_entity_creator(db_session, rbac_creator)).row
+            else:
+                role_row = (await execute_creator(db_session, input_data.creator)).row
 
             await db_session.refresh(role_row)
             return role_row

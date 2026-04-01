@@ -46,7 +46,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
-    RBACElementTypeDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
@@ -63,21 +62,13 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
+from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
 
 # ==================== Enums ====================
-
-RBACElementTypeGQL: type[RBACElementTypeDTO] = gql_enum(
-    BackendAIGQLMeta(
-        added_version="26.3.0",
-        description="Unified RBAC element type for scope-entity relationships",
-    ),
-    RBACElementTypeDTO,
-    name="RBACElementType",
-)
 
 OperationTypeGQL: type[OperationTypeDTO] = gql_enum(
     BackendAIGQLMeta(added_version="26.3.0", description="RBAC operation type"),
