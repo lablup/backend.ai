@@ -9,6 +9,7 @@ from typing import Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.exception import BackendAIError, UserNotFound
@@ -317,7 +318,7 @@ class AuthDBSource:
 
     async def _check_password(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
+        conn: AsyncConnection,
         row: sa.Row[Any],
         target_password_info: PasswordInfo,
     ) -> None:
@@ -332,7 +333,7 @@ class AuthDBSource:
 
     async def _migrate_password_hash(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
+        conn: AsyncConnection,
         row: sa.Row[Any],
         domain_name: str,
         email: str,
@@ -349,7 +350,7 @@ class AuthDBSource:
 
     async def _record_login_history(
         self,
-        conn: sa.ext.asyncio.AsyncConnection,
+        conn: AsyncConnection,
         user_id: UUID,
         domain_name: str,
         result: LoginAttemptResult,

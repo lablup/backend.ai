@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common.health_checker.types import CID_POSTGRES
 from ai.backend.common.typed_validators import HostPortPair
@@ -49,7 +50,7 @@ class TestDatabaseHealthChecker:
     async def test_timeout_property(self) -> None:
         """Test that timeout property returns the correct value."""
         # Create a dummy engine (won't be used for actual connection)
-        dummy_engine = sa.ext.asyncio.create_async_engine(
+        dummy_engine = create_async_engine(
             "postgresql+asyncpg://invalid:invalid@localhost:99999/invalid",
             echo=False,
         )
@@ -84,7 +85,7 @@ class TestDatabaseHealthChecker:
     async def test_invalid_connection(self) -> None:
         """Test health check failure with invalid database connection."""
         # Create engine with invalid connection string
-        invalid_engine = sa.ext.asyncio.create_async_engine(
+        invalid_engine = create_async_engine(
             "postgresql+asyncpg://invalid:invalid@localhost:99999/invalid",
             echo=False,
         )
