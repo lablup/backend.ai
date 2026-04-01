@@ -20,6 +20,11 @@ else
     git commit -m "chore: update webui to $WEBUI_VERSION"
 fi
 
+# Update external tool binaries (bssh, all-smi, etc.)
+echo "Updating external tool binaries..."
+./scripts/download-external-tools.sh
+git commit -m "chore: update external tool binaries"
+
 # Check dependencies
 pants tailor --check update-build-files --check '::'
 pants check ::
