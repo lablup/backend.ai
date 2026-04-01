@@ -421,6 +421,7 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]) -> None:
     raw_client_addr: str | None = request.headers.get("X-Forwarded-For") or request.remote
     if raw_client_addr is None:
         raise AuthorizationFailed("Not allowed IP address")
+    raw_client_addr = raw_client_addr.split(",")[0].strip()
     try:
         client_addr: ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] = ReadableCIDR(
             raw_client_addr, is_network=False
