@@ -5,6 +5,7 @@ Tests for VFolderService and VFolderFileService functionality.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -313,6 +314,13 @@ class TestVFolderFileServiceCreateArchiveDownload:
         assert call_kwargs["filename"] is None
 
 
+@dataclass(frozen=True)
+class CloneUsageModeCase:
+    source: VFolderUsageMode
+    request: VFolderUsageMode | None
+    expected: VFolderUsageMode
+
+
 class TestVFolderServiceCloneUsageModeInheritance:
     """Regression tests for BA-5527: clone should inherit source vfolder's usage_mode."""
 
@@ -402,14 +410,16 @@ class TestVFolderServiceCloneUsageModeInheritance:
         )
 
     @pytest.mark.parametrize(
-        ("source_usage_mode", "request_usage_mode", "expected_usage_mode"),
+        "case",
         [
             # None → inherit from source
-            (VFolderUsageMode.MODEL, None, VFolderUsageMode.MODEL),
-            (VFolderUsageMode.GENERAL, None, VFolderUsageMode.GENERAL),
-            (VFolderUsageMode.DATA, None, VFolderUsageMode.DATA),
+            CloneUsageModeCase(VFolderUsageMode.MODEL, None, VFolderUsageMode.MODEL),
+            CloneUsageModeCase(VFolderUsageMode.GENERAL, None, VFolderUsageMode.GENERAL),
+            CloneUsageModeCase(VFolderUsageMode.DATA, None, VFolderUsageMode.DATA),
             # explicit → override source
-            (VFolderUsageMode.MODEL, VFolderUsageMode.GENERAL, VFolderUsageMode.GENERAL),
+            CloneUsageModeCase(
+                VFolderUsageMode.MODEL, VFolderUsageMode.GENERAL, VFolderUsageMode.GENERAL
+            ),
         ],
     )
     async def test_clone_usage_mode_resolution(
@@ -419,12 +429,10 @@ class TestVFolderServiceCloneUsageModeInheritance:
         user_uuid: uuid.UUID,
         source_vfolder_uuid: uuid.UUID,
         source_vfolder_data: VFolderData,
-        source_usage_mode: VFolderUsageMode,
-        request_usage_mode: VFolderUsageMode | None,
-        expected_usage_mode: VFolderUsageMode,
+        case: CloneUsageModeCase,
     ) -> None:
         """Clone should inherit source usage_mode when None, or use explicit value."""
-        source_vfolder_data.usage_mode = source_usage_mode
+        source_vfolder_data.usage_mode = case.source
 
         action = CloneVFolderAction(
             requester_user_uuid=user_uuid,
@@ -433,13 +441,13 @@ class TestVFolderServiceCloneUsageModeInheritance:
             target_host="local:volume1",
             target_quota_scope_id=None,
             cloneable=False,
-            usage_mode=request_usage_mode,
+            usage_mode=case.request,
             mount_permission=VFolderPermission.READ_WRITE,
         )
 
         result = await mock_service.clone(action)
 
         assert isinstance(result, CloneVFolderActionResult)
-        assert result.usage_mode == expected_usage_mode
+        assert result.usage_mode == case.expected
         clone_info = mock_repo.initiate_vfolder_clone.call_args[0][0]
-        assert clone_info.usage_mode == expected_usage_mode
+        assert clone_info.usage_mode == case.expected
