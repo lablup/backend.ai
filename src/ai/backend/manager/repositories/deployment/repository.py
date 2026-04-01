@@ -730,6 +730,25 @@ class DeploymentRepository:
         await self._valkey_schedule.initialize_routes_health_status_batch(route_id_strings)
 
     @deployment_repository_resilience.apply()
+    async def fetch_kernel_connection_info(
+        self,
+        session_ids: list[SessionId],
+    ) -> dict[SessionId, tuple[str, int]]:
+        """Fetch kernel_host and inference port for sessions.
+
+        Returns mapping of session_id to (host, port) tuple.
+        """
+        return await self._db_source.fetch_kernel_connection_info(session_ids)
+
+    @deployment_repository_resilience.apply()
+    async def update_route_replica_info(
+        self,
+        updates: dict[uuid.UUID, tuple[str, int]],
+    ) -> None:
+        """Update replica_host and replica_port for routes."""
+        await self._db_source.update_route_replica_info(updates)
+
+    @deployment_repository_resilience.apply()
     async def delete_routes_by_route_ids(
         self,
         route_ids: set[uuid.UUID],

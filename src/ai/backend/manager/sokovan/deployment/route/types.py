@@ -15,6 +15,7 @@ class RouteLifecycleType(StrEnum):
     ROUTE_EVICTION = "route_eviction"
     TERMINATING = "terminating"
     SERVICE_DISCOVERY_SYNC = "service_discovery_sync"
+    OBSERVE_HEALTH = "observe_health"
 
 
 @dataclass

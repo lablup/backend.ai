@@ -1856,6 +1856,47 @@ class DeploymentDBSource:
                 )
                 await db_sess.execute(query)
 
+    async def fetch_kernel_connection_info(
+        self,
+        session_ids: list[SessionId],
+    ) -> dict[SessionId, tuple[str, int]]:
+        """Fetch kernel_host and inference port for sessions."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(
+                KernelRow.session_id,
+                KernelRow.kernel_host,
+                KernelRow.service_ports,
+            ).where(
+                KernelRow.session_id.in_(session_ids),
+                KernelRow.cluster_role == "main",
+            )
+            result = await db_sess.execute(query)
+            info: dict[SessionId, tuple[str, int]] = {}
+            for row in result:
+                if not row.kernel_host or not row.service_ports:
+                    continue
+                for sp in row.service_ports:
+                    if sp.get("is_inference"):
+                        host_ports = sp.get("host_ports", [])
+                        if host_ports:
+                            info[SessionId(row.session_id)] = (row.kernel_host, host_ports[0])
+                        break
+            return info
+
+    async def update_route_replica_info(
+        self,
+        updates: dict[uuid.UUID, tuple[str, int]],
+    ) -> None:
+        """Update replica_host and replica_port for routes."""
+        async with self._begin_session_read_committed() as db_sess:
+            for route_id, (host, port) in updates.items():
+                query = (
+                    sa.update(RoutingRow)
+                    .where(RoutingRow.id == route_id)
+                    .values(replica_host=host, replica_port=port)
+                )
+                await db_sess.execute(query)
+
     async def delete_routes_by_route_ids(
         self,
         route_ids: set[uuid.UUID],

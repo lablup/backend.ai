@@ -19,6 +19,7 @@ from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
@@ -35,6 +36,10 @@ from ai.backend.manager.sokovan.deployment.route.handlers import (
     RouteHandler,
     ServiceDiscoverySyncHandler,
     TerminatingRouteHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
+    RouteHealthObserver,
+    RouteObserver,
 )
 from ai.backend.manager.sokovan.deployment.route.handlers.running import RunningRouteHandler
 from ai.backend.manager.sokovan.deployment.route.recorder import RouteRecorderContext
@@ -118,6 +123,16 @@ class RouteCoordinator:
             service_discovery=service_discovery,
         )
         self._route_handlers = self._init_handlers(executor)
+        self._route_observers = self._init_observers()
+
+    def _init_observers(self) -> Mapping[RouteLifecycleType, RouteObserver]:
+        """Initialize route observers (no state transitions)."""
+        return {
+            RouteLifecycleType.OBSERVE_HEALTH: RouteHealthObserver(
+                deployment_repository=self._deployment_repository,
+                valkey_schedule=self._valkey_schedule,
+            ),
+        }
 
     def _init_handlers(self, executor: RouteExecutor) -> Mapping[RouteLifecycleType, RouteHandler]:
         """Initialize and return the mapping of route lifecycle types to their handlers."""
@@ -157,6 +172,12 @@ class RouteCoordinator:
         Args:
             lifecycle_type: Type of route lifecycle operation to process
         """
+        # Check for observer first (no state transitions)
+        observer = self._route_observers.get(lifecycle_type)
+        if observer:
+            await self._process_observer(observer)
+            return
+
         handler = self._route_handlers.get(lifecycle_type)
         if not handler:
             log.warning("No handler for route lifecycle type: {}", lifecycle_type.value)
@@ -192,6 +213,29 @@ class RouteCoordinator:
                 await handler.post_process(result)
             except Exception as e:
                 log.error("Error during post-processing: {}", e)
+
+    async def _process_observer(self, observer: RouteObserver) -> None:
+        """Process a route observer (no state transitions).
+
+        Observers collect data (e.g., health check results) without
+        changing route status in DB.
+        """
+        try:
+            routes = await self._deployment_repository.get_routes_by_statuses(
+                [RouteStatus.RUNNING],
+                list(RouteHealthStatus),
+            )
+            if not routes:
+                return
+
+            result = await observer.observe(routes)
+            log.debug(
+                "Observer {}: observed {} routes",
+                observer.name(),
+                result.observed_count,
+            )
+        except Exception:
+            log.exception("Error in route observer {}", observer.name())
 
     async def _handle_status_transitions(
         self,
@@ -385,6 +429,13 @@ class RouteCoordinator:
                 short_interval=None,  # No short-cycle for sync
                 long_interval=60.0,
                 initial_delay=30.0,
+            ),
+            # Health observer - manager fallback health check for stale routes
+            RouteTaskSpec(
+                RouteLifecycleType.OBSERVE_HEALTH,
+                short_interval=None,
+                long_interval=30.0,
+                initial_delay=15.0,
             ),
         ]
 

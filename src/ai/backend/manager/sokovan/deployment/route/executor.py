@@ -187,10 +187,34 @@ class RouteExecutor:
                     )
                 )
 
+        # Phase 3: Populate replica connection info for routes missing it
+        routes_missing_replica = [r for r in successes if not r.replica_host]
+        if routes_missing_replica:
+            with RouteRecorderContext.shared_phase("populate_replica_info"):
+                with RouteRecorderContext.shared_step("fetch_kernel_connection_info"):
+                    await self._populate_replica_info(routes_missing_replica)
+
         return RouteExecutionResult(
             successes=successes,
             errors=errors,
         )
+
+    async def _populate_replica_info(self, routes: Sequence[RouteData]) -> None:
+        """Fetch kernel host/port and store on route for future health checks."""
+        session_ids = [r.session_id for r in routes if r.session_id]
+        if not session_ids:
+            return
+
+        kernel_info = await self._deployment_repo.fetch_kernel_connection_info(session_ids)
+        updates: dict[UUID, tuple[str, int]] = {}
+        for route in routes:
+            if route.session_id and route.session_id in kernel_info:
+                info = kernel_info[route.session_id]
+                if info[0] and info[1]:
+                    updates[route.route_id] = info
+
+        if updates:
+            await self._deployment_repo.update_route_replica_info(updates)
 
     async def check_route_health(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """
