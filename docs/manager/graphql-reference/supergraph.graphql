@@ -2782,7 +2782,7 @@ input CreateDeploymentInput
   networkAccess: ModelDeploymentNetworkAccessInput!
   defaultDeploymentStrategy: DeploymentStrategyInput!
   desiredReplicaCount: Int!
-  initialRevision: CreateRevisionInput!
+  initialRevision: CreateRevisionInput = null
 }
 
 """Added in 25.19.0. Payload for creating a model deployment."""
