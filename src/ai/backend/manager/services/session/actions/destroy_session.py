@@ -1,25 +1,27 @@
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.base import (
+    SessionSingleEntityAction,
+    SessionSingleEntityActionResult,
+)
 
 
 # TODO: Change this to BatchAction since it can destroy multiple sessions with recursive option
 @dataclass
-class DestroySessionAction(SessionAction):
+class DestroySessionAction(SessionSingleEntityAction):
     user_role: UserRole
     session_name: str
     forced: bool
     recursive: bool
     owner_access_key: AccessKey
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    session_id: uuid.UUID | None = field(default=None)
 
     @override
     @classmethod
@@ -29,13 +31,25 @@ class DestroySessionAction(SessionAction):
         #     return "destroy_multi"
         return ActionOperationType.DELETE
 
+    @override
+    def target_entity_id(self) -> str:
+        if self.session_id is None:
+            raise ValueError("session_id is required for RBAC validation but was not set")
+        return str(self.session_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        if self.session_id is None:
+            raise ValueError("session_id is required for RBAC validation but was not set")
+        return RBACElementRef(RBACElementType.SESSION, str(self.session_id))
+
 
 @dataclass
-class DestroySessionActionResult(BaseActionResult):
+class DestroySessionActionResult(SessionSingleEntityActionResult):
     # TODO: Add proper type
     result: Any
 
     # TODO: Change this to `entity_ids`
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def target_entity_id(self) -> str:
+        return ""
