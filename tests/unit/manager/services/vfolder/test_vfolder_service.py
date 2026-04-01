@@ -333,34 +333,14 @@ class TestVFolderServiceCloneUsageModeInheritance:
         return uuid.uuid4()
 
     @pytest.fixture
-    def mock_repo(
-        self,
-        user_uuid: uuid.UUID,
-        target_vfolder_uuid: uuid.UUID,
-        bgtask_id: uuid.UUID,
-    ) -> MagicMock:
-        repo = MagicMock(spec=VfolderRepository)
-        repo.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
-        repo.check_vfolder_name_exists = AsyncMock(return_value=False)
-        repo.get_allowed_vfolder_hosts = AsyncMock(return_value={})
-        repo.ensure_host_permission_allowed = AsyncMock()
-        repo.get_max_vfolder_count = AsyncMock(return_value=0)
-        repo.get_user_email_by_id = AsyncMock(return_value="test@example.com")
-        repo.initiate_vfolder_clone = AsyncMock(return_value=(bgtask_id, target_vfolder_uuid))
-        return repo
-
-    def _make_source_vfolder_data(
-        self,
-        vfolder_uuid: uuid.UUID,
-        usage_mode: VFolderUsageMode,
-    ) -> VFolderData:
+    def source_vfolder_data(self, source_vfolder_uuid: uuid.UUID) -> VFolderData:
         return VFolderData(
-            id=vfolder_uuid,
+            id=source_vfolder_uuid,
             name="source-vfolder",
             host="local:volume1",
             domain_name="default",
-            quota_scope_id=QuotaScopeID.parse(f"user:{vfolder_uuid}"),
-            usage_mode=usage_mode,
+            quota_scope_id=QuotaScopeID.parse(f"user:{source_vfolder_uuid}"),
+            usage_mode=VFolderUsageMode.MODEL,
             permission=VFolderMountPermission.READ_WRITE,
             max_files=0,
             max_size=None,
@@ -371,34 +351,48 @@ class TestVFolderServiceCloneUsageModeInheritance:
             creator="test@example.com",
             unmanaged_path=None,
             ownership_type=VFolderOwnershipType.USER,
-            user=vfolder_uuid,
+            user=source_vfolder_uuid,
             group=None,
             cloneable=True,
             status=VFolderOperationStatus.READY,
         )
 
-    def _setup_list_accessible_vfolders(
+    @pytest.fixture
+    def mock_repo(
         self,
-        mock_repo: MagicMock,
-        source_data: VFolderData,
-    ) -> None:
-        mock_repo.list_accessible_vfolders = AsyncMock(
+        target_vfolder_uuid: uuid.UUID,
+        bgtask_id: uuid.UUID,
+        source_vfolder_data: VFolderData,
+    ) -> MagicMock:
+        repo = MagicMock(spec=VfolderRepository)
+        repo.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
+        repo.check_vfolder_name_exists = AsyncMock(return_value=False)
+        repo.get_allowed_vfolder_hosts = AsyncMock(return_value={})
+        repo.ensure_host_permission_allowed = AsyncMock()
+        repo.get_max_vfolder_count = AsyncMock(return_value=0)
+        repo.get_user_email_by_id = AsyncMock(return_value="test@example.com")
+        repo.initiate_vfolder_clone = AsyncMock(return_value=(bgtask_id, target_vfolder_uuid))
+        repo.list_accessible_vfolders = AsyncMock(
             return_value=VFolderListResult(
                 vfolders=[
                     VFolderAccessInfo(
-                        vfolder_data=source_data,
+                        vfolder_data=source_vfolder_data,
                         is_owner=True,
                         effective_permission=VFolderMountPermission.READ_WRITE,
                     ),
                 ],
             )
         )
+        return repo
 
-    def _make_service(self, mock_repo: MagicMock) -> VFolderService:
-        mock_config = MagicMock()
-        mock_config.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(return_value=["user"])
+    @pytest.fixture
+    def mock_service(
+        self,
+        mock_repo: MagicMock,
+        mock_config_provider: MagicMock,
+    ) -> VFolderService:
         return VFolderService(
-            config_provider=mock_config,
+            config_provider=mock_config_provider,
             etcd=MagicMock(),
             storage_manager=MagicMock(),
             background_task_manager=MagicMock(),
@@ -413,15 +407,26 @@ class TestVFolderServiceCloneUsageModeInheritance:
     )
     async def test_clone_inherits_source_usage_mode_when_not_specified(
         self,
+        mock_service: VFolderService,
         mock_repo: MagicMock,
         user_uuid: uuid.UUID,
         source_vfolder_uuid: uuid.UUID,
+        source_vfolder_data: VFolderData,
         source_usage_mode: VFolderUsageMode,
     ) -> None:
         """When usage_mode is None, clone should inherit source vfolder's usage_mode."""
-        source_data = self._make_source_vfolder_data(source_vfolder_uuid, source_usage_mode)
-        self._setup_list_accessible_vfolders(mock_repo, source_data)
-        service = self._make_service(mock_repo)
+        source_vfolder_data.usage_mode = source_usage_mode
+        mock_repo.list_accessible_vfolders = AsyncMock(
+            return_value=VFolderListResult(
+                vfolders=[
+                    VFolderAccessInfo(
+                        vfolder_data=source_vfolder_data,
+                        is_owner=True,
+                        effective_permission=VFolderMountPermission.READ_WRITE,
+                    ),
+                ],
+            )
+        )
 
         action = CloneVFolderAction(
             requester_user_uuid=user_uuid,
@@ -434,7 +439,7 @@ class TestVFolderServiceCloneUsageModeInheritance:
             mount_permission=VFolderPermission.READ_WRITE,
         )
 
-        result = await service.clone(action)
+        result = await mock_service.clone(action)
 
         assert isinstance(result, CloneVFolderActionResult)
         assert result.usage_mode == source_usage_mode
@@ -443,15 +448,12 @@ class TestVFolderServiceCloneUsageModeInheritance:
 
     async def test_clone_uses_explicit_usage_mode_over_source(
         self,
+        mock_service: VFolderService,
         mock_repo: MagicMock,
         user_uuid: uuid.UUID,
         source_vfolder_uuid: uuid.UUID,
     ) -> None:
         """When usage_mode is explicitly specified, it should override the source's."""
-        source_data = self._make_source_vfolder_data(source_vfolder_uuid, VFolderUsageMode.MODEL)
-        self._setup_list_accessible_vfolders(mock_repo, source_data)
-        service = self._make_service(mock_repo)
-
         action = CloneVFolderAction(
             requester_user_uuid=user_uuid,
             source_vfolder_uuid=source_vfolder_uuid,
@@ -463,7 +465,7 @@ class TestVFolderServiceCloneUsageModeInheritance:
             mount_permission=VFolderPermission.READ_WRITE,
         )
 
-        result = await service.clone(action)
+        result = await mock_service.clone(action)
 
         assert result.usage_mode == VFolderUsageMode.GENERAL
         clone_info = mock_repo.initiate_vfolder_clone.call_args[0][0]
