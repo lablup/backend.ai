@@ -194,6 +194,10 @@ class CreateRevisionInputDTO(BaseRequestModel):
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Additional vfolder mounts"
     )
+    auto_activate: bool = Field(
+        default=False,
+        description="If true, automatically activate this revision after creation.",
+    )
 
 
 class AddRevisionGQLInputDTO(BaseRequestModel):
@@ -216,6 +220,10 @@ class AddRevisionGQLInputDTO(BaseRequestModel):
     )
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Additional vfolder mounts"
+    )
+    auto_activate: bool = Field(
+        default=False,
+        description="If true, automatically activate this revision after creation.",
     )
 
 

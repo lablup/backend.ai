@@ -1,5 +1,6 @@
 """Deployment service for managing model deployments."""
 
+import dataclasses
 import logging
 from datetime import UTC, datetime
 
@@ -386,16 +387,15 @@ class DeploymentService:
 
         # Create initial revision via the same path as add_model_revision
         # to ensure preset/merge/resolve logic is applied consistently.
+        # Force auto_activate for initial revision so deployment starts provisioning.
+        initial_revision_creator = dataclasses.replace(
+            action.creator.model_revision, auto_activate=True
+        )
         await self.add_model_revision(
             AddModelRevisionAction(
                 model_deployment_id=deployment_info.id,
-                adder=action.creator.model_revision,
+                adder=initial_revision_creator,
             )
-        )
-
-        # Mark lifecycle needed to start provisioning
-        await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.CHECK_PENDING
         )
 
         # Re-fetch deployment info to include the created revision
@@ -764,6 +764,16 @@ class DeploymentService:
         revision_data = await self._deployment_repository.create_revision_with_next_number(
             creator, deployment_id
         )
+
+        # Auto-activate revision if requested
+        if action.adder.auto_activate:
+            await self.activate_revision(
+                ActivateRevisionAction(
+                    deployment_id=deployment_id,
+                    revision_id=revision_data.id,
+                )
+            )
+
         return AddModelRevisionActionResult(revision=revision_data)
 
     async def get_revision_by_id(

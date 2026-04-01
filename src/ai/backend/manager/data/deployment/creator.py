@@ -42,6 +42,7 @@ class ModelRevisionCreator:
     execution: ExecutionSpec
     model_definition: ModelDefinition | None
     revision_preset_id: UUID | None = None
+    auto_activate: bool = False
 
 
 @dataclass
