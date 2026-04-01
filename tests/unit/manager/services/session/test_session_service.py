@@ -592,6 +592,7 @@ class TestDestroySession:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         mock_scheduling_controller: MagicMock,
+        sample_session_id: SessionId,
         sample_access_key: AccessKey,
     ) -> None:
         """Test destroying sessions recursively"""

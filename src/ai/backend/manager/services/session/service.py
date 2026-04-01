@@ -765,6 +765,7 @@ class SessionService:
             action.session_name,
             action.owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.NONE,
+            allow_stale=True,
         )
         return ResolveSessionActionResult(session_id=session.id)
 
@@ -928,7 +929,7 @@ class SessionService:
 
         resp = {}
         session = await self._session_repository.get_session_validated(
-            session_id,
+            SessionId(session_id),
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
@@ -1153,7 +1154,7 @@ class SessionService:
         owner_access_key = action.owner_access_key
 
         sess = await self._session_repository.get_session_validated(
-            session_id,
+            SessionId(session_id),
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
