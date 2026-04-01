@@ -57,16 +57,27 @@ class RuntimeVariantOrderFieldGQL(StrEnum):
 
 
 @gql_node_type(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="A runtime variant entity."),
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Represents an inference runtime engine definition (e.g., vLLM, SGLang, NIM, TGI). Previously hardcoded as an enum, runtime variants are now managed as dynamic database entities to allow administrators to register and configure new inference runtimes without code changes.",
+    ),
     name="RuntimeVariant",
 )
 class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
-    row_id: UUID = gql_field(description="Runtime variant ID.")
-    name: str = gql_field(description="Unique name.")
-    description: str | None = gql_field(description="Description.")
-    created_at: datetime = gql_field(description="Creation timestamp.")
-    updated_at: datetime | None = gql_field(description="Last update timestamp.")
+    row_id: UUID = gql_field(description="The unique database identifier of this runtime variant.")
+    name: str = gql_field(
+        description="Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang', 'nim', 'tgi')."
+    )
+    description: str | None = gql_field(
+        description="Human-readable description explaining the runtime engine and its typical use cases."
+    )
+    created_at: datetime = gql_field(
+        description="Timestamp when this runtime variant was registered."
+    )
+    updated_at: datetime | None = gql_field(
+        description="Timestamp of the last modification to this runtime variant."
+    )
 
 
 RuntimeVariantEdge = Edge[RuntimeVariantGQL]
@@ -111,8 +122,12 @@ class RuntimeVariantOrderByGQL(PydanticInputMixin[RuntimeVariantOrderDTO]):
     name="CreateRuntimeVariantInput",
 )
 class CreateRuntimeVariantInputGQL(PydanticInputMixin[CreateRuntimeVariantInputDTO]):
-    name: str = gql_field(description="Unique name.")
-    description: str | None = gql_field(default=None, description="Description.")
+    name: str = gql_field(
+        description="Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang')."
+    )
+    description: str | None = gql_field(
+        default=None, description="Human-readable description of the runtime engine."
+    )
 
 
 @gql_pydantic_input(

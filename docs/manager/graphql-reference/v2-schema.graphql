@@ -2576,6 +2576,21 @@ type DeploymentRevisionPreset implements Node {
   """Display order rank."""
   rank: Int!
 
+  """Cluster configuration."""
+  cluster: PresetClusterSpec!
+
+  """Resource allocation."""
+  resource: PresetResourceAllocation!
+
+  """Execution specification."""
+  execution: PresetExecutionSpec!
+
+  """Model definition configuration."""
+  modelDefinition: ModelDefinition
+
+  """Preset values."""
+  presetValues: [DeploymentRevisionPresetValueEntry!]!
+
   """Creation timestamp."""
   createdAt: DateTime!
 
@@ -2627,6 +2642,15 @@ enum DeploymentRevisionPresetOrderField {
   NAME
   RANK
   CREATED_AT
+}
+
+"""Added in UNRELEASED. A preset value entry."""
+type DeploymentRevisionPresetValueEntry {
+  """Runtime variant preset ID."""
+  presetId: UUID!
+
+  """Value for this preset."""
+  value: String!
 }
 
 """Added in 24.09.0. Scope for deployment scheduling history query"""
@@ -4560,6 +4584,9 @@ type ModelCardV2 implements Node {
   """Creator user ID."""
   creatorId: UUID!
 
+  """Model metadata."""
+  metadata: ModelCardV2Metadata!
+
   """README content."""
   readme: String
 
@@ -4599,6 +4626,22 @@ input ModelCardV2Filter {
 
   """Project filter."""
   projectId: UUID = null
+}
+
+"""
+Added in UNRELEASED. Model card metadata including author, version, and classification info.
+"""
+type ModelCardV2Metadata {
+  author: String
+  title: String
+  modelVersion: String
+  description: String
+  task: String
+  category: String
+  architecture: String
+  framework: [String!]!
+  label: [String!]!
+  license: String
 }
 
 """Added in UNRELEASED. Order specification."""
@@ -6184,6 +6227,62 @@ type PresetAvailabilityV2 {
 
   """Whether this preset can be used for session creation."""
   available: Boolean!
+}
+
+"""
+Added in UNRELEASED. Cluster configuration for a deployment revision preset.
+"""
+type PresetClusterSpec {
+  """Cluster mode."""
+  clusterMode: String!
+
+  """Cluster size."""
+  clusterSize: Int!
+}
+
+"""
+Added in UNRELEASED. Execution specification for a deployment revision preset.
+"""
+type PresetExecutionSpec {
+  """Container image reference."""
+  image: String
+
+  """Startup command."""
+  startupCommand: String
+
+  """Bootstrap script."""
+  bootstrapScript: String
+
+  """Environment variables."""
+  environ: [EnvironmentVariableEntry!]!
+}
+
+"""
+Added in UNRELEASED. Resource allocation for a deployment revision preset.
+"""
+type PresetResourceAllocation {
+  """Resource slot allocations."""
+  resourceSlots: [ResourceSlotEntry!]!
+
+  """Additional resource options."""
+  resourceOpts: [ResourceOptsEntry!]!
+}
+
+"""
+Added in UNRELEASED. Preset target specification defining how the value is applied.
+"""
+type PresetTargetSpec {
+  """Target: env or args."""
+  presetTarget: String!
+
+  """Value type: str, int, float, bool."""
+  valueType: String!
+
+  """Default value."""
+  defaultValue: String
+
+  """Env key or args flag."""
+  key: String!
 }
 
 """
@@ -8851,6 +8950,9 @@ type RuntimeVariantPreset implements Node {
 
   """Display order rank."""
   rank: Int!
+
+  """Preset target specification."""
+  targetSpec: PresetTargetSpec!
 
   """Creation timestamp."""
   createdAt: DateTime!

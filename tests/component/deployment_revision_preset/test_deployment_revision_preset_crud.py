@@ -80,8 +80,8 @@ class TestDeploymentRevisionPresetCRUD:
         preset = create_result.preset
         assert preset.name == "test-preset"
         assert preset.rank == 100
-        assert len(preset.resource_slots) == 2
-        assert len(preset.resource_opts) == 1
+        assert len(preset.resource.resource_slots) == 2
+        assert len(preset.resource.resource_opts) == 1
 
         get_result = await admin_v2_registry.deployment_revision_preset.get(preset.id)
         assert get_result.id == preset.id
