@@ -47,6 +47,7 @@ from ai.backend.common.dto.manager.auth.types import (
     AuthTokenType,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
@@ -88,10 +89,7 @@ class AuthHandler:
 
     async def get_my_ip(self, request_ctx: RequestCtx) -> APIResponse:
         log.info("AUTH.GET_MY_IP()")
-        raw_client_addr: str | None = (
-            request_ctx.request.headers.get("X-Forwarded-For") or request_ctx.request.remote
-        )
-        client_ip = raw_client_addr.split(",")[0].strip() if raw_client_addr else ""
+        client_ip = extract_client_ip(request_ctx.request) or ""
         return APIResponse.build(HTTPStatus.OK, MyIpResponse(client_ip=client_ip))
 
     # ------------------------------------------------------------------
