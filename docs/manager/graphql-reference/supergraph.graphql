@@ -3524,6 +3524,7 @@ input CreateRoleInput
   name: String!
   description: String = null
   source: RoleSource! = CUSTOM
+  scope: ScopeInput = null
 }
 
 """Added in UNRELEASED. Input for creating a runtime variant."""
@@ -14925,6 +14926,16 @@ Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. <SCOPE
 """
 scalar ScopeField
   @join__type(graph: GRAPHENE)
+
+"""
+Added in 26.3.0. Scope reference for associating an entity with a scope.
+"""
+input ScopeInput
+  @join__type(graph: STRAWBERRY)
+{
+  scopeType: RBACElementType!
+  scopeId: String!
+}
 
 """
 Added in UNRELEASED. Resource usage for a single scope (keypair, project, domain).

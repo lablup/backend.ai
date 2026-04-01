@@ -2145,6 +2145,7 @@ input CreateRoleInput {
   name: String!
   description: String = null
   source: RoleSource! = CUSTOM
+  scope: ScopeInput = null
 }
 
 """Added in UNRELEASED. Input for creating a runtime variant."""
@@ -9721,6 +9722,14 @@ type ScopeEntityOperationCombination {
 
   """Entities and their valid operations within this scope"""
   entities: [EntityActionInfo!]!
+}
+
+"""
+Added in 26.3.0. Scope reference for associating an entity with a scope.
+"""
+input ScopeInput {
+  scopeType: RBACElementType!
+  scopeId: String!
 }
 
 """
