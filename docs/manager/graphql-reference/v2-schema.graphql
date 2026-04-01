@@ -3494,7 +3494,7 @@ extend type GroupNode @key(fields: "id") {
 """
 Added in UNRELEASED. Filter by storage host permission accessibility. Returns vfolders on hosts where the requesting user has (or lacks) the specified permissions.
 """
-input HostPermissionFilter {
+input HostPermissionCondition {
   """
   Include only vfolders on hosts where the user has ALL listed permissions.
   """
@@ -7616,12 +7616,12 @@ type Query {
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2!
 
   """Added in UNRELEASED. List virtual folders within a specific project."""
-  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
+  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, hostPermission: HostPermissionCondition = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
 
   """
   Added in UNRELEASED. Search virtual folders accessible to the current user with pagination and filtering.
   """
-  myVfolders(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
+  myVfolders(filter: VFolderFilter = null, hostPermission: HostPermissionCondition = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
 }
 
 """
@@ -11537,7 +11537,6 @@ input VFolderFilter {
   usageMode: VFolderUsageModeFilter = null
   cloneable: Boolean = null
   createdAt: DateTimeFilter = null
-  hostPermission: HostPermissionFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null

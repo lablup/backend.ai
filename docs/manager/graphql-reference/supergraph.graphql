@@ -5791,7 +5791,7 @@ scalar GroupPermissionField
 """
 Added in UNRELEASED. Filter by storage host permission accessibility. Returns vfolders on hosts where the requesting user has (or lacks) the specified permissions.
 """
-input HostPermissionFilter
+input HostPermissionCondition
   @join__type(graph: STRAWBERRY)
 {
   """
@@ -12263,12 +12263,12 @@ type Query
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2! @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. List virtual folders within a specific project."""
-  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
+  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, hostPermission: HostPermissionCondition = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Search virtual folders accessible to the current user with pagination and filtering.
   """
-  myVfolders(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
+  myVfolders(filter: VFolderFilter = null, hostPermission: HostPermissionCondition = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
 }
 
 """
@@ -17426,7 +17426,6 @@ input VFolderFilter
   usageMode: VFolderUsageModeFilter = null
   cloneable: Boolean = null
   createdAt: DateTimeFilter = null
-  hostPermission: HostPermissionFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null
