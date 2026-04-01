@@ -33,7 +33,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
     BackendAIGQLMeta(
         added_version="26.3.0", description="Get a single query definition by ID (admin only)."
     )
-)  # type: ignore[misc]
+)
 async def admin_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
@@ -50,7 +50,7 @@ async def admin_prometheus_query_preset(
         added_version="26.3.0",
         description="List query definitions with filtering and pagination (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_prometheus_query_presets(
     info: Info[StrawberryGQLContext],
     filter: QueryDefinitionFilter | None = None,
@@ -92,7 +92,7 @@ async def admin_prometheus_query_presets(
         added_version="26.3.0",
         description="Execute a query definition by ID and return the result (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_prometheus_query_preset_result(
     info: Info[StrawberryGQLContext],
     id: ID,

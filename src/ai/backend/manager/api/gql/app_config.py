@@ -177,7 +177,7 @@ class DeleteUserConfigPayload:
         added_version="26.2.0",
         description="Retrieve domain-level app configuration (admin only). Returns only the configuration set specifically for the domain, without merging. This query is useful for checking what values are configured at the domain level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead.",
     )
-)  # type: ignore[misc]
+)
 async def admin_domain_app_config(
     domain_name: str,
     info: Info[StrawberryGQLContext],
@@ -196,7 +196,7 @@ async def admin_domain_app_config(
         description="Retrieve domain-level app configuration. Returns only the configuration set specifically for the domain, without merging. This query is useful for checking what values are configured at the domain level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead. Requires admin privileges.",
     ),
     deprecation_reason="Use admin_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def domain_app_config(
     domain_name: str,
     info: Info[StrawberryGQLContext],
@@ -217,7 +217,7 @@ async def domain_app_config(
         added_version="25.16.0",
         description="Retrieve user-level app configuration. Returns only the configuration set specifically for the user, without merging with domain config. This query is useful for checking what values are configured at the user level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead. If user_id is not provided, returns the current user's configuration. Users can only access their own configuration, but admins can access any user's configuration.",
     )
-)  # type: ignore[misc]
+)
 async def user_app_config(
     info: Info[StrawberryGQLContext],
     user_id: ID | None = None,
@@ -244,7 +244,7 @@ async def user_app_config(
         added_version="25.16.0",
         description="Retrieve merged app configuration for the current user. The result combines domain-level and user-level configurations, where user settings override domain settings for the same keys. This query should be used when working with user app configurations to get the actual configuration values that will be applied.",
     )
-)  # type: ignore[misc]
+)
 async def merged_app_config(
     info: Info[StrawberryGQLContext],
 ) -> AppConfig:
@@ -263,7 +263,7 @@ async def merged_app_config(
         description="Create or update domain-level app configuration (admin only). The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. All users in this domain will be affected by these settings when their configurations are merged, unless they have user-level configurations that override specific keys",
     ),
     name="adminUpsertDomainAppConfig",
-)  # type: ignore[misc]
+)
 async def admin_upsert_domain_app_config(
     input: UpsertDomainConfigInput,
     info: Info[StrawberryGQLContext],
@@ -283,7 +283,7 @@ async def admin_upsert_domain_app_config(
     ),
     name="upsertDomainAppConfig",
     deprecation_reason="Use admin_upsert_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def upsert_domain_app_config(
     input: UpsertDomainConfigInput,
     info: Info[StrawberryGQLContext],
@@ -305,7 +305,7 @@ async def upsert_domain_app_config(
         description="Create or update user-level app configuration. The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. These settings will override domain-level settings when configurations are merged for this user. If user_id is not provided, the current user's configuration will be updated. Users can only modify their own configuration, but admins can modify any user's configuration",
     ),
     name="upsertUserAppConfig",
-)  # type: ignore[misc]
+)
 async def upsert_user_app_config(
     input: UpsertUserConfigInput,
     info: Info[StrawberryGQLContext],
@@ -333,7 +333,7 @@ async def upsert_user_app_config(
         description="Delete domain-level app configuration (admin only). All users in this domain may be affected by this deletion. After deletion, users will only receive their user-level configurations when configurations are merged, with no domain-level defaults",
     ),
     name="adminDeleteDomainAppConfig",
-)  # type: ignore[misc]
+)
 async def admin_delete_domain_app_config(
     input: DeleteDomainConfigInput,
     info: Info[StrawberryGQLContext],
@@ -351,7 +351,7 @@ async def admin_delete_domain_app_config(
     ),
     name="deleteDomainAppConfig",
     deprecation_reason="Use admin_delete_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def delete_domain_app_config(
     input: DeleteDomainConfigInput,
     info: Info[StrawberryGQLContext],
@@ -371,7 +371,7 @@ async def delete_domain_app_config(
         description="Delete user-level app configuration. After deletion, the user will still receive domain-level configuration values when configurations are merged, as domain settings remain unaffected. If user_id is not provided, the current user's configuration will be deleted. Users can only delete their own configuration, but admins can delete any user's configuration",
     ),
     name="deleteUserAppConfig",
-)  # type: ignore[misc]
+)
 async def delete_user_app_config(
     input: DeleteUserConfigInput,
     info: Info[StrawberryGQLContext],

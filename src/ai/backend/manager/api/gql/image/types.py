@@ -284,14 +284,14 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
             added_version="26.3.0",
             description="Timestamp of the most recent session created with this image. Returns null if the image has never been used.",
         )
-    )  # type: ignore[misc]
+    )
     def last_used(self) -> datetime | None:
         """Get the timestamp of the most recent session created with this image."""
         return self.metadata.last_used_at
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.2.0", description="Aliases for this image.")
-    )  # type: ignore[misc]
+    )
     async def aliases(
         self,
         info: Info[StrawberryGQLContext],

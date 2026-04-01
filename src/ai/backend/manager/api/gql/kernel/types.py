@@ -318,7 +318,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.2.0", description="The agent running this kernel.")
-    )  # type: ignore[misc]
+    )
     async def agent(self, info: Info[StrawberryGQLContext]) -> AgentV2GQL | None:
         if self.resource.agent_id is None:
             return None
@@ -331,7 +331,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.2.0", description="The user who owns this kernel.")
-    )  # type: ignore[misc]
+    )
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
         if self.user_info.user_id is None:
             return None
@@ -342,7 +342,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.2.0", description="The project this kernel belongs to.")
-    )  # type: ignore[misc]
+    )
     async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
         if self.user_info.group_id is None:
             return None
@@ -353,7 +353,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.2.0", description="The domain this kernel belongs to.")
-    )  # type: ignore[misc]
+    )
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
         if self.user_info.domain_name is None:
             return None
@@ -363,7 +363,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         BackendAIGQLMeta(
             added_version="26.2.0", description="The resource group this kernel is assigned to."
         )
-    )  # type: ignore[misc]
+    )
     async def resource_group(self, info: Info[StrawberryGQLContext]) -> ResourceGroupGQL | None:
         if self.resource.resource_group_name is None:
             return None
@@ -376,7 +376,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.3.0", description="The session this kernel belongs to.")
-    )  # type: ignore[misc]
+    )
     async def session(
         self,
     ) -> (
@@ -392,7 +392,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         BackendAIGQLMeta(
             added_version="26.3.0", description="Per-slot resource allocation for this kernel."
         )
-    )  # type: ignore[misc]
+    )
     async def resource_allocations(
         self,
         info: Info[StrawberryGQLContext],

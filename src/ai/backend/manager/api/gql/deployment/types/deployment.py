@@ -190,14 +190,14 @@ class ModelDeploymentMetadata:
     created_at: datetime
     updated_at: datetime
 
-    @gql_field(description="The project of this entity.")  # type: ignore[misc]
+    @gql_field(description="The project of this entity.")
     async def project(self, info: Info[StrawberryGQLContext]) -> Project:
         project_global_id = to_global_id(
             GroupNode, UUID(str(self.project_id)), is_target_graphene_object=True
         )
         return Project(id=ID(project_global_id))
 
-    @gql_field(description="The domain of this entity.")  # type: ignore[misc]
+    @gql_field(description="The domain of this entity.")
     async def domain(self, info: Info[StrawberryGQLContext]) -> Domain:
         domain_global_id = to_global_id(
             DomainNode, self.domain_name, is_target_graphene_object=True
@@ -234,7 +234,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     replica_state: ReplicaState
     created_user_id: ID
 
-    @gql_field(description="The created user of this entity.")  # type: ignore[misc]
+    @gql_field(description="The created user of this entity.")
     async def created_user(self, info: Info[StrawberryGQLContext]) -> User:
         user_global_id = to_global_id(
             UserNode, UUID(str(self.created_user_id)), is_target_graphene_object=True
@@ -243,7 +243,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="25.19.0", description="Deployment policy configuration.")
-    )  # type: ignore[misc]
+    )
     async def deployment_policy(
         self, info: Info[StrawberryGQLContext]
     ) -> DeploymentPolicyGQL | None:
@@ -255,7 +255,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             return None
         return policy_data
 
-    @gql_field(description="The revision history of this entity.")  # type: ignore[misc]
+    @gql_field(description="The revision history of this entity.")
     async def revision_history(
         self,
         info: Info[StrawberryGQLContext],
@@ -296,7 +296,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
-    @gql_field(description="The replicas of this entity.")  # type: ignore[misc]
+    @gql_field(description="The replicas of this entity.")
     async def replicas(
         self,
         info: Info[StrawberryGQLContext],
@@ -337,7 +337,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
-    @gql_field(description="The auto scaling rules of this entity.")  # type: ignore[misc]
+    @gql_field(description="The auto scaling rules of this entity.")
     async def auto_scaling_rules(
         self,
         info: Info[StrawberryGQLContext],
@@ -380,7 +380,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
-    @gql_field(description="The access tokens of this entity.")  # type: ignore[misc]
+    @gql_field(description="The access tokens of this entity.")
     async def access_tokens(
         self,
         info: Info[StrawberryGQLContext],

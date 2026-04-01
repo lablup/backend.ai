@@ -98,7 +98,7 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
             added_version="26.2.0",
             description="The project entity associated with this fair share record.",
         )
-    )  # type: ignore[misc]
+    )
     async def project(
         self,
         info: Info[StrawberryGQLContext],
@@ -119,7 +119,7 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
             added_version="26.2.0",
             description="The domain entity associated with this fair share record.",
         )
-    )  # type: ignore[misc]
+    )
     async def domain(
         self,
         info: Info[StrawberryGQLContext],
@@ -137,7 +137,7 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
             added_version="26.2.0",
             description="The resource group associated with this fair share record.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_group(
         self,
         info: Info[StrawberryGQLContext],

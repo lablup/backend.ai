@@ -330,7 +330,7 @@ mypy_path = "stubs:src"
 namespace_packages = true
 explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.14.3/bin/python"
-disable_error_code = ["typeddict-unknown-key", "import-untyped"]
+disable_error_code = ["typeddict-unknown-key", "import-untyped", "untyped-decorator"]
 enable_error_code = ["possibly-undefined"]
 warn_unreachable = true
 

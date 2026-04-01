@@ -39,7 +39,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="Get user fair share data (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_user_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -61,7 +61,7 @@ async def admin_user_fair_share(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List user fair shares (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_user_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: UserFairShareFilter | None = None,
@@ -114,7 +114,7 @@ async def admin_user_fair_shares(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get user fair share data within resource group scope."
     )
-)  # type: ignore[misc]
+)
 async def rg_user_fair_share(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupUserScope,
@@ -135,7 +135,7 @@ async def rg_user_fair_share(
     BackendAIGQLMeta(
         added_version="26.2.0", description="List user fair shares within resource group scope."
     )
-)  # type: ignore[misc]
+)
 async def rg_user_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupUserScope,
@@ -191,7 +191,7 @@ async def rg_user_fair_shares(
         added_version="26.1.0", description="Get user fair share data (superadmin only)."
     ),
     deprecation_reason="Use admin_user_fair_share instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def user_fair_share(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -218,7 +218,7 @@ async def user_fair_share(
         added_version="26.1.0", description="List user fair shares (superadmin only)."
     ),
     deprecation_reason="Use admin_user_fair_shares instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def user_fair_shares(
     info: Info[StrawberryGQLContext],
     filter: UserFairShareFilter | None = None,
@@ -274,7 +274,7 @@ async def user_fair_shares(
         added_version="26.2.0",
         description="Upsert user fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does",
     )
-)  # type: ignore[misc]
+)
 async def admin_upsert_user_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: UpsertUserFairShareWeightInput,
@@ -293,7 +293,7 @@ async def admin_upsert_user_fair_share_weight(
         added_version="26.2.0",
         description="Bulk upsert user fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do",
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_upsert_user_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: BulkUpsertUserFairShareWeightInput,
@@ -314,7 +314,7 @@ async def admin_bulk_upsert_user_fair_share_weight(
         description="Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does",
     ),
     deprecation_reason="Use admin_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def upsert_user_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: UpsertUserFairShareWeightInput,
@@ -336,7 +336,7 @@ async def upsert_user_fair_share_weight(
         description="Bulk upsert user fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do",
     ),
     deprecation_reason="Use admin_bulk_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def bulk_upsert_user_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: BulkUpsertUserFairShareWeightInput,

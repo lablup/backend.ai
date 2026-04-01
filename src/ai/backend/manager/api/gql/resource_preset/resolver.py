@@ -43,7 +43,7 @@ from .types import (
         added_version=NEXT_RELEASE_VERSION,
         description="List resource presets (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_resource_presets_v2(
     info: Info[StrawberryGQLContext],
     filter: ResourcePresetFilterGQL | None = None,
@@ -93,7 +93,7 @@ async def admin_resource_presets_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get a single resource preset by ID (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -111,7 +111,7 @@ async def admin_resource_preset_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Create a new resource preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     input: CreateResourcePresetInputGQL,
@@ -136,7 +136,7 @@ async def admin_create_resource_preset_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Update a resource preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateResourcePresetInputGQL,
@@ -153,7 +153,7 @@ async def admin_update_resource_preset_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Delete a resource preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,

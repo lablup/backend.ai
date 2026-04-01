@@ -111,7 +111,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
 
     @gql_field(
         description="Fair share record for this user in the specified resource group and project. Returns the scheduling priority configuration for this user. Always returns an object, even if no explicit configuration exists (in which case default values are used)."
-    )  # type: ignore[misc]
+    )
     async def fair_share(
         self,
         info: Info,
@@ -134,7 +134,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
 
     @gql_field(
         description="Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time."
-    )  # type: ignore[misc]
+    )
     async def usage_buckets(
         self,
         info: Info,
@@ -193,7 +193,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             count=payload.total_count,
         )
 
-    @gql_field(description="The domain this user belongs to.")  # type: ignore[misc]
+    @gql_field(description="The domain this user belongs to.")
     async def domain(
         self,
         info: Info,
@@ -211,7 +211,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         )
         return domain
 
-    @gql_field(description="Projects this user is a member of.")  # type: ignore[misc]
+    @gql_field(description="Projects this user is a member of.")
     async def projects(
         self,
         info: Info,

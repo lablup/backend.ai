@@ -45,7 +45,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.3.0",
         description="List scoped permissions with filtering and pagination (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_permissions(
     info: Info[StrawberryGQLContext],
     filter: PermissionFilter | None = None,
@@ -93,7 +93,7 @@ async def admin_permissions(
     BackendAIGQLMeta(
         added_version="26.3.0", description="List valid RBAC scope-entity type combinations."
     )
-)  # type: ignore[misc]
+)
 async def rbac_scope_entity_combinations(
     info: Info[StrawberryGQLContext],
 ) -> list[ScopeEntityCombinationGQL]:
@@ -114,7 +114,7 @@ async def rbac_scope_entity_combinations(
         added_version=NEXT_RELEASE_VERSION,
         description="List valid RBAC entity-operation combinations.",
     )
-)  # type: ignore[misc]
+)
 async def rbac_entity_operation_combinations(
     info: Info[StrawberryGQLContext],
 ) -> list[EntityOperationCombinationGQL]:
@@ -144,7 +144,7 @@ async def rbac_entity_operation_combinations(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Create a scoped permission (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_create_permission(
     info: Info[StrawberryGQLContext],
     input: CreatePermissionInput,
@@ -156,7 +156,7 @@ async def admin_create_permission(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Update a scoped permission (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_update_permission(
     info: Info[StrawberryGQLContext],
     input: UpdatePermissionInput,
@@ -168,7 +168,7 @@ async def admin_update_permission(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Delete a scoped permission (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_delete_permission(
     info: Info[StrawberryGQLContext],
     input: DeletePermissionInput,

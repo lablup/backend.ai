@@ -341,7 +341,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             added_version="26.1.0",
             description="Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation. Resource weights are merged with capacity and include default indicators.",
         )
-    )  # type: ignore[misc]
+    )
     async def fair_share_spec(
         self, info: Info[StrawberryGQLContext, None]
     ) -> FairShareScalingGroupSpecGQL:
@@ -355,7 +355,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             added_version="26.1.0",
             description="Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.",
         )
-    )  # type: ignore[misc]
+    )
     async def resource_info(self, info: Info[StrawberryGQLContext, None]) -> ResourceInfoGQL:
         """Get resource information for this resource group."""
         ctx = info.context

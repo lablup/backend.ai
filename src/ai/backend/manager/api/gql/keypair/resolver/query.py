@@ -26,7 +26,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version=NEXT_RELEASE_VERSION,
         description="List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.",
     )
-)  # type: ignore[misc]
+)
 async def my_keypairs(
     info: Info[StrawberryGQLContext],
     filter: KeypairFilterGQL | None = None,
@@ -69,7 +69,7 @@ async def my_keypairs(
         added_version=NEXT_RELEASE_VERSION,
         description="List all keypairs with filtering and pagination (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_keypairs_v2(
     info: Info[StrawberryGQLContext],
     filter: KeypairFilterGQL | None = None,
@@ -113,7 +113,7 @@ async def admin_keypairs_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get a single keypair by access key (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_keypair_v2(
     info: Info[StrawberryGQLContext],
     access_key: str,

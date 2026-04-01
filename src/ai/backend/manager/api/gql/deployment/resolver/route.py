@@ -59,7 +59,7 @@ def _route_filter_to_dto(filter: RouteFilter) -> RouteFilterDTO:
     BackendAIGQLMeta(
         added_version="25.19.0", description="List routes for a deployment with optional filters."
     )
-)  # type: ignore[misc]
+)
 async def routes(
     info: Info[StrawberryGQLContext],
     deployment_id: ID,
@@ -105,7 +105,7 @@ async def routes(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="25.19.0", description="Get a specific route by ID.")
-)  # type: ignore[misc]
+)
 async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
     """Get a specific route by ID."""
     _, route_id = resolve_global_id(id)
@@ -117,7 +117,7 @@ async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.19.0", description="Update the traffic status of a route")
-)  # type: ignore[misc]
+)
 async def update_route_traffic_status(
     input: UpdateRouteTrafficStatusInputGQL,
     info: Info[StrawberryGQLContext],

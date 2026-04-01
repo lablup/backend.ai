@@ -37,7 +37,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version=NEXT_RELEASE_VERSION,
         description="Query login sessions with pagination and filtering. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_login_sessions_v2(
     info: Info[StrawberryGQLContext],
     filter: LoginSessionFilterGQL | None = None,
@@ -81,7 +81,7 @@ async def admin_login_sessions_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Query login sessions of the current user with pagination and filtering.",
     )
-)  # type: ignore[misc]
+)
 async def my_login_sessions_v2(
     info: Info[StrawberryGQLContext],
     filter: LoginSessionFilterGQL | None = None,
@@ -124,7 +124,7 @@ async def my_login_sessions_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Revoke a login session. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_revoke_login_session(
     info: Info[StrawberryGQLContext],
     session_id: UUID,
@@ -141,7 +141,7 @@ async def admin_revoke_login_session(
         added_version=NEXT_RELEASE_VERSION,
         description="Revoke a login session owned by the current user.",
     )
-)  # type: ignore[misc]
+)
 async def my_revoke_login_session(
     info: Info[StrawberryGQLContext],
     session_id: UUID,

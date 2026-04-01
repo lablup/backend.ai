@@ -35,7 +35,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version=NEXT_RELEASE_VERSION,
         description="Search model cards.",
     )
-)  # type: ignore[misc]
+)
 async def model_cards_v2(
     info: Info[StrawberryGQLContext],
     filter: ModelCardFilterGQL | None = None,
@@ -94,7 +94,7 @@ async def model_cards_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get a single model card by ID.",
     )
-)  # type: ignore[misc]
+)
 async def model_card_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -108,7 +108,7 @@ async def model_card_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Create a model card (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_model_card_v2(
     info: Info[StrawberryGQLContext],
     input: CreateModelCardInputGQL,
@@ -124,7 +124,7 @@ async def admin_create_model_card_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Update a model card (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_model_card_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateModelCardInputGQL,
@@ -140,7 +140,7 @@ async def admin_update_model_card_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Delete a model card (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_model_card_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,

@@ -44,7 +44,7 @@ from ai.backend.manager.data.deployment.inference_runtime_config import (
         added_version="25.16.0",
         description="List revisions with optional filtering and pagination (admin, all deployments).",
     )
-)  # type: ignore[misc]
+)
 async def revisions(
     info: Info[StrawberryGQLContext],
     filter: ModelRevisionFilter | None = None,
@@ -87,7 +87,7 @@ async def revisions(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="25.16.0", description="Get a specific revision by ID.")
-)  # type: ignore[misc]
+)
 async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
     """Get a specific revision by ID."""
     _, revision_id = resolve_global_id(id)
@@ -99,7 +99,7 @@ async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | 
     BackendAIGQLMeta(
         added_version="25.16.0", description="Get JSON Schema for inference runtime configuration"
     )
-)  # type: ignore[misc]
+)
 async def inference_runtime_config(name: str) -> JSON:
     match name.lower():
         case "vllm":
@@ -121,7 +121,7 @@ async def inference_runtime_config(name: str) -> JSON:
         added_version="25.16.0",
         description="Get configuration JSON Schemas for all inference runtimes.",
     )
-)  # type: ignore[misc]
+)
 async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
     return {
         "vllm": VLLMRuntimeConfig.to_json_schema(),
@@ -134,7 +134,7 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
 # Mutation resolvers
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Add model revision."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Add model revision."))
 async def add_model_revision(
     input: AddRevisionInput, info: Info[StrawberryGQLContext]
 ) -> AddRevisionPayload:
@@ -148,7 +148,7 @@ async def add_model_revision(
         added_version="25.19.0",
         description="Activate a specific revision to be the current revision",
     )
-)  # type: ignore[misc]
+)
 async def activate_deployment_revision(
     input: ActivateRevisionInputGQL,
     info: Info[StrawberryGQLContext, None],

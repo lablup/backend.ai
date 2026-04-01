@@ -2832,9 +2832,7 @@ class AbstractAgent[
                     exposed_ports = [2000, 2001]
                     service_ports: list[ServicePort] = []
                     port_map: dict[str, ServicePort] = {}
-                    preopen_ports = ctx.kernel_config.get("preopen_ports")
-                    if preopen_ports is None:
-                        preopen_ports = []
+                    preopen_ports = ctx.kernel_config.get("preopen_ports") or []
 
                     service_ports.append({
                         "name": "sshd",

@@ -79,7 +79,7 @@ class SchedulingBroadcastEventPayloadGQL:
 
     @gql_field(
         description="The session ID associated with the replica. This can be null right after replica creation."
-    )  # type: ignore[misc]
+    )
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:
         session_global_id = to_global_id(
             ComputeSessionNode, self.session_id, is_target_graphene_object=True
@@ -87,7 +87,7 @@ class SchedulingBroadcastEventPayloadGQL:
         return Session(id=strawberry.ID(session_global_id))
 
 
-@gql_subscription(  # type: ignore[misc]
+@gql_subscription(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description=(

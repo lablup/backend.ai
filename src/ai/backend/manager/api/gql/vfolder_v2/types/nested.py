@@ -115,7 +115,7 @@ class VFolderOwnershipInfoGQL:
         description="Email of the user who originally created this virtual folder.",
     )
 
-    @gql_field(description="The user who owns this virtual folder. Null for project-owned folders.")  # type: ignore[misc]
+    @gql_field(description="The user who owns this virtual folder. Null for project-owned folders.")
     async def user(
         self,
         info: Info[StrawberryGQLContext],
@@ -131,7 +131,7 @@ class VFolderOwnershipInfoGQL:
 
     @gql_field(
         description="The project that owns this virtual folder. Null for user-owned folders."
-    )  # type: ignore[misc]
+    )
     async def project(
         self,
         info: Info[StrawberryGQLContext],
@@ -145,7 +145,7 @@ class VFolderOwnershipInfoGQL:
         # Defer to data loader when wired; stub returns None for now.
         return None
 
-    @gql_field(description="The user who originally created this virtual folder.")  # type: ignore[misc]
+    @gql_field(description="The user who originally created this virtual folder.")
     async def creator(
         self,
         info: Info[StrawberryGQLContext],

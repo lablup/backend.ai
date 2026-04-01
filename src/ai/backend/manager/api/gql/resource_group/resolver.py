@@ -65,7 +65,7 @@ class ResourceGroupConnection(Connection[ResourceGroupGQL]):
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List resource groups (admin only)")
-)  # type: ignore[misc]
+)
 async def admin_resource_groups(
     info: Info[StrawberryGQLContext],
     filter: ResourceGroupFilterGQL | None = None,
@@ -113,7 +113,7 @@ async def admin_resource_groups(
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List resource groups"),
     deprecation_reason="Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def resource_groups(
     info: Info[StrawberryGQLContext],
     filter: ResourceGroupFilterGQL | None = None,
@@ -164,7 +164,7 @@ async def resource_groups(
         added_version="26.2.0",
         description="Update fair share configuration for a resource group (admin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_resource_group_fair_share_spec(
     info: Info[StrawberryGQLContext],
     input: UpdateResourceGroupFairShareSpecInput,
@@ -187,7 +187,7 @@ async def admin_update_resource_group_fair_share_spec(
         "Use admin_update_resource_group_fair_share_spec instead. "
         "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
     ),
-)  # type: ignore[misc]
+)
 async def update_resource_group_fair_share_spec(
     info: Info[StrawberryGQLContext],
     input: UpdateResourceGroupFairShareSpecInput,
@@ -204,7 +204,7 @@ async def update_resource_group_fair_share_spec(
         added_version="26.2.0",
         description="Update resource group configuration (admin only). Only provided fields are updated; others retain their existing values. Supports all configuration fields except fair_share (use separate mutation).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_resource_group(
     info: Info[StrawberryGQLContext],
     input: UpdateResourceGroupInput,
@@ -223,7 +223,7 @@ async def admin_update_resource_group(
         added_version=NEXT_RELEASE_VERSION,
         description="Get a single resource group by name (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_resource_group_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -238,7 +238,7 @@ async def admin_resource_group_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Create a new resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_resource_group_v2(
     info: Info[StrawberryGQLContext],
     input: CreateResourceGroupInputGQL,
@@ -253,7 +253,7 @@ async def admin_create_resource_group_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Delete a resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_resource_group_v2(
     info: Info[StrawberryGQLContext],
     name: str,
@@ -272,7 +272,7 @@ async def admin_delete_resource_group_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get allowed resource groups for a domain (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_allowed_resource_groups_for_domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
@@ -289,7 +289,7 @@ async def admin_allowed_resource_groups_for_domain_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get allowed resource groups for a project (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_allowed_resource_groups_for_project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
@@ -306,7 +306,7 @@ async def admin_allowed_resource_groups_for_project_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get allowed domains for a resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_allowed_domains_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -323,7 +323,7 @@ async def admin_allowed_domains_for_resource_group_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Get allowed projects for a resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_allowed_projects_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
@@ -343,7 +343,7 @@ async def admin_allowed_projects_for_resource_group_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Update allowed resource groups for a domain (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_allowed_resource_groups_for_domain_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedResourceGroupsForDomainInputGQL,
@@ -360,7 +360,7 @@ async def admin_update_allowed_resource_groups_for_domain_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Update allowed resource groups for a project (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_allowed_resource_groups_for_project_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedResourceGroupsForProjectInputGQL,
@@ -377,7 +377,7 @@ async def admin_update_allowed_resource_groups_for_project_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Update allowed domains for a resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_allowed_domains_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedDomainsForResourceGroupInputGQL,
@@ -394,7 +394,7 @@ async def admin_update_allowed_domains_for_resource_group_v2(
         added_version=NEXT_RELEASE_VERSION,
         description="Update allowed projects for a resource group (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_allowed_projects_for_resource_group_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateAllowedProjectsForResourceGroupInputGQL,

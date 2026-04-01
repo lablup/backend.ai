@@ -2182,7 +2182,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     raise
 
-    @preserve_termination_log  # type: ignore[misc]
+    @preserve_termination_log
     async def monitor_docker_events(self) -> None:
         async def handle_action_start(
             session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]

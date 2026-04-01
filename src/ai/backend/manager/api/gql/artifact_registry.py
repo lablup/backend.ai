@@ -50,7 +50,7 @@ class ArtifactRegistry:
         added_version="25.14.0",
         description="Get the default artifact registry for a given artifact type",
     )
-)  # type: ignore[misc]
+)
 async def default_artifact_registry(
     artifact_type: ArtifactType, info: Info[StrawberryGQLContext]
 ) -> ArtifactRegistry | None:

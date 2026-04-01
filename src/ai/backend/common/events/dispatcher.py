@@ -609,7 +609,7 @@ class EventDispatcher(EventDispatcherGroup):
             )
             await asyncio.sleep(0)
 
-    @preserve_termination_log  # type: ignore[misc]
+    @preserve_termination_log
     async def _consume_loop(self) -> None:
         async for msg in self._msg_queue.consume_queue():  # type: ignore
             if self._closed:
@@ -637,7 +637,7 @@ class EventDispatcher(EventDispatcherGroup):
                 # Do not raise the exception to avoid stopping the loop.
                 # The exception will be handled by the task group.
 
-    @preserve_termination_log  # type: ignore[misc]
+    @preserve_termination_log
     async def _subscribe_loop(self) -> None:
         async for msg in self._msg_queue.subscribe_queue():  # type: ignore
             if self._closed:

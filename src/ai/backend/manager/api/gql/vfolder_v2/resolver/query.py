@@ -29,7 +29,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderEdge
         added_version=NEXT_RELEASE_VERSION,
         description="List virtual folders within a specific project.",
     )
-)  # type: ignore[misc]
+)
 async def project_vfolders(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
@@ -75,7 +75,7 @@ async def project_vfolders(
         added_version=NEXT_RELEASE_VERSION,
         description="Search virtual folders accessible to the current user with pagination and filtering.",
     )
-)  # type: ignore[misc]
+)
 async def my_vfolders(
     info: Info[StrawberryGQLContext],
     filter: VFolderFilterGQL | None = None,

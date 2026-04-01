@@ -76,7 +76,7 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
             added_version="26.2.0",
             description="Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).",
         )
-    )  # type: ignore[misc]
+    )
     def average_daily_usage(self) -> ResourceSlotGQL:
         return calculate_average_daily_usage(
             self.resource_usage,
@@ -89,7 +89,7 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
             added_version="26.2.0",
             description="Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.",
         )
-    )  # type: ignore[misc]
+    )
     def usage_capacity_ratio(self) -> ResourceSlotGQL:
         return calculate_usage_capacity_ratio(
             self.resource_usage,

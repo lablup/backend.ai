@@ -65,7 +65,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
 
     @gql_field(
         description="The user who triggered this audit log entry, resolved from triggered_by UUID."
-    )  # type: ignore[misc]
+    )
     async def user(
         self,
         info: Info[StrawberryGQLContext],

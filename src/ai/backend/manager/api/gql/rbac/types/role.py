@@ -165,7 +165,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         BackendAIGQLMeta(
             added_version="26.3.0", description="Permissions associated with this role."
         )
-    )  # type: ignore[misc]
+    )
     async def permissions(
         self,
         info: Info[StrawberryGQLContext],
@@ -245,7 +245,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.3.0", description="Users assigned to this role.")
-    )  # type: ignore[misc]
+    )
     async def users(
         self,
         info: Info[StrawberryGQLContext],
@@ -332,12 +332,12 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         ])
         return cast(list[Self | None], results)
 
-    @gql_field(description="The assigned role.")  # type: ignore[misc]
+    @gql_field(description="The assigned role.")
     async def role(self, info: Info[StrawberryGQLContext]) -> RoleGQL | None:
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         return await info.context.data_loaders.role_loader.load(self.role_id)
 
-    @gql_field(description="The assigned user.")  # type: ignore[misc]
+    @gql_field(description="The assigned user.")
     async def user(
         self, info: Info[StrawberryGQLContext]
     ) -> (

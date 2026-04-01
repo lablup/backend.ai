@@ -33,7 +33,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
         added_version="25.16.0",
         description="List replicas with optional filtering and pagination (admin, all deployments).",
     )
-)  # type: ignore[misc]
+)
 async def replicas(
     info: Info[StrawberryGQLContext],
     filter: ReplicaFilter | None = None,
@@ -76,7 +76,7 @@ async def replicas(
 
 @gql_root_field(
     BackendAIGQLMeta(added_version="25.16.0", description="Get a specific replica by ID.")
-)  # type: ignore[misc]
+)
 async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | None:
     """Get a specific replica by ID."""
     _, replica_id = resolve_global_id(id)
@@ -91,7 +91,7 @@ async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | No
 
 @gql_subscription(
     BackendAIGQLMeta(added_version="25.16.0", description="Subscribe to replica status changes.")
-)  # type: ignore[misc]
+)
 async def replica_status_changed(
     revision_id: ID,
 ) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:
