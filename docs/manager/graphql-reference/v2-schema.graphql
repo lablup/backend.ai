@@ -105,6 +105,11 @@ enum ActivenessStatus {
 """Added in 25.19.0. """
 input AddRevisionInput {
   name: String = null
+
+  """
+  Added in UNRELEASED. DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.
+  """
+  revisionPresetId: UUID = null
   deploymentId: ID!
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!
@@ -1937,6 +1942,11 @@ Added in 25.19.0. Input for specifying revision configuration within a deploymen
 """
 input CreateRevisionInput {
   name: String = null
+
+  """
+  Added in UNRELEASED. DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.
+  """
+  revisionPresetId: UUID = null
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!
   image: ImageInput!
