@@ -16,6 +16,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
@@ -1961,9 +1962,15 @@ class TestSessionActionRBACCompatibility:
             owner_access_key=sample_access_key,
         )
 
-        mock_user = MagicMock()
-        mock_user.user_id = uuid4()
-        with with_user(mock_user):
+        user = UserData(
+            user_id=uuid4(),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+        with with_user(user):
             await validator.validate(action, MagicMock())
 
         mock_repository.check_permission_with_scope_chain.assert_called_once()
