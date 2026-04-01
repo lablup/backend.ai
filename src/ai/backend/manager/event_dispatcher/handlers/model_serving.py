@@ -17,11 +17,12 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
@@ -67,9 +68,9 @@ class ModelServingEventHandler:
                 data: dict[str, Any] = {}
                 match event.new_status:
                     case ModelServiceStatus.HEALTHY:
-                        data["status"] = RouteStatus.HEALTHY
+                        data["health_status"] = RouteHealthStatus.HEALTHY
                     case ModelServiceStatus.UNHEALTHY:
-                        data["status"] = RouteStatus.UNHEALTHY
+                        data["health_status"] = RouteHealthStatus.UNHEALTHY
                 query = sa.update(RoutingRow).values(data).where(RoutingRow.id == route.id)
                 await db_sess.execute(query)
 

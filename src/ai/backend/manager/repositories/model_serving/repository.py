@@ -22,6 +22,7 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.data.deployment.types import RouteHealthStatus
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
     EndpointAutoScalingRuleData,
@@ -966,7 +967,12 @@ class ModelServingRepository:
                 current_rev = ep._find_current_revision()
                 routings_data = [r.to_data() for r in ep.routings] if ep.routings else None
                 active_route_count = (
-                    len([r for r in ep.routings if r.status == RouteStatus.HEALTHY])
+                    len([
+                        r
+                        for r in ep.routings
+                        if r.status == RouteStatus.RUNNING
+                        and r.health_status == RouteHealthStatus.HEALTHY
+                    ])
                     if ep.routings
                     else 0
                 )

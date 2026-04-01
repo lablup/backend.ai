@@ -15,6 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
@@ -79,6 +80,13 @@ class RoutingRow(Base):  # type: ignore[misc]
         EnumValueType(RouteStatus),
         nullable=False,
         default=RouteStatus.PROVISIONING,
+    )
+    health_status: Mapped[RouteHealthStatus] = mapped_column(
+        "health_status",
+        EnumValueType(RouteHealthStatus),
+        nullable=False,
+        default=RouteHealthStatus.NOT_CHECKED,
+        server_default=sa.text("'not_checked'"),
     )
     weight: Mapped[int | None] = mapped_column("weight", sa.Integer(), nullable=True, default=None)
     traffic_ratio: Mapped[float] = mapped_column("traffic_ratio", sa.Float(), nullable=False)
@@ -251,6 +259,7 @@ class RoutingRow(Base):  # type: ignore[misc]
             endpoint_id=self.endpoint,
             session_id=SessionId(self.session) if self.session else None,
             status=self.status,
+            health_status=self.health_status,
             traffic_ratio=self.traffic_ratio,
             created_at=self.created_at,
             revision_id=self.revision,

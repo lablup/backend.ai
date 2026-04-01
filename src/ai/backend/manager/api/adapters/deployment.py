@@ -11,6 +11,7 @@ from uuid import UUID
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -1510,6 +1511,7 @@ class DeploymentAdapter(BaseAdapter):
             deployment_id=data.endpoint_id,
             session_id=str(data.session_id) if data.session_id is not None else None,
             status=RouteStatus(data.status.value),
+            health_status=RouteHealthStatus(data.health_status.value),
             traffic_ratio=data.traffic_ratio,
             created_at=data.created_at,
             revision_id=data.revision_id,

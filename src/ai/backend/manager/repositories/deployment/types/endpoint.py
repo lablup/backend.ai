@@ -7,7 +7,7 @@ from typing import Any
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 
 
 @dataclass
@@ -54,6 +54,7 @@ class RouteData:
     endpoint_id: uuid.UUID
     session_id: SessionId | None
     status: RouteStatus
+    health_status: RouteHealthStatus
     traffic_ratio: float
     created_at: datetime
     revision_id: uuid.UUID

@@ -16,6 +16,7 @@ from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     LivenessStatus,
     ReadinessStatus,
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -128,7 +129,8 @@ class RouteNode(BaseResponseModel):
     id: UUID = Field(description="Route ID")
     deployment_id: UUID = Field(description="Deployment ID")
     session_id: str | None = Field(default=None, description="Session ID")
-    status: RouteStatus = Field(description="Route status")
+    status: RouteStatus = Field(description="Lifecycle status of the route")
+    health_status: RouteHealthStatus = Field(description="Health check status of the route")
     traffic_ratio: float = Field(description="Traffic ratio assigned to this route")
     created_at: datetime = Field(description="Creation timestamp")
     revision_id: UUID | None = Field(default=None, description="Associated revision ID")

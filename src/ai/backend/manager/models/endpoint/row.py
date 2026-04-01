@@ -510,13 +510,11 @@ class EndpointRow(Base):  # type: ignore[misc]
         if self.lifecycle_stage == EndpointLifecycle.DESTROYING:
             return {
                 RouteStatus.PROVISIONING,
-                RouteStatus.HEALTHY,
-                RouteStatus.UNHEALTHY,
+                RouteStatus.RUNNING,
                 RouteStatus.FAILED_TO_START,
             }
         return {
-            RouteStatus.HEALTHY,
-            RouteStatus.UNHEALTHY,
+            RouteStatus.RUNNING,
             RouteStatus.FAILED_TO_START,
         }
 

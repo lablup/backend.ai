@@ -104,10 +104,10 @@ class DeploymentConfig(BaseModel):
 
 
 class RouteStatus(enum.Enum):
+    """Lifecycle status of a route (independent of health)."""
+
     PROVISIONING = "provisioning"
-    HEALTHY = "healthy"
-    UNHEALTHY = "unhealthy"
-    DEGRADED = "degraded"
+    RUNNING = "running"
     TERMINATING = "terminating"
     TERMINATED = "terminated"
     FAILED_TO_START = "failed_to_start"
@@ -117,9 +117,7 @@ class RouteStatus(enum.Enum):
     def active_route_statuses(cls) -> set[RouteStatus]:
         return {
             RouteStatus.PROVISIONING,
-            RouteStatus.HEALTHY,
-            RouteStatus.UNHEALTHY,
-            RouteStatus.DEGRADED,
+            RouteStatus.RUNNING,
         }
 
     @classmethod
@@ -133,18 +131,25 @@ class RouteStatus(enum.Enum):
     def is_inactive(self) -> bool:
         return self in self.inactive_route_statuses()
 
-    def is_provisioning(self) -> bool:
-        """PROVISIONING or DEGRADED (still warming up, health checks not yet passing)."""
-        return self in (RouteStatus.PROVISIONING, RouteStatus.DEGRADED)
-
-    def termination_priority(self) -> int:
+    def termination_priority(self, health: RouteHealthStatus) -> int:
+        if self != RouteStatus.RUNNING:
+            return 0
         priority_map = {
-            RouteStatus.UNHEALTHY: 1,
-            RouteStatus.DEGRADED: 2,
-            RouteStatus.PROVISIONING: 3,
-            RouteStatus.HEALTHY: 4,
+            RouteHealthStatus.UNHEALTHY: 1,
+            RouteHealthStatus.DEGRADED: 2,
+            RouteHealthStatus.NOT_CHECKED: 3,
+            RouteHealthStatus.HEALTHY: 4,
         }
-        return priority_map.get(self, 0)
+        return priority_map.get(health, 0)
+
+
+class RouteHealthStatus(enum.Enum):
+    """Health check status of a route (independent of lifecycle)."""
+
+    NOT_CHECKED = "not_checked"
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    DEGRADED = "degraded"
 
 
 class RouteTrafficStatus(enum.StrEnum):
@@ -224,20 +229,37 @@ class DeploymentStatusTransitions:
 
 
 @dataclass(frozen=True)
+class RouteTargetStatuses:
+    """Target statuses for route handler filtering (lifecycle x health)."""
+
+    lifecycle: list[RouteStatus]
+    health: list[RouteHealthStatus]
+
+
+@dataclass(frozen=True)
+class RouteTransitionTarget:
+    """Target state for a route transition (lifecycle + health)."""
+
+    status: RouteStatus | None = None
+    health_status: RouteHealthStatus | None = None
+
+
+@dataclass(frozen=True)
 class RouteStatusTransitions:
     """Status transitions for route handlers.
 
     Route handlers have success/failure/stale outcomes (no expired/give_up).
+    Each outcome can change lifecycle status, health status, or both.
 
     Attributes:
-        success: Target status when handler succeeds, None means no change
-        failure: Target status when handler fails, None means no change
-        stale: Target status when route becomes stale, None means no change
+        success: Target state when handler succeeds, None means no change
+        failure: Target state when handler fails, None means no change
+        stale: Target state when route becomes stale, None means no change
     """
 
-    success: RouteStatus | None = None
-    failure: RouteStatus | None = None
-    stale: RouteStatus | None = None
+    success: RouteTransitionTarget | None = None
+    failure: RouteTransitionTarget | None = None
+    stale: RouteTransitionTarget | None = None
 
 
 @dataclass
@@ -518,6 +540,7 @@ class RouteInfo:
     endpoint_id: UUID
     session_id: SessionId | None
     status: RouteStatus
+    health_status: RouteHealthStatus
     traffic_ratio: float
     created_at: datetime
     revision_id: UUID

@@ -56,6 +56,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
+    RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
@@ -632,16 +633,10 @@ class DeploymentRepository:
     async def get_routes_by_statuses(
         self,
         statuses: list[RouteStatus],
+        health_statuses: list[RouteHealthStatus],
     ) -> list[RouteData]:
-        """Get routes by their statuses.
-
-        Args:
-            statuses: List of route statuses to filter by
-
-        Returns:
-            List of RouteData objects matching the statuses
-        """
-        return await self._db_source.get_routes_by_statuses(statuses)
+        """Get routes by lifecycle and health statuses."""
+        return await self._db_source.get_routes_by_statuses(statuses, health_statuses)
 
     @deployment_repository_resilience.apply()
     async def update_route_status_bulk(

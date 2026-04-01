@@ -863,7 +863,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
                     r for r in self.routings if r.status in active_route_status_names
                 ]
                 healthy_count = sum(
-                    1 for r in active_routings if r.status == RouteStatus.HEALTHY.name
+                    1 for r in active_routings if r.status == RouteStatus.RUNNING.name
                 )
                 if healthy_count == 0:
                     return EndpointStatus.UNHEALTHY

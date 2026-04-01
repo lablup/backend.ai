@@ -7,7 +7,11 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.deployment.types import RouteStatus, RouteTrafficStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import QueryCondition
 
@@ -47,6 +51,20 @@ class RouteConditions:
     def by_statuses(statuses: list[RouteStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoutingRow.status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_lifecycle_statuses(statuses: list[RouteStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_health_statuses(statuses: list[RouteHealthStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.health_status.in_(statuses)
 
         return inner
 

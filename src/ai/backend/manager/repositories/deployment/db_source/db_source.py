@@ -53,6 +53,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
+    RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
@@ -1059,6 +1060,7 @@ class DeploymentDBSource:
                     endpoint_id=row.endpoint,
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
+                    health_status=row.health_status,
                     traffic_ratio=row.traffic_ratio,
                     created_at=row.created_at,
                     revision_id=row.revision,
@@ -1621,17 +1623,14 @@ class DeploymentDBSource:
     async def get_routes_by_statuses(
         self,
         statuses: list[RouteStatus],
+        health_statuses: list[RouteHealthStatus],
     ) -> list[RouteData]:
-        """Get routes by their statuses.
-
-        Args:
-            statuses: List of route statuses to filter by
-
-        Returns:
-            List of RouteData objects matching the statuses
-        """
+        """Get routes by lifecycle and health statuses."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(RoutingRow).where(RoutingRow.status.in_(statuses))
+            query = sa.select(RoutingRow).where(
+                RoutingRow.status.in_(statuses),
+                RoutingRow.health_status.in_(health_statuses),
+            )
             result = await db_sess.execute(query)
             rows: Sequence[RoutingRow] = result.scalars().all()
 
@@ -1642,6 +1641,7 @@ class DeploymentDBSource:
                     endpoint_id=row.endpoint,
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
+                    health_status=row.health_status,
                     traffic_ratio=row.traffic_ratio,
                     created_at=row.created_at,
                     revision_id=row.revision,
