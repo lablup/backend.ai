@@ -334,6 +334,7 @@ class ExecutionSpec(ConfiguredModel):
 
 class ModelRevisionSpec(ConfiguredModel):
     revision_id: UUID | None = None
+    image_id: UUID
     image_identifier: ImageIdentifier
     resource_spec: ResourceSpec
     mounts: MountMetadata

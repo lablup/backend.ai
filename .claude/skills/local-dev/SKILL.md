@@ -74,6 +74,23 @@ docker compose -f docker-compose.halfstack.current.yml restart backendai-half-ap
 
 Shortcut for `./backend.ai v2`. Calls `/v2/` REST API endpoints.
 
+**IMPORTANT: All API/CLI changes MUST be verified with `./bai` CLI on a live server before committing.**
+Do not rely on type checks alone — run the actual CLI commands and confirm the responses.
+
+### CLI Operation Naming
+
+Standard 6 operations use fixed names: `create`, `get`, `search`, `update`, `delete`, `purge`.
+Only use different names for operations that don't fit the 6-op pattern:
+- `enqueue` (session), `terminate` (session)
+- `revision add`, `revision activate` (deployment)
+- `login`, `logout` (auth)
+
+### CLI Input Style
+
+- **Primary:** Individual `--option` flags for each field.
+- **Secondary:** `--config` or `--initial-revision` for deeply nested JSON structures (JSON string or `@file` path).
+- Never use raw JSON as a positional argument.
+
 ### Setup (Webserver Session — Recommended)
 
 The default testing flow uses webserver session auth, matching the production

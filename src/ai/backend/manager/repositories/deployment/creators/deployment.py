@@ -133,7 +133,7 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
 
     @override
     def build_row(self) -> EndpointRow:
-        row = EndpointRow(
+        return EndpointRow(
             # Metadata fields
             name=self.metadata.name,
             domain=self.metadata.domain,
@@ -153,24 +153,6 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
             lifecycle_stage=EndpointLifecycle.PENDING,
             retries=0,
         )
-        if self.revision is not None:
-            row.image = self.revision.image_id
-            row.cluster_mode = self.revision.resource.cluster_mode
-            row.cluster_size = self.revision.resource.cluster_size
-            row.resource_slots = self.revision.resource.resource_slots
-            row.resource_opts = self.revision.resource.resource_opts or {}
-            row.model = self.revision.mounts.model_vfolder_id
-            row.model_mount_destination = self.revision.mounts.model_mount_destination
-            row.model_definition_path = self.revision.mounts.model_definition_path
-            row.extra_mounts = list(self.revision.mounts.extra_mounts)
-            row.runtime_variant = self.revision.execution.runtime_variant
-            row.startup_command = self.revision.execution.startup_command
-            row.bootstrap_script = self.revision.execution.bootstrap_script
-            row.environ = (
-                dict(self.revision.execution.environ) if self.revision.execution.environ else {}
-            )
-            row.callback_url = self.revision.execution.callback_url
-        return row
 
 
 @dataclass

@@ -277,7 +277,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint.id)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.deployment_policy),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
@@ -358,7 +360,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint.id)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.deployment_policy),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
@@ -447,7 +451,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
@@ -480,7 +486,9 @@ class DeploymentDBSource:
                     )
                 )
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
@@ -600,7 +608,7 @@ class DeploymentDBSource:
             sa.select(EndpointRow)
             .where(where_clause)
             .options(
-                selectinload(EndpointRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.deployment_policy),
             )
@@ -623,7 +631,9 @@ class DeploymentDBSource:
                     EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED,
                 )
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
@@ -677,7 +687,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
@@ -716,7 +728,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == updater.pk_value)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.deployment_policy),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
@@ -1186,7 +1200,7 @@ class DeploymentDBSource:
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).options(
-                selectinload(EndpointRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.deployment_policy),
             )
@@ -1249,7 +1263,7 @@ class DeploymentDBSource:
                     RoutingRow.id.label("route_id"),
                     RoutingRow.endpoint.label("endpoint_id"),
                     EndpointRow.name.label("endpoint_name"),
-                    EndpointRow.runtime_variant.label("runtime_variant"),
+                    DeploymentRevisionRow.runtime_variant.label("runtime_variant"),
                     EndpointRow.session_owner.label("session_owner"),
                     EndpointRow.project.label("project"),
                     KernelRow.kernel_host,
@@ -1257,6 +1271,10 @@ class DeploymentDBSource:
                 )
                 .select_from(RoutingRow)
                 .join(EndpointRow, RoutingRow.endpoint == EndpointRow.id)
+                .join(
+                    DeploymentRevisionRow,
+                    EndpointRow.current_revision == DeploymentRevisionRow.id,
+                )
                 .join(
                     KernelRow,
                     sa.and_(
@@ -2020,16 +2038,17 @@ class DeploymentDBSource:
                 endpoint_id,
                 load_created_user=True,
                 load_session_owner=True,
-                load_image=True,
+                load_revisions=True,
                 load_routes=True,
             )
             if not endpoint:
                 raise EndpointNotFound(str(endpoint_id))
 
-            # Get model vfolder for health check config
-            if endpoint.model is None:
+            # Get model vfolder from current revision for health check config
+            current_rev = endpoint._find_current_revision()
+            if current_rev is None or current_rev.model is None:
                 return None
-            model = await VFolderRow.get(db_sess, endpoint.model)
+            model = await VFolderRow.get(db_sess, current_rev.model)
             if not model:
                 return None
 
@@ -2299,7 +2318,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == updater.pk_value)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),

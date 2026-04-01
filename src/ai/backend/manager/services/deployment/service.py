@@ -201,8 +201,10 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
     revision: ModelRevisionData | None = None
     if info.model_revisions:
         rev = info.model_revisions[0]
+        if rev.revision_id is None:
+            raise ValueError(f"ModelRevisionSpec has no revision_id for deployment {info.id}")
         revision = ModelRevisionData(
-            id=info.current_revision_id or info.id,
+            id=rev.revision_id,
             name=rev.image_identifier.canonical,
             cluster_config=ClusterConfigData(
                 mode=rev.resource_spec.cluster_mode,
@@ -228,8 +230,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
                 )
                 for m in rev.mounts.extra_mounts
             ],
-            image_id=info.current_revision_id
-            or info.id,  # Placeholder: actual image_id not in ImageIdentifier
+            image_id=rev.image_id,
             created_at=info.metadata.created_at or datetime.now(UTC),
             model_definition=rev.model_definition,
         )

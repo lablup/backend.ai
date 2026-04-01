@@ -140,6 +140,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
@@ -451,6 +452,13 @@ class DeploymentAdapter(BaseAdapter):
             GetDeploymentByIdAction(deployment_id=deployment_id)
         )
         return self._deployment_data_to_dto(action_result.data)
+
+    async def get_current_revision(self, deployment_id: UUID) -> RevisionNode:
+        """Retrieve the current active revision of a deployment."""
+        deployment = await self.get(deployment_id)
+        if deployment.current_revision_id is None:
+            raise DeploymentRevisionNotFound(f"Deployment {deployment_id} has no current revision")
+        return await self.get_revision(deployment.current_revision_id)
 
     async def update(
         self,
@@ -1420,11 +1428,7 @@ class DeploymentAdapter(BaseAdapter):
                 type=data.default_deployment_strategy,
             ),
             created_user_id=data.created_user_id,
-            revision=(
-                DeploymentAdapter._revision_data_to_dto(data.revision)
-                if data.revision is not None
-                else None
-            ),
+            current_revision_id=data.revision.id if data.revision is not None else None,
             policy=policy_info,
         )
 

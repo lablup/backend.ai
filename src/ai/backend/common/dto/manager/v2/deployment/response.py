@@ -114,7 +114,9 @@ class DeploymentNode(BaseResponseModel):
         description="Default deployment update strategy"
     )
     created_user_id: UUID = Field(description="ID of the user who created this deployment")
-    revision: RevisionNode | None = Field(default=None, description="Currently active revision")
+    current_revision_id: UUID | None = Field(
+        default=None, description="ID of the currently active revision"
+    )
     policy: DeploymentPolicyInfo | None = Field(
         default=None, description="Deployment update policy"
     )
