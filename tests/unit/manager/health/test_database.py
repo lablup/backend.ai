@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 import pytest
-import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common.health_checker.types import CID_POSTGRES
