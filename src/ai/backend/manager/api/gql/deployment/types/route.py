@@ -65,6 +65,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
     from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
 
+
 RouteStatusGQL: type[RouteStatusEnum] = gql_enum(
     BackendAIGQLMeta(
         added_version="25.19.0",

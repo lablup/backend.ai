@@ -16,6 +16,7 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -517,7 +518,12 @@ class RouteFilter(BaseRequestModel):
     """Filter for deployment routes."""
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
-    status: list[RouteStatus] | None = Field(default=None, description="Route status filter")
+    status: list[RouteStatus] | None = Field(
+        default=None, description="Route lifecycle status filter"
+    )
+    health_status: list[RouteHealthStatus] | None = Field(
+        default=None, description="Route health status filter"
+    )
     traffic_status: list[RouteTrafficStatus] | None = Field(
         default=None, description="Traffic status filter"
     )

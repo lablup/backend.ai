@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.config import ModelDefinition, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
@@ -1896,6 +1896,42 @@ class DeploymentDBSource:
                     .values(replica_host=host, replica_port=port)
                 )
                 await db_sess.execute(query)
+
+    async def fetch_health_check_configs_by_revision_ids(
+        self,
+        revision_ids: set[uuid.UUID],
+    ) -> dict[uuid.UUID, ModelHealthCheck | None]:
+        """Fetch health check configurations for revisions.
+
+        For non-CUSTOM runtimes, uses the runtime profile's health_check_endpoint.
+        For CUSTOM runtimes, parses the model_definition JSONB column.
+
+        Returns:
+            Mapping of revision_id to ModelHealthCheck (None if no health check configured)
+        """
+        if not revision_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(
+                DeploymentRevisionRow.id,
+                DeploymentRevisionRow.runtime_variant,
+                DeploymentRevisionRow.model_definition,
+            ).where(DeploymentRevisionRow.id.in_(revision_ids))
+            result = await db_sess.execute(query)
+
+            configs: dict[uuid.UUID, ModelHealthCheck | None] = {}
+            for row in result:
+                profile = MODEL_SERVICE_RUNTIME_PROFILES[row.runtime_variant]
+                if profile.health_check_endpoint:
+                    configs[row.id] = ModelHealthCheck(path=profile.health_check_endpoint)
+                elif row.runtime_variant == RuntimeVariant.CUSTOM and row.model_definition:
+                    md = ModelDefinition.model_validate(row.model_definition)
+                    configs[row.id] = md.health_check_config()
+                else:
+                    configs[row.id] = None
+
+            return configs
 
     async def delete_routes_by_route_ids(
         self,

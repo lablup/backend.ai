@@ -57,9 +57,12 @@ class TerminatingRouteHandler(RouteHandler):
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Terminating → TERMINATED on success."""
+        """Terminating → TERMINATED on success, reset health to NOT_CHECKED."""
         return RouteStatusTransitions(
-            success=RouteTransitionTarget(status=RouteStatus.TERMINATED),
+            success=RouteTransitionTarget(
+                status=RouteStatus.TERMINATED,
+                health_status=RouteHealthStatus.NOT_CHECKED,
+            ),
             failure=None,
             stale=None,
         )

@@ -135,6 +135,9 @@ from ai.backend.manager.data.deployment.types import (
     RouteSearchScope,
 )
 from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus as ManagerRouteHealthStatus,
+)
+from ai.backend.manager.data.deployment.types import (
     RouteStatus as ManagerRouteStatus,
 )
 from ai.backend.manager.data.deployment.types import (
@@ -1178,6 +1181,12 @@ class DeploymentAdapter(BaseAdapter):
             if f.status is not None:
                 conditions.append(
                     RouteConditions.by_statuses([ManagerRouteStatus(s.value) for s in f.status])
+                )
+            if f.health_status is not None:
+                conditions.append(
+                    RouteConditions.by_health_statuses([
+                        ManagerRouteHealthStatus(s.value) for s in f.health_status
+                    ])
                 )
             if f.traffic_status is not None:
                 conditions.append(

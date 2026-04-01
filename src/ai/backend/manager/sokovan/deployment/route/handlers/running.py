@@ -57,10 +57,13 @@ class RunningRouteHandler(RouteHandler):
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Running check: success=no change, failure=TERMINATING (session died)."""
+        """Running check: success=no change, failure=TERMINATING (session died) + reset health."""
         return RouteStatusTransitions(
             success=None,
-            failure=RouteTransitionTarget(status=RouteStatus.TERMINATING),
+            failure=RouteTransitionTarget(
+                status=RouteStatus.TERMINATING,
+                health_status=RouteHealthStatus.NOT_CHECKED,
+            ),
             stale=None,
         )
 

@@ -1,7 +1,8 @@
 """Observer for performing HTTP health checks on routes.
 
-Checks routes that have not been checked recently (stale in Valkey)
-and writes results back to Valkey. No DB state transitions are performed.
+Reads RouteHealthRecord from Valkey, performs HTTP health checks,
+and writes manager_healthy/manager_last_check back to Valkey.
+During initial_delay, failures are ignored (not written).
 The HealthCheckRouteHandler reads from Valkey and performs DB transitions.
 """
 
@@ -9,11 +10,12 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import Any
 
 import aiohttp
 
-from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.clients.valkey_client.valkey_schedule import (
+    ValkeyScheduleClient,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -26,11 +28,11 @@ HEALTH_CHECK_TIMEOUT_SEC = 5
 
 
 class RouteHealthObserver(RouteObserver):
-    """Performs HTTP health checks on stale routes and writes results to Valkey.
+    """Performs HTTP health checks on routes using RouteHealthRecord.
 
-    This is the manager fallback health checker. It only checks routes
-    whose Valkey health data is missing or expired (stale).
-    Routes must have replica_host and replica_port populated (set during provisioning).
+    Reads RouteHealthRecord from Valkey to get health_path, replica_host, inference_port.
+    During initial_delay period, health check failures are ignored (not written to Valkey).
+    After initial_delay, both success and failure results are written.
     """
 
     def __init__(
@@ -46,7 +48,7 @@ class RouteHealthObserver(RouteObserver):
         return "route-health-observer"
 
     async def observe(self, routes: Sequence[RouteData]) -> RouteObservationResult:
-        """Check health for routes with stale/missing Valkey data."""
+        """Check health for routes using RouteHealthRecord from Valkey."""
         if not routes:
             return RouteObservationResult(observed_count=0)
 
@@ -55,59 +57,47 @@ class RouteHealthObserver(RouteObserver):
         if not checkable:
             return RouteObservationResult(observed_count=0)
 
+        # Load RouteHealthRecords from Valkey
         route_ids = [str(r.route_id) for r in checkable]
+        records = await self._valkey_schedule.get_route_health_records_batch(route_ids)
 
-        # Find stale routes (no recent health data in Valkey)
-        health_statuses = await self._valkey_schedule.check_route_health_status(route_ids)
-        stale_routes = [r for r in checkable if health_statuses.get(str(r.route_id)) is None]
-
-        if not stale_routes:
-            return RouteObservationResult(observed_count=0)
-
-        log.debug("Health observer: {} stale routes to check", len(stale_routes))
-
-        # Resolve health check path from deployment revision
-        health_paths = await self._resolve_health_paths(stale_routes)
-
-        # Perform HTTP health checks and write to Valkey
+        current_time = await self._valkey_schedule.get_redis_time()
         checked = 0
-        for route in stale_routes:
-            health_path = health_paths.get(route.route_id, "/health")
+
+        for route in checkable:
+            route_id_str = str(route.route_id)
+            record = records.get(route_id_str)
+            if record is None:
+                continue
+
             is_healthy = await self._http_health_check(
-                route.replica_host,
-                route.replica_port,
-                health_path,
+                record.replica_host,
+                record.inference_port,
+                record.health_path,
             )
-            await self._valkey_schedule.update_route_liveness(
-                str(route.route_id),
-                liveness=is_healthy,
-            )
+
+            within_initial_delay = current_time < record.initial_delay_until
+
+            # Always refresh TTL to prevent key expiry
+            await self._valkey_schedule.refresh_route_health_ttl(route_id_str)
+
+            if is_healthy:
+                # Success: always write regardless of initial_delay
+                await self._valkey_schedule.update_route_manager_health(route_id_str, True)
+            elif not within_initial_delay:
+                # Failure after initial_delay: write as unhealthy
+                await self._valkey_schedule.update_route_manager_health(route_id_str, False)
+            # else: failure within initial_delay → ignore (don't write)
+
             checked += 1
 
-        log.debug("Health observer: checked {} routes", checked)
+        if checked:
+            log.debug("Health observer: checked {} routes", checked)
         return RouteObservationResult(observed_count=checked)
 
-    async def _resolve_health_paths(
-        self,
-        routes: Sequence[RouteData],
-    ) -> dict[Any, str]:
-        """Resolve health check path from revision's model_definition."""
-        paths: dict[Any, str] = {}
-
-        for route in routes:
-            if route.revision_id in paths:
-                continue
-            # TODO: batch query revision model_definitions
-            # For now, use default path
-            paths[route.revision_id] = "/health"
-
-        return {r.route_id: paths.get(r.revision_id, "/health") for r in routes}
-
     @staticmethod
-    async def _http_health_check(host: str | None, port: int | None, path: str) -> bool:
+    async def _http_health_check(host: str, port: int, path: str) -> bool:
         """Perform HTTP GET health check."""
-        if not host or not port:
-            return False
         url = f"http://{host}:{port}{path}"
         try:
             async with aiohttp.ClientSession() as session:
