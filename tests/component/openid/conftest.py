@@ -31,7 +31,12 @@ from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap, ValkeyProfileTarget, ValkeyTarget
+from ai.backend.common.types import (
+    ResourceSlot,
+    ValkeyProfileTarget,
+    ValkeyTarget,
+    VFolderHostPermissionMap,
+)
 from ai.backend.logging import LogLevel
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
