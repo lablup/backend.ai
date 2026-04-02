@@ -83,7 +83,7 @@ class DevInventoryBuilder:
         *,
         public_facing_address: str = "127.0.0.1",
         home_dir: str | None = None,
-        bai_version: str = "dev",
+        bai_version: str = "26.3.0",
     ) -> None:
         self.host = public_facing_address
         self.home_dir = home_dir or str(Path.cwd())
