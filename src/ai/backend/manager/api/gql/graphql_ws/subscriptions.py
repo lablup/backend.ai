@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Final
 
-from strawberry.types.execution import PreExecutionError
+from strawberry.types.execution import ExecutionResult, PreExecutionError
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -96,10 +96,12 @@ class SubscriptionExecutor:
             async for item in result_stream:
                 if sender.closed:
                     break
-                if isinstance(item, PreExecutionError):
-                    await sender.send_pre_execution_error(sub_id, item)
-                    return
-                await sender.send_next(sub_id, item)
+                match item:
+                    case PreExecutionError():
+                        await sender.send_pre_execution_error(sub_id, item)
+                        return
+                    case ExecutionResult():
+                        await sender.send_next(sub_id, item)
         except asyncio.CancelledError:
             # Client-initiated complete — do NOT echo complete back.
             send_complete = False
