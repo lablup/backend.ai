@@ -1,11 +1,11 @@
 import asyncio
 import logging
-import platform
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import override
 
+from ai.backend.agent.errors.agent import OverlayMountFailedError
 from ai.backend.agent.resources import Mount
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 from ai.backend.common.types import (
@@ -39,10 +39,9 @@ class OverlayMountResult:
 class OverlayMountProvisioner(Provisioner[OverlayMountSpec, OverlayMountResult]):
     """Provisions overlayfs mounts for vfolders with overlay_target set.
 
-    On Linux: creates overlayfs (lower=vfolder ro, upper=overlay_target or temp dir)
+    Creates overlayfs (lower=vfolder ro, upper=overlay_target or temp dir)
     and bind-mounts the merged directory into the container.
-
-    On macOS: falls back to read-only bind mount (overlay not supported).
+    Raises OverlayMountFailedError if the mount command fails.
     """
 
     @property
@@ -54,9 +53,6 @@ class OverlayMountProvisioner(Provisioner[OverlayMountSpec, OverlayMountResult])
     async def setup(self, spec: OverlayMountSpec) -> OverlayMountResult:
         if not spec.overlay_mounts:
             return OverlayMountResult(mounts=[])
-
-        if platform.system() != "Linux":
-            return self._fallback_bind_ro(spec)
 
         mounts: list[Mount] = []
         merged_paths: list[Path] = []
@@ -89,20 +85,10 @@ class OverlayMountProvisioner(Provisioner[OverlayMountSpec, OverlayMountResult])
             )
             _, stderr = await proc.communicate()
             if proc.returncode != 0:
-                log.warning(
-                    "Failed to create overlay mount for {}: {} (falling back to bind ro)",
-                    vfmount.name,
-                    stderr.decode().strip(),
+                err_msg = stderr.decode().strip()
+                raise OverlayMountFailedError(
+                    f"Failed to create overlay mount for '{vfmount.name}': {err_msg}",
                 )
-                mounts.append(
-                    Mount(
-                        MountTypes.BIND,
-                        lower,
-                        Path(vfmount.kernel_path),
-                        MountPermission.READ_ONLY,
-                    )
-                )
-                continue
 
             merged_paths.append(merged)
             mounts.append(
@@ -134,19 +120,6 @@ class OverlayMountProvisioner(Provisioner[OverlayMountSpec, OverlayMountResult])
                 shutil.rmtree(overlay_base, ignore_errors=True)
             except Exception:
                 log.warning("Failed to cleanup overlay dir at {}", merged.parent)
-
-    def _fallback_bind_ro(self, spec: OverlayMountSpec) -> OverlayMountResult:
-        log.warning("Overlay mount not supported on this platform, falling back to bind ro")
-        mounts = [
-            Mount(
-                MountTypes.BIND,
-                Path(vfmount.host_path),
-                Path(vfmount.kernel_path),
-                MountPermission.READ_ONLY,
-            )
-            for vfmount in spec.overlay_mounts
-        ]
-        return OverlayMountResult(mounts=mounts)
 
 
 class OverlayMountStage(ProvisionStage[OverlayMountSpec, OverlayMountResult]):

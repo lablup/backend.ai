@@ -307,3 +307,17 @@ class KernelNotFoundError(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class OverlayMountFailedError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when overlay mount cannot be created on this platform or due to a system error."""
+
+    error_type = "https://api.backend.ai/probs/agent/overlay-mount-failed"
+    error_title = "Overlay mount failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
