@@ -23,69 +23,40 @@ def upgrade() -> None:
     # The IntOrPercent model now expects:
     #   {"max_surge": {"count": 1}, "max_unavailable": {"count": 0}}
     #
-    # Convert any rows where max_surge or max_unavailable is a plain integer
-    # to the new {"count": N} dict format.
-    # Convert plain integers: {"max_surge": 1} -> {"max_surge": {"count": 1}}
+    # After a downgrade round-trip, values are always plain numbers (int or
+    # float such as 0.0, 1.0) because the downgrade converts percent values
+    # to rounded integers.  We always convert to {"count": N} here.
     op.execute(
         """
         UPDATE deployment_policies
         SET strategy_spec = jsonb_set(
             strategy_spec,
             '{max_surge}',
-            jsonb_build_object('count', (strategy_spec ->> 'max_surge')::int)
+            jsonb_build_object('count', round((strategy_spec ->> 'max_surge')::numeric)::int)
         )
         WHERE strategy_spec IS NOT NULL
           AND jsonb_typeof(strategy_spec -> 'max_surge') = 'number'
-          AND (strategy_spec ->> 'max_surge')::numeric = floor((strategy_spec ->> 'max_surge')::numeric)
         """
     )
-    # Convert plain floats: {"max_surge": 0.5} -> {"max_surge": {"percent": 0.5}}
-    op.execute(
-        """
-        UPDATE deployment_policies
-        SET strategy_spec = jsonb_set(
-            strategy_spec,
-            '{max_surge}',
-            jsonb_build_object('percent', (strategy_spec ->> 'max_surge')::float)
-        )
-        WHERE strategy_spec IS NOT NULL
-          AND jsonb_typeof(strategy_spec -> 'max_surge') = 'number'
-          AND (strategy_spec ->> 'max_surge')::numeric != floor((strategy_spec ->> 'max_surge')::numeric)
-        """
-    )
-    # Convert plain integers: {"max_unavailable": 0} -> {"max_unavailable": {"count": 0}}
     op.execute(
         """
         UPDATE deployment_policies
         SET strategy_spec = jsonb_set(
             strategy_spec,
             '{max_unavailable}',
-            jsonb_build_object('count', (strategy_spec ->> 'max_unavailable')::int)
+            jsonb_build_object('count', round((strategy_spec ->> 'max_unavailable')::numeric)::int)
         )
         WHERE strategy_spec IS NOT NULL
           AND jsonb_typeof(strategy_spec -> 'max_unavailable') = 'number'
-          AND (strategy_spec ->> 'max_unavailable')::numeric = floor((strategy_spec ->> 'max_unavailable')::numeric)
-        """
-    )
-    # Convert plain floats: {"max_unavailable": 0.5} -> {"max_unavailable": {"percent": 0.5}}
-    op.execute(
-        """
-        UPDATE deployment_policies
-        SET strategy_spec = jsonb_set(
-            strategy_spec,
-            '{max_unavailable}',
-            jsonb_build_object('percent', (strategy_spec ->> 'max_unavailable')::float)
-        )
-        WHERE strategy_spec IS NOT NULL
-          AND jsonb_typeof(strategy_spec -> 'max_unavailable') = 'number'
-          AND (strategy_spec ->> 'max_unavailable')::numeric != floor((strategy_spec ->> 'max_unavailable')::numeric)
         """
     )
 
 
 def downgrade() -> None:
-    # Convert IntOrPercent dict back to plain numeric value.
-    # Use count if present, otherwise use percent.
+    # Convert IntOrPercent dict back to a plain integer.
+    # count is used as-is; percent is rounded to the nearest integer so that
+    # the old RollingUpdateSpec(max_surge: int) can parse the value without
+    # a Pydantic validation error.
     op.execute(
         """
         UPDATE deployment_policies
@@ -96,7 +67,7 @@ def downgrade() -> None:
                 WHEN (strategy_spec -> 'max_surge' ->> 'count') IS NOT NULL
                     THEN to_jsonb((strategy_spec -> 'max_surge' ->> 'count')::int)
                 WHEN (strategy_spec -> 'max_surge' ->> 'percent') IS NOT NULL
-                    THEN to_jsonb((strategy_spec -> 'max_surge' ->> 'percent')::float)
+                    THEN to_jsonb(round((strategy_spec -> 'max_surge' ->> 'percent')::numeric)::int)
                 ELSE '0'::jsonb
             END
         )
@@ -114,7 +85,7 @@ def downgrade() -> None:
                 WHEN (strategy_spec -> 'max_unavailable' ->> 'count') IS NOT NULL
                     THEN to_jsonb((strategy_spec -> 'max_unavailable' ->> 'count')::int)
                 WHEN (strategy_spec -> 'max_unavailable' ->> 'percent') IS NOT NULL
-                    THEN to_jsonb((strategy_spec -> 'max_unavailable' ->> 'percent')::float)
+                    THEN to_jsonb(round((strategy_spec -> 'max_unavailable' ->> 'percent')::numeric)::int)
                 ELSE '0'::jsonb
             END
         )
