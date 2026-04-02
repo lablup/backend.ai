@@ -41,5 +41,4 @@ class VFolderScanData:
     quota_scope_id: QuotaScopeID
     unmanaged_path: str | None
     domain_name: str
-    group_id: UUID
-    creator_uuid: UUID
+    project_id: UUID

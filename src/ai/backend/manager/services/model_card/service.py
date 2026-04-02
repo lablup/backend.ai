@@ -182,7 +182,7 @@ class ModelCardService:
             name=name,
             vfolder_id=vf.id,
             domain=vf.domain_name,
-            project_id=vf.group_id,
+            project_id=vf.project_id,
             creator_id=requester_id,
             author=metadata.author if metadata else None,
             title=metadata.title if metadata else None,

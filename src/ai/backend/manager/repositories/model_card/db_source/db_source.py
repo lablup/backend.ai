@@ -96,11 +96,10 @@ class ModelCardDBSource:
                     quota_scope_id=row.quota_scope_id,
                     unmanaged_path=row.unmanaged_path,
                     domain_name=row.domain_name,
-                    group_id=row.group,  # guaranteed non-null by group == project_id filter
-                    creator_uuid=row.user,  # guaranteed non-null for group vfolders
+                    project_id=row.group,
                 )
                 for row in rows
-                if row.group is not None and row.user is not None
+                if row.group is not None
             ]
 
     async def get_existing_card_names(self, project_id: UUID, domain: str) -> set[str]:
