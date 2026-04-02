@@ -888,6 +888,19 @@ class Context(metaclass=ABCMeta):
             if tls_advertised:
                 data["proxy_coordinator"]["tls_advertised"] = True  # type: ignore[index]
                 data["proxy_coordinator"]["advertised_addr"]["port"] = advertised_port  # type: ignore[index]
+
+            # Enable traefik integration in coordinator
+            if frontend_mode == FrontendMode.TRAEFIK:
+                data["proxy_coordinator"]["enable_traefik"] = True  # type: ignore[index]
+                traefik_table = tomlkit.table()
+                traefik_etcd_table = tomlkit.table()
+                traefik_etcd_table["namespace"] = "backend"
+                etcd_addr_table = tomlkit.inline_table()
+                etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
+                etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
+                traefik_etcd_table["addr"] = etcd_addr_table
+                traefik_table["etcd"] = traefik_etcd_table
+                data["proxy_coordinator"]["traefik"] = traefik_table  # type: ignore[index]
         with coord_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -925,11 +938,36 @@ class Context(metaclass=ABCMeta):
             if tls_advertised:
                 data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
 
-            # set frontend mode (port or wildcard)
-            data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
+            # set frontend mode
+            if frontend_mode == FrontendMode.TRAEFIK:
+                data["proxy_worker"]["frontend_mode"] = "traefik"  # type: ignore[index]
+            else:
+                data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
 
             # configure based on frontend_mode
-            if frontend_mode == FrontendMode.WILDCARD:
+            if frontend_mode == FrontendMode.TRAEFIK:
+                # Remove port_proxy section — traefik handles routing
+                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
+                    del data["proxy_worker"]["port_proxy"]
+
+                # Add traefik section
+                traefik_table = tomlkit.table()
+                traefik_table["api_port"] = 18080
+                traefik_table["last_used_time_marker_directory"] = "./last_used"
+                traefik_etcd_table = tomlkit.table()
+                traefik_etcd_table["namespace"] = "traefik"
+                etcd_addr_table = tomlkit.inline_table()
+                etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
+                etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
+                traefik_etcd_table["addr"] = etcd_addr_table
+                traefik_table["etcd"] = traefik_etcd_table
+                # Port proxy sub-section under traefik
+                port_proxy_table = tomlkit.table()
+                port_proxy_table["advertised_host"] = public_facing_address
+                port_proxy_table["bind_port_range"] = [10205, 10300]
+                traefik_table["port_proxy"] = port_proxy_table
+                data["proxy_worker"]["traefik"] = traefik_table  # type: ignore[index]
+            elif frontend_mode == FrontendMode.WILDCARD:
                 # Remove port_proxy section for wildcard mode
                 if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
                     del data["proxy_worker"]["port_proxy"]
