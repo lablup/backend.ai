@@ -1,7 +1,7 @@
 """register existing project roles in association_scopes_entities
 
 Revision ID: 9dc6609c92ce
-Revises: af1b9ec86adb
+Revises: bbcc151ec870
 Create Date: 2026-04-01
 
 """
@@ -17,7 +17,7 @@ from ai.backend.manager.models.rbac_models.migration.models import (
 
 # revision identifiers, used by Alembic.
 revision = "9dc6609c92ce"
-down_revision = "af1b9ec86adb"
+down_revision = "bbcc151ec870"
 branch_labels = None
 depends_on = None
 
