@@ -50,6 +50,9 @@ pants test --changed-since=HEAD~1
 
 **Fix all lint, type, and test errors — never suppress or skip.**
 
+**After API/CLI changes, verify with live server using `./bai` CLI** — see `/local-dev` skill.
+If docker service changes are needed, see `/halfstack` skill.
+
 ## Alembic Migration Backport
 
 When backporting migrations to release branches, both the backport and main branch

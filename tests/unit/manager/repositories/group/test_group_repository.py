@@ -630,15 +630,11 @@ class TestGroupRepository:
                 session_owner=test_user,
                 replicas=1,
                 desired_replicas=1,
-                image=uuid.uuid4(),  # Active endpoints need image
                 domain=test_domain,
                 project=group_id,
                 resource_group=test_scaling_group,
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 current_revision=uuid.uuid4(),
-                resource_slots=ResourceSlot(),
-                cluster_mode="single-node",
-                cluster_size=1,
             )
             session.add(endpoint)
             await session.commit()

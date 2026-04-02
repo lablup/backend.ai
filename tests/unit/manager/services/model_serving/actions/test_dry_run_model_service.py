@@ -144,6 +144,7 @@ class TestDryRunModelService:
         mock_generator = MagicMock()
         mock_generator.generate_revision = AsyncMock(
             return_value=ModelRevisionSpec(
+                image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
                 image_identifier=ImageIdentifier(
                     canonical="ai.backend/python:3.9",
                     architecture="x86_64",
@@ -408,6 +409,7 @@ class TestDryRunModelServiceActionWithRevision:
     @pytest.fixture
     def revision_spec(self) -> ModelRevisionSpec:
         return ModelRevisionSpec(
+            image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
             image_identifier=ImageIdentifier(
                 canonical="service-def-image:v2",
                 architecture="arm64",
@@ -510,6 +512,7 @@ class TestDryRunModelServiceActionWithRevision:
     @pytest.fixture
     def revision_spec_with_no_environ(self) -> ModelRevisionSpec:
         return ModelRevisionSpec(
+            image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
             image_identifier=ImageIdentifier(
                 canonical="service-def-image:v2",
                 architecture="arm64",
@@ -628,6 +631,7 @@ class TestDryRunWithDeploymentConfigOverrides:
     def revision_from_deployment_config(self) -> ModelRevisionSpec:
         """Revision spec that would come from deployment config via RevisionGenerator."""
         return ModelRevisionSpec(
+            image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
             image_identifier=ImageIdentifier(
                 canonical="service-def-image:v1",
                 architecture="arm64",
@@ -940,6 +944,7 @@ class TestDryRunExtraMountsHandling:
         mock_generator = MagicMock()
         mock_generator.generate_revision = AsyncMock(
             return_value=ModelRevisionSpec(
+                image_id=uuid.UUID("88888888-8888-8888-8888-888888888888"),
                 image_identifier=ImageIdentifier(
                     canonical="ai.backend/python:3.9",
                     architecture="x86_64",

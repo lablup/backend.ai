@@ -198,6 +198,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         )
         return ModelRevisionSpec(
             revision_id=self.id,
+            image_id=self.image,
             image_identifier=image_identifier,
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode(self.cluster_mode),

@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
     UpdateDeploymentRevisionPresetPayload,
 )
 
-_PATH = "/v2/deployment-revision-presets"
+_PATH = "/v2/deployments/revision-presets"
 
 
 class V2DeploymentRevisionPresetClient(BaseDomainClient):

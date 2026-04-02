@@ -40,10 +40,20 @@ If both admin and non-admin variants exist for the same operation (different beh
 - SDK registry: `client/v2/v2_registry.py`
 - New SDK domain clients must be registered as `@cached_property` in `V2ClientRegistry`.
 
-## Command Patterns
+## Operation Naming
 
-- JSON body as CLI argument for create/update: `./bai admin domain create '{"name":"foo"}'`
-- Entity identifier as argument for get/delete/purge: `./bai admin domain delete foo`
+Standard 6 operations use fixed command names: `create`, `get`, `search`, `update`, `delete`, `purge`.
+Only use different names for operations outside the 6-op pattern:
+- `enqueue`, `terminate` (session lifecycle)
+- `revision add`, `revision activate`, `revision current` (deployment revision)
+- `login`, `logout` (auth)
+
+## Command Input Style
+
+- **Primary:** Individual `--option` flags for each field.
+- **Secondary:** For deeply nested structures (e.g., revision config), accept JSON string or `@file` path via a single option (e.g., `--config '{"cluster_config": ...}'` or `--config @revision.json`).
+- **Never** use raw JSON as a positional argument for create/update.
+- Entity identifier (UUID, name) as positional argument for get/delete/purge.
 - Filter options as `--option` flags for search: `./bai admin domain search --name-contains foo`
 - Use `print_result()` helper for JSON output.
 - Use lazy imports inside command functions for DTO classes.

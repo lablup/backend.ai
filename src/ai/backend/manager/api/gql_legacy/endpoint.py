@@ -50,6 +50,7 @@ from ai.backend.manager.errors.service import (
     EndpointNotFound,
     EndpointTokenNotFound,
 )
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
@@ -663,47 +664,15 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         ctx: GraphQueryContext,
         row: EndpointRow,
     ) -> Self:
-        creator = cast(UserRow | None, row.created_user_row)
-        return cls(
-            endpoint_id=row.id,
-            # image="", # deprecated, row.image_object.name,
-            image_object=ImageNode.from_row(ctx, row.image_row),
-            domain=row.domain,
-            project=row.project,
-            resource_group=row.resource_group,
-            resource_slots=row.resource_slots.to_json(),
-            url=row.url,
-            model=row.model,
-            model_definition_path=row.model_definition_path,
-            model_mount_destiation=row.model_mount_destination,
-            model_mount_destination=row.model_mount_destination,
-            created_user=row.created_user,
-            created_user_id=row.created_user,
-            created_user_email=creator.email if creator is not None else None,
-            session_owner=row.session_owner,
-            session_owner_id=row.session_owner,
-            session_owner_email=row.session_owner_row.email
-            if row.session_owner_row is not None
-            else None,
-            tag=row.tag,
-            startup_command=row.startup_command,
-            bootstrap_script=row.bootstrap_script,
-            callback_url=row.callback_url,
-            environ=row.environ,
-            name=row.name,
-            resource_opts=row.resource_opts,
-            replicas=row.replicas,
-            desired_session_count=row.replicas,
-            cluster_mode=row.cluster_mode,
-            cluster_size=row.cluster_size,
-            open_to_public=row.open_to_public,
-            created_at=row.created_at,
-            destroyed_at=row.destroyed_at,
-            retries=row.retries,
-            routings=[await Routing.from_row(ctx, r, endpoint=row) for r in row.routings],
-            lifecycle_stage=row.lifecycle_stage.name,
-            runtime_variant=RuntimeVariantInfo.from_enum(row.runtime_variant),
-        )
+        """Convert EndpointRow to GQL type via to_data() → from_dto().
+
+        Requires revisions and revisions.image_row to be eagerly loaded.
+        """
+        dto = row.to_data()
+        result = cls.from_dto(ctx, dto)
+        if result is None:
+            raise ValueError(f"Failed to convert EndpointRow {row.id} to GQL type")
+        return result
 
     @classmethod
     def from_dto(cls, ctx: GraphQueryContext, dto: EndpointData | None) -> Self | None:
@@ -804,7 +773,9 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             )
             .limit(limit)
             .offset(offset)
-            .options(selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases))
+            .options(
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+            )
             .options(selectinload(EndpointRow.routings))
             .options(selectinload(EndpointRow.session_owner_row))
             .options(joinedload(EndpointRow.created_user_row))
@@ -844,7 +815,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
                 project=project,
                 domain=domain_name,
                 user_uuid=user_uuid,
-                load_image=True,
+                load_revisions=True,
                 load_created_user=True,
                 load_session_owner=True,
             )
@@ -871,7 +842,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
                     domain=domain_name,
                     user_uuid=user_uuid,
                     project=project,
-                    load_image=True,
+                    load_revisions=True,
                     load_routes=True,
                     load_created_user=True,
                     load_session_owner=True,
@@ -892,7 +863,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
                     r for r in self.routings if r.status in active_route_status_names
                 ]
                 healthy_count = sum(
-                    1 for r in active_routings if r.status == RouteStatus.HEALTHY.name
+                    1 for r in active_routings if r.status == RouteStatus.RUNNING.name
                 )
                 if healthy_count == 0:
                     return EndpointStatus.UNHEALTHY
@@ -917,8 +888,10 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         async with ctx.db.begin_readonly_session() as sess:
-            endpoint_row = await EndpointRow.get(sess, self.endpoint_id)
-            extra_mount_folder_ids = [m.vfid.folder_id for m in endpoint_row.extra_mounts]
+            endpoint_row = await EndpointRow.get(sess, self.endpoint_id, load_revisions=True)
+            current_rev = endpoint_row._find_current_revision()
+            extra_mounts = current_rev.extra_mounts if current_rev else []
+            extra_mount_folder_ids = [m.vfid.folder_id for m in extra_mounts]
             query = (
                 sa.select(VFolderRow)
                 .where(VFolderRow.id.in_(extra_mount_folder_ids))

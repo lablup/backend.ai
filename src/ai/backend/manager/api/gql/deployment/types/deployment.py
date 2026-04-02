@@ -229,7 +229,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     id: NodeID[str]
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
-    revision: ModelRevision | None = None
+    current_revision_id: ID | None = None
     default_deployment_strategy: DeploymentStrategyGQL
     replica_state: ReplicaState
     created_user_id: ID
@@ -558,7 +558,7 @@ class CreateDeploymentInput(PydanticInputMixin[CreateDeploymentInputDTO]):
     network_access: ModelDeploymentNetworkAccessInput
     default_deployment_strategy: DeploymentStrategyInputGQL
     desired_replica_count: int
-    initial_revision: CreateRevisionInput
+    initial_revision: CreateRevisionInput | None = None
 
 
 @gql_pydantic_input(

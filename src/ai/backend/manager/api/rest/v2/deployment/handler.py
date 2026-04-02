@@ -92,6 +92,14 @@ class V2DeploymentHandler:
         result = await self._adapter.get(path.parsed.deployment_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def get_current_revision(
+        self,
+        path: PathParam[DeploymentIdPathParam],
+    ) -> APIResponse:
+        """Retrieve the current active revision of a deployment."""
+        result = await self._adapter.get_current_revision(path.parsed.deployment_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def update(
         self,
         path: PathParam[DeploymentIdPathParam],

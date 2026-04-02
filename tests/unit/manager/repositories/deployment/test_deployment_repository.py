@@ -12,6 +12,7 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
@@ -42,6 +43,7 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import AutoScalingPolicyNotFound, DeploymentPolicyNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
     DeploymentAutoScalingPolicyRow,
@@ -146,9 +148,12 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 KeyPairRow,
                 GroupRow,
                 VFolderRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 EndpointRow,
+                DeploymentRevisionRow,
                 RoutingRow,
             ],
         ):
@@ -550,10 +555,47 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
     ) -> uuid.UUID:
-        """Create test endpoint and return endpoint ID."""
+        """Create test endpoint with revision and return endpoint ID."""
         endpoint_id = uuid.uuid4()
+        revision_id = uuid.uuid4()
+        registry_id = uuid.uuid4()
+        image_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
+            # Create container registry for image FK
+            registry = ContainerRegistryRow(
+                id=registry_id,
+                url="https://test-registry.example.com",
+                registry_name="test-registry",
+                type=ContainerRegistryType.DOCKER,
+                project=None,
+                is_global=True,
+            )
+            db_sess.add(registry)
+            await db_sess.flush()
+
+            # Create image for revision FK
+            image = ImageRow(
+                name="test-registry/test-image:latest",
+                project=None,
+                architecture="x86_64",
+                registry_id=registry_id,
+                is_local=False,
+                registry="test-registry",
+                image="test-image",
+                tag="latest",
+                config_digest="sha256:" + "a" * 64,
+                size_bytes=100000000,
+                type=ImageType.COMPUTE,
+                accelerators=None,
+                labels={},
+                resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
+            )
+            image.id = image_id
+            db_sess.add(image)
+            await db_sess.flush()
+
+            # Create endpoint
             endpoint = EndpointRow(
                 id=endpoint_id,
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
@@ -562,17 +604,33 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 domain=test_domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
-                model=None,  # Optional field
                 desired_replicas=1,
-                image=None,  # Set to None since we're in DESTROYED state
-                runtime_variant=RuntimeVariant.VLLM,
                 url="http://test.example.com",
                 open_to_public=False,
-                lifecycle_stage=EndpointLifecycle.DESTROYED,  # DESTROYED allows null image
-                current_revision=uuid.uuid4(),
-                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
+                lifecycle_stage=EndpointLifecycle.READY,
+                current_revision=revision_id,
             )
             db_sess.add(endpoint)
+            await db_sess.flush()
+
+            # Create revision for endpoint
+            revision = DeploymentRevisionRow(
+                id=revision_id,
+                endpoint=endpoint_id,
+                revision_number=1,
+                image=image_id,
+                model=None,
+                model_mount_destination="/models",
+                resource_group=test_scaling_group_name,
+                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
+                resource_opts={},
+                cluster_mode=ClusterMode.SINGLE_NODE.name,
+                cluster_size=1,
+                runtime_variant=RuntimeVariant.VLLM,
+                environ={},
+                extra_mounts=[],
+            )
+            db_sess.add(revision)
             await db_sess.commit()
 
         return endpoint_id
@@ -721,9 +779,43 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         endpoint_ids = []
 
         async with db_with_cleanup.begin_session() as db_sess:
+            # Create shared container registry + image for revisions
+            registry_id = uuid.uuid4()
+            image_id = uuid.uuid4()
+            registry = ContainerRegistryRow(
+                id=registry_id,
+                url="https://multi-test-registry.example.com",
+                registry_name="multi-test-registry",
+                type=ContainerRegistryType.DOCKER,
+                project=None,
+                is_global=True,
+            )
+            db_sess.add(registry)
+            await db_sess.flush()
+            image = ImageRow(
+                name="multi-test-registry/test-image:latest",
+                project=None,
+                architecture="x86_64",
+                registry_id=registry_id,
+                is_local=False,
+                registry="multi-test-registry",
+                image="test-image",
+                tag="latest",
+                config_digest="sha256:" + "b" * 64,
+                size_bytes=100000000,
+                type=ImageType.COMPUTE,
+                accelerators=None,
+                labels={},
+                resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
+            )
+            image.id = image_id
+            db_sess.add(image)
+            await db_sess.flush()
+
             for i in range(3):
-                # Create endpoint
+                # Create endpoint + revision
                 endpoint_id = uuid.uuid4()
+                revision_id = uuid.uuid4()
                 endpoint = EndpointRow(
                     id=endpoint_id,
                     name=f"endpoint-{i}",
@@ -732,17 +824,30 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     domain=test_domain_name,
                     project=test_group_id,
                     resource_group=test_scaling_group_name,
-                    model=None,  # Optional field
                     desired_replicas=1,
-                    image=None,  # Set to None since we're in DESTROYED state
-                    runtime_variant=RuntimeVariant.VLLM,
                     url=f"http://test{i}.example.com",
                     open_to_public=False,
-                    lifecycle_stage=EndpointLifecycle.DESTROYED,  # DESTROYED allows null image
-                    current_revision=uuid.uuid4(),
-                    resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
+                    lifecycle_stage=EndpointLifecycle.READY,
+                    current_revision=revision_id,
                 )
                 db_sess.add(endpoint)
+                revision = DeploymentRevisionRow(
+                    id=revision_id,
+                    endpoint=endpoint_id,
+                    revision_number=1,
+                    image=image_id,
+                    model=None,
+                    model_mount_destination="/models",
+                    resource_group=test_scaling_group_name,
+                    resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
+                    resource_opts={},
+                    cluster_mode=ClusterMode.SINGLE_NODE.name,
+                    cluster_size=1,
+                    runtime_variant=RuntimeVariant.VLLM,
+                    environ={},
+                    extra_mounts=[],
+                )
+                db_sess.add(revision)
                 endpoint_ids.append(endpoint_id)
 
                 # Create session
@@ -1395,21 +1500,11 @@ class TestDeploymentRevisionOperations:
                 domain=test_domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
-                model=None,
                 replicas=1,
-                image=test_image_id,
-                runtime_variant=RuntimeVariant.CUSTOM,
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 current_revision=uuid.uuid4(),
-                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
-                model_mount_destination="/models",
-                cluster_mode=ClusterMode.SINGLE_NODE.name,
-                cluster_size=1,
-                environ={},
-                resource_opts={},
-                extra_mounts=[],
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -2037,15 +2132,11 @@ class TestDeploymentAutoScalingPolicyOperations:
                 domain=test_domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
-                model=None,
                 desired_replicas=1,
-                image=None,
-                runtime_variant=RuntimeVariant.CUSTOM,
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
                 current_revision=uuid.uuid4(),
-                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -2417,15 +2508,11 @@ class TestDeploymentPolicyOperations:
                 domain=test_domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
-                model=None,
                 desired_replicas=1,
-                image=None,
-                runtime_variant=RuntimeVariant.CUSTOM,
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
                 current_revision=uuid.uuid4(),
-                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -2741,15 +2828,11 @@ class TestSearchDeploymentPolicies:
                     domain=test_domain_name,
                     project=test_group_id,
                     resource_group=test_scaling_group_name,
-                    model=None,
                     desired_replicas=1,
-                    image=None,
-                    runtime_variant=RuntimeVariant.CUSTOM,
                     url=f"http://test-{eid.hex[:8]}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
                     current_revision=uuid.uuid4(),
-                    resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 )
                 db_sess.add(endpoint)
                 endpoint_ids.append(eid)
@@ -3146,15 +3229,11 @@ class TestRouteOperations:
                 domain=test_domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
-                model=None,
                 desired_replicas=1,
-                image=None,
-                runtime_variant=RuntimeVariant.CUSTOM,
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
-                lifecycle_stage=EndpointLifecycle.DESTROYED,  # DESTROYED allows null image
+                lifecycle_stage=EndpointLifecycle.DESTROYED,
                 current_revision=uuid.uuid4(),
-                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -3243,7 +3322,7 @@ class TestRouteOperations:
         # Update the route status
         updater = Updater(
             spec=RouteStatusUpdaterSpec(
-                status=OptionalState.update(RouteStatus.HEALTHY),
+                status=OptionalState.update(RouteStatus.RUNNING),
                 traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
             ),
             pk_value=route_id,
@@ -3257,7 +3336,7 @@ class TestRouteOperations:
             query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
             db_result = await db_sess.execute(query)
             route = db_result.scalar_one()
-            assert route.status == RouteStatus.HEALTHY
+            assert route.status == RouteStatus.RUNNING
             assert route.traffic_status == RouteTrafficStatus.INACTIVE
 
     async def test_update_route_with_unified_spec(
@@ -3291,7 +3370,7 @@ class TestRouteOperations:
         # Update the route using unified spec (excluding session to avoid FK constraint)
         updater = Updater(
             spec=RouteUpdaterSpec(
-                status=OptionalState.update(RouteStatus.HEALTHY),
+                status=OptionalState.update(RouteStatus.RUNNING),
                 traffic_status=OptionalState.update(RouteTrafficStatus.ACTIVE),
                 traffic_ratio=OptionalState.update(0.5),
             ),
@@ -3306,7 +3385,7 @@ class TestRouteOperations:
             query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
             db_result = await db_sess.execute(query)
             route = db_result.scalar_one()
-            assert route.status == RouteStatus.HEALTHY
+            assert route.status == RouteStatus.RUNNING
             assert route.traffic_status == RouteTrafficStatus.ACTIVE
             assert route.traffic_ratio == 0.5
 
@@ -3318,7 +3397,7 @@ class TestRouteOperations:
         nonexistent_id = uuid.uuid4()
         updater = Updater(
             spec=RouteStatusUpdaterSpec(
-                status=OptionalState.update(RouteStatus.HEALTHY),
+                status=OptionalState.update(RouteStatus.RUNNING),
             ),
             pk_value=nonexistent_id,
         )

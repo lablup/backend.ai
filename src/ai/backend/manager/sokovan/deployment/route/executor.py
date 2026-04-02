@@ -7,7 +7,7 @@ from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
-    HealthCheckStatus,
+    RouteHealthRecord,
     ValkeyScheduleClient,
 )
 from ai.backend.common.exception import BackendAIError
@@ -16,12 +16,11 @@ from ai.backend.common.service_discovery.service_discovery import ModelServiceMe
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
+from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteHealthStatus
 from ai.backend.manager.errors.deployment import (
     EndpointNotFound,
     RouteSessionNotFound,
     RouteSessionTerminated,
-    RouteUnhealthy,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -187,35 +186,99 @@ class RouteExecutor:
                     )
                 )
 
+        # Phase 3: Populate replica connection info for routes missing it
+        routes_missing_replica = [r for r in successes if not r.replica_host]
+        if routes_missing_replica:
+            with RouteRecorderContext.shared_phase("populate_replica_info"):
+                with RouteRecorderContext.shared_step("fetch_kernel_connection_info"):
+                    await self._populate_replica_info(routes_missing_replica)
+
         return RouteExecutionResult(
             successes=successes,
             errors=errors,
         )
 
+    async def _populate_replica_info(self, routes: Sequence[RouteData]) -> None:
+        """Fetch kernel host/port, store on route, and initialize RouteHealthRecords in Valkey."""
+        session_ids = [r.session_id for r in routes if r.session_id]
+        if not session_ids:
+            return
+
+        kernel_info = await self._deployment_repo.fetch_kernel_connection_info(session_ids)
+        updates: dict[UUID, tuple[str, int]] = {}
+        populated_routes: list[RouteData] = []
+        for route in routes:
+            if route.session_id and route.session_id in kernel_info:
+                info = kernel_info[route.session_id]
+                if info[0] and info[1]:
+                    updates[route.route_id] = info
+                    populated_routes.append(route)
+
+        if updates:
+            await self._deployment_repo.update_route_replica_info(updates)
+
+        if populated_routes:
+            await self._initialize_health_records(populated_routes, updates)
+
+    async def _initialize_health_records(
+        self,
+        routes: Sequence[RouteData],
+        replica_info: Mapping[UUID, tuple[str, int]],
+    ) -> None:
+        """Create RouteHealthRecords in Valkey for routes that just got replica info."""
+        revision_ids = {r.revision_id for r in routes}
+        health_configs = await self._deployment_repo.fetch_health_check_configs_by_revision_ids(
+            revision_ids
+        )
+        records: list[RouteHealthRecord] = []
+        for route in routes:
+            host, port = replica_info[route.route_id]
+            health_config = health_configs.get(route.revision_id)
+
+            health_path = health_config.path if health_config else "/"
+            initial_delay = health_config.initial_delay if health_config else 60.0
+            created_at = int(route.created_at.timestamp())
+            initial_delay_until = created_at + int(initial_delay)
+
+            records.append(
+                RouteHealthRecord(
+                    route_id=str(route.route_id),
+                    created_at=created_at,
+                    initial_delay_until=initial_delay_until,
+                    health_path=health_path,
+                    inference_port=port,
+                    replica_host=host,
+                )
+            )
+
+        if records:
+            await self._valkey_schedule.initialize_route_health_records_batch(records)
+            log.debug("Initialized {} RouteHealthRecords in Valkey", len(records))
+
     async def check_route_health(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """
-        Check health status of routes using Redis health data.
+        Check health status of routes using RouteHealthRecord from Valkey.
 
-        Classifies routes into three states:
-        - HEALTHY: readiness check passes and data is fresh (successes)
-        - UNHEALTHY: readiness check fails (errors)
-        - DEGRADED: health data is stale or missing (stale)
+        Reads RouteHealthRecord and classifies based on computed healthy/stale:
+        - HEALTHY: record.healthy is True
+        - UNHEALTHY: record.healthy is False and not stale
+        - DEGRADED: record is stale or missing
+
+        The handler only reads and syncs to DB — all health check logic
+        is in the RouteHealthObserver.
 
         Args:
             routes: Routes to check health for
 
         Returns:
-            Result containing:
-            - successes: healthy routes
-            - errors: unhealthy routes
-            - stale: degraded routes
+            Result with successes (healthy), errors (unhealthy), stale (degraded)
         """
-        # Phase 1: Load health status
+        # Phase 1: Load RouteHealthRecords
         with RouteRecorderContext.shared_phase("load_health_status"):
             with RouteRecorderContext.shared_step("query_health_check_results"):
-                # Get health status for all routes from Redis
                 route_ids = [str(route.route_id) for route in routes]
-                health_statuses = await self._valkey_schedule.check_route_health_status(route_ids)
+                records = await self._valkey_schedule.get_route_health_records_batch(route_ids)
+                current_time = await self._valkey_schedule.get_redis_time()
 
         successes: list[RouteData] = []
         errors: list[RouteExecutionError] = []
@@ -223,19 +286,32 @@ class RouteExecutor:
 
         # Phase 2: Classify health state (per-route)
         for route in routes:
-            try:
-                is_healthy = self._classify_route_health(route, health_statuses)
-                if is_healthy:
-                    successes.append(route)
-                else:
-                    stale.append(route)
-            except RouteUnhealthy as e:
+            route_id_str = str(route.route_id)
+            record = records.get(route_id_str)
+
+            if record is None:
+                # No RouteHealthRecord — not yet initialized
+                stale.append(route)
+                continue
+
+            if record.last_check == 0:
+                # Never checked yet — keep as NOT_CHECKED (stale)
+                stale.append(route)
+                continue
+
+            if record.is_stale(current_time):
+                stale.append(route)
+                continue
+
+            if record.healthy:
+                successes.append(route)
+            else:
                 errors.append(
                     RouteExecutionError(
                         route_info=route,
-                        reason=e.error_title,
-                        error_detail=str(e),
-                        error_code=_extract_error_code(e),
+                        reason="Route health check failed",
+                        error_detail="RouteHealthRecord reports unhealthy",
+                        error_code=None,
                     )
                 )
 
@@ -340,7 +416,7 @@ class RouteExecutor:
                 )
 
         # Create mapping of endpoint_id -> cleanup config (no phase - transformation only)
-        endpoint_cleanup_config: dict[UUID, set[RouteStatus]] = {}
+        endpoint_cleanup_config: dict[UUID, set[RouteHealthStatus]] = {}
         for endpoint in endpoints:
             config = cleanup_configs.get(endpoint.metadata.resource_group, None)
             if config:
@@ -433,39 +509,10 @@ class RouteExecutor:
                 if session_status.is_terminal():
                     raise RouteSessionTerminated(session_status.value)
 
-    def _classify_route_health(
-        self,
-        route: RouteData,
-        health_statuses: Mapping[str, Any],
-    ) -> bool:
-        """Classify route health status. Returns True for healthy, False for stale, raises for unhealthy."""
-        pool = RouteRecorderContext.current_pool()
-        recorder = pool.recorder(route.route_id)
-
-        with recorder.phase("classify_health"):
-            with recorder.step("determine_health_state"):
-                route_id_str = str(route.route_id)
-                health_status = health_statuses.get(route_id_str, None)
-
-                if not health_status:
-                    # No health data - Redis TTL expired, mark as stale
-                    return False
-
-                status = health_status.get_status()
-                match status:
-                    case HealthCheckStatus.HEALTHY:
-                        return True
-                    case HealthCheckStatus.STALE:
-                        return False
-                    case HealthCheckStatus.UNHEALTHY:
-                        raise RouteUnhealthy("Route health check failed")
-
-        return False  # Default to stale for unexpected cases
-
     def _check_route_cleanup_eligibility(
         self,
         route: RouteData,
-        endpoint_cleanup_config: Mapping[UUID, set[RouteStatus]],
+        endpoint_cleanup_config: Mapping[UUID, set[RouteHealthStatus]],
     ) -> bool:
         """Check if route should be cleaned up based on cleanup config."""
         pool = RouteRecorderContext.current_pool()
@@ -474,4 +521,4 @@ class RouteExecutor:
         with recorder.phase("identify_cleanup_target"):
             with recorder.step("check_cleanup_eligibility"):
                 cleanup_targets = endpoint_cleanup_config.get(route.endpoint_id, set())
-                return route.status in cleanup_targets
+                return route.health_status in cleanup_targets

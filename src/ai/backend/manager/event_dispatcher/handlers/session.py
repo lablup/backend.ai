@@ -37,7 +37,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.routing import RouteHealthStatus, RouteStatus, RoutingRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
@@ -263,7 +263,8 @@ class SessionEventHandler:
 
                         query = sa.select(sa.func.count("*")).where(
                             (RoutingRow.endpoint == endpoint.id)
-                            & (RoutingRow.status == RouteStatus.HEALTHY)
+                            & (RoutingRow.status == RouteStatus.RUNNING)
+                            & (RoutingRow.health_status == RouteHealthStatus.HEALTHY)
                         )
                         healthy_routes = await db_sess.scalar(query)
                         if endpoint.replicas == healthy_routes:

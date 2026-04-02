@@ -26,7 +26,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.image.types import ImageData
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.deployment.types import RouteStatus
+    from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 
 __all__ = [
     "EndpointAccessValidationData",
@@ -92,6 +92,7 @@ class RoutingData:
     endpoint: uuid.UUID
     session: uuid.UUID | None
     status: RouteStatus
+    health_status: RouteHealthStatus
     traffic_ratio: float
     created_at: datetime
     error_data: dict[str, Any]

@@ -105,6 +105,11 @@ enum ActivenessStatus {
 """Added in 25.19.0. """
 input AddRevisionInput {
   name: String = null
+
+  """
+  Added in UNRELEASED. DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.
+  """
+  revisionPresetId: UUID = null
   deploymentId: ID!
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!
@@ -1635,7 +1640,7 @@ input CreateDeploymentInput {
   networkAccess: ModelDeploymentNetworkAccessInput!
   defaultDeploymentStrategy: DeploymentStrategyInput!
   desiredReplicaCount: Int!
-  initialRevision: CreateRevisionInput!
+  initialRevision: CreateRevisionInput = null
 }
 
 """Added in 25.19.0. Payload for creating a model deployment."""
@@ -1937,6 +1942,11 @@ Added in 25.19.0. Input for specifying revision configuration within a deploymen
 """
 input CreateRevisionInput {
   name: String = null
+
+  """
+  Added in UNRELEASED. DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.
+  """
+  revisionPresetId: UUID = null
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!
   image: ImageInput!
@@ -4749,7 +4759,7 @@ type ModelDeployment implements Node {
   id: ID!
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
-  revision: ModelRevision
+  currentRevisionId: ID
   defaultDeploymentStrategy: DeploymentStrategyGQL!
   replicaState: ReplicaState!
   createdUserId: ID!
@@ -7934,9 +7944,7 @@ Added in 25.19.0. This enum represents the provisioning status of a replica.
 """
 enum ReplicaStatus {
   PROVISIONING
-  HEALTHY
-  UNHEALTHY
-  DEGRADED
+  RUNNING
   TERMINATING
   TERMINATED
   FAILED_TO_START
@@ -8736,8 +8744,11 @@ type Route implements Node {
   sessionId: ID
   revisionId: ID
 
-  """The current status of the route indicating its health state."""
+  """The lifecycle status of the route."""
   status: RouteStatus!
+
+  """The health check status of the route."""
+  healthStatus: RouteHealthStatus!
 
   """
   The traffic routing status (ACTIVE/INACTIVE). Controls whether traffic should be sent to this route.
@@ -8789,10 +8800,19 @@ type RouteEdge {
 """Added in 25.19.0. Filter for routes."""
 input RouteFilter {
   status: [RouteStatus!] = null
+  healthStatus: [RouteHealthStatus!] = null
   trafficStatus: [RouteTrafficStatus!] = null
   AND: [RouteFilter!] = null
   OR: [RouteFilter!] = null
   NOT: [RouteFilter!] = null
+}
+
+"""Added in 25.19.0. Health check status of a route."""
+enum RouteHealthStatus {
+  NOT_CHECKED
+  HEALTHY
+  UNHEALTHY
+  DEGRADED
 }
 
 """Added in 26.3.0. Route history record."""
@@ -8801,6 +8821,7 @@ type RouteHistory implements Node {
   id: ID!
   routeId: ID!
   deploymentId: ID!
+  category: String!
   phase: String!
   fromStatus: String
   toStatus: String
@@ -8881,14 +8902,10 @@ input RouteScope {
   routeId: UUID!
 }
 
-"""
-Added in 25.19.0. Route status indicating the health and lifecycle state of a route.
-"""
+"""Added in 25.19.0. Lifecycle status of a route."""
 enum RouteStatus {
   PROVISIONING
-  HEALTHY
-  UNHEALTHY
-  DEGRADED
+  RUNNING
   TERMINATING
   TERMINATED
   FAILED_TO_START

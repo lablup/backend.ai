@@ -5,7 +5,14 @@ from collections.abc import Sequence
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
+from ai.backend.manager.data.deployment.types import (
+    RouteHandlerCategory,
+    RouteHealthStatus,
+    RouteStatus,
+    RouteStatusTransitions,
+    RouteTargetStatuses,
+    RouteTransitionTarget,
+)
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -38,36 +45,25 @@ class ProvisioningRouteHandler(RouteHandler):
         return LockID.LOCKID_DEPLOYMENT_PROVISIONING_ROUTES
 
     @classmethod
-    def target_statuses(cls) -> list[RouteStatus]:
-        """Get the target route statuses for this handler."""
-        return [RouteStatus.PROVISIONING]
+    def category(cls) -> RouteHandlerCategory:
+        return RouteHandlerCategory.LIFECYCLE
 
     @classmethod
-    def next_status(cls) -> RouteStatus | None:
-        """Get the next route status after this handler's operation."""
-        return RouteStatus.DEGRADED
-
-    @classmethod
-    def failure_status(cls) -> RouteStatus | None:
-        """Get the failure route status if applicable."""
-        return RouteStatus.FAILED_TO_START
-
-    @classmethod
-    def stale_status(cls) -> RouteStatus | None:
-        """Get the stale route status if applicable."""
-        return None
+    def target_statuses(cls) -> RouteTargetStatuses:
+        return RouteTargetStatuses(
+            lifecycle=[RouteStatus.PROVISIONING],
+            health=list(RouteHealthStatus),
+        )
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Define state transitions for provisioning route handler (BEP-1030).
-
-        - success: Route → DEGRADED (provisioned, needs health check)
-        - failure: Route → FAILED_TO_START
-        - stale: None
-        """
+        """Provisioning → RUNNING + NOT_CHECKED on success, FAILED_TO_START on failure."""
         return RouteStatusTransitions(
-            success=RouteStatus.DEGRADED,
-            failure=RouteStatus.FAILED_TO_START,
+            success=RouteTransitionTarget(
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.NOT_CHECKED,
+            ),
+            failure=RouteTransitionTarget(status=RouteStatus.FAILED_TO_START),
             stale=None,
         )
 

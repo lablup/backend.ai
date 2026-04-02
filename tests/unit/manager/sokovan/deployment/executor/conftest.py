@@ -17,6 +17,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentState,
     ReplicaSpec,
+    RouteHealthStatus,
     RouteStatus,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
@@ -147,7 +148,8 @@ def _create_deployment_info(
 def _create_route_data(
     route_id: UUID | None = None,
     endpoint_id: UUID | None = None,
-    status: RouteStatus = RouteStatus.HEALTHY,
+    status: RouteStatus = RouteStatus.RUNNING,
+    health_status: RouteHealthStatus = RouteHealthStatus.HEALTHY,
 ) -> RouteData:
     """Create RouteData for tests."""
     return RouteData(
@@ -155,6 +157,7 @@ def _create_route_data(
         endpoint_id=endpoint_id or uuid4(),
         session_id=None,
         status=status,
+        health_status=health_status,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
         revision_id=uuid4(),
@@ -293,8 +296,8 @@ def routes_matching_replicas() -> list[RouteData]:
     """Routes matching target replica count."""
     endpoint_id = uuid4()
     return [
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.HEALTHY),
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.HEALTHY),
+        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
+        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
     ]
 
 
@@ -303,7 +306,7 @@ def routes_fewer_than_replicas() -> list[RouteData]:
     """Routes fewer than target replica count."""
     endpoint_id = uuid4()
     return [
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.HEALTHY),
+        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
     ]
 
 
@@ -312,7 +315,7 @@ def routes_more_than_replicas() -> list[RouteData]:
     """Routes more than target replica count."""
     endpoint_id = uuid4()
     return [
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.HEALTHY),
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.HEALTHY),
-        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.HEALTHY),
+        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
+        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
+        _create_route_data(endpoint_id=endpoint_id, status=RouteStatus.RUNNING),
     ]

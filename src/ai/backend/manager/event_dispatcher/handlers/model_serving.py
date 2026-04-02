@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 import sqlalchemy as sa
+import yarl
 from sqlalchemy.exc import NoResultFound
 
 from ai.backend.common.events.event_types.model_serving.anycast import (
@@ -16,17 +17,19 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
 )
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.utils import query_userinfo_from_session
@@ -65,9 +68,9 @@ class ModelServingEventHandler:
                 data: dict[str, Any] = {}
                 match event.new_status:
                     case ModelServiceStatus.HEALTHY:
-                        data["status"] = RouteStatus.HEALTHY
+                        data["health_status"] = RouteHealthStatus.HEALTHY
                     case ModelServiceStatus.UNHEALTHY:
-                        data["status"] = RouteStatus.UNHEALTHY
+                        data["health_status"] = RouteHealthStatus.UNHEALTHY
                 query = sa.update(RoutingRow).values(data).where(RoutingRow.id == route.id)
                 await db_sess.execute(query)
 
@@ -85,9 +88,12 @@ class ModelServingEventHandler:
             async with self._db.begin_readonly_session() as db_sess:
                 log.debug("Route ID: {}", event.route_id)
                 route = await RoutingRow.get(db_sess, event.route_id)
-                endpoint = await EndpointRow.get(
-                    db_sess, route.endpoint, load_image=True, load_model=True
-                )
+                endpoint = await EndpointRow.get(db_sess, route.endpoint, load_revisions=True)
+
+                # Get the current revision for revision-level fields
+                current_rev = endpoint._find_current_revision()
+                if current_rev is None:
+                    raise ValueError(f"No current revision for endpoint {endpoint.id}")
 
                 query = sa.select(
                     sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)
@@ -117,21 +123,25 @@ class ModelServingEventHandler:
                     query_on_behalf_of=session_owner.access_key,
                 )
 
-                if endpoint.image_row is None:
+                if current_rev.image_row is None:
                     raise ValueError(f"Image not found for endpoint {endpoint.id}")
-                if endpoint.model_row is None:
-                    raise ValueError(f"Model not found for endpoint {endpoint.id}")
                 image_row = await ImageRow.resolve(
                     db_sess,
                     [
-                        ImageIdentifier(endpoint.image_row.name, endpoint.image_row.architecture),
-                        ImageAlias(endpoint.image_row.name),
+                        ImageIdentifier(
+                            current_rev.image_row.name, current_rev.image_row.architecture
+                        ),
+                        ImageAlias(current_rev.image_row.name),
                     ],
                 )
 
-                environ = {**(endpoint.environ or {})}
+                environ = {**(current_rev.environ or {})}
                 if "BACKEND_MODEL_NAME" not in environ:
-                    environ["BACKEND_MODEL_NAME"] = endpoint.model_row.name
+                    # Look up the model VFolder name for BACKEND_MODEL_NAME
+                    if current_rev.model is not None:
+                        model_row = await VFolderRow.get(db_sess, current_rev.model)
+                        if model_row is not None:
+                            environ["BACKEND_MODEL_NAME"] = model_row.name
 
                 await self._registry.create_session(
                     f"{endpoint.name}-{event.route_id!s}",
@@ -147,35 +157,37 @@ class ModelServingEventHandler:
                     SessionTypes.INFERENCE,
                     {
                         "mounts": [
-                            endpoint.model,
-                            *[m.vfid.folder_id for m in endpoint.extra_mounts],
+                            current_rev.model,
+                            *[m.vfid.folder_id for m in current_rev.extra_mounts],
                         ],
                         "mount_map": {
-                            endpoint.model: endpoint.model_mount_destination,
+                            current_rev.model: current_rev.model_mount_destination,
                             **{
                                 m.vfid.folder_id: m.kernel_path.as_posix()
-                                for m in endpoint.extra_mounts
+                                for m in current_rev.extra_mounts
                             },
                         },
                         "mount_options": {
                             m.vfid.folder_id: {"permission": m.mount_perm}
-                            for m in endpoint.extra_mounts
+                            for m in current_rev.extra_mounts
                         },
-                        "model_definition_path": endpoint.model_definition_path,
-                        "runtime_variant": endpoint.runtime_variant.value,
+                        "model_definition_path": current_rev.model_definition_path,
+                        "runtime_variant": current_rev.runtime_variant.value,
                         "environ": environ,
                         "scaling_group": endpoint.resource_group,
-                        "resources": endpoint.resource_slots,
-                        "resource_opts": endpoint.resource_opts,
+                        "resources": current_rev.resource_slots,
+                        "resource_opts": current_rev.resource_opts,
                         "preopen_ports": None,
                         "agent_list": None,
                     },
-                    ClusterMode(endpoint.cluster_mode),
-                    endpoint.cluster_size,
-                    bootstrap_script=endpoint.bootstrap_script,
-                    startup_command=endpoint.startup_command,
+                    ClusterMode(current_rev.cluster_mode),
+                    current_rev.cluster_size,
+                    bootstrap_script=current_rev.bootstrap_script,
+                    startup_command=current_rev.startup_command,
                     tag=endpoint.tag,
-                    callback_url=endpoint.callback_url,
+                    callback_url=(
+                        yarl.URL(current_rev.callback_url) if current_rev.callback_url else None
+                    ),
                     enqueue_only=True,
                     route_id=route.id,
                     sudo_session_enabled=session_owner.sudo_session_enabled,

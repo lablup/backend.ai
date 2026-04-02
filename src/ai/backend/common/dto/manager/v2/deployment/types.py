@@ -16,6 +16,7 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -61,6 +62,7 @@ __all__ = (
     "RevisionOrderField",
     "RollingUpdateConfigInfo",
     "RollingUpdateStrategySpecInfo",
+    "RouteHealthStatus",
     "RouteOrderField",
     "RouteStatus",
     "RouteTrafficStatus",

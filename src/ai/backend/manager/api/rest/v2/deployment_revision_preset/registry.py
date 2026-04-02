@@ -17,7 +17,7 @@ def register_v2_deployment_revision_preset_routes(
     handler: V2DeploymentRevisionPresetHandler,
     route_deps: RouteDeps,
 ) -> RouteRegistry:
-    registry = RouteRegistry.create("deployment-revision-presets", route_deps.cors_options)
+    registry = RouteRegistry.create("deployments/revision-presets", route_deps.cors_options)
 
     registry.add("POST", "/search", handler.search, middlewares=[auth_required])
     registry.add("POST", "", handler.create, middlewares=[auth_required])

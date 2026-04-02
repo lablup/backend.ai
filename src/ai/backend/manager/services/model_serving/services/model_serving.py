@@ -46,6 +46,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpecDraft,
     MountMetadata,
     ResourceSpecDraft,
+    RouteHealthStatus,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
@@ -408,7 +409,10 @@ class ModelServingService:
                     replicas=endpoint.replicas,
                     desired_session_count=endpoint.replicas,
                     active_route_count=len([
-                        r for r in endpoint.routings if r.status == RouteStatus.HEALTHY
+                        r
+                        for r in endpoint.routings
+                        if r.status == RouteStatus.RUNNING
+                        and r.health_status == RouteHealthStatus.HEALTHY
                     ])
                     if endpoint.routings
                     else 0,

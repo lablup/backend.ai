@@ -251,15 +251,11 @@ class TestGroupDBSourceDeleteEndpoints:
                     session_owner=test_user,
                     replicas=1,
                     desired_replicas=1,
-                    image=None,
                     domain=test_domain,
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
                     current_revision=uuid.uuid4(),
-                    resource_slots=ResourceSlot(),
-                    cluster_mode="single-node",
-                    cluster_size=1,
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)
@@ -316,15 +312,11 @@ class TestGroupDBSourceDeleteEndpoints:
                 session_owner=test_user,
                 replicas=1,
                 desired_replicas=1,
-                image=None,
                 domain=test_domain,
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
                 current_revision=uuid.uuid4(),
-                resource_slots=ResourceSlot(),
-                cluster_mode="single-node",
-                cluster_size=1,
             )
             session.add(endpoint)
 
@@ -375,7 +367,6 @@ class TestGroupDBSourceDeleteEndpoints:
     ) -> uuid.UUID:
         """Create one active endpoint (lifecycle_stage=CREATED)"""
         endpoint_id = uuid.uuid4()
-        image_id = uuid.uuid4()
         sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
@@ -399,15 +390,11 @@ class TestGroupDBSourceDeleteEndpoints:
                 session_owner=test_user,
                 replicas=1,
                 desired_replicas=1,
-                image=image_id,
                 domain=test_domain,
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 current_revision=uuid.uuid4(),
-                resource_slots=ResourceSlot(),
-                cluster_mode="single-node",
-                cluster_size=1,
             )
             session.add(endpoint)
             await session.commit()
@@ -452,15 +439,11 @@ class TestGroupDBSourceDeleteEndpoints:
                     session_owner=test_user,
                     replicas=1,
                     desired_replicas=1,
-                    image=None,
                     domain=test_domain,
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
                     current_revision=uuid.uuid4(),
-                    resource_slots=ResourceSlot(),
-                    cluster_mode="single-node",
-                    cluster_size=1,
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)

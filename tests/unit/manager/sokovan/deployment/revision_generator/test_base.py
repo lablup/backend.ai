@@ -984,6 +984,7 @@ class TestDefinitionFileRequirement:
 
         # And: CUSTOM variant revision (already converted to ModelRevisionSpec)
         revision = ModelRevisionSpec(
+            image_id=uuid4(),
             image_identifier=ImageIdentifier(
                 canonical="custom-image:latest",
                 architecture="x86_64",
@@ -1036,6 +1037,7 @@ class TestDefinitionFileRequirement:
 
         # And: CUSTOM variant revision
         revision = ModelRevisionSpec(
+            image_id=uuid4(),
             image_identifier=ImageIdentifier(
                 canonical="custom-image:latest",
                 architecture="x86_64",
@@ -1089,6 +1091,7 @@ class TestDefinitionFileRequirement:
 
         # And: CUSTOM variant revision
         revision = ModelRevisionSpec(
+            image_id=uuid4(),
             image_identifier=ImageIdentifier(
                 canonical="custom-image:latest",
                 architecture="x86_64",

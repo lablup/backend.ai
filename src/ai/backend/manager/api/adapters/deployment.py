@@ -11,6 +11,7 @@ from uuid import UUID
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -134,12 +135,16 @@ from ai.backend.manager.data.deployment.types import (
     RouteSearchScope,
 )
 from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus as ManagerRouteHealthStatus,
+)
+from ai.backend.manager.data.deployment.types import (
     RouteStatus as ManagerRouteStatus,
 )
 from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
@@ -339,6 +344,8 @@ class DeploymentAdapter(BaseAdapter):
     ) -> CreateDeploymentPayload:
         """Create a new deployment."""
         initial_revision = input.initial_revision
+        if initial_revision is None:
+            raise ValueError("initial_revision is required for deployment creation")
         mounts_creator = VFolderMountsCreator(
             model_vfolder_id=initial_revision.model_mount_config.vfolder_id,
             model_definition_path=initial_revision.model_mount_config.definition_path,
@@ -368,6 +375,7 @@ class DeploymentAdapter(BaseAdapter):
             ),
             mounts=mounts_creator,
             model_definition=initial_revision.model_definition,
+            revision_preset_id=initial_revision.revision_preset_id,
             execution=ExecutionSpec(
                 runtime_variant=RuntimeVariant(
                     initial_revision.model_runtime_config.runtime_variant
@@ -450,6 +458,13 @@ class DeploymentAdapter(BaseAdapter):
             GetDeploymentByIdAction(deployment_id=deployment_id)
         )
         return self._deployment_data_to_dto(action_result.data)
+
+    async def get_current_revision(self, deployment_id: UUID) -> RevisionNode:
+        """Retrieve the current active revision of a deployment."""
+        deployment = await self.get(deployment_id)
+        if deployment.current_revision_id is None:
+            raise DeploymentRevisionNotFound(f"Deployment {deployment_id} has no current revision")
+        return await self.get_revision(deployment.current_revision_id)
 
     async def update(
         self,
@@ -798,6 +813,7 @@ class DeploymentAdapter(BaseAdapter):
                 inference_runtime_config=input.model_runtime_config.inference_runtime_config,
             ),
             model_definition=input.model_definition,
+            revision_preset_id=input.revision_preset_id,
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(model_deployment_id=input.deployment_id, adder=adder)
@@ -1168,6 +1184,12 @@ class DeploymentAdapter(BaseAdapter):
                 conditions.append(
                     RouteConditions.by_statuses([ManagerRouteStatus(s.value) for s in f.status])
                 )
+            if f.health_status is not None:
+                conditions.append(
+                    RouteConditions.by_health_statuses([
+                        ManagerRouteHealthStatus(s.value) for s in f.health_status
+                    ])
+                )
             if f.traffic_status is not None:
                 conditions.append(
                     RouteConditions.by_traffic_statuses([
@@ -1418,11 +1440,7 @@ class DeploymentAdapter(BaseAdapter):
                 type=data.default_deployment_strategy,
             ),
             created_user_id=data.created_user_id,
-            revision=(
-                DeploymentAdapter._revision_data_to_dto(data.revision)
-                if data.revision is not None
-                else None
-            ),
+            current_revision_id=data.revision.id if data.revision is not None else None,
             policy=policy_info,
         )
 
@@ -1504,6 +1522,7 @@ class DeploymentAdapter(BaseAdapter):
             deployment_id=data.endpoint_id,
             session_id=str(data.session_id) if data.session_id is not None else None,
             status=RouteStatus(data.status.value),
+            health_status=RouteHealthStatus(data.health_status.value),
             traffic_ratio=data.traffic_ratio,
             created_at=data.created_at,
             revision_id=data.revision_id,
