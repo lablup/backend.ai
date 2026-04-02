@@ -306,6 +306,10 @@ class BaseDeploy:
                 extra_context={"service_name": "backendai-appproxy-coordinator"}
             )
         """
+        if getattr(self, "skip_systemd", False):
+            logger.info("Skipping management scripts creation (skip_systemd=True)")
+            return
+
         svc_dir = service_dir or getattr(self, "service_dir", None)
         if svc_dir is None:
             raise ConfigurationError(
