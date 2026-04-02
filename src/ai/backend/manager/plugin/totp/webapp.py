@@ -47,7 +47,7 @@ async def initialize_otp_activation(request: web.Request) -> web.Response:
         raise InvalidAPIParameters("TOTP is already activated to this user.")
     new_totp_key = pyotp.random_base32()
     async with db.begin() as conn:
-        query = (
+        update_query = (
             sa.update(users)
             .values({
                 "totp_activated": False,
@@ -56,7 +56,7 @@ async def initialize_otp_activation(request: web.Request) -> web.Response:
             })
             .where(users.c.email == email)
         )
-        await conn.execute(query)
+        await conn.execute(update_query)
     totp = pyotp.TOTP(new_totp_key)
     totp_uri = totp.provisioning_uri(name=email, issuer_name=ctx.config.issuer)
 
@@ -96,14 +96,14 @@ async def finalize_otp_activation(request: web.Request, params: Any) -> web.Resp
         raise AuthorizationFailed
 
     async with db.begin() as conn:
-        query = (
+        update_query = (
             sa.update(users)
             .values({
                 "totp_activated": True,
             })
             .where(users.c.email == email)
         )
-        await conn.execute(query)
+        await conn.execute(update_query)
     return web.json_response({"success": True})
 
 
@@ -132,7 +132,7 @@ async def deactivate_totp(request: web.Request) -> web.Response:
         raise InvalidAPIParameters("TOTP is not activated")
 
     async with db.begin() as conn:
-        query = (
+        update_query = (
             sa.update(users)
             .values({
                 "totp_activated": False,
@@ -141,7 +141,7 @@ async def deactivate_totp(request: web.Request) -> web.Response:
             })
             .where(users.c.email == email)
         )
-        await conn.execute(query)
+        await conn.execute(update_query)
     return web.json_response({"success": True})
 
 
@@ -210,6 +210,8 @@ async def finalize_anonymous_otp_activation(request: web.Request, params: Any) -
             raise InvalidAPIParameters(f"User does not exist. (user_id: {token.sub})")
         if user_row.totp_activated:
             raise InvalidAPIParameters("TOTP is already activated to this user.")
+        if not user_row.totp_key:
+            raise InvalidAPIParameters("TOTP key does not exist.")
         totp = pyotp.TOTP(user_row.totp_key)
         if not totp.verify(params["otp"]):
             raise AuthorizationFailed

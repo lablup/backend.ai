@@ -38,10 +38,8 @@ class TOTPHook(HookPlugin):
         )
 
     def get_handlers(self) -> Sequence[tuple[str, HookHandler]]:
-        # FIXME: Until https://github.com/python/mypy/issues/5876 is resolved,
-        #        we ignore type mismatch errors due to *args compared with concrete arguments.
         return [
-            ("POST_AUTHORIZE", self.validate_otp),  # type: ignore
+            ("POST_AUTHORIZE", self.validate_otp),
         ]
 
     async def init(self, context: Any = None) -> None:
@@ -79,13 +77,13 @@ class TOTPHook(HookPlugin):
 
         otp = params.get("stoken") or params.get("sToken") or params.get("otp")
         if not otp:
-            auth_data = RequireTwoFactorAuthResponse(
+            auth_response = RequireTwoFactorAuthResponse(
                 response_type=AuthResponseType.REQUIRE_TWO_FACTOR_AUTH,
                 type=TwoFactorType.TOTP,
             )
             return web.json_response(
                 data={
-                    "data": auth_data.to_dict(),
+                    "data": auth_response.to_dict(),
                 },
             )
 
