@@ -90,7 +90,7 @@ class RouteCreationSpec:
         return sum(
             1
             for route in deployment_with_routes.routes
-            if route.status in {RouteStatus.HEALTHY, RouteStatus.PROVISIONING}
+            if route.status in {RouteStatus.RUNNING, RouteStatus.PROVISIONING}
         )
 
     @staticmethod
@@ -101,7 +101,7 @@ class RouteCreationSpec:
         healthy_routes = [
             r
             for r in deployment_with_routes.routes
-            if r.status in {RouteStatus.HEALTHY, RouteStatus.PROVISIONING}
+            if r.status in {RouteStatus.RUNNING, RouteStatus.PROVISIONING}
         ]
         current_count = len(healthy_routes)
         if current_count <= target_count:

@@ -142,6 +142,17 @@ class V2DeploymentClient(BaseDomainClient):
             response_model=AddRevisionPayload,
         )
 
+    async def get_current_revision(
+        self,
+        deployment_id: UUID,
+    ) -> RevisionNode:
+        """Retrieve the current active revision of a deployment."""
+        return await self._client.typed_request(
+            "GET",
+            _PATH + f"/{deployment_id}/current-revision",
+            response_model=RevisionNode,
+        )
+
     async def get_revision(
         self,
         revision_id: UUID,

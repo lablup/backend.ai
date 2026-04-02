@@ -53,13 +53,8 @@ class EndpointModifier(PartialModifier):
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
+        """Endpoint-level fields only. Revision fields are handled separately."""
         to_update: dict[str, Any] = {}
-        self.resource_slots.update_dict(to_update, "resource_slots")
-        self.resource_opts.update_dict(to_update, "resource_opts")
-        self.cluster_mode.update_dict(to_update, "cluster_mode")
-        self.cluster_size.update_dict(to_update, "cluster_size")
-        self.model_definition_path.update_dict(to_update, "model_definition_path")
-        self.runtime_variant.update_dict(to_update, "runtime_variant")
         self.resource_group.update_dict(to_update, "resource_group")
         return to_update
 

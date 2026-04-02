@@ -41,6 +41,8 @@ class ModelRevisionCreator:
     mounts: VFolderMountsCreator
     execution: ExecutionSpec
     model_definition: ModelDefinition | None
+    revision_preset_id: UUID | None = None
+    auto_activate: bool = False
 
 
 @dataclass
@@ -135,5 +137,5 @@ class NewDeploymentCreator:
     metadata: DeploymentMetadata
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
-    model_revision: ModelRevisionCreator
+    model_revision: ModelRevisionCreator | None = None
     policy: DeploymentPolicyConfig | None = None

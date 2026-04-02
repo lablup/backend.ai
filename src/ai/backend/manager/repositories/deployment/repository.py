@@ -17,6 +17,7 @@ from ruamel.yaml import YAML
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -56,6 +57,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
+    RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
@@ -632,16 +634,10 @@ class DeploymentRepository:
     async def get_routes_by_statuses(
         self,
         statuses: list[RouteStatus],
+        health_statuses: list[RouteHealthStatus],
     ) -> list[RouteData]:
-        """Get routes by their statuses.
-
-        Args:
-            statuses: List of route statuses to filter by
-
-        Returns:
-            List of RouteData objects matching the statuses
-        """
-        return await self._db_source.get_routes_by_statuses(statuses)
+        """Get routes by lifecycle and health statuses."""
+        return await self._db_source.get_routes_by_statuses(statuses, health_statuses)
 
     @deployment_repository_resilience.apply()
     async def update_route_status_bulk(
@@ -724,15 +720,39 @@ class DeploymentRepository:
         self,
         route_session_ids: Mapping[uuid.UUID, SessionId],
     ) -> None:
-        """Update session IDs for multiple routes and initialize their health status.
+        """Update session IDs for multiple routes.
 
         Args:
             route_session_ids: Mapping of route IDs to new session IDs
         """
-        # Update sessions in database
         await self._db_source.update_route_sessions(route_session_ids)
-        route_id_strings = [str(route_id) for route_id in route_session_ids.keys()]
-        await self._valkey_schedule.initialize_routes_health_status_batch(route_id_strings)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_kernel_connection_info(
+        self,
+        session_ids: list[SessionId],
+    ) -> dict[SessionId, tuple[str, int]]:
+        """Fetch kernel_host and inference port for sessions.
+
+        Returns mapping of session_id to (host, port) tuple.
+        """
+        return await self._db_source.fetch_kernel_connection_info(session_ids)
+
+    @deployment_repository_resilience.apply()
+    async def update_route_replica_info(
+        self,
+        updates: dict[uuid.UUID, tuple[str, int]],
+    ) -> None:
+        """Update replica_host and replica_port for routes."""
+        await self._db_source.update_route_replica_info(updates)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_health_check_configs_by_revision_ids(
+        self,
+        revision_ids: set[uuid.UUID],
+    ) -> dict[uuid.UUID, ModelHealthCheck | None]:
+        """Fetch health check configurations for revisions."""
+        return await self._db_source.fetch_health_check_configs_by_revision_ids(revision_ids)
 
     @deployment_repository_resilience.apply()
     async def delete_routes_by_route_ids(

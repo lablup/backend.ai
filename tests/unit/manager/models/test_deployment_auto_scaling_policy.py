@@ -15,9 +15,7 @@ from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     BinarySize,
-    ClusterMode,
     ResourceSlot,
-    RuntimeVariant,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
@@ -281,21 +279,12 @@ class TestDeploymentAutoScalingPolicyRow:
                 created_user=test_user.uuid,
                 session_owner=test_user.uuid,
                 replicas=1,
-                image=test_image.id,
                 domain=test_domain.name,
                 project=test_group.id,
                 resource_group=test_scaling_group.name,
-                resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 url=f"https://test-{uuid.uuid4().hex[:8]}.example.com",
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 current_revision=uuid.uuid4(),
-                model_mount_destination="/models",
-                cluster_mode=ClusterMode.SINGLE_NODE.name,
-                cluster_size=1,
-                runtime_variant=RuntimeVariant.CUSTOM,
-                environ={},
-                resource_opts={},
-                extra_mounts=[],
             )
             db_sess.add(endpoint)
             await db_sess.flush()

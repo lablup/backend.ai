@@ -2,6 +2,7 @@ from typing import cast, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
@@ -186,7 +187,7 @@ class SessionProcessors(AbstractProcessorPackage):
         TerminateSessionsInProjectAction, TerminateSessionsInProjectActionResult
     ]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
-    modify_session: ActionProcessor[ModifySessionAction, ModifySessionActionResult]
+    modify_session: SingleEntityActionProcessor[ModifySessionAction, ModifySessionActionResult]
     check_and_transit_status: ActionProcessor[
         CheckAndTransitStatusAction, CheckAndTransitStatusActionResult
     ]
@@ -273,26 +274,17 @@ class SessionProcessors(AbstractProcessorPackage):
             validators=[cast(ActionValidator, scope_validator)],
         )
 
+        # Actions without RBAC validation (name-based, no session_id at construction)
+        self.destroy_session = ActionProcessor(service.destroy_session, action_monitors)
+        self.execute_session = ActionProcessor(service.execute_session, action_monitors)
+        self.get_session_info = ActionProcessor(service.get_session_info, action_monitors)
+
         # Single entity actions with RBAC validation
-        self.destroy_session = ActionProcessor(
-            service.destroy_session,
-            action_monitors,
-            validators=[cast(ActionValidator, single_entity_validator)],
-        )
-        self.execute_session = ActionProcessor(
-            service.execute_session,
-            action_monitors,
-            validators=[cast(ActionValidator, single_entity_validator)],
-        )
-        self.get_session_info = ActionProcessor(
-            service.get_session_info,
-            action_monitors,
-            validators=[cast(ActionValidator, single_entity_validator)],
-        )
-        self.modify_session = ActionProcessor(
+        rbac_single_entity_validators = [single_entity_validator]
+        self.modify_session = SingleEntityActionProcessor(
             service.modify_session,
             action_monitors,
-            validators=[cast(ActionValidator, single_entity_validator)],
+            validators=rbac_single_entity_validators,
         )
 
     @override

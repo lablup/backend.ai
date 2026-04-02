@@ -165,6 +165,11 @@ def build_v2_routes(
         register_v2_container_registry_routes(container_registry_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_deployment_routes(deployment_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_deployment_revision_preset_routes(
+            deployment_revision_preset_handler, route_deps
+        )
+    )
     v2_reg.add_subregistry(register_v2_domain_routes(domain_handler, route_deps))
     v2_reg.add_subregistry(register_v2_fair_share_routes(fair_share_handler, route_deps))
     v2_reg.add_subregistry(
@@ -194,11 +199,6 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_runtime_variant_routes(runtime_variant_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_runtime_variant_preset_routes(runtime_variant_preset_handler, route_deps)
-    )
-    v2_reg.add_subregistry(
-        register_v2_deployment_revision_preset_routes(
-            deployment_revision_preset_handler, route_deps
-        )
     )
     v2_reg.add_subregistry(register_v2_model_card_routes(model_card_handler, route_deps))
     v2_reg.add_subregistry(register_v2_resource_usage_routes(resource_usage_handler, route_deps))

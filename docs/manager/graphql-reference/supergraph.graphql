@@ -145,6 +145,11 @@ input AddRevisionInput
   @join__type(graph: STRAWBERRY)
 {
   name: String = null
+
+  """
+  Added in UNRELEASED. DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.
+  """
+  revisionPresetId: UUID = null
   deploymentId: ID!
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!
@@ -2777,7 +2782,7 @@ input CreateDeploymentInput
   networkAccess: ModelDeploymentNetworkAccessInput!
   defaultDeploymentStrategy: DeploymentStrategyInput!
   desiredReplicaCount: Int!
-  initialRevision: CreateRevisionInput!
+  initialRevision: CreateRevisionInput = null
 }
 
 """Added in 25.19.0. Payload for creating a model deployment."""
@@ -3281,6 +3286,11 @@ input CreateRevisionInput
   @join__type(graph: STRAWBERRY)
 {
   name: String = null
+
+  """
+  Added in UNRELEASED. DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.
+  """
+  revisionPresetId: UUID = null
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!
   image: ImageInput!
@@ -7747,7 +7757,7 @@ type ModelDeployment implements Node
   id: ID!
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
-  revision: ModelRevision
+  currentRevisionId: ID
   defaultDeploymentStrategy: DeploymentStrategyGQL!
   replicaState: ReplicaState!
   createdUserId: ID!
@@ -12572,9 +12582,7 @@ enum ReplicaStatus
   @join__type(graph: STRAWBERRY)
 {
   PROVISIONING @join__enumValue(graph: STRAWBERRY)
-  HEALTHY @join__enumValue(graph: STRAWBERRY)
-  UNHEALTHY @join__enumValue(graph: STRAWBERRY)
-  DEGRADED @join__enumValue(graph: STRAWBERRY)
+  RUNNING @join__enumValue(graph: STRAWBERRY)
   TERMINATING @join__enumValue(graph: STRAWBERRY)
   TERMINATED @join__enumValue(graph: STRAWBERRY)
   FAILED_TO_START @join__enumValue(graph: STRAWBERRY)
@@ -13659,8 +13667,11 @@ type Route implements Node
   sessionId: ID
   revisionId: ID
 
-  """The current status of the route indicating its health state."""
+  """The lifecycle status of the route."""
   status: RouteStatus!
+
+  """The health check status of the route."""
+  healthStatus: RouteHealthStatus!
 
   """
   The traffic routing status (ACTIVE/INACTIVE). Controls whether traffic should be sent to this route.
@@ -13718,10 +13729,21 @@ input RouteFilter
   @join__type(graph: STRAWBERRY)
 {
   status: [RouteStatus!] = null
+  healthStatus: [RouteHealthStatus!] = null
   trafficStatus: [RouteTrafficStatus!] = null
   AND: [RouteFilter!] = null
   OR: [RouteFilter!] = null
   NOT: [RouteFilter!] = null
+}
+
+"""Added in 25.19.0. Health check status of a route."""
+enum RouteHealthStatus
+  @join__type(graph: STRAWBERRY)
+{
+  NOT_CHECKED @join__enumValue(graph: STRAWBERRY)
+  HEALTHY @join__enumValue(graph: STRAWBERRY)
+  UNHEALTHY @join__enumValue(graph: STRAWBERRY)
+  DEGRADED @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.3.0. Route history record."""
@@ -13733,6 +13755,7 @@ type RouteHistory implements Node
   id: ID!
   routeId: ID!
   deploymentId: ID!
+  category: String!
   phase: String!
   fromStatus: String
   toStatus: String
@@ -13829,16 +13852,12 @@ input RouteScope
   routeId: UUID!
 }
 
-"""
-Added in 25.19.0. Route status indicating the health and lifecycle state of a route.
-"""
+"""Added in 25.19.0. Lifecycle status of a route."""
 enum RouteStatus
   @join__type(graph: STRAWBERRY)
 {
   PROVISIONING @join__enumValue(graph: STRAWBERRY)
-  HEALTHY @join__enumValue(graph: STRAWBERRY)
-  UNHEALTHY @join__enumValue(graph: STRAWBERRY)
-  DEGRADED @join__enumValue(graph: STRAWBERRY)
+  RUNNING @join__enumValue(graph: STRAWBERRY)
   TERMINATING @join__enumValue(graph: STRAWBERRY)
   TERMINATED @join__enumValue(graph: STRAWBERRY)
   FAILED_TO_START @join__enumValue(graph: STRAWBERRY)

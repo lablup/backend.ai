@@ -390,6 +390,7 @@ class TestCreateDeploymentInput:
         image_id = uuid.uuid4()
         rev = _make_create_revision_input_dto(image=ImageInput(id=image_id))
         inp = self._make_input(initial_revision=rev)
+        assert inp.initial_revision is not None
         assert inp.initial_revision.image.id == image_id
 
     def test_missing_metadata_raises_validation_error(self) -> None:

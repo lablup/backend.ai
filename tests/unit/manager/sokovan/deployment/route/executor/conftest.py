@@ -9,7 +9,6 @@ from uuid import UUID, uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
@@ -18,6 +17,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentState,
     ReplicaSpec,
+    RouteHealthStatus,
     RouteStatus,
 )
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -66,7 +66,8 @@ def mock_client_pool() -> MagicMock:
 def mock_valkey_schedule() -> AsyncMock:
     """Mock ValkeyScheduleClient."""
     client = AsyncMock()
-    client.check_route_health_status = AsyncMock(return_value={})
+    client.get_route_health_records_batch = AsyncMock(return_value={})
+    client.get_redis_time = AsyncMock(return_value=1000)
     return client
 
 
@@ -150,6 +151,7 @@ def _create_route_data(
     endpoint_id: UUID | None = None,
     session_id: SessionId | None = None,
     status: RouteStatus = RouteStatus.PROVISIONING,
+    health_status: RouteHealthStatus = RouteHealthStatus.NOT_CHECKED,
 ) -> RouteData:
     """Create RouteData for tests."""
     return RouteData(
@@ -157,6 +159,7 @@ def _create_route_data(
         endpoint_id=endpoint_id or uuid4(),
         session_id=session_id,
         status=status,
+        health_status=health_status,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
         revision_id=uuid4(),
@@ -192,7 +195,8 @@ def provisioning_routes_multiple() -> list[RouteData]:
 def running_route() -> RouteData:
     """Single RUNNING route."""
     return _create_route_data(
-        status=RouteStatus.HEALTHY,
+        status=RouteStatus.RUNNING,
+        health_status=RouteHealthStatus.HEALTHY,
         session_id=SessionId(uuid4()),
     )
 
@@ -204,12 +208,14 @@ def running_routes_multiple() -> list[RouteData]:
     return [
         _create_route_data(
             endpoint_id=endpoint_id,
-            status=RouteStatus.HEALTHY,
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
             session_id=SessionId(uuid4()),
         ),
         _create_route_data(
             endpoint_id=endpoint_id,
-            status=RouteStatus.HEALTHY,
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
             session_id=SessionId(uuid4()),
         ),
     ]
@@ -219,7 +225,8 @@ def running_routes_multiple() -> list[RouteData]:
 def healthy_route() -> RouteData:
     """Single HEALTHY route."""
     return _create_route_data(
-        status=RouteStatus.HEALTHY,
+        status=RouteStatus.RUNNING,
+        health_status=RouteHealthStatus.HEALTHY,
         session_id=SessionId(uuid4()),
     )
 
@@ -231,12 +238,14 @@ def healthy_routes_multiple() -> list[RouteData]:
     return [
         _create_route_data(
             endpoint_id=endpoint_id,
-            status=RouteStatus.HEALTHY,
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
             session_id=SessionId(uuid4()),
         ),
         _create_route_data(
             endpoint_id=endpoint_id,
-            status=RouteStatus.HEALTHY,
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
             session_id=SessionId(uuid4()),
         ),
     ]
@@ -246,7 +255,8 @@ def healthy_routes_multiple() -> list[RouteData]:
 def unhealthy_route() -> RouteData:
     """Single UNHEALTHY route."""
     return _create_route_data(
-        status=RouteStatus.UNHEALTHY,
+        status=RouteStatus.RUNNING,
+        health_status=RouteHealthStatus.UNHEALTHY,
         session_id=SessionId(uuid4()),
     )
 
@@ -288,35 +298,6 @@ def route_without_session() -> RouteData:
 
 
 # =============================================================================
-# Health Status Fixtures
-# =============================================================================
-
-
-@pytest.fixture
-def health_status_healthy() -> MagicMock:
-    """Healthy health status response."""
-    status = MagicMock()
-    status.get_status = MagicMock(return_value=HealthCheckStatus.HEALTHY)
-    return status
-
-
-@pytest.fixture
-def health_status_unhealthy() -> MagicMock:
-    """Unhealthy health status response."""
-    status = MagicMock()
-    status.get_status = MagicMock(return_value=HealthCheckStatus.UNHEALTHY)
-    return status
-
-
-@pytest.fixture
-def health_status_stale() -> MagicMock:
-    """Stale health status response."""
-    status = MagicMock()
-    status.get_status = MagicMock(return_value=HealthCheckStatus.STALE)
-    return status
-
-
-# =============================================================================
 # Session Status Fixtures
 # =============================================================================
 
@@ -348,7 +329,7 @@ def session_status_terminated() -> MagicMock:
 def cleanup_config_unhealthy_only() -> MagicMock:
     """Cleanup config that targets UNHEALTHY routes."""
     config = MagicMock()
-    config.cleanup_target_statuses = [RouteStatus.UNHEALTHY]
+    config.cleanup_target_statuses = [RouteHealthStatus.UNHEALTHY]
     return config
 
 
@@ -356,5 +337,5 @@ def cleanup_config_unhealthy_only() -> MagicMock:
 def cleanup_config_unhealthy_and_degraded() -> MagicMock:
     """Cleanup config that targets UNHEALTHY and DEGRADED routes."""
     config = MagicMock()
-    config.cleanup_target_statuses = [RouteStatus.UNHEALTHY, RouteStatus.DEGRADED]
+    config.cleanup_target_statuses = [RouteHealthStatus.UNHEALTHY, RouteHealthStatus.DEGRADED]
     return config

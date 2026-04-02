@@ -49,22 +49,35 @@ class EndpointUpdaterSpec(UpdaterSpec[EndpointRow]):
 
     @override
     def build_values(self) -> dict[str, Any]:
+        """Build values for endpoint-level column updates only.
+
+        Revision-level fields (resource_slots, resource_opts, cluster_mode, etc.)
+        are NOT included here — they are used to create a new DeploymentRevisionRow
+        in modify_endpoint() when changed.
+        """
         to_update: dict[str, Any] = {}
-        self.resource_slots.update_dict(to_update, "resource_slots")
-        self.resource_opts.update_dict(to_update, "resource_opts")
-        self.cluster_mode.update_dict(to_update, "cluster_mode")
-        self.cluster_size.update_dict(to_update, "cluster_size")
-        self.model_definition_path.update_dict(to_update, "model_definition_path")
-        self.runtime_variant.update_dict(to_update, "runtime_variant")
         self.resource_group.update_dict(to_update, "resource_group")
         self.desired_session_count.update_dict(to_update, "desired_session_count")
         self.replicas.update_dict(to_update, "replicas")
-        self.environ.update_dict(to_update, "environ")
         return to_update
 
     def replica_count_modified(self) -> bool:
         """Check if replicas field was modified."""
         return self.replicas.optional_value() is not None
+
+    def has_revision_changes(self) -> bool:
+        """Check if any revision-level field was modified."""
+        return any([
+            self.resource_slots.optional_value() is not None,
+            self.resource_opts.optional_value() is not None,
+            self.cluster_mode.optional_value() is not None,
+            self.cluster_size.optional_value() is not None,
+            self.image.optional_value() is not None,
+            self.model_definition_path.optional_value() is not None,
+            self.extra_mounts.optional_value() is not None,
+            self.environ.optional_value() is not None,
+            self.runtime_variant.optional_value() is not None,
+        ])
 
 
 @dataclass

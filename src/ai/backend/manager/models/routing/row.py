@@ -15,6 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
@@ -24,6 +25,7 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
+    StrEnumType,
 )
 
 if TYPE_CHECKING:
@@ -80,6 +82,13 @@ class RoutingRow(Base):  # type: ignore[misc]
         nullable=False,
         default=RouteStatus.PROVISIONING,
     )
+    health_status: Mapped[RouteHealthStatus] = mapped_column(
+        "health_status",
+        StrEnumType(RouteHealthStatus),
+        nullable=False,
+        default=RouteHealthStatus.NOT_CHECKED,
+        server_default=sa.text("'not_checked'"),
+    )
     weight: Mapped[int | None] = mapped_column("weight", sa.Integer(), nullable=True, default=None)
     traffic_ratio: Mapped[float] = mapped_column("traffic_ratio", sa.Float(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -92,6 +101,12 @@ class RoutingRow(Base):  # type: ignore[misc]
     error_data: Mapped[dict[str, Any] | None] = mapped_column(
         "error_data", pgsql.JSONB(), nullable=True, default=sa.null()
     )
+
+    # Replica connection info (populated when provisioning completes)
+    replica_host: Mapped[str | None] = mapped_column(
+        "replica_host", sa.String(length=256), nullable=True
+    )
+    replica_port: Mapped[int | None] = mapped_column("replica_port", sa.Integer, nullable=True)
 
     # Revision reference without FK (relationship only)
     revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
@@ -240,6 +255,7 @@ class RoutingRow(Base):  # type: ignore[misc]
             endpoint=self.endpoint,
             session=self.session,
             status=self.status,
+            health_status=self.health_status,
             traffic_ratio=self.traffic_ratio,
             created_at=self.created_at,
             error_data=self.error_data or {},
@@ -251,6 +267,7 @@ class RoutingRow(Base):  # type: ignore[misc]
             endpoint_id=self.endpoint,
             session_id=SessionId(self.session) if self.session else None,
             status=self.status,
+            health_status=self.health_status,
             traffic_ratio=self.traffic_ratio,
             created_at=self.created_at,
             revision_id=self.revision,

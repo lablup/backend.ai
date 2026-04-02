@@ -16,6 +16,7 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -178,6 +179,10 @@ class CreateRevisionInputDTO(BaseRequestModel):
     """Input for a deployment revision (nested structure matching GQL CreateRevisionInput)."""
 
     name: str | None = Field(default=None, description="Revision name")
+    revision_preset_id: UUID | None = Field(
+        default=None,
+        description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
+    )
     cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
     resource_config: ResourceConfigInput = Field(description="Resource configuration")
     image: ImageInput = Field(description="Container image")
@@ -190,12 +195,20 @@ class CreateRevisionInputDTO(BaseRequestModel):
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Additional vfolder mounts"
     )
+    auto_activate: bool = Field(
+        default=False,
+        description="If true, automatically activate this revision after creation.",
+    )
 
 
 class AddRevisionGQLInputDTO(BaseRequestModel):
     """Input for adding a revision via GQL (flat structure matching GQL AddRevisionInput)."""
 
     name: str | None = Field(default=None, description="Revision name")
+    revision_preset_id: UUID | None = Field(
+        default=None,
+        description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
+    )
     deployment_id: UUID = Field(description="Deployment ID")
     cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
     resource_config: ResourceConfigInput = Field(description="Resource configuration")
@@ -208,6 +221,10 @@ class AddRevisionGQLInputDTO(BaseRequestModel):
     )
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Additional vfolder mounts"
+    )
+    auto_activate: bool = Field(
+        default=False,
+        description="If true, automatically activate this revision after creation.",
     )
 
 
@@ -304,6 +321,10 @@ class RevisionInput(BaseRequestModel):
     """Input for a deployment revision."""
 
     name: str | None = Field(default=None, description="Revision name")
+    revision_preset_id: UUID | None = Field(
+        default=None,
+        description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
+    )
     image_id: UUID = Field(description="Container image ID")
     cluster_mode: ClusterMode = Field(description="Cluster mode for the revision")
     cluster_size: int = Field(default=1, ge=1, description="Number of nodes in the cluster")
@@ -344,7 +365,10 @@ class CreateDeploymentInput(BaseRequestModel):
         description="Deployment strategy configuration"
     )
     desired_replica_count: int = Field(ge=0, description="Desired number of replicas")
-    initial_revision: CreateRevisionInputDTO = Field(description="Initial revision configuration")
+    initial_revision: CreateRevisionInputDTO | None = Field(
+        default=None,
+        description="Initial revision configuration. If omitted, deployment is created without a revision and must be added later via add_revision.",
+    )
 
 
 class UpdateDeploymentInput(BaseRequestModel):
@@ -494,7 +518,12 @@ class RouteFilter(BaseRequestModel):
     """Filter for deployment routes."""
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
-    status: list[RouteStatus] | None = Field(default=None, description="Route status filter")
+    status: list[RouteStatus] | None = Field(
+        default=None, description="Route lifecycle status filter"
+    )
+    health_status: list[RouteHealthStatus] | None = Field(
+        default=None, description="Route health status filter"
+    )
     traffic_status: list[RouteTrafficStatus] | None = Field(
         default=None, description="Traffic status filter"
     )

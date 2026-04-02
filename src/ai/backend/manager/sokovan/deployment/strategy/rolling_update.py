@@ -17,6 +17,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
+    RouteHealthStatus,
     RouteInfo,
     RouteStatus,
 )
@@ -121,13 +122,19 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
                     classified.old_active.append(route)
                 continue
 
-            if route.status.is_provisioning():
+            if route.status == RouteStatus.PROVISIONING:
                 classified.new_provisioning_count += 1
             elif route.status.is_inactive():
                 classified.new_failed_count += 1
-            elif route.status == RouteStatus.HEALTHY:
+            elif (
+                route.status == RouteStatus.RUNNING
+                and route.health_status == RouteHealthStatus.HEALTHY
+            ):
                 classified.new_healthy_count += 1
-            elif route.status == RouteStatus.UNHEALTHY:
+            elif (
+                route.status == RouteStatus.RUNNING
+                and route.health_status == RouteHealthStatus.UNHEALTHY
+            ):
                 classified.new_unhealthy_count += 1
         return classified
 
@@ -189,7 +196,8 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         to_terminate = self._compute_routes_to_terminate(classified, min_available)
         if to_terminate > 0:
             sorted_old = sorted(
-                classified.old_active, key=lambda route: route.status.termination_priority()
+                classified.old_active,
+                key=lambda route: route.termination_priority,
             )
             for route in sorted_old[:to_terminate]:
                 route_changes.drain_route_ids.append(route.route_id)

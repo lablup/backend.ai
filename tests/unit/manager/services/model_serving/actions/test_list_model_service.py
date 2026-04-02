@@ -17,6 +17,7 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.deployment.types import RouteHealthStatus
 from ai.backend.manager.data.model_serving.types import CompactServiceInfo
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
@@ -256,7 +257,10 @@ class TestListModelService:
                 replicas=endpoint_data.replicas,
                 desired_session_count=endpoint_data.replicas,
                 routings=[
-                    MagicMock(status=RouteStatus.HEALTHY)
+                    MagicMock(
+                        status=RouteStatus.RUNNING,
+                        health_status=RouteHealthStatus.HEALTHY,
+                    )
                     for _ in range(endpoint_data.active_route_count)
                 ],
                 url=str(endpoint_data.service_endpoint),

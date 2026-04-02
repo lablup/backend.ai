@@ -13,6 +13,7 @@ from ai.backend.client.cli.v2.helpers import (
     parse_order_options,
     print_result,
 )
+from ai.backend.common.cli import LazyGroup
 
 
 @click.group()
@@ -333,3 +334,15 @@ def policy_search(
             await registry.close()
 
     asyncio.run(_run())
+
+
+# -- Sub-group: revision-preset --
+
+
+@deployment.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.deployment_revision_preset:deployment_revision_preset",
+    name="revision-preset",
+)
+def revision_preset() -> None:
+    """Admin deployment revision preset commands."""

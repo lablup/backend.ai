@@ -5,7 +5,14 @@ from collections.abc import Sequence
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
+from ai.backend.manager.data.deployment.types import (
+    RouteHandlerCategory,
+    RouteHealthStatus,
+    RouteStatus,
+    RouteStatusTransitions,
+    RouteTargetStatuses,
+    RouteTransitionTarget,
+)
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -43,35 +50,21 @@ class RouteEvictionHandler(RouteHandler):
         return None
 
     @classmethod
-    def target_statuses(cls) -> list[RouteStatus]:
-        """Get the target route statuses for this handler."""
-        return [RouteStatus.UNHEALTHY]
+    def category(cls) -> RouteHandlerCategory:
+        return RouteHandlerCategory.HEALTH
 
     @classmethod
-    def next_status(cls) -> RouteStatus | None:
-        """Routes that should be evicted become TERMINATING."""
-        return RouteStatus.TERMINATING
-
-    @classmethod
-    def failure_status(cls) -> RouteStatus | None:
-        """No failure status for eviction - routes are either evicted or left as is."""
-        return None
-
-    @classmethod
-    def stale_status(cls) -> RouteStatus | None:
-        """No stale status for eviction handler."""
-        return None
+    def target_statuses(cls) -> RouteTargetStatuses:
+        return RouteTargetStatuses(
+            lifecycle=[RouteStatus.RUNNING],
+            health=[RouteHealthStatus.UNHEALTHY],
+        )
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Define state transitions for route eviction handler (BEP-1030).
-
-        - success: Route → TERMINATING (evicted)
-        - failure: None (routes are either evicted or left as is)
-        - stale: None
-        """
+        """Eviction: success → TERMINATING, failure → no change."""
         return RouteStatusTransitions(
-            success=RouteStatus.TERMINATING,
+            success=RouteTransitionTarget(status=RouteStatus.TERMINATING),
             failure=None,
             stale=None,
         )

@@ -312,16 +312,13 @@ class TestScaleDeployment:
         # Arrange - 3 routes exist, target is 1, so need to terminate 2 routes
         mock_route1 = MagicMock()
         mock_route1.route_id = uuid4()
-        mock_route1.status = MagicMock()
-        mock_route1.status.termination_priority = MagicMock(return_value=1)
+        mock_route1.termination_priority = 1
         mock_route2 = MagicMock()
         mock_route2.route_id = uuid4()
-        mock_route2.status = MagicMock()
-        mock_route2.status.termination_priority = MagicMock(return_value=2)
+        mock_route2.termination_priority = 2
         mock_route3 = MagicMock()
         mock_route3.route_id = uuid4()
-        mock_route3.status = MagicMock()
-        mock_route3.status.termination_priority = MagicMock(return_value=3)
+        mock_route3.termination_priority = 3
 
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             ready_deployment_needs_scale_down.deployment_info.id: [

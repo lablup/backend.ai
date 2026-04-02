@@ -19,13 +19,10 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AccessKey,
-    ClusterMode,
-    MountPermission,
-    MountTypes,
-    RuntimeVariant,
-    SessionTypes,
+    ResourceSlot,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.data.deployment.types import RouteHealthStatus
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
     EndpointAutoScalingRuleData,
@@ -46,6 +43,7 @@ from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -125,8 +123,7 @@ class ModelServingRepository:
                 endpoint_id,
                 load_routes=True,
                 load_session_owner=True,
-                load_model=True,
-                load_image=True,
+                load_revisions=True,
             )
             if not endpoint:
                 return None
@@ -242,7 +239,7 @@ class ModelServingRepository:
                 endpoint.id,
                 load_created_user=True,
                 load_session_owner=True,
-                load_image=True,
+                load_revisions=True,
                 load_routes=True,
             )
             endpoint_before_assign_url = endpoint_row.to_data()
@@ -436,9 +433,8 @@ class ModelServingRepository:
         session: SASession,
         endpoint_id: uuid.UUID,
         load_routes: bool = False,
-        load_image: bool = False,
         load_session_owner: bool = False,
-        load_model: bool = False,
+        load_revisions: bool = False,
     ) -> EndpointRow | None:
         """
         Private method to get endpoint by ID using an existing session.
@@ -448,9 +444,8 @@ class ModelServingRepository:
                 session,
                 endpoint_id,
                 load_routes=load_routes,
-                load_image=load_image,
                 load_session_owner=load_session_owner,
-                load_model=load_model,
+                load_revisions=load_revisions,
             )
         except NoResultFound:
             return None
@@ -765,9 +760,8 @@ class ModelServingRepository:
                         db_session,
                         action.endpoint_id,
                         load_session_owner=True,
-                        load_model=True,
+                        load_revisions=True,
                         load_routes=True,
-                        load_image=True,
                     )
                     user_data = current_user()
                     if user_data is None:
@@ -793,17 +787,9 @@ class ModelServingRepository:
                     raise InvalidAPIParameters("Cannot update endpoint marked for removal")
 
                 spec = cast(EndpointUpdaterSpec, action.updater.spec)
-                spec.apply_to_row(endpoint_row)
 
-                image_ref = spec.image.optional_value()
-                if image_ref is not None:
-                    image_name = image_ref.name
-                    arch = image_ref.architecture.value()
-                    # This needs to happen within the transaction
-                    image_row = await ImageRow.resolve(
-                        db_session, [ImageIdentifier(image_name, arch), ImageAlias(image_name)]
-                    )
-                    endpoint_row.image = image_row.id
+                # Apply endpoint-level changes (replicas, resource_group, etc.)
+                spec.apply_to_row(endpoint_row)
 
                 session_owner = endpoint_row.session_owner_row
                 if session_owner is None:
@@ -825,130 +811,91 @@ class ModelServingRepository:
                     endpoint_row.project,
                 )
 
-                user_scope = UserScope(
-                    domain_name=endpoint_row.domain,
-                    group_id=endpoint_row.project,
-                    user_uuid=session_owner.uuid,
-                    user_role=session_owner.role.value,
-                )
+                # If revision-level fields changed, create a new revision
+                if spec.has_revision_changes():
+                    current_rev = endpoint_row._find_current_revision()
+                    if current_rev is None:
+                        raise InvalidAPIParameters("Endpoint has no current revision")
 
-                resource_policy_row = await self.get_keypair_resource_policy(
-                    session_owner.resource_policy
-                )
-                if not resource_policy_row:
-                    raise InvalidAPIParameters("Resource policy not found")
-                resource_policy = resource_policy_row._mapping  # for backward compatibility
-                extra_mounts_input = spec.extra_mounts.optional_value()
-                if extra_mounts_input is not None:
-                    extra_mounts = {
-                        mount.vfolder_id.value(): MountOptionModel(
-                            mount_destination=(
-                                mount.mount_destination.value()
-                                if mount.mount_destination.optional_value() is not None
-                                else None
-                            ),
-                            type=MountTypes(mount.type.value())
-                            if mount.type.optional_value() is not None
-                            else MountTypes.BIND,
-                            permission=(
-                                MountPermission(mount.permission.value())
-                                if mount.permission.optional_value() is not None
-                                else None
-                            ),
+                    # Resolve image if changed
+                    image_id = current_rev.image
+                    image_ref = spec.image.optional_value()
+                    if image_ref is not None:
+                        image_name = image_ref.name
+                        arch = image_ref.architecture.value()
+                        resolved_image = await ImageRow.resolve(
+                            db_session,
+                            [ImageIdentifier(image_name, arch), ImageAlias(image_name)],
                         )
-                        for mount in extra_mounts_input
-                    }
-                    if endpoint_row.model is None:
-                        raise InvalidAPIParameters("Endpoint has no model")
-                    vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
-                        conn,
-                        legacy_etcd_config_loader,
-                        storage_manager,
-                        endpoint_row.model,
-                        endpoint_row.model_mount_destination,
-                        extra_mounts,
-                        user_scope,
-                        resource_policy,
-                    )
-                    endpoint_row.extra_mounts = list(vfolder_mounts)
+                        image_id = resolved_image.id
 
-                if endpoint_row.runtime_variant == RuntimeVariant.CUSTOM:
-                    if endpoint_row.model_row is None:
-                        raise InvalidAPIParameters("Endpoint has no model row")
-                    vfid = endpoint_row.model_row.vfid
-                    yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
-                        storage_manager,
-                        endpoint_row.model_row.host,
-                        vfid,
-                        endpoint_row.model_definition_path,
-                    )
-                    await ModelServiceHelper.validate_model_definition(
-                        storage_manager,
-                        endpoint_row.model_row.host,
-                        vfid,
-                        yaml_path,
-                    )
-                elif (
-                    endpoint_row.runtime_variant != RuntimeVariant.CMD
-                    and endpoint_row.model_mount_destination != "/models"
-                ):
-                    raise InvalidAPIParameters(
-                        "Model mount destination must be /models for non-custom runtimes"
-                    )
-
-                # This needs to happen within the transaction for validation
-                if endpoint_row.image_row is None:
-                    raise InvalidAPIParameters("Endpoint has no image row")
-                image_row = await ImageRow.resolve(
-                    db_session,
-                    [
-                        ImageIdentifier(
-                            endpoint_row.image_row.name, endpoint_row.image_row.architecture
+                    # Merge revision fields: current revision as base, spec overrides
+                    new_revision = DeploymentRevisionRow(
+                        endpoint=endpoint_row.id,
+                        revision_number=0,  # placeholder, will be set atomically below
+                        image=image_id,
+                        model=current_rev.model,
+                        model_mount_destination=current_rev.model_mount_destination,
+                        model_definition_path=(
+                            spec.model_definition_path.optional_value()
+                            if spec.model_definition_path.optional_value() is not None
+                            else current_rev.model_definition_path
                         ),
-                    ],
-                )
+                        resource_group=endpoint_row.resource_group,
+                        resource_slots=(
+                            spec.resource_slots.optional_value() or current_rev.resource_slots
+                        ),
+                        resource_opts=(
+                            spec.resource_opts.optional_value()
+                            if spec.resource_opts.optional_value() is not None
+                            else current_rev.resource_opts
+                        ),
+                        cluster_mode=(
+                            spec.cluster_mode.value().value
+                            if spec.cluster_mode.optional_value() is not None
+                            else current_rev.cluster_mode
+                        ),
+                        cluster_size=(
+                            spec.cluster_size.optional_value() or current_rev.cluster_size
+                        ),
+                        startup_command=current_rev.startup_command,
+                        bootstrap_script=current_rev.bootstrap_script,
+                        environ=(
+                            spec.environ.optional_value()
+                            if spec.environ.optional_value() is not None
+                            else current_rev.environ
+                        ),
+                        callback_url=current_rev.callback_url,
+                        runtime_variant=(
+                            spec.runtime_variant.optional_value() or current_rev.runtime_variant
+                        ),
+                        extra_mounts=list(current_rev.extra_mounts),
+                    )
 
-                await agent_registry.create_session(
-                    "",
-                    image_row.image_ref,
-                    user_scope,
-                    AccessKey(session_owner.main_access_key),
-                    resource_policy,
-                    SessionTypes.INFERENCE,
-                    {
-                        "mounts": [
-                            endpoint_row.model,
-                            *[m.vfid.folder_id for m in endpoint_row.extra_mounts],
-                        ],
-                        "mount_map": {
-                            endpoint_row.model: endpoint_row.model_mount_destination,
-                            **{
-                                m.vfid.folder_id: m.kernel_path.as_posix()
-                                for m in endpoint_row.extra_mounts
-                            },
-                        },
-                        "mount_options": {
-                            m.vfid.folder_id: {"permission": m.mount_perm}
-                            for m in endpoint_row.extra_mounts
-                        },
-                        "environ": endpoint_row.environ,
-                        "scaling_group": endpoint_row.resource_group,
-                        "resources": endpoint_row.resource_slots,
-                        "resource_opts": endpoint_row.resource_opts,
-                        "preopen_ports": None,
-                        "agent_list": None,
-                    },
-                    ClusterMode(endpoint_row.cluster_mode),
-                    endpoint_row.cluster_size,
-                    bootstrap_script=endpoint_row.bootstrap_script,
-                    startup_command=endpoint_row.startup_command,
-                    tag=endpoint_row.tag,
-                    callback_url=endpoint_row.callback_url,
-                    sudo_session_enabled=session_owner.sudo_session_enabled,
-                    dry_run=True,
-                )
+                    # Atomically assign next revision number
+                    max_query = sa.select(sa.func.max(DeploymentRevisionRow.revision_number)).where(
+                        DeploymentRevisionRow.endpoint == endpoint_row.id
+                    )
+                    result = await db_session.execute(max_query)
+                    latest = result.scalar()
+                    new_revision.revision_number = (latest or 0) + 1
+
+                    db_session.add(new_revision)
+                    await db_session.flush()
+
+                    # Activate: set as current revision
+                    endpoint_row.current_revision = new_revision.id
 
                 await db_session.commit()
+
+                # Reload with revisions for to_data()
+                endpoint_row = await EndpointRow.get(
+                    db_session,
+                    endpoint_row.id,
+                    load_revisions=True,
+                    load_created_user=True,
+                    load_session_owner=True,
+                )
                 return MutationResult(
                     success=True,
                     message="success",
@@ -1009,6 +956,7 @@ class ModelServingRepository:
                 .where(EndpointRow.session_owner == session_owner_id)
                 .where(EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
                 .options(selectinload(EndpointRow.routings))
+                .options(selectinload(EndpointRow.revisions))
             )
 
             result = await execute_batch_querier(session, query, querier)
@@ -1016,9 +964,15 @@ class ModelServingRepository:
             items: list[ServiceSearchItem] = []
             for row in result.rows:
                 ep = row.EndpointRow
+                current_rev = ep._find_current_revision()
                 routings_data = [r.to_data() for r in ep.routings] if ep.routings else None
                 active_route_count = (
-                    len([r for r in ep.routings if r.status == RouteStatus.HEALTHY])
+                    len([
+                        r
+                        for r in ep.routings
+                        if r.status == RouteStatus.RUNNING
+                        and r.health_status == RouteHealthStatus.HEALTHY
+                    ])
                     if ep.routings
                     else 0
                 )
@@ -1030,7 +984,9 @@ class ModelServingRepository:
                         active_route_count=active_route_count,
                         service_endpoint=HttpUrl(ep.url) if ep.url else None,
                         open_to_public=ep.open_to_public or False,
-                        resource_slots=ep.resource_slots,
+                        resource_slots=(
+                            current_rev.resource_slots if current_rev else ResourceSlot({})
+                        ),
                         resource_group=ep.resource_group,
                         routings=routings_data,
                     )

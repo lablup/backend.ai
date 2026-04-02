@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -148,9 +147,7 @@ async def model_deployment_fixture(
                 domain=domain_fixture,
                 project=str(group_fixture),
                 resource_group=scaling_group_fixture,
-                image=image_id,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                resource_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                 url=None,
             )
         )

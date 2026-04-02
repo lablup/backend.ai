@@ -8,6 +8,7 @@ import uuid
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -30,6 +31,9 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelDeploymentStatus as ExportedModelDeploymentStatus,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    RouteHealthStatus as ExportedRouteHealthStatus,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
     RouteStatus as ExportedRouteStatus,
@@ -154,8 +158,11 @@ class TestReExportedEnums:
     def test_deployment_strategy_rolling_value(self) -> None:
         assert ExportedDeploymentStrategy.ROLLING.value == "ROLLING"
 
-    def test_route_status_healthy_value(self) -> None:
-        assert ExportedRouteStatus.HEALTHY.value == "healthy"
+    def test_route_health_status_is_same_object(self) -> None:
+        assert ExportedRouteHealthStatus is RouteHealthStatus
+
+    def test_route_health_status_healthy_value(self) -> None:
+        assert ExportedRouteHealthStatus.HEALTHY.value == "healthy"
 
     def test_route_traffic_status_active_value(self) -> None:
         assert ExportedRouteTrafficStatus.ACTIVE.value == "active"
