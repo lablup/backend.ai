@@ -7,7 +7,9 @@ from collections.abc import Sequence
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from ai.backend.common.data.permission.types import RBACElementType, RelationType
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.group.types import ProjectType
@@ -19,10 +21,16 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import DEAD_VFOLDER_STATUSES, VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.model_card.types import (
@@ -40,9 +48,9 @@ class ModelCardDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def create(self, creator: Creator[ModelCardRow]) -> ModelCardData:
+    async def create(self, creator: RBACEntityCreator[ModelCardRow]) -> ModelCardData:
         async with self._db.begin_session() as session:
-            result = await execute_creator(session, creator)
+            result = await execute_rbac_entity_creator(session, creator)
             return result.row.to_data()
 
     async def get_by_id(self, card_id: UUID) -> ModelCardData:
@@ -157,4 +165,37 @@ class ModelCardDBSource:
             total = result.upserted_count
             updated = sum(1 for s in specs if s.name in existing_names)
             created = total - updated
+
+            # Bind all upserted model cards to their project scope in RBAC
+            # ON CONFLICT DO NOTHING ensures idempotency for existing bindings
+            new_names = {s.name for s in specs} - existing_names
+            if new_names:
+                card_rows = (
+                    await session.execute(
+                        sa.select(ModelCardRow.id, ModelCardRow.project).where(
+                            sa.and_(
+                                ModelCardRow.name.in_(new_names),
+                                ModelCardRow.project == specs[0].project_id,
+                                ModelCardRow.domain == specs[0].domain,
+                            )
+                        )
+                    )
+                ).all()
+                if card_rows:
+                    assoc_values = [
+                        {
+                            "scope_type": RBACElementType.PROJECT.to_scope_type(),
+                            "scope_id": str(row.project),
+                            "entity_type": RBACElementType.MODEL_CARD.to_entity_type(),
+                            "entity_id": str(row.id),
+                            "relation_type": RelationType.AUTO,
+                        }
+                        for row in card_rows
+                    ]
+                    await session.execute(
+                        pg_insert(AssociationScopesEntitiesRow)
+                        .values(assoc_values)
+                        .on_conflict_do_nothing()
+                    )
+
             return created, updated

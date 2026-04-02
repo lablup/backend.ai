@@ -9,7 +9,7 @@ from ai.backend.manager.data.model_card.types import ModelCardData, VFolderScanD
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.types import (
     ModelCardSearchResult,
@@ -28,7 +28,7 @@ class ModelCardRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = ModelCardDBSource(db)
 
-    async def create(self, creator: Creator[ModelCardRow]) -> ModelCardData:
+    async def create(self, creator: RBACEntityCreator[ModelCardRow]) -> ModelCardData:
         return await self._db_source.create(creator)
 
     async def get_by_id(self, card_id: UUID) -> ModelCardData:

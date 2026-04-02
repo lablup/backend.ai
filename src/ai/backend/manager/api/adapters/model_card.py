@@ -4,6 +4,7 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
     ModelCardFilter,
@@ -26,13 +27,14 @@ from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderFiel
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.model_card.types import ModelCardData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ModelCardNotFound
 from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.types import MinResourceSpec
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder, combine_conditions_or
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
@@ -144,7 +146,7 @@ class ModelCardAdapter(BaseAdapter):
         input: CreateModelCardInput,
     ) -> CreateModelCardPayload:
         min_resource = _entries_to_min_resource(input.min_resource) if input.min_resource else None
-        creator = Creator(
+        creator: RBACEntityCreator[ModelCardRow] = RBACEntityCreator(
             spec=ModelCardCreatorSpec(
                 name=input.name,
                 vfolder_id=input.vfolder_id,
@@ -163,7 +165,12 @@ class ModelCardAdapter(BaseAdapter):
                 license=input.license,
                 min_resource=min_resource,
                 readme=input.readme,
-            )
+            ),
+            element_type=RBACElementType.MODEL_CARD,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.PROJECT,
+                element_id=str(input.project_id),
+            ),
         )
         result = await self._processors.model_card.create.wait_for_complete(
             CreateModelCardAction(creator=creator)

@@ -1,8 +1,9 @@
-from typing import override
+from typing import cast, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.model_card.actions.create import (
     CreateModelCardAction,
@@ -47,11 +48,17 @@ class ModelCardProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
+        scope_validator = validators.rbac.scope
+
         self.create = ActionProcessor(service.create, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
-        self.search_in_project = ActionProcessor(service.search_in_project, action_monitors)
+        self.search_in_project = ActionProcessor(
+            service.search_in_project,
+            action_monitors,
+            validators=[cast(ActionValidator, scope_validator)],
+        )
         self.scan = ActionProcessor(service.scan, action_monitors)
 
     @override
