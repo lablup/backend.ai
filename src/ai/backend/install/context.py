@@ -35,6 +35,12 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
 
 from .common import detect_os
+from .config_gen.appproxy import (
+    CoordinatorParams,
+    WorkerParams,
+    build_coordinator_config,
+    build_worker_config,
+)
 from .dev import (
     bootstrap_pants,
     install_editable_webui,
@@ -845,13 +851,6 @@ class Context(metaclass=ABCMeta):
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
 
-        # Coordinator
-        coord_conf = self.copy_config("app-proxy-coordinator.toml")
-
-        self.log.write(f"DB HOST = {halfstack.postgres_addr.face.host}")
-        self.log.write(f"DB PORT = {halfstack.postgres_addr.face.port}")
-        self.log.write(f"API SECRET = {service.appproxy_api_secret}")
-
         tls_advertised = self.install_variable.tls_advertised
         advertised_port = self.install_variable.advertised_port
         wildcard_domain = self.install_variable.wildcard_domain
@@ -860,140 +859,63 @@ class Context(metaclass=ABCMeta):
         app_address = self.install_variable.app_address
         frontend_mode = self.install_variable.frontend_mode
 
-        with coord_conf.open("r") as fp:
-            data = tomlkit.load(fp)
-            data["db"]["type"] = "postgresql"  # type: ignore[index]
-            data["db"]["name"] = "appproxy"  # type: ignore[index]
-            data["db"]["user"] = "appproxy"  # type: ignore[index]
-            data["db"]["password"] = "develove"  # type: ignore[index]
-            data["db"]["pool_size"] = 8  # type: ignore[index]
-            data["db"]["max_overflow"] = 64  # type: ignore[index]
-            data["db"]["addr"]["host"] = halfstack.postgres_addr.face.host  # type: ignore[index]
-            data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port  # type: ignore[index]
-            redis_addr_table = tomlkit.inline_table()
-            redis_addr_table["host"] = halfstack.redis_addr.face.host
-            redis_addr_table["port"] = halfstack.redis_addr.face.port
-            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
-            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
-            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
-            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
-            data["proxy_coordinator"]["bind_addr"]["host"] = "0.0.0.0"  # type: ignore[index]
-            data["proxy_coordinator"]["bind_addr"]["port"] = (  # type: ignore[index]
-                service.appproxy_coordinator_addr.bind.port
-            )
-            data["proxy_coordinator"]["advertised_addr"]["host"] = apphub_address  # type: ignore[index]
-            data["proxy_coordinator"]["advertised_addr"]["port"] = (  # type: ignore[index]
-                service.appproxy_coordinator_addr.bind.port
-            )
-            if tls_advertised:
-                data["proxy_coordinator"]["tls_advertised"] = True  # type: ignore[index]
-                data["proxy_coordinator"]["advertised_addr"]["port"] = advertised_port  # type: ignore[index]
+        self.log.write(f"DB HOST = {halfstack.postgres_addr.face.host}")
+        self.log.write(f"DB PORT = {halfstack.postgres_addr.face.port}")
+        self.log.write(f"API SECRET = {service.appproxy_api_secret}")
 
-            # Enable traefik integration in coordinator
-            if frontend_mode == FrontendMode.TRAEFIK:
-                data["proxy_coordinator"]["enable_traefik"] = True  # type: ignore[index]
-                traefik_table = tomlkit.table()
-                traefik_etcd_table = tomlkit.table()
-                traefik_etcd_table["namespace"] = "backend"
-                etcd_addr_table = tomlkit.inline_table()
-                etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
-                etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
-                traefik_etcd_table["addr"] = etcd_addr_table
-                traefik_table["etcd"] = traefik_etcd_table
-                data["proxy_coordinator"]["traefik"] = traefik_table  # type: ignore[index]
+        # Generate coordinator config using shared module
+        coord_params = CoordinatorParams(
+            db_host=halfstack.postgres_addr.face.host,
+            db_port=halfstack.postgres_addr.face.port,
+            redis_host=halfstack.redis_addr.face.host,
+            redis_port=halfstack.redis_addr.face.port,
+            api_secret=service.appproxy_api_secret,
+            jwt_secret=service.appproxy_jwt_secret,
+            permit_hash_secret=service.appproxy_permit_hash_secret,
+            bind_port=service.appproxy_coordinator_addr.bind.port,
+            advertised_host=apphub_address,
+            advertised_port=advertised_port
+            if tls_advertised
+            else service.appproxy_coordinator_addr.bind.port,
+            tls_advertised=tls_advertised,
+            enable_traefik=frontend_mode == FrontendMode.TRAEFIK,
+            etcd_host=halfstack.etcd_addr[0].face.host,
+            etcd_port=halfstack.etcd_addr[0].face.port,
+        )
+        coord_config = build_coordinator_config(coord_params)
+        coord_conf = self.copy_config("app-proxy-coordinator.toml")
         with coord_conf.open("w") as fp:
-            tomlkit.dump(data, fp)
+            tomlkit.dump(coord_config, fp)
 
-        # Worker
+        # Generate worker config using shared module
+        worker_params = WorkerParams(
+            redis_host=halfstack.redis_addr.face.host,
+            redis_port=halfstack.redis_addr.face.port,
+            coordinator_host=service.appproxy_coordinator_addr.bind.host,
+            coordinator_port=service.appproxy_coordinator_addr.bind.port,
+            api_bind_host=service.appproxy_worker_addr.bind.host,
+            api_bind_port=service.appproxy_worker_addr.bind.port,
+            api_advertised_host=app_address
+            if frontend_mode == FrontendMode.WILDCARD
+            else public_facing_address,
+            api_advertised_port=advertised_port
+            if frontend_mode == FrontendMode.WILDCARD
+            else service.appproxy_worker_addr.bind.port,
+            api_secret=service.appproxy_api_secret,
+            jwt_secret=service.appproxy_jwt_secret,
+            permit_hash_secret=service.appproxy_permit_hash_secret,
+            tls_advertised=tls_advertised,
+            frontend_mode=frontend_mode,
+            port_proxy_advertised_host=public_facing_address,
+            wildcard_domain=wildcard_domain,
+            wildcard_advertised_port=advertised_port,
+            traefik_etcd_host=halfstack.etcd_addr[0].face.host,
+            traefik_etcd_port=halfstack.etcd_addr[0].face.port,
+        )
+        worker_config = build_worker_config(worker_params)
         worker_conf = self.copy_config("app-proxy-worker.toml")
-        with worker_conf.open("r") as fp:
-            data = tomlkit.load(fp)
-            # Update redis addr inline table
-            redis_addr_table = tomlkit.inline_table()
-            redis_addr_table["host"] = halfstack.redis_addr.face.host
-            redis_addr_table["port"] = halfstack.redis_addr.face.port
-            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
-
-            data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
-                f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
-            )
-
-            # api_bind_addr as inline table
-            api_bind_addr_table = tomlkit.inline_table()
-            api_bind_addr_table["host"] = service.appproxy_worker_addr.bind.host
-            api_bind_addr_table["port"] = service.appproxy_worker_addr.bind.port
-            data["proxy_worker"]["api_bind_addr"] = api_bind_addr_table  # type: ignore[index]
-
-            # api_advertised_addr as inline table
-            api_advertised_addr_table = tomlkit.inline_table()
-            api_advertised_addr_table["host"] = public_facing_address
-            api_advertised_addr_table["port"] = service.appproxy_worker_addr.bind.port
-            data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
-
-            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
-            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
-            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
-
-            # advertise TLS to external clients
-            if tls_advertised:
-                data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
-
-            # set frontend mode
-            if frontend_mode == FrontendMode.TRAEFIK:
-                data["proxy_worker"]["frontend_mode"] = "traefik"  # type: ignore[index]
-            else:
-                data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
-
-            # configure based on frontend_mode
-            if frontend_mode == FrontendMode.TRAEFIK:
-                # Remove port_proxy section — traefik handles routing
-                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
-                    del data["proxy_worker"]["port_proxy"]
-
-                # Add traefik section
-                traefik_table = tomlkit.table()
-                traefik_table["api_port"] = 18080
-                traefik_table["last_used_time_marker_directory"] = "./last_used"
-                traefik_etcd_table = tomlkit.table()
-                traefik_etcd_table["namespace"] = "traefik"
-                etcd_addr_table = tomlkit.inline_table()
-                etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
-                etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
-                traefik_etcd_table["addr"] = etcd_addr_table
-                traefik_table["etcd"] = traefik_etcd_table
-                # Port proxy sub-section under traefik
-                port_proxy_table = tomlkit.table()
-                port_proxy_table["advertised_host"] = public_facing_address
-                port_proxy_table["bind_port_range"] = [10205, 10300]
-                traefik_table["port_proxy"] = port_proxy_table
-                data["proxy_worker"]["traefik"] = traefik_table  # type: ignore[index]
-            elif frontend_mode == FrontendMode.WILDCARD:
-                # Remove port_proxy section for wildcard mode
-                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
-                    del data["proxy_worker"]["port_proxy"]
-
-                # Override api_advertised_addr with app_address and advertised_port
-                api_advertised_addr_table = tomlkit.inline_table()
-                api_advertised_addr_table["host"] = app_address
-                api_advertised_addr_table["port"] = advertised_port
-                data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
-
-                # Add wildcard_domain section
-                if wildcard_domain:
-                    wildcard_table = tomlkit.table()
-                    wildcard_table["domain"] = wildcard_domain
-                    bind_addr_table = tomlkit.inline_table()
-                    bind_addr_table["host"] = "0.0.0.0"
-                    bind_addr_table["port"] = 10250
-                    wildcard_table["bind_addr"] = bind_addr_table
-                    wildcard_table["advertised_port"] = advertised_port
-                    wildcard_table.add(tomlkit.nl())  # Add newline before next section
-                    data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
-            else:
-                # update port_proxy.advertised_host
-                data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
         with worker_conf.open("w") as fp:
-            tomlkit.dump(data, fp)
+            tomlkit.dump(worker_config, fp)
 
         # Alembic migration config
         alembic_cfg = self.copy_config("alembic-appproxy.ini")
