@@ -91,6 +91,9 @@ class CircuitManager:
             self._circuit_locks[circuit_id] = asyncio.Lock()
         return self._circuit_locks[circuit_id]
 
+    def release_circuit_lock(self, circuit_id: UUID) -> None:
+        self._circuit_locks.pop(circuit_id, None)
+
     @actxmgr
     async def circuit_lock(self, circuit_id: UUID) -> AsyncIterator[None]:
         async with self._get_lock(circuit_id):
@@ -243,6 +246,7 @@ class CircuitManager:
                     await self.unload_traefik_circuit(circuit)
                 else:
                     await self.unload_legacy_circuit(circuit)
+            self.release_circuit_lock(circuit.id)
 
     async def unload_traefik_circuit(self, circuit: Circuit) -> None:
         log.debug("unload_traefik_circuit(): start")

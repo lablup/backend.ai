@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.coordinator.health_checker import HealthCheckEngine
 from ai.backend.appproxy.coordinator.models import Circuit
 from ai.backend.appproxy.coordinator.types import CircuitManager
@@ -52,6 +53,9 @@ class _FakeCircuitManager:
             yield
         finally:
             self._order.append("lock_exit")
+
+    def release_circuit_lock(self, _circuit_id: UUID) -> None:
+        self._order.append("release_lock")
 
     async def _update_circuit_routes_unlocked(
         self,
@@ -145,7 +149,7 @@ class TestCircuitManagerLocking:
             "second_end",
         ]
 
-    async def test_unload_does_not_split_circuit_lock_queue(
+    async def test_queued_updates_before_unload_are_serialized(
         self,
         circuit_manager: CircuitManager,
         circuit: Circuit,
@@ -154,25 +158,24 @@ class TestCircuitManagerLocking:
     ) -> None:
         monkeypatch.setattr(circuit_manager, "unload_traefik_circuit", AsyncMock(return_value=None))
 
-        # Act - hold the lock externally, then queue unload + update behind it
+        # Act - hold the lock externally, then queue update + unload behind it
         async with circuit_manager.circuit_lock(circuit.id):
-            unload_task = asyncio.create_task(circuit_manager.unload_circuits([circuit]))
-            waiting_update_task = asyncio.create_task(
+            first_update_task = asyncio.create_task(
                 circuit_manager.update_circuit_routes(circuit, [])
             )
+            second_update_task = asyncio.create_task(
+                circuit_manager.update_circuit_routes(circuit, [])
+            )
+            unload_task = asyncio.create_task(circuit_manager.unload_circuits([circuit]))
             await asyncio.sleep(0)
 
-        await unload_task
+        # First update acquires the lock
         await patched_update.first_started.wait()
-
-        second_update_task = asyncio.create_task(circuit_manager.update_circuit_routes(circuit, []))
-        await asyncio.sleep(0.05)
-
-        # Assert - second update must still wait for first
         assert patched_update.call_order == ["first_start"]
 
+        # Release first update — second update and unload proceed in queue order
         patched_update.release_first.set()
-        await asyncio.gather(waiting_update_task, second_update_task)
+        await asyncio.gather(first_update_task, second_update_task, unload_task)
 
         assert patched_update.call_order == [
             "first_start",
@@ -180,6 +183,33 @@ class TestCircuitManagerLocking:
             "second_start",
             "second_end",
         ]
+        # Lock entry is cleaned up after unload
+        assert circuit.id not in circuit_manager._circuit_locks
+
+    @pytest.fixture
+    def patch_unload(
+        self,
+        circuit_manager: CircuitManager,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(circuit_manager, "unload_traefik_circuit", AsyncMock(return_value=None))
+
+    async def test_unload_removes_circuit_lock(
+        self,
+        circuit_manager: CircuitManager,
+        circuit: Circuit,
+        patch_unload: None,
+    ) -> None:
+        # Populate the lock entry
+        async with circuit_manager.circuit_lock(circuit.id):
+            pass
+        assert circuit.id in circuit_manager._circuit_locks
+
+        # Act
+        await circuit_manager.unload_circuits([circuit])
+
+        # Assert - lock entry should be cleaned up
+        assert circuit.id not in circuit_manager._circuit_locks
 
 
 class TestHealthCheckEnginePropagation:
@@ -252,5 +282,43 @@ class TestHealthCheckEnginePropagation:
             "circuit_get",
             "db_exit",
             "update",
+            "lock_exit",
+        ]
+
+    @pytest.fixture
+    def patch_circuit_get_not_found(
+        self,
+        operation_order: list[str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async def _raise_not_found(
+            _session: object,
+            _circuit_id: UUID,
+            **_kwargs: object,
+        ) -> object:
+            operation_order.append("circuit_get_not_found")
+            raise ObjectNotFound(object_name="Circuit")
+
+        monkeypatch.setattr(Circuit, "get", _raise_not_found)
+
+    async def test_deleted_circuit_skips_propagation(
+        self,
+        health_check_engine: HealthCheckEngine,
+        operation_order: list[str],
+        patch_circuit_get_not_found: None,
+    ) -> None:
+        # Act
+        await health_check_engine.propagate_route_updates_to_workers(
+            cast(Any, SimpleNamespace(id=uuid4())),
+            [],
+        )
+
+        # Assert - lock acquired, DB read raises ObjectNotFound, early return without update
+        # Lock cleanup is handled by unload_circuits, not here
+        assert operation_order == [
+            "lock_enter",
+            "db_enter",
+            "circuit_get_not_found",
+            "db_exit",
             "lock_exit",
         ]
