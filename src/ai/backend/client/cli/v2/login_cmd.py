@@ -48,12 +48,21 @@ def login(force: bool) -> None:
             async with client.session.post(login_url, json=payload) as resp:
                 data = await resp.json()
 
+            def _get_details(resp_data: dict[str, object]) -> str:
+                raw = resp_data.get("data")
+                if isinstance(raw, dict):
+                    details = raw.get("details")
+                    if details:
+                        return str(details)
+                elif raw:
+                    return str(raw)
+                # Handle RFC 7807 problem responses (e.g., {"type": ..., "title": ...})
+                if "title" in resp_data:
+                    return str(resp_data["title"])
+                return "Unknown error"
+
             if not data.get("authenticated"):
-                raw_data = data.get("data", {})
-                if isinstance(raw_data, dict):
-                    details = raw_data.get("details", "Unknown error")
-                else:
-                    details = str(raw_data) if raw_data else "Unknown error"
+                details = _get_details(data)
 
                 if details == "OTP not provided":
                     otp = input("One-time Password: ")
@@ -62,11 +71,7 @@ def login(force: bool) -> None:
                         data = await resp.json()
 
             if not data.get("authenticated"):
-                raw_data = data.get("data", {})
-                if isinstance(raw_data, dict):
-                    details = raw_data.get("details", "Unknown error")
-                else:
-                    details = str(raw_data) if raw_data else "Unknown error"
+                details = _get_details(data)
                 click.echo(click.style(f"Login failed: {details}", fg="red"))
                 raise SystemExit(1)
 
