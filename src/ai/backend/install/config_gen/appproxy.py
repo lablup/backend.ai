@@ -2,13 +2,16 @@
 Shared AppProxy configuration generation.
 
 Used by both TUI dev mode (context.py) and pyinfra deploy scripts
-to generate coordinator and worker config dicts from a common set of parameters.
+to apply coordinator and worker config to existing tomlkit documents,
+preserving comments and structure from sample/halfstack config files.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+
+import tomlkit
 
 from ai.backend.install.types import FrontendMode
 
@@ -101,133 +104,154 @@ class WorkerParams:
     traefik_etcd_namespace: str = "traefik"
 
 
-def build_coordinator_config(params: CoordinatorParams) -> dict[str, Any]:
-    """
-    Build appproxy coordinator config dict.
+def _make_inline_table(values: dict[str, Any]) -> tomlkit.items.InlineTable:
+    """Create a tomlkit inline table from a dict."""
+    table = tomlkit.inline_table()
+    for k, v in values.items():
+        table[k] = v
+    return table
 
-    Returns a nested dict that can be written as TOML.
-    """
-    config: dict[str, Any] = {
-        "db": {
-            "type": "postgresql",
-            "name": params.db_name,
-            "user": params.db_user,
-            "password": params.db_password,
-            "pool_size": params.db_pool_size,
-            "max_overflow": params.db_max_overflow,
-            "addr": {"host": params.db_host, "port": params.db_port},
-        },
-        "redis": {
-            "addr": {"host": params.redis_host, "port": params.redis_port},
-        },
-        "proxy_coordinator": {
-            "tls_listen": False,
-            "tls_advertised": params.tls_advertised,
-            "bind_addr": {"host": params.bind_host, "port": params.bind_port},
-            "advertised_addr": {
-                "host": params.advertised_host,
-                "port": params.advertised_port,
-            },
-        },
-        "secrets": {
-            "api_secret": params.api_secret,
-            "jwt_secret": params.jwt_secret,
-        },
-        "permit_hash": {
-            "secret": params.permit_hash_secret,
-        },
-    }
 
+def apply_coordinator_config(
+    doc: tomlkit.TOMLDocument,
+    params: CoordinatorParams,
+) -> None:
+    """
+    Apply coordinator params to an existing tomlkit document.
+
+    Modifies the document in-place, preserving comments and structure.
+    """
+    # Database
+    doc["db"]["type"] = "postgresql"  # type: ignore[index]
+    doc["db"]["name"] = params.db_name  # type: ignore[index]
+    doc["db"]["user"] = params.db_user  # type: ignore[index]
+    doc["db"]["password"] = params.db_password  # type: ignore[index]
+    doc["db"]["pool_size"] = params.db_pool_size  # type: ignore[index]
+    doc["db"]["max_overflow"] = params.db_max_overflow  # type: ignore[index]
+    doc["db"]["addr"]["host"] = params.db_host  # type: ignore[index]
+    doc["db"]["addr"]["port"] = params.db_port  # type: ignore[index]
+
+    # Redis
+    doc["redis"]["addr"] = _make_inline_table({
+        "host": params.redis_host,
+        "port": params.redis_port,
+    })  # type: ignore[index]
+
+    # Secrets
+    doc["secrets"]["api_secret"] = params.api_secret  # type: ignore[index]
+    doc["secrets"]["jwt_secret"] = params.jwt_secret  # type: ignore[index]
+    doc["permit_hash"]["secret"] = params.permit_hash_secret  # type: ignore[index]
+
+    # Bind/advertised addresses
+    doc["proxy_coordinator"]["bind_addr"]["host"] = params.bind_host  # type: ignore[index]
+    doc["proxy_coordinator"]["bind_addr"]["port"] = params.bind_port  # type: ignore[index]
+    doc["proxy_coordinator"]["advertised_addr"]["host"] = params.advertised_host  # type: ignore[index]
+    doc["proxy_coordinator"]["advertised_addr"]["port"] = params.advertised_port  # type: ignore[index]
+
+    # TLS
+    if params.tls_advertised:
+        doc["proxy_coordinator"]["tls_advertised"] = True  # type: ignore[index]
+
+    # Traefik
     if params.enable_traefik:
-        config["proxy_coordinator"]["enable_traefik"] = True
-        config["proxy_coordinator"]["traefik"] = {
-            "etcd": {
-                "namespace": params.etcd_namespace,
-                "addr": {"host": params.etcd_host, "port": params.etcd_port},
-            },
-        }
+        doc["proxy_coordinator"]["enable_traefik"] = True  # type: ignore[index]
+        traefik_table = tomlkit.table()
+        traefik_etcd_table = tomlkit.table()
+        traefik_etcd_table["namespace"] = params.etcd_namespace
+        traefik_etcd_table["addr"] = _make_inline_table({
+            "host": params.etcd_host,
+            "port": params.etcd_port,
+        })
+        traefik_table["etcd"] = traefik_etcd_table
+        doc["proxy_coordinator"]["traefik"] = traefik_table  # type: ignore[index]
 
-    return config
 
-
-def build_worker_config(params: WorkerParams) -> dict[str, Any]:
+def apply_worker_config(
+    doc: tomlkit.TOMLDocument,
+    params: WorkerParams,
+) -> None:
     """
-    Build appproxy worker config dict.
+    Apply worker params to an existing tomlkit document.
 
-    Returns a nested dict that can be written as TOML.
+    Modifies the document in-place, preserving comments and structure.
     Frontend mode logic (port/wildcard/traefik) is handled here.
     """
-    config: dict[str, Any] = {
-        "redis": {
-            "addr": {"host": params.redis_host, "port": params.redis_port},
-        },
-        "proxy_worker": {
-            "coordinator_endpoint": (
-                f"{params.coordinator_scheme}://{params.coordinator_host}:{params.coordinator_port}"
-            ),
-            "tls_listen": False,
-            "tls_advertised": params.tls_advertised,
-            "frontend_mode": params.frontend_mode.value,
-            "api_bind_addr": {
-                "host": params.api_bind_host,
-                "port": params.api_bind_port,
-            },
-            "api_advertised_addr": {
-                "host": params.api_advertised_host,
-                "port": params.api_advertised_port,
-            },
-        },
-        "secrets": {
-            "api_secret": params.api_secret,
-            "jwt_secret": params.jwt_secret,
-        },
-        "permit_hash": {
-            "secret": params.permit_hash_secret,
-        },
-    }
+    # Redis
+    doc["redis"]["addr"] = _make_inline_table({
+        "host": params.redis_host,
+        "port": params.redis_port,
+    })  # type: ignore[index]
 
+    # Coordinator endpoint
+    doc["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
+        f"{params.coordinator_scheme}://{params.coordinator_host}:{params.coordinator_port}"
+    )
+
+    # API bind/advertised addresses
+    doc["proxy_worker"]["api_bind_addr"] = _make_inline_table(  # type: ignore[index]
+        {"host": params.api_bind_host, "port": params.api_bind_port}
+    )
+    doc["proxy_worker"]["api_advertised_addr"] = _make_inline_table(  # type: ignore[index]
+        {"host": params.api_advertised_host, "port": params.api_advertised_port}
+    )
+
+    # Secrets
+    doc["secrets"]["api_secret"] = params.api_secret  # type: ignore[index]
+    doc["secrets"]["jwt_secret"] = params.jwt_secret  # type: ignore[index]
+    doc["permit_hash"]["secret"] = params.permit_hash_secret  # type: ignore[index]
+
+    # TLS
+    if params.tls_advertised:
+        doc["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
+
+    # Frontend mode
+    doc["proxy_worker"]["frontend_mode"] = params.frontend_mode.value  # type: ignore[index]
+
+    # Configure based on frontend_mode
     match params.frontend_mode:
         case FrontendMode.PORT:
-            config["proxy_worker"]["port_proxy"] = {
-                "bind_host": params.port_proxy_bind_host,
-                "advertised_host": params.port_proxy_advertised_host,
-                "bind_port_range": [
-                    params.port_proxy_range_start,
-                    params.port_proxy_range_end,
-                ],
-            }
+            doc["proxy_worker"]["port_proxy"]["advertised_host"] = params.port_proxy_advertised_host  # type: ignore[index]
         case FrontendMode.WILDCARD:
-            if params.wildcard_domain:
-                config["proxy_worker"]["wildcard_domain"] = {
-                    "domain": params.wildcard_domain,
-                    "bind_addr": {
-                        "host": params.wildcard_bind_host,
-                        "port": params.wildcard_bind_port,
-                    },
-                    "advertised_port": params.wildcard_advertised_port,
-                }
-            config["proxy_worker"]["api_advertised_addr"] = {
-                "host": params.api_advertised_host,
-                "port": params.wildcard_advertised_port,
-            }
-        case FrontendMode.TRAEFIK:
-            config["proxy_worker"]["traefik"] = {
-                "api_port": params.traefik_api_port,
-                "last_used_time_marker_directory": params.traefik_last_used_dir,
-                "etcd": {
-                    "namespace": params.traefik_etcd_namespace,
-                    "addr": {
-                        "host": params.traefik_etcd_host,
-                        "port": params.traefik_etcd_port,
-                    },
-                },
-                "port_proxy": {
-                    "advertised_host": params.port_proxy_advertised_host,
-                    "bind_port_range": [
-                        params.port_proxy_range_start,
-                        params.port_proxy_range_end,
-                    ],
-                },
-            }
+            # Remove port_proxy section
+            if "port_proxy" in doc["proxy_worker"]:  # type: ignore[operator]
+                del doc["proxy_worker"]["port_proxy"]  # type: ignore[union-attr]
 
-    return config
+            # Override api_advertised_addr
+            doc["proxy_worker"]["api_advertised_addr"] = _make_inline_table(  # type: ignore[index]
+                {"host": params.api_advertised_host, "port": params.wildcard_advertised_port}
+            )
+
+            # Add wildcard_domain section
+            if params.wildcard_domain:
+                wildcard_table = tomlkit.table()
+                wildcard_table["domain"] = params.wildcard_domain
+                wildcard_table["bind_addr"] = _make_inline_table({
+                    "host": params.wildcard_bind_host,
+                    "port": params.wildcard_bind_port,
+                })
+                wildcard_table["advertised_port"] = params.wildcard_advertised_port
+                doc["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
+        case FrontendMode.TRAEFIK:
+            # Remove port_proxy section
+            if "port_proxy" in doc["proxy_worker"]:  # type: ignore[operator]
+                del doc["proxy_worker"]["port_proxy"]  # type: ignore[union-attr]
+
+            # Add traefik section
+            traefik_table = tomlkit.table()
+            traefik_table["api_port"] = params.traefik_api_port
+            traefik_table["last_used_time_marker_directory"] = params.traefik_last_used_dir
+            traefik_etcd_table = tomlkit.table()
+            traefik_etcd_table["namespace"] = params.traefik_etcd_namespace
+            traefik_etcd_table["addr"] = _make_inline_table({
+                "host": params.traefik_etcd_host,
+                "port": params.traefik_etcd_port,
+            })
+            traefik_table["etcd"] = traefik_etcd_table
+            port_proxy_table = tomlkit.table()
+            port_proxy_table["advertised_host"] = params.port_proxy_advertised_host
+            port_proxy_table["bind_port_range"] = [
+                params.port_proxy_range_start,
+                params.port_proxy_range_end,
+            ]
+            traefik_table["port_proxy"] = port_proxy_table
+            doc["proxy_worker"]["traefik"] = traefik_table  # type: ignore[index]

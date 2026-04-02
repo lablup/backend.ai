@@ -38,8 +38,8 @@ from .common import detect_os
 from .config_gen.appproxy import (
     CoordinatorParams,
     WorkerParams,
-    build_coordinator_config,
-    build_worker_config,
+    apply_coordinator_config,
+    apply_worker_config,
 )
 from .dev import (
     bootstrap_pants,
@@ -882,12 +882,14 @@ class Context(metaclass=ABCMeta):
             etcd_host=halfstack.etcd_addr[0].face.host,
             etcd_port=halfstack.etcd_addr[0].face.port,
         )
-        coord_config = build_coordinator_config(coord_params)
         coord_conf = self.copy_config("app-proxy-coordinator.toml")
+        with coord_conf.open("r") as fp:
+            coord_doc = tomlkit.load(fp)
+        apply_coordinator_config(coord_doc, coord_params)
         with coord_conf.open("w") as fp:
-            tomlkit.dump(coord_config, fp)
+            tomlkit.dump(coord_doc, fp)
 
-        # Generate worker config using shared module
+        # Apply worker config to sample toml using shared module
         worker_params = WorkerParams(
             redis_host=halfstack.redis_addr.face.host,
             redis_port=halfstack.redis_addr.face.port,
@@ -912,10 +914,12 @@ class Context(metaclass=ABCMeta):
             traefik_etcd_host=halfstack.etcd_addr[0].face.host,
             traefik_etcd_port=halfstack.etcd_addr[0].face.port,
         )
-        worker_config = build_worker_config(worker_params)
         worker_conf = self.copy_config("app-proxy-worker.toml")
+        with worker_conf.open("r") as fp:
+            worker_doc = tomlkit.load(fp)
+        apply_worker_config(worker_doc, worker_params)
         with worker_conf.open("w") as fp:
-            tomlkit.dump(worker_config, fp)
+            tomlkit.dump(worker_doc, fp)
 
         # Alembic migration config
         alembic_cfg = self.copy_config("alembic-appproxy.ini")
