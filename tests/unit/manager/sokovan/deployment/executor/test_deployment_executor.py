@@ -50,10 +50,10 @@ class TestCheckPendingDeployments:
             proxy_targets_by_scaling_group
         )
 
-        # Mock _register_endpoint via patching
+        # Mock register_endpoint via patching
         expected_url = "http://endpoint.test/v1"
         with patch.object(
-            deployment_executor, "_register_endpoint", return_value=expected_url
+            deployment_executor, "register_endpoint", return_value=expected_url
         ) as mock_register:
             entity_ids = [pending_deployment.deployment_info.id]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -91,7 +91,7 @@ class TestCheckPendingDeployments:
         )
 
         expected_url = "http://endpoint.test/v1"
-        with patch.object(deployment_executor, "_register_endpoint", return_value=expected_url):
+        with patch.object(deployment_executor, "register_endpoint", return_value=expected_url):
             entity_ids = [pending_deployment_no_revision.deployment_info.id]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
                 # Act
@@ -151,7 +151,7 @@ class TestCheckPendingDeployments:
 
         with patch.object(
             deployment_executor,
-            "_register_endpoint",
+            "register_endpoint",
             side_effect=RuntimeError("Registration failed"),
         ):
             entity_ids = [pending_deployment.deployment_info.id]
