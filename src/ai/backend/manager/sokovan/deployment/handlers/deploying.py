@@ -25,9 +25,11 @@ with history logged), and skipped (no change — waiting).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Sequence
 from typing import override
+from uuid import UUID
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -39,6 +41,7 @@ from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.strategy.applier import (
@@ -83,11 +86,15 @@ class DeployingProvisioningHandler(DeploymentHandler):
         route_controller: RouteController,
         evaluator: DeploymentStrategyEvaluator,
         applier: StrategyResultApplier,
+        deployment_executor: DeploymentExecutor,
+        deployment_repo: DeploymentRepository,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
         self._evaluator = evaluator
         self._applier = applier
+        self._deployment_executor = deployment_executor
+        self._deployment_repo = deployment_repo
 
     @classmethod
     @override
@@ -127,10 +134,81 @@ class DeployingProvisioningHandler(DeploymentHandler):
             ),
         )
 
+    async def _register_unregistered_endpoints(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> None:
+        """Register endpoints in appproxy for deployments that have no URL yet.
+
+        Deployments that entered DEPLOYING via ActivateRevision skip
+        check_pending (which normally registers them), so this method
+        ensures they are registered before route provisioning begins.
+        """
+        unregistered = [
+            d
+            for d in deployments
+            if not d.deployment_info.network.url and d.deployment_info.deploying_revision_id
+        ]
+        if not unregistered:
+            return
+
+        scaling_groups = {d.deployment_info.metadata.resource_group for d in unregistered}
+        scaling_group_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
+            scaling_groups
+        )
+
+        tasks: list[tuple[DeploymentWithHistory, asyncio.Task[str]]] = []
+        for deployment in unregistered:
+            info = deployment.deployment_info
+            target = scaling_group_targets.get(info.metadata.resource_group)
+            if not target:
+                log.warning(
+                    "No proxy target for scaling group {}, skipping endpoint registration for {}",
+                    info.metadata.resource_group,
+                    info.id,
+                )
+                continue
+            deploying_revision_id = info.deploying_revision_id
+            if deploying_revision_id is None:
+                continue
+            task = asyncio.ensure_future(
+                self._deployment_executor.register_endpoint(
+                    info,
+                    target,
+                    deploying_revision_id,
+                )
+            )
+            tasks.append((deployment, task))
+
+        if not tasks:
+            return
+
+        results = await asyncio.gather(
+            *(task for _, task in tasks),
+            return_exceptions=True,
+        )
+
+        url_updates: dict[UUID, str] = {}
+        for (deployment, _), result in zip(tasks, results, strict=True):
+            if isinstance(result, BaseException):
+                log.error(
+                    "Failed to register endpoint for deployment {}: {}",
+                    deployment.deployment_info.id,
+                    result,
+                )
+            else:
+                url_updates[deployment.deployment_info.id] = result
+
+        if url_updates:
+            await self._deployment_repo.update_endpoint_urls_bulk(url_updates)
+
     @override
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
+        # Register endpoints in appproxy for deployments that entered DEPLOYING
+        # via ActivateRevision without passing through check_pending.
+        await self._register_unregistered_endpoints(deployments)
+
         deployment_infos = [d.deployment_info for d in deployments]
         deployment_map = {d.deployment_info.id: d for d in deployments}
 

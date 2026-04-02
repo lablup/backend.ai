@@ -103,6 +103,12 @@ class DeploymentExecutor:
     async def check_pending_deployments(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
+        """Register endpoints in appproxy for deployments that need it.
+
+        Resolves the target revision for health check configuration from either
+        current_revision_id or deploying_revision_id (whichever is available).
+        Skips deployments that already have a URL or have no revision at all.
+        """
         # Phase 1: Load configuration
         with DeploymentRecorderContext.shared_phase("load_configuration"):
             with DeploymentRecorderContext.shared_step("load_proxy_targets"):
@@ -119,6 +125,9 @@ class DeploymentExecutor:
         skipped_deployments: list[DeploymentWithHistory] = []
         for deployment in deployments:
             info = deployment.deployment_info
+            if info.network.url:
+                skipped_deployments.append(deployment)
+                continue
             targets = scaling_group_targets[info.metadata.resource_group]
             if not targets:
                 log.warning(
@@ -128,12 +137,11 @@ class DeploymentExecutor:
                 )
                 skipped_deployments.append(deployment)
                 continue
-            if info.current_revision_id is None:
+            revision_id = info.current_revision_id or info.deploying_revision_id
+            if revision_id is None:
                 skipped_deployments.append(deployment)
                 continue
-            registration_tasks.append(
-                self._register_endpoint(info, targets, info.current_revision_id)
-            )
+            registration_tasks.append(self.register_endpoint(info, targets, revision_id))
             valid_deployments.append(deployment)
 
         # Wait for all tasks to complete
@@ -457,7 +465,7 @@ class DeploymentExecutor:
 
     # Private helper methods
 
-    async def _register_endpoint(
+    async def register_endpoint(
         self,
         deployment: DeploymentInfo,
         scaling_group_target: ScalingGroupProxyTarget,
