@@ -194,3 +194,21 @@ def delete(card_id: uuid.UUID) -> None:
             await registry.close()
 
     _run_async(_run)
+
+
+@model_card.command()
+@click.option(
+    "--project-id", required=True, type=click.UUID, help="MODEL_STORE project UUID to scan."
+)
+def scan(project_id: uuid.UUID) -> None:
+    """Scan vfolders in a MODEL_STORE project and upsert model cards."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.model_card.scan_project(project_id)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    _run_async(_run)

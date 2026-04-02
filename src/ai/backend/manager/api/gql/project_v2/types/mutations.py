@@ -5,13 +5,13 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.group.request import (
-    CreateGroupInput as CreateGroupInputDTO,
+    CreateProjectInput as CreateProjectInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.request import (
     UnassignUsersFromProjectInput as UnassignUsersFromProjectInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.request import (
-    UpdateGroupInput as UpdateGroupInputDTO,
+    UpdateProjectInput as UpdateProjectInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     DeleteProjectPayload as DeleteProjectPayloadDTO,
@@ -51,7 +51,7 @@ UNSET = None
         description="Input for creating a new project.",
     )
 )
-class CreateProjectInputGQL(PydanticInputMixin[CreateGroupInputDTO]):
+class CreateProjectInputGQL(PydanticInputMixin[CreateProjectInputDTO]):
     """Input for creating a new project."""
 
     name: str = gql_field(description="Project name. Must be unique within the domain.")
@@ -71,7 +71,7 @@ class CreateProjectInputGQL(PydanticInputMixin[CreateGroupInputDTO]):
         description="Input for updating project information. All fields optional.",
     )
 )
-class UpdateProjectInputGQL(PydanticInputMixin[UpdateGroupInputDTO]):
+class UpdateProjectInputGQL(PydanticInputMixin[UpdateProjectInputDTO]):
     """Input for updating project information."""
 
     name: str | None = gql_field(default=UNSET, description="New project name.")

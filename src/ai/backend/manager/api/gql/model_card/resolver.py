@@ -23,6 +23,7 @@ from ai.backend.manager.api.gql.model_card.types import (
     ModelCardOrderByGQL,
     ModelCardV2Connection,
     ModelCardV2Edge,
+    ScanProjectModelCardsPayloadGQL,
     UpdateModelCardInputGQL,
     UpdateModelCardPayloadGQL,
 )
@@ -148,3 +149,17 @@ async def admin_delete_model_card_v2(
     check_admin_only()
     payload = await info.context.adapters.model_card.delete(id)
     return DeleteModelCardPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.",
+    )
+)  # type: ignore[misc]
+async def scan_project_model_cards_v2(
+    info: Info[StrawberryGQLContext],
+    project_id: UUID,
+) -> ScanProjectModelCardsPayloadGQL:
+    payload = await info.context.adapters.model_card.scan_project(project_id)
+    return ScanProjectModelCardsPayloadGQL.from_pydantic(payload)

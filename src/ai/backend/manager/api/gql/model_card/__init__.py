@@ -4,6 +4,7 @@ from .resolver import (
     admin_update_model_card_v2,
     model_card_v2,
     model_cards_v2,
+    scan_project_model_cards_v2,
 )
 
 __all__ = (
@@ -12,4 +13,5 @@ __all__ = (
     "admin_update_model_card_v2",
     "model_card_v2",
     "model_cards_v2",
+    "scan_project_model_cards_v2",
 )

@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     UpdateModelCardInput,
 )
 from ai.backend.manager.api.adapters.model_card import ModelCardAdapter
+from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam
 
 
 class CardIdPathParam(BaseRequestModel):
@@ -57,4 +58,11 @@ class V2ModelCardHandler:
         path: PathParam[CardIdPathParam],
     ) -> APIResponse:
         result = await self._adapter.delete(path.parsed.card_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scan_project(
+        self,
+        path: PathParam[ProjectIdPathParam],
+    ) -> APIResponse:
+        result = await self._adapter.scan_project(path.parsed.project_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

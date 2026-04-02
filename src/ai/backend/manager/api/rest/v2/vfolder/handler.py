@@ -6,8 +6,12 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
-from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
-from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    CreateUploadSessionInput,
+    CreateVFolderInput,
+    SearchVFoldersInput,
+)
+from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, VFolderIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
@@ -26,4 +30,21 @@ class V2VFolderHandler:
     ) -> APIResponse:
         """Search vfolders within a project."""
         result = await self._adapter.project_search(path.parsed.project_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def create(
+        self,
+        body: BodyParam[CreateVFolderInput],
+    ) -> APIResponse:
+        """Create a new vfolder."""
+        result = await self._adapter.create(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
+
+    async def create_upload_session(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[CreateUploadSessionInput],
+    ) -> APIResponse:
+        """Create an upload session for a vfolder."""
+        result = await self._adapter.create_upload_session(path.parsed.vfolder_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

@@ -9,15 +9,15 @@ from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.group.request import (
-    AdminSearchGroupsInput,
+    AdminSearchProjectsInput,
     AssignUsersToProjectInput,
-    CreateGroupInput,
-    DeleteGroupInput,
-    GroupFilter,
-    GroupOrder,
-    PurgeGroupInput,
+    CreateProjectInput,
+    DeleteProjectInput,
+    ProjectFilter,
+    ProjectOrder,
+    PurgeProjectInput,
     UnassignUsersFromProjectInput,
-    UpdateGroupInput,
+    UpdateProjectInput,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     AdminSearchGroupsPayload,
@@ -35,11 +35,11 @@ from ai.backend.common.dto.manager.v2.group.response import (
     VFolderHostPermissionEntry,
 )
 from ai.backend.common.dto.manager.v2.group.types import (
-    GroupOrderField,
-    GroupUserFilter,
     OrderDirection,
+    ProjectOrderField,
     ProjectType,
     ProjectTypeFilter,
+    ProjectUserFilter,
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
@@ -133,7 +133,7 @@ class ProjectAdapter(BaseAdapter):
 
     async def admin_search(
         self,
-        input: AdminSearchGroupsInput,
+        input: AdminSearchProjectsInput,
     ) -> AdminSearchGroupsPayload:
         """Search projects (admin, no scope) with filters, orders, and pagination."""
         conditions = self._convert_group_filter(input.filter) if input.filter else []
@@ -161,11 +161,12 @@ class ProjectAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def admin_create(self, input: CreateGroupInput) -> ProjectPayload:
+    async def admin_create(self, input: CreateProjectInput) -> ProjectPayload:
         """Create a new project (superadmin only)."""
         spec = GroupCreatorSpec(
             name=input.name,
             domain_name=input.domain_name,
+            type=DataProjectType(input.type.value) if input.type else None,
             description=input.description,
             integration_id=input.integration_id,
             resource_policy=input.resource_policy,
@@ -177,7 +178,7 @@ class ProjectAdapter(BaseAdapter):
             raise UnreachableError("create_group must return data")
         return ProjectPayload(project=self._group_data_to_node(result.data))
 
-    async def admin_update(self, project_id: UUID, input: UpdateGroupInput) -> ProjectPayload:
+    async def admin_update(self, project_id: UUID, input: UpdateProjectInput) -> ProjectPayload:
         """Update an existing project (superadmin only)."""
         spec = GroupUpdaterSpec(
             name=(
@@ -216,14 +217,14 @@ class ProjectAdapter(BaseAdapter):
             raise UnreachableError("modify_group must return data")
         return ProjectPayload(project=self._group_data_to_node(result.data))
 
-    async def admin_delete(self, input: DeleteGroupInput) -> DeleteProjectPayload:
+    async def admin_delete(self, input: DeleteProjectInput) -> DeleteProjectPayload:
         """Soft-delete a project (superadmin only)."""
         await self._processors.group.delete_group.wait_for_complete(
             DeleteGroupAction(group_id=input.group_id)
         )
         return DeleteProjectPayload(deleted=True)
 
-    async def admin_purge(self, input: PurgeGroupInput) -> PurgeProjectPayload:
+    async def admin_purge(self, input: PurgeProjectInput) -> PurgeProjectPayload:
         """Permanently purge a project (superadmin only)."""
         await self._processors.group.purge_group.wait_for_complete(
             PurgeGroupAction(group_id=input.group_id)
@@ -253,7 +254,7 @@ class ProjectAdapter(BaseAdapter):
     async def search_by_domain(
         self,
         scope: DomainProjectSearchScope,
-        input: AdminSearchGroupsInput,
+        input: AdminSearchProjectsInput,
     ) -> AdminSearchGroupsPayload:
         """Search projects within a domain."""
         conditions = self._convert_group_filter(input.filter) if input.filter else []
@@ -286,7 +287,7 @@ class ProjectAdapter(BaseAdapter):
     async def search_by_user(
         self,
         scope: UserProjectSearchScope,
-        input: AdminSearchGroupsInput,
+        input: AdminSearchProjectsInput,
     ) -> AdminSearchGroupsPayload:
         """Search projects a user is a member of."""
         conditions = self._convert_group_filter(input.filter) if input.filter else []
@@ -329,7 +330,7 @@ class ProjectAdapter(BaseAdapter):
             items=[UserAdapter._user_data_to_node(u) for u in result.assigned_users],
         )
 
-    def _convert_group_filter(self, filter: GroupFilter) -> list[QueryCondition]:
+    def _convert_group_filter(self, filter: ProjectFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
 
         if filter.id is not None:
@@ -481,7 +482,7 @@ class ProjectAdapter(BaseAdapter):
         return [GroupConditions.exists_domain_combined(raw_conditions)]
 
     @staticmethod
-    def _convert_user_nested_filter(user_filter: GroupUserFilter) -> list[QueryCondition]:
+    def _convert_user_nested_filter(user_filter: ProjectUserFilter) -> list[QueryCondition]:
         raw_conditions: list[QueryCondition] = []
         if user_filter.username is not None:
             condition = user_filter.username.build_query_condition(
@@ -508,7 +509,7 @@ class ProjectAdapter(BaseAdapter):
         return [GroupConditions.exists_user_combined(raw_conditions)]
 
     @staticmethod
-    def _convert_orders(order: list[GroupOrder]) -> list[QueryOrder]:
+    def _convert_orders(order: list[ProjectOrder]) -> list[QueryOrder]:
         return [_resolve_order(o.field, o.direction) for o in order]
 
     @staticmethod
@@ -545,23 +546,23 @@ class ProjectAdapter(BaseAdapter):
         )
 
 
-def _resolve_order(field: GroupOrderField, direction: OrderDirection) -> QueryOrder:
-    """Resolve a GroupOrderField + OrderDirection pair to a QueryOrder."""
+def _resolve_order(field: ProjectOrderField, direction: OrderDirection) -> QueryOrder:
+    """Resolve a ProjectOrderField + OrderDirection pair to a QueryOrder."""
     ascending = direction == OrderDirection.ASC
     match field:
-        case GroupOrderField.NAME:
+        case ProjectOrderField.NAME:
             return GroupOrders.name(ascending)
-        case GroupOrderField.CREATED_AT:
+        case ProjectOrderField.CREATED_AT:
             return GroupOrders.created_at(ascending)
-        case GroupOrderField.MODIFIED_AT:
+        case ProjectOrderField.MODIFIED_AT:
             return GroupOrders.modified_at(ascending)
-        case GroupOrderField.IS_ACTIVE:
+        case ProjectOrderField.IS_ACTIVE:
             return GroupOrders.is_active(ascending)
-        case GroupOrderField.TYPE:
+        case ProjectOrderField.TYPE:
             return GroupOrders.type(ascending)
-        case GroupOrderField.DOMAIN_NAME:
+        case ProjectOrderField.DOMAIN_NAME:
             return GroupOrders.by_domain_name(ascending)
-        case GroupOrderField.USER_USERNAME:
+        case ProjectOrderField.USER_USERNAME:
             return GroupOrders.by_user_username(ascending)
-        case GroupOrderField.USER_EMAIL:
+        case ProjectOrderField.USER_EMAIL:
             return GroupOrders.by_user_email(ascending)

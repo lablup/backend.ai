@@ -31,6 +31,9 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
     ModelCardNode as NodeDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
+    ScanProjectModelCardsPayload as ScanPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.response import (
     UpdateModelCardPayload as UpdatePayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -211,3 +214,17 @@ class UpdateModelCardPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
 )
 class DeleteModelCardPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted model card.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Result of scanning a MODEL_STORE project for model cards.",
+    ),
+    model=ScanPayloadDTO,
+    name="ScanProjectModelCardsV2Payload",
+)
+class ScanProjectModelCardsPayloadGQL(PydanticOutputMixin[ScanPayloadDTO]):
+    created_count: int = gql_field(description="Number of newly created model cards.")
+    updated_count: int = gql_field(description="Number of updated model cards.")
+    errors: list[str] = gql_field(description="Per-vfolder error messages.")

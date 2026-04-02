@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.group.request import (
-    AdminSearchGroupsInput,
+    AdminSearchProjectsInput,
     AssignUsersToProjectInput,
-    CreateGroupInput,
-    DeleteGroupInput,
-    PurgeGroupInput,
+    CreateProjectInput,
+    DeleteProjectInput,
+    PurgeProjectInput,
     UnassignUsersFromProjectInput,
-    UpdateGroupInput,
+    UpdateProjectInput,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam
@@ -41,7 +41,7 @@ class V2ProjectHandler:
 
     async def admin_search(
         self,
-        body: BodyParam[AdminSearchGroupsInput],
+        body: BodyParam[AdminSearchProjectsInput],
     ) -> APIResponse:
         """Search projects with filters, orders, and pagination (superadmin only)."""
         result = await self._adapter.admin_search(body.parsed)
@@ -49,7 +49,7 @@ class V2ProjectHandler:
 
     async def admin_create(
         self,
-        body: BodyParam[CreateGroupInput],
+        body: BodyParam[CreateProjectInput],
     ) -> APIResponse:
         """Create a new project (superadmin only)."""
         result = await self._adapter.admin_create(body.parsed)
@@ -58,7 +58,7 @@ class V2ProjectHandler:
     async def admin_update(
         self,
         path: PathParam[ProjectIdPathParam],
-        body: BodyParam[UpdateGroupInput],
+        body: BodyParam[UpdateProjectInput],
     ) -> APIResponse:
         """Update a project (superadmin only)."""
         result = await self._adapter.admin_update(path.parsed.project_id, body.parsed)
@@ -66,7 +66,7 @@ class V2ProjectHandler:
 
     async def admin_delete(
         self,
-        body: BodyParam[DeleteGroupInput],
+        body: BodyParam[DeleteProjectInput],
     ) -> APIResponse:
         """Soft-delete a project (superadmin only)."""
         result = await self._adapter.admin_delete(body.parsed)
@@ -74,7 +74,7 @@ class V2ProjectHandler:
 
     async def admin_purge(
         self,
-        body: BodyParam[PurgeGroupInput],
+        body: BodyParam[PurgeProjectInput],
     ) -> APIResponse:
         """Permanently purge a project (superadmin only)."""
         result = await self._adapter.admin_purge(body.parsed)

@@ -5,11 +5,11 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Self
 
-from ai.backend.common.dto.manager.v2.group.request import GroupFilter, GroupOrder
+from ai.backend.common.dto.manager.v2.group.request import ProjectFilter, ProjectOrder
 from ai.backend.common.dto.manager.v2.group.types import (
-    GroupDomainFilter,
-    GroupUserFilter,
+    ProjectDomainFilter,
     ProjectTypeFilter,
+    ProjectUserFilter,
 )
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -34,7 +34,7 @@ from .enums import ProjectTypeEnum
     ),
     name="ProjectDomainNestedFilter",
 )
-class ProjectDomainNestedFilter(PydanticInputMixin[GroupDomainFilter]):
+class ProjectDomainNestedFilter(PydanticInputMixin[ProjectDomainFilter]):
     """Nested filter for domain of a project."""
 
     name: StringFilter | None = None
@@ -48,7 +48,7 @@ class ProjectDomainNestedFilter(PydanticInputMixin[GroupDomainFilter]):
     ),
     name="ProjectUserNestedFilter",
 )
-class ProjectUserNestedFilter(PydanticInputMixin[GroupUserFilter]):
+class ProjectUserNestedFilter(PydanticInputMixin[ProjectUserFilter]):
     """Nested filter for users within a project."""
 
     username: StringFilter | None = None
@@ -79,7 +79,7 @@ class ProjectTypeEnumFilter(PydanticInputMixin[ProjectTypeFilter]):
     ),
     name="ProjectV2Filter",
 )
-class ProjectV2Filter(PydanticInputMixin[GroupFilter]):
+class ProjectV2Filter(PydanticInputMixin[ProjectFilter]):
     """Filter for project queries."""
 
     id: UUIDFilter | None = None
@@ -131,7 +131,7 @@ class ProjectV2OrderField(StrEnum):
     ),
     name="ProjectV2OrderBy",
 )
-class ProjectV2OrderBy(PydanticInputMixin[GroupOrder]):
+class ProjectV2OrderBy(PydanticInputMixin[ProjectOrder]):
     """OrderBy for project queries."""
 
     field: ProjectV2OrderField = ProjectV2OrderField.CREATED_AT

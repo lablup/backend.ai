@@ -176,6 +176,7 @@ from .model_card import (
     admin_update_model_card_v2,
     model_card_v2,
     model_cards_v2,
+    scan_project_model_cards_v2,
 )
 from .notification import (
     admin_create_notification_channel,
@@ -762,6 +763,7 @@ class Mutation:
     admin_create_model_card_v2 = admin_create_model_card_v2
     admin_update_model_card_v2 = admin_update_model_card_v2
     admin_delete_model_card_v2 = admin_delete_model_card_v2
+    scan_project_model_cards_v2 = scan_project_model_cards_v2
     # Session V2 mutations
     terminate_project_sessions_v2 = terminate_project_sessions_v2
 

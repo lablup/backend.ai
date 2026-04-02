@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
     CreateModelCardPayload,
     DeleteModelCardPayload,
     ModelCardNode,
+    ScanProjectModelCardsPayload,
     SearchModelCardsPayload,
     UpdateModelCardPayload,
 )
@@ -56,4 +57,11 @@ class V2ModelCardClient(BaseDomainClient):
             "DELETE",
             f"{_PATH}/{card_id}",
             response_model=DeleteModelCardPayload,
+        )
+
+    async def scan_project(self, project_id: UUID) -> ScanProjectModelCardsPayload:
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/projects/{project_id}/scan",
+            response_model=ScanProjectModelCardsPayload,
         )

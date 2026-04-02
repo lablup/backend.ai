@@ -26,5 +26,17 @@ def register_v2_vfolder_routes(
         handler.project_search,
         middlewares=[auth_required],
     )
+    registry.add(
+        "POST",
+        "",
+        handler.create,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/{vfolder_id}/upload-session",
+        handler.create_upload_session,
+        middlewares=[auth_required],
+    )
 
     return registry

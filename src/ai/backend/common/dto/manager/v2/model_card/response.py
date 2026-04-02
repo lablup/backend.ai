@@ -57,3 +57,9 @@ class SearchModelCardsPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of matching items.")
     has_next_page: bool = Field(description="Whether there are more items after.")
     has_previous_page: bool = Field(description="Whether there are more items before.")
+
+
+class ScanProjectModelCardsPayload(BaseResponseModel):
+    created_count: int = Field(description="Number of newly created model cards.")
+    updated_count: int = Field(description="Number of updated existing model cards.")
+    errors: list[str] = Field(default_factory=list, description="Per-vfolder error messages.")
