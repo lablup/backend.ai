@@ -2,6 +2,8 @@
 
 Handles GraphQL endpoints (graphene legacy, graphene v1, strawberry v2).
 Strawberry v2 is served at ``POST /admin/gql/strawberry`` via ``handle_gql_strawberry()``.
+WebSocket subscriptions are served at ``GET /admin/gql/strawberry`` via
+``handle_gql_strawberry_ws()`` using the ``graphql-transport-ws`` protocol.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, cast
 
 import graphene
+from aiohttp import web
 from graphene.validation import depth_limit_validator
 from graphql import ValidationRule, parse, validate
 from graphql.execution import ExecutionResult
@@ -21,6 +24,7 @@ from ai.backend.common.dto.manager.admin.request import GraphQLRequest
 from ai.backend.common.dto.manager.admin.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api import ManagerStatus
+from ai.backend.manager.api.gql.graphql_ws import GraphQLTransportWSHandler
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.base import DataLoaderManager
 from ai.backend.manager.api.gql_legacy.schema import (
@@ -80,6 +84,11 @@ class AdminHandler:
         self._gql_schema = gql_schema
         self._gql_deps = gql_deps
         self._strawberry_schema = strawberry_schema
+        self._gql_ws_handler = GraphQLTransportWSHandler(
+            schema=strawberry_schema,
+            gql_deps=gql_deps,
+            max_msg_size=gql_deps.config_provider.config.manager.max_wsmsg_size,
+        )
 
     async def _handle_gql_common(
         self, request_ctx: RequestCtx, params: GraphQLRequest
@@ -230,3 +239,13 @@ class AdminHandler:
             errors=[dict(e.formatted) for e in result.errors] if result.errors else None,
         )
         return APIResponse.build(HTTPStatus.OK, resp)
+
+    # ------------------------------------------------------------------
+    # handle_gql_strawberry_ws (GET /admin/gql/strawberry — WebSocket)
+    # ------------------------------------------------------------------
+
+    async def handle_gql_strawberry_ws(
+        self,
+        request_ctx: RequestCtx,
+    ) -> web.WebSocketResponse:
+        return await self._gql_ws_handler.handle(request_ctx.request)
