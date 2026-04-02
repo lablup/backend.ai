@@ -40,6 +40,15 @@ from ai.backend.install.pyinfra.configs.halfstack import (
     RedisConfig,
 )
 from ai.backend.install.pyinfra.configs.pro import FastTrackConfig
+from ai.backend.install.pyinfra.inventory.shared_defaults import (
+    APPPROXY_PORTS,
+    CORE_PORTS,
+    DEFAULT_VERSIONS,
+    DEV_DEFAULTS,
+    HALFSTACK_PORTS,
+    MONITORING_PORTS,
+    OTHER_PORTS,
+)
 
 
 class DevInventoryBuilder:
@@ -50,32 +59,18 @@ class DevInventoryBuilder:
     Matches the configuration from DevContext.hydrate_install_info().
     """
 
-    # Halfstack ports matching Docker Compose defaults
     PORTS = {
-        "postgres": 8100,
-        "redis": 8110,
-        "etcd": 8120,
-        "manager": 8091,
-        "webserver": 8090,
-        "storage_proxy_client": 6021,
-        "storage_proxy_manager": 6022,
-        "agent_rpc": 6011,
-        "appproxy_coordinator": 10200,
-        "appproxy_worker_interactive": 10201,
-        "appproxy_worker_interactive_start": 10205,
-        "appproxy_worker_interactive_end": 10300,
-        "appproxy_worker_tcp": 10202,
-        "appproxy_worker_tcp_start": 10501,
-        "appproxy_worker_tcp_end": 10600,
-        "hive_gateway": 4000,
-        "prometheus": 19090,
-        "grafana": 3000,
-        "loki": 3100,
-    }
-
-    DEFAULT_VERSIONS = {
-        "traefik": "v3.3.7",
-        "traefik_plugin": "0.0.5",
+        **HALFSTACK_PORTS,
+        **CORE_PORTS,
+        "appproxy_coordinator": APPPROXY_PORTS["coordinator"],
+        "appproxy_worker_interactive": APPPROXY_PORTS["worker_interactive"],
+        "appproxy_worker_interactive_start": APPPROXY_PORTS["worker_interactive_range"][0],
+        "appproxy_worker_interactive_end": APPPROXY_PORTS["worker_interactive_range"][1],
+        "appproxy_worker_tcp": APPPROXY_PORTS["worker_tcp"],
+        "appproxy_worker_tcp_start": APPPROXY_PORTS["worker_tcp_range"][0],
+        "appproxy_worker_tcp_end": APPPROXY_PORTS["worker_tcp_range"][1],
+        **MONITORING_PORTS,
+        **OTHER_PORTS,
     }
 
     def __init__(
@@ -100,8 +95,8 @@ class DevInventoryBuilder:
         postgres_config = PostgreSQLConfig(
             hostname=h,
             port=p["postgres"],
-            user="postgres",
-            password="develove",
+            user=DEV_DEFAULTS["postgres_user"],
+            password=DEV_DEFAULTS["postgres_password"],
         )
 
         redis_config = RedisConfig(
@@ -123,12 +118,12 @@ class DevInventoryBuilder:
         manager_config = ManagerConfig(
             hostname=h,
             port=p["manager"],
-            superadmin_password="wJalrXUt",
-            superadmin_access_key="AKIAIOSFODNN7EXAMPLE",
-            superadmin_secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-            user_password="test",
-            user_access_key="AKIANABBDUSEREXAMPLE",
-            user_secret_key="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",
+            superadmin_password=DEV_DEFAULTS["superadmin_password"],
+            superadmin_access_key=DEV_DEFAULTS["superadmin_access_key"],
+            superadmin_secret_key=DEV_DEFAULTS["superadmin_secret_key"],
+            user_password=DEV_DEFAULTS["user_password"],
+            user_access_key=DEV_DEFAULTS["user_access_key"],
+            user_secret_key=DEV_DEFAULTS["user_secret_key"],
         )
 
         webserver_config = WebserverConfig(
@@ -150,8 +145,8 @@ class DevInventoryBuilder:
             shared_key=self.api_secret,
             jwt_secret=self.jwt_secret,
             permit_hash_secret=self.permit_hash_secret,
-            db_user="appproxy",
-            db_password="develove",
+            db_user=DEV_DEFAULTS["appproxy_db_user"],
+            db_password=DEV_DEFAULTS["appproxy_db_password"],
             db_name="appproxy",
             coordinator_hostname=h,
             coordinator_port=p["appproxy_coordinator"],
@@ -213,7 +208,7 @@ class DevInventoryBuilder:
             "python_version": "3.13.7",
             # Version
             "bai_version": self.bai_version,
-            "bai_default_versions": self.DEFAULT_VERSIONS,
+            "bai_default_versions": DEFAULT_VERSIONS,
             # Services
             "services": services,
             # Deploy mode
