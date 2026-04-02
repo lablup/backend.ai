@@ -25,10 +25,9 @@ from urllib.parse import quote_plus as urlquote
 
 import jwt as pyjwt
 import pytest
-import pytest_asyncio
 import sqlalchemy as sa
-from authlib.jose import JsonWebKey
-from authlib.jose import jwt as jose_jwt
+from authlib.jose import JsonWebKey  # pants: no-infer-dep
+from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -37,11 +36,12 @@ from ai.backend.logging import LogLevel
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.config.unified import DatabaseConfig
-from ai.backend.manager.data.user.types import UserRole, UserStatus
-from ai.backend.manager.models import DomainRow, GroupRow
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group import association_groups_users, groups
+from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.resource_policy import (
@@ -52,8 +52,8 @@ from ai.backend.manager.models.resource_policy import (
     project_resource_policies,
     user_resource_policies,
 )
-from ai.backend.manager.models.user import users
-from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.models.user import UserRole, UserStatus, users
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_database
 from ai.backend.manager.plugin.openid.hook import OIDCHookPlugin
 from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
 from ai.backend.manager.plugin.openid.webapp import OIDCWebAppPlugin
@@ -75,16 +75,16 @@ IDP_ISSUER = "https://idp.example.com"
 
 
 @pytest.fixture(scope="session")
-def oidc_rsa_key():
+def oidc_rsa_key() -> dict[str, Any]:
     """RSA private key used by the mock IdP to sign ID tokens."""
     key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
-    key_dict = key.as_dict(is_private=True)
+    key_dict: dict[str, Any] = key.as_dict(is_private=True)
     key_dict.update({"kid": "test-key-1", "use": "sig", "alg": "RS256"})
     return key_dict
 
 
 @pytest.fixture(scope="session")
-def oidc_jwks(oidc_rsa_key):
+def oidc_jwks(oidc_rsa_key: dict[str, Any]) -> dict[str, Any]:
     """JWKS (public keys only) served by the mock IdP's jwks_uri endpoint."""
     private_fields = {"d", "p", "q", "dp", "dq", "qi"}
     public_key = {k: v for k, v in oidc_rsa_key.items() if k not in private_fields}
@@ -97,7 +97,7 @@ def oidc_jwks(oidc_rsa_key):
 
 
 @pytest.fixture
-def oidc_discovery():
+def oidc_discovery() -> dict[str, Any]:
     """OpenID Connect discovery document (.well-known/openid-configuration)."""
     return {
         "issuer": IDP_ISSUER,
@@ -118,7 +118,7 @@ def oidc_discovery():
 
 
 @pytest.fixture
-def plugin_config():
+def plugin_config() -> dict[str, Any]:
     """Plugin configuration as stored in etcd."""
     return {
         "openid": {
@@ -146,7 +146,7 @@ def plugin_config():
 
 
 @pytest.fixture
-def oidc_id_token_claims():
+def oidc_id_token_claims() -> dict[str, Any]:
     """Standard claims for a valid OIDC ID token."""
     now = int(time.time())
     return {
@@ -163,7 +163,7 @@ def oidc_id_token_claims():
 
 
 @pytest.fixture
-def sign_id_token(oidc_rsa_key):
+def sign_id_token(oidc_rsa_key: dict[str, Any]) -> Callable[..., str]:
     """Factory: sign arbitrary claims into a JWT using the mock IdP's RSA key."""
 
     def _sign(claims: dict[str, Any]) -> str:
@@ -175,7 +175,9 @@ def sign_id_token(oidc_rsa_key):
 
 
 @pytest.fixture
-def oidc_token_response(sign_id_token, oidc_id_token_claims):
+def oidc_token_response(
+    sign_id_token: Callable[..., str], oidc_id_token_claims: dict[str, Any]
+) -> dict[str, Any]:
     """Complete token response from the IdP's token endpoint."""
     return {
         "access_token": "mock-access-token-xyz",
@@ -192,14 +194,14 @@ def oidc_token_response(sign_id_token, oidc_id_token_claims):
 
 
 @pytest.fixture
-def mock_aiohttp_session(oidc_discovery, oidc_jwks):
+def mock_aiohttp_session(oidc_discovery: dict[str, Any], oidc_jwks: dict[str, Any]) -> MagicMock:
     """
     Mock aiohttp.ClientSession that routes GET requests to:
       - /.well-known/openid-configuration  ->  discovery document
       - /.well-known/jwks.json             ->  JWKS
     """
 
-    def _make_ctx(data: dict):
+    def _make_ctx(data: dict[str, Any]) -> MagicMock:
         resp = MagicMock()
         resp.json = AsyncMock(return_value=data)
         resp.status = 200
@@ -207,7 +209,7 @@ def mock_aiohttp_session(oidc_discovery, oidc_jwks):
         resp.__aexit__ = AsyncMock(return_value=False)
         return resp
 
-    def _route(url, **kwargs):
+    def _route(url: Any, **kwargs: Any) -> MagicMock:
         url_str = str(url)
         if "openid-configuration" in url_str:
             return _make_ctx(oidc_discovery)
@@ -223,7 +225,7 @@ def mock_aiohttp_session(oidc_discovery, oidc_jwks):
 
 
 @pytest.fixture
-def mock_oauth2_client(oidc_token_response):
+def mock_oauth2_client(oidc_token_response: dict[str, Any]) -> MagicMock:
     """
     Mock authlib AsyncOAuth2Client:
       - create_authorization_url -> deterministic redirect URL
@@ -250,16 +252,17 @@ def mock_oauth2_client(oidc_token_response):
 
 
 @pytest.fixture(scope="session")
-def test_db():
+def test_db() -> str:
     """Unique database name for the test session."""
     return f"test_openid_{secrets.token_hex(8)}"
 
 
 @pytest.fixture(scope="session")
-def db_config(postgres_container, test_db):  # noqa: F811
+def db_config(postgres_container: Any, test_db: str) -> DatabaseConfig:  # noqa: F811
     """DatabaseConfig pointing at the Docker PostgreSQL container."""
     _, addr = postgres_container
     return DatabaseConfig(
+        type="postgresql",
         addr=HostPortPairModel(host=addr.host, port=addr.port),
         name=test_db,
         user="postgres",
@@ -273,19 +276,19 @@ def db_config(postgres_container, test_db):  # noqa: F811
 
 
 @pytest.fixture(scope="session")
-def database(request, db_config, test_db):
+def database(request: pytest.FixtureRequest, db_config: DatabaseConfig, test_db: str) -> Any:
     """
     Create the test database and install the schema via Alembic oneshot.
     Must be synchronous because cli_schema_oneshot internally calls asyncio.run().
     """
     addr = db_config.addr
     address = f"{addr.host}:{addr.port}"
-    user = db_config.user
-    password = db_config.password
+    user = db_config.user or "postgres"
+    password = db_config.password or ""
     bootstrap_url = f"postgresql+asyncpg://{urlquote(user)}:{urlquote(password)}@{address}/testing"
 
     # 1. Create the test database.
-    async def _create():
+    async def _create() -> None:
         engine = create_async_engine(
             bootstrap_url,
             connect_args=pgsql_connect_opts,
@@ -348,7 +351,7 @@ def database(request, db_config, test_db):
     yield
 
     # 3. Drop the test database.
-    async def _drop():
+    async def _drop() -> None:
         engine = create_async_engine(
             bootstrap_url,
             connect_args=pgsql_connect_opts,
@@ -373,8 +376,10 @@ def database(request, db_config, test_db):
 # ---------------------------------------------------------------------------
 
 
-@pytest_asyncio.fixture
-async def database_engine(db_config, database) -> AsyncIterator:
+@pytest.fixture
+async def database_engine(
+    db_config: DatabaseConfig, database: Any
+) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """Live ExtendedAsyncSAEngine connected to the test database."""
     async with connect_database(db_config) as db:
         yield db
@@ -385,8 +390,10 @@ async def database_engine(db_config, database) -> AsyncIterator:
 # ---------------------------------------------------------------------------
 
 
-@pytest_asyncio.fixture
-async def seed_data(database_engine) -> AsyncIterator:
+@pytest.fixture
+async def seed_data(
+    database_engine: ExtendedAsyncSAEngine,
+) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """
     Insert the minimum seed data that the openid plugin's DB operations
     require (domain, resource policies, group).
@@ -457,8 +464,8 @@ async def seed_data(database_engine) -> AsyncIterator:
 # ---------------------------------------------------------------------------
 
 
-@pytest_asyncio.fixture
-async def valkey_client(redis_container) -> AsyncIterator[ValkeyOpenIDClient]:  # noqa: F811
+@pytest.fixture
+async def valkey_client(redis_container: Any) -> AsyncIterator[ValkeyOpenIDClient]:  # noqa: F811
     """Real ValkeyOpenIDClient connected to the Docker Redis container."""
     _, addr = redis_container
     target = ValkeyTarget(addr=f"{addr.host}:{addr.port}")
@@ -473,7 +480,7 @@ async def valkey_client(redis_container) -> AsyncIterator[ValkeyOpenIDClient]:  
 
 
 @pytest.fixture
-def mock_config_provider(redis_container):  # noqa: F811
+def mock_config_provider(redis_container: Any) -> MagicMock:  # noqa: F811
     """
     Mock config_provider with:
       - config.auth.password_hash_* attributes
@@ -496,7 +503,9 @@ def mock_config_provider(redis_container):  # noqa: F811
 
 
 @pytest.fixture
-def mock_root_app(seed_data, mock_config_provider):
+def mock_root_app(
+    seed_data: ExtendedAsyncSAEngine, mock_config_provider: MagicMock
+) -> dict[str, Any]:
     """
     Dict simulating root_app that plugin handlers access via
     request.app["_root_app"]["_db"] / ["_config_provider"].
@@ -513,13 +522,13 @@ def mock_root_app(seed_data, mock_config_provider):
 
 
 @pytest.fixture
-def hook_plugin(plugin_config):
+def hook_plugin(plugin_config: dict[str, Any]) -> OIDCHookPlugin:
     """OIDCHookPlugin instance."""
     return OIDCHookPlugin(plugin_config, local_config={})
 
 
 @pytest.fixture
-def webapp_plugin(plugin_config):
+def webapp_plugin(plugin_config: dict[str, Any]) -> OIDCWebAppPlugin:
     """OIDCWebAppPlugin instance."""
     return OIDCWebAppPlugin(plugin_config, local_config={})
 
@@ -530,7 +539,7 @@ def webapp_plugin(plugin_config):
 
 
 @pytest.fixture
-def insert_user(seed_data) -> Callable:
+def insert_user(seed_data: ExtendedAsyncSAEngine) -> Callable[..., Any]:
     """Async callable(email, status) -> uuid. Inserts a minimal user row."""
 
     async def _insert(
@@ -562,7 +571,7 @@ def insert_user(seed_data) -> Callable:
 
 
 @pytest.fixture
-def make_stoken(plugin_config) -> Callable:
+def make_stoken(plugin_config: dict[str, Any]) -> Callable[..., str]:
     """Callable(user_uuid, email, *, expired) -> str. Creates an HS256 sToken JWT."""
     secret = plugin_config["secret"]
 
@@ -587,9 +596,9 @@ def make_stoken(plugin_config) -> Callable:
 
 
 @pytest.fixture
-def make_hook_request(seed_data) -> Callable:
+def make_hook_request(seed_data: ExtendedAsyncSAEngine) -> Callable[..., MagicMock]:
     """Callable(cookies) -> mock Request with _root_app wired to seed_data."""
-    root_app = {"_db": seed_data}
+    root_app: dict[str, Any] = {"_db": seed_data}
 
     def _make(cookies: dict[str, str]) -> MagicMock:
         request = MagicMock()
@@ -606,18 +615,18 @@ def make_hook_request(seed_data) -> Callable:
 
 
 @pytest.fixture
-def password_info():
+def password_info() -> PasswordInfo:
     """PasswordInfo instance for user creation tests."""
     return PasswordInfo(
         password="random-test-password",
-        algorithm="bcrypt",
+        algorithm=PasswordHashAlgorithm.BCRYPT,
         rounds=12,
         salt_size=16,
     )
 
 
 @pytest.fixture
-def openid_claims():
+def openid_claims() -> dict[str, Any]:
     """Standard OpenID claims dict for user creation tests."""
     return {
         "email": "newuser@example.com",
@@ -627,7 +636,7 @@ def openid_claims():
 
 
 @pytest.fixture
-def group_mapping():
+def group_mapping() -> dict[str, Any]:
     """Single-group mapping dict."""
     return {
         "backend-ai-users": {
@@ -645,7 +654,7 @@ def group_mapping():
 
 
 @pytest.fixture
-def failing_oauth2_client():
+def failing_oauth2_client() -> MagicMock:
     """Mock OAuth2Client whose fetch_token raises an Exception."""
     client = MagicMock()
     client.fetch_token = AsyncMock(side_effect=Exception("token exchange failed"))

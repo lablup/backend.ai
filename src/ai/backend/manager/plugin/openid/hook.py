@@ -11,7 +11,7 @@ import jwt.exceptions
 import sqlalchemy as sa
 from aiohttp import web
 
-from ai.backend.common.plugin.hook import HookHandler, HookPlugin, HookResult, Reject
+from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.login_session.enums import LoginSessionStatus
 from ai.backend.manager.models.login_session.row import LoginSessionRow
@@ -36,14 +36,14 @@ class OIDCHookPlugin(HookPlugin):
 
     def get_handlers(self) -> Sequence[tuple[str, HookHandler]]:
         return [
-            ("AUTHORIZE", self.pre_auth_hook),  # type: ignore
+            ("AUTHORIZE", self.pre_auth_hook),
         ]
 
     async def pre_auth_hook(
         self,
         request: web.Request,
         params: Mapping[str, Any],
-    ) -> HookResult | None:
+    ) -> Any:
         root_app = request.app["_root_app"]
         db = root_app["_db"]
         secret = self.plugin_config["secret"]

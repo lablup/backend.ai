@@ -18,19 +18,18 @@ import jwt
 import sqlalchemy as sa
 import yarl
 from aiohttp import web
-from authlib.common.security import generate_token
-from authlib.integrations.httpx_client import AsyncOAuth2Client
-from authlib.jose import jwt as joseJWT
-from authlib.oidc.core import CodeIDToken
+from authlib.common.security import generate_token  # pants: no-infer-dep
+from authlib.integrations.httpx_client import AsyncOAuth2Client  # pants: no-infer-dep
+from authlib.jose import jwt as joseJWT  # pants: no-infer-dep
+from authlib.oidc.core import CodeIDToken  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
-from ai.backend.manager.data.user.types import UserRole, UserStatus
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair, generate_ssh_keypair
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.webapp import WebappPlugin
 
@@ -73,6 +72,10 @@ def generate_user_data(
         password = generate_random_string()
 
     full_name = token["name"]
+    domain_name = "default"
+    project_name = "default"
+    user_resource_policy_name = "default"
+    keypair_resource_policy_name = "default"
     group_found = False
     # Generate domain.
     if "groups" in token:
@@ -131,7 +134,7 @@ def generate_keypair_data(
 
 
 async def associate_user_with_group(
-    conn: AsyncConnection, user: sa.engine.row.Row, group_name: str
+    conn: AsyncConnection, user: sa.engine.row.Row[Any], group_name: str
 ) -> None:
     query = (
         sa.select(groups.c.id)
@@ -154,7 +157,7 @@ async def create_user_if_not_existssss(
     group_order: list[str],
     db: ExtendedAsyncSAEngine,
     password_info: PasswordInfo,
-) -> sa.engine.row.Row:
+) -> sa.engine.row.Row[Any]:
     async with db.begin_session() as dbsess:
         conn = await dbsess.connection()
         # Check if user exists

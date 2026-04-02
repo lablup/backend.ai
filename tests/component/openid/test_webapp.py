@@ -8,15 +8,17 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import pytest_asyncio
 import sqlalchemy as sa
 from aiohttp import web
 
-from ai.backend.manager.data.user.types import UserRole, UserStatus
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.openid.exceptions import InvalidSession
+from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
 from ai.backend.manager.plugin.openid.webapp import (
+    OIDCWebAppPlugin,
     OpenIDError,
     create_user_if_not_existssss,
     generate_user_data,
@@ -29,7 +31,7 @@ from ai.backend.manager.plugin.openid.webapp import (
 
 class TestGenerateUserData:
     @pytest.fixture
-    def oidc_token(self):
+    def oidc_token(self) -> Any:
         def _make(groups: list[str]) -> dict[str, Any]:
             return {
                 "email": "alice@example.com",
@@ -40,7 +42,7 @@ class TestGenerateUserData:
         return _make
 
     @pytest.fixture
-    def multi_group_mapping(self):
+    def multi_group_mapping(self) -> dict[str, Any]:
         return {
             "backend-ai-users": {
                 "domain": "default",
@@ -56,7 +58,9 @@ class TestGenerateUserData:
             },
         }
 
-    def test_valid_group_mapping(self, oidc_token, multi_group_mapping):
+    def test_valid_group_mapping(
+        self, oidc_token: Any, multi_group_mapping: dict[str, Any]
+    ) -> None:
         token = oidc_token(["backend-ai-users"])
         result = generate_user_data(token, multi_group_mapping, ["backend-ai-users"])
 
@@ -70,12 +74,16 @@ class TestGenerateUserData:
         assert result["keypair_resource_policy"] == "default"
         assert result["user"]["password"]  # non-empty random string
 
-    def test_no_matching_group_raises_error(self, oidc_token, multi_group_mapping):
+    def test_no_matching_group_raises_error(
+        self, oidc_token: Any, multi_group_mapping: dict[str, Any]
+    ) -> None:
         token = oidc_token(["unknown-group"])
         with pytest.raises(OpenIDError, match="does not belong to group"):
             generate_user_data(token, multi_group_mapping, ["backend-ai-users"])
 
-    def test_group_order_priority(self, oidc_token, multi_group_mapping):
+    def test_group_order_priority(
+        self, oidc_token: Any, multi_group_mapping: dict[str, Any]
+    ) -> None:
         token = oidc_token(["backend-ai-users", "admins"])
         # admins comes first in group_order -> picks admin mapping
         result = generate_user_data(token, multi_group_mapping, ["admins", "backend-ai-users"])
@@ -96,11 +104,11 @@ class TestGenerateUserData:
 class TestCreateUserIfNotExists:
     async def test_creates_new_user_with_keypair(
         self,
-        seed_data,
-        openid_claims,
-        group_mapping,
-        password_info,
-    ):
+        seed_data: ExtendedAsyncSAEngine,
+        openid_claims: dict[str, Any],
+        group_mapping: dict[str, Any],
+        password_info: PasswordInfo,
+    ) -> None:
         user = await create_user_if_not_existssss(
             openid_claims,
             group_mapping,
@@ -124,11 +132,11 @@ class TestCreateUserIfNotExists:
 
     async def test_returns_existing_user_without_duplicate(
         self,
-        seed_data,
-        openid_claims,
-        group_mapping,
-        password_info,
-    ):
+        seed_data: ExtendedAsyncSAEngine,
+        openid_claims: dict[str, Any],
+        group_mapping: dict[str, Any],
+        password_info: PasswordInfo,
+    ) -> None:
         user1 = await create_user_if_not_existssss(
             openid_claims,
             group_mapping,
@@ -166,7 +174,7 @@ class TestCreateUserIfNotExists:
 
 
 class TestValkeySession:
-    async def test_set_and_get_code_verifier(self, valkey_client):
+    async def test_set_and_get_code_verifier(self, valkey_client: ValkeyOpenIDClient) -> None:
         session_key = str(uuid.uuid4())
         verifier = "test-code-verifier-abc123"
 
@@ -174,7 +182,7 @@ class TestValkeySession:
         result = await valkey_client.get_openid_key(session_key)
         assert result == verifier
 
-    async def test_get_nonexistent_session_raises(self, valkey_client):
+    async def test_get_nonexistent_session_raises(self, valkey_client: ValkeyOpenIDClient) -> None:
         with pytest.raises(InvalidSession):
             await valkey_client.get_openid_key("nonexistent-session-key")
 
@@ -186,7 +194,7 @@ class TestValkeySession:
 
 class TestWebAppLogin:
     @pytest.fixture
-    def login_request(self, valkey_client):
+    def login_request(self, valkey_client: ValkeyOpenIDClient) -> MagicMock:
         request = MagicMock()
         post_data = {"redirect_to": "https://app.example.com/dashboard"}
         request.post = AsyncMock(return_value=post_data)
@@ -198,10 +206,10 @@ class TestWebAppLogin:
 
     async def test_login_stores_verifier_and_redirects(
         self,
-        webapp_plugin,
-        login_request,
-        mock_oauth2_client,
-    ):
+        webapp_plugin: OIDCWebAppPlugin,
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
         with patch(
             "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
             return_value=mock_oauth2_client,
@@ -209,7 +217,7 @@ class TestWebAppLogin:
             response = await webapp_plugin.login(login_request)
 
         assert isinstance(response, web.HTTPFound)
-        redirect_url = response.location
+        redirect_url = str(response.location)
         assert "idp.example.com/authorize" in redirect_url
         assert "client_id=test-client-id" in redirect_url
 
@@ -222,8 +230,13 @@ class TestWebAppLogin:
 
 
 class TestWebAppRedirect:
-    @pytest_asyncio.fixture
-    async def redirect_request(self, mock_root_app, valkey_client, oidc_jwks):
+    @pytest.fixture
+    async def redirect_request(
+        self,
+        mock_root_app: dict[str, Any],
+        valkey_client: ValkeyOpenIDClient,
+        oidc_jwks: dict[str, Any],
+    ) -> MagicMock:
         session_key = str(uuid.uuid4())
         await valkey_client.set_openid_key(session_key, "test-verifier")
 
@@ -248,11 +261,11 @@ class TestWebAppRedirect:
 
     async def test_redirect_creates_user_and_returns_stoken(
         self,
-        webapp_plugin,
-        mock_root_app,
-        redirect_request,
-        mock_oauth2_client,
-    ):
+        webapp_plugin: OIDCWebAppPlugin,
+        mock_root_app: dict[str, Any],
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
         with patch(
             "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
             return_value=mock_oauth2_client,
@@ -276,10 +289,10 @@ class TestWebAppRedirect:
 
     async def test_redirect_invalid_token_returns_unauthorized(
         self,
-        webapp_plugin,
-        redirect_request,
-        failing_oauth2_client,
-    ):
+        webapp_plugin: OIDCWebAppPlugin,
+        redirect_request: MagicMock,
+        failing_oauth2_client: MagicMock,
+    ) -> None:
         with patch(
             "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
             return_value=failing_oauth2_client,
