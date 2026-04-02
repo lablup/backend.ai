@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import override
 
@@ -23,12 +23,14 @@ class VFolderMountSpecGenerator(ArgsSpecGenerator[VFolderMountSpec]):
 @dataclass
 class VFolderMountResult:
     mounts: list[Mount]
+    overlay_mounts: list[VFolderMount] = field(default_factory=list)
 
 
 class VFolderMountProvisioner(Provisioner[VFolderMountSpec, VFolderMountResult]):
-    """
-    Provisioner for the kernel creation setup stage.
-    This is a no-op provisioner as it does not create any resources.
+    """Provisioner for regular vfolder bind mounts.
+
+    VFolders with overlay_target set are separated into overlay_mounts
+    for the OverlayMountProvisioner to handle.
     """
 
     @property
@@ -39,10 +41,14 @@ class VFolderMountProvisioner(Provisioner[VFolderMountSpec, VFolderMountResult])
     @override
     async def setup(self, spec: VFolderMountSpec) -> VFolderMountResult:
         result: list[Mount] = []
+        overlay_mounts: list[VFolderMount] = []
         for vfolder in spec.mounts:
             if spec.prevent_vfolder_mount:
                 if vfolder.name != ".logs":
                     continue
+            if vfolder.overlay_target is not None:
+                overlay_mounts.append(vfolder)
+                continue
             mount = Mount(
                 MountTypes.BIND,
                 Path(vfolder.host_path),
@@ -50,7 +56,7 @@ class VFolderMountProvisioner(Provisioner[VFolderMountSpec, VFolderMountResult])
                 vfolder.mount_perm,
             )
             result.append(mount)
-        return VFolderMountResult(mounts=result)
+        return VFolderMountResult(mounts=result, overlay_mounts=overlay_mounts)
 
     @override
     async def teardown(self, resource: VFolderMountResult) -> None:
