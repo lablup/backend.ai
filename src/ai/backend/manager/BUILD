@@ -4,6 +4,8 @@ python_sources(
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
         ":resources",
+        "//:reqs#authlib",  # pants: no-infer-dep in plugin/openid/webapp.py
+        "//:reqs#httpx",  # pants: no-infer-dep in plugin/openid/webapp.py (authlib dep)
     ],
 )
 

@@ -20,7 +20,7 @@ from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
 from ai.backend.manager.plugin.openid.webapp import (
     OIDCWebAppPlugin,
     OpenIDError,
-    create_user_if_not_existssss,
+    create_user_if_not_exists,
     generate_user_data,
 )
 
@@ -109,7 +109,7 @@ class TestCreateUserIfNotExists:
         group_mapping: dict[str, Any],
         password_info: PasswordInfo,
     ) -> None:
-        user = await create_user_if_not_existssss(
+        user = await create_user_if_not_exists(
             openid_claims,
             group_mapping,
             ["backend-ai-users"],
@@ -137,14 +137,14 @@ class TestCreateUserIfNotExists:
         group_mapping: dict[str, Any],
         password_info: PasswordInfo,
     ) -> None:
-        user1 = await create_user_if_not_existssss(
+        user1 = await create_user_if_not_exists(
             openid_claims,
             group_mapping,
             ["backend-ai-users"],
             seed_data,
             password_info,
         )
-        user2 = await create_user_if_not_existssss(
+        user2 = await create_user_if_not_exists(
             openid_claims,
             group_mapping,
             ["backend-ai-users"],

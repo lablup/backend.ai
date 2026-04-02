@@ -151,7 +151,7 @@ async def associate_user_with_group(
         await conn.execute(query)
 
 
-async def create_user_if_not_existssss(
+async def create_user_if_not_exists(
     openid_user_data: Mapping[str, Any],
     group_mapping: Mapping[str, Any],
     group_order: list[str],
@@ -353,7 +353,7 @@ class OIDCWebAppPlugin(WebappPlugin):
             rounds=config.auth.password_hash_rounds,
             salt_size=config.auth.password_hash_salt_size,
         )
-        user = await create_user_if_not_existssss(
+        user = await create_user_if_not_exists(
             claims,
             openid_config.get("group_mapping", {}),
             [x.strip() for x in openid_config.get("group_order", "").split(",")],
