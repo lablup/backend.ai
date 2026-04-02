@@ -17,7 +17,7 @@ from aiohttp import web
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx
 
-from .connection import GraphQLWSConnection, WSReceiver, WSSender
+from .connection import GraphQLWSConnection
 from .subscriptions import SubscriptionExecutor
 from .types import (
     ClientCompleteMessage,
@@ -62,17 +62,12 @@ class GraphQLTransportWSHandler:
 
     async def handle(self, request_ctx: RequestCtx) -> web.WebSocketResponse:
         conn = await GraphQLWSConnection.open(request_ctx.request, max_msg_size=self._max_msg_size)
-        receiver = conn.receiver
-        sender = conn.sender
 
-        try:
-            if not await self._wait_connection_init(receiver, sender):
-                return conn.handler_return
-        except Exception as e:
-            log.exception("GQL WS: error during connection initialization (error: {})", repr(e))
-            await sender.close()
+        if not await conn.wait_connection_init(wait_seconds=self._connection_init_timeout):
             return conn.handler_return
 
+        sender = conn.sender
+        receiver = conn.receiver
         subs = SubscriptionExecutor(sender, self._schema, self._gql_deps)
 
         try:
@@ -89,15 +84,3 @@ class GraphQLTransportWSHandler:
         finally:
             await subs.cancel_all()
         return conn.handler_return
-
-    # ------------------------------------------------------------------
-    # Protocol helpers
-    # ------------------------------------------------------------------
-
-    async def _wait_connection_init(self, receiver: WSReceiver, sender: WSSender) -> bool:
-        received = await receiver.receive_init(wait_seconds=self._connection_init_timeout)
-        if not received:
-            await sender.close_init_timeout()
-            return False
-        await sender.send_ack()
-        return True

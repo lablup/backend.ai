@@ -166,6 +166,24 @@ class GraphQLWSConnection:
         await ws.prepare(request)
         return cls(ws)
 
+    async def wait_connection_init(self, *, wait_seconds: float) -> bool:
+        """Wait for ``connection_init`` and send ``connection_ack``.
+
+        Returns ``True`` on success, ``False`` if the client timed out
+        or an error occurred (the connection is closed in that case).
+        """
+        try:
+            received = await self.receiver.receive_init(wait_seconds=wait_seconds)
+            if not received:
+                await self.sender.close_init_timeout()
+                return False
+            await self.sender.send_ack()
+            return True
+        except Exception as e:
+            log.exception("GQL WS: error during connection initialization (error: {})", repr(e))
+            await self.sender.close()
+            return False
+
     @property
     def handler_return(self) -> web.WebSocketResponse:
         """Access the underlying ``WebSocketResponse`` (for returning from aiohttp handlers)."""
