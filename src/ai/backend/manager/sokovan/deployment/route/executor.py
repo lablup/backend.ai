@@ -16,7 +16,7 @@ from ai.backend.common.service_discovery.service_discovery import ModelServiceMe
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
+from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteHealthStatus
 from ai.backend.manager.errors.deployment import (
     EndpointNotFound,
     RouteSessionNotFound,
@@ -416,7 +416,7 @@ class RouteExecutor:
                 )
 
         # Create mapping of endpoint_id -> cleanup config (no phase - transformation only)
-        endpoint_cleanup_config: dict[UUID, set[RouteStatus]] = {}
+        endpoint_cleanup_config: dict[UUID, set[RouteHealthStatus]] = {}
         for endpoint in endpoints:
             config = cleanup_configs.get(endpoint.metadata.resource_group, None)
             if config:
@@ -512,7 +512,7 @@ class RouteExecutor:
     def _check_route_cleanup_eligibility(
         self,
         route: RouteData,
-        endpoint_cleanup_config: Mapping[UUID, set[RouteStatus]],
+        endpoint_cleanup_config: Mapping[UUID, set[RouteHealthStatus]],
     ) -> bool:
         """Check if route should be cleaned up based on cleanup config."""
         pool = RouteRecorderContext.current_pool()
@@ -521,4 +521,4 @@ class RouteExecutor:
         with recorder.phase("identify_cleanup_target"):
             with recorder.step("check_cleanup_eligibility"):
                 cleanup_targets = endpoint_cleanup_config.get(route.endpoint_id, set())
-                return route.status in cleanup_targets
+                return route.health_status in cleanup_targets

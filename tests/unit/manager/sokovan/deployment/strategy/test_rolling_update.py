@@ -595,7 +595,10 @@ class TestTerminationPriority:
     """Test that old routes are terminated in priority order."""
 
     def test_full_priority_order(self) -> None:
-        """Termination order: UNHEALTHY → DEGRADED → PROVISIONING → HEALTHY."""
+        """Termination order: PROVISIONING(0) → UNHEALTHY(1) → DEGRADED(2) → HEALTHY(4).
+
+        Non-RUNNING routes (priority 0) are terminated first, then by health status.
+        """
         unhealthy_id = UUID("00000000-0000-0000-0000-000000000001")
         degraded_id = UUID("00000000-0000-0000-0000-000000000002")
         provisioning_id = UUID("00000000-0000-0000-0000-000000000003")
@@ -630,9 +633,9 @@ class TestTerminationPriority:
 
         terminated = result.route_changes.drain_route_ids
         assert len(terminated) == 3
-        assert terminated[0] == unhealthy_id
-        assert terminated[1] == degraded_id
-        assert terminated[2] == provisioning_id
+        assert terminated[0] == provisioning_id
+        assert terminated[1] == unhealthy_id
+        assert terminated[2] == degraded_id
 
 
 # ===========================================================================

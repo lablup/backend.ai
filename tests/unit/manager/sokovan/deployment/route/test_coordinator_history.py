@@ -10,7 +10,14 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHandlerCategory,
+    RouteHealthStatus,
+    RouteStatus,
+    RouteStatusTransitions,
+    RouteTargetStatuses,
+    RouteTransitionTarget,
+)
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
@@ -130,11 +137,23 @@ def mock_handler_with_success(
     """Handler that returns success result."""
     mock = MagicMock(spec=RouteHandler)
     mock.name = MagicMock(return_value="provisioning")
+    mock.category = MagicMock(return_value=RouteHandlerCategory.LIFECYCLE)
     mock.lock_id = None
-    mock.target_statuses = MagicMock(return_value=[RouteStatus.PROVISIONING])
-    mock.next_status = MagicMock(return_value=RouteStatus.RUNNING)
-    mock.failure_status = MagicMock(return_value=None)
-    mock.stale_status = MagicMock(return_value=None)
+    mock.target_statuses = MagicMock(
+        return_value=RouteTargetStatuses(
+            lifecycle=[RouteStatus.PROVISIONING],
+            health=list(RouteHealthStatus),
+        )
+    )
+    mock.status_transitions = MagicMock(
+        return_value=RouteStatusTransitions(
+            success=RouteTransitionTarget(
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.NOT_CHECKED,
+            ),
+            failure=RouteTransitionTarget(status=RouteStatus.FAILED_TO_START),
+        )
+    )
     mock.execute = AsyncMock(
         return_value=RouteExecutionResult(
             successes=[sample_route_data],
@@ -153,11 +172,23 @@ def mock_handler_with_failure(
     """Handler that returns failure result."""
     mock = MagicMock(spec=RouteHandler)
     mock.name = MagicMock(return_value="provisioning")
+    mock.category = MagicMock(return_value=RouteHandlerCategory.LIFECYCLE)
     mock.lock_id = None
-    mock.target_statuses = MagicMock(return_value=[RouteStatus.PROVISIONING])
-    mock.next_status = MagicMock(return_value=RouteStatus.RUNNING)
-    mock.failure_status = MagicMock(return_value=RouteStatus.FAILED_TO_START)
-    mock.stale_status = MagicMock(return_value=None)
+    mock.target_statuses = MagicMock(
+        return_value=RouteTargetStatuses(
+            lifecycle=[RouteStatus.PROVISIONING],
+            health=list(RouteHealthStatus),
+        )
+    )
+    mock.status_transitions = MagicMock(
+        return_value=RouteStatusTransitions(
+            success=RouteTransitionTarget(
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.NOT_CHECKED,
+            ),
+            failure=RouteTransitionTarget(status=RouteStatus.FAILED_TO_START),
+        )
+    )
     mock.execute = AsyncMock(
         return_value=RouteExecutionResult(
             successes=[],
@@ -176,11 +207,26 @@ def mock_handler_with_stale(
     """Handler that returns stale result."""
     mock = MagicMock(spec=RouteHandler)
     mock.name = MagicMock(return_value="health_check")
+    mock.category = MagicMock(return_value=RouteHandlerCategory.HEALTH)
     mock.lock_id = None
-    mock.target_statuses = MagicMock(return_value=[RouteStatus.RUNNING])
-    mock.next_status = MagicMock(return_value=None)
-    mock.failure_status = MagicMock(return_value=None)
-    mock.stale_status = MagicMock(return_value=RouteHealthStatus.UNHEALTHY)
+    mock.target_statuses = MagicMock(
+        return_value=RouteTargetStatuses(
+            lifecycle=[RouteStatus.RUNNING],
+            health=[
+                RouteHealthStatus.NOT_CHECKED,
+                RouteHealthStatus.HEALTHY,
+                RouteHealthStatus.UNHEALTHY,
+                RouteHealthStatus.DEGRADED,
+            ],
+        )
+    )
+    mock.status_transitions = MagicMock(
+        return_value=RouteStatusTransitions(
+            success=RouteTransitionTarget(health_status=RouteHealthStatus.HEALTHY),
+            failure=RouteTransitionTarget(health_status=RouteHealthStatus.UNHEALTHY),
+            stale=RouteTransitionTarget(health_status=RouteHealthStatus.DEGRADED),
+        )
+    )
     mock.execute = AsyncMock(
         return_value=RouteExecutionResult(
             successes=[],
@@ -197,11 +243,23 @@ def mock_handler_with_empty_result() -> MagicMock:
     """Handler that returns empty result."""
     mock = MagicMock(spec=RouteHandler)
     mock.name = MagicMock(return_value="provisioning")
+    mock.category = MagicMock(return_value=RouteHandlerCategory.LIFECYCLE)
     mock.lock_id = None
-    mock.target_statuses = MagicMock(return_value=[RouteStatus.PROVISIONING])
-    mock.next_status = MagicMock(return_value=RouteStatus.RUNNING)
-    mock.failure_status = MagicMock(return_value=None)
-    mock.stale_status = MagicMock(return_value=None)
+    mock.target_statuses = MagicMock(
+        return_value=RouteTargetStatuses(
+            lifecycle=[RouteStatus.PROVISIONING],
+            health=list(RouteHealthStatus),
+        )
+    )
+    mock.status_transitions = MagicMock(
+        return_value=RouteStatusTransitions(
+            success=RouteTransitionTarget(
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.NOT_CHECKED,
+            ),
+            failure=RouteTransitionTarget(status=RouteStatus.FAILED_TO_START),
+        )
+    )
     mock.execute = AsyncMock(return_value=RouteExecutionResult())
     mock.post_process = AsyncMock()
     return mock

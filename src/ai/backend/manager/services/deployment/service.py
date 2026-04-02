@@ -3,6 +3,7 @@
 import dataclasses
 import logging
 from datetime import UTC, datetime
+from uuid import UUID
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -230,7 +231,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
                 )
                 for m in rev.mounts.extra_mounts
             ],
-            image_id=rev.image_id,
+            image_id=rev.image_id or UUID(int=0),
             created_at=info.metadata.created_at or datetime.now(UTC),
             model_definition=rev.model_definition,
         )

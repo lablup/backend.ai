@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot, RuntimeVariant
+from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import RouteHandlerCategory, RouteStatus
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -386,15 +386,11 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 domain=test_domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
-                model=None,
                 desired_replicas=1,
-                image=test_image_id,  # Image required for non-DESTROYED lifecycle
-                runtime_variant=RuntimeVariant.VLLM,
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.PENDING,
                 current_revision=uuid.uuid4(),
-                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -802,15 +798,11 @@ class TestUpdateRouteStatusBulkWithHistory:
                 domain=test_domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
-                model=None,
                 desired_replicas=1,
-                image=test_image_id,  # Image required for non-DESTROYED lifecycle
-                runtime_variant=RuntimeVariant.VLLM,
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.READY,
                 current_revision=uuid.uuid4(),
-                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -1113,15 +1105,11 @@ class TestDeploymentHistoryMergeLogic:
                     domain=domain_name,
                     project=group_id,
                     resource_group=sgroup_name,
-                    model=None,
                     desired_replicas=1,
-                    image=image_id,
-                    runtime_variant=RuntimeVariant.VLLM,
                     url="http://test.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.PENDING,
                     current_revision=uuid.uuid4(),
-                    resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 )
             )
 
@@ -1442,15 +1430,11 @@ class TestRouteHistoryMergeLogic:
                     domain=domain_name,
                     project=group_id,
                     resource_group=sgroup_name,
-                    model=None,
                     desired_replicas=1,
-                    image=image_id,
-                    runtime_variant=RuntimeVariant.VLLM,
                     url="http://test.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.READY,
                     current_revision=uuid.uuid4(),
-                    resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 )
             )
 

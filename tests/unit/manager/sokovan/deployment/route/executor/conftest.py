@@ -9,7 +9,6 @@ from uuid import UUID, uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
@@ -67,7 +66,8 @@ def mock_client_pool() -> MagicMock:
 def mock_valkey_schedule() -> AsyncMock:
     """Mock ValkeyScheduleClient."""
     client = AsyncMock()
-    client.check_route_health_status = AsyncMock(return_value={})
+    client.get_route_health_records_batch = AsyncMock(return_value={})
+    client.get_redis_time = AsyncMock(return_value=1000)
     return client
 
 
@@ -295,35 +295,6 @@ def route_without_session() -> RouteData:
         status=RouteStatus.TERMINATING,
         session_id=None,
     )
-
-
-# =============================================================================
-# Health Status Fixtures
-# =============================================================================
-
-
-@pytest.fixture
-def health_status_healthy() -> MagicMock:
-    """Healthy health status response."""
-    status = MagicMock()
-    status.get_status = MagicMock(return_value=HealthCheckStatus.HEALTHY)
-    return status
-
-
-@pytest.fixture
-def health_status_unhealthy() -> MagicMock:
-    """Unhealthy health status response."""
-    status = MagicMock()
-    status.get_status = MagicMock(return_value=HealthCheckStatus.UNHEALTHY)
-    return status
-
-
-@pytest.fixture
-def health_status_stale() -> MagicMock:
-    """Stale health status response."""
-    status = MagicMock()
-    status.get_status = MagicMock(return_value=HealthCheckStatus.STALE)
-    return status
 
 
 # =============================================================================
