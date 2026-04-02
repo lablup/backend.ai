@@ -38,6 +38,10 @@ from ai.backend.manager.services.permission_contoller.actions.get_entity_types i
     GetEntityTypesAction,
     GetEntityTypesActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
+    GetPermissionMatrixAction,
+    GetPermissionMatrixActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
     GetRoleDetailActionResult,
@@ -278,9 +282,9 @@ class PermissionControllerService:
             actions[action_cls.action_name()] = perm
         return result
 
-    def get_permission_matrix(
-        self,
-    ) -> dict[RBACElementType, dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]]]:
+    async def get_permission_matrix(
+        self, _action: GetPermissionMatrixAction
+    ) -> GetPermissionMatrixActionResult:
         """
         Build the RBAC permission matrix: scope -> entity -> action_name -> permission.
 
@@ -296,4 +300,4 @@ class PermissionControllerService:
             entity_map = result.setdefault(scope, {})
             actions = entity_map.setdefault(perm.element_type, {})
             actions[action_cls.action_name()] = perm
-        return result
+        return GetPermissionMatrixActionResult(matrix=result)
