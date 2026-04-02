@@ -751,7 +751,7 @@ class DeploymentService:
         drain_route_ids = []
         for route in route_search.items:
             if route.revision_id == deploying_revision_id:
-                if route.status == RouteStatus.HEALTHY:
+                if route.health_status == RouteHealthStatus.HEALTHY:
                     promote_route_ids.append(route.route_id)
             else:
                 if route.status.is_active():

@@ -43,6 +43,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleStatus,
     DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
+    RouteHealthStatus,
     RouteStatus,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
@@ -341,7 +342,7 @@ class DeployingAwaitingPromotionHandler(DeploymentHandler):
         drain_route_ids: list[uuid.UUID] = []
         for route in route_search.items:
             if route.revision_id == info.deploying_revision_id:
-                if route.status == RouteStatus.HEALTHY:
+                if route.health_status == RouteHealthStatus.HEALTHY:
                     promote_route_ids.append(route.route_id)
             elif route.status.is_active():
                 drain_route_ids.append(route.route_id)
