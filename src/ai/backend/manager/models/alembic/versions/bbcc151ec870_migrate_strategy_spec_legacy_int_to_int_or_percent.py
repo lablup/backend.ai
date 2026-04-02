@@ -52,19 +52,24 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Convert back to plain integer format
+    # Convert IntOrPercent dict back to plain numeric value.
+    # Use count if present, otherwise use percent.
     op.execute(
         """
         UPDATE deployment_policies
         SET strategy_spec = jsonb_set(
             strategy_spec,
             '{max_surge}',
-            to_jsonb((strategy_spec -> 'max_surge' ->> 'count')::int)
+            CASE
+                WHEN (strategy_spec -> 'max_surge' ->> 'count') IS NOT NULL
+                    THEN to_jsonb((strategy_spec -> 'max_surge' ->> 'count')::int)
+                WHEN (strategy_spec -> 'max_surge' ->> 'percent') IS NOT NULL
+                    THEN to_jsonb((strategy_spec -> 'max_surge' ->> 'percent')::float)
+                ELSE '0'::jsonb
+            END
         )
         WHERE strategy_spec IS NOT NULL
           AND jsonb_typeof(strategy_spec -> 'max_surge') = 'object'
-          AND strategy_spec -> 'max_surge' ? 'count'
-          AND (strategy_spec -> 'max_surge' ->> 'count') IS NOT NULL
         """
     )
     op.execute(
@@ -73,11 +78,15 @@ def downgrade() -> None:
         SET strategy_spec = jsonb_set(
             strategy_spec,
             '{max_unavailable}',
-            to_jsonb((strategy_spec -> 'max_unavailable' ->> 'count')::int)
+            CASE
+                WHEN (strategy_spec -> 'max_unavailable' ->> 'count') IS NOT NULL
+                    THEN to_jsonb((strategy_spec -> 'max_unavailable' ->> 'count')::int)
+                WHEN (strategy_spec -> 'max_unavailable' ->> 'percent') IS NOT NULL
+                    THEN to_jsonb((strategy_spec -> 'max_unavailable' ->> 'percent')::float)
+                ELSE '0'::jsonb
+            END
         )
         WHERE strategy_spec IS NOT NULL
           AND jsonb_typeof(strategy_spec -> 'max_unavailable') = 'object'
-          AND strategy_spec -> 'max_unavailable' ? 'count'
-          AND (strategy_spec -> 'max_unavailable' ->> 'count') IS NOT NULL
         """
     )
