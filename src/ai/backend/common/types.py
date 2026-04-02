@@ -1350,7 +1350,16 @@ class VFolderMount(JSONSerializableMixin):
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
-        return cls(**cls.as_trafaret().check(obj))
+        base = cls.as_trafaret().check(obj)
+        overlay_target: OverlayTarget | None = None
+        if overlay_raw := obj.get("overlay_target"):
+            vfolder_id_raw = overlay_raw.get("vfolder_id")
+            host_path_raw = overlay_raw.get("host_path")
+            overlay_target = OverlayTarget(
+                vfolder_id=VFolderID.from_str(vfolder_id_raw) if vfolder_id_raw else None,
+                host_path=PurePosixPath(host_path_raw) if host_path_raw else None,
+            )
+        return cls(**base, overlay_target=overlay_target)
 
     @classmethod
     def from_dataclass(cls, obj: VFolderMountData) -> Self:
