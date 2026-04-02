@@ -226,7 +226,9 @@ class TestApplyWorkerConfig:
         assert "port_proxy" not in doc["proxy_worker"]
         assert doc["proxy_worker"]["traefik"]["api_port"] == 18080
         assert doc["proxy_worker"]["traefik"]["etcd"]["addr"]["host"] == "10.0.0.1"
-        assert doc["proxy_worker"]["traefik"]["port_proxy"]["advertised_host"] == "proxy.example.com"
+        assert (
+            doc["proxy_worker"]["traefik"]["port_proxy"]["advertised_host"] == "proxy.example.com"
+        )
 
     def test_tls_advertised(self) -> None:
         params = WorkerParams(

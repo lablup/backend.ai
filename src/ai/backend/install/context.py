@@ -35,6 +35,7 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
 
 from .common import detect_os
+from .config_gen.agent import AgentParams, apply_agent_config
 from .config_gen.appproxy import (
     CoordinatorParams,
     WorkerParams,
@@ -458,7 +459,7 @@ class Context(metaclass=ABCMeta):
         self.os_info = await detect_os()
         text = Text()
         text.append("Detetced OS info: ")
-        text.append(self.os_info.__rich__())  # type: ignore
+        text.append(str(self.os_info.__rich__()))
         self.log.write(text)
         if "LiveCD" in self.os_info.distro_variants:
             self.log.write(
@@ -589,51 +590,38 @@ class Context(metaclass=ABCMeta):
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         accelerator = self.install_info.accelerator
-        toml_path = self.copy_config("agent.toml")
-        self.sed_in_place_multi(
-            toml_path,
-            [
-                ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
-                ("port = 6001", f"port = {service.agent_rpc_addr.bind.port}"),
-                ("port = 6009", f"port = {service.agent_watcher_addr.bind.port}"),
-                (
-                    re.compile("^(# )?ipc-base-path = .*", flags=re.MULTILINE),
-                    f'ipc-base-path = "{service.agent_ipc_base_path}"',
-                ),
-                (
-                    re.compile("^(# )?var-base-path = .*", flags=re.MULTILINE),
-                    f'var-base-path = "{service.agent_var_base_path}"',
-                ),
-                (
-                    re.compile("(# )?mount_path = .*", flags=re.MULTILINE),
-                    f'"{self.install_info.base_path / service.vfolder_relpath}"',
-                ),
-            ],
-        )
-        Path(self.install_info.service_config.agent_var_base_path).mkdir(
-            parents=True, exist_ok=True
-        )
+
+        # Determine accelerator plugins
+        plugin_list: list[str] = []
         if accelerator is not None:
             if accelerator == Accelerator.CUDA:
-                plugin_list = ['"ai.backend.accelerator.cuda_open"']
+                plugin_list = ["ai.backend.accelerator.cuda_open"]
             elif accelerator in (
                 Accelerator.CUDA_MOCK,
                 Accelerator.CUDA_MIG_MOCK,
                 Accelerator.ROCM_MOCK,
             ):
-                plugin_list = ['"ai.backend.accelerator.mock"']
-            else:
-                plugin_list = []
-
+                plugin_list = ["ai.backend.accelerator.mock"]
             await self._configure_mock_accelerator(accelerator)
-        else:
-            plugin_list = []
 
-        self.sed_in_place(
-            toml_path,
-            re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.MULTILINE),
-            f"allow-compute-plugins = [{', '.join(plugin_list)}]",
+        # Apply config using shared module
+        params = AgentParams(
+            etcd_port=halfstack.etcd_addr[0].face.port,
+            rpc_port=service.agent_rpc_addr.bind.port,
+            watcher_port=service.agent_watcher_addr.bind.port,
+            ipc_base_path=service.agent_ipc_base_path,
+            var_base_path=service.agent_var_base_path,
+            mount_path=str(self.install_info.base_path / service.vfolder_relpath),
+            compute_plugins=plugin_list,
         )
+        toml_path = self.copy_config("agent.toml")
+        with toml_path.open("r") as fp:
+            doc = tomlkit.load(fp)
+        apply_agent_config(doc, params)
+        with toml_path.open("w") as fp:
+            tomlkit.dump(doc, fp)
+
+        Path(service.agent_var_base_path).mkdir(parents=True, exist_ok=True)
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -684,18 +672,18 @@ class Context(metaclass=ABCMeta):
             else:
                 etcd_table.pop("password", None)
             data["etcd"] = etcd_table
-            data["storage-proxy"]["secret"] = service.storage_proxy_random  # type: ignore
-            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path  # type: ignore
+            data["storage-proxy"]["secret"] = service.storage_proxy_random
+            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path
             client_facing_addr_table = tomlkit.inline_table()
             client_facing_addr_table["host"] = service.storage_proxy_client_facing_addr.bind.host
             client_facing_addr_table["port"] = service.storage_proxy_client_facing_addr.bind.port
-            data["api"]["client"]["service-addr"] = client_facing_addr_table  # type: ignore
+            data["api"]["client"]["service-addr"] = client_facing_addr_table
             manager_facing_addr_table = tomlkit.inline_table()
             manager_facing_addr_table["host"] = service.storage_proxy_manager_facing_addr.bind.host
             manager_facing_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
-            data["api"]["manager"]["service-addr"] = manager_facing_addr_table  # type: ignore
-            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key  # type: ignore
-            data["volume"]["volume1"]["path"] = service.vfolder_relpath  # type: ignore
+            data["api"]["manager"]["service-addr"] = manager_facing_addr_table
+            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key
+            data["volume"]["volume1"]["path"] = service.vfolder_relpath
         with toml_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -727,10 +715,10 @@ class Context(metaclass=ABCMeta):
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
             if endpoint_protocol is not None:
-                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value  # type: ignore
-            data["api"][  # type: ignore
-                "endpoint"
-            ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
+                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value
+            data["api"]["endpoint"] = (
+                f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
+            )
             helper_table = tomlkit.table()
             helper_table["socket_timeout"] = 5.0
             helper_table["socket_connect_timeout"] = 2.0
@@ -756,9 +744,9 @@ class Context(metaclass=ABCMeta):
                 redis_table["redis_helper_config"] = helper_table
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
-            data["session"]["redis"] = redis_table  # type: ignore
-            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)  # type: ignore
-            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
+            data["session"]["redis"] = redis_table
+            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)
+            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -869,9 +857,9 @@ class Context(metaclass=ABCMeta):
             db_port=halfstack.postgres_addr.face.port,
             redis_host=halfstack.redis_addr.face.host,
             redis_port=halfstack.redis_addr.face.port,
-            api_secret=service.appproxy_api_secret,
-            jwt_secret=service.appproxy_jwt_secret,
-            permit_hash_secret=service.appproxy_permit_hash_secret,
+            api_secret=service.appproxy_api_secret or "",
+            jwt_secret=service.appproxy_jwt_secret or "",
+            permit_hash_secret=service.appproxy_permit_hash_secret or "",
             bind_port=service.appproxy_coordinator_addr.bind.port,
             advertised_host=apphub_address,
             advertised_port=advertised_port
@@ -903,9 +891,9 @@ class Context(metaclass=ABCMeta):
             api_advertised_port=advertised_port
             if frontend_mode == FrontendMode.WILDCARD
             else service.appproxy_worker_addr.bind.port,
-            api_secret=service.appproxy_api_secret,
-            jwt_secret=service.appproxy_jwt_secret,
-            permit_hash_secret=service.appproxy_permit_hash_secret,
+            api_secret=service.appproxy_api_secret or "",
+            jwt_secret=service.appproxy_jwt_secret or "",
+            permit_hash_secret=service.appproxy_permit_hash_secret or "",
             tls_advertised=tls_advertised,
             frontend_mode=frontend_mode,
             port_proxy_advertised_host=public_facing_address,

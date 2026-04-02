@@ -188,12 +188,14 @@ def apply_worker_config(
     )
 
     # API bind/advertised addresses
-    doc["proxy_worker"]["api_bind_addr"] = _make_inline_table(
-        {"host": params.api_bind_host, "port": params.api_bind_port}
-    )
-    doc["proxy_worker"]["api_advertised_addr"] = _make_inline_table(
-        {"host": params.api_advertised_host, "port": params.api_advertised_port}
-    )
+    doc["proxy_worker"]["api_bind_addr"] = _make_inline_table({
+        "host": params.api_bind_host,
+        "port": params.api_bind_port,
+    })
+    doc["proxy_worker"]["api_advertised_addr"] = _make_inline_table({
+        "host": params.api_advertised_host,
+        "port": params.api_advertised_port,
+    })
 
     # Secrets
     doc["secrets"]["api_secret"] = params.api_secret
@@ -217,9 +219,10 @@ def apply_worker_config(
                 del doc["proxy_worker"]["port_proxy"]
 
             # Override api_advertised_addr
-            doc["proxy_worker"]["api_advertised_addr"] = _make_inline_table(
-                {"host": params.api_advertised_host, "port": params.wildcard_advertised_port}
-            )
+            doc["proxy_worker"]["api_advertised_addr"] = _make_inline_table({
+                "host": params.api_advertised_host,
+                "port": params.wildcard_advertised_port,
+            })
 
             # Add wildcard_domain section
             if params.wildcard_domain:
