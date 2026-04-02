@@ -2,6 +2,10 @@
 
 Encapsulates ``aiohttp.web.WebSocketResponse`` and exposes typed
 send/receive methods so that the handler never touches the raw WS object.
+
+The connection is split into :class:`WSReceiver` (read) and
+:class:`WSSender` (write/close), accessible via ``conn.receiver``
+and ``conn.sender``.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ from .types import (
     NextPayload,
     PongMessage,
     ServerCompleteMessage,
+    ServerMessage,
 )
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -34,38 +39,11 @@ _PROTOCOL: Final = "graphql-transport-ws"
 _client_message_adapter: Final[TypeAdapter[ClientMessage]] = TypeAdapter(ClientMessage)
 
 
-class GraphQLWSConnection:
-    """Thin wrapper around ``web.WebSocketResponse`` for the *graphql-transport-ws* protocol."""
+class WSReceiver:
+    """Read-side view of a graphql-transport-ws connection."""
 
     def __init__(self, ws: web.WebSocketResponse) -> None:
         self._ws = ws
-
-    @classmethod
-    async def open(
-        cls,
-        request: web.Request,
-        *,
-        max_msg_size: int,
-    ) -> GraphQLWSConnection:
-        ws = web.WebSocketResponse(
-            protocols=[_PROTOCOL],
-            max_msg_size=max_msg_size,
-        )
-        await ws.prepare(request)
-        return cls(ws)
-
-    @property
-    def closed(self) -> bool:
-        return self._ws.closed
-
-    @property
-    def raw(self) -> web.WebSocketResponse:
-        """Access the underlying ``WebSocketResponse`` (for returning from aiohttp handlers)."""
-        return self._ws
-
-    # ------------------------------------------------------------------
-    # Receive
-    # ------------------------------------------------------------------
 
     async def receive_init(self, *, wait_seconds: float) -> bool:
         """Wait for a ``connection_init`` message within the timeout.
@@ -97,6 +75,17 @@ class GraphQLWSConnection:
             elif msg.type in (WSMsgType.ERROR, WSMsgType.CLOSE):
                 break
 
+
+class WSSender:
+    """Write-side view of a graphql-transport-ws connection."""
+
+    def __init__(self, ws: web.WebSocketResponse) -> None:
+        self._ws = ws
+
+    @property
+    def closed(self) -> bool:
+        return self._ws.closed
+
     # ------------------------------------------------------------------
     # Send — Server → Client messages
     # ------------------------------------------------------------------
@@ -124,14 +113,7 @@ class GraphQLWSConnection:
     async def send_pong(self) -> None:
         await self._send(PongMessage())
 
-    async def _send(
-        self,
-        msg: ConnectionAckMessage
-        | NextMessage
-        | ErrorMessage
-        | ServerCompleteMessage
-        | PongMessage,
-    ) -> None:
+    async def _send(self, msg: ServerMessage) -> None:
         await self._ws.send_json(msg.model_dump(exclude_none=True))
 
     # ------------------------------------------------------------------
@@ -157,3 +139,34 @@ class GraphQLWSConnection:
         """Close: client reused an existing subscription ID (4409)."""
         if not self._ws.closed:
             await self._ws.close(code=4409, message=b"Subscriber already exists")
+
+
+class GraphQLWSConnection:
+    """Lifecycle owner for a graphql-transport-ws WebSocket connection.
+
+    Provides ``receiver`` and ``sender`` views for reading and writing.
+    """
+
+    def __init__(self, ws: web.WebSocketResponse) -> None:
+        self._ws = ws
+        self.receiver = WSReceiver(ws)
+        self.sender = WSSender(ws)
+
+    @classmethod
+    async def open(
+        cls,
+        request: web.Request,
+        *,
+        max_msg_size: int,
+    ) -> GraphQLWSConnection:
+        ws = web.WebSocketResponse(
+            protocols=[_PROTOCOL],
+            max_msg_size=max_msg_size,
+        )
+        await ws.prepare(request)
+        return cls(ws)
+
+    @property
+    def handler_return(self) -> web.WebSocketResponse:
+        """Access the underlying ``WebSocketResponse`` (for returning from aiohttp handlers)."""
+        return self._ws

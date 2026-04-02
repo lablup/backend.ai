@@ -242,6 +242,14 @@ def build_api_routes(
 
     if gql_context_deps is None:
         raise RuntimeError("GQLContextDeps required for admin routes")
+
+    from ai.backend.manager.api.gql.graphql_ws import GraphQLTransportWSHandler
+
+    gql_ws_handler = GraphQLTransportWSHandler(
+        schema=strawberry_schema,
+        gql_deps=gql_context_deps,
+        max_msg_size=gql_context_deps.config_provider.config.manager.max_wsmsg_size,
+    )
     admin_handler = AdminHandler(
         gql_schema=graphene_schema,
         gql_deps=gql_context_deps,
@@ -309,6 +317,7 @@ def build_api_routes(
                 quota_scope_reg,
                 auto_scaling_rule_reg,
             ],
+            gql_ws_handler=gql_ws_handler,
         ),
         register_template_routes(
             route_deps,

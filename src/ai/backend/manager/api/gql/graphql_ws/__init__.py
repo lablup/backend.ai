@@ -1,6 +1,6 @@
-from .connection import GraphQLWSConnection
+from .connection import GraphQLWSConnection, WSReceiver, WSSender
 from .handler import GraphQLTransportWSHandler
-from .subscriptions import SubscriptionRegistry
+from .subscriptions import SubscriptionExecutor
 from .types import (
     ClientCompleteMessage,
     ClientMessage,
@@ -13,14 +13,17 @@ from .types import (
     PingMessage,
     PongMessage,
     ServerCompleteMessage,
+    ServerMessage,
     SubscribeMessage,
     SubscribePayload,
 )
 
 __all__ = [
     "GraphQLWSConnection",
+    "WSReceiver",
+    "WSSender",
     "GraphQLTransportWSHandler",
-    "SubscriptionRegistry",
+    "SubscriptionExecutor",
     "GQLWSMessageType",
     "ClientMessage",
     "ConnectionInitMessage",
@@ -34,4 +37,5 @@ __all__ = [
     "NextPayload",
     "ErrorMessage",
     "ServerCompleteMessage",
+    "ServerMessage",
 ]

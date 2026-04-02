@@ -98,3 +98,7 @@ ClientMessage = Annotated[
     SubscribeMessage | ClientCompleteMessage | PingMessage | PongMessage,
     Field(discriminator="type"),
 ]
+
+ServerMessage = (
+    ConnectionAckMessage | NextMessage | ErrorMessage | ServerCompleteMessage | PongMessage
+)
