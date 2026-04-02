@@ -445,55 +445,58 @@ class HealthCheckEngine:
             old_routes: Previous route information for comparison
         """
         try:
-            # Get the endpoint to check if health checking is enabled
-            endpoint = None
-            if circuit.endpoint_id:
+            async with self.circuit_manager.circuit_lock(circuit.id):
+                # Re-read the circuit under the same per-circuit lock used for propagation
+                # so the snapshot cannot become stale before we write it to workers.
                 try:
                     async with self.db.begin_readonly_session() as sess:
-                        endpoint = await Endpoint.get(sess, circuit.endpoint_id)
-                except Exception as e:
-                    log.warning(
-                        "Failed to get endpoint {} for circuit {}: {}",
-                        circuit.endpoint_id,
+                        fresh_circuit = await Circuit.get(
+                            sess, circuit.id, load_worker=True, load_endpoint=True
+                        )
+                except ObjectNotFound:
+                    log.info(
+                        "Circuit {} was deleted, skipping route propagation",
                         circuit.id,
-                        e,
+                    )
+                    return
+
+                log.debug(
+                    "Re-read circuit {} from DB for route propagation ({} routes)",
+                    fresh_circuit.id,
+                    len(fresh_circuit.route_info),
+                )
+
+                endpoint = fresh_circuit.endpoint_row
+                health_check_enabled = (
+                    endpoint is not None
+                    and endpoint.health_check_enabled
+                    and endpoint.health_check_config is not None
+                )
+
+                if health_check_enabled:
+                    healthy_routes_count = len(fresh_circuit.healthy_routes)
+                    total_routes_count = len(fresh_circuit.route_info)
+
+                    log.debug(
+                        "Health checking enabled for circuit {} - propagating {}/{} healthy routes to workers",
+                        fresh_circuit.id,
+                        healthy_routes_count,
+                        total_routes_count,
+                    )
+                else:
+                    log.debug(
+                        "Health checking disabled for circuit {} - propagating all {} routes to workers",
+                        fresh_circuit.id,
+                        len(fresh_circuit.route_info),
                     )
 
-            # Determine if health checking is enabled for this endpoint
-            health_check_enabled = (
-                endpoint is not None
-                and endpoint.health_check_enabled
-                and endpoint.health_check_config is not None
-            )
-
-            if health_check_enabled:
-                # Health checking is enabled: use circuit.healthy_routes which filters by health status
-                # This automatically considers routes with health_status=None or HEALTHY as healthy
-                healthy_routes_count = len(circuit.healthy_routes)
-                total_routes_count = len(circuit.route_info)
-
-                log.debug(
-                    "Health checking enabled for circuit {} - propagating {}/{} healthy routes to workers",
-                    circuit.id,
-                    healthy_routes_count,
-                    total_routes_count,
+                await self.circuit_manager._update_circuit_routes_unlocked(
+                    fresh_circuit, old_routes
                 )
-            else:
-                # Health checking is disabled: all routes are considered healthy
-                log.debug(
-                    "Health checking disabled for circuit {} - propagating all {} routes to workers",
-                    circuit.id,
-                    len(circuit.route_info),
-                )
-
-            # Use RootContext.update_circuit_routes() to propagate route updates
-            # This method automatically handles both Traefik and legacy modes
-            # The circuit.healthy_routes property handles the health filtering logic
-            await self.circuit_manager.update_circuit_routes(circuit, old_routes)
 
             log.debug(
                 "Successfully propagated route updates for circuit {} to workers",
-                circuit.id,
+                fresh_circuit.id,
             )
 
         except Exception as e:
