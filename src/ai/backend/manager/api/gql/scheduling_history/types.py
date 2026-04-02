@@ -230,6 +230,7 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     id: NodeID[str]
     route_id: ID
     deployment_id: ID
+    category: str
     phase: str
     from_status: str | None
     to_status: str | None

@@ -20,6 +20,90 @@ def user() -> None:
 
 
 @user.command()
+@click.option("--email", required=True, type=str, help="User email address.")
+@click.option("--username", required=True, type=str, help="Username for login.")
+@click.option("--password", required=True, type=str, help="Initial password.")
+@click.option("--domain-name", required=True, type=str, help="Domain to assign the user to.")
+@click.option(
+    "--status",
+    required=True,
+    type=click.Choice(["active", "inactive", "before-verification"], case_sensitive=False),
+    help="Initial account status.",
+)
+@click.option(
+    "--role",
+    required=True,
+    type=click.Choice(["superadmin", "admin", "user", "monitor"], case_sensitive=False),
+    help="User role.",
+)
+@click.option("--full-name", default=None, type=str, help="Full display name.")
+@click.option("--description", default=None, type=str, help="Optional description.")
+@click.option("--resource-policy", default="default", type=str, help="Resource policy name.")
+def create(
+    email: str,
+    username: str,
+    password: str,
+    domain_name: str,
+    status: str,
+    role: str,
+    full_name: str | None,
+    description: str | None,
+    resource_policy: str,
+) -> None:
+    """Create a new user (superadmin only)."""
+    from ai.backend.common.dto.manager.v2.user.request import CreateUserInput
+    from ai.backend.common.dto.manager.v2.user.types import (
+        UserRole as UserRoleEnum,
+    )
+    from ai.backend.common.dto.manager.v2.user.types import (
+        UserStatus as UserStatusEnum,
+    )
+
+    body = CreateUserInput(
+        email=email,
+        username=username,
+        password=password,
+        domain_name=domain_name,
+        status=UserStatusEnum(status),
+        role=UserRoleEnum(role),
+        full_name=full_name,
+        description=description,
+        resource_policy=resource_policy,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.user.create(body)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@user.command()
+@click.argument("user_id", type=str)
+def delete(user_id: str) -> None:
+    """Soft-delete a user by UUID (superadmin only)."""
+    from uuid import UUID
+
+    from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput
+
+    body = DeleteUserInput(user_id=UUID(user_id))
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.user.delete(body)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@user.command()
 @click.option("--limit", default=20, help="Maximum number of results to return.")
 @click.option("--offset", default=0, help="Number of results to skip.")
 @click.option(

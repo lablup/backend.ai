@@ -102,7 +102,6 @@ from ai.backend.manager.models.utils import (
 from ai.backend.manager.types import UserScope
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.endpoint import EndpointRow
     from ai.backend.manager.models.storage import StorageSessionManager
 
 __all__: Sequence[str] = (
@@ -275,7 +274,7 @@ class VFolderCloneInfo(NamedTuple):
     domain_name: str
 
     # Target Vfolder infos
-    target_quota_scope_id: str
+    target_quota_scope_id: QuotaScopeID
     target_vfolder_name: str
     target_host: str
     usage_mode: VFolderUsageMode
@@ -367,7 +366,6 @@ class VFolderRow(Base):  # type: ignore[misc]
     )
 
     # Relationships
-    endpoints: Mapped[list[EndpointRow]] = relationship("EndpointRow", back_populates="model_row")
     user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         back_populates="vfolder_rows",

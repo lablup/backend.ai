@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import time
 import uuid
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -10,6 +12,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ai.backend.common.auth import PublicKey, SecretKey
+from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
+from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -23,6 +27,8 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 
@@ -550,3 +556,148 @@ class TestGetHealthCheckInfo:
         assert result.max_wait_time == 15.0
         assert result.expected_status_code == 200
         assert result.initial_delay == 60.0
+
+
+def _make_scheduling_event(
+    session_id: SessionId,
+    status: str,
+) -> SchedulingBroadcastEvent:
+    return SchedulingBroadcastEvent(
+        session_id=session_id,
+        creation_id="test-creation",
+        status_transition=status,
+        reason="test",
+    )
+
+
+class TestWaitForSessionRunning:
+    """Tests for _wait_for_session_running() timeout behavior."""
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid.uuid4())
+
+    @pytest.fixture
+    def mock_propagator(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_registry_obj(self) -> MagicMock:
+        """Create a minimal mock with db for the registry instance."""
+        registry = MagicMock(spec=AgentRegistry)
+        registry._wait_for_session_running = AgentRegistry._wait_for_session_running.__get__(
+            registry, AgentRegistry
+        )
+        return registry
+
+    async def test_max_wait_positive_times_out_after_specified_seconds(
+        self,
+        session_id: SessionId,
+        mock_propagator: MagicMock,
+        mock_registry_obj: MagicMock,
+    ) -> None:
+        """max_wait=2 should raise TimeoutError after ~2 seconds, not 60."""
+
+        async def _hang_forever(cache_id: str) -> AsyncIterator[AbstractEvent]:
+            await asyncio.Event().wait()  # blocks until cancelled by timeout
+            yield  # type: ignore[misc]  # make it an async generator
+
+        mock_propagator.receive = _hang_forever
+
+        start = time.monotonic()
+        with pytest.raises(TimeoutError):
+            await mock_registry_obj._wait_for_session_running(
+                session_id, mock_propagator, max_wait=2
+            )
+        elapsed = time.monotonic() - start
+        assert elapsed < 5, f"Timed out in {elapsed}s, expected ~2s"
+        assert elapsed >= 1.5, f"Timed out too fast in {elapsed}s, expected ~2s"
+
+    async def test_max_wait_zero_uses_default_timeout_and_retries(
+        self,
+        session_id: SessionId,
+        mock_propagator: MagicMock,
+        mock_registry_obj: MagicMock,
+    ) -> None:
+        """max_wait=0 should NOT raise TimeoutError; it retries after timeout and checks DB."""
+        call_count = 0
+
+        async def _hang_then_stop(cache_id: str) -> AsyncIterator[AbstractEvent]:
+            nonlocal call_count
+            call_count += 1
+            await asyncio.Event().wait()
+            yield  # type: ignore[misc]
+
+        mock_propagator.receive = _hang_then_stop
+
+        # Mock DB to return RUNNING status on the fallback check
+        mock_db_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_row = MagicMock()
+        mock_row.status = SessionStatus.RUNNING
+        mock_result.first.return_value = mock_row
+        mock_db_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_db_ctx = MagicMock()
+        mock_db_ctx.__aenter__ = AsyncMock(return_value=mock_db_session)
+        mock_db_ctx.__aexit__ = AsyncMock(return_value=False)
+        mock_registry_obj.db = MagicMock()
+        mock_registry_obj.db.begin_readonly_session = MagicMock(return_value=mock_db_ctx)
+
+        # With max_wait=0, the method should catch TimeoutError, check DB, and return
+        # We use a short timeout by patching DEFAULT_WAIT_TIMEOUT_SECONDS
+        with patch("ai.backend.manager.registry.DEFAULT_WAIT_TIMEOUT_SECONDS", 1):
+            await mock_registry_obj._wait_for_session_running(
+                session_id, mock_propagator, max_wait=0
+            )
+
+        assert call_count >= 1
+
+    async def test_running_event_returns_immediately(
+        self,
+        session_id: SessionId,
+        mock_propagator: MagicMock,
+        mock_registry_obj: MagicMock,
+    ) -> None:
+        """Session becoming RUNNING should cause immediate return."""
+
+        async def _yield_running(cache_id: str) -> AsyncIterator[AbstractEvent]:
+            yield _make_scheduling_event(session_id, str(SessionStatus.RUNNING))
+
+        mock_propagator.receive = _yield_running
+
+        start = time.monotonic()
+        await mock_registry_obj._wait_for_session_running(session_id, mock_propagator, max_wait=15)
+        elapsed = time.monotonic() - start
+        assert elapsed < 1, f"Should return immediately, took {elapsed}s"
+
+    async def test_max_wait_zero_db_not_found_raises_session_not_found(
+        self,
+        session_id: SessionId,
+        mock_propagator: MagicMock,
+        mock_registry_obj: MagicMock,
+    ) -> None:
+        """max_wait=0 timeout + session not found in DB should raise SessionNotFound."""
+
+        async def _hang(cache_id: str) -> AsyncIterator[AbstractEvent]:
+            await asyncio.Event().wait()
+            yield  # type: ignore[misc]
+
+        mock_propagator.receive = _hang
+
+        mock_db_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.first.return_value = None  # session not found in DB
+        mock_db_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_db_ctx = MagicMock()
+        mock_db_ctx.__aenter__ = AsyncMock(return_value=mock_db_session)
+        mock_db_ctx.__aexit__ = AsyncMock(return_value=False)
+        mock_registry_obj.db = MagicMock()
+        mock_registry_obj.db.begin_readonly_session = MagicMock(return_value=mock_db_ctx)
+
+        with patch("ai.backend.manager.registry.DEFAULT_WAIT_TIMEOUT_SECONDS", 1):
+            with pytest.raises(SessionNotFound):
+                await mock_registry_obj._wait_for_session_running(
+                    session_id, mock_propagator, max_wait=0
+                )

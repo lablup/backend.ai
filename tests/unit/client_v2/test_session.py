@@ -204,11 +204,11 @@ class TestSessionLifecycle:
 
         await sc.rename("old-name", RenameSessionRequest(session_name="new-name"))
 
-        method, url, _ = _last_request_call(mock_session)
+        method, url, body = _last_request_call(mock_session)
         assert method == "POST"
         assert "/session/old-name/rename" in url
-        call_kwargs = mock_session.request.call_args.kwargs
-        assert call_kwargs["params"]["session_name"] == "new-name"
+        assert body is not None
+        assert body["session_name"] == "new-name"
 
     async def test_interrupt(self) -> None:
         resp = _no_content_response()

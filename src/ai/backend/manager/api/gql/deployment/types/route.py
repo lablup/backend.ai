@@ -48,6 +48,9 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus as RouteHealthStatusEnum,
+)
+from ai.backend.manager.data.deployment.types import (
     RouteStatus as RouteStatusEnum,
 )
 from ai.backend.manager.data.deployment.types import (
@@ -62,13 +65,23 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
     from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
 
+
 RouteStatusGQL: type[RouteStatusEnum] = gql_enum(
     BackendAIGQLMeta(
         added_version="25.19.0",
-        description="Route status indicating the health and lifecycle state of a route.",
+        description="Lifecycle status of a route.",
     ),
     RouteStatusEnum,
     name="RouteStatus",
+)
+
+RouteHealthStatusGQL: type[RouteHealthStatusEnum] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Health check status of a route.",
+    ),
+    RouteHealthStatusEnum,
+    name="RouteHealthStatus",
 )
 
 RouteTrafficStatusGQL: type[RouteTrafficStatusEnum] = gql_enum(
@@ -92,8 +105,9 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     deployment_id: ID
     session_id: ID | None
     revision_id: ID | None
-    status: RouteStatusGQL = gql_field(
-        description="The current status of the route indicating its health state."
+    status: RouteStatusGQL = gql_field(description="The lifecycle status of the route.")
+    health_status: RouteHealthStatusGQL = gql_field(
+        description="The health check status of the route."
     )
     traffic_status: RouteTrafficStatusGQL = gql_field(
         description="The traffic routing status (ACTIVE/INACTIVE). Controls whether traffic should be sent to this route."
@@ -182,6 +196,7 @@ class RouteOrderField(StrEnum):
 )
 class RouteFilter(PydanticInputMixin[RouteFilterDTO]):
     status: list[RouteStatusGQL] | None = None
+    health_status: list[RouteHealthStatusGQL] | None = None
     traffic_status: list[RouteTrafficStatusGQL] | None = None
 
     AND: list[Self] | None = None

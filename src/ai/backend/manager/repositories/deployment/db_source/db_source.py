@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.config import ModelDefinition, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
@@ -53,6 +53,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
+    RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
@@ -255,26 +256,31 @@ class DeploymentDBSource:
 
             # Create deployment policy if provided
             if policy_config is not None:
-                policy_spec = DeploymentPolicyCreatorSpec(
+                policy_creator_spec = DeploymentPolicyCreatorSpec(
                     endpoint_id=endpoint.id,
                     strategy=policy_config.strategy,
                     strategy_spec=policy_config.strategy_spec,
                 )
-                policy_creator = RBACEntityCreator(
-                    spec=policy_spec,
-                    element_type=RBACElementType.DEPLOYMENT_POLICY,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.MODEL_DEPLOYMENT,
-                        element_id=str(endpoint.id),
-                    ),
-                )
-                await execute_rbac_entity_creator(db_sess, policy_creator)
+            else:
+                policy_creator_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
+            policy_creator = RBACEntityCreator(
+                spec=policy_creator_spec,
+                element_type=RBACElementType.DEPLOYMENT_POLICY,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(endpoint.id),
+                ),
+            )
+            await execute_rbac_entity_creator(db_sess, policy_creator)
+            await db_sess.flush()
 
             stmt = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint.id)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.deployment_policy),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
@@ -337,21 +343,27 @@ class DeploymentDBSource:
 
             # Create deployment policy if provided
             if spec.policy is not None:
-                policy_creator = RBACEntityCreator(
-                    spec=spec.policy,
-                    element_type=RBACElementType.DEPLOYMENT_POLICY,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.MODEL_DEPLOYMENT,
-                        element_id=str(endpoint.id),
-                    ),
-                )
-                await execute_rbac_entity_creator(db_sess, policy_creator)
+                policy_spec = spec.policy
+            else:
+                policy_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
+            policy_creator = RBACEntityCreator(
+                spec=policy_spec,
+                element_type=RBACElementType.DEPLOYMENT_POLICY,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(endpoint.id),
+                ),
+            )
+            await execute_rbac_entity_creator(db_sess, policy_creator)
+            await db_sess.flush()
 
             stmt = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint.id)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.deployment_policy),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
@@ -440,7 +452,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
@@ -473,7 +487,9 @@ class DeploymentDBSource:
                     )
                 )
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
@@ -508,12 +524,12 @@ class DeploymentDBSource:
 
             cleanup_configs: dict[str, ScalingGroupCleanupConfig] = {}
             for row in result:
-                # Convert str to RouteStatus
+                # Convert str to RouteHealthStatus
                 status_strs = row.scheduler_opts.route_cleanup_target_statuses
-                statuses = []
+                statuses: list[RouteHealthStatus] = []
                 for status_str in status_strs:
                     try:
-                        statuses.append(RouteStatus(status_str))
+                        statuses.append(RouteHealthStatus(status_str))
                     except ValueError:
                         # Skip invalid status strings
                         pass
@@ -593,7 +609,7 @@ class DeploymentDBSource:
             sa.select(EndpointRow)
             .where(where_clause)
             .options(
-                selectinload(EndpointRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.deployment_policy),
             )
@@ -616,7 +632,9 @@ class DeploymentDBSource:
                     EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED,
                 )
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
@@ -670,7 +688,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
@@ -709,7 +729,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == updater.pk_value)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.deployment_policy),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
@@ -1038,9 +1060,12 @@ class DeploymentDBSource:
                     endpoint_id=row.endpoint,
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
+                    health_status=row.health_status,
                     traffic_ratio=row.traffic_ratio,
                     created_at=row.created_at,
                     revision_id=row.revision,
+                    replica_host=row.replica_host,
+                    replica_port=row.replica_port,
                     error_data=row.error_data or {},
                 )
                 for row in rows
@@ -1179,7 +1204,7 @@ class DeploymentDBSource:
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).options(
-                selectinload(EndpointRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.deployment_policy),
             )
@@ -1242,7 +1267,7 @@ class DeploymentDBSource:
                     RoutingRow.id.label("route_id"),
                     RoutingRow.endpoint.label("endpoint_id"),
                     EndpointRow.name.label("endpoint_name"),
-                    EndpointRow.runtime_variant.label("runtime_variant"),
+                    DeploymentRevisionRow.runtime_variant.label("runtime_variant"),
                     EndpointRow.session_owner.label("session_owner"),
                     EndpointRow.project.label("project"),
                     KernelRow.kernel_host,
@@ -1250,6 +1275,10 @@ class DeploymentDBSource:
                 )
                 .select_from(RoutingRow)
                 .join(EndpointRow, RoutingRow.endpoint == EndpointRow.id)
+                .join(
+                    DeploymentRevisionRow,
+                    EndpointRow.current_revision == DeploymentRevisionRow.id,
+                )
                 .join(
                     KernelRow,
                     sa.and_(
@@ -1596,17 +1625,14 @@ class DeploymentDBSource:
     async def get_routes_by_statuses(
         self,
         statuses: list[RouteStatus],
+        health_statuses: list[RouteHealthStatus],
     ) -> list[RouteData]:
-        """Get routes by their statuses.
-
-        Args:
-            statuses: List of route statuses to filter by
-
-        Returns:
-            List of RouteData objects matching the statuses
-        """
+        """Get routes by lifecycle and health statuses."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(RoutingRow).where(RoutingRow.status.in_(statuses))
+            query = sa.select(RoutingRow).where(
+                RoutingRow.status.in_(statuses),
+                RoutingRow.health_status.in_(health_statuses),
+            )
             result = await db_sess.execute(query)
             rows: Sequence[RoutingRow] = result.scalars().all()
 
@@ -1617,9 +1643,12 @@ class DeploymentDBSource:
                     endpoint_id=row.endpoint,
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
+                    health_status=row.health_status,
                     traffic_ratio=row.traffic_ratio,
                     created_at=row.created_at,
                     revision_id=row.revision,
+                    replica_host=row.replica_host,
+                    replica_port=row.replica_port,
                     error_data=row.error_data or {},
                 )
                 route_data_list.append(route_data)
@@ -1827,6 +1856,83 @@ class DeploymentDBSource:
                 )
                 await db_sess.execute(query)
 
+    async def fetch_kernel_connection_info(
+        self,
+        session_ids: list[SessionId],
+    ) -> dict[SessionId, tuple[str, int]]:
+        """Fetch kernel_host and inference port for sessions."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(
+                KernelRow.session_id,
+                KernelRow.kernel_host,
+                KernelRow.service_ports,
+            ).where(
+                KernelRow.session_id.in_(session_ids),
+                KernelRow.cluster_role == "main",
+            )
+            result = await db_sess.execute(query)
+            info: dict[SessionId, tuple[str, int]] = {}
+            for row in result:
+                if not row.kernel_host or not row.service_ports:
+                    continue
+                for sp in row.service_ports:
+                    if sp.get("is_inference"):
+                        host_ports = sp.get("host_ports", [])
+                        if host_ports:
+                            info[SessionId(row.session_id)] = (row.kernel_host, host_ports[0])
+                        break
+            return info
+
+    async def update_route_replica_info(
+        self,
+        updates: dict[uuid.UUID, tuple[str, int]],
+    ) -> None:
+        """Update replica_host and replica_port for routes."""
+        async with self._begin_session_read_committed() as db_sess:
+            for route_id, (host, port) in updates.items():
+                query = (
+                    sa.update(RoutingRow)
+                    .where(RoutingRow.id == route_id)
+                    .values(replica_host=host, replica_port=port)
+                )
+                await db_sess.execute(query)
+
+    async def fetch_health_check_configs_by_revision_ids(
+        self,
+        revision_ids: set[uuid.UUID],
+    ) -> dict[uuid.UUID, ModelHealthCheck | None]:
+        """Fetch health check configurations for revisions.
+
+        For non-CUSTOM runtimes, uses the runtime profile's health_check_endpoint.
+        For CUSTOM runtimes, parses the model_definition JSONB column.
+
+        Returns:
+            Mapping of revision_id to ModelHealthCheck (None if no health check configured)
+        """
+        if not revision_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(
+                DeploymentRevisionRow.id,
+                DeploymentRevisionRow.runtime_variant,
+                DeploymentRevisionRow.model_definition,
+            ).where(DeploymentRevisionRow.id.in_(revision_ids))
+            result = await db_sess.execute(query)
+
+            configs: dict[uuid.UUID, ModelHealthCheck | None] = {}
+            for row in result:
+                profile = MODEL_SERVICE_RUNTIME_PROFILES[row.runtime_variant]
+                if profile.health_check_endpoint:
+                    configs[row.id] = ModelHealthCheck(path=profile.health_check_endpoint)
+                elif row.runtime_variant == RuntimeVariant.CUSTOM and row.model_definition:
+                    md = ModelDefinition.model_validate(row.model_definition)
+                    configs[row.id] = md.health_check_config()
+                else:
+                    configs[row.id] = None
+
+            return configs
+
     async def delete_routes_by_route_ids(
         self,
         route_ids: set[uuid.UUID],
@@ -2013,16 +2119,17 @@ class DeploymentDBSource:
                 endpoint_id,
                 load_created_user=True,
                 load_session_owner=True,
-                load_image=True,
+                load_revisions=True,
                 load_routes=True,
             )
             if not endpoint:
                 raise EndpointNotFound(str(endpoint_id))
 
-            # Get model vfolder for health check config
-            if endpoint.model is None:
+            # Get model vfolder from current revision for health check config
+            current_rev = endpoint._find_current_revision()
+            if current_rev is None or current_rev.model is None:
                 return None
-            model = await VFolderRow.get(db_sess, endpoint.model)
+            model = await VFolderRow.get(db_sess, current_rev.model)
             if not model:
                 return None
 
@@ -2292,7 +2399,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == updater.pk_value)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),

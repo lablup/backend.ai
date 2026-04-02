@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     CreateGroupInput,
     DeleteGroupInput,
     PurgeGroupInput,
+    UnassignUsersFromProjectInput,
     UpdateGroupInput,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -86,4 +87,13 @@ class V2ProjectHandler:
     ) -> APIResponse:
         """Assign users to a project."""
         result = await self._adapter.assign_users(path.parsed.project_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def unassign_users(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[UnassignUsersFromProjectInput],
+    ) -> APIResponse:
+        """Unassign users from a project."""
+        result = await self._adapter.unassign_users(path.parsed.project_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

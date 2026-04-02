@@ -7,12 +7,12 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.typed_validators import VFolderName
-from ai.backend.common.types import VFolderUsageMode
+from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 
 __all__ = (
     # CRUD Operations
@@ -144,9 +144,26 @@ class CloneVFolderReq(BaseRequestModel):
         validation_alias=AliasChoices("target_host", "folder_host"),
         description="Target host for the clone",
     )
+    target_quota_scope_id: QuotaScopeID | None = Field(
+        default=None,
+        validation_alias=AliasChoices("target_quota_scope_id", "targetQuotaScopeId"),
+        description=(
+            "Target quota scope ID for the clone (e.g. 'user:<uuid>'). "
+            "If not specified, defaults to the requester's user quota scope."
+        ),
+    )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
     permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
+
+    @field_validator("target_quota_scope_id", mode="before")
+    @classmethod
+    def parse_quota_scope_id(cls, v: Any) -> QuotaScopeID | None:
+        if v is None:
+            return None
+        if isinstance(v, QuotaScopeID):
+            return v
+        return QuotaScopeID.parse(v)
 
 
 class GetVFolderIDReq(BaseRequestModel):

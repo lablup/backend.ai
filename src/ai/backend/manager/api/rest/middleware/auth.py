@@ -412,13 +412,28 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         raise AuthorizationFailed("Invalid signature") from e
 
 
+def extract_client_ip(request: web.Request) -> str | None:
+    """Extract the client IP from the request.
+
+    When XForwardedStrict middleware is active, request.remote is already
+    resolved to the real client IP, so use it directly.  Otherwise, fall back
+    to manual X-Forwarded-For parsing (first IP in the comma-separated list).
+    """
+    if request.app.get("_trusted_proxies_enabled"):
+        return request.remote
+    raw: str | None = request.headers.get("X-Forwarded-For") or request.remote
+    if raw:
+        return raw.split(",")[0].strip()
+    return None
+
+
 def validate_ip(request: web.Request, user: Mapping[str, Any]) -> None:
     allowed_client_ip = user.get("allowed_client_ip", None)
     if not allowed_client_ip or allowed_client_ip is None:
         return
     if not isinstance(allowed_client_ip, list):
         raise InvalidClientIPConfig("allowed_client_ip must be a list")
-    raw_client_addr: str | None = request.headers.get("X-Forwarded-For") or request.remote
+    raw_client_addr = extract_client_ip(request)
     if raw_client_addr is None:
         raise AuthorizationFailed("Not allowed IP address")
     try:
@@ -654,9 +669,8 @@ def _setup_user_context(request: web.Request) -> ExitStack:
                 })
             )
 
-    raw_client_addr: str | None = request.headers.get("X-Forwarded-For") or request.remote
-    if raw_client_addr:
-        client_ip = raw_client_addr.split(",")[0].strip()
+    client_ip = extract_client_ip(request)
+    if client_ip:
         stack.enter_context(with_client_ip(client_ip))
 
     return stack

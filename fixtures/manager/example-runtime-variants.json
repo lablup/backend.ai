@@ -1,0 +1,11 @@
+{
+  "runtime_variants": [
+    {"name": "vllm", "description": "vLLM"},
+    {"name": "nim", "description": "NVIDIA NIM"},
+    {"name": "cmd", "description": "Predefined Image Command"},
+    {"name": "huggingface-tgi", "description": "Huggingface TGI"},
+    {"name": "sglang", "description": "SGLang"},
+    {"name": "modular-max", "description": "Modular MAX"},
+    {"name": "custom", "description": "Custom (Default)"}
+  ]
+}

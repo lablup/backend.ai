@@ -5,7 +5,14 @@ from collections.abc import Sequence
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
+from ai.backend.manager.data.deployment.types import (
+    RouteHandlerCategory,
+    RouteHealthStatus,
+    RouteStatus,
+    RouteStatusTransitions,
+    RouteTargetStatuses,
+    RouteTransitionTarget,
+)
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -38,40 +45,25 @@ class RunningRouteHandler(RouteHandler):
         return LockID.LOCKID_DEPLOYMENT_RUNNING_ROUTES
 
     @classmethod
-    def target_statuses(cls) -> list[RouteStatus]:
-        """Get the target route statuses for this handler."""
-        return [
-            RouteStatus.DEGRADED,
-            RouteStatus.HEALTHY,
-            RouteStatus.UNHEALTHY,
-            RouteStatus.FAILED_TO_START,
-        ]
+    def category(cls) -> RouteHandlerCategory:
+        return RouteHandlerCategory.LIFECYCLE
 
     @classmethod
-    def next_status(cls) -> RouteStatus | None:
-        return None
-
-    @classmethod
-    def failure_status(cls) -> RouteStatus | None:
-        """Get the failure route status if applicable."""
-        return RouteStatus.TERMINATING
-
-    @classmethod
-    def stale_status(cls) -> RouteStatus | None:
-        """Get the stale route status if applicable."""
-        return None
+    def target_statuses(cls) -> RouteTargetStatuses:
+        return RouteTargetStatuses(
+            lifecycle=[RouteStatus.RUNNING, RouteStatus.FAILED_TO_START],
+            health=list(RouteHealthStatus),
+        )
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Define state transitions for running route handler (BEP-1030).
-
-        - success: None (stays in current status)
-        - failure: Route → TERMINATING (session died or failed)
-        - stale: None
-        """
+        """Running check: success=no change, failure=TERMINATING (session died) + reset health."""
         return RouteStatusTransitions(
             success=None,
-            failure=RouteStatus.TERMINATING,
+            failure=RouteTransitionTarget(
+                status=RouteStatus.TERMINATING,
+                health_status=RouteHealthStatus.NOT_CHECKED,
+            ),
             stale=None,
         )
 

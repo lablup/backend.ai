@@ -5,7 +5,13 @@ from collections.abc import Sequence
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
+from ai.backend.manager.data.deployment.types import (
+    RouteHandlerCategory,
+    RouteHealthStatus,
+    RouteStatus,
+    RouteStatusTransitions,
+    RouteTargetStatuses,
+)
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -38,24 +44,15 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         return None
 
     @classmethod
-    def target_statuses(cls) -> list[RouteStatus]:
-        """Get the target route statuses for this handler."""
-        return [RouteStatus.HEALTHY]
+    def category(cls) -> RouteHandlerCategory:
+        return RouteHandlerCategory.HEALTH
 
     @classmethod
-    def next_status(cls) -> RouteStatus | None:
-        """No status transition for service discovery sync."""
-        return None
-
-    @classmethod
-    def failure_status(cls) -> RouteStatus | None:
-        """No failure status for service discovery sync."""
-        return None
-
-    @classmethod
-    def stale_status(cls) -> RouteStatus | None:
-        """Get the stale route status if applicable."""
-        return None
+    def target_statuses(cls) -> RouteTargetStatuses:
+        return RouteTargetStatuses(
+            lifecycle=[RouteStatus.RUNNING],
+            health=[RouteHealthStatus.HEALTHY],
+        )
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:

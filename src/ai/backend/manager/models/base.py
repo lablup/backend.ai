@@ -767,6 +767,20 @@ class KernelIDColumnType(GUID[KernelId]):
     cache_ok = True
 
 
+class ResourceSlotEntry(BaseModel):
+    """A single resource slot entry for PydanticListColumn storage."""
+
+    resource_type: str
+    quantity: str
+
+
+class ResourceOptsEntry(BaseModel):
+    """A single resource option entry for PydanticListColumn storage."""
+
+    name: str
+    value: str
+
+
 def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 

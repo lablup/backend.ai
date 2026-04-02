@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import enum
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -13,6 +14,7 @@ from uuid import UUID
 import yarl
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -27,7 +29,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
     from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
-from ai.backend.common.config import ModelDefinition
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -60,7 +61,7 @@ class ImageEnvironment(BaseModel):
     )
 
 
-class ModelServiceDefinition(BaseModel):
+class DeploymentConfig(BaseModel):
     environment: ImageEnvironment | None = Field(
         default=None,
         description="""
@@ -82,6 +83,15 @@ class ModelServiceDefinition(BaseModel):
             {"cpu": 1, "mem": "2gb"},
         ],
     )
+    resource_opts: dict[str, Any] | None = Field(
+        default=None,
+        description="""
+        Resource options for the model service session (e.g., shmem).
+        """,
+        examples=[
+            {"shmem": "16g"},
+        ],
+    )
     environ: dict[str, str] | None = Field(
         default=None,
         description="""
@@ -94,10 +104,10 @@ class ModelServiceDefinition(BaseModel):
 
 
 class RouteStatus(enum.Enum):
+    """Lifecycle status of a route (independent of health)."""
+
     PROVISIONING = "provisioning"
-    HEALTHY = "healthy"
-    UNHEALTHY = "unhealthy"
-    DEGRADED = "degraded"
+    RUNNING = "running"
     TERMINATING = "terminating"
     TERMINATED = "terminated"
     FAILED_TO_START = "failed_to_start"
@@ -107,9 +117,7 @@ class RouteStatus(enum.Enum):
     def active_route_statuses(cls) -> set[RouteStatus]:
         return {
             RouteStatus.PROVISIONING,
-            RouteStatus.HEALTHY,
-            RouteStatus.UNHEALTHY,
-            RouteStatus.DEGRADED,
+            RouteStatus.RUNNING,
         }
 
     @classmethod
@@ -123,18 +131,21 @@ class RouteStatus(enum.Enum):
     def is_inactive(self) -> bool:
         return self in self.inactive_route_statuses()
 
-    def is_provisioning(self) -> bool:
-        """PROVISIONING or DEGRADED (still warming up, health checks not yet passing)."""
-        return self in (RouteStatus.PROVISIONING, RouteStatus.DEGRADED)
 
-    def termination_priority(self) -> int:
-        priority_map = {
-            RouteStatus.UNHEALTHY: 1,
-            RouteStatus.DEGRADED: 2,
-            RouteStatus.PROVISIONING: 3,
-            RouteStatus.HEALTHY: 4,
-        }
-        return priority_map.get(self, 0)
+class RouteHealthStatus(enum.Enum):
+    """Health check status of a route (independent of lifecycle)."""
+
+    NOT_CHECKED = "not_checked"
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    DEGRADED = "degraded"
+
+
+class RouteHandlerCategory(enum.StrEnum):
+    """Category of route handler for history separation."""
+
+    LIFECYCLE = "lifecycle"
+    HEALTH = "health"
 
 
 class RouteTrafficStatus(enum.StrEnum):
@@ -214,20 +225,37 @@ class DeploymentStatusTransitions:
 
 
 @dataclass(frozen=True)
+class RouteTargetStatuses:
+    """Target statuses for route handler filtering (lifecycle x health)."""
+
+    lifecycle: list[RouteStatus]
+    health: list[RouteHealthStatus]
+
+
+@dataclass(frozen=True)
+class RouteTransitionTarget:
+    """Target state for a route transition (lifecycle + health)."""
+
+    status: RouteStatus | None = None
+    health_status: RouteHealthStatus | None = None
+
+
+@dataclass(frozen=True)
 class RouteStatusTransitions:
     """Status transitions for route handlers.
 
     Route handlers have success/failure/stale outcomes (no expired/give_up).
+    Each outcome can change lifecycle status, health status, or both.
 
     Attributes:
-        success: Target status when handler succeeds, None means no change
-        failure: Target status when handler fails, None means no change
-        stale: Target status when route becomes stale, None means no change
+        success: Target state when handler succeeds, None means no change
+        failure: Target state when handler fails, None means no change
+        stale: Target state when route becomes stale, None means no change
     """
 
-    success: RouteStatus | None = None
-    failure: RouteStatus | None = None
-    stale: RouteStatus | None = None
+    success: RouteTransitionTarget | None = None
+    failure: RouteTransitionTarget | None = None
+    stale: RouteTransitionTarget | None = None
 
 
 @dataclass
@@ -235,7 +263,7 @@ class ScalingGroupCleanupConfig:
     """Cleanup configuration for a scaling group."""
 
     scaling_group_name: str
-    cleanup_target_statuses: list[RouteStatus]
+    cleanup_target_statuses: list[RouteHealthStatus]
 
 
 @dataclass
@@ -324,6 +352,7 @@ class ExecutionSpec(ConfiguredModel):
 
 class ModelRevisionSpec(ConfiguredModel):
     revision_id: UUID | None = None
+    image_id: UUID | None = None
     image_identifier: ImageIdentifier
     resource_spec: ResourceSpec
     mounts: MountMetadata
@@ -359,6 +388,70 @@ class ModelRevisionSpecDraft(ConfiguredModel):
     resource_spec: ResourceSpecDraft
     mounts: MountMetadata
     execution: ExecutionSpec
+
+
+@dataclass
+class RevisionDraft:
+    """Intermediate representation for revision creation with all fields optional.
+
+    Three drafts are created from different sources and merged with priority:
+    model_definition (base) → preset (override) → request (highest priority).
+    Only non-None fields participate in the merge.
+    """
+
+    image_id: UUID | None = None
+    resource_slots: Mapping[str, Any] | None = None
+    resource_opts: Mapping[str, Any] | None = None
+    cluster_mode: ClusterMode | None = None
+    cluster_size: int | None = None
+    startup_command: str | None = None
+    bootstrap_script: str | None = None
+    environ: dict[str, str] | None = None
+    runtime_variant: RuntimeVariant | None = None
+    model_definition: ModelDefinition | None = None
+
+
+def merge_revision_drafts(*drafts: RevisionDraft) -> RevisionDraft:
+    """Merge multiple RevisionDrafts with later drafts taking priority.
+
+    For most fields: later non-None value overwrites earlier.
+    For environ: dict merge (later keys overwrite earlier keys).
+    """
+    result = RevisionDraft()
+    merged_environ: dict[str, str] = {}
+    merged_resource_slots: dict[str, Any] = {}
+    merged_resource_opts: dict[str, Any] = {}
+
+    for draft in drafts:
+        if draft.image_id is not None:
+            result = dataclasses.replace(result, image_id=draft.image_id)
+        if draft.resource_slots is not None:
+            merged_resource_slots.update(draft.resource_slots)
+        if draft.resource_opts is not None:
+            merged_resource_opts.update(draft.resource_opts)
+        if draft.cluster_mode is not None:
+            result = dataclasses.replace(result, cluster_mode=draft.cluster_mode)
+        if draft.cluster_size is not None:
+            result = dataclasses.replace(result, cluster_size=draft.cluster_size)
+        if draft.startup_command is not None:
+            result = dataclasses.replace(result, startup_command=draft.startup_command)
+        if draft.bootstrap_script is not None:
+            result = dataclasses.replace(result, bootstrap_script=draft.bootstrap_script)
+        if draft.environ is not None:
+            merged_environ.update(draft.environ)
+        if draft.runtime_variant is not None:
+            result = dataclasses.replace(result, runtime_variant=draft.runtime_variant)
+        if draft.model_definition is not None:
+            result = dataclasses.replace(result, model_definition=draft.model_definition)
+
+    if merged_resource_slots:
+        result = dataclasses.replace(result, resource_slots=merged_resource_slots)
+    if merged_resource_opts:
+        result = dataclasses.replace(result, resource_opts=merged_resource_opts)
+    if merged_environ:
+        result = dataclasses.replace(result, environ=merged_environ)
+
+    return result
 
 
 @dataclass
@@ -431,8 +524,16 @@ class ScaleOutDecision:
 
 @dataclass
 class DefinitionFiles:
-    service_definition: dict[str, Any] | None
+    deployment_config: dict[str, Any] | None
     model_definition: dict[str, Any]
+
+
+_HEALTH_TERMINATION_PRIORITY: dict[RouteHealthStatus, int] = {
+    RouteHealthStatus.UNHEALTHY: 1,
+    RouteHealthStatus.DEGRADED: 2,
+    RouteHealthStatus.NOT_CHECKED: 3,
+    RouteHealthStatus.HEALTHY: 4,
+}
 
 
 @dataclass
@@ -443,11 +544,23 @@ class RouteInfo:
     endpoint_id: UUID
     session_id: SessionId | None
     status: RouteStatus
+    health_status: RouteHealthStatus
     traffic_ratio: float
     created_at: datetime
-    revision_id: UUID | None
+    revision_id: UUID
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def termination_priority(self) -> int:
+        """Priority for scale-in termination (lower = terminated first).
+
+        Non-RUNNING routes are terminated first (0).
+        Among RUNNING routes: UNHEALTHY(1) > DEGRADED(2) > NOT_CHECKED(3) > HEALTHY(4).
+        """
+        if self.status != RouteStatus.RUNNING:
+            return 0
+        return _HEALTH_TERMINATION_PRIORITY.get(self.health_status, 0)
 
 
 @dataclass
@@ -546,6 +659,7 @@ class ModelRevisionData:
     model_mount_config: ModelMountConfigData
     created_at: datetime
     image_id: UUID
+    model_definition: ModelDefinition | None = None
     extra_vfolder_mounts: list[ExtraVFolderMountData] = field(default_factory=list)
 
 
@@ -633,15 +747,21 @@ class DeploymentHistoryData:
 
 @dataclass
 class RouteHistoryData:
-    """Domain model for route history."""
+    """Domain model for route history.
+
+    from_status/to_status contain the relevant status for the category:
+    - category=lifecycle: lifecycle status values (provisioning, running, etc.)
+    - category=health: health status values (healthy, unhealthy, etc.)
+    """
 
     id: UUID
     route_id: UUID
     deployment_id: UUID
 
+    category: str  # RouteHandlerCategory value
     phase: str  # RouteLifecycleType value
-    from_status: RouteStatus | None
-    to_status: RouteStatus | None
+    from_status: str | None
+    to_status: str | None
 
     result: SchedulingResult
     error_code: str | None

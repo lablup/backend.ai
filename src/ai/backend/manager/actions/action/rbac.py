@@ -82,3 +82,14 @@ class BaseRBACAction(ABC):
     def required_permission(cls) -> RBACRequiredPermission:
         """Return the RBAC permission required by this action."""
         ...
+
+    @classmethod
+    @abstractmethod
+    def permission_scope(cls) -> RBACElementType:
+        """Return the scope type where this action's permission is evaluated.
+
+        Each RBAC action class represents a unique (scope, entity, operation)
+        triple.  The scope is the context in which the permission check occurs
+        (e.g. PROJECT, USER, DOMAIN).
+        """
+        ...

@@ -25,6 +25,7 @@ from ai.backend.manager.data.deployment.creator import (
 )
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    DeploymentConfig,
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -36,7 +37,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
-    ModelServiceDefinition,
     ReplicaSpec,
     ResourceConfigData,
     ResourceSpec,
@@ -314,9 +314,9 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
 
     @pytest.fixture(autouse=True)
     def _setup_revision_generator(self, mock_revision_generator_registry: MagicMock) -> None:
-        """Set up mock revision generator to return no service definition by default."""
+        """Set up mock revision generator to return no deployment config by default."""
         mock_generator = MagicMock()
-        mock_generator.load_service_definition = AsyncMock(return_value=None)
+        mock_generator.load_deployment_config = AsyncMock(return_value=None)
         mock_revision_generator_registry.get.return_value = mock_generator
 
     @pytest.fixture(autouse=True)
@@ -572,33 +572,33 @@ class TestAddModelRevision(ModelRevisionFixtures):
         assert spec.model_definition == sample_model_definition
 
 
-class TestServiceDefinitionMerge(ModelRevisionFixtures):
-    """Tests for service definition merging in revision creation."""
+class TestDeploymentConfigMerge(ModelRevisionFixtures):
+    """Tests for deployment config merging in revision creation."""
 
     @pytest.fixture
-    def setup_mock_service_definition(
+    def setup_mock_deployment_config(
         self, mock_revision_generator_registry: MagicMock
-    ) -> Callable[[ModelServiceDefinition], None]:
-        """Factory fixture to inject a service definition into the mock generator registry."""
+    ) -> Callable[[DeploymentConfig], None]:
+        """Factory fixture to inject a deployment config into the mock generator registry."""
 
-        def _setup(service_def: ModelServiceDefinition) -> None:
+        def _setup(deployment_config: DeploymentConfig) -> None:
             mock_generator = MagicMock()
-            mock_generator.load_service_definition = AsyncMock(return_value=service_def)
+            mock_generator.load_deployment_config = AsyncMock(return_value=deployment_config)
             mock_revision_generator_registry.get.return_value = mock_generator
 
         return _setup
 
-    async def test_merge_environ_from_service_definition(
+    async def test_merge_environ_from_deployment_config(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_id: uuid.UUID,
         revision_creator: ModelRevisionCreator,
-        setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
+        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
     ) -> None:
-        """Service definition environ should be merged with creator environ as base."""
-        setup_mock_service_definition(
-            ModelServiceDefinition(
+        """Deployment config environ should be merged with creator environ as base."""
+        setup_mock_deployment_config(
+            DeploymentConfig(
                 environ={"SERVICE_VAR": "from_def", "CUDA_VISIBLE_DEVICES": "1"},
             )
         )
@@ -607,22 +607,22 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         await processors.add_model_revision.wait_for_complete(action)
 
         spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        # Creator value overrides service definition for overlapping keys
+        # Creator value overrides deployment config for overlapping keys
         assert spec.environ["CUDA_VISIBLE_DEVICES"] == "0"
-        # Service definition provides new keys
+        # Deployment config provides new keys
         assert spec.environ["SERVICE_VAR"] == "from_def"
 
-    async def test_merge_resource_slots_from_service_definition(
+    async def test_merge_resource_slots_from_deployment_config(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_id: uuid.UUID,
         revision_creator: ModelRevisionCreator,
-        setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
+        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
     ) -> None:
-        """Service definition resource_slots should be merged with creator slots as base."""
-        setup_mock_service_definition(
-            ModelServiceDefinition(
+        """Deployment config resource_slots should be merged with creator slots as base."""
+        setup_mock_deployment_config(
+            DeploymentConfig(
                 resource_slots={"cpu": "2", "mem": "4g", "cuda.shares": "1.0"},
             )
         )
@@ -634,14 +634,14 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         expected = ResourceSlot({"cpu": "4", "mem": "8g", "cuda.shares": "1.0"})
         assert spec.resource_slots == expected
 
-    async def test_no_service_definition_uses_creator_values_as_is(
+    async def test_no_deployment_config_uses_creator_values_as_is(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_id: uuid.UUID,
         revision_creator: ModelRevisionCreator,
     ) -> None:
-        """When no service definition exists, creator values are used unchanged."""
+        """When no deployment config exists, creator values are used unchanged."""
         action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
         await processors.add_model_revision.wait_for_complete(action)
 
@@ -649,16 +649,16 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         assert spec.environ == revision_creator.execution.environ
         assert spec.resource_slots == ResourceSlot(revision_creator.resource_spec.resource_slots)
 
-    async def test_service_definition_with_empty_fields_no_effect(
+    async def test_deployment_config_with_empty_fields_no_effect(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_id: uuid.UUID,
         revision_creator: ModelRevisionCreator,
-        setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
+        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
     ) -> None:
-        """Service definition with None environ/resource_slots should not affect creator."""
-        setup_mock_service_definition(ModelServiceDefinition(environ=None, resource_slots=None))
+        """Deployment config with None environ/resource_slots should not affect creator."""
+        setup_mock_deployment_config(DeploymentConfig(environ=None, resource_slots=None))
 
         action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
         await processors.add_model_revision.wait_for_complete(action)

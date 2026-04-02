@@ -58,6 +58,12 @@ def register_v2_deployment_routes(
     # Revision operations
     # ------------------------------------------------------------------
     registry.add(
+        "GET",
+        "/{deployment_id}/current-revision",
+        handler.get_current_revision,
+        middlewares=[auth_required],
+    )
+    registry.add(
         "POST",
         "/{deployment_id}/revisions",
         handler.add_revision,

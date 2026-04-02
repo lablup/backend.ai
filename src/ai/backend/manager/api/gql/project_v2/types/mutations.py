@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from ai.backend.common.dto.manager.v2.group.request import (
     CreateGroupInput as CreateGroupInputDTO,
+)
+from ai.backend.common.dto.manager.v2.group.request import (
+    UnassignUsersFromProjectInput as UnassignUsersFromProjectInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.request import (
     UpdateGroupInput as UpdateGroupInputDTO,
@@ -17,6 +22,12 @@ from ai.backend.common.dto.manager.v2.group.response import (
 from ai.backend.common.dto.manager.v2.group.response import (
     PurgeProjectPayload as PurgeProjectPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.group.response import (
+    UnassignUserError as UnassignUserErrorDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import (
+    UnassignUsersFromProjectPayload as UnassignUsersFromProjectPayloadDTO,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -26,6 +37,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 UNSET = None
 
@@ -111,3 +123,53 @@ class PurgeProjectPayloadGQL(PydanticOutputMixin[PurgeProjectPayloadDTO]):
     """Payload for project permanent purge."""
 
     purged: bool = gql_field(description="Whether the purge was successful.")
+
+
+# --- Unassign Users ---
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for unassigning users from a project.",
+    ),
+    name="UnassignUsersFromProjectInput",
+)
+class UnassignUsersFromProjectInputGQL(PydanticInputMixin[UnassignUsersFromProjectInputDTO]):
+    """Input for unassigning users from a project."""
+
+    user_ids: list[UUID] = gql_field(description="List of user UUIDs to unassign from the project.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Error information for a user that failed to be unassigned.",
+    ),
+    model=UnassignUserErrorDTO,
+    name="UnassignUserError",
+)
+class UnassignUserErrorGQL(PydanticOutputMixin[UnassignUserErrorDTO]):
+    """Error information for a user that failed to be unassigned."""
+
+    user_id: UUID = gql_field(description="UUID of the user that failed to be unassigned.")
+    message: str = gql_field(description="Error message describing the failure reason.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for user unassignment from project.",
+    ),
+    model=UnassignUsersFromProjectPayloadDTO,
+    name="UnassignUsersFromProjectPayload",
+)
+class UnassignUsersFromProjectPayloadGQL(PydanticOutputMixin[UnassignUsersFromProjectPayloadDTO]):
+    """Payload for user unassignment from project."""
+
+    unassigned_users: list[UserV2GQL] = gql_field(
+        description="List of users that were unassigned from the project.",
+    )
+    failed: list[UnassignUserErrorGQL] = gql_field(
+        description="List of errors for users that could not be unassigned.",
+    )

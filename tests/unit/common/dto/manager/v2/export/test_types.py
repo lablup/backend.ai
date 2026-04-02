@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 from ai.backend.common.dto.manager.v2.export.types import (
-    BooleanFilter,
     ExportFieldInfoNode,
     ExportReportInfoNode,
     ExportReportKey,
@@ -177,33 +176,3 @@ class TestExportReportInfoNode:
         data = json.loads(node.model_dump_json())
         assert "report_key" in data
         assert "reportKey" not in data
-
-
-class TestBooleanFilter:
-    """Tests for BooleanFilter model."""
-
-    def test_creation_with_true(self) -> None:
-        f = BooleanFilter(equals=True)
-        assert f.equals is True
-
-    def test_creation_with_false(self) -> None:
-        f = BooleanFilter(equals=False)
-        assert f.equals is False
-
-    def test_round_trip_true(self) -> None:
-        f = BooleanFilter(equals=True)
-        json_str = f.model_dump_json()
-        restored = BooleanFilter.model_validate_json(json_str)
-        assert restored.equals is True
-
-    def test_round_trip_false(self) -> None:
-        f = BooleanFilter(equals=False)
-        json_str = f.model_dump_json()
-        restored = BooleanFilter.model_validate_json(json_str)
-        assert restored.equals is False
-
-    def test_model_dump_contains_equals(self) -> None:
-        f = BooleanFilter(equals=True)
-        data = f.model_dump()
-        assert "equals" in data
-        assert data["equals"] is True

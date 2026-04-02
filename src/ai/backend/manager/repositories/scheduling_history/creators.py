@@ -8,7 +8,11 @@ from uuid import UUID
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHandlerCategory,
+    RouteHealthStatus,
+    RouteStatus,
+)
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
@@ -121,11 +125,14 @@ class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
 
     route_id: UUID
     deployment_id: UUID
+    category: RouteHandlerCategory
     phase: str  # RouteLifecycleType value
     result: SchedulingResult
     message: str
     from_status: RouteStatus | None = None
     to_status: RouteStatus | None = None
+    from_health_status: RouteHealthStatus | None = None
+    to_health_status: RouteHealthStatus | None = None
     error_code: str | None = None
     sub_steps: list[SubStepResult] = field(default_factory=list)
 
@@ -134,9 +141,14 @@ class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
         return RouteHistoryRow(
             route_id=self.route_id,
             deployment_id=self.deployment_id,
+            category=self.category.value,
             phase=self.phase,
             from_status=str(self.from_status.value) if self.from_status else None,
             to_status=str(self.to_status.value) if self.to_status else None,
+            from_health_status=str(self.from_health_status.value)
+            if self.from_health_status
+            else None,
+            to_health_status=str(self.to_health_status.value) if self.to_health_status else None,
             result=str(self.result),
             error_code=self.error_code,
             message=self.message,

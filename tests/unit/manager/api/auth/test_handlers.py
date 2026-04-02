@@ -116,13 +116,24 @@ class TestTestGet:
 class TestGetMyIp:
     """Tests for get_my_ip handler (GET /auth/my-ip)."""
 
+    @staticmethod
+    def _make_mock_request(
+        xff: str | None = None,
+        remote: str | None = None,
+        trusted_proxies_enabled: bool = False,
+    ) -> MagicMock:
+        mock_request = MagicMock(spec=web.Request)
+        mock_request.headers.get.return_value = xff
+        mock_request.remote = remote
+        mock_request.app.get.return_value = trusted_proxies_enabled
+        return mock_request
+
     async def test_returns_client_ip_from_x_forwarded_for(
         self,
         handler: AuthHandler,
     ) -> None:
         """Verify get_my_ip returns IP from X-Forwarded-For header."""
-        mock_request = MagicMock(spec=web.Request)
-        mock_request.headers.get.return_value = "1.2.3.4"
+        mock_request = self._make_mock_request(xff="1.2.3.4")
         request_ctx = RequestCtx(request=mock_request)
 
         response = await handler.get_my_ip(request_ctx)
@@ -138,9 +149,7 @@ class TestGetMyIp:
         handler: AuthHandler,
     ) -> None:
         """Verify get_my_ip falls back to request.remote when no X-Forwarded-For header."""
-        mock_request = MagicMock(spec=web.Request)
-        mock_request.headers.get.return_value = None
-        mock_request.remote = "5.6.7.8"
+        mock_request = self._make_mock_request(remote="5.6.7.8")
         request_ctx = RequestCtx(request=mock_request)
 
         response = await handler.get_my_ip(request_ctx)
@@ -156,8 +165,27 @@ class TestGetMyIp:
         handler: AuthHandler,
     ) -> None:
         """Verify get_my_ip returns the first IP from comma-separated X-Forwarded-For."""
-        mock_request = MagicMock(spec=web.Request)
-        mock_request.headers.get.return_value = "1.2.3.4, 5.6.7.8"
+        mock_request = self._make_mock_request(xff="1.2.3.4, 5.6.7.8")
+        request_ctx = RequestCtx(request=mock_request)
+
+        response = await handler.get_my_ip(request_ctx)
+
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert isinstance(data, dict)
+        assert data["client_ip"] == "1.2.3.4"
+
+    async def test_returns_remote_when_trusted_proxies_enabled(
+        self,
+        handler: AuthHandler,
+    ) -> None:
+        """When XForwardedStrict is active, use request.remote directly."""
+        mock_request = self._make_mock_request(
+            xff="1.2.3.4, 10.0.0.1",
+            remote="1.2.3.4",
+            trusted_proxies_enabled=True,
+        )
         request_ctx = RequestCtx(request=mock_request)
 
         response = await handler.get_my_ip(request_ctx)

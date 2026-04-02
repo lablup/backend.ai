@@ -115,6 +115,7 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 from ai.backend.manager.services.session.actions.enqueue_session import (
     EnqueueSessionAction,
     ResourceSlotEntry,
@@ -129,6 +130,9 @@ from ai.backend.manager.services.session.actions.get_container_logs import (
 )
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
+from ai.backend.manager.services.session.actions.search_in_project import (
+    SearchSessionsInProjectAction,
+)
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
 from ai.backend.manager.services.session.actions.start_service import StartServiceAction
@@ -455,6 +459,35 @@ class SessionAdapter(BaseAdapter):
         )
         action_result = await self._processors.session.search_sessions.wait_for_complete(
             SearchSessionsAction(querier=querier, user_id=user.user_id)
+        )
+        return AdminSearchSessionsPayload(
+            items=[self._session_data_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def gql_search_by_project(
+        self,
+        scope: ProjectSessionSearchScope,
+        input: AdminSearchSessionsInput,
+    ) -> AdminSearchSessionsPayload:
+        """Search sessions within a project, cursor-based pagination."""
+        conditions = self._convert_session_filter(input.filter) if input.filter else []
+        orders = self._convert_session_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_SESSION_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.session.search_sessions_in_project.wait_for_complete(
+            SearchSessionsInProjectAction(scope=scope, querier=querier)
         )
         return AdminSearchSessionsPayload(
             items=[self._session_data_to_node(item) for item in action_result.data],

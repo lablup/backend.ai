@@ -479,7 +479,7 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         mock_get_endpoint_access_validation_data.return_value = self._make_validation_data(
             user_data
         )
-        mock_route_data = MagicMock(status=RouteStatus.HEALTHY)
+        mock_route_data = MagicMock(status=RouteStatus.RUNNING)
         mock_get_route_by_id.return_value = mock_route_data
 
         mock_session_row = MagicMock()
@@ -534,7 +534,7 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         mock_get_endpoint_access_validation_data.return_value = self._make_validation_data(
             user_data
         )
-        mock_get_route_by_id.return_value = MagicMock(status=RouteStatus.HEALTHY)
+        mock_get_route_by_id.return_value = MagicMock(status=RouteStatus.RUNNING)
         mock_get_route_with_session.return_value = MagicMock(session_row=None)
 
         action = DeleteRouteAction(service_id=service_id, route_id=route_id)

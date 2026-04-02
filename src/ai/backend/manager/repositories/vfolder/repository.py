@@ -16,7 +16,12 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderID
+from ai.backend.common.types import (
+    QuotaScopeID,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderID,
+)
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
@@ -29,6 +34,7 @@ from ai.backend.manager.data.permission.types import (
     RoleSource,
     ScopeType,
 )
+from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     ValidatedVFolderInfo,
     VFolderAccessInfo,
@@ -88,6 +94,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
     delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
+    ensure_quota_scope_accessible_by_user,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
     get_sessions_by_mounted_folder,
@@ -117,7 +124,10 @@ from ai.backend.manager.repositories.base.rbac.revoker import (
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
-from ai.backend.manager.repositories.vfolder.types import ProjectVFolderSearchScope
+from ai.backend.manager.repositories.vfolder.types import (
+    ProjectVFolderSearchScope,
+    UserVFolderSearchScope,
+)
 
 vfolder_repository_resilience = Resilience(
     policies=[
@@ -711,6 +721,24 @@ class VfolderRepository:
             if not user_row:
                 return None
             return user_row.email
+
+    @vfolder_repository_resilience.apply()
+    async def validate_quota_scope_access(
+        self,
+        quota_scope_id: QuotaScopeID,
+        user_identity: UserIdentity,
+    ) -> None:
+        """
+        Validate that the user has access to the given quota scope.
+        Raises InvalidAPIParameters if the user does not have access.
+        """
+        user_info: Mapping[str, Any] = {
+            "uuid": user_identity.user_uuid,
+            "role": user_identity.user_role,
+            "domain_name": user_identity.domain_name,
+        }
+        async with self._db.begin_readonly_session_read_committed() as session:
+            await ensure_quota_scope_accessible_by_user(session, quota_scope_id, user_info)
 
     @vfolder_repository_resilience.apply()
     async def get_users_by_ids(self, user_ids: list[uuid.UUID]) -> list[tuple[uuid.UUID, str]]:
@@ -1309,7 +1337,7 @@ class VfolderRepository:
         #       the actual object (with RETURNING clause).  In that case, we need to temporarily
         #       mark the object to be "unusable-yet" until the storage proxy creates the destination
         #       vfolder.  After done, we need to make another transaction to clear the unusable state.
-        target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
+        target_folder_id = VFolderID(vfolder_info.target_quota_scope_id, uuid.uuid4())
 
         # Clone the vfolder contents
         manager_client = storage_manager.get_manager_facing_client(source_proxy)
@@ -1331,14 +1359,13 @@ class VfolderRepository:
                     "permission": vfolder_info.permission,
                     "last_used": None,
                     "host": vfolder_info.target_host,
-                    # TODO: add quota_scope_id
                     "creator": vfolder_info.email,
                     "ownership_type": VFolderOwnershipType("user"),
                     "user": vfolder_info.user_id,
                     "group": None,
                     "unmanaged_path": None,
                     "cloneable": vfolder_info.cloneable,
-                    "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
+                    "quota_scope_id": vfolder_info.target_quota_scope_id,
                 }
                 query = sa.insert(vfolders).values(**insert_values)
                 await db_session.execute(query)
@@ -1935,14 +1962,16 @@ class VfolderRepository:
             )
 
     @vfolder_repository_resilience.apply()
-    async def search_vfolders(
+    async def search_user_vfolders(
         self,
         querier: BatchQuerier,
+        scope: UserVFolderSearchScope,
     ) -> VFolderSearchResult:
-        """Search all vfolders with pagination and filters (admin, no scope).
+        """Search vfolders scoped to a user.
 
         Args:
             querier: BatchQuerier for filtering, ordering, and pagination
+            scope: UserVFolderSearchScope that filters by user and validates existence
 
         Returns:
             VFolderSearchResult with items, total count, and pagination info
@@ -1954,6 +1983,7 @@ class VfolderRepository:
                 db_sess,
                 query,
                 querier,
+                scope=scope,
             )
 
             items = [row.VFolderRow.to_data() for row in result.rows]

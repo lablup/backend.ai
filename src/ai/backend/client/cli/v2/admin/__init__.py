@@ -132,3 +132,30 @@ def keypair() -> None:
 )
 def resource_preset() -> None:
     """Admin resource preset commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.runtime_variant:runtime_variant",
+    name="runtime-variant",
+)
+def runtime_variant() -> None:
+    """Admin runtime variant commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.runtime_variant_preset:runtime_variant_preset",
+    name="runtime-variant-preset",
+)
+def runtime_variant_preset() -> None:
+    """Admin runtime variant preset commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.model_card:model_card",
+    name="model-card",
+)
+def model_card() -> None:
+    """Admin model card commands."""

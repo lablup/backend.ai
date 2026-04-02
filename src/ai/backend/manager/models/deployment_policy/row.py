@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
@@ -93,12 +93,6 @@ class BlueGreenSpec(BaseModel):
 DeploymentStrategySpec = RollingUpdateSpec | BlueGreenSpec
 
 
-def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.endpoint import EndpointRow
-
-    return foreign(DeploymentPolicyRow.endpoint) == EndpointRow.id
-
-
 class DeploymentPolicyRow(Base):  # type: ignore[misc]
     """
     Represents a deployment policy for a deployment.
@@ -118,7 +112,12 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    endpoint: Mapped[uuid.UUID] = mapped_column("endpoint", GUID, nullable=False)
+    endpoint: Mapped[uuid.UUID] = mapped_column(
+        "endpoint",
+        GUID,
+        sa.ForeignKey("endpoints.id", name="fk_deployment_policies_endpoint", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     # Deployment strategy
     strategy: Mapped[DeploymentStrategy] = mapped_column(
@@ -150,11 +149,10 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
-    # Relationships (without FK constraints)
     endpoint_row: Mapped[EndpointRow | None] = relationship(
         "EndpointRow",
         back_populates="deployment_policy",
-        primaryjoin=_get_endpoint_join_condition,
+        foreign_keys=[endpoint],
         uselist=False,
     )
 

@@ -1,24 +1,44 @@
-"""VFolderV2 GraphQL API package."""
+"""VFolder GraphQL API package.
 
+Provides structured vfolder management API with typed fields
+replacing JSON scalars and organized into logical field groups.
+"""
+
+from .resolver import my_vfolders, project_vfolders
 from .types import (
-    VFolderV2FilterGQL,
-    VFolderV2OperationStatusFilterGQL,
-    VFolderV2OperationStatusGQL,
-    VFolderV2OrderByGQL,
-    VFolderV2OrderFieldGQL,
-    VFolderV2UsageModeFilterGQL,
-    VFolderV2UsageModeGQL,
+    VFolderAccessControlInfoGQL,
+    VFolderConnection,
+    VFolderEdge,
+    VFolderFilterGQL,
+    VFolderGQL,
+    VFolderMetadataInfoGQL,
+    VFolderOperationStatusFilterGQL,
+    VFolderOperationStatusGQL,
+    VFolderOrderByGQL,
+    VFolderOrderFieldGQL,
+    VFolderUsageModeFilterGQL,
+    VFolderUsageModeGQL,
 )
 
 __all__ = [
+    # Queries
+    "my_vfolders",
+    "project_vfolders",
     # Enum types
-    "VFolderV2OperationStatusGQL",
-    "VFolderV2UsageModeGQL",
+    "VFolderOperationStatusGQL",
+    "VFolderUsageModeGQL",
     # Enum filters
-    "VFolderV2OperationStatusFilterGQL",
-    "VFolderV2UsageModeFilterGQL",
+    "VFolderOperationStatusFilterGQL",
+    "VFolderUsageModeFilterGQL",
     # Filter and OrderBy
-    "VFolderV2FilterGQL",
-    "VFolderV2OrderByGQL",
-    "VFolderV2OrderFieldGQL",
+    "VFolderFilterGQL",
+    "VFolderOrderByGQL",
+    "VFolderOrderFieldGQL",
+    # Nested types
+    "VFolderMetadataInfoGQL",
+    "VFolderAccessControlInfoGQL",
+    # Node types
+    "VFolderGQL",
+    "VFolderEdge",
+    "VFolderConnection",
 ]

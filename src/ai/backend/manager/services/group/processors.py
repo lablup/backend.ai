@@ -35,6 +35,10 @@ from ai.backend.manager.services.group.actions.search_projects import (
     SearchProjectsByDomainAction,
     SearchProjectsByUserAction,
 )
+from ai.backend.manager.services.group.actions.unassign_users import (
+    UnassignUsersFromProjectAction,
+    UnassignUsersFromProjectActionResult,
+)
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
@@ -63,6 +67,9 @@ class GroupProcessors(AbstractProcessorPackage):
     get_project: SingleEntityActionProcessor[GetProjectAction, GetProjectActionResult]
     assign_users_to_project: SingleEntityActionProcessor[
         AssignUsersToProjectAction, AssignUsersToProjectActionResult
+    ]
+    unassign_users_from_project: SingleEntityActionProcessor[
+        UnassignUsersFromProjectAction, UnassignUsersFromProjectActionResult
     ]
 
     def __init__(
@@ -102,6 +109,11 @@ class GroupProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=rbac_single_entity_validators,
         )
+        self.unassign_users_from_project = SingleEntityActionProcessor(
+            group_service.unassign_users_from_project,
+            action_monitors,
+            validators=rbac_single_entity_validators,
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -117,4 +129,5 @@ class GroupProcessors(AbstractProcessorPackage):
             SearchProjectsByUserAction.spec(),
             GetProjectAction.spec(),
             AssignUsersToProjectAction.spec(),
+            UnassignUsersFromProjectAction.spec(),
         ]

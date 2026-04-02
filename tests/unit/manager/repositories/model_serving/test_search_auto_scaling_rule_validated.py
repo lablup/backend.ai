@@ -13,7 +13,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.model_serving.types import (
@@ -303,16 +303,9 @@ class TestSearchAutoScalingRulesValidated:
                 domain=test_domain,
                 project=test_group_id,
                 resource_group=test_scaling_group,
-                image=test_image_id,
-                model=None,
-                model_mount_destination="/models",
-                runtime_variant=RuntimeVariant.CUSTOM,
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 current_revision=uuid.uuid4(),
                 replicas=1,
-                resource_slots=ResourceSlot({"cpu": "1", "mem": "1g"}),
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
             )
             db_sess.add(endpoint)
             await db_sess.flush()

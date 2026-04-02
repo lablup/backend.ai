@@ -328,9 +328,10 @@ class AgentRegistry:
         max_wait: int,
     ) -> None:
         cache_id = EventCacheDomain.SESSION_SCHEDULER.cache_id(str(session_id))
+        timeout_seconds = max_wait if max_wait > 0 else DEFAULT_WAIT_TIMEOUT_SECONDS
         while True:
             try:
-                with _timeout(DEFAULT_WAIT_TIMEOUT_SECONDS):
+                with _timeout(timeout_seconds):
                     async for event in propagator.receive(cache_id):
                         if isinstance(event, SchedulingBroadcastEvent):
                             if event.status_transition == str(SessionStatus.RUNNING):
@@ -2532,13 +2533,14 @@ class AgentRegistry:
                 endpoint_id,
                 load_created_user=True,
                 load_session_owner=True,
-                load_image=True,
+                load_revisions=True,
                 load_routes=True,
             )
             connection_info = await endpoint.generate_route_info(db_sess)
-            if endpoint.model is None:
+            current_rev = endpoint._find_current_revision()
+            if current_rev is None or current_rev.model is None:
                 raise InvalidAPIParameters("Model not set for endpoint")
-            model = await VFolderRow.get(db_sess, endpoint.model)
+            model = await VFolderRow.get(db_sess, current_rev.model)
             endpoint_data = endpoint.to_data()
 
         health_check_config = await self.get_health_check_info(endpoint_data, model)

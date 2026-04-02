@@ -473,7 +473,6 @@ def export_projects(
     from ai.backend.client.session import Session
     from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
     from ai.backend.common.dto.manager.v2.export import (
-        BooleanFilter,
         OrderDirection,
         ProjectExportFilter,
         ProjectExportOrder,
@@ -494,7 +493,7 @@ def export_projects(
         project_filter = ProjectExportFilter(
             name=StringFilter(contains=filter_name) if filter_name else None,
             domain_name=StringFilter(contains=filter_domain) if filter_domain else None,
-            is_active=BooleanFilter(equals=filter_active) if filter_active is not None else None,
+            is_active=filter_active,
             created_at=DateTimeRangeFilter(after=filter_after, before=filter_before)
             if filter_after or filter_before
             else None,
