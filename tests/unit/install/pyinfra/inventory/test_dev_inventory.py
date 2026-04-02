@@ -56,13 +56,13 @@ class TestDevInventoryBuilder:
         return DevInventoryBuilder()
 
     @pytest.fixture()
-    def inventory(self, builder: DevInventoryBuilder) -> dict:
+    def inventory(self, builder: DevInventoryBuilder) -> dict[str, object]:
         return builder.build()
 
-    def test_build_returns_dict(self, inventory: dict) -> None:
+    def test_build_returns_dict(self, inventory: dict[str, object]) -> None:
         assert isinstance(inventory, dict)
 
-    def test_node_groups_present(self, inventory: dict) -> None:
+    def test_node_groups_present(self, inventory: dict[str, object]) -> None:
         expected_groups = [
             "mgmt",
             "compute",
@@ -77,18 +77,18 @@ class TestDevInventoryBuilder:
         for group in expected_groups:
             assert group in inventory, f"Missing node group: {group}"
 
-    def test_mgmt_has_one_local_node(self, inventory: dict) -> None:
+    def test_mgmt_has_one_local_node(self, inventory: dict[str, object]) -> None:
         mgmt = inventory["mgmt"]
         assert len(mgmt) == 1
         host, data = mgmt[0]
         assert host == "@local"
         assert isinstance(data, dict)
 
-    def test_compute_is_empty(self, inventory: dict) -> None:
+    def test_compute_is_empty(self, inventory: dict[str, object]) -> None:
         assert inventory["compute"] == []
         assert inventory["agent"] == []
 
-    def test_host_data_has_required_keys(self, inventory: dict) -> None:
+    def test_host_data_has_required_keys(self, inventory: dict[str, object]) -> None:
         _, data = inventory["mgmt"][0]
         required = [
             "bai_home_dir",
@@ -106,7 +106,7 @@ class TestDevInventoryBuilder:
         for key in required:
             assert key in data, f"Missing host data key: {key}"
 
-    def test_services_dict_has_all_services(self, inventory: dict) -> None:
+    def test_services_dict_has_all_services(self, inventory: dict[str, object]) -> None:
         _, data = inventory["mgmt"][0]
         services = data["services"]
         expected = [
@@ -127,7 +127,7 @@ class TestDevInventoryBuilder:
         for svc in expected:
             assert svc in services, f"Missing service: {svc}"
 
-    def test_service_types(self, inventory: dict) -> None:
+    def test_service_types(self, inventory: dict[str, object]) -> None:
         _, data = inventory["mgmt"][0]
         services = data["services"]
         assert isinstance(services["postgres"], PostgreSQLConfig)
@@ -138,7 +138,7 @@ class TestDevInventoryBuilder:
         assert isinstance(services["storage_proxy"], StorageProxyConfig)
         assert isinstance(services["appproxy"], AppProxyConfig)
 
-    def test_enterprise_stubs_disabled(self, inventory: dict) -> None:
+    def test_enterprise_stubs_disabled(self, inventory: dict[str, object]) -> None:
         _, data = inventory["mgmt"][0]
         services = data["services"]
         assert isinstance(services["license_server"], LicenseServerConfig)
@@ -148,28 +148,28 @@ class TestDevInventoryBuilder:
         assert isinstance(services["fasttrack"], FastTrackConfig)
         assert services["fasttrack"].enabled is False
 
-    def test_ports_match_halfstack(self, inventory: dict) -> None:
+    def test_ports_match_halfstack(self, inventory: dict[str, object]) -> None:
         _, data = inventory["mgmt"][0]
         services = data["services"]
         assert services["postgres"].port == HALFSTACK_PORTS["postgres"]
         assert services["redis"].port == HALFSTACK_PORTS["redis"]
         assert services["etcd"].advertised_client_port == HALFSTACK_PORTS["etcd"]
 
-    def test_appproxy_ports(self, inventory: dict) -> None:
+    def test_appproxy_ports(self, inventory: dict[str, object]) -> None:
         _, data = inventory["mgmt"][0]
         appproxy = data["services"]["appproxy"]
         assert appproxy.coordinator_port == APPPROXY_COORDINATOR_PORT
         assert appproxy.worker_interactive_port == APPPROXY_WORKER_INTERACTIVE_PORT
         assert appproxy.worker_tcp_port == APPPROXY_WORKER_TCP_PORT
 
-    def test_credentials_from_shared_defaults(self, inventory: dict) -> None:
+    def test_credentials_from_shared_defaults(self, inventory: dict[str, object]) -> None:
         _, data = inventory["mgmt"][0]
         services = data["services"]
         assert services["postgres"].password == DEV_DEFAULTS["postgres_password"]
         assert services["manager"].superadmin_password == DEV_DEFAULTS["superadmin_password"]
         assert services["appproxy"].db_user == DEV_DEFAULTS["appproxy_db_user"]
 
-    def test_config_objects_in_inventory(self, inventory: dict) -> None:
+    def test_config_objects_in_inventory(self, inventory: dict[str, object]) -> None:
         config_keys = [
             "postgresConfig",
             "redisConfig",
@@ -191,7 +191,7 @@ class TestDevInventoryBuilder:
         services = data["services"]
         assert services["appproxy"].coordinator_hostname == "192.168.1.100"
 
-    def test_default_versions_in_host_data(self, inventory: dict) -> None:
+    def test_default_versions_in_host_data(self, inventory: dict[str, object]) -> None:
         _, data = inventory["mgmt"][0]
         versions = data["bai_default_versions"]
         assert "traefik" in versions
