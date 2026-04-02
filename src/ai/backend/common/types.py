@@ -1351,6 +1351,7 @@ class VFolderMount(JSONSerializableMixin):
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
         base = cls.as_trafaret().check(obj)
+        base.pop("overlay_target", None)
         overlay_target: OverlayTarget | None = None
         if overlay_raw := obj.get("overlay_target"):
             vfolder_id_raw = overlay_raw.get("vfolder_id")
@@ -1399,6 +1400,7 @@ class VFolderMount(JSONSerializableMixin):
             t.Key("mount_perm"): tx.Enum(MountPermission),
             t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null
             | tx.Enum(VFolderUsageMode),
+            t.Key("overlay_target", optional=True, default=None): t.Null | t.Any,
         })
 
 
