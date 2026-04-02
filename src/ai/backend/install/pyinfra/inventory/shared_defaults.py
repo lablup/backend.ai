@@ -31,16 +31,14 @@ CORE_PORTS = {
 }
 
 # -- AppProxy ports
-APPPROXY_PORTS = {
-    "coordinator": 10200,
-    "worker_interactive": 10201,
-    "worker_interactive_range": (10205, 10300),
-    "worker_tcp": 10202,
-    "worker_tcp_range": (10501, 10600),
-    "worker_inference": 10203,
-    "worker_inference_range": (10601, 10700),
-    "traefik_api": 18080,
-}
+APPPROXY_COORDINATOR_PORT = 10200
+APPPROXY_WORKER_INTERACTIVE_PORT = 10201
+APPPROXY_WORKER_INTERACTIVE_RANGE = (10205, 10300)
+APPPROXY_WORKER_TCP_PORT = 10202
+APPPROXY_WORKER_TCP_RANGE = (10501, 10600)
+APPPROXY_WORKER_INFERENCE_PORT = 10203
+APPPROXY_WORKER_INFERENCE_RANGE = (10601, 10700)
+APPPROXY_TRAEFIK_API_PORT = 18080
 
 # -- Monitoring ports
 MONITORING_PORTS = {

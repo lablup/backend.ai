@@ -257,7 +257,7 @@ def get_package_manager(
         UnsupportedPlatformError: If platform is not supported
     """
     # Import here to avoid circular imports
-    from ai.backend.pyinfra.platform_utils import PlatformType, detect_platform
+    from ai.backend.install.pyinfra.platform_utils import PlatformType, detect_platform
 
     from .apt_manager import APTManager
     from .rpm_manager import DNFManager, YUMManager

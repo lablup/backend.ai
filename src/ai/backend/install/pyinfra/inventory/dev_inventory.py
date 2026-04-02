@@ -41,7 +41,11 @@ from ai.backend.install.pyinfra.configs.halfstack import (
 )
 from ai.backend.install.pyinfra.configs.pro import FastTrackConfig
 from ai.backend.install.pyinfra.inventory.shared_defaults import (
-    APPPROXY_PORTS,
+    APPPROXY_COORDINATOR_PORT,
+    APPPROXY_WORKER_INTERACTIVE_PORT,
+    APPPROXY_WORKER_INTERACTIVE_RANGE,
+    APPPROXY_WORKER_TCP_PORT,
+    APPPROXY_WORKER_TCP_RANGE,
     CORE_PORTS,
     DEFAULT_VERSIONS,
     DEV_DEFAULTS,
@@ -59,16 +63,16 @@ class DevInventoryBuilder:
     Matches the configuration from DevContext.hydrate_install_info().
     """
 
-    PORTS = {
+    PORTS: dict[str, int] = {
         **HALFSTACK_PORTS,
         **CORE_PORTS,
-        "appproxy_coordinator": APPPROXY_PORTS["coordinator"],
-        "appproxy_worker_interactive": APPPROXY_PORTS["worker_interactive"],
-        "appproxy_worker_interactive_start": APPPROXY_PORTS["worker_interactive_range"][0],
-        "appproxy_worker_interactive_end": APPPROXY_PORTS["worker_interactive_range"][1],
-        "appproxy_worker_tcp": APPPROXY_PORTS["worker_tcp"],
-        "appproxy_worker_tcp_start": APPPROXY_PORTS["worker_tcp_range"][0],
-        "appproxy_worker_tcp_end": APPPROXY_PORTS["worker_tcp_range"][1],
+        "appproxy_coordinator": APPPROXY_COORDINATOR_PORT,
+        "appproxy_worker_interactive": APPPROXY_WORKER_INTERACTIVE_PORT,
+        "appproxy_worker_interactive_start": APPPROXY_WORKER_INTERACTIVE_RANGE[0],
+        "appproxy_worker_interactive_end": APPPROXY_WORKER_INTERACTIVE_RANGE[1],
+        "appproxy_worker_tcp": APPPROXY_WORKER_TCP_PORT,
+        "appproxy_worker_tcp_start": APPPROXY_WORKER_TCP_RANGE[0],
+        "appproxy_worker_tcp_end": APPPROXY_WORKER_TCP_RANGE[1],
         **MONITORING_PORTS,
         **OTHER_PORTS,
     }
