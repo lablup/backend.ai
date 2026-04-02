@@ -84,8 +84,8 @@ class GraphQLTransportWSHandler:
                         subs.cancel(message)
                     case PingMessage() | PongMessage():
                         await sender.send_pong()
-        except Exception:
-            log.exception("GQL WS: unexpected error")
+        except Exception as e:
+            log.exception("GQL WS: unexpected error ({})", repr(e))
         finally:
             await subs.cancel_all()
         return conn.handler_return

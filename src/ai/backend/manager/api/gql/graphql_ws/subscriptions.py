@@ -104,8 +104,8 @@ class SubscriptionExecutor:
             # Client-initiated complete — do NOT echo complete back.
             send_complete = False
             return
-        except Exception:
-            log.exception("GQL WS: subscription {} error", sub_id)
+        except Exception as e:
+            log.exception("GQL WS: subscription {} error ({})", sub_id, repr(e))
             if not sender.closed:
                 await sender.send_internal_error(sub_id)
         finally:
