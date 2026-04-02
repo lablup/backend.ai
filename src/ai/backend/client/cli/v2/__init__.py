@@ -125,6 +125,18 @@ def service_catalog() -> None:
     """Service catalog commands."""
 
 
+# ------------------------------------------------------------------ Model Store
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.model_card:model_card",
+    name="model-card",
+)
+def model_card() -> None:
+    """Model card commands."""
+
+
 # ------------------------------------------------------------------ Storage
 
 

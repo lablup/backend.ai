@@ -101,7 +101,7 @@ def search(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.model_card.search(search_input)
+            result = await registry.model_card.admin_search(search_input)
             print_result(result)
         finally:
             await registry.close()

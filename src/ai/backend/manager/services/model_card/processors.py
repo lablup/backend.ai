@@ -20,6 +20,10 @@ from ai.backend.manager.services.model_card.actions.search import (
     SearchModelCardsAction,
     SearchModelCardsActionResult,
 )
+from ai.backend.manager.services.model_card.actions.search_in_project import (
+    SearchModelCardsInProjectAction,
+    SearchModelCardsInProjectActionResult,
+)
 from ai.backend.manager.services.model_card.actions.update import (
     UpdateModelCardAction,
     UpdateModelCardActionResult,
@@ -32,6 +36,9 @@ class ModelCardProcessors(AbstractProcessorPackage):
     update: ActionProcessor[UpdateModelCardAction, UpdateModelCardActionResult]
     delete: ActionProcessor[DeleteModelCardAction, DeleteModelCardActionResult]
     search: ActionProcessor[SearchModelCardsAction, SearchModelCardsActionResult]
+    search_in_project: ActionProcessor[
+        SearchModelCardsInProjectAction, SearchModelCardsInProjectActionResult
+    ]
     scan: ActionProcessor[ScanProjectModelCardsAction, ScanProjectModelCardsActionResult]
 
     def __init__(
@@ -44,6 +51,7 @@ class ModelCardProcessors(AbstractProcessorPackage):
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
+        self.search_in_project = ActionProcessor(service.search_in_project, action_monitors)
         self.scan = ActionProcessor(service.scan, action_monitors)
 
     @override
@@ -53,5 +61,6 @@ class ModelCardProcessors(AbstractProcessorPackage):
             UpdateModelCardAction.spec(),
             DeleteModelCardAction.spec(),
             SearchModelCardsAction.spec(),
+            SearchModelCardsInProjectAction.spec(),
             ScanProjectModelCardsAction.spec(),
         ]

@@ -35,11 +35,15 @@ from ai.backend.manager.repositories.base import QueryCondition, QueryOrder, com
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
+from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
 from ai.backend.manager.services.model_card.actions.search import SearchModelCardsAction
+from ai.backend.manager.services.model_card.actions.search_in_project import (
+    SearchModelCardsInProjectAction,
+)
 from ai.backend.manager.services.model_card.actions.update import UpdateModelCardAction
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -65,7 +69,7 @@ def _min_resource_to_entries(slots: dict[str, str]) -> list[ResourceSlotEntryInf
 
 
 class ModelCardAdapter(BaseAdapter):
-    async def search(
+    async def admin_search(
         self,
         input: SearchModelCardsInput,
     ) -> SearchModelCardsPayload:
@@ -84,6 +88,34 @@ class ModelCardAdapter(BaseAdapter):
         )
         result = await self._processors.model_card.search.wait_for_complete(
             SearchModelCardsAction(querier=querier)
+        )
+        return SearchModelCardsPayload(
+            items=[self._data_to_node(d) for d in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def project_search(
+        self,
+        scope: ProjectModelCardSearchScope,
+        input: SearchModelCardsInput,
+    ) -> SearchModelCardsPayload:
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_model_card_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._processors.model_card.search_in_project.wait_for_complete(
+            SearchModelCardsInProjectAction(scope=scope, querier=querier)
         )
         return SearchModelCardsPayload(
             items=[self._data_to_node(d) for d in result.items],

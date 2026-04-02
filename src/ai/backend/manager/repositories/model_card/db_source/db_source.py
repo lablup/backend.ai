@@ -25,6 +25,10 @@ from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_que
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_bulk_upserter
+from ai.backend.manager.repositories.model_card.types import (
+    ModelCardSearchResult,
+    ProjectModelCardSearchScope,
+)
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -69,12 +73,31 @@ class ModelCardDBSource:
     async def search(
         self,
         querier: BatchQuerier,
-    ) -> tuple[list[ModelCardData], int, bool, bool]:
+    ) -> ModelCardSearchResult:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(ModelCardRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.ModelCardRow.to_data() for row in result.rows]
-            return items, result.total_count, result.has_next_page, result.has_previous_page
+            return ModelCardSearchResult(
+                items=[row.ModelCardRow.to_data() for row in result.rows],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_in_project(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectModelCardSearchScope,
+    ) -> ModelCardSearchResult:
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ModelCardRow)
+            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+            return ModelCardSearchResult(
+                items=[row.ModelCardRow.to_data() for row in result.rows],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     async def get_scan_target_vfolders(self, project_id: UUID) -> list[VFolderScanData]:
         async with self._db.begin_readonly_session() as session:

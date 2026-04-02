@@ -173,9 +173,10 @@ from .login_session import (
 from .model_card import (
     admin_create_model_card_v2,
     admin_delete_model_card_v2,
+    admin_model_cards_v2,
     admin_update_model_card_v2,
     model_card_v2,
-    model_cards_v2,
+    project_model_cards_v2,
     scan_project_model_cards_v2,
 )
 from .notification import (
@@ -562,7 +563,8 @@ class Query:
     deployment_revision_presets = deployment_revision_presets
     deployment_revision_preset = deployment_revision_preset
     # Model Card APIs
-    model_cards_v2 = model_cards_v2
+    admin_model_cards_v2 = admin_model_cards_v2
+    project_model_cards_v2 = project_model_cards_v2
     model_card_v2 = model_card_v2
     # Resource Allocation V2 APIs
     my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2

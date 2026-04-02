@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     ModelCardOrder,
     SearchModelCardsInput,
 )
+from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCardsPayload
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
@@ -23,6 +24,7 @@ from ai.backend.manager.api.gql.model_card.types import (
     ModelCardOrderByGQL,
     ModelCardV2Connection,
     ModelCardV2Edge,
+    ProjectModelCardScopeGQL,
     ScanProjectModelCardsPayloadGQL,
     UpdateModelCardInputGQL,
     UpdateModelCardPayloadGQL,
@@ -34,10 +36,10 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 @gql_root_field(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Search model cards.",
+        description="Search all model cards (superadmin only).",
     )
 )  # type: ignore[misc]
-async def model_cards_v2(
+async def admin_model_cards_v2(
     info: Info[StrawberryGQLContext],
     filter: ModelCardFilterGQL | None = None,
     order_by: list[ModelCardOrderByGQL] | None = None,
@@ -48,46 +50,36 @@ async def model_cards_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ModelCardV2Connection | None:
-    filter_dto: ModelCardFilter | None = filter.to_pydantic() if filter else None
-    orders_dto: list[ModelCardOrder] | None = None
-    if order_by:
-        orders_dto = [
-            ModelCardOrder(
-                field=ModelCardOrderField(o.field.value),
-                direction=OrderDirection(o.direction),
-            )
-            for o in order_by
-        ]
+    check_admin_only()
+    search_input = _build_search_input(filter, order_by, first, after, last, before, limit, offset)
+    result = await info.context.adapters.model_card.admin_search(search_input)
+    return _build_connection(result)
 
-    search_input = SearchModelCardsInput(
-        filter=filter_dto,
-        order=orders_dto,
-        first=first,
-        after=after,
-        last=last,
-        before=before,
-        limit=limit,
-        offset=offset,
-    )
 
-    result = await info.context.adapters.model_card.search(search_input)
-    edges = [
-        ModelCardV2Edge(
-            node=ModelCardGQL.from_pydantic(item),
-            cursor=str(item.id),
-        )
-        for item in result.items
-    ]
-    return ModelCardV2Connection(
-        edges=edges,
-        page_info=PageInfo(
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=result.total_count,
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Search model cards within a MODEL_STORE project.",
     )
+)  # type: ignore[misc]
+async def project_model_cards_v2(
+    info: Info[StrawberryGQLContext],
+    scope: ProjectModelCardScopeGQL,
+    filter: ModelCardFilterGQL | None = None,
+    order_by: list[ModelCardOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ModelCardV2Connection | None:
+    from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
+
+    repo_scope = ProjectModelCardSearchScope(project_id=scope.project_id)
+    search_input = _build_search_input(filter, order_by, first, after, last, before, limit, offset)
+    result = await info.context.adapters.model_card.project_search(repo_scope, search_input)
+    return _build_connection(result)
 
 
 @gql_root_field(
@@ -163,3 +155,55 @@ async def scan_project_model_cards_v2(
 ) -> ScanProjectModelCardsPayloadGQL:
     payload = await info.context.adapters.model_card.scan_project(project_id)
     return ScanProjectModelCardsPayloadGQL.from_pydantic(payload)
+
+
+def _build_search_input(
+    filter: ModelCardFilterGQL | None,
+    order_by: list[ModelCardOrderByGQL] | None,
+    first: int | None,
+    after: str | None,
+    last: int | None,
+    before: str | None,
+    limit: int | None,
+    offset: int | None,
+) -> SearchModelCardsInput:
+    filter_dto: ModelCardFilter | None = filter.to_pydantic() if filter else None
+    orders_dto: list[ModelCardOrder] | None = None
+    if order_by:
+        orders_dto = [
+            ModelCardOrder(
+                field=ModelCardOrderField(o.field.value),
+                direction=OrderDirection(o.direction),
+            )
+            for o in order_by
+        ]
+    return SearchModelCardsInput(
+        filter=filter_dto,
+        order=orders_dto,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def _build_connection(result: SearchModelCardsPayload) -> ModelCardV2Connection:
+    edges = [
+        ModelCardV2Edge(
+            node=ModelCardGQL.from_pydantic(item),
+            cursor=str(item.id),
+        )
+        for item in result.items
+    ]
+    return ModelCardV2Connection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
+    )

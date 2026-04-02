@@ -36,6 +36,9 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
 from ai.backend.common.dto.manager.v2.model_card.response import (
     UpdateModelCardPayload as UpdatePayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.model_card.types import (
+    ProjectModelCardScope as ProjectModelCardScopeDTO,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -150,6 +153,17 @@ class ModelCardV2Connection(Connection[ModelCardGQL]):
     def __init__(self, *args, count: int, **kwargs) -> None:  # type: ignore[no-untyped-def]
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Scope for model card queries within a MODEL_STORE project.",
+    ),
+    name="ProjectModelCardV2Scope",
+)
+class ProjectModelCardScopeGQL(PydanticInputMixin[ProjectModelCardScopeDTO]):
+    project_id: UUID = gql_field(description="MODEL_STORE project UUID.")
 
 
 @gql_pydantic_input(

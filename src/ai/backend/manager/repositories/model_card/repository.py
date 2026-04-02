@@ -11,6 +11,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.model_card.types import (
+    ModelCardSearchResult,
+    ProjectModelCardSearchScope,
+)
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
 
 from .db_source.db_source import ModelCardDBSource
@@ -39,8 +43,15 @@ class ModelCardRepository:
     async def search(
         self,
         querier: BatchQuerier,
-    ) -> tuple[list[ModelCardData], int, bool, bool]:
+    ) -> ModelCardSearchResult:
         return await self._db_source.search(querier)
+
+    async def search_in_project(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectModelCardSearchScope,
+    ) -> ModelCardSearchResult:
+        return await self._db_source.search_in_project(querier, scope)
 
     async def get_scan_target_vfolders(self, project_id: UUID) -> list[VFolderScanData]:
         return await self._db_source.get_scan_target_vfolders(project_id)

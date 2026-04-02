@@ -29,6 +29,10 @@ from ai.backend.manager.services.model_card.actions.search import (
     SearchModelCardsAction,
     SearchModelCardsActionResult,
 )
+from ai.backend.manager.services.model_card.actions.search_in_project import (
+    SearchModelCardsInProjectAction,
+    SearchModelCardsInProjectActionResult,
+)
 from ai.backend.manager.services.model_card.actions.update import (
     UpdateModelCardAction,
     UpdateModelCardActionResult,
@@ -67,14 +71,23 @@ class ModelCardService:
         return DeleteModelCardActionResult(model_card=data)
 
     async def search(self, action: SearchModelCardsAction) -> SearchModelCardsActionResult:
-        items, total_count, has_next_page, has_previous_page = await self._repository.search(
-            action.querier
-        )
+        result = await self._repository.search(action.querier)
         return SearchModelCardsActionResult(
-            items=items,
-            total_count=total_count,
-            has_next_page=has_next_page,
-            has_previous_page=has_previous_page,
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_in_project(
+        self, action: SearchModelCardsInProjectAction
+    ) -> SearchModelCardsInProjectActionResult:
+        result = await self._repository.search_in_project(action.querier, action.scope)
+        return SearchModelCardsInProjectActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def scan(self, action: ScanProjectModelCardsAction) -> ScanProjectModelCardsActionResult:

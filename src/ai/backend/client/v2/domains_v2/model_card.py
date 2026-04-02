@@ -21,10 +21,20 @@ _PATH = "/v2/model-cards"
 
 
 class V2ModelCardClient(BaseDomainClient):
-    async def search(self, request: SearchModelCardsInput) -> SearchModelCardsPayload:
+    async def admin_search(self, request: SearchModelCardsInput) -> SearchModelCardsPayload:
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/search",
+            request=request,
+            response_model=SearchModelCardsPayload,
+        )
+
+    async def project_search(
+        self, project_id: UUID, request: SearchModelCardsInput
+    ) -> SearchModelCardsPayload:
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/projects/{project_id}/search",
             request=request,
             response_model=SearchModelCardsPayload,
         )
