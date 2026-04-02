@@ -31,7 +31,7 @@ def upgrade() -> None:
         SET strategy_spec = jsonb_set(
             strategy_spec,
             '{max_surge}',
-            jsonb_build_object('count', (strategy_spec -> 'max_surge')::int)
+            jsonb_build_object('count', (strategy_spec ->> 'max_surge')::int)
         )
         WHERE jsonb_typeof(strategy_spec -> 'max_surge') = 'number'
         """
@@ -42,7 +42,7 @@ def upgrade() -> None:
         SET strategy_spec = jsonb_set(
             strategy_spec,
             '{max_unavailable}',
-            jsonb_build_object('count', (strategy_spec -> 'max_unavailable')::int)
+            jsonb_build_object('count', (strategy_spec ->> 'max_unavailable')::int)
         )
         WHERE jsonb_typeof(strategy_spec -> 'max_unavailable') = 'number'
         """
