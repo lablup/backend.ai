@@ -100,9 +100,13 @@ class ModelCardAdapter(BaseAdapter):
 
     async def project_search(
         self,
-        scope: ProjectModelCardSearchScope,
+        project_id: UUID,
         input: SearchModelCardsInput,
     ) -> SearchModelCardsPayload:
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        scope = ProjectModelCardSearchScope(project_id=project_id, user_id=me.user_id)
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         querier = self._build_querier(

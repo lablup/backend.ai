@@ -14,6 +14,7 @@ from ai.backend.common.types import VFolderUsageMode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.model_card.types import ModelCardData, VFolderScanData
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import (
     InvalidProjectTypeForModelCard,
     ModelCardNotFound,
@@ -98,6 +99,9 @@ class ModelCardDBSource:
         scope: ProjectModelCardSearchScope,
     ) -> ModelCardSearchResult:
         async with self._db.begin_readonly_session() as db_sess:
+            is_member = (await db_sess.execute(scope.membership_check_query)).scalar()
+            if not is_member:
+                raise GenericForbidden("User is not a member of this project")
             query = sa.select(ModelCardRow)
             result = await execute_batch_querier(db_sess, query, querier, scope=scope)
             return ModelCardSearchResult(

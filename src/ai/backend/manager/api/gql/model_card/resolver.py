@@ -74,11 +74,8 @@ async def project_model_cards_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ModelCardV2Connection | None:
-    from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
-
-    repo_scope = ProjectModelCardSearchScope(project_id=scope.project_id)
     search_input = _build_search_input(filter, order_by, first, after, last, before, limit, offset)
-    result = await info.context.adapters.model_card.project_search(repo_scope, search_input)
+    result = await info.context.adapters.model_card.project_search(scope.project_id, search_input)
     return _build_connection(result)
 
 

@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
@@ -32,9 +32,14 @@ class ModelCardSearchResult:
 
 @dataclass(frozen=True)
 class ProjectModelCardSearchScope(SearchScope):
-    """Scope for searching model cards within a MODEL_STORE project."""
+    """Scope for searching model cards within a MODEL_STORE project.
+
+    Includes user_id for membership validation — only project members
+    can search model cards in the project.
+    """
 
     project_id: UUID
+    user_id: UUID
 
     def to_condition(self) -> QueryCondition:
         project_id = self.project_id
@@ -53,3 +58,13 @@ class ProjectModelCardSearchScope(SearchScope):
                 error=ProjectNotFound(str(self.project_id)),
             ),
         ]
+
+    @property
+    def membership_check_query(self) -> sa.Select:
+        """Query to validate user is a member of this project."""
+        return sa.select(sa.literal(True)).where(
+            sa.and_(
+                AssocGroupUserRow.user_id == self.user_id,
+                AssocGroupUserRow.group_id == self.project_id,
+            )
+        )
