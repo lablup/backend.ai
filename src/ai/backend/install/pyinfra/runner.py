@@ -526,6 +526,9 @@ class BaseSystemdDeploy(BaseDeploy):
         # Whether to use sudo for systemd operations (default: True)
         self.use_sudo: bool = True
 
+        # Skip systemd service creation/management (for dev mode on macOS etc.)
+        self.skip_systemd: bool = False
+
     def _get_full_service_name(self) -> str:
         """Get the full systemd service name."""
         if not self.service_name:
@@ -555,6 +558,10 @@ class BaseSystemdDeploy(BaseDeploy):
             group_id: Group ID to run the service as (default: 0/root)
             dest: Custom destination path. If None, uses /etc/systemd/system/backendai-{service_name}.service
         """
+        if self.skip_systemd:
+            logger.info("Skipping systemd service creation (skip_systemd=True)")
+            return
+
         svc_name = service_name or self.service_name
         if not svc_name:
             raise ConfigurationError(
@@ -599,6 +606,10 @@ class BaseSystemdDeploy(BaseDeploy):
         Args:
             service_name: Service name (without 'backendai-' prefix). If None, uses self.service_name
         """
+        if self.skip_systemd:
+            logger.info("Skipping systemd service removal (skip_systemd=True)")
+            return
+
         svc_name = service_name or self.service_name
         if not svc_name:
             raise ConfigurationError(
@@ -620,6 +631,8 @@ class BaseSystemdDeploy(BaseDeploy):
 
     def start_service(self) -> None:
         """Start the systemd service."""
+        if self.skip_systemd:
+            return
         systemd.service(
             service=self._get_full_service_name(),
             running=True,
@@ -628,6 +641,8 @@ class BaseSystemdDeploy(BaseDeploy):
 
     def stop_service(self) -> None:
         """Stop the systemd service."""
+        if self.skip_systemd:
+            return
         systemd.service(
             service=self._get_full_service_name(),
             running=False,
@@ -636,6 +651,8 @@ class BaseSystemdDeploy(BaseDeploy):
 
     def restart_service(self) -> None:
         """Restart the systemd service."""
+        if self.skip_systemd:
+            return
         systemd.service(
             service=self._get_full_service_name(),
             restarted=True,

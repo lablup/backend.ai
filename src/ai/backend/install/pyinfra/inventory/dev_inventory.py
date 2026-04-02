@@ -214,6 +214,8 @@ class DevInventoryBuilder:
             "services": services,
             # Deploy mode
             "mode": "install",
+            # Skip systemd service creation (dev mode uses ./dev start)
+            "skip_systemd": True,
             # Network
             "internal_ip": self.host,
             "public_ip": self.host,

@@ -23,6 +23,9 @@ class AppProxyBaseDeploy(BaseSystemdDeploy):
         self.appproxy_major_version = get_major_version(self.config_bai_core.version)
         self.pip_install_options = host_data.bai_pip_install_options
 
+        # Dev mode: skip systemd service management
+        self.skip_systemd = getattr(host_data, "skip_systemd", False)
+
     def _init_python_env(self, host_data: object) -> None:
         """Initialize Python environment paths."""
         self.python_version = host_data.python_version
