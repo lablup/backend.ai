@@ -50,7 +50,9 @@ if [ $USER_ID -eq 0 ]; then
   fi
 
   # Set up distributed training environment variables from BACKENDAI_* cluster vars.
-  . /opt/kernel/setup_dist_environ.sh
+  if [ -f /opt/kernel/setup_dist_environ.sh ]; then
+    . /opt/kernel/setup_dist_environ.sh
+  fi
 
   # Extract dotfiles
   /opt/backend.ai/bin/python -s /opt/kernel/extract_dotfiles.py
@@ -135,7 +137,9 @@ else
   fi
 
   # Set up distributed training environment variables from BACKENDAI_* cluster vars.
-  . /opt/kernel/setup_dist_environ.sh
+  if [ -f /opt/kernel/setup_dist_environ.sh ]; then
+    . /opt/kernel/setup_dist_environ.sh
+  fi
 
   # Correct the ownership of agent socket.
   chown $USER_ID:$GROUP_ID /opt/kernel/agent.sock
