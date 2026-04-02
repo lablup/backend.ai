@@ -12380,7 +12380,9 @@ input ProjectWeightInputItem
   weight: Decimal = null
 }
 
-"""Added in UNRELEASED. Input for manually promoting a blue-green deployment."""
+"""
+Added in UNRELEASED. Input for manually promoting a blue-green deployment.
+"""
 input PromoteDeploymentInput
   @join__type(graph: STRAWBERRY)
 {

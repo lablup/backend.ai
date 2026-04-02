@@ -8073,6 +8073,19 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
+"""
+Added in UNRELEASED. Input for manually promoting a blue-green deployment.
+"""
+input PromoteDeploymentInput {
+  deploymentId: ID!
+}
+
+"""Added in UNRELEASED. Result of manually promoting a deployment."""
+type PromoteDeploymentPayload {
+  """The promoted deployment"""
+  deployment: ModelDeployment!
+}
+
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""
 type PurgeDomainPayloadGQL {
   """Whether the purge was successful."""
@@ -8083,17 +8096,6 @@ type PurgeDomainPayloadGQL {
 type PurgeProjectPayloadGQL {
   """Whether the purge was successful."""
   purged: Boolean!
-}
-
-"""Added in UNRELEASED. Input for manually promoting a blue-green deployment."""
-input PromoteDeploymentInput {
-  deploymentId: ID!
-}
-
-"""Added in UNRELEASED. Result of manually promoting a deployment."""
-type PromoteDeploymentPayload {
-  """The promoted deployment"""
-  deployment: ModelDeployment!
 }
 
 """Added in 26.3.0. Input for purging a role"""
