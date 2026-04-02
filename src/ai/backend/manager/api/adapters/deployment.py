@@ -378,17 +378,16 @@ class DeploymentAdapter(BaseAdapter):
             model_definition=initial_revision.model_definition,
             revision_preset_id=initial_revision.revision_preset_id,
             execution=ExecutionSpec(
-                    runtime_variant=RuntimeVariant(
-                        initial_revision.model_runtime_config.runtime_variant
-                    ),
-                    environ={
-                        e.name: e.value
-                        for e in initial_revision.model_runtime_config.environ.entries
-                    }
-                    if initial_revision.model_runtime_config.environ
-                    else None,
+                runtime_variant=RuntimeVariant(
+                    initial_revision.model_runtime_config.runtime_variant
                 ),
-            )
+                environ={
+                    e.name: e.value for e in initial_revision.model_runtime_config.environ.entries
+                }
+                if initial_revision.model_runtime_config.environ
+                else None,
+            ),
+        )
         strategy = input.default_deployment_strategy
         policy: DeploymentPolicyConfig | None = None
         if strategy.rolling_update is not None:

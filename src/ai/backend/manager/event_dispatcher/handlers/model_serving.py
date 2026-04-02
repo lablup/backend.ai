@@ -2,7 +2,6 @@ import logging
 from typing import Any
 
 import sqlalchemy as sa
-import yarl
 from sqlalchemy.exc import NoResultFound
 
 from ai.backend.common.events.event_types.model_serving.anycast import (

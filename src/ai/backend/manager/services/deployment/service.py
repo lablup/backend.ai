@@ -44,6 +44,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
@@ -204,7 +205,13 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
     if info.model_revisions:
         rev = info.model_revisions[0]
         if rev.revision_id is None:
-            raise ValueError(f"ModelRevisionSpec has no revision_id for deployment {info.id}")
+            raise DeploymentRevisionNotFound(
+                f"ModelRevisionSpec has no revision_id for deployment {info.id}"
+            )
+        if info.metadata.resource_group is None:
+            raise DeploymentRevisionNotFound(
+                f"resource_group is missing in metadata for deployment {info.id}"
+            )
         revision = ModelRevisionData(
             id=rev.revision_id,
             name=rev.image_identifier.canonical,
@@ -359,13 +366,11 @@ class DeploymentService:
                 ),
             )
 
-
         creator_spec = DeploymentCreatorSpec(
             metadata=DeploymentMetadataFields(
                 name=metadata.name,
                 domain=metadata.domain,
                 project_id=metadata.project,
-                resource_group=metadata.resource_group,
                 created_user_id=metadata.created_user,
                 session_owner_id=metadata.session_owner,
                 revision_history_limit=metadata.revision_history_limit,
@@ -618,6 +623,7 @@ class DeploymentService:
 
         return ModelRevisionCreator(
             image_id=merged.image_id or creator.image_id,
+            resource_group=creator.resource_group,
             resource_spec=ResourceSpec(
                 cluster_mode=merged.cluster_mode or creator.resource_spec.cluster_mode,
                 cluster_size=merged.cluster_size or creator.resource_spec.cluster_size,
