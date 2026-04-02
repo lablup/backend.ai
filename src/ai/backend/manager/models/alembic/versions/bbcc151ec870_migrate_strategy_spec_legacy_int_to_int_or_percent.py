@@ -1,6 +1,6 @@
 """migrate strategy_spec legacy plain-int values to IntOrPercent dict format
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: bbcc151ec870
 Revises: e3111d960208
 Create Date: 2026-04-02
 
@@ -9,7 +9,7 @@ Create Date: 2026-04-02
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "a1b2c3d4e5f6"
+revision = "bbcc151ec870"
 down_revision = "e3111d960208"
 branch_labels = None
 depends_on = None
