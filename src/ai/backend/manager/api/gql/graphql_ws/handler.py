@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Final
 from aiohttp import web
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.dto.context import RequestCtx
 
 from .connection import GraphQLWSConnection, WSReceiver, WSSender
 from .subscriptions import SubscriptionExecutor
@@ -59,8 +60,8 @@ class GraphQLTransportWSHandler:
     # Public entry point
     # ------------------------------------------------------------------
 
-    async def handle(self, request: web.Request) -> web.WebSocketResponse:
-        conn = await GraphQLWSConnection.open(request, max_msg_size=self._max_msg_size)
+    async def handle(self, request_ctx: RequestCtx) -> web.WebSocketResponse:
+        conn = await GraphQLWSConnection.open(request_ctx.request, max_msg_size=self._max_msg_size)
         receiver = conn.receiver
         sender = conn.sender
 
