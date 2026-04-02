@@ -149,6 +149,14 @@ class UserData:
 
 
 @dataclass
+class UserDetail:
+    """Combined view of user data with group memberships."""
+
+    user: UserData
+    groups: list[UserGroupMembership] = field(default_factory=list)
+
+
+@dataclass
 class UserCreateResultData:
     user: UserData
     keypair: KeyPairData

@@ -31,6 +31,7 @@ from ai.backend.manager.data.user.types import (
     BulkUserUpdateResultData,
     UserCreateResultData,
     UserData,
+    UserDetail,
     UserGroupMembership,
     UserSearchResult,
 )
@@ -135,21 +136,33 @@ class UserDBSource:
         Admin-only operation.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            user_row = await self._get_user_by_uuid(
-                db_session,
-                user_uuid,
-                options=[
+            user_row = await self._get_user_by_uuid(db_session, user_uuid)
+            return user_row.to_data()
+
+    async def get_user_detail_by_uuid(self, user_uuid: UUID) -> UserDetail:
+        """
+        Get user with group memberships by UUID.
+        Used for user detail view.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            query = (
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_uuid)
+                .options(
                     selectinload(UserRow.groups)
                     .joinedload(AssocGroupUserRow.group)
                     .load_only(GroupRow.id, GroupRow.name),
-                ],
+                )
             )
+            user_row = await db_session.scalar(query)
+            if user_row is None:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
             group_memberships = [
                 UserGroupMembership(id=assoc.group.id, name=assoc.group.name)
                 for assoc in user_row.groups
                 if assoc.group is not None
             ]
-            return user_row.to_data(groups=group_memberships)
+            return UserDetail(user=user_row.to_data(), groups=group_memberships)
 
     async def get_by_email_validated(
         self,
@@ -835,12 +848,9 @@ class UserDBSource:
         self,
         session: SASession,
         user_uuid: UUID,
-        options: Sequence[sa.orm.strategy_options._AbstractLoad] | None = None,
     ) -> UserRow:
         """Private method to get user by UUID."""
         query = sa.select(UserRow).where(UserRow.uuid == user_uuid)
-        if options:
-            query = query.options(*options)
         res = await session.scalar(query)
         if res is None:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")

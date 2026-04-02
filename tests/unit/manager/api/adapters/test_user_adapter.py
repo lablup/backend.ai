@@ -13,7 +13,6 @@ from ai.backend.manager.data.user.types import UserData, UserGroupMembership
 
 def _create_user_data(
     user_id: UUID | None = None,
-    groups: list[UserGroupMembership] | None = None,
 ) -> UserData:
     """Create a minimal UserData for testing adapter conversion."""
     now = datetime.now(tz=UTC)
@@ -42,29 +41,28 @@ def _create_user_data(
         container_uid=None,
         container_main_gid=None,
         container_gids=None,
-        groups=groups if groups is not None else [],
     )
 
 
 class TestUserDataToNodeGroups:
     """Tests for _user_data_to_node group membership mapping."""
 
-    def test_empty_groups_produces_empty_list(self) -> None:
-        """UserData with no groups should produce UserNode.groups == []."""
-        data = _create_user_data(groups=[])
+    def test_no_groups_produces_empty_list(self) -> None:
+        """UserData without groups kwarg should produce UserNode.groups == []."""
+        data = _create_user_data()
         node = UserAdapter._user_data_to_node(data)
         assert node.groups == []
 
     def test_populated_groups_mapped_correctly(self) -> None:
-        """UserData with group memberships should produce correctly mapped UserNode.groups."""
+        """Groups passed to _user_data_to_node should produce correctly mapped UserNode.groups."""
         group_id_1 = uuid4()
         group_id_2 = uuid4()
         groups = [
             UserGroupMembership(id=group_id_1, name="researchers"),
             UserGroupMembership(id=group_id_2, name="developers"),
         ]
-        data = _create_user_data(groups=groups)
-        node = UserAdapter._user_data_to_node(data)
+        data = _create_user_data()
+        node = UserAdapter._user_data_to_node(data, groups=groups)
 
         assert len(node.groups) == 2
         assert isinstance(node.groups[0], UserGroupMembershipInfo)
@@ -75,11 +73,11 @@ class TestUserDataToNodeGroups:
         assert node.groups[1].name == "developers"
 
     def test_single_group_mapped_correctly(self) -> None:
-        """UserData with a single group membership maps to a single-element list."""
+        """Single group passed to _user_data_to_node maps to a single-element list."""
         group_id = uuid4()
         groups = [UserGroupMembership(id=group_id, name="admins")]
-        data = _create_user_data(groups=groups)
-        node = UserAdapter._user_data_to_node(data)
+        data = _create_user_data()
+        node = UserAdapter._user_data_to_node(data, groups=groups)
 
         assert len(node.groups) == 1
         assert node.groups[0].id == group_id
