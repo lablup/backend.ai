@@ -1030,7 +1030,7 @@ class DeploymentAdapter(BaseAdapter):
                 adder=adder,
             )
         )
-        if options.activate:
+        if options.auto_activate:
             await self._processors.deployment.activate_revision.wait_for_complete(
                 ActivateRevisionAction(
                     deployment_id=input.deployment_id,

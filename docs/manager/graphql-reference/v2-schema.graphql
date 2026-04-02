@@ -129,7 +129,7 @@ input AddRevisionOptions {
   """
   When true, automatically activate the newly added revision immediately after creation.
   """
-  activate: Boolean! = false
+  autoActivate: Boolean! = false
 }
 
 """Added in 25.19.0. Payload for adding a revision."""

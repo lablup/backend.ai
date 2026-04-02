@@ -852,7 +852,7 @@ class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
     name="AddRevisionOptions",
 )
 class AddRevisionOptionsGQL(PydanticInputMixin[AddRevisionOptionsDTO]):
-    activate: bool = gql_field(
+    auto_activate: bool = gql_field(
         default=False,
         description="When true, automatically activate the newly added revision immediately after creation.",
     )

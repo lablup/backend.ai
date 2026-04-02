@@ -255,7 +255,7 @@ class DeploymentAPIHandler:
                 adder=revision_creator,
             )
         )
-        if body.parsed.options.activate:
+        if body.parsed.options.auto_activate:
             await self._deployment.activate_revision.wait_for_complete(
                 ActivateRevisionAction(
                     deployment_id=path.parsed.deployment_id,
