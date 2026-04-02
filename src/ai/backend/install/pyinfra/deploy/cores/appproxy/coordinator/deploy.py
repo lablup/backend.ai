@@ -167,6 +167,13 @@ class AppProxyCoordinatorDeploy(AppProxyBaseDeploy):
         self.create_directories(dirs=[self.service_dir, self.coordinator_dir])
         self._setup_coordinator()
 
+    def configure_only(self) -> None:
+        """Generate config files only (for dev mode)."""
+        self.create_directories(dirs=[self.service_dir, self.coordinator_dir])
+        self._create_coordinator_toml_file()
+        self._create_alembic_ini()
+        self._create_run_script()
+
     def remove(self) -> None:
         self._cleanup_coordinator()
         self.remove_directories(dirs=[self.coordinator_dir])

@@ -17,6 +17,7 @@ class DeployMode(Enum):
     INSTALL = "install"
     REMOVE = "remove"
     UPDATE = "update"
+    CONFIGURE_ONLY = "configure_only"
 
 
 def _create_management_scripts(
@@ -245,6 +246,8 @@ class BaseDeploy:
                 self.remove()
             case DeployMode.UPDATE:
                 self.update()
+            case DeployMode.CONFIGURE_ONLY:
+                self.configure_only()
             case _:
                 raise ConfigurationError(f"Unsupported mode: {mode}")
 
@@ -257,6 +260,14 @@ class BaseDeploy:
     def update(self) -> None:
         logger.warning(f"{type(self).__name__} does not implement update(), skipping.")
         print(f"[BAI:UPDATE_NOT_IMPLEMENTED] {type(self).__name__}")
+
+    def configure_only(self) -> None:
+        """Generate configuration files only, without installing packages or managing services.
+
+        Used by dev mode to reuse pyinfra deploy scripts for config generation.
+        Subclasses should override this to generate their specific config files.
+        """
+        logger.warning(f"{type(self).__name__} does not implement configure_only(), skipping.")
 
     def _auto_detect_template_dir(self) -> str:
         """

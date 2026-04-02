@@ -225,6 +225,49 @@ class AppProxyTraefikDeploy(BaseSystemdDeploy):
 
         self._cleanup_traefik(worker_type)
 
+    def _create_traefik_config(self, worker_type: str) -> None:
+        """Generate traefik configuration files for a specific worker type without managing services.
+
+        Args:
+            worker_type: Type of worker (inference, interactive, tcp)
+        """
+        worker_config = self.worker_configs[worker_type]
+
+        # Create traefik config YAML
+        files.template(
+            name=f"Create traefik config for {worker_type}",
+            src=str(self.locate_template("traefik-config.yml.j2")),
+            dest=f"{self.traefik_dir}/config-{worker_type}.yml",
+            mode="644",
+            port_start=worker_config["app_port_start"],
+            port_end=worker_config["app_port_end"],
+            api_port=worker_config["traefik_api_port"],
+            authority=worker_config["authority"],
+            etcd_host=self.config_etcd.connect_client_ip,
+            etcd_port=self.config_etcd.advertised_client_port,
+            traefik_dir=self.traefik_dir,
+            home_dir=self.home_dir,
+        )
+
+        # Create run script
+        files.template(
+            name=f"Create traefik run script for {worker_type}",
+            src=str(self.locate_template("run-traefik.sh.j2")),
+            dest=f"{self.home_dir}/bin/run-traefik-{worker_type}.sh",
+            mode="755",
+            home_dir=self.home_dir,
+            worker_type=worker_type,
+        )
+
+    def configure_only(self) -> None:
+        """Generate configuration files only, without installing packages or managing services."""
+        dirs = [self.service_dir, self.traefik_dir]
+        dirs.extend([f"{self.traefik_dir}/{worker_type}" for worker_type in self.worker_types])
+        self.create_directories(dirs=dirs)
+
+        for worker_type in self.worker_types:
+            self._create_traefik_config(worker_type)
+
     def _create_diff_script(self) -> None:
         """Create shell script to compare old vs new configurations for all worker types."""
         files.template(
@@ -276,14 +319,7 @@ class AppProxyTraefikDeploy(BaseSystemdDeploy):
 # Execute deployment when script is loaded
 def main() -> None:
     deploy_mode = host.data.get("mode", "install")
-    deploy = AppProxyTraefikDeploy(host.data)
-
-    if deploy_mode == "remove":
-        deploy.remove()
-    elif deploy_mode == "update":
-        deploy.update()
-    else:
-        deploy.install()
+    AppProxyTraefikDeploy(host.data).run(deploy_mode)
 
 
 main()

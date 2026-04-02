@@ -403,6 +403,21 @@ class ManagerDeploy(BaseSystemdDeploy):
         self._create_systemd_service_file(dest_dir=self.upgrade_dir)
         self._create_diff_script()
 
+    def configure_only(self) -> None:
+        """Generate configuration files only, without installing packages or managing services."""
+        self.create_directories(
+            dirs=[
+                self.service_dir,
+                f"{self.home_dir}/{self.BIN_DIR}",
+                f"{self.home_dir}/{self.CONFIG_DIR}",
+                f"{self.service_dir}/{self.FIXTURES_DIR}",
+            ]
+        )
+        self._create_toml_config_file()
+        self._create_run_script()
+        self._create_alembic_ini()
+        self._create_db_fixtures()
+
     def remove(self) -> None:
         """Remove the manager service and clean up all related files and configurations."""
         self.stop_service()

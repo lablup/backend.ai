@@ -193,6 +193,21 @@ class WebserverDeploy(BaseSystemdDeploy):
             logger.error(error_msg)
             raise DeploymentError(error_msg) from e
 
+    def configure_only(self) -> None:
+        """Generate configuration files only, without installing packages or managing services."""
+        self.create_directories(
+            dirs=[
+                self.service_dir,
+                f"{self.home_dir}/{self.BIN_DIR}",
+                f"{self.home_dir}/{self.CONFIG_DIR}",
+            ]
+        )
+        self._create_toml_config_file()
+        self.create_run_script(
+            home_dir=self.home_dir,
+            service_name=self.service_name,
+        )
+
     def _create_diff_script(self) -> None:
         """Create shell script to compare old vs new configurations."""
         files.template(

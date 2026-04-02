@@ -302,6 +302,19 @@ class AgentDeploy(BaseSystemdDeploy):
         )
         self.start_service()
 
+    def configure_only(self) -> None:
+        """Generate configuration files only, without installing packages or managing services."""
+        self.create_directories(
+            dirs=[
+                self.service_dir,
+                f"{self.home_dir}/bin",
+                f"{self.home_dir}/.config/backend.ai",
+            ]
+        )
+        self._create_toml_config_file()
+        self._create_agent_docker_container_opts()
+        self._create_run_script()
+
     def remove(self) -> None:
         """Remove the Backend.AI agent service and all related configurations.
 
@@ -353,14 +366,7 @@ class AgentDeploy(BaseSystemdDeploy):
 def main() -> None:
     """Entry point for agent deployment script."""
     deploy_mode = host.data.get("mode", "install")
-    deploy = AgentDeploy(host.data)
-
-    if deploy_mode == "remove":
-        deploy.remove()
-    elif deploy_mode == "update":
-        deploy.update()
-    else:
-        deploy.install()
+    AgentDeploy(host.data).run(deploy_mode)
 
 
 main()

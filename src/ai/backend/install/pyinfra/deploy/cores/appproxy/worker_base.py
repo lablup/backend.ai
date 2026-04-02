@@ -170,6 +170,12 @@ class AppProxyWorkerBaseDeploy(AppProxyBaseDeploy):
             path=f"{self.home_dir}/bin/{self.worker_config['run_script_name']}", present=False
         )
 
+    def configure_only(self) -> None:
+        """Generate configuration files only, without installing packages or managing services."""
+        self.create_directories(dirs=[self.service_dir, self.worker_config["dir"]])
+        self._create_worker_toml_file()
+        self._create_run_script()
+
     def install(self) -> None:
         self.create_directories(dirs=[self.service_dir, self.worker_config["dir"]])
         self._setup_worker()

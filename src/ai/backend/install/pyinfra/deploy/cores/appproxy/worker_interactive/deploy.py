@@ -11,14 +11,7 @@ class AppProxyWorkerInteractiveDeploy(AppProxyWorkerBaseDeploy):
 # Execute deployment when script is loaded
 def main() -> None:
     deploy_mode = host.data.get("mode", "install")
-    deploy = AppProxyWorkerInteractiveDeploy(host.data)
-
-    if deploy_mode == "remove":
-        deploy.remove()
-    elif deploy_mode == "update":
-        deploy.update()
-    else:
-        deploy.install()
+    AppProxyWorkerInteractiveDeploy(host.data).run(deploy_mode)
 
 
 main()

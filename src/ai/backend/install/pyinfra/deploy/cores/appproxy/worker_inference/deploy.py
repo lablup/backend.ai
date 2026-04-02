@@ -11,14 +11,7 @@ class AppProxyWorkerInferenceDeploy(AppProxyWorkerBaseDeploy):
 # Execute deployment when script is loaded
 def main() -> None:
     deploy_mode = host.data.get("mode", "install")
-    deploy = AppProxyWorkerInferenceDeploy(host.data)
-
-    if deploy_mode == "remove":
-        deploy.remove()
-    elif deploy_mode == "update":
-        deploy.update()
-    else:
-        deploy.install()
+    AppProxyWorkerInferenceDeploy(host.data).run(deploy_mode)
 
 
 main()
