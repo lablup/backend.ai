@@ -139,6 +139,7 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
             name=self.metadata.name,
             domain=self.metadata.domain,
             project=self.metadata.project_id,
+            resource_group=self.metadata.resource_group,
             created_user=self.metadata.created_user_id,
             session_owner=self.metadata.session_owner_id,
             revision_history_limit=self.metadata.revision_history_limit,
