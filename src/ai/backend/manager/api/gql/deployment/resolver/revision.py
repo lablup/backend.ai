@@ -185,9 +185,12 @@ async def activate_deployment_revision(
     )
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description="Added in 26.4.0. Manually promote a blue-green deployment."
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description="Manually promote a blue-green deployment.",
+    )
+)  # type: ignore[misc]
 async def promote_deployment(
     input: PromoteDeploymentInputGQL,
     info: Info[StrawberryGQLContext, None],
