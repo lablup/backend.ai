@@ -1,7 +1,4 @@
-from typing import Optional
-
 from pydantic import BaseModel, Field
-
 
 _DEFAULT_TOKEN_SECRET = "BACKEND_AI_TOKEN_SECRET"
 
@@ -14,11 +11,10 @@ class TOTPConfig(BaseModel):
     forced: bool = Field(
         default=False,
         description=(
-            "Whether TOTP is forced for all users. "
-            "If set to true, users must register TOTP."
+            "Whether TOTP is forced for all users. If set to true, users must register TOTP."
         ),
     )
-    totp_registration_url: Optional[str] = Field(
+    totp_registration_url: str | None = Field(
         default=None,
         description=(
             "URL to register TOTP. "
@@ -27,14 +23,9 @@ class TOTPConfig(BaseModel):
     )
     token_secret: str = Field(
         default=_DEFAULT_TOKEN_SECRET,
-        description=(
-            "Secret used when creating TOTP registration token for anonymous users."
-        ),
+        description=("Secret used when creating TOTP registration token for anonymous users."),
     )
     token_lifetime: int = Field(
         default=300,
-        description=(
-            "Lifetime for TOTP registration token in seconds. "
-            "Default is 5 minutes."
-        ),
+        description=("Lifetime for TOTP registration token in seconds. Default is 5 minutes."),
     )

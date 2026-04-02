@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Self
 
 import jwt
@@ -15,7 +15,7 @@ class TokenExpired(Exception):
 
 @dataclass
 class Token:
-    sub: str    # user_id
+    sub: str  # user_id
     exp: int
 
     def to_dict(self) -> dict[str, Any]:
@@ -45,22 +45,26 @@ class TokenParser:
         self._lifetime = lifetime
 
     def serialize(self, user_id: str) -> str:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expiration = now + timedelta(seconds=self._lifetime)
-        return jwt.encode(Token(user_id, int(expiration.timestamp())).to_dict(), self._secret, algorithm=self._algorithm)
+        return jwt.encode(
+            Token(user_id, int(expiration.timestamp())).to_dict(),
+            self._secret,
+            algorithm=self._algorithm,
+        )
 
     def deserialize(self, value: str) -> Token:
         try:
             val = jwt.decode(value, self._secret, algorithms=[self._algorithm])
         except jwt.ExpiredSignatureError:
-            raise TokenExpired
+            raise TokenExpired from None
         except (jwt.PyJWTError, jwt.exceptions.InvalidSignatureError):
-            raise InvalidTokenError
+            raise InvalidTokenError from None
         try:
             token = Token.from_dict(val)
         except KeyError:
-            raise InvalidTokenError("Invalid token format")
+            raise InvalidTokenError("Invalid token format") from None
 
-        if token.exp < datetime.now(timezone.utc).timestamp():
+        if token.exp < datetime.now(UTC).timestamp():
             raise TokenExpired
         return token

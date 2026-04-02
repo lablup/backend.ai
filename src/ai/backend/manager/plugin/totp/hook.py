@@ -1,21 +1,23 @@
 import logging
-from typing import Any, Mapping, Optional, Sequence, Tuple
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 import pyotp
 from aiohttp import web
 
+from ai.backend.common.dto.manager.auth.types import (
+    AuthResponseType,
+    RequireTwoFactorAuthResponse,
+    RequireTwoFactorRegistrationResponse,
+    TwoFactorType,
+)
+from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.hook import (
     HookHandler,
     HookPlugin,
     Reject,
 )
-from ai.backend.common.logging_utils import BraceStyleAdapter
-from ai.backend.common.dto.manager.auth.types import (
-    AuthResponseType,
-    TwoFactorType,
-    RequireTwoFactorAuthResponse,
-    RequireTwoFactorRegistrationResponse,
-)
+
 from .config import TOTPConfig
 from .utils import TokenParser
 
@@ -35,11 +37,11 @@ class TOTPHook(HookPlugin):
             self._plugin_config.token_secret, self._plugin_config.token_lifetime
         )
 
-    def get_handlers(self) -> Sequence[Tuple[str, HookHandler]]:
+    def get_handlers(self) -> Sequence[tuple[str, HookHandler]]:
         # FIXME: Until https://github.com/python/mypy/issues/5876 is resolved,
         #        we ignore type mismatch errors due to *args compared with concrete arguments.
         return [
-            ("POST_AUTHORIZE", self.validate_otp),   # type: ignore
+            ("POST_AUTHORIZE", self.validate_otp),  # type: ignore
         ]
 
     async def init(self, context: Any = None) -> None:
@@ -54,7 +56,9 @@ class TOTPHook(HookPlugin):
         self._token_parser.set_secret(self._plugin_config.token_secret)
         self._token_parser.set_lifetime(self._plugin_config.token_lifetime)
 
-    async def validate_otp(self, request: web.Request, params, user, keypair) -> Optional[web.Response]:
+    async def validate_otp(
+        self, request: web.Request, params: Any, user: Any, keypair: Any
+    ) -> web.Response | None:
         if not user["totp_activated"]:
             if self._plugin_config.forced:
                 token = self._token_parser.serialize(str(user["uuid"]))
@@ -68,9 +72,8 @@ class TOTPHook(HookPlugin):
                         "data": auth_data.to_dict(),
                     },
                 )
-            else:
-                log.info("TOTP.VALIDATE_OTP(TOTP not forced, user TOTP not activated)")
-                return None
+            log.info("TOTP.VALIDATE_OTP(TOTP not forced, user TOTP not activated)")
+            return None
         if not user["totp_key"]:
             raise Reject("User activated TOTP but TOTP key does not exist")
 

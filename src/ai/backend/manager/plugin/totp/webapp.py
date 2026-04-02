@@ -1,13 +1,14 @@
 import logging
-from typing import Any, Mapping, Sequence, Tuple, cast, Optional
-from dataclasses import dataclass
 import uuid
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any, cast
 
-from aiohttp import web
 import aiohttp_cors
 import pyotp
 import sqlalchemy as sa
 import trafaret as t
+from aiohttp import web
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.logging_utils import BraceStyleAdapter
@@ -15,12 +16,12 @@ from ai.backend.manager.api.rest.middleware.auth import auth_required
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.api.utils import check_api_params
 from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.plugin.webapp import WebappPlugin
 from ai.backend.manager.models.user.row import UserRow, users
+from ai.backend.manager.plugin.webapp import WebappPlugin
 
 from .config import TOTPConfig
-from .utils import InvalidTokenError, TokenParser, TokenExpired
 from .exception import AuthorizationFailed, ExpiredToken, InvalidToken
+from .utils import InvalidTokenError, TokenExpired, TokenParser
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -158,16 +159,13 @@ async def initialize_anonymous_otp_activation(request: web.Request, params: Any)
     try:
         token = ctx.token_parser.deserialize(raw_token)
     except TokenExpired:
-        raise ExpiredToken()
+        raise ExpiredToken() from None
     except InvalidTokenError:
-        raise InvalidToken()
+        raise InvalidToken() from None
 
     async with db.begin_session() as db_session:
-        query = (
-            sa.select(UserRow)
-            .where(UserRow.uuid == uuid.UUID(token.sub))
-        )
-        user_row = cast(Optional[UserRow], await db_session.scalar(query))
+        query = sa.select(UserRow).where(UserRow.uuid == uuid.UUID(token.sub))
+        user_row = cast(UserRow | None, await db_session.scalar(query))
         if user_row is None:
             raise InvalidAPIParameters(f"User does not exist. (user_id: {token.sub})")
         if user_row.totp_activated:
@@ -201,16 +199,13 @@ async def finalize_anonymous_otp_activation(request: web.Request, params: Any) -
     try:
         token = ctx.token_parser.deserialize(raw_token)
     except TokenExpired:
-        raise ExpiredToken()
+        raise ExpiredToken() from None
     except InvalidTokenError:
-        raise InvalidToken()
+        raise InvalidToken() from None
 
     async with db.begin_session() as db_session:
-        query = (
-            sa.select(UserRow)
-            .where(UserRow.uuid == uuid.UUID(token.sub))
-        )
-        user_row = cast(Optional[UserRow], await db_session.scalar(query))
+        query = sa.select(UserRow).where(UserRow.uuid == uuid.UUID(token.sub))
+        user_row = cast(UserRow | None, await db_session.scalar(query))
         if user_row is None:
             raise InvalidAPIParameters(f"User does not exist. (user_id: {token.sub})")
         if user_row.totp_activated:
@@ -224,7 +219,7 @@ async def finalize_anonymous_otp_activation(request: web.Request, params: Any) -
     return web.json_response({"success": True})
 
 
-async def ping(request) -> web.Response:
+async def ping(_request: web.Request) -> web.Response:
     return web.json_response({"totp_enabled": True})
 
 
@@ -234,11 +229,11 @@ class PrivateContext:
     config: TOTPConfig
 
 
-async def _webapp_init(app):
+async def _webapp_init(app: web.Application) -> None:
     pass
 
 
-async def _webapp_shutdown(app):
+async def _webapp_shutdown(app: web.Application) -> None:
     pass
 
 
@@ -249,7 +244,9 @@ class TOTPWebapp(WebappPlugin):
         """
         super().__init__(plugin_config, local_config)
         self._plugin_config = TOTPConfig(**plugin_config)
-        self._token_parser = TokenParser(self._plugin_config.token_secret, self._plugin_config.token_lifetime)
+        self._token_parser = TokenParser(
+            self._plugin_config.token_secret, self._plugin_config.token_lifetime
+        )
 
     async def init(self, context: Any = None) -> None:
         pass
@@ -264,8 +261,9 @@ class TOTPWebapp(WebappPlugin):
         self._token_parser.set_lifetime(self._plugin_config.token_lifetime)
 
     async def create_app(
-        self, cors_options: CORSOptions,
-    ) -> Tuple[web.Application, Sequence[WebMiddleware]]:
+        self,
+        cors_options: CORSOptions,
+    ) -> tuple[web.Application, Sequence[WebMiddleware]]:
         app = web.Application()
         self._plugin_config = TOTPConfig(**self.plugin_config)
         app["context"] = PrivateContext(
@@ -282,6 +280,6 @@ class TOTPWebapp(WebappPlugin):
         cors.add(root_resource.add_route("POST", initialize_otp_activation))
         cors.add(root_resource.add_route("DELETE", deactivate_totp))
         cors.add(app.router.add_route("POST", "/verify", finalize_otp_activation))
-        cors.add(app.router.add_route("POST", "/anon",  initialize_anonymous_otp_activation))
+        cors.add(app.router.add_route("POST", "/anon", initialize_anonymous_otp_activation))
         cors.add(app.router.add_route("POST", "/anon/verify", finalize_anonymous_otp_activation))
         return app, []

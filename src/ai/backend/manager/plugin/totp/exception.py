@@ -8,6 +8,7 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 
+
 class ExpiredToken(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/expired-token"
     error_title = "Expired Token"
