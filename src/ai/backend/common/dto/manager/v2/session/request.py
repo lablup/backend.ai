@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionOrderField,
     SessionStatusFilter,
 )
+from ai.backend.common.types import MountMode
 
 __all__ = (
     "AdminSearchSessionsInput",
@@ -264,6 +265,16 @@ class MountItemInput(BaseRequestModel):
     )
     permission: str | None = Field(
         default=None, description="Mount permission override ('rw' or 'ro')."
+    )
+    mount_mode: MountMode | None = Field(
+        default=None,
+        description="Mount mode: 'bind' (default) or 'overlay'. "
+        "Overlay mounts the vfolder as a read-only lower layer with a writable upper layer.",
+    )
+    overlay_target_vfolder_id: UUID | None = Field(
+        default=None,
+        description="VFolder UUID to use as the writable upper layer for overlay mount. "
+        "If omitted, a temporary directory is created and deleted on session end.",
     )
 
 

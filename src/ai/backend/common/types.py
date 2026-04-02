@@ -615,8 +615,14 @@ class MountTypes(enum.StrEnum):
     VOLUME = "volume"
     BIND = "bind"
     TMPFS = "tmpfs"
+    OVERLAY = "overlay"
     K8S_GENERIC = "k8s-generic"
     K8S_HOSTPATH = "k8s-hostpath"
+
+
+class MountMode(enum.StrEnum):
+    BIND = "bind"
+    OVERLAY = "overlay"
 
 
 class MountPoint(BaseModel):
@@ -1297,6 +1303,19 @@ class VFolderUsageMode(CIStrEnum):
     DATA = "data"
 
 
+class OverlayTarget(BaseModel):
+    """Writable layer for overlay mount.
+
+    If vfolder_id is None, agent creates a temporary directory (deleted on session end).
+    If vfolder_id is set, the specified vfolder is used as the writable layer (persisted).
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    vfolder_id: VFolderID | None = None
+    host_path: PurePosixPath | None = None
+
+
 @attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):
     name: str
@@ -1306,9 +1325,10 @@ class VFolderMount(JSONSerializableMixin):
     kernel_path: PurePosixPath
     mount_perm: MountPermission
     usage_mode: VFolderUsageMode
+    overlay_target: OverlayTarget | None = None
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "name": self.name,
             "vfid": str(self.vfid),
             "vfsubpath": str(self.vfsubpath),
@@ -1317,6 +1337,16 @@ class VFolderMount(JSONSerializableMixin):
             "mount_perm": self.mount_perm.value,
             "usage_mode": self.usage_mode.value,
         }
+        if self.overlay_target is not None:
+            result["overlay_target"] = {
+                "vfolder_id": str(self.overlay_target.vfolder_id)
+                if self.overlay_target.vfolder_id
+                else None,
+                "host_path": str(self.overlay_target.host_path)
+                if self.overlay_target.host_path
+                else None,
+            }
+        return result
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
