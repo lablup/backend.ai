@@ -122,39 +122,39 @@ def apply_coordinator_config(
     Modifies the document in-place, preserving comments and structure.
     """
     # Database
-    doc["db"]["type"] = "postgresql"  # type: ignore[index]
-    doc["db"]["name"] = params.db_name  # type: ignore[index]
-    doc["db"]["user"] = params.db_user  # type: ignore[index]
-    doc["db"]["password"] = params.db_password  # type: ignore[index]
-    doc["db"]["pool_size"] = params.db_pool_size  # type: ignore[index]
-    doc["db"]["max_overflow"] = params.db_max_overflow  # type: ignore[index]
-    doc["db"]["addr"]["host"] = params.db_host  # type: ignore[index]
-    doc["db"]["addr"]["port"] = params.db_port  # type: ignore[index]
+    doc["db"]["type"] = "postgresql"
+    doc["db"]["name"] = params.db_name
+    doc["db"]["user"] = params.db_user
+    doc["db"]["password"] = params.db_password
+    doc["db"]["pool_size"] = params.db_pool_size
+    doc["db"]["max_overflow"] = params.db_max_overflow
+    doc["db"]["addr"]["host"] = params.db_host
+    doc["db"]["addr"]["port"] = params.db_port
 
     # Redis
     doc["redis"]["addr"] = _make_inline_table({
         "host": params.redis_host,
         "port": params.redis_port,
-    })  # type: ignore[index]
+    })
 
     # Secrets
-    doc["secrets"]["api_secret"] = params.api_secret  # type: ignore[index]
-    doc["secrets"]["jwt_secret"] = params.jwt_secret  # type: ignore[index]
-    doc["permit_hash"]["secret"] = params.permit_hash_secret  # type: ignore[index]
+    doc["secrets"]["api_secret"] = params.api_secret
+    doc["secrets"]["jwt_secret"] = params.jwt_secret
+    doc["permit_hash"]["secret"] = params.permit_hash_secret
 
     # Bind/advertised addresses
-    doc["proxy_coordinator"]["bind_addr"]["host"] = params.bind_host  # type: ignore[index]
-    doc["proxy_coordinator"]["bind_addr"]["port"] = params.bind_port  # type: ignore[index]
-    doc["proxy_coordinator"]["advertised_addr"]["host"] = params.advertised_host  # type: ignore[index]
-    doc["proxy_coordinator"]["advertised_addr"]["port"] = params.advertised_port  # type: ignore[index]
+    doc["proxy_coordinator"]["bind_addr"]["host"] = params.bind_host
+    doc["proxy_coordinator"]["bind_addr"]["port"] = params.bind_port
+    doc["proxy_coordinator"]["advertised_addr"]["host"] = params.advertised_host
+    doc["proxy_coordinator"]["advertised_addr"]["port"] = params.advertised_port
 
     # TLS
     if params.tls_advertised:
-        doc["proxy_coordinator"]["tls_advertised"] = True  # type: ignore[index]
+        doc["proxy_coordinator"]["tls_advertised"] = True
 
     # Traefik
     if params.enable_traefik:
-        doc["proxy_coordinator"]["enable_traefik"] = True  # type: ignore[index]
+        doc["proxy_coordinator"]["enable_traefik"] = True
         traefik_table = tomlkit.table()
         traefik_etcd_table = tomlkit.table()
         traefik_etcd_table["namespace"] = params.etcd_namespace
@@ -163,7 +163,7 @@ def apply_coordinator_config(
             "port": params.etcd_port,
         })
         traefik_table["etcd"] = traefik_etcd_table
-        doc["proxy_coordinator"]["traefik"] = traefik_table  # type: ignore[index]
+        doc["proxy_coordinator"]["traefik"] = traefik_table
 
 
 def apply_worker_config(
@@ -180,44 +180,44 @@ def apply_worker_config(
     doc["redis"]["addr"] = _make_inline_table({
         "host": params.redis_host,
         "port": params.redis_port,
-    })  # type: ignore[index]
+    })
 
     # Coordinator endpoint
-    doc["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
+    doc["proxy_worker"]["coordinator_endpoint"] = (
         f"{params.coordinator_scheme}://{params.coordinator_host}:{params.coordinator_port}"
     )
 
     # API bind/advertised addresses
-    doc["proxy_worker"]["api_bind_addr"] = _make_inline_table(  # type: ignore[index]
+    doc["proxy_worker"]["api_bind_addr"] = _make_inline_table(
         {"host": params.api_bind_host, "port": params.api_bind_port}
     )
-    doc["proxy_worker"]["api_advertised_addr"] = _make_inline_table(  # type: ignore[index]
+    doc["proxy_worker"]["api_advertised_addr"] = _make_inline_table(
         {"host": params.api_advertised_host, "port": params.api_advertised_port}
     )
 
     # Secrets
-    doc["secrets"]["api_secret"] = params.api_secret  # type: ignore[index]
-    doc["secrets"]["jwt_secret"] = params.jwt_secret  # type: ignore[index]
-    doc["permit_hash"]["secret"] = params.permit_hash_secret  # type: ignore[index]
+    doc["secrets"]["api_secret"] = params.api_secret
+    doc["secrets"]["jwt_secret"] = params.jwt_secret
+    doc["permit_hash"]["secret"] = params.permit_hash_secret
 
     # TLS
     if params.tls_advertised:
-        doc["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
+        doc["proxy_worker"]["tls_advertised"] = True
 
     # Frontend mode
-    doc["proxy_worker"]["frontend_mode"] = params.frontend_mode.value  # type: ignore[index]
+    doc["proxy_worker"]["frontend_mode"] = params.frontend_mode.value
 
     # Configure based on frontend_mode
     match params.frontend_mode:
         case FrontendMode.PORT:
-            doc["proxy_worker"]["port_proxy"]["advertised_host"] = params.port_proxy_advertised_host  # type: ignore[index]
+            doc["proxy_worker"]["port_proxy"]["advertised_host"] = params.port_proxy_advertised_host
         case FrontendMode.WILDCARD:
             # Remove port_proxy section
-            if "port_proxy" in doc["proxy_worker"]:  # type: ignore[operator]
-                del doc["proxy_worker"]["port_proxy"]  # type: ignore[union-attr]
+            if "port_proxy" in doc["proxy_worker"]:
+                del doc["proxy_worker"]["port_proxy"]
 
             # Override api_advertised_addr
-            doc["proxy_worker"]["api_advertised_addr"] = _make_inline_table(  # type: ignore[index]
+            doc["proxy_worker"]["api_advertised_addr"] = _make_inline_table(
                 {"host": params.api_advertised_host, "port": params.wildcard_advertised_port}
             )
 
@@ -230,11 +230,11 @@ def apply_worker_config(
                     "port": params.wildcard_bind_port,
                 })
                 wildcard_table["advertised_port"] = params.wildcard_advertised_port
-                doc["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
+                doc["proxy_worker"]["wildcard_domain"] = wildcard_table
         case FrontendMode.TRAEFIK:
             # Remove port_proxy section
-            if "port_proxy" in doc["proxy_worker"]:  # type: ignore[operator]
-                del doc["proxy_worker"]["port_proxy"]  # type: ignore[union-attr]
+            if "port_proxy" in doc["proxy_worker"]:
+                del doc["proxy_worker"]["port_proxy"]
 
             # Add traefik section
             traefik_table = tomlkit.table()
@@ -254,4 +254,4 @@ def apply_worker_config(
                 params.port_proxy_range_end,
             ]
             traefik_table["port_proxy"] = port_proxy_table
-            doc["proxy_worker"]["traefik"] = traefik_table  # type: ignore[index]
+            doc["proxy_worker"]["traefik"] = traefik_table

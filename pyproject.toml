@@ -355,12 +355,17 @@ disable_error_code = ["misc", "arg-type", "attr-defined", "assignment", "operato
 module = [
     "ai.backend.install.*",
 ]
-disable_error_code = ["union-attr", "misc"]
+disable_error_code = ["union-attr", "misc", "index", "operator"]
 
 # PyInfra deploy scripts use dynamic host.data access patterns
 [[tool.mypy.overrides]]
 module = "ai.backend.install.pyinfra.*"
 disable_error_code = ["no-any-return", "attr-defined", "arg-type", "call-arg", "return-value", "type-arg", "func-returns-value"]
+
+# Tests for installer config_gen use tomlkit dict-like access patterns
+[[tool.mypy.overrides]]
+module = "tests.unit.install.*"
+disable_error_code = ["index", "operator"]
 
 # gql_enum() function-call results are valid types at runtime (strawberry handles them)
 # but mypy cannot recognise dynamically-wrapped enum variables as types
