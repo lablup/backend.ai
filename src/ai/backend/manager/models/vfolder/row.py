@@ -879,6 +879,42 @@ def check_overlapping_mounts(mounts: Iterable[str] | Iterable[PurePosixPath]) ->
                 )
 
 
+async def _resolve_overlay_target(
+    conn: SAConnection,
+    storage_manager: StorageSessionManager,
+    target_vfolder_uuid: uuid.UUID,
+) -> OverlayTarget:
+    """Resolve overlay target vfolder's host_path from storage proxy."""
+    query = sa.select(
+        vfolders.c.id,
+        vfolders.c.host,
+        vfolders.c.quota_scope_id,
+    ).where(vfolders.c.id == target_vfolder_uuid)
+    result = await conn.execute(query)
+    row = result.first()
+    if row is None:
+        raise VFolderNotFound(f"Overlay target vfolder {target_vfolder_uuid} not found.")
+    target_vfid = VFolderID(row.quota_scope_id, row.id)
+    try:
+        proxy_name, volume_name = storage_manager.get_proxy_and_volume(row.host)
+        manager_client = storage_manager.get_manager_facing_client(proxy_name)
+        mount_path_result = await manager_client.get_mount_path(
+            volume_name,
+            str(target_vfid),
+            ".",
+        )
+        host_path = PurePosixPath(mount_path_result["path"])
+    except VFolderOperationFailed as e:
+        raise InvalidAPIParameters(
+            f"Cannot resolve overlay target vfolder path: {e.extra_msg}",
+            e.extra_data,
+        ) from None
+    return OverlayTarget(
+        vfolder_id=target_vfid,
+        host_path=host_path,
+    )
+
+
 async def prepare_vfolder_mounts(
     conn: SAConnection,
     storage_manager: StorageSessionManager,
@@ -1159,8 +1195,10 @@ async def prepare_vfolder_mounts(
             if mount_mode_raw == MountMode.OVERLAY or (is_cross_project and is_model_store_vfolder):
                 overlay_target_vfid_raw = mount_opts.get("overlay_target")
                 if overlay_target_vfid_raw and overlay_target_vfid_raw != "temp":
-                    overlay_target = OverlayTarget(
-                        vfolder_id=VFolderID(None, uuid.UUID(overlay_target_vfid_raw)),
+                    overlay_target = await _resolve_overlay_target(
+                        conn,
+                        storage_manager,
+                        uuid.UUID(overlay_target_vfid_raw),
                     )
                 else:
                     overlay_target = OverlayTarget()
