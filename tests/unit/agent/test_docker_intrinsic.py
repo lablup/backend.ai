@@ -580,42 +580,31 @@ class TestReadProcNetDev:
         "        8888       10    0    0    0     0       0          0\n"
     )
 
-    def test_parses_standard_format(self, tmp_path: Path) -> None:
-        """Parses standard /proc/net/dev format: skips headers, excludes lo,
-        returns correct rx/tx sums."""
+    @pytest.mark.parametrize(
+        ("content_attr", "expected_rx", "expected_tx"),
+        [
+            ("SAMPLE_NET_DEV", 50000, 80000),
+            ("MULTI_IFACE_NET_DEV", 40000, 60000),
+            ("LO_ONLY_NET_DEV", 0, 0),
+        ],
+        ids=["standard_format", "multiple_interfaces", "loopback_only"],
+    )
+    def test_parse_net_dev(
+        self,
+        tmp_path: Path,
+        content_attr: str,
+        expected_rx: int,
+        expected_tx: int,
+    ) -> None:
         net_dev = tmp_path / "net_dev"
-        net_dev.write_text(self.SAMPLE_NET_DEV)
+        net_dev.write_text(getattr(self, content_attr))
         with patch(
             "ai.backend.agent.docker.intrinsic.Path",
             return_value=net_dev,
         ):
             result = read_proc_net_dev(42)
-        assert result.rx_bytes == 50000
-        assert result.tx_bytes == 80000
-
-    def test_sums_multiple_interfaces(self, tmp_path: Path) -> None:
-        """Sums rx/tx bytes across all non-loopback interfaces."""
-        net_dev = tmp_path / "net_dev"
-        net_dev.write_text(self.MULTI_IFACE_NET_DEV)
-        with patch(
-            "ai.backend.agent.docker.intrinsic.Path",
-            return_value=net_dev,
-        ):
-            result = read_proc_net_dev(42)
-        assert result.rx_bytes == 40000  # 10000 + 30000
-        assert result.tx_bytes == 60000  # 20000 + 40000
-
-    def test_loopback_only_returns_zero(self, tmp_path: Path) -> None:
-        """When only loopback is present, returns (0, 0)."""
-        net_dev = tmp_path / "net_dev"
-        net_dev.write_text(self.LO_ONLY_NET_DEV)
-        with patch(
-            "ai.backend.agent.docker.intrinsic.Path",
-            return_value=net_dev,
-        ):
-            result = read_proc_net_dev(42)
-        assert result.rx_bytes == 0
-        assert result.tx_bytes == 0
+        assert result.rx_bytes == expected_rx
+        assert result.tx_bytes == expected_tx
 
     def test_raises_oserror_for_nonexistent_pid(self) -> None:
         """Raises OSError when /proc/[pid]/net/dev does not exist."""
