@@ -21,7 +21,7 @@ load_dotenv()
 ssh_user = os.getenv("PYINFRA_SSH_USER", "bai")
 ssh_key = os.getenv("PYINFRA_SSH_KEY", "~/.ssh/id_rsa")
 ssh_pubkey = os.getenv("PYINFRA_SSH_PUBKEY", "~/.ssh/id_rsa.pub")
-ssh_port = os.getenv("PYINFRA_SSH_PORT", 22)
+ssh_port = int(os.getenv("PYINFRA_SSH_PORT", "22"))
 ssh_password = os.getenv("PYINFRA_SSH_PASSWORD", "")
 ssh_strict_host_key_checking = "no"
 
@@ -40,13 +40,11 @@ bai_pip_install_options = os.getenv("PYINFRA_BAI_PIP_INSTALL_OPTIONS")
 # -- OS configuration
 bai_home_dir = os.getenv("PYINFRA_BAI_HOME_DIR", "/home/bai")
 bai_user = os.getenv("PYINFRA_BAI_USER", "bai")
-bai_user_id = os.getenv("PYINFRA_BAI_USER_ID", 1100)
-bai_user_group_id = os.getenv("PYINFRA_BAI_USER_GROUP_ID", 1100)
+bai_user_id = int(os.getenv("PYINFRA_BAI_USER_ID", "1100"))
+bai_user_group_id = int(os.getenv("PYINFRA_BAI_USER_GROUP_ID", "1100"))
 bai_user_password = os.getenv("PYINFRA_BAI_USER_PASSWORD")
 
-enable_passwordless_sudo = (
-    os.getenv("PYINFRA_ENABLE_PASSWORDLESS_SUDO", "false").lower() == "true"
-)
+enable_passwordless_sudo = os.getenv("PYINFRA_ENABLE_PASSWORDLESS_SUDO", "false").lower() == "true"
 
 bai_file_block_marker = os.getenv("PYINFRA_BAI_FILE_BLOCK_MARKER", "# -- {mark} Backend.AI")
 bai_fstab_contents_path = os.getenv("PYINFRA_BAI_FSTAB_CONTENTS_PATH", "./_files/etc_fstab")
