@@ -12,7 +12,11 @@ from ai.backend.common.types import VFolderUsageMode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.model_card.types import ModelCardData, VFolderScanData
-from ai.backend.manager.errors.resource import ModelCardNotFound, ProjectNotFound
+from ai.backend.manager.errors.resource import (
+    InvalidProjectTypeForModelCard,
+    ModelCardNotFound,
+    ProjectNotFound,
+)
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -79,7 +83,9 @@ class ModelCardDBSource:
             if project_type is None:
                 raise ProjectNotFound(str(project_id))
             if project_type != ProjectType.MODEL_STORE:
-                raise ProjectNotFound(f"Project {project_id} is not a MODEL_STORE type project")
+                raise InvalidProjectTypeForModelCard(
+                    extra_msg=f"Project {project_id} is type '{project_type}', expected 'model-store'"
+                )
             stmt = sa.select(VFolderRow).where(
                 sa.and_(
                     VFolderRow.group == project_id,
