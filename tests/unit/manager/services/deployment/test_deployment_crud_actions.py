@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -159,12 +159,11 @@ class TestCreateDeployment(DeploymentCRUDBaseFixtures):
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
-        mock_deployment_controller: MagicMock,
         endpoint_info: DeploymentInfo,
     ) -> None:
         """Creating a deployment without initial_revision succeeds."""
         mock_deployment_repository.create_endpoint = AsyncMock(return_value=endpoint_info)
-        mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
 
         creator = NewDeploymentCreator(
             metadata=DeploymentMetadata(
@@ -184,20 +183,17 @@ class TestCreateDeployment(DeploymentCRUDBaseFixtures):
         result = await processors.create_deployment.wait_for_complete(action)
 
         assert result.data.id == endpoint_info.id
-        mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
-            DeploymentLifecycleType.CHECK_PENDING
-        )
+        mock_deployment_repository.create_endpoint.assert_called_once()
 
     async def test_create_deployment_with_initial_revision(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
-        mock_deployment_controller: MagicMock,
         endpoint_info: DeploymentInfo,
     ) -> None:
         """Creating a deployment with initial_revision passes revision to repository."""
         mock_deployment_repository.create_endpoint = AsyncMock(return_value=endpoint_info)
-        mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
 
         creator = NewDeploymentCreator(
             metadata=DeploymentMetadata(
@@ -229,7 +225,12 @@ class TestCreateDeployment(DeploymentCRUDBaseFixtures):
             ),
         )
         action = CreateDeploymentAction(creator=creator)
-        result = await processors.create_deployment.wait_for_complete(action)
+        with patch.object(
+            DeploymentService,
+            "add_model_revision",
+            new_callable=AsyncMock,
+        ):
+            result = await processors.create_deployment.wait_for_complete(action)
 
         assert result.data.id == endpoint_info.id
         create_call = mock_deployment_repository.create_endpoint
