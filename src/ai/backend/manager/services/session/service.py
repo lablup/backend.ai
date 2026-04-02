@@ -1617,10 +1617,15 @@ class SessionService:
                 mount_ids.append(item.vfolder_id)
                 if item.mount_path is not None:
                     mount_id_map[item.vfolder_id] = item.mount_path
+                opts: dict[str, str] = {}
                 if item.permission is not None:
-                    mount_options[str(item.vfolder_id)] = {
-                        "permission": item.permission.value,
-                    }
+                    opts["permission"] = item.permission.value
+                if item.mount_mode is not None:
+                    opts["mount_mode"] = item.mount_mode.value
+                if item.overlay_target_vfolder_id is not None:
+                    opts["overlay_target"] = str(item.overlay_target_vfolder_id)
+                if opts:
+                    mount_options[str(item.vfolder_id)] = opts
 
         creation_spec: dict[str, Any] = {
             "resources": resource_entries,

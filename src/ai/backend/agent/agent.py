@@ -563,17 +563,31 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
     ) -> None:
         for vfolder in vfolders:
             if self.internal_data.get("prevent_vfolder_mounts", False):
-                # Only allow mount of ".logs" directory to prevent expose
-                # internal-only information, such as Docker credentials to user's ".docker" vfolder
-                # in image importer kernels.
                 if vfolder.name != ".logs":
                     continue
-            mount = Mount(
-                MountTypes.BIND,
-                Path(vfolder.host_path),
-                Path(vfolder.kernel_path),
-                vfolder.mount_perm,
-            )
+            if vfolder.overlay_target is not None:
+                # Overlay mount: on macOS fallback to bind ro
+                import sys
+
+                if sys.platform.startswith("linux"):
+                    # TODO: integrate with OverlayMountProvisioner for full overlayfs support
+                    log.warning(
+                        "Overlay mount for {} not yet integrated with provisioner, falling back to bind ro",
+                        vfolder.name,
+                    )
+                mount = Mount(
+                    MountTypes.BIND,
+                    Path(vfolder.host_path),
+                    Path(vfolder.kernel_path),
+                    MountPermission.READ_ONLY,
+                )
+            else:
+                mount = Mount(
+                    MountTypes.BIND,
+                    Path(vfolder.host_path),
+                    Path(vfolder.kernel_path),
+                    vfolder.mount_perm,
+                )
             resource_spec.mounts.append(mount)
 
     async def mount_krunner(
