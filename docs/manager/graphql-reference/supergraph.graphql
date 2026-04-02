@@ -10415,7 +10415,7 @@ type Mutation
   """
   activateDeploymentRevision(input: ActivateRevisionInput!): ActivateRevisionPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.0. Manually promote a blue-green deployment."""
+  """Added in UNRELEASED. Manually promote a blue-green deployment."""
   promoteDeployment(input: PromoteDeploymentInput!): PromoteDeploymentPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.19.0. Update the traffic status of a route"""
@@ -12380,14 +12380,14 @@ input ProjectWeightInputItem
   weight: Decimal = null
 }
 
-"""Added in 26.4.0. Input for manually promoting a blue-green deployment."""
+"""Added in UNRELEASED. Input for manually promoting a blue-green deployment."""
 input PromoteDeploymentInput
   @join__type(graph: STRAWBERRY)
 {
   deploymentId: ID!
 }
 
-"""Added in 26.4.0. Result of manually promoting a deployment."""
+"""Added in UNRELEASED. Result of manually promoting a deployment."""
 type PromoteDeploymentPayload
   @join__type(graph: STRAWBERRY)
 {

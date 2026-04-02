@@ -107,6 +107,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -640,7 +641,7 @@ class ActivateRevisionPayloadGQL:
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for manually promoting a blue-green deployment.",
-        added_version="26.4.0",
+        added_version=NEXT_RELEASE_VERSION,
     ),
     name="PromoteDeploymentInput",
 )
@@ -650,7 +651,7 @@ class PromoteDeploymentInputGQL(PydanticInputMixin[PromoteDeploymentInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Result of manually promoting a deployment.",
     ),
     model=PromoteDeploymentPayloadDTO,

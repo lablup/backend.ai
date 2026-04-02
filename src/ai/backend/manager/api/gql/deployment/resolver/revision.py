@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchRevisionsInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -187,7 +188,7 @@ async def activate_deployment_revision(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version="26.4.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Manually promote a blue-green deployment.",
     )
 )  # type: ignore[misc]

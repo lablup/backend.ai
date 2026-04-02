@@ -6403,7 +6403,7 @@ type Mutation {
   """
   activateDeploymentRevision(input: ActivateRevisionInput!): ActivateRevisionPayload!
 
-  """Added in 26.4.0. Manually promote a blue-green deployment."""
+  """Added in UNRELEASED. Manually promote a blue-green deployment."""
   promoteDeployment(input: PromoteDeploymentInput!): PromoteDeploymentPayload!
 
   """Added in 25.19.0. Update the traffic status of a route"""
@@ -8085,12 +8085,12 @@ type PurgeProjectPayloadGQL {
   purged: Boolean!
 }
 
-"""Added in 26.4.0. Input for manually promoting a blue-green deployment."""
+"""Added in UNRELEASED. Input for manually promoting a blue-green deployment."""
 input PromoteDeploymentInput {
   deploymentId: ID!
 }
 
-"""Added in 26.4.0. Result of manually promoting a deployment."""
+"""Added in UNRELEASED. Result of manually promoting a deployment."""
 type PromoteDeploymentPayload {
   """The promoted deployment"""
   deployment: ModelDeployment!
