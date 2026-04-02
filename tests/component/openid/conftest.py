@@ -31,7 +31,7 @@ from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import ValkeyProfileTarget, ValkeyTarget
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap, ValkeyProfileTarget, ValkeyTarget
 from ai.backend.logging import LogLevel
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
@@ -400,7 +400,7 @@ async def seed_data(
     Yields the database_engine for convenience.
     """
     async with database_engine.begin_session() as sess:
-        sess.add(DomainRow(name="default", total_resource_slots={}))
+        sess.add(DomainRow(name="default", total_resource_slots=ResourceSlot({})))
         sess.add(
             UserResourcePolicyRow(
                 name="default",
@@ -423,7 +423,7 @@ async def seed_data(
             keypair_resource_policies.insert().values(
                 name="default",
                 default_for_unspecified=DefaultForUnspecified.LIMITED,
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot({}),
                 max_session_lifetime=0,
                 max_concurrent_sessions=30,
                 max_pending_session_count=None,
@@ -431,14 +431,14 @@ async def seed_data(
                 max_concurrent_sftp_sessions=1,
                 max_containers_per_session=1,
                 idle_timeout=1800,
-                allowed_vfolder_hosts={},
+                allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             )
         )
         sess.add(
             GroupRow(
                 name="default",
                 domain_name="default",
-                total_resource_slots={},
+                total_resource_slots=ResourceSlot({}),
                 resource_policy="default",
             )
         )
@@ -554,7 +554,12 @@ def insert_user(seed_data: ExtendedAsyncSAEngine) -> Callable[..., Any]:
                     uuid=user_uuid,
                     username=email,
                     email=email,
-                    password="placeholder-hashed",
+                    password=PasswordInfo(
+                        password="placeholder-password",
+                        algorithm=PasswordHashAlgorithm.BCRYPT,
+                        rounds=4,
+                        salt_size=16,
+                    ),
                     need_password_change=False,
                     full_name="Test User",
                     description="",

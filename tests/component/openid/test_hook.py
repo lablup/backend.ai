@@ -113,7 +113,7 @@ class TestOIDCHookPreAuth:
     async def test_expired_stoken_rejects(
         self, hook_plugin: OIDCHookPlugin, request_with_expired_stoken: MagicMock
     ) -> None:
-        with pytest.raises(Reject, match="Invalid authentication token"):
+        with pytest.raises(Reject, match="Expired authentication token"):
             await hook_plugin.pre_auth_hook(request_with_expired_stoken, {})
 
     async def test_valid_stoken_user_not_found_rejects(
