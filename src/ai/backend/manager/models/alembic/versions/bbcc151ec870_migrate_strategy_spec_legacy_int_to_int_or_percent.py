@@ -64,6 +64,7 @@ def downgrade() -> None:
         WHERE strategy_spec IS NOT NULL
           AND jsonb_typeof(strategy_spec -> 'max_surge') = 'object'
           AND strategy_spec -> 'max_surge' ? 'count'
+          AND (strategy_spec -> 'max_surge' ->> 'count') IS NOT NULL
         """
     )
     op.execute(
@@ -77,5 +78,6 @@ def downgrade() -> None:
         WHERE strategy_spec IS NOT NULL
           AND jsonb_typeof(strategy_spec -> 'max_unavailable') = 'object'
           AND strategy_spec -> 'max_unavailable' ? 'count'
+          AND (strategy_spec -> 'max_unavailable' ->> 'count') IS NOT NULL
         """
     )
