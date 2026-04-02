@@ -1593,6 +1593,9 @@ class SessionService:
         to the scheduling controller. Returns immediately with PENDING status.
         """
         image_row = await self._session_repository.resolve_image_by_id(action.image_id)
+        resource_policy = await self._session_repository.get_keypair_resource_policy(
+            action.access_key,
+        )
 
         user_scope = UserScope(
             domain_name=action.domain_name,
@@ -1611,7 +1614,7 @@ class SessionService:
 
         mount_ids: list[uuid.UUID] = []
         mount_id_map: dict[uuid.UUID, str] = {}
-        mount_options: dict[str, dict[str, str]] = {}
+        mount_options: dict[uuid.UUID, dict[str, str]] = {}
         if action.mounts:
             for item in action.mounts:
                 mount_ids.append(item.vfolder_id)
@@ -1625,7 +1628,7 @@ class SessionService:
                 if item.overlay_target_vfolder_id is not None:
                     opts["overlay_target"] = str(item.overlay_target_vfolder_id)
                 if opts:
-                    mount_options[str(item.vfolder_id)] = opts
+                    mount_options[item.vfolder_id] = opts
 
         creation_spec: dict[str, Any] = {
             "resources": resource_entries,
@@ -1675,7 +1678,7 @@ class SessionService:
             cluster_mode=action.resource.cluster_mode,
             cluster_size=action.resource.cluster_size,
             priority=action.scheduling.priority,
-            resource_policy={},
+            resource_policy=resource_policy,
             kernel_specs=kernel_specs,
             creation_spec=creation_spec,
             is_preemptible=action.scheduling.is_preemptible,

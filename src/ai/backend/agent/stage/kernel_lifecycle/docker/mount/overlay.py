@@ -1,7 +1,7 @@
 import asyncio
 import logging
+import platform
 import shutil
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import override
@@ -55,7 +55,7 @@ class OverlayMountProvisioner(Provisioner[OverlayMountSpec, OverlayMountResult])
         if not spec.overlay_mounts:
             return OverlayMountResult(mounts=[])
 
-        if not sys.platform.startswith("linux"):
+        if platform.system() != "Linux":
             return self._fallback_bind_ro(spec)
 
         mounts: list[Mount] = []

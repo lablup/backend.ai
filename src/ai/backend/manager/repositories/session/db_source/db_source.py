@@ -23,6 +23,8 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
     KernelLoadingStrategy,
@@ -623,6 +625,27 @@ class SessionDBSource:
             if row is None:
                 raise ImageNotFound(f"Image not found: {image_id}")
             return row
+
+    async def get_keypair_resource_policy(
+        self,
+        access_key: AccessKey,
+    ) -> dict[str, Any]:
+        """Fetch the keypair resource policy dict for the given access key."""
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(KeyPairResourcePolicyRow)
+                .join(
+                    KeyPairRow,
+                    KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
+                )
+                .where(KeyPairRow.access_key == access_key)
+            )
+            row = await db_sess.scalar(query)
+            if row is None:
+                return {}
+            return {
+                "allowed_vfolder_hosts": row.allowed_vfolder_hosts,
+            }
 
     async def get_session_data_by_id(
         self,

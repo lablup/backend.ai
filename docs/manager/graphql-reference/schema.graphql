@@ -3683,7 +3683,7 @@ input ExtraMountInput {
   mount_destination: String
 
   """
-  Added in 24.03.4. Set bind type of this mount. Shoud be one of (volume,bind,tmpfs,k8s-generic,k8s-hostpath). Default is 'bind'.
+  Added in 24.03.4. Set bind type of this mount. Shoud be one of (volume,bind,tmpfs,overlay,k8s-generic,k8s-hostpath). Default is 'bind'.
   """
   type: String
 

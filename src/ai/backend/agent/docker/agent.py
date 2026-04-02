@@ -242,6 +242,23 @@ def container_from_docker_container(src: DockerContainer) -> Container:
     )
 
 
+async def _unmount_overlays(
+    merged_paths: list[str],
+) -> None:
+    """Unmount overlayfs mounts that were created during session setup."""
+    for merged in merged_paths:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "umount",
+                merged,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.communicate()
+        except Exception:
+            log.warning("Failed to umount overlay at {}", merged)
+
+
 async def _clean_scratch(
     loop: asyncio.AbstractEventLoop,
     scratch_type: str,
@@ -2135,6 +2152,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 
             if not restarting:
+                overlay_paths: list[str] = (
+                    kernel_obj.get("overlay_merged_paths", []) if kernel_obj else []
+                )
+                await _unmount_overlays(overlay_paths)
                 await _clean_scratch(
                     loop,
                     self.local_config.container.scratch_type,

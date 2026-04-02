@@ -5830,6 +5830,11 @@ type Mutation {
   """Added in UNRELEASED. Delete a model card (admin only)."""
   adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL!
 
+  """
+  Added in UNRELEASED. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.
+  """
+  scanProjectModelCardsV2(projectId: UUID!): ScanProjectModelCardsV2Payload!
+
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload!
 }
@@ -6543,6 +6548,14 @@ type ProjectLifecycleInfo {
 
   """Timestamp when the project was last modified."""
   modifiedAt: DateTime
+}
+
+"""
+Added in UNRELEASED. Scope for model card queries within a MODEL_STORE project.
+"""
+input ProjectModelCardV2Scope {
+  """MODEL_STORE project UUID."""
+  projectId: UUID!
 }
 
 """
@@ -7575,8 +7588,11 @@ type Query {
   """Added in UNRELEASED. Get a single deployment revision preset by ID."""
   deploymentRevisionPreset(id: UUID!): DeploymentRevisionPreset
 
-  """Added in UNRELEASED. Search model cards."""
-  modelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+  """Added in UNRELEASED. Search all model cards (superadmin only)."""
+  adminModelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+
+  """Added in UNRELEASED. Search model cards within a MODEL_STORE project."""
+  projectModelCardsV2(scope: ProjectModelCardV2Scope!, filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 
   """Added in UNRELEASED. Get a single model card by ID."""
   modelCardV2(id: UUID!): ModelCardV2
@@ -9129,6 +9145,20 @@ Added in 25.14.0. Response payload for artifact scanning operations. Contains th
 type ScanArtifactsPayload {
   """List of scanned artifacts."""
   artifacts: [Artifact!]!
+}
+
+"""
+Added in UNRELEASED. Result of scanning a MODEL_STORE project for model cards.
+"""
+type ScanProjectModelCardsV2Payload {
+  """Number of newly created model cards."""
+  createdCount: Int!
+
+  """Number of updated existing model cards."""
+  updatedCount: Int!
+
+  """Per-vfolder error messages."""
+  errors: [String!]!
 }
 
 """
