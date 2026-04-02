@@ -25,6 +25,7 @@ def upgrade() -> None:
     #
     # Convert any rows where max_surge or max_unavailable is a plain integer
     # to the new {"count": N} dict format.
+    # Convert plain integers: {"max_surge": 1} -> {"max_surge": {"count": 1}}
     op.execute(
         """
         UPDATE deployment_policies
@@ -35,8 +36,24 @@ def upgrade() -> None:
         )
         WHERE strategy_spec IS NOT NULL
           AND jsonb_typeof(strategy_spec -> 'max_surge') = 'number'
+          AND (strategy_spec ->> 'max_surge')::numeric = floor((strategy_spec ->> 'max_surge')::numeric)
         """
     )
+    # Convert plain floats: {"max_surge": 0.5} -> {"max_surge": {"percent": 0.5}}
+    op.execute(
+        """
+        UPDATE deployment_policies
+        SET strategy_spec = jsonb_set(
+            strategy_spec,
+            '{max_surge}',
+            jsonb_build_object('percent', (strategy_spec ->> 'max_surge')::float)
+        )
+        WHERE strategy_spec IS NOT NULL
+          AND jsonb_typeof(strategy_spec -> 'max_surge') = 'number'
+          AND (strategy_spec ->> 'max_surge')::numeric != floor((strategy_spec ->> 'max_surge')::numeric)
+        """
+    )
+    # Convert plain integers: {"max_unavailable": 0} -> {"max_unavailable": {"count": 0}}
     op.execute(
         """
         UPDATE deployment_policies
@@ -47,6 +64,21 @@ def upgrade() -> None:
         )
         WHERE strategy_spec IS NOT NULL
           AND jsonb_typeof(strategy_spec -> 'max_unavailable') = 'number'
+          AND (strategy_spec ->> 'max_unavailable')::numeric = floor((strategy_spec ->> 'max_unavailable')::numeric)
+        """
+    )
+    # Convert plain floats: {"max_unavailable": 0.5} -> {"max_unavailable": {"percent": 0.5}}
+    op.execute(
+        """
+        UPDATE deployment_policies
+        SET strategy_spec = jsonb_set(
+            strategy_spec,
+            '{max_unavailable}',
+            jsonb_build_object('percent', (strategy_spec ->> 'max_unavailable')::float)
+        )
+        WHERE strategy_spec IS NOT NULL
+          AND jsonb_typeof(strategy_spec -> 'max_unavailable') = 'number'
+          AND (strategy_spec ->> 'max_unavailable')::numeric != floor((strategy_spec ->> 'max_unavailable')::numeric)
         """
     )
 
