@@ -95,7 +95,7 @@ class CircuitManager:
         self._circuit_locks.pop(circuit_id, None)
 
     @actxmgr
-    async def _circuit_lock(self, circuit_id: UUID) -> AsyncIterator[None]:
+    async def circuit_lock(self, circuit_id: UUID) -> AsyncIterator[None]:
         async with self._get_lock(circuit_id):
             yield
 
@@ -170,7 +170,7 @@ class CircuitManager:
         self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
     async def update_circuit_routes(self, circuit: Circuit, old_routes: list[RouteInfo]) -> None:
-        async with self._circuit_lock(circuit.id):
+        async with self.circuit_lock(circuit.id):
             await self._update_circuit_routes_unlocked(circuit, old_routes)
 
     async def _update_circuit_routes_unlocked(
@@ -242,7 +242,7 @@ class CircuitManager:
     async def unload_circuits(self, circuits: Sequence[Circuit]) -> None:
         for circuit in circuits:
             try:
-                async with self._circuit_lock(circuit.id):
+                async with self.circuit_lock(circuit.id):
                     if self.local_config.proxy_coordinator.enable_traefik:
                         await self.unload_traefik_circuit(circuit)
                     else:
