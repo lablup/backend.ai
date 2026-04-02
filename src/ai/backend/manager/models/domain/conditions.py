@@ -146,17 +146,17 @@ class DomainConditions:
 
         return inner
 
-    # ==================== Integration ID Filters ====================
+    # ==================== Integration Name Filters ====================
 
     @staticmethod
-    def by_integration_id_equals(integration_id: str) -> QueryCondition:
+    def by_integration_name_equals(integration_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.integration_id == integration_id
+            return DomainRow.integration_id == integration_name  # DB column is integration_id
 
         return inner
 
     @staticmethod
-    def by_has_integration_id(has_integration: bool) -> QueryCondition:
+    def by_has_integration_name(has_integration: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if has_integration:
                 return DomainRow.integration_id.is_not(None)

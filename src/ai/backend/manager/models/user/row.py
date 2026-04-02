@@ -431,7 +431,7 @@ class UserRow(Base):  # type: ignore[misc]
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,
-            integration_id=self.integration_id,
+            integration_name=self.integration_id,  # DB column is integration_id
         )
 
 

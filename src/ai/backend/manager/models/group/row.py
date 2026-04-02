@@ -256,7 +256,7 @@ class GroupRow(Base):  # type: ignore[misc]
             is_active=self.is_active,
             created_at=self.created_at,
             modified_at=self.modified_at,
-            integration_id=self.integration_id,
+            integration_name=self.integration_id,  # DB column is integration_id
             domain_name=self.domain_name,
             total_resource_slots=self.total_resource_slots,
             allowed_vfolder_hosts=self.allowed_vfolder_hosts,
@@ -373,7 +373,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
     domain_name: str
     type: str
 
-    _integration_id: str | None
+    _integration_name: str | None
     _total_resource_slots: ResourceSlot
     _allowed_vfolder_hosts: VFolderHostPermissionMap
     _dotfiles: bytes
@@ -388,8 +388,8 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def integration_id(self) -> str | None:
-        return self._integration_id
+    def integration_name(self) -> str | None:
+        return self._integration_name
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
@@ -427,7 +427,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
             modified_at=row.modified_at,
             domain_name=row.domain_name,
             type=row.type,
-            _integration_id=row.integration_id,
+            _integration_name=row.integration_id,  # DB column is integration_id
             _total_resource_slots=row.total_resource_slots,
             _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
             _dotfiles=row.dotfiles,

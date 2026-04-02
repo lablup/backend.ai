@@ -27,7 +27,7 @@ def _make_project_node(
     name: str = "test-project",
     description: str | None = "Test project description",
     project_type: ProjectType = ProjectType.GENERAL,
-    integration_id: str | None = None,
+    integration_name: str | None = None,
     domain_name: str = "default",
     resource_policy: str = "default-policy",
     allowed_vfolder_hosts: list[VFolderHostPermissionEntry] | None = None,
@@ -41,7 +41,7 @@ def _make_project_node(
             name=name,
             description=description,
             type=project_type,
-            integration_id=integration_id,
+            integration_name=integration_name,
         ),
         organization=ProjectOrganizationInfo(
             domain_name=domain_name,
@@ -68,7 +68,7 @@ class TestProjectV2GQL:
         dto = _make_project_node(
             name="test-project",
             description="Test project description",
-            integration_id="integration-123",
+            integration_name="integration-123",
             domain_name="default",
             resource_policy="default-policy",
             is_active=True,
@@ -82,7 +82,7 @@ class TestProjectV2GQL:
         assert project_gql.basic_info.name == "test-project"
         assert project_gql.basic_info.description == "Test project description"
         assert project_gql.basic_info.type == ProjectTypeEnum.GENERAL
-        assert project_gql.basic_info.integration_id == "integration-123"
+        assert project_gql.basic_info.integration_name == "integration-123"
 
         # Verify organization
         assert project_gql.organization.domain_name == "default"
@@ -151,7 +151,7 @@ class TestProjectV2GQL:
         dto = _make_project_node(
             name="minimal-project",
             description=None,
-            integration_id=None,
+            integration_name=None,
             is_active=None,
             created_at=None,
             modified_at=None,
@@ -161,7 +161,7 @@ class TestProjectV2GQL:
 
         # Verify None values are preserved
         assert project_gql.basic_info.description is None
-        assert project_gql.basic_info.integration_id is None
+        assert project_gql.basic_info.integration_name is None
         assert project_gql.lifecycle.is_active is None
         assert project_gql.lifecycle.created_at is None
         assert project_gql.lifecycle.modified_at is None

@@ -97,7 +97,7 @@ class TestCreateDomain:
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
             dotfiles=b"\x90",
-            integration_id=None,
+            integration_name=None,
         )
 
     @pytest.fixture
@@ -124,7 +124,7 @@ class TestCreateDomain:
             }),
             allowed_docker_registries=["docker.io", "registry.example.com"],
             dotfiles=b"\x90",
-            integration_id=None,
+            integration_name=None,
         )
 
     async def test_create_with_valid_data_as_admin_returns_domain(
@@ -279,7 +279,7 @@ class TestModifyDomain:
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
             dotfiles=b"\x90",
-            integration_id=None,
+            integration_name=None,
         )
 
     @pytest.fixture
@@ -294,7 +294,7 @@ class TestModifyDomain:
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
             dotfiles=b"\x90",
-            integration_id=None,
+            integration_name=None,
         )
 
     @pytest.fixture
@@ -309,7 +309,7 @@ class TestModifyDomain:
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
             dotfiles=b"\x90",
-            integration_id=None,
+            integration_name=None,
         )
 
     async def test_modify_with_valid_data_returns_updated_domain(
@@ -425,7 +425,7 @@ class TestModifyDomain:
             updater=Updater(
                 spec=DomainUpdaterSpec(
                     description=TriState.nullify(),
-                    integration_id=TriState.nullify(),
+                    integration_name=TriState.nullify(),
                 ),
                 pk_value=nullified_domain_data.name,
             ),
@@ -638,7 +638,7 @@ class TestCreateDomainNode:
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
             dotfiles=b"\x90",
-            integration_id=None,
+            integration_name=None,
         )
 
     async def test_create_domain_node_as_admin(
@@ -769,7 +769,7 @@ class TestModifyDomainNode:
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
             dotfiles=b"\x90",
-            integration_id=None,
+            integration_name=None,
         )
 
     @pytest.fixture
@@ -784,7 +784,7 @@ class TestModifyDomainNode:
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
             dotfiles=b"\x90",
-            integration_id=None,
+            integration_name=None,
         )
 
     async def test_modify_domain_node_as_admin(
