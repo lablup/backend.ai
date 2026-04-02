@@ -63,7 +63,7 @@ class ResourceGroupNode(BaseResponseModel):
     allowed_vfolder_hosts: dict[str, Any] = Field(
         description="Allowed vfolder host permissions for the resource group.",
     )
-    integration_id: str | None = Field(
+    integration_name: str | None = Field(
         default=None,
         description="External integration ID associated with this resource group.",
     )

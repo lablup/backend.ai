@@ -22,7 +22,7 @@ def _make_resource_group_node(name: str = "test-group") -> ResourceGroupNode:
         is_active=True,
         total_resource_slots={"cpu": "4", "mem": "8g"},
         allowed_vfolder_hosts={"default": "rw"},
-        integration_id=None,
+        integration_name=None,
         resource_policy=None,
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         modified_at=datetime(2024, 6, 1, tzinfo=UTC),
@@ -42,7 +42,7 @@ class TestResourceGroupNode:
     def test_valid_creation_with_optional_none(self) -> None:
         node = _make_resource_group_node()
         assert node.description == "A test resource group"
-        assert node.integration_id is None
+        assert node.integration_name is None
         assert node.resource_policy is None
 
     def test_serializes_correctly(self) -> None:

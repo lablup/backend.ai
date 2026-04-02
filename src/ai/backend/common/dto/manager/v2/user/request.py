@@ -97,7 +97,7 @@ class CreateUserInput(BaseRequestModel):
         default=None,
         description="Supplementary group IDs for container processes.",
     )
-    integration_id: str | None = Field(
+    integration_name: str | None = Field(
         default=None,
         max_length=512,
         description="External system integration identifier.",
@@ -171,7 +171,7 @@ class UpdateUserInput(BaseRequestModel):
         default=SENTINEL,
         description="New container supplementary group IDs. Set to null to clear.",
     )
-    integration_id: str | Sentinel | None = Field(
+    integration_name: str | Sentinel | None = Field(
         default=SENTINEL,
         description="New external integration identifier. Set to null to clear.",
     )

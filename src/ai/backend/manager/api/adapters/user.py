@@ -411,7 +411,7 @@ class UserAdapter(BaseAdapter):
             container_uid=input.container_uid,
             container_main_gid=input.container_main_gid,
             container_gids=input.container_gids,
-            integration_id=input.integration_id,
+            integration_name=input.integration_name,
         )
         group_ids = [str(gid) for gid in input.group_ids] if input.group_ids else None
         result = await self._processors.user.create_user.wait_for_complete(
@@ -508,10 +508,10 @@ class UserAdapter(BaseAdapter):
                 if isinstance(input.container_gids, Sentinel)
                 else TriState.from_graphql(input.container_gids)
             ),
-            integration_id=(
+            integration_name=(
                 TriState.nop()
-                if isinstance(input.integration_id, Sentinel)
-                else TriState.from_graphql(input.integration_id)
+                if isinstance(input.integration_name, Sentinel)
+                else TriState.from_graphql(input.integration_name)
             ),
             group_ids=(
                 OptionalState.nop()
@@ -1218,7 +1218,7 @@ class UserAdapter(BaseAdapter):
                 email=data.email,
                 full_name=data.full_name,
                 description=data.description,
-                integration_id=data.integration_id,
+                integration_name=data.integration_name,
             ),
             status=UserStatusInfo(
                 status=UserStatusDTO(data.status),

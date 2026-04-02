@@ -49,7 +49,7 @@ class ProjectBasicInfoGQL:
     type: ProjectTypeEnum = gql_field(
         description="Project type determining its purpose. See ProjectTypeV2 enum."
     )
-    integration_id: str | None = gql_field(description="External system integration identifier.")
+    integration_name: str | None = gql_field(description="External system integration identifier.")
 
 
 # ============================================================================

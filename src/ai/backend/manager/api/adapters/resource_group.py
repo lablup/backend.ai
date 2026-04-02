@@ -783,7 +783,7 @@ class ResourceGroupAdapter(BaseAdapter):
             is_active=data.status.is_active,
             total_resource_slots={},
             allowed_vfolder_hosts={},
-            integration_id=None,
+            integration_name=None,
             resource_policy=None,
             created_at=data.metadata.created_at,
             modified_at=datetime.fromtimestamp(0, tz=UTC),

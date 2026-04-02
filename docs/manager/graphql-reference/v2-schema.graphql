@@ -1679,7 +1679,7 @@ input CreateDomainInputGQL {
   allowedDockerRegistries: [String!] = null
 
   """External integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
 }
 
 """Added in 25.14.0. """
@@ -1830,7 +1830,7 @@ input CreateProjectInputGQL {
   description: String = null
 
   """External integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
 
   """Name of the resource policy to apply."""
   resourcePolicy: String = null
@@ -2758,7 +2758,7 @@ type DomainBasicInfo {
   description: String
 
   """External system integration identifier."""
-  integrationId: String
+  integrationName: String
 }
 
 """
@@ -6350,7 +6350,7 @@ type ProjectBasicInfo {
   type: ProjectTypeV2!
 
   """External system integration identifier."""
-  integrationId: String
+  integrationName: String
 }
 
 """
@@ -10141,7 +10141,7 @@ input UpdateDomainInputGQL {
   allowedDockerRegistries: [String!] = null
 
   """New external integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
 }
 
 """Added in 25.14.0. """
@@ -10331,7 +10331,7 @@ input UpdateProjectInputGQL {
   isActive: Boolean = null
 
   """New external integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
 
   """New resource policy name."""
   resourcePolicy: String = null
