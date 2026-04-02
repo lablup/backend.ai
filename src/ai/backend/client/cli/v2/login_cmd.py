@@ -49,14 +49,24 @@ def login(force: bool) -> None:
                 data = await resp.json()
 
             if not data.get("authenticated"):
-                if data.get("data", {}).get("details") == "OTP not provided":
+                raw_data = data.get("data", {})
+                if isinstance(raw_data, dict):
+                    details = raw_data.get("details", "Unknown error")
+                else:
+                    details = str(raw_data) if raw_data else "Unknown error"
+
+                if details == "OTP not provided":
                     otp = input("One-time Password: ")
                     payload["otp"] = otp.strip()
                     async with client.session.post(login_url, json=payload) as resp:
                         data = await resp.json()
 
             if not data.get("authenticated"):
-                details = data.get("data", {}).get("details", "Unknown error")
+                raw_data = data.get("data", {})
+                if isinstance(raw_data, dict):
+                    details = raw_data.get("details", "Unknown error")
+                else:
+                    details = str(raw_data) if raw_data else "Unknown error"
                 click.echo(click.style(f"Login failed: {details}", fg="red"))
                 raise SystemExit(1)
 
