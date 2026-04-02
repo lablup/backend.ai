@@ -79,6 +79,7 @@ class TestUserConditionsIntegrationNameFilters:
         spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=False)
         condition = UserConditions.by_integration_name_contains(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
         assert "integration_id" in sql
         assert "LIKE" in sql.upper()
         assert "%ext-abc%" in sql
@@ -99,6 +100,7 @@ class TestUserConditionsIntegrationNameFilters:
         spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=False)
         condition = UserConditions.by_integration_name_equals(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
         assert "integration_id" in sql
         assert "ext-abc" in sql
 
@@ -118,6 +120,7 @@ class TestUserConditionsIntegrationNameFilters:
         spec = StringMatchSpec(value="ext-", case_insensitive=False, negated=False)
         condition = UserConditions.by_integration_name_starts_with(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
         assert "integration_id" in sql
         assert "LIKE" in sql.upper()
 
@@ -125,6 +128,7 @@ class TestUserConditionsIntegrationNameFilters:
         spec = StringMatchSpec(value="-abc", case_insensitive=False, negated=False)
         condition = UserConditions.by_integration_name_ends_with(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
         assert "integration_id" in sql
         assert "LIKE" in sql.upper()
 
