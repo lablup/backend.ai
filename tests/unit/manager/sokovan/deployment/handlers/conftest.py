@@ -139,16 +139,26 @@ def proxy_target() -> ScalingGroupProxyTarget:
 
 
 @pytest.fixture
-def deploying_deployment_without_url() -> DeploymentWithHistory:
-    """DEPLOYING deployment that has no URL (needs endpoint registration)."""
+def deployment_created_without_revision() -> DeploymentWithHistory:
+    """Deployment created without a revision, then sent to DEPLOYING via ActivateRevision.
+
+    Simulates the bug scenario: current_revision_id is None (no initial revision),
+    deploying_revision_id is set (ActivateRevision assigned it), and url is None
+    (check_pending was skipped so appproxy endpoint was never registered).
+    """
     return DeploymentWithHistory(
-        deployment_info=_create_deploying_deployment_info(url=None),
+        deployment_info=_create_deploying_deployment_info(
+            current_revision_id=None,
+            url=None,
+        ),
     )
 
 
 @pytest.fixture
-def deploying_deployment_with_url() -> DeploymentWithHistory:
-    """DEPLOYING deployment that already has a URL (skip registration)."""
+def deployment_already_registered() -> DeploymentWithHistory:
+    """Deployment that went through check_pending and already has an appproxy URL."""
     return DeploymentWithHistory(
-        deployment_info=_create_deploying_deployment_info(url="http://already-registered/v1"),
+        deployment_info=_create_deploying_deployment_info(
+            url="http://already-registered/v1",
+        ),
     )
