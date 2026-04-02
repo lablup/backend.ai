@@ -464,10 +464,16 @@ class CreateDeploymentAdapter:
         tag = ",".join(request.metadata.tags) if request.metadata.tags else None
 
         # Build metadata
+        resource_group = (
+            request.initial_revision.resource_config.resource_group
+            if request.initial_revision is not None
+            else ""
+        )
         metadata = DeploymentMetadata(
             name=name,
             domain=request.metadata.domain_name,
             project=request.metadata.project_id,
+            resource_group=resource_group,
             created_user=user_uuid,
             session_owner=user_uuid,
             created_at=None,

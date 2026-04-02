@@ -34,6 +34,7 @@ class DeploymentMetadataFields:
     name: str
     domain: str
     project_id: uuid.UUID
+    resource_group: str
     created_user_id: uuid.UUID
     session_owner_id: uuid.UUID
     revision_history_limit: int = 10

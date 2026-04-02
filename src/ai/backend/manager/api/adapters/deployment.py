@@ -417,6 +417,7 @@ class DeploymentAdapter(BaseAdapter):
                 name=meta.name or f"deployment-{created_user_id.hex[:8]}",
                 domain=meta.domain_name,
                 project=meta.project_id,
+                resource_group=initial_revision.resource_config.resource_group.name,
                 created_user=created_user_id,
                 session_owner=created_user_id,
                 created_at=None,

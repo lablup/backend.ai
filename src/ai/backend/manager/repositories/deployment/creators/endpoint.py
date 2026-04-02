@@ -16,7 +16,6 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
@@ -89,8 +88,6 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
         Returns:
             LegacyEndpointCreatorSpec instance.
         """
-        if creator.metadata.resource_group is None:
-            raise InvalidAPIParameters("resource_group is required for legacy endpoint creation")
         return cls(
             # Metadata
             name=creator.metadata.name,
@@ -136,6 +133,7 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
             name=self.name,
             domain=self.domain,
             project=self.project,
+            resource_group=self.resource_group,
             created_user=self.created_user,
             session_owner=self.session_owner,
             revision_history_limit=self.revision_history_limit,

@@ -210,6 +210,13 @@ class EndpointRow(Base):  # type: ignore[misc]
         sa.ForeignKey("groups.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    resource_group: Mapped[str] = mapped_column(
+        "resource_group",
+        sa.String,
+        sa.ForeignKey("scaling_groups.name", ondelete="RESTRICT"),
+        index=True,
+        nullable=False,
+    )
     lifecycle_stage: Mapped[EndpointLifecycle] = mapped_column(
         "lifecycle_stage",
         EnumValueType(EndpointLifecycle),
@@ -364,7 +371,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
-        load_revisions: bool = False,
+        load_current_revision: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> list[Self]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -382,9 +389,11 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
             query = query.options(selectinload(EndpointRow.session_owner_row))
-        if load_revisions:
+        if load_current_revision:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                )
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -648,7 +657,7 @@ class EndpointRow(Base):  # type: ignore[misc]
                 else None,
                 domain=self.domain,
                 project=self.project,
-                resource_group=current_revision.resource_group,
+                resource_group=self.resource_group,
                 resource_slots=current_revision.resource_slots,
                 url=self.url or "",
                 model=current_revision.model or uuid.UUID(int=0),
@@ -687,7 +696,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             image=None,
             domain=self.domain,
             project=self.project,
-            resource_group="",
+            resource_group=self.resource_group,
             resource_slots=ResourceSlot({}),
             url=self.url or "",
             model=uuid.UUID(int=0),
@@ -735,6 +744,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             replicas=creator.replica_spec.replica_count,
             domain=creator.metadata.domain,
             project=creator.metadata.project,
+            resource_group=creator.metadata.resource_group,
             tag=creator.metadata.tag,
             open_to_public=creator.network.open_to_public,
             url=creator.network.url,
@@ -764,14 +774,13 @@ class EndpointRow(Base):  # type: ignore[misc]
         model_revisions: list[ModelRevisionSpec],
     ) -> DeploymentInfo:
         """Build DeploymentInfo with pre-built model_revisions dict."""
-        current_revision = self.current_revision_row
         return DeploymentInfo(
             id=self.id,
             metadata=DeploymentMetadata(
                 name=self.name,
                 domain=self.domain,
                 project=self.project,
-                resource_group=current_revision.resource_group if current_revision else None,
+                resource_group=self.resource_group,
                 created_user=self.created_user,
                 session_owner=self.session_owner,
                 created_at=self.created_at,

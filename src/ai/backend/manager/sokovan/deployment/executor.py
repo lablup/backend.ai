@@ -107,9 +107,7 @@ class DeploymentExecutor:
         with DeploymentRecorderContext.shared_phase("load_configuration"):
             with DeploymentRecorderContext.shared_step("load_proxy_targets"):
                 scaling_groups = {
-                    dep.deployment_info.metadata.resource_group
-                    for dep in deployments
-                    if dep.deployment_info.metadata.resource_group is not None
+                    dep.deployment_info.metadata.resource_group for dep in deployments
                 }
                 scaling_group_targets = (
                     await self._deployment_repo.fetch_scaling_group_proxy_targets(scaling_groups)
@@ -121,9 +119,6 @@ class DeploymentExecutor:
         skipped_deployments: list[DeploymentWithHistory] = []
         for deployment in deployments:
             info = deployment.deployment_info
-            if info.metadata.resource_group is None:
-                skipped_deployments.append(deployment)
-                continue
             targets = scaling_group_targets[info.metadata.resource_group]
             if not targets:
                 log.warning(
@@ -383,9 +378,7 @@ class DeploymentExecutor:
 
             with DeploymentRecorderContext.shared_step("load_proxy_config"):
                 scaling_groups = {
-                    dep.deployment_info.metadata.resource_group
-                    for dep in deployments
-                    if dep.deployment_info.metadata.resource_group is not None
+                    dep.deployment_info.metadata.resource_group for dep in deployments
                 }
                 proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
                     scaling_groups
@@ -681,8 +674,6 @@ class DeploymentExecutor:
 
         with recorder.phase("unregister_endpoint"):
             with recorder.step("delete_from_proxy"):
-                if deployment.metadata.resource_group is None:
-                    return
                 target = proxy_targets.get(deployment.metadata.resource_group)
                 if not target:
                     log.warning(

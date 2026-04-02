@@ -302,7 +302,9 @@ class TestSearchAutoScalingRulesValidated:
                 session_owner=test_user_id,
                 domain=test_domain,
                 project=test_group_id,
+                resource_group=test_scaling_group,
                 lifecycle_stage=EndpointLifecycle.CREATED,
+                current_revision=uuid.uuid4(),
                 replicas=1,
             )
             db_sess.add(endpoint)

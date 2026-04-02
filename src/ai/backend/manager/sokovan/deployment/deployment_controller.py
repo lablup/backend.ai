@@ -20,7 +20,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
@@ -95,8 +94,6 @@ class DeploymentController:
         log.info("Creating deployment '{}' in project {}", draft.name, draft.project)
 
         # Pre-fetch default architecture from scaling group
-        if draft.metadata.resource_group is None:
-            raise InvalidAPIParameters("resource_group must be set for deployment creation")
         default_architecture = (
             await self._deployment_repository.get_default_architecture_from_scaling_group(
                 draft.metadata.resource_group

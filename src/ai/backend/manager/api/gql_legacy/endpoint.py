@@ -664,9 +664,9 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         ctx: GraphQueryContext,
         row: EndpointRow,
     ) -> Self:
-        """Convert EndpointRow to GQL type via to_data() -> from_dto().
+        """Convert EndpointRow to GQL type via to_data() → from_dto().
 
-        Requires current_revision_row and image_row to be eagerly loaded.
+        Requires revisions and revisions.image_row to be eagerly loaded.
         """
         dto = row.to_data()
         result = cls.from_dto(ctx, dto)
@@ -774,10 +774,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             .limit(limit)
             .offset(offset)
             .options(
-                selectinload(EndpointRow.current_revision_row)
-                .selectinload(DeploymentRevisionRow.image_row)
-                .selectinload(ImageRow.aliases),
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
             )
             .options(selectinload(EndpointRow.routings))
             .options(selectinload(EndpointRow.session_owner_row))
@@ -818,6 +815,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
                 project=project,
                 domain=domain_name,
                 user_uuid=user_uuid,
+                load_current_revision=True,
                 load_created_user=True,
                 load_session_owner=True,
             )
@@ -844,6 +842,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
                     domain=domain_name,
                     user_uuid=user_uuid,
                     project=project,
+                    load_current_revision=True,
                     load_routes=True,
                     load_created_user=True,
                     load_session_owner=True,
@@ -889,17 +888,10 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         async with ctx.db.begin_readonly_session() as sess:
-            endpoint_query = (
-                sa.select(EndpointRow)
-                .where(EndpointRow.id == self.endpoint_id)
-                .options(selectinload(EndpointRow.current_revision_row))
-            )
-            endpoint_row = (await sess.execute(endpoint_query)).scalar_one()
-            current_revision: DeploymentRevisionRow | None = endpoint_row.current_revision_row
-            extra_mount_folder_ids = [
-                m.vfid.folder_id
-                for m in (current_revision.extra_mounts if current_revision is not None else [])
-            ]
+            endpoint_row = await EndpointRow.get(sess, self.endpoint_id, load_current_revision=True)
+            current_rev = endpoint_row.current_revision_row
+            extra_mounts = current_rev.extra_mounts if current_rev else []
+            extra_mount_folder_ids = [m.vfid.folder_id for m in extra_mounts]
             query = (
                 sa.select(VFolderRow)
                 .where(VFolderRow.id.in_(extra_mount_folder_ids))

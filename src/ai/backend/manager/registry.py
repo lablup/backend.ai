@@ -2513,15 +2513,13 @@ class AgentRegistry:
         query = (
             sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
             .select_from(scaling_groups)
-            .where(scaling_groups.c.name == endpoint.current_revision_row.resource_group)
+            .where(scaling_groups.c.name == endpoint.resource_group)
         )
 
         result = await db_sess.execute(query)
         sgroup = result.first()
         if sgroup is None:
-            raise InvalidAPIParameters(
-                f"Scaling group not found: {endpoint.current_revision_row.resource_group}"
-            )
+            raise InvalidAPIParameters(f"Scaling group not found: {endpoint.resource_group}")
         wsproxy_addr = sgroup.wsproxy_addr
         wsproxy_api_token = sgroup.wsproxy_api_token
 

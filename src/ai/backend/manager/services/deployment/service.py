@@ -43,7 +43,6 @@ from ai.backend.manager.data.deployment.types import (
     merge_revision_drafts,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -208,10 +207,6 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             raise DeploymentRevisionNotFound(
                 f"ModelRevisionSpec has no revision_id for deployment {info.id}"
             )
-        if info.metadata.resource_group is None:
-            raise DeploymentRevisionNotFound(
-                f"resource_group is missing in metadata for deployment {info.id}"
-            )
         revision = ModelRevisionData(
             id=rev.revision_id,
             name=rev.image_identifier.canonical,
@@ -371,6 +366,7 @@ class DeploymentService:
                 name=metadata.name,
                 domain=metadata.domain,
                 project_id=metadata.project,
+                resource_group=metadata.resource_group,
                 created_user_id=metadata.created_user,
                 session_owner_id=metadata.session_owner,
                 revision_history_limit=metadata.revision_history_limit,
@@ -744,8 +740,6 @@ class DeploymentService:
         merged_creator = await self._merge_deployment_config(preset_applied)
         resolved_model_definition = await self._resolve_model_definition(merged_creator)
 
-        if endpoint_info.metadata.resource_group is None:
-            raise InvalidAPIParameters("resource_group must be set when adding a revision")
         spec = DeploymentRevisionCreatorSpec(
             endpoint_id=deployment_id,
             image_id=merged_creator.image_id,

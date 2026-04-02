@@ -111,8 +111,7 @@ async def database_fixture(
         for stmt in [
             "CREATE TABLE IF NOT EXISTS sessions (id UUID PRIMARY KEY, scaling_group_name VARCHAR)",
             "CREATE TABLE IF NOT EXISTS kernels (id UUID PRIMARY KEY, session_id UUID)",
-            "CREATE TABLE IF NOT EXISTS deployment_revisions (id UUID PRIMARY KEY, endpoint UUID, resource_group VARCHAR)",
-            "CREATE TABLE IF NOT EXISTS endpoints (id UUID PRIMARY KEY)",
+            "CREATE TABLE IF NOT EXISTS endpoints (id UUID PRIMARY KEY, resource_group VARCHAR)",
             "CREATE TABLE IF NOT EXISTS routings (id UUID PRIMARY KEY, session UUID)",
         ]:
             await conn.execute(text(stmt))

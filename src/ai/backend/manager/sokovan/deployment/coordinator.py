@@ -34,7 +34,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
@@ -700,8 +699,6 @@ class DeploymentCoordinator:
         timestamp: str,
     ) -> NotificationTriggeredEvent:
         """Build a notification event for a lifecycle transition."""
-        if deployment.metadata.resource_group is None:
-            raise InvalidAPIParameters("resource_group must be set for lifecycle notifications")
         message = EndpointLifecycleChangedMessage(
             endpoint_id=str(deployment.id),
             endpoint_name=deployment.metadata.name,
