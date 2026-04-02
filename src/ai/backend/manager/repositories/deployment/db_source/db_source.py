@@ -125,7 +125,6 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creator,
     execute_rbac_entity_creators,
 )
-from ai.backend.manager.repositories.base.types import SearchScope
 from ai.backend.manager.repositories.base.updater import (
     BatchUpdater,
     Updater,
@@ -143,6 +142,7 @@ from ai.backend.manager.repositories.deployment.creators import (
 )
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.types import (
+    ProjectDeploymentSearchScope,
     RouteData,
     RouteServiceDiscoveryInfo,
 )
@@ -1229,7 +1229,7 @@ class DeploymentDBSource:
     async def search_deployments_in_project(
         self,
         querier: BatchQuerier,
-        scope: SearchScope,
+        scope: ProjectDeploymentSearchScope,
     ) -> DeploymentSummarySearchResult:
         """Search endpoints within a project scope with pagination and filtering.
 

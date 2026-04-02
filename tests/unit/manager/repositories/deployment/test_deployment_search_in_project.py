@@ -11,7 +11,7 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.types import ClusterMode, EndpointId, ResourceSlot, RuntimeVariant
+from ai.backend.common.types import EndpointId, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import DeploymentSummarySearchResult
 from ai.backend.manager.data.image.types import ImageType
@@ -228,16 +228,9 @@ class TestEndpointSearchInProject:
                         domain=domain_name,
                         project=project_a_id,
                         resource_group=sgroup_name,
-                        image=image_id,
-                        model=None,
-                        model_mount_destination="/models",
-                        runtime_variant=RuntimeVariant.CUSTOM,
                         lifecycle_stage=EndpointLifecycle.CREATED,
                         current_revision=uuid.uuid4(),
                         replicas=1,
-                        resource_slots=ResourceSlot({"cpu": "1", "mem": "1g"}),
-                        cluster_mode=ClusterMode.SINGLE_NODE,
-                        cluster_size=1,
                     )
                 )
                 endpoint_ids_in_a.append(eid)
@@ -253,16 +246,9 @@ class TestEndpointSearchInProject:
                     domain=domain_name,
                     project=project_b_id,
                     resource_group=sgroup_name,
-                    image=image_id,
-                    model=None,
-                    model_mount_destination="/models",
-                    runtime_variant=RuntimeVariant.CUSTOM,
                     lifecycle_stage=EndpointLifecycle.CREATED,
                     current_revision=uuid.uuid4(),
                     replicas=1,
-                    resource_slots=ResourceSlot({"cpu": "1", "mem": "1g"}),
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
                 )
             )
             endpoint_ids_in_b.append(eid)

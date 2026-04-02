@@ -709,9 +709,6 @@ class DeploymentSummaryData:
     tag: str | None
     open_to_public: bool
     url: str | None
-    runtime_variant: RuntimeVariant
-    image: UUID | None
-    model: UUID | None
     current_revision: UUID | None
     deploying_revision: UUID | None
     replicas: int
