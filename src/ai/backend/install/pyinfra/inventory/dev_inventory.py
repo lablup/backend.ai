@@ -111,8 +111,9 @@ class DevInventoryBuilder:
         )
 
         etcd_config = EtcdConfig(
-            hostname=h,
-            port=p["etcd"],
+            advertised_client_ip=h,
+            advertised_client_port=p["etcd"],
+            connect_client_ip=h,
         )
 
         bai_core_config = BackendAICoreConfig(
@@ -120,7 +121,6 @@ class DevInventoryBuilder:
         )
 
         manager_config = ManagerConfig(
-            hostname=h,
             port=p["manager"],
             superadmin_password=DEV_DEFAULTS["superadmin_password"],
             superadmin_access_key=DEV_DEFAULTS["superadmin_access_key"],
@@ -131,14 +131,12 @@ class DevInventoryBuilder:
         )
 
         webserver_config = WebserverConfig(
-            hostname=h,
             port=p["webserver"],
             haproxy_service_port=p["webserver"],
         )
 
         storage_proxy_config = StorageProxyConfig(
-            hostname=h,
-            client_port=p["storage_proxy_client"],
+            port=p["storage_proxy_client"],
             manager_port=p["storage_proxy_manager"],
             client_endpoint=f"http://{h}:{p['storage_proxy_client']}",
             manager_token=secrets.token_hex(32),
@@ -172,7 +170,6 @@ class DevInventoryBuilder:
         )
 
         hive_gateway_config = HiveGatewayConfig(
-            hostname=h,
             port=p["hive_gateway"],
         )
 

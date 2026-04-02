@@ -153,6 +153,7 @@ class TestDevInventoryBuilder:
         services = data["services"]
         assert services["postgres"].port == HALFSTACK_PORTS["postgres"]
         assert services["redis"].port == HALFSTACK_PORTS["redis"]
+        assert services["etcd"].advertised_client_port == HALFSTACK_PORTS["etcd"]
 
     def test_appproxy_ports(self, inventory: dict) -> None:
         _, data = inventory["mgmt"][0]
