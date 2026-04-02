@@ -33,7 +33,8 @@ def upgrade() -> None:
             '{max_surge}',
             jsonb_build_object('count', (strategy_spec ->> 'max_surge')::int)
         )
-        WHERE jsonb_typeof(strategy_spec -> 'max_surge') = 'number'
+        WHERE strategy_spec IS NOT NULL
+          AND jsonb_typeof(strategy_spec -> 'max_surge') = 'number'
         """
     )
     op.execute(
@@ -44,7 +45,8 @@ def upgrade() -> None:
             '{max_unavailable}',
             jsonb_build_object('count', (strategy_spec ->> 'max_unavailable')::int)
         )
-        WHERE jsonb_typeof(strategy_spec -> 'max_unavailable') = 'number'
+        WHERE strategy_spec IS NOT NULL
+          AND jsonb_typeof(strategy_spec -> 'max_unavailable') = 'number'
         """
     )
 
@@ -59,7 +61,8 @@ def downgrade() -> None:
             '{max_surge}',
             to_jsonb((strategy_spec -> 'max_surge' ->> 'count')::int)
         )
-        WHERE jsonb_typeof(strategy_spec -> 'max_surge') = 'object'
+        WHERE strategy_spec IS NOT NULL
+          AND jsonb_typeof(strategy_spec -> 'max_surge') = 'object'
           AND strategy_spec -> 'max_surge' ? 'count'
         """
     )
@@ -71,7 +74,8 @@ def downgrade() -> None:
             '{max_unavailable}',
             to_jsonb((strategy_spec -> 'max_unavailable' ->> 'count')::int)
         )
-        WHERE jsonb_typeof(strategy_spec -> 'max_unavailable') = 'object'
+        WHERE strategy_spec IS NOT NULL
+          AND jsonb_typeof(strategy_spec -> 'max_unavailable') = 'object'
           AND strategy_spec -> 'max_unavailable' ? 'count'
         """
     )
