@@ -531,6 +531,7 @@ async def copy_runner_files(scratch_path: Path) -> None:
 
     target_files = [
         "entrypoint.sh",
+        "setup_dist_environ.sh",
         "*.bin",
         "*.so",
         "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",

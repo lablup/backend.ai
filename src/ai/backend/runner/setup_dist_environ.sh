@@ -20,18 +20,15 @@ if [ -z "$BACKENDAI_CLUSTER_SIZE" ] || [ "$BACKENDAI_CLUSTER_SIZE" -le 1 ] 2>/de
   return 0 2>/dev/null || exit 0
 fi
 
-BACKENDAI_DIST_MASTER_PORT="${BACKENDAI_DIST_MASTER_PORT:-29500}"
-BACKENDAI_DIST_MASTER_ADDR="$(echo "$BACKENDAI_CLUSTER_HOSTS" | cut -d, -f1)"
-
 # --- PyTorch / General distributed training ---
 # Only set MASTER_ADDR and MASTER_PORT — the two variables that launchers like
 # torchrun cannot auto-discover and that require cluster-level knowledge.
 # WORLD_SIZE, RANK, LOCAL_RANK are left to the launcher (e.g., torchrun --nproc_per_node).
 if [ -z "$MASTER_ADDR" ]; then
-  export MASTER_ADDR="$BACKENDAI_DIST_MASTER_ADDR"
+  export MASTER_ADDR="$(echo "$BACKENDAI_CLUSTER_HOSTS" | cut -d, -f1)"
 fi
 if [ -z "$MASTER_PORT" ]; then
-  export MASTER_PORT="$BACKENDAI_DIST_MASTER_PORT"
+  export MASTER_PORT="${BACKENDAI_DIST_MASTER_PORT:-29500}"
 fi
 
 # --- TensorFlow TF_CONFIG ---
@@ -39,18 +36,22 @@ fi
 # Each worker gets a unique port derived from the base port + its rank to avoid
 # port conflicts when multiple workers run on the same host.
 if [ -z "$TF_CONFIG" ]; then
-  TF_WORKER_LIST=""
-  TF_WORKER_IDX=0
+  _DIST_BASE_PORT="${BACKENDAI_DIST_MASTER_PORT:-29500}"
+  _TF_WORKER_LIST=""
+  _TF_WORKER_IDX=0
+  _OLD_IFS="$IFS"
   IFS=','
-  for host in $BACKENDAI_CLUSTER_HOSTS; do
-    if [ -n "$TF_WORKER_LIST" ]; then
-      TF_WORKER_LIST="${TF_WORKER_LIST},"
+  for _host in $BACKENDAI_CLUSTER_HOSTS; do
+    if [ -n "$_TF_WORKER_LIST" ]; then
+      _TF_WORKER_LIST="${_TF_WORKER_LIST},"
     fi
-    TF_WORKER_PORT=$((BACKENDAI_DIST_MASTER_PORT + TF_WORKER_IDX))
-    TF_WORKER_LIST="${TF_WORKER_LIST}\"${host}:${TF_WORKER_PORT}\""
-    TF_WORKER_IDX=$((TF_WORKER_IDX + 1))
+    _TF_WORKER_PORT=$((_DIST_BASE_PORT + _TF_WORKER_IDX))
+    _TF_WORKER_LIST="${_TF_WORKER_LIST}\"${_host}:${_TF_WORKER_PORT}\""
+    _TF_WORKER_IDX=$((_TF_WORKER_IDX + 1))
   done
-  unset IFS
+  IFS="$_OLD_IFS"
 
-  export TF_CONFIG="{\"cluster\":{\"worker\":[${TF_WORKER_LIST}]},\"task\":{\"type\":\"worker\",\"index\":${BACKENDAI_CLUSTER_LOCAL_RANK}}}"
+  export TF_CONFIG="{\"cluster\":{\"worker\":[${_TF_WORKER_LIST}]},\"task\":{\"type\":\"worker\",\"index\":${BACKENDAI_CLUSTER_LOCAL_RANK:-0}}}"
+
+  unset _DIST_BASE_PORT _TF_WORKER_LIST _TF_WORKER_IDX _TF_WORKER_PORT _OLD_IFS _host
 fi
