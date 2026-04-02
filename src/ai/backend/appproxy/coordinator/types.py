@@ -241,12 +241,14 @@ class CircuitManager:
 
     async def unload_circuits(self, circuits: Sequence[Circuit]) -> None:
         for circuit in circuits:
-            async with self.circuit_lock(circuit.id):
-                if self.local_config.proxy_coordinator.enable_traefik:
-                    await self.unload_traefik_circuit(circuit)
-                else:
-                    await self.unload_legacy_circuit(circuit)
-            self.release_circuit_lock(circuit.id)
+            try:
+                async with self.circuit_lock(circuit.id):
+                    if self.local_config.proxy_coordinator.enable_traefik:
+                        await self.unload_traefik_circuit(circuit)
+                    else:
+                        await self.unload_legacy_circuit(circuit)
+            finally:
+                self.release_circuit_lock(circuit.id)
 
     async def unload_traefik_circuit(self, circuit: Circuit) -> None:
         log.debug("unload_traefik_circuit(): start")
