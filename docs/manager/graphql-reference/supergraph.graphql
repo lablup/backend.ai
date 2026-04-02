@@ -17187,7 +17187,7 @@ type UserV2Edge
 }
 
 """
-Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
+Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, integration_name, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input UserV2Filter
   @join__type(graph: STRAWBERRY)
@@ -17197,6 +17197,9 @@ input UserV2Filter
   email: StringFilter = null
   status: UserStatusV2EnumFilter = null
   domainName: StringFilter = null
+
+  """Added in UNRELEASED. Filter by external integration identifier."""
+  integrationName: StringFilter = null
   role: UserRoleV2EnumFilter = null
   createdAt: DateTimeFilter = null
   domain: UserDomainNestedFilter = null
