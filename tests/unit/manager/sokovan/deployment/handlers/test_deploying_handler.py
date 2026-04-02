@@ -19,27 +19,31 @@ from ai.backend.manager.sokovan.deployment.strategy.types import StrategyEvaluat
 from ai.backend.manager.sokovan.deployment.types import DeploymentWithHistory
 
 
-async def test_execute_registers_endpoint_for_deployment_without_revision(
-    deploying_provisioning_handler: DeployingProvisioningHandler,
-    mock_deployment_repo: AsyncMock,
-    mock_deployment_executor: AsyncMock,
-    mock_evaluator: AsyncMock,
-    mock_applier: AsyncMock,
-    deployment_created_without_revision: DeploymentWithHistory,
-    proxy_target: ScalingGroupProxyTarget,
-) -> None:
-    """BA-5557: execute() registers appproxy endpoint for a deployment that
-    was created without a revision and later ActivateRevision'd into DEPLOYING."""
-    mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = {
-        "default": proxy_target,
-    }
-    mock_evaluator.evaluate.return_value = StrategyEvaluationSummary()
-    mock_applier.apply.return_value = StrategyApplyResult()
+class TestDeployingProvisioningHandler:
+    """Tests for DeployingProvisioningHandler."""
 
-    await deploying_provisioning_handler.execute([deployment_created_without_revision])
+    async def test_registers_endpoint_for_deployment_created_without_revision(
+        self,
+        deploying_provisioning_handler: DeployingProvisioningHandler,
+        mock_deployment_repo: AsyncMock,
+        mock_deployment_executor: AsyncMock,
+        mock_evaluator: AsyncMock,
+        mock_applier: AsyncMock,
+        deployment_created_without_revision: DeploymentWithHistory,
+        proxy_target: ScalingGroupProxyTarget,
+    ) -> None:
+        """BA-5557: execute() registers appproxy endpoint for a deployment that
+        was created without a revision and later ActivateRevision'd into DEPLOYING."""
+        mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = {
+            "default": proxy_target,
+        }
+        mock_evaluator.evaluate.return_value = StrategyEvaluationSummary()
+        mock_applier.apply.return_value = StrategyApplyResult()
 
-    info = deployment_created_without_revision.deployment_info
-    mock_deployment_executor.register_endpoint.assert_awaited_once_with(
-        info, proxy_target, info.deploying_revision_id
-    )
-    mock_deployment_repo.update_endpoint_urls_bulk.assert_awaited_once()
+        await deploying_provisioning_handler.execute([deployment_created_without_revision])
+
+        info = deployment_created_without_revision.deployment_info
+        mock_deployment_executor.register_endpoint.assert_awaited_once_with(
+            info, proxy_target, info.deploying_revision_id
+        )
+        mock_deployment_repo.update_endpoint_urls_bulk.assert_awaited_once()
