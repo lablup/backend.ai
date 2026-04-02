@@ -48,7 +48,7 @@ def login(force: bool) -> None:
             async with client.session.post(login_url, json=payload) as resp:
                 data = await resp.json()
 
-            def _get_details(resp_data: dict[str, object]) -> str:
+            def _get_details(resp_data: dict[str, Any]) -> str:
                 raw = resp_data.get("data")
                 if isinstance(raw, dict):
                     details = raw.get("details")
