@@ -264,6 +264,7 @@ class AsyncEtcd(AbstractKVStore):
         credentials: dict[str, str] | None = None,
         encoding: str = "utf-8",
         watch_reconnect_intvl: float = 0.5,
+        watch_reconnect_max_intvl: float = 30.0,
     ) -> None:
         self.scope_prefix_map = t.Dict({
             t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
@@ -289,10 +290,23 @@ class AsyncEtcd(AbstractKVStore):
         )
         self.encoding = encoding
         self.watch_reconnect_intvl = watch_reconnect_intvl
+        self.watch_reconnect_max_intvl = watch_reconnect_max_intvl
         self.etcd = EtcdClient(
             [f"http://{addr.host}:{addr.port}" for addr in addrs],
             connect_options=self._connect_options,
         )
+
+    def _calc_watch_reconnect_delay(self, attempt: int) -> float:
+        """Calculate exponential backoff delay for watch reconnection.
+
+        Args:
+            attempt: 1-indexed retry count.
+
+        Returns:
+            Delay in seconds, capped at ``watch_reconnect_max_intvl``.
+        """
+        delay = self.watch_reconnect_intvl * (2 ** (attempt - 1))
+        return cast(float, min(delay, self.watch_reconnect_max_intvl))
 
     @classmethod
     def create_from_config(cls, etcd_config: EtcdConfigData) -> Self:
@@ -714,6 +728,7 @@ class AsyncEtcd(AbstractKVStore):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+        retry_count: int = 0
         ended_without_error = False
 
         while not ended_without_error:
@@ -728,14 +743,30 @@ class AsyncEtcd(AbstractKVStore):
                     cleanup_event=cleanup_event,
                     wait_timeout=wait_timeout,
                 ):
+                    if retry_count > 0:
+                        log.info(
+                            "watch(): successfully reconnected to Etcd server after %d retries",
+                            retry_count,
+                        )
+                        retry_count = 0
                     yield ev
                 ended_without_error = True
             except GRPCStatusError as e:
                 err_detail = e.args[0]
 
                 if err_detail["code"] == GRPCStatusCode.Unavailable:
-                    log.warning("watch(): error while connecting to Etcd server, retrying...")
-                    await asyncio.sleep(self.watch_reconnect_intvl)
+                    retry_count += 1
+                    delay = self._calc_watch_reconnect_delay(retry_count)
+                    if retry_count == 1:
+                        log.warning("watch(): error while connecting to Etcd server, retrying...")
+                    else:
+                        log.debug(
+                            "watch(): still unable to connect to Etcd server (attempt %d),"
+                            " next retry in %.1fs",
+                            retry_count,
+                            delay,
+                        )
+                    await asyncio.sleep(delay)
                     ended_without_error = False
                 else:
                     raise
@@ -754,6 +785,7 @@ class AsyncEtcd(AbstractKVStore):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
         mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
+        retry_count: int = 0
         ended_without_error = False
 
         while not ended_without_error:
@@ -768,16 +800,32 @@ class AsyncEtcd(AbstractKVStore):
                     cleanup_event=cleanup_event,
                     wait_timeout=wait_timeout,
                 ):
+                    if retry_count > 0:
+                        log.info(
+                            "watch_prefix(): successfully reconnected to Etcd server after %d retries",
+                            retry_count,
+                        )
+                        retry_count = 0
                     yield ev
                 ended_without_error = True
             except GRPCStatusError as e:
                 err_detail = e.args[0]
 
                 if err_detail["code"] == GRPCStatusCode.Unavailable:
-                    log.warning(
-                        "watch_prefix(): error while connecting to Etcd server, retrying..."
-                    )
-                    await asyncio.sleep(self.watch_reconnect_intvl)
+                    retry_count += 1
+                    delay = self._calc_watch_reconnect_delay(retry_count)
+                    if retry_count == 1:
+                        log.warning(
+                            "watch_prefix(): error while connecting to Etcd server, retrying..."
+                        )
+                    else:
+                        log.debug(
+                            "watch_prefix(): still unable to connect to Etcd server (attempt %d),"
+                            " next retry in %.1fs",
+                            retry_count,
+                            delay,
+                        )
+                    await asyncio.sleep(delay)
                     ended_without_error = False
                 else:
-                    raise e
+                    raise

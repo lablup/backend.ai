@@ -1,0 +1,20 @@
+[docker-ce-stable]
+name=Docker CE Stable - $basearch
+baseurl={{ docker_installation_uri }}/{{ docker_installation_os }}/{{ docker_installation_distro }}/$releasever/$basearch/stable
+enabled=1
+gpgcheck=1
+gpgkey={{ docker_installation_uri }}/{{ docker_installation_os }}/{{ docker_installation_distro }}/gpg
+
+[docker-ce-stable-debuginfo]
+name=Docker CE Stable - Debuginfo $basearch
+baseurl={{ docker_installation_uri }}/{{ docker_installation_os }}/{{ docker_installation_distro }}/$releasever/debug/$basearch/stable
+enabled=0
+gpgcheck=1
+gpgkey={{ docker_installation_uri }}/{{ docker_installation_os }}/{{ docker_installation_distro }}/gpg
+
+[docker-ce-stable-source]
+name=Docker CE Stable - Sources
+baseurl={{ docker_installation_uri }}/{{ docker_installation_os }}/{{ docker_installation_distro }}/$releasever/source/stable
+enabled=0
+gpgcheck=1
+gpgkey={{ docker_installation_uri }}/{{ docker_installation_os }}/{{ docker_installation_distro }}/gpg

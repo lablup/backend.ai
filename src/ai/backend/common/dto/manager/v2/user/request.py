@@ -35,6 +35,7 @@ __all__ = (
     "DeleteUsersInput",
     "PurgeUserInput",
     "PurgeUserV2Input",
+    "PurgeUserV2Options",
     "SearchUsersRequest",
     "UpdateMyAllowedClientIPInput",
     "UpdateUserInput",
@@ -212,10 +213,26 @@ class DeleteUsersInput(BaseRequestModel):
     user_ids: list[UUID] = Field(description="List of user UUIDs to soft-delete.")
 
 
+class PurgeUserV2Options(BaseRequestModel):
+    """Options for single user purge operation."""
+
+    purge_shared_vfolders: bool = Field(
+        default=False,
+        description="If true, migrate shared virtual folders to the admin user before purging.",
+    )
+    delegate_endpoint_ownership: bool = Field(
+        default=False,
+        description="If true, delegate endpoint ownership to the admin user before purging.",
+    )
+
+
 class PurgeUserV2Input(BaseRequestModel):
     """Input for permanently deleting a single user (GQL-aligned, user_id only)."""
 
     user_id: UUID = Field(description="UUID of the user to purge.")
+    options: PurgeUserV2Options | None = Field(
+        default=None, description="Options for the purge operation."
+    )
 
 
 class BulkPurgeUsersOptions(BaseRequestModel):

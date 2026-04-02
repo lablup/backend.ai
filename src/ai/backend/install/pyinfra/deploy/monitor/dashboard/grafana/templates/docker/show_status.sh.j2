@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# Grafana Health Check Script
+# Checks Grafana service health via HTTP API endpoint
+
+set -euo pipefail
+
+# Load configuration from .env
+if [[ -f .env ]]; then
+    source .env
+fi
+
+GRAFANA_URL="http://localhost:${GRAFANA_PORT:-3000}"
+HEALTH_ENDPOINT="/api/health"
+DATASOURCES_ENDPOINT="/api/datasources"
+
+echo "=== Grafana Service Status ==="
+echo
+
+# Check Docker container status
+echo "1. Container Status:"
+if command -v docker-compose >/dev/null 2>&1; then
+    docker-compose ps grafana 2>/dev/null || echo "  Container not found or not running"
+else
+    docker compose ps grafana 2>/dev/null || echo "  Container not found or not running"
+fi
+echo
+
+# Check Grafana health endpoint
+echo "2. Health Endpoint Check:"
+if ! command -v curl >/dev/null 2>&1; then
+    echo "  ⚠ curl not available, skipping health checks"
+    exit 0
+fi
+
+response=$(curl -s "${GRAFANA_URL}${HEALTH_ENDPOINT}" 2>/dev/null || echo '{"status":"error"}')
+
+if echo "$response" | grep -q '"database": "ok"'; then
+    echo "  ✓ Grafana is healthy"
+
+    # Extract and display health information
+    echo ""
+    echo "3. Health Details:"
+    if command -v jq >/dev/null 2>&1; then
+        echo "$response" | jq -r 'to_entries[] | "  \(.key): \(.value)"'
+    else
+        echo "  Database: $(echo "$response" | grep -o '"database": "[^"]*"' | cut -d'"' -f4)"
+        version=$(echo "$response" | grep -o '"version": "[^"]*"' | cut -d'"' -f4)
+        if [[ -n "$version" ]]; then
+            echo "  Version: $version"
+        fi
+    fi
+
+    # Check datasources
+    echo ""
+    echo "4. Datasources Status:"
+    if [[ -n "${GRAFANA_ADMIN_USER:-}" ]] && [[ -n "${GRAFANA_ADMIN_PASSWORD:-}" ]]; then
+        datasources_response=$(curl -s -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" \
+            "${GRAFANA_URL}${DATASOURCES_ENDPOINT}" 2>/dev/null || echo '[]')
+
+        datasource_count=$(echo "$datasources_response" | grep -o '"id":' | wc -l | tr -d ' ')
+        echo "  Configured datasources: $datasource_count"
+
+        if [[ "$datasource_count" -gt 0 ]]; then
+            if command -v jq >/dev/null 2>&1; then
+                echo "$datasources_response" | jq -r '.[] | "  - \(.name) (\(.type))"'
+            else
+                echo "$datasources_response" | grep -o '"name":"[^"]*"' | cut -d'"' -f4 | sed 's/^/  - /'
+            fi
+        fi
+    else
+        echo "  ⚠ Admin credentials not found in .env, skipping datasource check"
+    fi
+
+    echo ""
+    echo "✓ Grafana Status: Healthy"
+    exit 0
+else
+    echo "  ✗ Grafana is unhealthy"
+    echo ""
+    echo "3. Error Details:"
+    echo "  Response: $response"
+    echo ""
+    echo "4. Container Logs (last 15 lines):"
+    if command -v docker-compose >/dev/null 2>&1; then
+        docker-compose logs --tail=15 grafana 2>/dev/null || echo "  Cannot retrieve logs"
+    else
+        docker compose logs --tail=15 grafana 2>/dev/null || echo "  Cannot retrieve logs"
+    fi
+
+    exit 1
+fi

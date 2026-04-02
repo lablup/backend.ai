@@ -8,27 +8,29 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, OrderDirection
 from ai.backend.common.types import VFolderUsageMode
 
 __all__ = (
     "OrderDirection",
-    "VFolderBasicInfo",
     "VFolderInvitationState",
+    "VFolderMetadataInfo",
     "VFolderOperationStatusField",
     "VFolderOrderField",
-    "VFolderOwnerInfo",
+    "VFolderOwnershipInfo",
     "VFolderOwnershipTypeField",
     "VFolderPermissionField",
-    "VFolderPermissionInfo",
+    "VFolderAccessControlInfo",
+    "VFolderStatusFilter",
     "VFolderUsageInfo",
     "VFolderUsageMode",
+    "VFolderUsageModeFilter",
 )
 
 
@@ -51,40 +53,50 @@ class VFolderInvitationState(StrEnum):
     REJECTED = "rejected"
 
 
-class VFolderBasicInfo(BaseResponseModel):
-    """Core identity fields for a virtual folder."""
+class VFolderStatusFilter(BaseRequestModel):
+    """Filter for vfolder operation status values."""
 
-    id: UUID
+    in_: list[VFolderOperationStatusField] | None = None
+    not_in: list[VFolderOperationStatusField] | None = None
+
+
+class VFolderUsageModeFilter(BaseRequestModel):
+    """Filter for vfolder usage mode values."""
+
+    in_: list[VFolderUsageMode] | None = None
+    not_in: list[VFolderUsageMode] | None = None
+
+
+class VFolderMetadataInfo(BaseResponseModel):
+    """Descriptive metadata fields for a virtual folder."""
+
     name: str
-    host: str
-    quota_scope_id: str | None
     usage_mode: VFolderUsageMode
-    status: VFolderOperationStatusField
+    quota_scope_id: str | None
     created_at: datetime
     last_used: datetime | None
-
-
-class VFolderPermissionInfo(BaseResponseModel):
-    """Permission and ownership fields for a virtual folder."""
-
-    permission: VFolderPermissionField
-    ownership_type: VFolderOwnershipTypeField
-    is_owner: bool
     cloneable: bool
 
 
-class VFolderOwnerInfo(BaseResponseModel):
-    """Owner context fields for a virtual folder."""
+class VFolderAccessControlInfo(BaseResponseModel):
+    """Access control fields for a virtual folder."""
 
-    user: UUID | None
-    group: UUID | None
-    creator: str | None
+    permission: VFolderPermissionField | None
+    ownership_type: VFolderOwnershipTypeField
+
+
+class VFolderOwnershipInfo(BaseResponseModel):
+    """Ownership context fields for a virtual folder."""
+
+    user_id: UUID | None
+    project_id: UUID | None
+    creator_email: str | None
 
 
 class VFolderUsageInfo(BaseResponseModel):
     """Usage statistics fields for a virtual folder."""
 
     num_files: int
-    used_bytes: int
-    max_size: int | None
+    used_bytes: BinarySizeInfo
+    max_size: BinarySizeInfo | None
     max_files: int

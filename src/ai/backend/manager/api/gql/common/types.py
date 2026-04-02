@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsDTOInput,
     ResourceOptsEntryDTO,
@@ -17,6 +15,8 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 from ai.backend.common.dto.manager.v2.streaming.types import ServiceProtocol
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_enum,
+    gql_field,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -25,9 +25,12 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, Pydan
 # ========== Common Enums ==========
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Cluster mode for compute sessions and deployments.",
+    ),
     name="ClusterMode",
-    description="Added in 25.19.0. Cluster mode for compute sessions and deployments.",
 )
 class ClusterModeGQL(StrEnum):
     """GraphQL enum for cluster mode."""
@@ -36,9 +39,9 @@ class ClusterModeGQL(StrEnum):
     MULTI_NODE = "MULTI_NODE"
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="Type of compute session."),
     name="SessionV2Type",
-    description="Added in 26.3.0. Type of compute session.",
 )
 class SessionV2TypeGQL(StrEnum):
     """GraphQL enum for session types."""
@@ -49,15 +52,18 @@ class SessionV2TypeGQL(StrEnum):
     SYSTEM = "system"
 
 
-@strawberry.enum(
-    name="SessionV2Result",
-    description=(
-        "Added in 26.3.0. Result status of a session or kernel execution. "
-        "Indicates the final outcome after the session/kernel has terminated. "
-        "UNDEFINED: The session has not yet finished or its result is unknown. "
-        "SUCCESS: The session completed normally without errors. "
-        "FAILURE: The session terminated abnormally due to an error or user cancellation."
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description=(
+            "Result status of a session or kernel execution. "
+            "Indicates the final outcome after the session/kernel has terminated. "
+            "UNDEFINED: The session has not yet finished or its result is unknown. "
+            "SUCCESS: The session completed normally without errors. "
+            "FAILURE: The session terminated abnormally due to an error or user cancellation."
+        ),
     ),
+    name="SessionV2Result",
 )
 class SessionV2ResultGQL(StrEnum):
     """GraphQL enum for session result.
@@ -71,10 +77,10 @@ class SessionV2ResultGQL(StrEnum):
     FAILURE = "failure"
 
 
-ServicePortProtocolGQL: type[ServiceProtocol] = strawberry.enum(
+ServicePortProtocolGQL: type[ServiceProtocol] = gql_enum(
+    BackendAIGQLMeta(added_version="26.2.0", description="Protocol type for service ports."),
     ServiceProtocol,
     name="ServicePortProtocol",
-    description="Added in 26.2.0. Protocol type for service ports.",
 )
 
 
@@ -95,8 +101,8 @@ ServicePortProtocolGQL: type[ServiceProtocol] = strawberry.enum(
 class ResourceOptsEntryGQL(PydanticOutputMixin[ResourceOptsEntryInfoDTO]):
     """Single resource option entry with name and value."""
 
-    name: str = strawberry.field(description="The name of this resource option. Example: 'shmem'.")
-    value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
+    name: str = gql_field(description="The name of this resource option. Example: 'shmem'.")
+    value: str = gql_field(description="The value for this resource option. Example: '64m'.")
 
 
 @gql_pydantic_type(
@@ -113,7 +119,7 @@ class ResourceOptsEntryGQL(PydanticOutputMixin[ResourceOptsEntryInfoDTO]):
 class ResourceOptsGQL(PydanticOutputMixin[ResourceOptsInfoDTO]):
     """Resource options containing multiple key-value entries."""
 
-    entries: list[ResourceOptsEntryGQL] = strawberry.field(
+    entries: list[ResourceOptsEntryGQL] = gql_field(
         description="List of resource option entries. Each entry contains a key-value pair."
     )
 
@@ -128,8 +134,8 @@ class ResourceOptsGQL(PydanticOutputMixin[ResourceOptsInfoDTO]):
 class ResourceOptsEntryInput(PydanticInputMixin[ResourceOptsEntryDTO]):
     """Single resource option entry input with name and value."""
 
-    name: str = strawberry.field(description="The name of this resource option (e.g., 'shmem').")
-    value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
+    name: str = gql_field(description="The name of this resource option (e.g., 'shmem').")
+    value: str = gql_field(description="The value for this resource option (e.g., '64m').")
 
 
 @gql_pydantic_input(
@@ -141,7 +147,7 @@ class ResourceOptsEntryInput(PydanticInputMixin[ResourceOptsEntryDTO]):
 class ResourceOptsInput(PydanticInputMixin[ResourceOptsDTOInput]):
     """Resource options input containing multiple key-value entries."""
 
-    entries: list[ResourceOptsEntryInput] = strawberry.field(
+    entries: list[ResourceOptsEntryInput] = gql_field(
         description="List of resource option entries."
     )
 
@@ -163,19 +169,17 @@ class ResourceOptsInput(PydanticInputMixin[ResourceOptsDTOInput]):
 class ServicePortEntryGQL(PydanticOutputMixin[ServicePortEntryInfoDTO]):
     """Single service port entry with name, protocol, and port mappings."""
 
-    name: str = strawberry.field(
+    name: str = gql_field(
         description="Name of the service (e.g., 'jupyter', 'tensorboard', 'ssh')."
     )
-    protocol: ServicePortProtocolGQL = strawberry.field(
+    protocol: ServicePortProtocolGQL = gql_field(
         description="Protocol type for this service port (http, tcp, preopen, internal)."
     )
-    container_ports: list[int] = strawberry.field(description="Port numbers inside the container.")
-    host_ports: list[int | None] = strawberry.field(
+    container_ports: list[int] = gql_field(description="Port numbers inside the container.")
+    host_ports: list[int | None] = gql_field(
         description="Mapped port numbers on the host. May be null if not yet assigned."
     )
-    is_inference: bool = strawberry.field(
-        description="Whether this port is used for inference endpoints."
-    )
+    is_inference: bool = gql_field(description="Whether this port is used for inference endpoints.")
 
 
 @gql_pydantic_type(
@@ -192,6 +196,4 @@ class ServicePortEntryGQL(PydanticOutputMixin[ServicePortEntryInfoDTO]):
 class ServicePortsGQL(PydanticOutputMixin[ServicePortsInfoDTO]):
     """Service ports containing multiple port entries."""
 
-    entries: list[ServicePortEntryGQL] = strawberry.field(
-        description="List of service port entries."
-    )
+    entries: list[ServicePortEntryGQL] = gql_field(description="List of service port entries.")

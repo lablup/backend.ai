@@ -25,6 +25,10 @@ __all__ = (
     "ResourceGroupFilter",
     "ResourceGroupOrder",
     "ResourceWeightEntryInput",
+    "UpdateAllowedDomainsForResourceGroupInput",
+    "UpdateAllowedProjectsForResourceGroupInput",
+    "UpdateAllowedResourceGroupsForDomainInput",
+    "UpdateAllowedResourceGroupsForProjectInput",
     "UpdateResourceGroupConfigInput",
     "UpdateResourceGroupFairShareSpecInput",
     "UpdateResourceGroupInput",
@@ -251,3 +255,39 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
         default=None,
         description="Preemption configuration. Leave null to keep existing value.",
     )
+
+
+class UpdateAllowedResourceGroupsForDomainInput(BaseRequestModel):
+    """Input for updating allowed resource groups for a domain."""
+
+    domain_name: str = Field(description="Domain name to update allowed resource groups for.")
+    add: list[str] | None = Field(default=None, description="Resource group names to allow.")
+    remove: list[str] | None = Field(default=None, description="Resource group names to disallow.")
+
+
+class UpdateAllowedResourceGroupsForProjectInput(BaseRequestModel):
+    """Input for updating allowed resource groups for a project."""
+
+    project_id: UUID = Field(description="Project ID to update allowed resource groups for.")
+    add: list[str] | None = Field(default=None, description="Resource group names to allow.")
+    remove: list[str] | None = Field(default=None, description="Resource group names to disallow.")
+
+
+class UpdateAllowedDomainsForResourceGroupInput(BaseRequestModel):
+    """Input for updating allowed domains for a resource group."""
+
+    resource_group_name: str = Field(
+        description="Resource group name to update allowed domains for."
+    )
+    add: list[str] | None = Field(default=None, description="Domain names to allow.")
+    remove: list[str] | None = Field(default=None, description="Domain names to disallow.")
+
+
+class UpdateAllowedProjectsForResourceGroupInput(BaseRequestModel):
+    """Input for updating allowed projects for a resource group."""
+
+    resource_group_name: str = Field(
+        description="Resource group name to update allowed projects for."
+    )
+    add: list[UUID] | None = Field(default=None, description="Project IDs to allow.")
+    remove: list[UUID] | None = Field(default=None, description="Project IDs to disallow.")

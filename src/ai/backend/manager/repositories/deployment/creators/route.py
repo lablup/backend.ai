@@ -6,7 +6,11 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.manager.data.deployment.types import RouteStatus, RouteTrafficStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import CreatorSpec
 from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec
@@ -24,8 +28,8 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
     session_owner_id: uuid.UUID
     domain: str
     project_id: uuid.UUID
+    revision_id: uuid.UUID
     traffic_ratio: float = 1.0
-    revision_id: uuid.UUID | None = None
     traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE
 
     @override
@@ -53,6 +57,7 @@ class RouteBatchUpdaterSpec(BatchUpdaterSpec[RoutingRow]):
     """
 
     status: RouteStatus | None = None
+    health_status: RouteHealthStatus | None = None
     traffic_ratio: float | None = None
     traffic_status: RouteTrafficStatus | None = None
 
@@ -66,6 +71,8 @@ class RouteBatchUpdaterSpec(BatchUpdaterSpec[RoutingRow]):
         values: dict[str, Any] = {}
         if self.status is not None:
             values["status"] = self.status
+        if self.health_status is not None:
+            values["health_status"] = self.health_status
         if self.traffic_ratio is not None:
             values["traffic_ratio"] = self.traffic_ratio
         if self.traffic_status is not None:

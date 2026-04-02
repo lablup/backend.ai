@@ -129,7 +129,7 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
     metadata: DeploymentMetadataFields
     replica: DeploymentReplicaFields
     network: DeploymentNetworkFields
-    revision: ModelRevisionFields
+    revision: ModelRevisionFields | None = None
 
     @override
     def build_row(self) -> EndpointRow:
@@ -149,26 +149,6 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
             # Network fields
             open_to_public=self.network.open_to_public,
             url=self.network.url,
-            # Revision fields - image
-            image=self.revision.image_id,
-            # Revision fields - resource
-            cluster_mode=self.revision.resource.cluster_mode,
-            cluster_size=self.revision.resource.cluster_size,
-            resource_slots=self.revision.resource.resource_slots,
-            resource_opts=self.revision.resource.resource_opts or {},
-            # Revision fields - mounts
-            model=self.revision.mounts.model_vfolder_id,
-            model_mount_destination=self.revision.mounts.model_mount_destination,
-            model_definition_path=self.revision.mounts.model_definition_path,
-            extra_mounts=list(self.revision.mounts.extra_mounts),
-            # Revision fields - execution
-            runtime_variant=self.revision.execution.runtime_variant,
-            startup_command=self.revision.execution.startup_command,
-            bootstrap_script=self.revision.execution.bootstrap_script,
-            environ=dict(self.revision.execution.environ)
-            if self.revision.execution.environ
-            else {},
-            callback_url=self.revision.execution.callback_url,
             # Default state fields
             lifecycle_stage=EndpointLifecycle.PENDING,
             retries=0,

@@ -1,0 +1,14 @@
+# Add the line below in ~/.bashrc or your shell.
+# . ~/scripts/tools_env.sh
+
+# Add tools directory to PATH if not already present
+if [ -d "{{ tools_dir }}" ]; then
+    case ":$PATH:" in
+        *":{{ tools_dir }}:"*)
+            # Already in PATH, do nothing
+            ;;
+        *)
+            export PATH="{{ tools_dir }}:$PATH"
+            ;;
+    esac
+fi

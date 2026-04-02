@@ -1,0 +1,10 @@
+[Unit]
+Description=Backend.AI Manager Restart Timer (Daily at {{ restart_time }})
+
+[Timer]
+OnCalendar=*-*-* {{ restart_time }}
+Persistent=true
+Unit=backendai-manager-restart.service
+
+[Install]
+WantedBy=timers.target

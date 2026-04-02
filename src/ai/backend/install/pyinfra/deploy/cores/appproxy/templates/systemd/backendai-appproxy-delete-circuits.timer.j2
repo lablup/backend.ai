@@ -1,0 +1,10 @@
+[Unit]
+Description=Backend.AI AppProxy Delete Unused Circuits Timer (Every 5 minutes)
+
+[Timer]
+OnCalendar=*:0/5:00
+Persistent=true
+Unit=backendai-appproxy-delete-circuits.service
+
+[Install]
+WantedBy=timers.target

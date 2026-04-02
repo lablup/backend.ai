@@ -6,13 +6,14 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-import strawberry
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.keypair.response import KeypairNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_field,
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -20,9 +21,9 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version="26.5.0",
+        added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Added in 26.5.0. Keypair entity representing an API access key. "
+            "Keypair entity representing an API access key. "
             "The access_key field serves as the unique identifier. "
             "Secret key and private SSH key are excluded for security reasons."
         ),
@@ -32,36 +33,26 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     """Keypair entity accessible via Relay Node interface."""
 
-    id: NodeID[str] = strawberry.field(
-        description="Access key (primary key, used as the Relay Node ID)."
-    )
-    access_key: str = strawberry.field(description="The access key string.")
-    is_active: bool | None = strawberry.field(
-        description="Whether the keypair is currently active."
-    )
-    is_admin: bool | None = strawberry.field(
-        description="Whether the keypair has admin privileges."
-    )
-    created_at: datetime | None = strawberry.field(
-        description="Timestamp when the keypair was created."
-    )
-    modified_at: datetime | None = strawberry.field(
+    id: NodeID[str] = gql_field(description="Access key (primary key, used as the Relay Node ID).")
+    access_key: str = gql_field(description="The access key string.")
+    is_active: bool | None = gql_field(description="Whether the keypair is currently active.")
+    is_admin: bool | None = gql_field(description="Whether the keypair has admin privileges.")
+    created_at: datetime | None = gql_field(description="Timestamp when the keypair was created.")
+    modified_at: datetime | None = gql_field(
         description="Timestamp when the keypair was last modified."
     )
-    last_used: datetime | None = strawberry.field(
+    last_used: datetime | None = gql_field(
         description="Timestamp when the keypair was last used for an API call."
     )
-    rate_limit: int = strawberry.field(description="API rate limit (requests per minute).")
-    num_queries: int = strawberry.field(
-        description="Total number of API queries made with this keypair."
-    )
-    resource_policy: str = strawberry.field(
+    rate_limit: int = gql_field(description="API rate limit (requests per minute).")
+    num_queries: int = gql_field(description="Total number of API queries made with this keypair.")
+    resource_policy: str = gql_field(
         description="Name of the resource policy assigned to this keypair."
     )
-    ssh_public_key: str | None = strawberry.field(
+    ssh_public_key: str | None = gql_field(
         description="The SSH public key associated with this keypair."
     )
-    user_id: UUID = strawberry.field(description="UUID of the user who owns this keypair.")
+    user_id: UUID = gql_field(description="UUID of the user who owns this keypair.")
 
 
 KeyPairEdge = Edge[KeyPairGQL]
@@ -69,7 +60,7 @@ KeyPairEdge = Edge[KeyPairGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version="26.5.0",
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Paginated connection for keypair records. "
             "Provides relay-style cursor-based pagination. "
@@ -80,7 +71,7 @@ KeyPairEdge = Edge[KeyPairGQL]
 class KeyPairConnection(Connection[KeyPairGQL]):
     """Paginated connection for keypair records."""
 
-    count: int = strawberry.field(
+    count: int = gql_field(
         description="Total number of keypair records matching the query criteria."
     )
 

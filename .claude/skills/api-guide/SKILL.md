@@ -72,6 +72,19 @@ query adminDomain(id: ID)
 query adminSearchDomains(filter: ...)
 ```
 
+### When to Separate admin_ vs Non-admin Endpoints
+
+**search — always two variants:**
+- `admin_search_*`: superadmin, no scope — queries entire system.
+- `{scope}_search_*`: non-admin, scope required — queries within the given scope only.
+- There is NO "search everything without scope" for non-admin users.
+
+**create / update / get / delete / purge — depends on the entity:**
+
+1. **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` endpoint.
+2. **Both admin and users, but behavior differs** (e.g., admin can set more fields on create/update): separate `admin_` and non-admin endpoints with different DTOs.
+3. **Both admin and users, only permission check differs**: single endpoint — admin already has entity access permissions, no need for a separate `admin_` variant.
+
 ## REST v1 API Patterns (Legacy)
 
 > **New endpoints MUST use REST v2 patterns below.**

@@ -11,7 +11,11 @@ from enum import StrEnum
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+)
 
 __all__ = (
     # Enums
@@ -88,19 +92,6 @@ class UserUsageBucketOrderField(StrEnum):
     """Fields available for ordering user usage buckets."""
 
     PERIOD_START = "period_start"
-
-
-class ResourceSlotEntryInfo(BaseResponseModel):
-    """A single resource slot entry with resource type and quantity."""
-
-    resource_type: str = Field(description="Resource type identifier (e.g., cpu, mem, cuda.shares)")
-    quantity: Decimal = Field(description="Quantity of the resource")
-
-
-class ResourceSlotInfo(BaseResponseModel):
-    """Collection of compute resource allocations."""
-
-    entries: list[ResourceSlotEntryInfo] = Field(description="List of resource allocations")
 
 
 class ResourceWeightEntryInfo(BaseResponseModel):

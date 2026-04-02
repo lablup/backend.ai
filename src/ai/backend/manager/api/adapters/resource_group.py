@@ -21,11 +21,18 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     CreateResourceGroupInput,
     ResourceGroupFilter,
     ResourceGroupOrder,
+    UpdateAllowedDomainsForResourceGroupInput,
+    UpdateAllowedProjectsForResourceGroupInput,
+    UpdateAllowedResourceGroupsForDomainInput,
+    UpdateAllowedResourceGroupsForProjectInput,
     UpdateResourceGroupConfigInput,
     UpdateResourceGroupFairShareSpecInput,
     UpdateResourceGroupInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
+    AllowedDomainsPayload,
+    AllowedProjectsPayload,
+    AllowedResourceGroupsPayload,
     CreateResourceGroupPayload,
     FairShareScalingGroupSpecInfo,
     PreemptionConfigInfo,
@@ -79,6 +86,18 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupUpdaterSpec,
 )
 from ai.backend.manager.services.scaling_group.actions.create import CreateScalingGroupAction
+from ai.backend.manager.services.scaling_group.actions.get_allowed_domains_for_rg import (
+    GetAllowedDomainsForResourceGroupAction,
+)
+from ai.backend.manager.services.scaling_group.actions.get_allowed_projects_for_rg import (
+    GetAllowedProjectsForResourceGroupAction,
+)
+from ai.backend.manager.services.scaling_group.actions.get_allowed_rgs_for_domain import (
+    GetAllowedResourceGroupsForDomainAction,
+)
+from ai.backend.manager.services.scaling_group.actions.get_allowed_rgs_for_project import (
+    GetAllowedResourceGroupsForProjectAction,
+)
 from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
     GetResourceInfoAction,
 )
@@ -88,6 +107,18 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
 from ai.backend.manager.services.scaling_group.actions.modify import ModifyScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
+)
+from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
+    UpdateAllowedDomainsForResourceGroupAction,
+)
+from ai.backend.manager.services.scaling_group.actions.update_allowed_projects_for_rg import (
+    UpdateAllowedProjectsForResourceGroupAction,
+)
+from ai.backend.manager.services.scaling_group.actions.update_allowed_rgs_for_domain import (
+    UpdateAllowedResourceGroupsForDomainAction,
+)
+from ai.backend.manager.services.scaling_group.actions.update_allowed_rgs_for_project import (
+    UpdateAllowedResourceGroupsForProjectAction,
 )
 from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec import (
     ResourceWeightInput,
@@ -284,6 +315,13 @@ class ResourceGroupAdapter(BaseAdapter):
                 case ResourceGroupOrderField.IS_ACTIVE:
                     result.append(ScalingGroupOrders.is_active(ascending))
         return result
+
+    async def get(self, name: str) -> ResourceGroupDetailNode:
+        """Retrieve a single resource group by name."""
+        results = await self.batch_load_by_names([name])
+        if results[0] is None:
+            raise ScalingGroupNotFound(f"Resource group '{name}' not found.")
+        return results[0]
 
     async def create(
         self,
@@ -588,6 +626,112 @@ class ResourceGroupAdapter(BaseAdapter):
         )
 
         return self._data_to_node(action_result.data)
+
+    # Allow / Disallow operations
+
+    async def update_allowed_resource_groups_for_domain(
+        self,
+        input: UpdateAllowedResourceGroupsForDomainInput,
+    ) -> AllowedResourceGroupsPayload:
+        """Atomically add/remove allowed resource groups for a domain."""
+        result = (
+            await self._processors.scaling_group.update_allowed_rgs_for_domain.wait_for_complete(
+                UpdateAllowedResourceGroupsForDomainAction(
+                    domain_name=input.domain_name,
+                    add=input.add or [],
+                    remove=input.remove or [],
+                )
+            )
+        )
+        return AllowedResourceGroupsPayload(items=result.allowed_resource_groups)
+
+    async def update_allowed_resource_groups_for_project(
+        self,
+        input: UpdateAllowedResourceGroupsForProjectInput,
+    ) -> AllowedResourceGroupsPayload:
+        """Atomically add/remove allowed resource groups for a project."""
+        result = (
+            await self._processors.scaling_group.update_allowed_rgs_for_project.wait_for_complete(
+                UpdateAllowedResourceGroupsForProjectAction(
+                    project_id=input.project_id,
+                    add=input.add or [],
+                    remove=input.remove or [],
+                )
+            )
+        )
+        return AllowedResourceGroupsPayload(items=result.allowed_resource_groups)
+
+    async def update_allowed_domains_for_resource_group(
+        self,
+        input: UpdateAllowedDomainsForResourceGroupInput,
+    ) -> AllowedDomainsPayload:
+        """Atomically add/remove allowed domains for a resource group."""
+        result = (
+            await self._processors.scaling_group.update_allowed_domains_for_rg.wait_for_complete(
+                UpdateAllowedDomainsForResourceGroupAction(
+                    resource_group_name=input.resource_group_name,
+                    add=input.add or [],
+                    remove=input.remove or [],
+                )
+            )
+        )
+        return AllowedDomainsPayload(items=result.allowed_domains)
+
+    async def update_allowed_projects_for_resource_group(
+        self,
+        input: UpdateAllowedProjectsForResourceGroupInput,
+    ) -> AllowedProjectsPayload:
+        """Atomically add/remove allowed projects for a resource group."""
+        result = (
+            await self._processors.scaling_group.update_allowed_projects_for_rg.wait_for_complete(
+                UpdateAllowedProjectsForResourceGroupAction(
+                    resource_group_name=input.resource_group_name,
+                    add=input.add or [],
+                    remove=input.remove or [],
+                )
+            )
+        )
+        return AllowedProjectsPayload(items=result.allowed_projects)
+
+    async def get_allowed_resource_groups_for_domain(
+        self,
+        domain_name: str,
+    ) -> AllowedResourceGroupsPayload:
+        """Get allowed resource groups for a domain."""
+        result = await self._processors.scaling_group.get_allowed_rgs_for_domain.wait_for_complete(
+            GetAllowedResourceGroupsForDomainAction(domain_name=domain_name)
+        )
+        return AllowedResourceGroupsPayload(items=result.items)
+
+    async def get_allowed_resource_groups_for_project(
+        self,
+        project_id: UUID,
+    ) -> AllowedResourceGroupsPayload:
+        """Get allowed resource groups for a project."""
+        result = await self._processors.scaling_group.get_allowed_rgs_for_project.wait_for_complete(
+            GetAllowedResourceGroupsForProjectAction(project_id=project_id)
+        )
+        return AllowedResourceGroupsPayload(items=result.items)
+
+    async def get_allowed_domains_for_resource_group(
+        self,
+        resource_group_name: str,
+    ) -> AllowedDomainsPayload:
+        """Get allowed domains for a resource group."""
+        result = await self._processors.scaling_group.get_allowed_domains_for_rg.wait_for_complete(
+            GetAllowedDomainsForResourceGroupAction(resource_group_name=resource_group_name)
+        )
+        return AllowedDomainsPayload(items=result.items)
+
+    async def get_allowed_projects_for_resource_group(
+        self,
+        resource_group_name: str,
+    ) -> AllowedProjectsPayload:
+        """Get allowed projects for a resource group."""
+        result = await self._processors.scaling_group.get_allowed_projects_for_rg.wait_for_complete(
+            GetAllowedProjectsForResourceGroupAction(resource_group_name=resource_group_name)
+        )
+        return AllowedProjectsPayload(items=result.items)
 
     @staticmethod
     def _data_to_detail_node(data: ScalingGroupData) -> ResourceGroupDetailNode:

@@ -9,15 +9,34 @@
 
 ## Decorators
 
-- NEVER use `@strawberry.type`, `@strawberry.input`, or `@strawberry.experimental.pydantic.*` directly.
+- NEVER use `@strawberry.type`, `@strawberry.input`, `@strawberry.field`, `@strawberry.enum`,
+  `@strawberry.mutation`, or `@strawberry.experimental.pydantic.*` directly.
 - Use only the custom decorators defined in `decorators.py`:
   - `@gql_node_type` — Relay Node types (inherit `PydanticNodeMixin[DTO]`)
   - `@gql_pydantic_type(model=DTO)` — output types and payloads backed by a v2 Pydantic DTO
   - `@gql_pydantic_input` — input types (inherit `PydanticInputMixin[DTO]`)
   - `@gql_pydantic_interface(model=DTO)` — interface types backed by a v2 Pydantic DTO
   - `@gql_connection_type` — Connection[T] and Edge[T] subclasses
-- `@strawberry.enum`, `@strawberry.field`, `@strawberry.mutation`, `@strawberry.subscription` are allowed directly.
+  - `gql_field` — fields introduced with the parent type (no separate version)
+  - `gql_added_field` — fields added after the parent type (own version via `BackendAIGQLMeta`)
+  - `@gql_root_field` — root query fields on the Query type (always versioned via `BackendAIGQLMeta`)
+  - `gql_enum` / `@gql_enum` — enum types with version metadata
+  - `@gql_mutation` — mutation resolvers with version metadata
+  - `@gql_subscription` — subscription resolvers with version metadata
+  - `@gql_federation_type` — federation types with keys and version metadata
 - Do NOT add new decorators to bypass the Pydantic DTO requirement.
+
+## Version Metadata
+
+- When adding **new** types, fields, enums, or mutations, use `NEXT_RELEASE_VERSION` constant for `added_version`.
+  Do NOT hardcode the version string — it is frozen to a literal at release time by `scripts/release.sh`.
+  ```python
+  from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+
+  @gql_root_field(BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="..."))
+  async def my_foo(...): ...
+  ```
+- Existing types already released with a literal version (e.g., `"24.09.0"`) should NOT be changed.
 
 ## Imports
 
@@ -35,9 +54,25 @@
 - Never call individual fetch functions inside resolvers for related entities.
 - Always use `info.context.data_loaders.*` for cross-entity data loading.
 
-## Admin Check
+## Admin Check & Scope Rules
 
 - Superadmin-only resolvers: call `check_admin_only(info)` as the first statement.
+
+**search — always two variants:**
+- `adminFoosV2`: superadmin only, no scope — queries entire system.
+- `{scope}FoosV2` (e.g., `projectSessionsV2`): non-admin, scope parameter required — queries within the given scope only.
+- `myFoosV2`: self-service, adapter resolves current user as scope internally.
+- There is NO "search everything without scope" for non-admin users.
+
+**Scoped search naming convention:**
+- GQL query names use scope as prefix: `projectSessionsV2`, `domainUsersV2`.
+- The scope ID is a required argument, not an optional filter.
+- Maps to REST pattern: `POST /v2/{entity}/{scope_type}/{scope_id}/search`.
+
+**create / update / get / delete / purge — when to separate `admin_` vs non-admin:**
+- **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` mutation/query.
+- **Both admin and users, behavior differs** (e.g., admin sets more fields): separate `admin_` and non-admin mutations with different input types.
+- **Both admin and users, only permission check differs**: single mutation/query — admin already has entity access permissions, no separate `admin_` variant needed.
 
 ## Calling Services
 
@@ -73,6 +108,21 @@ All search/list queries MUST provide ALL of the following argument groups — do
 - `limit: int | None`, `offset: int | None` — offset-based pagination
 
 Clients must be able to choose between cursor and offset pagination freely.
+
+### Pagination Mode Behavior
+
+**Default (no pagination args):** Falls back to offset pagination (`limit=10, offset=0`).
+
+**Offset pagination (`limit`/`offset`):**
+- User-specified `order_by` is applied. If no `order_by`, the entity's default order is used.
+- Use this mode when custom ordering is needed.
+
+**Cursor pagination (`first`/`after` or `last`/`before`):**
+- Ordering is fixed to the entity's cursor key (typically `created_at` or the primary key).
+- User-specified `order_by` is **ignored** — cursor consistency requires a fixed sort order.
+- Use this mode for infinite scrolling / "load more" UX where stable page boundaries matter.
+
+Only one pagination mode is allowed per request. Combining `first` with `limit` raises an error.
 
 ## `my_` Resolver Pattern
 

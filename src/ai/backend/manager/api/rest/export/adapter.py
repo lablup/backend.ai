@@ -11,11 +11,10 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.dto.manager.export import (
+from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+from ai.backend.common.dto.manager.v2.export import (
     AuditLogExportFilter,
     AuditLogExportOrder,
-    BooleanFilter,
-    DateTimeRangeFilter,
     OrderDirection,
     ProjectExportFilter,
     ProjectExportOrder,
@@ -24,7 +23,6 @@ from ai.backend.common.dto.manager.export import (
     UserExportFilter,
     UserExportOrder,
 )
-from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.errors.export import InvalidExportFieldKeys
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -778,10 +776,9 @@ class ExportAdapter(BaseFilterAdapter):
 
     def _build_boolean_condition(
         self,
-        bool_filter: BooleanFilter,
+        value: bool,
         field_def: ExportFieldDef,
     ) -> QueryCondition:
-        """Convert BooleanFilter to QueryCondition."""
+        """Convert a bool value to QueryCondition."""
         column = field_def.column
-        value = bool_filter.equals
         return lambda: column == value

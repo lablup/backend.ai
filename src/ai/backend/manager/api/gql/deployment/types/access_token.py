@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import Any, Self, cast
 from uuid import UUID
 
-import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -31,6 +30,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_connection_type,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -71,13 +71,9 @@ class AccessTokenOrderBy(PydanticInputMixin[AccessTokenOrderDTO]):
 )
 class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
     id: NodeID[str]
-    token: str = strawberry.field(description="Added in 25.16.0: The access token.")
-    created_at: datetime = strawberry.field(
-        description="Added in 25.16.0: The creation timestamp of the access token."
-    )
-    valid_until: datetime = strawberry.field(
-        description="Added in 25.16.0: The expiration timestamp of the access token."
-    )
+    token: str = gql_field(description="The access token.")
+    created_at: datetime = gql_field(description="The creation timestamp of the access token.")
+    valid_until: datetime = gql_field(description="The expiration timestamp of the access token.")
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -114,12 +110,10 @@ class AccessTokenConnection(Connection[AccessToken]):
     ),
 )
 class CreateAccessTokenInput(PydanticInputMixin[CreateAccessTokenInputDTO]):
-    model_deployment_id: ID = strawberry.field(
-        description="Added in 25.16.0: The ID of the model deployment for which the access token is created."
+    model_deployment_id: ID = gql_field(
+        description="The ID of the model deployment for which the access token is created."
     )
-    valid_until: datetime = strawberry.field(
-        description="Added in 25.16.0: The expiration timestamp of the access token."
-    )
+    valid_until: datetime = gql_field(description="The expiration timestamp of the access token.")
 
 
 @gql_pydantic_type(

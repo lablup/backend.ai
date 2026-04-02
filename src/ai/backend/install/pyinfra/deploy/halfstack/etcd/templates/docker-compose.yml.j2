@@ -1,0 +1,44 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  restart: unless-stopped
+  cpu_count: 1
+  mem_limit: "1g"
+
+services:
+  etcd:
+    <<: *base
+    image: ${ETCD_CONTAINER_IMAGE}
+    container_name: ${ETCD_CONTAINER_NAME}
+    user: "${ETCD_UID}:${ETCD_GID}"
+    security_opt:
+      - no-new-privileges:true
+    command: >
+      /usr/local/bin/etcd
+        --name bai-etcd1
+        --data-dir /etcd-data
+        --listen-client-urls http://0.0.0.0:2379
+        --advertise-client-urls http://${ETCD_ADVERTISE_CLIENT_IP}:${ETCD_ADVERTISE_CLIENT_PORT}
+        --listen-peer-urls http://0.0.0.0:2380
+        --initial-advertise-peer-urls http://${ETCD_ADVERTISE_CLIENT_IP}:8320
+        --initial-cluster bai-etcd1=http://${ETCD_ADVERTISE_CLIENT_IP}:8320
+        --initial-cluster-token backendai-etcd-token
+        --initial-cluster-state new
+        --auto-compaction-retention 1
+    volumes:
+      - "{{ data_dir }}:/etcd-data:rw"
+      - "{{ service_dir }}/backups:/backups:rw"
+    ports:
+      # Listen client
+      - "${ETCD_ADVERTISE_CLIENT_PORT}:2379"
+      # Listen peer
+      - "8320:2380"
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+      start_period: 30s

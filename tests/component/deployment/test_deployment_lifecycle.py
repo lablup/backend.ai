@@ -14,6 +14,7 @@ import pytest
 
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.deployment import (
     AddRevisionRequest,
@@ -76,6 +77,7 @@ class TestCreateDeployment:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         with pytest.raises(Exception):
@@ -116,6 +118,7 @@ class TestCreateDeployment:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         response = await admin_registry.deployment.create_deployment(request)
@@ -184,6 +187,7 @@ class TestUpdateDeployment:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         response = await admin_registry.deployment.create_deployment(request)
@@ -254,6 +258,7 @@ class TestDestroyDeployment:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         response = await admin_registry.deployment.create_deployment(request)
@@ -292,9 +297,26 @@ class TestRevisionManagement:
         scaling_group_fixture: str,
         deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
     ) -> None:
-        """Activating and deactivating revisions updates their status."""
+        """Adding a revision and searching revisions works correctly."""
         image_id, vfolder_id = deployment_seed_data
-        # Create deployment with initial revision
+        revision_input = RevisionInput(
+            name="v1",
+            cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
+            resource_config=ResourceConfigInput(
+                resource_group=scaling_group_fixture,
+                resource_slots={"cpu": "2", "mem": "2147483648"},
+            ),
+            image=ImageInput(id=image_id),
+            model_runtime_config=ModelRuntimeConfigInput(),
+            model_mount_config=ModelMountConfigInput(
+                vfolder_id=vfolder_id,
+                mount_destination="/models",
+                definition_path="model-definition.yaml",
+            ),
+            model_definition=ModelDefinition(),
+        )
+
+        # Create deployment with initial revision (auto-activated)
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
@@ -305,27 +327,13 @@ class TestRevisionManagement:
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
-            initial_revision=RevisionInput(
-                name="v1",
-                cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
-                resource_config=ResourceConfigInput(
-                    resource_group=scaling_group_fixture,
-                    resource_slots={"cpu": "2", "mem": "2147483648"},
-                ),
-                image=ImageInput(id=image_id),
-                model_runtime_config=ModelRuntimeConfigInput(),
-                model_mount_config=ModelMountConfigInput(
-                    vfolder_id=vfolder_id,
-                    mount_destination="/models",
-                    definition_path="model-definition.yaml",
-                ),
-            ),
+            desired_replica_count=0,
+            initial_revision=revision_input,
         )
         response = await admin_registry.deployment.create_deployment(request)
         deployment = response.deployment
 
-        # Add a second revision
+        # Add a second revision (not activated since deployment is already deploying)
         revision2_response = await admin_registry.deployment.add_revision(
             deployment.id,
             AddRevisionRequest(
@@ -343,27 +351,20 @@ class TestRevisionManagement:
                         mount_destination="/models",
                         definition_path="model-definition.yaml",
                     ),
+                    model_definition=ModelDefinition(),
                 ),
             ),
         )
         revision2 = revision2_response.revision
 
-        # Activate revision2
-        await admin_registry.deployment.activate_revision(deployment.id, revision2.id)
-
-        # Get revisions and verify activation
+        # Search revisions and verify both exist
         revisions_result = await admin_registry.deployment.search_revisions(
             deployment.id,
             SearchRevisionsRequest(limit=10, offset=0),
         )
-        # Check that we have at least one revision returned
-        assert len(revisions_result.revisions) > 0
-        # Verify that the activated revision is in the list
+        assert len(revisions_result.revisions) >= 2
         revision_ids = [r.id for r in revisions_result.revisions]
         assert revision2.id in revision_ids
-
-        # Deactivate revision
-        await admin_registry.deployment.deactivate_revision(deployment.id, revision2.id)
 
 
 # ---------------------------------------------------------------------------
@@ -407,6 +408,7 @@ class TestReplicaManagement:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         response = await admin_registry.deployment.create_deployment(request)

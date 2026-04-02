@@ -4,13 +4,20 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection
+from datetime import datetime
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType, RoleSource, ScopeType
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    RoleSource,
+    ScopeType,
+)
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -170,14 +177,14 @@ class RoleConditions:
         return inner
 
     @staticmethod
-    def by_has_permission_for(entity_type: EntityType) -> QueryCondition:
+    def by_has_permission_for(element_type: RBACElementType) -> QueryCondition:
         """Filter roles having permission for entity type.
 
         Requires JOIN with ObjectPermissionRow.
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_type == entity_type
+            return ObjectPermissionRow.entity_type == element_type.to_entity_type()
 
         return inner
 
@@ -185,6 +192,38 @@ class RoleConditions:
     def by_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoleRow.id.in_(role_ids)
+
+        return inner
+
+
+class PermissionConditions:
+    """Query conditions for permissions."""
+
+    @staticmethod
+    def by_scope_id(scope_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.scope_id == scope_id
+
+        return inner
+
+    @staticmethod
+    def by_scope_types(scope_types: list[ScopeType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.scope_type.in_(scope_types)
+
+        return inner
+
+    @staticmethod
+    def by_entity_types(entity_types: list[EntityType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.entity_type.in_(entity_types)
+
+        return inner
+
+    @staticmethod
+    def by_operations(operations: list[OperationType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.operation.in_(operations)
 
         return inner
 
@@ -395,6 +434,22 @@ class AssignedUserConditions:
 
         return inner
 
+    @staticmethod
+    def exists_permission_combined(permission_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple permission conditions into single EXISTS subquery."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = (
+                sa.select(sa.literal(1))
+                .where(PermissionRow.role_id == UserRoleRow.role_id)
+                .correlate(UserRoleRow)
+            )
+            for cond in permission_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
 
 class DomainScopeConditions:
     """Query conditions for domain scope IDs."""
@@ -588,9 +643,9 @@ class EntityScopeConditions:
     """Query conditions for entity scope search."""
 
     @staticmethod
-    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
+    def by_scope_type(element_type: RBACElementType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssociationScopesEntitiesRow.scope_type == scope_type
+            return AssociationScopesEntitiesRow.scope_type == element_type.to_scope_type()
 
         return inner
 
@@ -602,9 +657,9 @@ class EntityScopeConditions:
         return inner
 
     @staticmethod
-    def by_entity_type(entity_type: EntityType) -> QueryCondition:
+    def by_entity_type(element_type: RBACElementType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssociationScopesEntitiesRow.entity_type == entity_type
+            return AssociationScopesEntitiesRow.entity_type == element_type.to_entity_type()
 
         return inner
 
@@ -738,9 +793,9 @@ class ScopedPermissionConditions:
     """Query conditions for scoped permissions."""
 
     @staticmethod
-    def by_entity_type(entity_type: EntityType) -> QueryCondition:
+    def by_entity_type(element_type: RBACElementType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.entity_type == entity_type
+            return PermissionRow.entity_type == element_type.to_entity_type()
 
         return inner
 
@@ -753,21 +808,65 @@ class ScopedPermissionConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to look up created_at of the cursor row (default order: created_at DESC).
+        """
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.id > cursor_uuid
+            subquery = (
+                sa.select(PermissionRow.created_at)
+                .where(PermissionRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return PermissionRow.created_at < subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to look up created_at of the cursor row (default order: created_at DESC).
+        """
         cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.id < cursor_uuid
+            subquery = (
+                sa.select(PermissionRow.created_at)
+                .where(PermissionRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return PermissionRow.created_at > subquery
+
+        return inner
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.created_at <= dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.created_at >= dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.created_at == dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_not_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.created_at != dt
 
         return inner
 
@@ -779,9 +878,9 @@ class ScopedPermissionConditions:
         return inner
 
     @staticmethod
-    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
+    def by_scope_type(element_type: RBACElementType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.scope_type == scope_type
+            return PermissionRow.scope_type == element_type.to_scope_type()
 
         return inner
 
@@ -811,9 +910,9 @@ class ObjectPermissionConditions:
         return inner
 
     @staticmethod
-    def by_entity_type(entity_type: EntityType) -> QueryCondition:
+    def by_entity_type(element_type: RBACElementType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_type == entity_type
+            return ObjectPermissionRow.entity_type == element_type.to_entity_type()
 
         return inner
 

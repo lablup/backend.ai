@@ -36,25 +36,32 @@ class DeploymentStrategy(CIStrEnum):
 
 
 class RouteStatus(CIStrEnum):
-    """Status of a route in the deployment."""
+    """Lifecycle status of a route in the deployment."""
 
     PROVISIONING = "provisioning"
-    HEALTHY = "healthy"
-    UNHEALTHY = "unhealthy"
-    DEGRADED = "degraded"
+    RUNNING = "running"
     TERMINATING = "terminating"
     TERMINATED = "terminated"
     FAILED_TO_START = "failed_to_start"
+
+
+class RouteHealthStatus(CIStrEnum):
+    """Health check status of a route."""
+
+    NOT_CHECKED = "not_checked"
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    DEGRADED = "degraded"
 
 
 class RouteTrafficStatus(CIStrEnum):
     """Traffic routing status for a route.
 
     Controls whether traffic should be sent to this route.
-    Actual traffic delivery depends on RouteStatus being HEALTHY.
+    Actual traffic delivery depends on health being HEALTHY.
 
-    - ACTIVE: Traffic enabled (will receive traffic when RouteStatus is HEALTHY)
-    - INACTIVE: Traffic disabled (will not receive traffic regardless of RouteStatus)
+    - ACTIVE: Traffic enabled (will receive traffic when health is HEALTHY)
+    - INACTIVE: Traffic disabled (will not receive traffic regardless of health)
     """
 
     ACTIVE = "active"

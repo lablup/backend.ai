@@ -13,16 +13,24 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
+from ai.backend.manager.actions.validators.rbac.single_entity import (
+    SingleEntityActionRBACValidator,
+)
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
     VFolderMountsCreator,
 )
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    DeploymentConfig,
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
@@ -34,7 +42,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
-    ModelServiceDefinition,
     ReplicaSpec,
     ResourceConfigData,
     ResourceSpec,
@@ -80,23 +87,41 @@ class DeploymentServiceBaseFixtures:
         return MagicMock(spec=RevisionGeneratorRegistry)
 
     @pytest.fixture
+    def mock_model_definition_generator_registry(self) -> AsyncMock:
+        """Mock ModelDefinitionGeneratorRegistry."""
+        registry = AsyncMock()
+        registry.generate_model_definition.return_value = ModelDefinition()
+        return registry
+
+    @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
         mock_revision_generator_registry: MagicMock,
+        mock_model_definition_generator_registry: AsyncMock,
     ) -> DeploymentService:
         """Create DeploymentService with mock dependencies."""
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
             revision_generator_registry=mock_revision_generator_registry,
+            model_definition_generator_registry=mock_model_definition_generator_registry,
         )
 
     @pytest.fixture
     def processors(self, deployment_service: DeploymentService) -> DeploymentProcessors:
         """Create DeploymentProcessors with mock DeploymentService."""
-        return DeploymentProcessors(deployment_service, [], MagicMock(spec=ActionValidators))
+        return DeploymentProcessors(
+            deployment_service,
+            [],
+            ActionValidators(
+                rbac=RBACValidators(
+                    scope=MagicMock(spec=ScopeActionRBACValidator),
+                    single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                ),
+            ),
+        )
 
     @pytest.fixture
     def deployment_policy_data(self) -> DeploymentPolicyData:
@@ -105,7 +130,10 @@ class DeploymentServiceBaseFixtures:
             id=uuid.uuid4(),
             endpoint=uuid.uuid4(),
             strategy=DeploymentStrategy.ROLLING,
-            strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
+            strategy_spec=RollingUpdateSpec(
+                max_surge=IntOrPercent(count=1),
+                max_unavailable=IntOrPercent(count=0),
+            ),
             created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
             updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
         )
@@ -127,7 +155,10 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
         return DeploymentPolicyUpserter(
             deployment_id=endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
-            strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=1),
+            strategy_spec=RollingUpdateSpec(
+                max_surge=IntOrPercent(count=2),
+                max_unavailable=IntOrPercent(count=1),
+            ),
         )
 
     @pytest.fixture
@@ -297,9 +328,9 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
 
     @pytest.fixture(autouse=True)
     def _setup_revision_generator(self, mock_revision_generator_registry: MagicMock) -> None:
-        """Set up mock revision generator to return no service definition by default."""
+        """Set up mock revision generator to return no deployment config by default."""
         mock_generator = MagicMock()
-        mock_generator.load_service_definition = AsyncMock(return_value=None)
+        mock_generator.load_deployment_config = AsyncMock(return_value=None)
         mock_revision_generator_registry.get.return_value = mock_generator
 
     @pytest.fixture(autouse=True)
@@ -374,6 +405,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 runtime_variant=RuntimeVariant.VLLM,
                 callback_url=None,
             ),
+            model_definition=ModelDefinition(),
         )
 
     @pytest.fixture
@@ -421,6 +453,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 runtime_variant=RuntimeVariant.VLLM,
                 environ=None,
             ),
+            model_definition=ModelDefinition(),
         )
 
 
@@ -473,7 +506,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
         assert spec.cluster_size == revision_creator.resource_spec.cluster_size
         assert spec.model_mount_destination == revision_creator.mounts.model_mount_destination
         assert spec.model_definition_path == revision_creator.mounts.model_definition_path
-        assert spec.model_definition is None
+        assert spec.model_definition == revision_creator.model_definition
         assert spec.startup_command == revision_creator.execution.startup_command
         assert spec.bootstrap_script == revision_creator.execution.bootstrap_script
         assert spec.environ == revision_creator.execution.environ
@@ -498,34 +531,88 @@ class TestAddModelRevision(ModelRevisionFixtures):
         assert spec.environ == {}
         assert spec.resource_opts == {}
 
-
-class TestServiceDefinitionMerge(ModelRevisionFixtures):
-    """Tests for service definition merging in revision creation."""
+    @pytest.fixture
+    def sample_model_definition(self) -> ModelDefinition:
+        return ModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "test-model",
+                    "model-path": "/models",
+                    "service": {"start-command": "serve", "port": 8000},
+                }
+            ]
+        })
 
     @pytest.fixture
-    def setup_mock_service_definition(
-        self, mock_revision_generator_registry: MagicMock
-    ) -> Callable[[ModelServiceDefinition], None]:
-        """Factory fixture to inject a service definition into the mock generator registry."""
+    def revision_creator_with_model_definition(
+        self,
+        image_id: uuid.UUID,
+        model_vfolder_id: uuid.UUID,
+        sample_model_definition: ModelDefinition,
+    ) -> ModelRevisionCreator:
+        return ModelRevisionCreator(
+            image_id=image_id,
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots={"cpu": "4"},
+            ),
+            mounts=VFolderMountsCreator(model_vfolder_id=model_vfolder_id),
+            execution=ExecutionSpec(runtime_variant=RuntimeVariant.VLLM),
+            model_definition=sample_model_definition,
+        )
 
-        def _setup(service_def: ModelServiceDefinition) -> None:
+    async def test_add_model_revision_stores_resolved_model_definition(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        mock_model_definition_generator_registry: AsyncMock,
+        deployment_id: uuid.UUID,
+        revision_creator_with_model_definition: ModelRevisionCreator,
+        sample_model_definition: ModelDefinition,
+    ) -> None:
+        """Resolved model_definition (from generator registry) should be stored in the DB spec."""
+        mock_model_definition_generator_registry.generate_model_definition.return_value = (
+            sample_model_definition
+        )
+
+        action = AddModelRevisionAction(
+            model_deployment_id=deployment_id, adder=revision_creator_with_model_definition
+        )
+        await processors.add_model_revision.wait_for_complete(action)
+
+        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
+        assert spec.model_definition is not None
+        assert spec.model_definition == sample_model_definition
+
+
+class TestDeploymentConfigMerge(ModelRevisionFixtures):
+    """Tests for deployment config merging in revision creation."""
+
+    @pytest.fixture
+    def setup_mock_deployment_config(
+        self, mock_revision_generator_registry: MagicMock
+    ) -> Callable[[DeploymentConfig], None]:
+        """Factory fixture to inject a deployment config into the mock generator registry."""
+
+        def _setup(deployment_config: DeploymentConfig) -> None:
             mock_generator = MagicMock()
-            mock_generator.load_service_definition = AsyncMock(return_value=service_def)
+            mock_generator.load_deployment_config = AsyncMock(return_value=deployment_config)
             mock_revision_generator_registry.get.return_value = mock_generator
 
         return _setup
 
-    async def test_merge_environ_from_service_definition(
+    async def test_merge_environ_from_deployment_config(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_id: uuid.UUID,
         revision_creator: ModelRevisionCreator,
-        setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
+        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
     ) -> None:
-        """Service definition environ should be merged with creator environ as base."""
-        setup_mock_service_definition(
-            ModelServiceDefinition(
+        """Deployment config environ should be merged with creator environ as base."""
+        setup_mock_deployment_config(
+            DeploymentConfig(
                 environ={"SERVICE_VAR": "from_def", "CUDA_VISIBLE_DEVICES": "1"},
             )
         )
@@ -534,22 +621,22 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         await processors.add_model_revision.wait_for_complete(action)
 
         spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        # Creator value overrides service definition for overlapping keys
+        # Creator value overrides deployment config for overlapping keys
         assert spec.environ["CUDA_VISIBLE_DEVICES"] == "0"
-        # Service definition provides new keys
+        # Deployment config provides new keys
         assert spec.environ["SERVICE_VAR"] == "from_def"
 
-    async def test_merge_resource_slots_from_service_definition(
+    async def test_merge_resource_slots_from_deployment_config(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_id: uuid.UUID,
         revision_creator: ModelRevisionCreator,
-        setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
+        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
     ) -> None:
-        """Service definition resource_slots should be merged with creator slots as base."""
-        setup_mock_service_definition(
-            ModelServiceDefinition(
+        """Deployment config resource_slots should be merged with creator slots as base."""
+        setup_mock_deployment_config(
+            DeploymentConfig(
                 resource_slots={"cpu": "2", "mem": "4g", "cuda.shares": "1.0"},
             )
         )
@@ -561,14 +648,14 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         expected = ResourceSlot({"cpu": "4", "mem": "8g", "cuda.shares": "1.0"})
         assert spec.resource_slots == expected
 
-    async def test_no_service_definition_uses_creator_values_as_is(
+    async def test_no_deployment_config_uses_creator_values_as_is(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_id: uuid.UUID,
         revision_creator: ModelRevisionCreator,
     ) -> None:
-        """When no service definition exists, creator values are used unchanged."""
+        """When no deployment config exists, creator values are used unchanged."""
         action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
         await processors.add_model_revision.wait_for_complete(action)
 
@@ -576,16 +663,16 @@ class TestServiceDefinitionMerge(ModelRevisionFixtures):
         assert spec.environ == revision_creator.execution.environ
         assert spec.resource_slots == ResourceSlot(revision_creator.resource_spec.resource_slots)
 
-    async def test_service_definition_with_empty_fields_no_effect(
+    async def test_deployment_config_with_empty_fields_no_effect(
         self,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_id: uuid.UUID,
         revision_creator: ModelRevisionCreator,
-        setup_mock_service_definition: Callable[[ModelServiceDefinition], None],
+        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
     ) -> None:
-        """Service definition with None environ/resource_slots should not affect creator."""
-        setup_mock_service_definition(ModelServiceDefinition(environ=None, resource_slots=None))
+        """Deployment config with None environ/resource_slots should not affect creator."""
+        setup_mock_deployment_config(DeploymentConfig(environ=None, resource_slots=None))
 
         action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
         await processors.add_model_revision.wait_for_complete(action)

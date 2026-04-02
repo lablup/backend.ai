@@ -8,6 +8,7 @@ import uuid
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -17,6 +18,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentOrderField,
     DeploymentPolicyInfo,
     DeploymentRevisionInfo,
+    IntOrPercent,
     NetworkConfigInfo,
     OrderDirection,
     ReplicaStateInfo,
@@ -29,6 +31,9 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelDeploymentStatus as ExportedModelDeploymentStatus,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    RouteHealthStatus as ExportedRouteHealthStatus,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
     RouteStatus as ExportedRouteStatus,
@@ -153,8 +158,11 @@ class TestReExportedEnums:
     def test_deployment_strategy_rolling_value(self) -> None:
         assert ExportedDeploymentStrategy.ROLLING.value == "ROLLING"
 
-    def test_route_status_healthy_value(self) -> None:
-        assert ExportedRouteStatus.HEALTHY.value == "healthy"
+    def test_route_health_status_is_same_object(self) -> None:
+        assert ExportedRouteHealthStatus is RouteHealthStatus
+
+    def test_route_health_status_healthy_value(self) -> None:
+        assert ExportedRouteHealthStatus.HEALTHY.value == "healthy"
 
     def test_route_traffic_status_active_value(self) -> None:
         assert ExportedRouteTrafficStatus.ACTIVE.value == "active"
@@ -361,12 +369,18 @@ class TestRollingUpdateConfigInfo:
     """Tests for RollingUpdateConfigInfo model creation."""
 
     def test_creation(self) -> None:
-        info = RollingUpdateConfigInfo(max_surge=2, max_unavailable=1)
-        assert info.max_surge == 2
-        assert info.max_unavailable == 1
+        info = RollingUpdateConfigInfo(
+            max_surge=IntOrPercent(count=2),
+            max_unavailable=IntOrPercent(count=1),
+        )
+        assert info.max_surge.count == 2
+        assert info.max_unavailable.count == 1
 
     def test_serialization_round_trip(self) -> None:
-        info = RollingUpdateConfigInfo(max_surge=1, max_unavailable=0)
+        info = RollingUpdateConfigInfo(
+            max_surge=IntOrPercent(count=1),
+            max_unavailable=IntOrPercent(count=0),
+        )
         json_str = info.model_dump_json()
         restored = RollingUpdateConfigInfo.model_validate_json(json_str)
         assert restored.max_surge == info.max_surge
@@ -393,7 +407,10 @@ class TestDeploymentPolicyInfo:
     """Tests for DeploymentPolicyInfo model creation and serialization."""
 
     def test_creation_with_rolling_strategy(self) -> None:
-        rolling = RollingUpdateConfigInfo(max_surge=1, max_unavailable=0)
+        rolling = RollingUpdateConfigInfo(
+            max_surge=IntOrPercent(count=1),
+            max_unavailable=IntOrPercent(count=0),
+        )
         info = DeploymentPolicyInfo(
             strategy=DeploymentStrategy.ROLLING,
             rolling_update=rolling,
@@ -401,7 +418,7 @@ class TestDeploymentPolicyInfo:
         )
         assert info.strategy == DeploymentStrategy.ROLLING
         assert info.rolling_update is not None
-        assert info.rolling_update.max_surge == 1
+        assert info.rolling_update.max_surge.count == 1
         assert info.blue_green is None
 
     def test_creation_with_blue_green_strategy(self) -> None:
@@ -416,7 +433,10 @@ class TestDeploymentPolicyInfo:
         assert info.blue_green.auto_promote is True
 
     def test_serialization_round_trip(self) -> None:
-        rolling = RollingUpdateConfigInfo(max_surge=2, max_unavailable=1)
+        rolling = RollingUpdateConfigInfo(
+            max_surge=IntOrPercent(count=2),
+            max_unavailable=IntOrPercent(count=1),
+        )
         info = DeploymentPolicyInfo(
             strategy=DeploymentStrategy.ROLLING,
             rolling_update=rolling,
@@ -426,5 +446,5 @@ class TestDeploymentPolicyInfo:
         restored = DeploymentPolicyInfo.model_validate_json(json_str)
         assert restored.strategy == info.strategy
         assert restored.rolling_update is not None
-        assert restored.rolling_update.max_surge == 2
+        assert restored.rolling_update.max_surge.count == 2
         assert restored.blue_green is None

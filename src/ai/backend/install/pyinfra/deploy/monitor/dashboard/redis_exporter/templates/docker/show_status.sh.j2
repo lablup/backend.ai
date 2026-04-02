@@ -1,0 +1,87 @@
+#!/bin/bash
+set -e
+
+EXPORTER_URL="http://localhost:{{ exporter_port }}"
+HEALTH_ENDPOINT="/metrics"
+
+echo "=== Redis Exporter Status Check ==="
+{% if is_ha_mode %}
+echo "Mode: HA (via HAProxy VIP)"
+{% else %}
+echo "Mode: Single Instance"
+{% endif %}
+echo "Endpoint: ${EXPORTER_URL}${HEALTH_ENDPOINT}"
+echo
+
+# Check Docker container status
+echo "1. Container Status:"
+docker compose ps redis-exporter 2>/dev/null || echo "  Container not found or not running"
+echo
+
+# Check if exporter endpoint is responding
+echo "2. Endpoint Health:"
+if curl -sf "${EXPORTER_URL}${HEALTH_ENDPOINT}" >/dev/null 2>&1; then
+    echo "  ✓ Exporter endpoint is responding"
+else
+    echo "  ✗ Exporter endpoint is not responding"
+    exit 1
+fi
+
+# Check Redis connection status
+echo "3. Redis Connection:"
+response=$(curl -s "${EXPORTER_URL}${HEALTH_ENDPOINT}")
+redis_up_line=$(echo "$response" | grep "^redis_up " | head -1)
+echo "  Debug: redis_up line = '$redis_up_line'"
+
+if echo "$response" | grep -q "^redis_up 1"; then
+{% if is_ha_mode %}
+    echo "  ✓ Redis HA cluster is connected and accessible (via HAProxy)"
+{% else %}
+    echo "  ✓ Redis server is connected and accessible"
+{% endif %}
+elif echo "$response" | grep -q "^redis_up 0"; then
+{% if is_ha_mode %}
+    echo "  ✗ Redis HA cluster connection failed"
+{% else %}
+    echo "  ✗ Redis server connection failed"
+{% endif %}
+    echo "  Checking Redis configuration..."
+    echo "  Environment variables from .env:"
+    cat .env | grep -E "^(REDIS_HOST|REDIS_PORT)" || echo "  .env file not found"
+    echo
+    echo "  Testing Redis connectivity:"
+    # Extract REDIS_PORT from .env
+    REDIS_PORT=$(grep "^REDIS_PORT=" .env | cut -d'=' -f2)
+    REDIS_HOST=$(grep "^REDIS_HOST=" .env | cut -d'=' -f2)
+    if nc -z ${REDIS_HOST} ${REDIS_PORT} 2>/dev/null; then
+        echo "    ✓ Redis port ${REDIS_HOST}:${REDIS_PORT} is accessible"
+    else
+        echo "    ✗ Redis port ${REDIS_HOST}:${REDIS_PORT} is not accessible"
+    fi
+    echo
+    echo "  Redis Exporter container logs (last 10 lines):"
+    docker compose logs --tail=10 redis-exporter 2>/dev/null || echo "    Cannot retrieve logs"
+    exit 1
+else
+    echo "  ? Unable to determine Redis connection status"
+    echo "  First 10 lines of metrics response:"
+    echo "$response" | head -10 | sed 's/^/    /'
+fi
+
+# Show key metrics summary
+echo "4. Key Metrics Summary:"
+if [ -n "$response" ]; then
+    echo "$response" | grep -E "^(redis_up|redis_connected_clients|redis_memory_used_bytes|redis_commands_processed_total)" | head -10 | while read -r line; do
+        echo "  $line"
+    done
+else
+    echo "  No metrics available"
+fi
+
+echo
+{% if is_ha_mode %}
+echo "✓ Redis Exporter (HA via HAProxy) Status: Healthy"
+echo "Note: Individual Redis instances are monitored via Prometheus multi-target scraping"
+{% else %}
+echo "✓ Redis Exporter (Single Instance) Status: Healthy"
+{% endif %}

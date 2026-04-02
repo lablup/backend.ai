@@ -97,7 +97,10 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
 from ai.backend.manager.services.scaling_group.actions.modify import (
     ModifyScalingGroupAction,
 )
-from ai.backend.manager.services.scaling_group.service import ScalingGroupService
+from ai.backend.manager.services.scaling_group.service import (
+    WSPROXY_V1_VERSION,
+    ScalingGroupService,
+)
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -766,13 +769,13 @@ class TestGetWsproxyVersion:
         with pytest.raises(ObjectNotFound):
             await scaling_group_service.get_wsproxy_version(action)
 
-    async def test_wsproxy_addr_not_set_raises_object_not_found(
+    async def test_wsproxy_addr_not_set_returns_v1(
         self,
         scaling_group_service: ScalingGroupService,
         mock_repository: MagicMock,
         sample_sgroup_with_wsproxy: ScalingGroupData,
     ) -> None:
-        """wsproxy_addr not set raises ObjectNotFound."""
+        """wsproxy_addr not set returns v1 version."""
         no_wsproxy = ScalingGroupData(
             name="gpu-group",
             status=sample_sgroup_with_wsproxy.status,
@@ -795,8 +798,8 @@ class TestGetWsproxyVersion:
             access_key="AKTEST123",
         )
 
-        with pytest.raises(ObjectNotFound):
-            await scaling_group_service.get_wsproxy_version(action)
+        result = await scaling_group_service.get_wsproxy_version(action)
+        assert result.wsproxy_version == WSPROXY_V1_VERSION
 
     async def test_appproxy_pool_none_raises_object_not_found(
         self,

@@ -98,6 +98,19 @@ from .revision import (
     ResourceConfigInput,
     ResourceGroupInput,
 )
+from .revision_preset import (
+    CreateDeploymentRevisionPresetInputGQL,
+    CreateDeploymentRevisionPresetPayloadGQL,
+    DeleteDeploymentRevisionPresetPayloadGQL,
+    DeploymentRevisionPresetConnection,
+    DeploymentRevisionPresetEdge,
+    DeploymentRevisionPresetFilterGQL,
+    DeploymentRevisionPresetGQL,
+    DeploymentRevisionPresetOrderByGQL,
+    DeploymentRevisionPresetOrderFieldGQL,
+    UpdateDeploymentRevisionPresetInputGQL,
+    UpdateDeploymentRevisionPresetPayloadGQL,
+)
 from .route import (
     Route,
     RouteConnection,
@@ -217,4 +230,16 @@ __all__ = [
     "UpdateRouteTrafficStatusInputGQL",
     "UpdateRouteTrafficStatusPayloadGQL",
     "get_route_pagination_spec",
+    # Revision Preset
+    "CreateDeploymentRevisionPresetInputGQL",
+    "CreateDeploymentRevisionPresetPayloadGQL",
+    "DeleteDeploymentRevisionPresetPayloadGQL",
+    "DeploymentRevisionPresetConnection",
+    "DeploymentRevisionPresetEdge",
+    "DeploymentRevisionPresetFilterGQL",
+    "DeploymentRevisionPresetGQL",
+    "DeploymentRevisionPresetOrderByGQL",
+    "DeploymentRevisionPresetOrderFieldGQL",
+    "UpdateDeploymentRevisionPresetInputGQL",
+    "UpdateDeploymentRevisionPresetPayloadGQL",
 ]

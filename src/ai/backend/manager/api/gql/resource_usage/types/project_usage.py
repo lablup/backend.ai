@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any, Self
 from uuid import UUID
 
-import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -27,7 +26,9 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
 )
@@ -67,38 +68,27 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
     """Project-level usage bucket containing aggregated resource usage for a period."""
 
     id: NodeID[str]
-    project_id: UUID = strawberry.field(
-        description="UUID of the project this usage bucket belongs to."
-    )
-    domain_name: str = strawberry.field(description="Name of the domain the project belongs to.")
-    resource_group_name: str = strawberry.field(
+    project_id: UUID = gql_field(description="UUID of the project this usage bucket belongs to.")
+    domain_name: str = gql_field(description="Name of the domain the project belongs to.")
+    resource_group_name: str = gql_field(
         description="Name of the scaling group this usage was recorded in."
     )
-    metadata: UsageBucketMetadataGQL = strawberry.field(
+    metadata: UsageBucketMetadataGQL = gql_field(
         description="Metadata about the usage measurement period and timestamps."
     )
-    resource_usage: ResourceSlotGQL = strawberry.field(
-        description=(
-            "Aggregated resource usage during this period. "
-            "Contains the total compute resources consumed by all workloads in this project "
-            "during the measurement period (cpu cores, memory bytes, accelerator usage)."
-        )
+    resource_usage: ResourceSlotGQL = gql_field(
+        description="Aggregated resource usage during this period. Contains the total compute resources consumed by all workloads in this project during the measurement period (cpu cores, memory bytes, accelerator usage)."
     )
-    capacity_snapshot: ResourceSlotGQL = strawberry.field(
-        description=(
-            "Snapshot of total available capacity in the scaling group at the end of this period. "
-            "Used as a reference to calculate relative usage and fair share factors."
-        )
+    capacity_snapshot: ResourceSlotGQL = gql_field(
+        description="Snapshot of total available capacity in the scaling group at the end of this period. Used as a reference to calculate relative usage and fair share factors."
     )
 
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Added in 26.2.0. Average daily resource usage during this period. "
-            "Calculated as resource_usage divided by bucket duration in days. "
-            "For each resource type, this represents the average amount consumed per day. "
-            "Units match the resource type (e.g., CPU cores, memory bytes)."
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.2.0",
+            description="Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).",
         )
-    )
+    )  # type: ignore[misc]
     def average_daily_usage(self) -> ResourceSlotGQL:
         return calculate_average_daily_usage(
             self.resource_usage,
@@ -106,28 +96,24 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
             self.metadata.period_end,
         )
 
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Added in 26.2.0. Usage ratio against total available capacity for each resource. "
-            "Calculated as resource_usage divided by capacity_snapshot. "
-            "Represents the fraction of total capacity consumed (resource-seconds / resource). "
-            "The result is in seconds, where 86400 means full utilization for one day. "
-            "Values can exceed this if usage exceeds capacity."
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.2.0",
+            description="Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.",
         )
-    )
+    )  # type: ignore[misc]
     def usage_capacity_ratio(self) -> ResourceSlotGQL:
         return calculate_usage_capacity_ratio(
             self.resource_usage,
             self.capacity_snapshot,
         )
 
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Added in 26.1.0. User usage buckets belonging to this project. "
-            "Returns paginated user-level usage history for all users in this project "
-            "within the same scaling group."
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.1.0",
+            description="User usage buckets belonging to this project. Returns paginated user-level usage history for all users in this project within the same scaling group.",
         )
-    )
+    )  # type: ignore[misc]
     async def user_usage_buckets(
         self,
         info: Info[StrawberryGQLContext],
@@ -191,7 +177,7 @@ ProjectUsageBucketEdge = Edge[ProjectUsageBucketGQL]
     ),
 )
 class ProjectUsageBucketConnection(Connection[ProjectUsageBucketGQL]):
-    count: int = strawberry.field(
+    count: int = gql_field(
         description="Total number of project usage bucket records matching the query criteria."
     )
 
@@ -210,45 +196,36 @@ class ProjectUsageBucketConnection(Connection[ProjectUsageBucketGQL]):
 class ProjectUsageBucketFilter(PydanticInputMixin[ProjectUsageBucketFilterDTO], GQLFilter):
     """Filter for project usage buckets."""
 
-    resource_group: StringFilter | None = strawberry.field(
+    resource_group: StringFilter | None = gql_field(
+        description="Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.",
         default=None,
-        description=(
-            "Filter by scaling group name. Scaling groups define where usage was recorded. "
-            "Supports equals, contains, startsWith, and endsWith operations."
-        ),
     )
-    project_id: UUIDFilter | None = strawberry.field(
+    project_id: UUIDFilter | None = gql_field(
+        description="Filter by project UUID. This filters usage buckets for a specific project. Supports equals operation for exact match.",
         default=None,
-        description=(
-            "Filter by project UUID. This filters usage buckets for a specific project. "
-            "Supports equals operation for exact match."
-        ),
     )
-    domain_name: StringFilter | None = strawberry.field(
+    domain_name: StringFilter | None = gql_field(
+        description="Filter by domain name. This filters usage buckets for projects within a specific domain. Supports equals, contains, startsWith, and endsWith operations.",
         default=None,
-        description=(
-            "Filter by domain name. This filters usage buckets for projects within a specific domain. "
-            "Supports equals, contains, startsWith, and endsWith operations."
-        ),
     )
-    period_start: DateFilter | None = strawberry.field(
-        default=None, description="Filter by usage measurement period start date."
+    period_start: DateFilter | None = gql_field(
+        description="Filter by usage measurement period start date.", default=None
     )
-    period_end: DateFilter | None = strawberry.field(
-        default=None, description="Filter by usage measurement period end date."
+    period_end: DateFilter | None = gql_field(
+        description="Filter by usage measurement period end date.", default=None
     )
 
-    AND: list[Self] | None = strawberry.field(
-        default=None,
+    AND: list[Self] | None = gql_field(
         description="Combine multiple filters with AND logic. All conditions must match.",
-    )
-    OR: list[Self] | None = strawberry.field(
         default=None,
+    )
+    OR: list[Self] | None = gql_field(
         description="Combine multiple filters with OR logic. At least one condition must match.",
-    )
-    NOT: list[Self] | None = strawberry.field(
         default=None,
+    )
+    NOT: list[Self] | None = gql_field(
         description="Negate the specified filters. Records matching these conditions will be excluded.",
+        default=None,
     )
 
 
@@ -262,15 +239,12 @@ class ProjectUsageBucketFilter(PydanticInputMixin[ProjectUsageBucketFilterDTO], 
 class ProjectUsageBucketOrderBy(PydanticInputMixin[ProjectUsageBucketOrderByDTO], GQLOrderBy):
     """OrderBy for project usage buckets."""
 
-    field: UsageBucketOrderField = strawberry.field(
+    field: UsageBucketOrderField = gql_field(
         description="The field to order by. See UsageBucketOrderField for available options."
     )
-    direction: OrderDirection = strawberry.field(
+    direction: OrderDirection = gql_field(
+        description="Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).",
         default=OrderDirection.DESC,
-        description=(
-            "Sort direction. ASC for chronological order (oldest first), "
-            "DESC for reverse chronological order (most recent first)."
-        ),
     )
 
 

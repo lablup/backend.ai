@@ -29,7 +29,10 @@ from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -57,9 +60,9 @@ if TYPE_CHECKING:
     )
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.1.0", description="Permissions related to agent operations"),
     name="AgentPermission",
-    description="Added in 26.1.0. Permissions related to agent operations",
 )
 class AgentPermissionGQL(StrEnum):
     READ_ATTRIBUTE = "read_attribute"
@@ -68,9 +71,9 @@ class AgentPermissionGQL(StrEnum):
     CREATE_SERVICE = "create_service"
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.1.0", description="Order by specification for agents"),
     name="AgentOrderField",
-    description="Added in 26.1.0. Order by specification for agents",
 )
 class AgentOrderFieldGQL(StrEnum):
     ID = "id"
@@ -81,15 +84,19 @@ class AgentOrderFieldGQL(StrEnum):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Filter options for agent status within AgentFilter.
+            It includes options to filter whether agent status is in a specific list or equals a specific value.
+        """),
+        added_version="24.09.0",
+    ),
     name="AgentStatusFilter",
-    description=dedent_strip("""
-        Filter options for agent status within AgentFilter.
-        It includes options to filter whether agent status is in a specific list or equals a specific value.
-    """),
 )
 class AgentStatusFilterGQL(PydanticInputMixin[AgentStatusFilter]):
-    in_: list[AgentStatusEnum] | None = strawberry.field(name="in", default=None)
+    in_: list[AgentStatusEnum] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     equals: AgentStatusEnum | None = None
 
 
@@ -126,29 +133,14 @@ class AgentOrderByGQL(PydanticInputMixin[AgentOrder]):
     name="AgentResource",
 )
 class AgentResourceGQL:
-    capacity: JSON = strawberry.field(
-        description=dedent_strip("""
-            Total hardware resource capacity available on the agent.
-            Expressed as a JSON object containing resource slots (e.g., cpu, mem, accelerators).
-            Each slot represents the maximum amount of that resource type the agent can provide.
-        """)
+    capacity: JSON = gql_field(
+        description="Total hardware resource capacity available on the agent. Expressed as a JSON object containing resource slots (e.g., cpu, mem, accelerators). Each slot represents the maximum amount of that resource type the agent can provide."
     )
-    used: JSON = strawberry.field(
-        description=dedent_strip("""
-            Total amount of resources currently consumed by running and scheduled compute sessions.
-            Includes both the requested resources for sessions being prepared and already allocated
-            resources for active sessions. The sum of occupied resources across all session states
-            that occupy agent resources (PREPARING, PULLING, RUNNING, RESTARTING, etc.).
-            Expressed as a JSON object with the same structure as capacity.
-        """)
+    used: JSON = gql_field(
+        description="Total amount of resources currently consumed by running and scheduled compute sessions. Includes both the requested resources for sessions being prepared and already allocated resources for active sessions. The sum of occupied resources across all session states that occupy agent resources (PREPARING, PULLING, RUNNING, RESTARTING, etc.). Expressed as a JSON object with the same structure as capacity."
     )
-    free: JSON = strawberry.field(
-        description=dedent_strip("""
-            Available resources for scheduling new compute sessions (capacity - used).
-            This represents the maximum resources that can be allocated to new sessions
-            without exceeding the agent's capacity. Expressed as a JSON object with
-            the same structure as capacity.
-        """)
+    free: JSON = gql_field(
+        description="Available resources for scheduling new compute sessions (capacity - used). This represents the maximum resources that can be allocated to new sessions without exceeding the agent's capacity. Expressed as a JSON object with the same structure as capacity."
     )
 
 
@@ -161,7 +153,9 @@ class AgentResourceGQL:
     name="AgentStats",
 )
 class AgentStatsGQL:
-    total_resource: AgentResourceGQL = strawberry.field(description="Added in 25.15.0")
+    total_resource: AgentResourceGQL = gql_field(
+        description="Total resource capacity of the agent."
+    )
 
 
 @gql_pydantic_type(
@@ -173,41 +167,20 @@ class AgentStatsGQL:
     name="AgentStatusInfo",
 )
 class AgentStatusInfoGQL:
-    status: AgentStatus = strawberry.field(
-        description=dedent_strip("""
-            Current operational status of the agent.
-            Indicates whether the agent is ALIVE (active and reachable), LOST (unreachable),
-            TERMINATED (intentionally stopped), or RESTARTING (in recovery process).
-        """)
+    status: AgentStatus = gql_field(
+        description="Current operational status of the agent. Indicates whether the agent is ALIVE (active and reachable), LOST (unreachable), TERMINATED (intentionally stopped), or RESTARTING (in recovery process)."
     )
-    status_changed: datetime | None = strawberry.field(
-        description=dedent_strip("""
-            Timestamp when the agent last changed its status.
-            Updated whenever the agent transitions between different status states
-            (e.g., from ALIVE to LOST, or RESTARTING to ALIVE).
-            Will be null if the agent status has never changed since initial registration.
-        """)
+    status_changed: datetime | None = gql_field(
+        description="Timestamp when the agent last changed its status. Updated whenever the agent transitions between different status states (e.g., from ALIVE to LOST, or RESTARTING to ALIVE). Will be null if the agent status has never changed since initial registration."
     )
-    first_contact: datetime | None = strawberry.field(
-        description=dedent_strip("""
-            Timestamp when the agent first registered with the manager.
-            This value remains constant throughout the agent's lifecycle and can be used
-            to track the agent's age or identify when it was initially deployed.
-        """)
+    first_contact: datetime | None = gql_field(
+        description="Timestamp when the agent first registered with the manager. This value remains constant throughout the agent's lifecycle and can be used to track the agent's age or identify when it was initially deployed."
     )
-    lost_at: datetime | None = strawberry.field(
-        description=dedent_strip("""
-            Timestamp when the agent was marked as lost or unreachable.
-            Set when the manager detects the agent has stopped sending heartbeats.
-            Will be null if the agent has never been lost or is currently alive.
-        """)
+    lost_at: datetime | None = gql_field(
+        description="Timestamp when the agent was marked as lost or unreachable. Set when the manager detects the agent has stopped sending heartbeats. Will be null if the agent has never been lost or is currently alive."
     )
-    schedulable: bool = strawberry.field(
-        description=dedent_strip("""
-            Indicates whether the agent is available for scheduling new compute sessions.
-            An agent can be non-schedulable due to maintenance mode, resource constraints or other operational reasons by admin.
-            When false, no new sessions will be assigned to this agent.
-        """)
+    schedulable: bool = gql_field(
+        description="Indicates whether the agent is available for scheduling new compute sessions. An agent can be non-schedulable due to maintenance mode, resource constraints or other operational reasons by admin. When false, no new sessions will be assigned to this agent."
     )
 
 
@@ -240,11 +213,8 @@ class ComputePluginEntryGQL:
 class ComputePluginsGQL:
     """Compute plugins container with multiple plugin entries."""
 
-    entries: list[ComputePluginEntryGQL] = strawberry.field(
-        description=(
-            "List of compute plugins. Each entry contains a plugin name and its metadata. "
-            "The list includes all accelerator and resource type plugins installed on the agent."
-        )
+    entries: list[ComputePluginEntryGQL] = gql_field(
+        description="List of compute plugins. Each entry contains a plugin name and its metadata. The list includes all accelerator and resource type plugins installed on the agent."
     )
 
 
@@ -257,35 +227,17 @@ class ComputePluginsGQL:
     name="AgentSystemInfo",
 )
 class AgentSystemInfoGQL:
-    architecture: str = strawberry.field(
-        description=dedent_strip("""
-            Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64").
-            Used to match compute sessions with compatible container images and ensure
-            proper binary execution on the agent.
-        """)
+    architecture: str = gql_field(
+        description='Hardware architecture of the agent\'s host system (e.g., "x86_64", "aarch64"). Used to match compute sessions with compatible container images and ensure proper binary execution on the agent.'
     )
-    version: str = strawberry.field(
-        description=dedent_strip("""
-            Version string of the Backend.AI agent software running on this node.
-            Follows semantic versioning (e.g., "26.1.0") and helps identify
-            compatibility and available features.
-        """)
+    version: str = gql_field(
+        description='Version string of the Backend.AI agent software running on this node. Follows semantic versioning (e.g., "26.1.0") and helps identify compatibility and available features.'
     )
-    auto_terminate_abusing_kernel: bool = strawberry.field(
-        description=dedent_strip("""
-            Legacy configuration flag, no longer actively used in the system.
-            Retained for backward compatibility and schema consistency.
-            Originally intended to control automatic termination of misbehaving sessions.
-        """),
-        deprecation_reason="Legacy feature no longer in use.",
+    auto_terminate_abusing_kernel: bool = gql_field(
+        description="Legacy configuration flag, no longer actively used in the system. Retained for backward compatibility and schema consistency. Originally intended to control automatic termination of misbehaving sessions."
     )
-    compute_plugins: ComputePluginsGQL = strawberry.field(
-        description=dedent_strip("""
-            List of compute plugin metadata supported by this agent.
-            Each plugin represents a specific accelerator or resource type (e.g., CUDA).
-            Entries contain plugin names and their associated metadata with
-            plugin-specific configuration and capabilities.
-        """)
+    compute_plugins: ComputePluginsGQL = gql_field(
+        description="List of compute plugin metadata supported by this agent. Each plugin represents a specific accelerator or resource type (e.g., CUDA). Entries contain plugin names and their associated metadata with plugin-specific configuration and capabilities."
     )
 
 
@@ -311,49 +263,30 @@ class AgentNetworkInfoGQL:
 )
 class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     id: NodeID[str]
-    resource_info: AgentResourceGQL = strawberry.field(
-        description=dedent_strip("""
-            Hardware resource capacity, usage, and availability information.
-            Contains capacity (total), used (occupied by sessions), and free (available) resource slots
-            including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
-        """)
+    resource_info: AgentResourceGQL = gql_field(
+        description="Hardware resource capacity, usage, and availability information. Contains capacity (total), used (occupied by sessions), and free (available) resource slots including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources."
     )
-    status_info: AgentStatusInfoGQL = strawberry.field(
-        description=dedent_strip("""
-            Current operational status and lifecycle timestamps.
-            Includes the agent's status (ALIVE, LOST, etc.), status change history,
-            initial registration time, and schedulability state.
-        """)
+    status_info: AgentStatusInfoGQL = gql_field(
+        description="Current operational status and lifecycle timestamps. Includes the agent's status (ALIVE, LOST, etc.), status change history, initial registration time, and schedulability state."
     )
-    system_info: AgentSystemInfoGQL = strawberry.field(
-        description=dedent_strip("""
-            System configuration and software version information.
-            Contains the host architecture, agent software version, and available compute plugins
-            for accelerators and specialized hardware.
-        """)
+    system_info: AgentSystemInfoGQL = gql_field(
+        description="System configuration and software version information. Contains the host architecture, agent software version, and available compute plugins for accelerators and specialized hardware."
     )
-    network_info: AgentNetworkInfoGQL = strawberry.field(
-        description=dedent_strip("""
-            Network location and connectivity information.
-            Provides the agent's region and network address for manager-to-agent communication.
-        """)
+    network_info: AgentNetworkInfoGQL = gql_field(
+        description="Network location and connectivity information. Provides the agent's region and network address for manager-to-agent communication."
     )
-    permissions: list[AgentPermissionGQL] = strawberry.field(
-        description=dedent_strip("""
-            List of permissions the current authenticated user has on this agent.
-            Determines which operations (read attributes, create sessions, etc.)
-            the user can perform on this specific agent based on RBAC policies.
-        """)
+    permissions: list[AgentPermissionGQL] = gql_field(
+        description="List of permissions the current authenticated user has on this agent. Determines which operations (read attributes, create sessions, etc.) the user can perform on this specific agent based on RBAC policies."
     )
-    scaling_group: str = strawberry.field(
-        description=dedent_strip("""
-            Name of the scaling group this agent belongs to.
-            Scaling groups are logical collections of agents used for resource scheduling,
-            quota management, and workload isolation across different user groups or projects.
-        """)
+    scaling_group: str = gql_field(
+        description="Name of the scaling group this agent belongs to. Scaling groups are logical collections of agents used for resource scheduling, quota management, and workload isolation across different user groups or projects."
     )
 
-    @strawberry.field(description="Added in 26.1.0. Load the container count for this agent.")  # type: ignore[misc]
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.1.0", description="Load the container count for this agent."
+        )
+    )  # type: ignore[misc]
     async def container_count(
         self,
         info: Info[StrawberryGQLContext],
@@ -363,9 +296,12 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         """
         return await info.context.data_loaders.container_count_loader.load(AgentId(self.id))
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. List of kernels running on this agent with pagination support."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.2.0",
+            description="List of kernels running on this agent with pagination support.",
+        )
+    )  # type: ignore[misc]
     async def kernels(
         self,
         info: Info[StrawberryGQLContext],
@@ -421,9 +357,12 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             count=payload.total_count,
         )
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. List of sessions running on this agent with pagination support."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0",
+            description="List of sessions running on this agent with pagination support.",
+        )
+    )  # type: ignore[misc]
     async def sessions(
         self,
         info: Info[StrawberryGQLContext],
@@ -481,9 +420,12 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             count=payload.total_count,
         )
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. Per-slot resource capacity and usage for this agent."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0",
+            description="Per-slot resource capacity and usage for this agent.",
+        )
+    )  # type: ignore[misc]
     async def resource_slots(
         self,
         info: Info[StrawberryGQLContext],

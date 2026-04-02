@@ -5,7 +5,14 @@ from collections.abc import Sequence
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus, RouteStatusTransitions
+from ai.backend.manager.data.deployment.types import (
+    RouteHandlerCategory,
+    RouteHealthStatus,
+    RouteStatus,
+    RouteStatusTransitions,
+    RouteTargetStatuses,
+    RouteTransitionTarget,
+)
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -38,37 +45,28 @@ class HealthCheckRouteHandler(RouteHandler):
         return LockID.LOCKID_DEPLOYMENT_HEALTH_CHECK_ROUTES
 
     @classmethod
-    def target_statuses(cls) -> list[RouteStatus]:
-        """Get the target route statuses for this handler."""
-        return [RouteStatus.HEALTHY, RouteStatus.UNHEALTHY, RouteStatus.DEGRADED]
+    def category(cls) -> RouteHandlerCategory:
+        return RouteHandlerCategory.HEALTH
 
     @classmethod
-    def next_status(cls) -> RouteStatus | None:
-        """Routes that pass health check become HEALTHY."""
-        return RouteStatus.HEALTHY
-
-    @classmethod
-    def failure_status(cls) -> RouteStatus | None:
-        """Routes that fail health check become UNHEALTHY."""
-        return RouteStatus.UNHEALTHY
-
-    @classmethod
-    def stale_status(cls) -> RouteStatus | None:
-        """Routes with stale health data become DEGRADED."""
-        return RouteStatus.DEGRADED
+    def target_statuses(cls) -> RouteTargetStatuses:
+        return RouteTargetStatuses(
+            lifecycle=[RouteStatus.RUNNING],
+            health=[
+                RouteHealthStatus.NOT_CHECKED,
+                RouteHealthStatus.HEALTHY,
+                RouteHealthStatus.UNHEALTHY,
+                RouteHealthStatus.DEGRADED,
+            ],
+        )
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Define state transitions for health check route handler (BEP-1030).
-
-        - success: Route → HEALTHY
-        - failure: Route → UNHEALTHY
-        - stale: Route → DEGRADED (stale health data)
-        """
+        """Health check only changes health_status, not lifecycle status."""
         return RouteStatusTransitions(
-            success=RouteStatus.HEALTHY,
-            failure=RouteStatus.UNHEALTHY,
-            stale=RouteStatus.DEGRADED,
+            success=RouteTransitionTarget(health_status=RouteHealthStatus.HEALTHY),
+            failure=RouteTransitionTarget(health_status=RouteHealthStatus.UNHEALTHY),
+            stale=RouteTransitionTarget(health_status=RouteHealthStatus.DEGRADED),
         )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:

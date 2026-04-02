@@ -708,7 +708,7 @@ class SessionRow(Base):  # type: ignore[misc]
     target_sgroup_names: Mapped[list[str] | None] = mapped_column(
         "target_sgroup_names",
         sa.ARRAY(sa.String(length=64)),
-        default="{}",
+        default=None,
         server_default="{}",
         nullable=True,
     )

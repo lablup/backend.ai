@@ -143,11 +143,10 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: RenameSessionRequest,
     ) -> None:
-        params = request.model_dump(mode="json", exclude_none=True)
         await self._client.typed_request_no_content(
             "POST",
             f"{_BASE_PATH}/{session_name}/rename",
-            params={k: str(v) for k, v in params.items()},
+            request=request,
         )
 
     async def interrupt(
@@ -353,13 +352,13 @@ class SessionClient(BaseDomainClient):
         self,
         request: SyncAgentRegistryRequest,
     ) -> dict[str, Any] | None:
-        result: dict[str, Any] | list[Any] | None = await self._client._request(
+        result: dict[str, Any] | list[Any] | str | None = await self._client._request(
             "POST",
             f"{_BASE_PATH}/_/sync-agent-registry",
             json=request.model_dump(exclude_none=True),
         )
-        if isinstance(result, list):
-            raise TypeError("Unexpected list response from sync_agent_registry")
+        if isinstance(result, (list, str)):
+            raise TypeError("Unexpected list/str response from sync_agent_registry")
         return result
 
     async def transit_session_status(

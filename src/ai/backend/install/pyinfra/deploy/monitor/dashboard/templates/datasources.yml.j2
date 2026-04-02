@@ -1,0 +1,22 @@
+apiVersion: 1
+datasources:
+  - name: backendai-dashboard-prometheus
+    type: prometheus
+    access: proxy
+    uid: {{ prometheus_uid }}
+    url: http://{{ prometheus_host }}:{{ prometheus_port }}
+  - name: backendai-dashboard-pyroscope
+    type: grafana-pyroscope-datasource
+    access: proxy
+    uid: {{ pyroscope_uid }}
+    url: http://{{ pyroscope_host }}:{{ pyroscope_port }}
+  - name: backendai-dashboard-loki
+    type: loki
+    access: proxy
+    uid: {{ loki_uid }}
+    url: http://{{ loki_host }}:{{ loki_port }}
+  - name: backendai-dashboard-tempo
+    type: tempo
+    access: proxy
+    uid: {{ tempo_uid }}
+    url: http://{{ tempo_host }}:{{ tempo_port }}

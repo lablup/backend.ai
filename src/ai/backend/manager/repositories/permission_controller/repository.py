@@ -4,18 +4,14 @@ import uuid
 from collections.abc import Mapping
 from typing import cast
 
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, OperationType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.permission.entity import ElementAssociationListResult, EntityListResult
-from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.object_permission import (
-    ObjectPermissionData,
-    ObjectPermissionListResult,
-)
+from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
     PermissionListResult,
@@ -31,6 +27,7 @@ from ai.backend.manager.data.permission.role import (
     RoleDetailData,
     RoleListResult,
     RolePermissionsUpdateInput,
+    ScopeChainPermissionCheckInput,
     ScopePermissionCheckInput,
     SingleEntityPermissionCheckInput,
     UserRoleAssignmentData,
@@ -39,12 +36,8 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
-    RBACElementRef,
-    ScopeData,
     ScopeListResult,
-    ScopeType,
 )
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -54,10 +47,7 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.types import (
-    ObjectPermissionSearchScope,
-    PermissionSearchScope,
-)
+from ai.backend.manager.repositories.permission_controller.types import PermissionSearchScope
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
 
@@ -140,32 +130,6 @@ class PermissionControllerRepository:
         """
         row = await self._db_source.update_permission(updater)
         return row.to_data()
-
-    @permission_controller_repository_resilience.apply()
-    async def create_object_permission(
-        self,
-        creator: Creator[ObjectPermissionRow],
-    ) -> ObjectPermissionData:
-        """
-        Create a new object permission in the database.
-
-        Returns the created object permission data.
-        """
-        row = await self._db_source.create_object_permission(creator)
-        return row.to_data()
-
-    @permission_controller_repository_resilience.apply()
-    async def delete_object_permission(
-        self,
-        purger: Purger[ObjectPermissionRow],
-    ) -> ObjectPermissionData | None:
-        """
-        Delete an object permission from the database.
-
-        Returns the deleted object permission data, or None if not found.
-        """
-        row = await self._db_source.delete_object_permission(purger)
-        return row.to_data() if row else None
 
     @permission_controller_repository_resilience.apply()
     async def update_role(self, updater: Updater[RoleRow]) -> RoleData:
@@ -279,15 +243,6 @@ class PermissionControllerRepository:
         return await self._db_source.search_permissions(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
-    async def search_object_permissions(
-        self,
-        querier: BatchQuerier,
-        scope: ObjectPermissionSearchScope | None = None,
-    ) -> ObjectPermissionListResult:
-        """Searches object permissions with pagination and filtering."""
-        return await self._db_source.search_object_permissions(querier=querier, scope=scope)
-
-    @permission_controller_repository_resilience.apply()
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:
         """Get role with all permission details (without users)."""
         result = await self._db_source.get_role_with_permissions(role_id)
@@ -303,43 +258,27 @@ class PermissionControllerRepository:
             querier=querier,
         )
 
-    def _get_global_scope(self) -> ScopeListResult:
-        """Get the global scope as a static result."""
-        return ScopeListResult(
-            items=[
-                ScopeData(
-                    id=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
-                    name=GLOBAL_SCOPE_ID,
-                )
-            ],
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-
     @permission_controller_repository_resilience.apply()
     async def search_scopes(
         self,
-        scope_type: ScopeType,
+        element_type: RBACElementType,
         querier: BatchQuerier,
     ) -> ScopeListResult:
-        """Search scopes based on scope type.
+        """Search scopes based on element type.
 
         Args:
-            scope_type: The type of scope to search.
+            element_type: The RBAC element type of scope to search.
             querier: BatchQuerier with conditions, orders, and pagination.
 
         Returns:
             ScopeListResult with matching scopes.
         """
-        match scope_type:
-            case ScopeType.GLOBAL:
-                return self._get_global_scope()
-            case ScopeType.DOMAIN:
+        match element_type:
+            case RBACElementType.DOMAIN:
                 return await self._db_source.search_domain_scopes(querier)
-            case ScopeType.PROJECT:
+            case RBACElementType.PROJECT:
                 return await self._db_source.search_project_scopes(querier)
-            case ScopeType.USER:
+            case RBACElementType.USER:
                 return await self._db_source.search_user_scopes(querier)
             case _:
                 raise NotImplementedError(
@@ -379,9 +318,7 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def check_permission_with_scope_chain(
         self,
-        user_id: uuid.UUID,
-        target_element_ref: RBACElementRef,
-        operation: OperationType,
+        data: ScopeChainPermissionCheckInput,
     ) -> bool:
         """Permission check that traverses the scope chain via AUTO edges only.
 
@@ -389,8 +326,4 @@ class PermissionControllerRepository:
         entity, checking if the user has the requested operation at any ancestor
         scope. REF edges are not traversed.
         """
-        return await self._db_source.check_permission_with_scope_chain(
-            user_id=user_id,
-            target_element_ref=target_element_ref,
-            operation=operation,
-        )
+        return await self._db_source.check_permission_with_scope_chain(data)

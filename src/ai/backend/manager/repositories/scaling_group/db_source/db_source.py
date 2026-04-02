@@ -6,7 +6,9 @@ import uuid
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from ai.backend.common.data.permission.types import RBACElementType, RelationType
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.scaling_group.types import (
@@ -18,6 +20,9 @@ from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
@@ -405,3 +410,283 @@ class ScalingGroupDBSource:
             used=used_list,
             free=free_list,
         )
+
+    # =========================================================================
+    # Allow / Disallow (atomic add+remove in single read-committed transaction)
+    # =========================================================================
+
+    async def update_allowed_resource_groups_for_domain(
+        self,
+        domain_name: str,
+        add: list[str],
+        remove: list[str],
+    ) -> list[str]:
+        """Atomically add/remove allowed resource groups for a domain.
+
+        Returns the current list of allowed resource group names after the update.
+        """
+        async with self._db.begin_session_read_committed() as session:
+            if remove:
+                await session.execute(
+                    sa.delete(ScalingGroupForDomainRow).where(
+                        ScalingGroupForDomainRow.domain == domain_name,
+                        ScalingGroupForDomainRow.scaling_group.in_(remove),
+                    )
+                )
+                await session.execute(
+                    sa.delete(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type
+                        == RBACElementType.DOMAIN.to_scope_type(),
+                        AssociationScopesEntitiesRow.scope_id == domain_name,
+                        AssociationScopesEntitiesRow.entity_type
+                        == RBACElementType.RESOURCE_GROUP.to_entity_type(),
+                        AssociationScopesEntitiesRow.entity_id.in_(remove),
+                    )
+                )
+
+            if add:
+                for rg_name in add:
+                    await session.execute(
+                        pg_insert(ScalingGroupForDomainRow.__table__)
+                        .values(scaling_group=rg_name, domain=domain_name)
+                        .on_conflict_do_nothing()
+                    )
+                    await session.execute(
+                        pg_insert(AssociationScopesEntitiesRow.__table__)
+                        .values(
+                            scope_type=RBACElementType.DOMAIN.to_scope_type(),
+                            scope_id=domain_name,
+                            entity_type=RBACElementType.RESOURCE_GROUP.to_entity_type(),
+                            entity_id=rg_name,
+                            relation_type=RelationType.AUTO,
+                        )
+                        .on_conflict_do_nothing()
+                    )
+
+            result = await session.execute(
+                sa.select(ScalingGroupForDomainRow.scaling_group).where(
+                    ScalingGroupForDomainRow.domain == domain_name
+                )
+            )
+            return [row[0] for row in result]
+
+    async def update_allowed_resource_groups_for_project(
+        self,
+        project_id: uuid.UUID,
+        add: list[str],
+        remove: list[str],
+    ) -> list[str]:
+        """Atomically add/remove allowed resource groups for a project.
+
+        Returns the current list of allowed resource group names after the update.
+        """
+        async with self._db.begin_session_read_committed() as session:
+            if remove:
+                await session.execute(
+                    sa.delete(ScalingGroupForProjectRow).where(
+                        ScalingGroupForProjectRow.group == project_id,
+                        ScalingGroupForProjectRow.scaling_group.in_(remove),
+                    )
+                )
+                await session.execute(
+                    sa.delete(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type
+                        == RBACElementType.PROJECT.to_scope_type(),
+                        AssociationScopesEntitiesRow.scope_id == str(project_id),
+                        AssociationScopesEntitiesRow.entity_type
+                        == RBACElementType.RESOURCE_GROUP.to_entity_type(),
+                        AssociationScopesEntitiesRow.entity_id.in_(remove),
+                    )
+                )
+
+            if add:
+                for rg_name in add:
+                    await session.execute(
+                        pg_insert(ScalingGroupForProjectRow.__table__)
+                        .values(scaling_group=rg_name, group=project_id)
+                        .on_conflict_do_nothing()
+                    )
+                    await session.execute(
+                        pg_insert(AssociationScopesEntitiesRow.__table__)
+                        .values(
+                            scope_type=RBACElementType.PROJECT.to_scope_type(),
+                            scope_id=str(project_id),
+                            entity_type=RBACElementType.RESOURCE_GROUP.to_entity_type(),
+                            entity_id=rg_name,
+                            relation_type=RelationType.AUTO,
+                        )
+                        .on_conflict_do_nothing()
+                    )
+
+            result = await session.execute(
+                sa.select(ScalingGroupForProjectRow.scaling_group).where(
+                    ScalingGroupForProjectRow.group == project_id
+                )
+            )
+            return [row[0] for row in result]
+
+    async def update_allowed_domains_for_resource_group(
+        self,
+        resource_group_name: str,
+        add: list[str],
+        remove: list[str],
+    ) -> list[str]:
+        """Atomically add/remove allowed domains for a resource group.
+
+        Returns the current list of allowed domain names after the update.
+        """
+        async with self._db.begin_session_read_committed() as session:
+            if remove:
+                await session.execute(
+                    sa.delete(ScalingGroupForDomainRow).where(
+                        ScalingGroupForDomainRow.scaling_group == resource_group_name,
+                        ScalingGroupForDomainRow.domain.in_(remove),
+                    )
+                )
+                await session.execute(
+                    sa.delete(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.entity_type
+                        == RBACElementType.RESOURCE_GROUP.to_entity_type(),
+                        AssociationScopesEntitiesRow.entity_id == resource_group_name,
+                        AssociationScopesEntitiesRow.scope_type
+                        == RBACElementType.DOMAIN.to_scope_type(),
+                        AssociationScopesEntitiesRow.scope_id.in_(remove),
+                    )
+                )
+
+            if add:
+                for domain_name in add:
+                    await session.execute(
+                        pg_insert(ScalingGroupForDomainRow.__table__)
+                        .values(scaling_group=resource_group_name, domain=domain_name)
+                        .on_conflict_do_nothing()
+                    )
+                    await session.execute(
+                        pg_insert(AssociationScopesEntitiesRow.__table__)
+                        .values(
+                            scope_type=RBACElementType.DOMAIN.to_scope_type(),
+                            scope_id=domain_name,
+                            entity_type=RBACElementType.RESOURCE_GROUP.to_entity_type(),
+                            entity_id=resource_group_name,
+                            relation_type=RelationType.AUTO,
+                        )
+                        .on_conflict_do_nothing()
+                    )
+
+            result = await session.execute(
+                sa.select(ScalingGroupForDomainRow.domain).where(
+                    ScalingGroupForDomainRow.scaling_group == resource_group_name
+                )
+            )
+            return [row[0] for row in result]
+
+    async def update_allowed_projects_for_resource_group(
+        self,
+        resource_group_name: str,
+        add: list[uuid.UUID],
+        remove: list[uuid.UUID],
+    ) -> list[uuid.UUID]:
+        """Atomically add/remove allowed projects for a resource group.
+
+        Returns the current list of allowed project IDs after the update.
+        """
+        async with self._db.begin_session_read_committed() as session:
+            if remove:
+                await session.execute(
+                    sa.delete(ScalingGroupForProjectRow).where(
+                        ScalingGroupForProjectRow.scaling_group == resource_group_name,
+                        ScalingGroupForProjectRow.group.in_(remove),
+                    )
+                )
+                await session.execute(
+                    sa.delete(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.entity_type
+                        == RBACElementType.RESOURCE_GROUP.to_entity_type(),
+                        AssociationScopesEntitiesRow.entity_id == resource_group_name,
+                        AssociationScopesEntitiesRow.scope_type
+                        == RBACElementType.PROJECT.to_scope_type(),
+                        AssociationScopesEntitiesRow.scope_id.in_([str(pid) for pid in remove]),
+                    )
+                )
+
+            if add:
+                for project_id in add:
+                    await session.execute(
+                        pg_insert(ScalingGroupForProjectRow.__table__)
+                        .values(scaling_group=resource_group_name, group=project_id)
+                        .on_conflict_do_nothing()
+                    )
+                    await session.execute(
+                        pg_insert(AssociationScopesEntitiesRow.__table__)
+                        .values(
+                            scope_type=RBACElementType.PROJECT.to_scope_type(),
+                            scope_id=str(project_id),
+                            entity_type=RBACElementType.RESOURCE_GROUP.to_entity_type(),
+                            entity_id=resource_group_name,
+                            relation_type=RelationType.AUTO,
+                        )
+                        .on_conflict_do_nothing()
+                    )
+
+            result = await session.execute(
+                sa.select(ScalingGroupForProjectRow.group).where(
+                    ScalingGroupForProjectRow.scaling_group == resource_group_name
+                )
+            )
+            return [row[0] for row in result]
+
+    # =========================================================================
+    # Get allowed (read-only queries)
+    # =========================================================================
+
+    async def get_allowed_resource_groups_for_domain(
+        self,
+        domain_name: str,
+    ) -> list[str]:
+        """Get allowed resource group names for a domain."""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            result = await session.execute(
+                sa.select(ScalingGroupForDomainRow.scaling_group).where(
+                    ScalingGroupForDomainRow.domain == domain_name
+                )
+            )
+            return [row[0] for row in result]
+
+    async def get_allowed_resource_groups_for_project(
+        self,
+        project_id: uuid.UUID,
+    ) -> list[str]:
+        """Get allowed resource group names for a project."""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            result = await session.execute(
+                sa.select(ScalingGroupForProjectRow.scaling_group).where(
+                    ScalingGroupForProjectRow.group == project_id
+                )
+            )
+            return [row[0] for row in result]
+
+    async def get_allowed_domains_for_resource_group(
+        self,
+        resource_group_name: str,
+    ) -> list[str]:
+        """Get allowed domain names for a resource group."""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            result = await session.execute(
+                sa.select(ScalingGroupForDomainRow.domain).where(
+                    ScalingGroupForDomainRow.scaling_group == resource_group_name
+                )
+            )
+            return [row[0] for row in result]
+
+    async def get_allowed_projects_for_resource_group(
+        self,
+        resource_group_name: str,
+    ) -> list[uuid.UUID]:
+        """Get allowed project IDs for a resource group."""
+        async with self._db.begin_readonly_session_read_committed() as session:
+            result = await session.execute(
+                sa.select(ScalingGroupForProjectRow.group).where(
+                    ScalingGroupForProjectRow.scaling_group == resource_group_name
+                )
+            )
+            return [row[0] for row in result]

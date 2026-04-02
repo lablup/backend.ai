@@ -26,17 +26,21 @@ from ai.backend.common.dto.manager.rbac import (
 from ai.backend.common.dto.manager.rbac.response import PaginationInfo
 from ai.backend.common.dto.manager.v2.rbac import (
     AssociationScopesEntitiesNode,
+    BulkAssignRoleFailureInfo,
     BulkAssignRoleResultPayload,
+    BulkRevokeRoleFailureInfo,
     BulkRevokeRoleResultPayload,
-    BulkRoleOperationFailureInfo,
     CreateRoleInput,
     CreateRolePayload,
     DeleteRolePayload,
+    EntityActionInfo,
     EntityNode,
+    OperationInfo,
     PermissionNode,
     PurgeRolePayload,
     RoleAssignmentNode,
     RoleNode,
+    ScopeEntityOperationCombinationInfo,
     UpdateRoleInput,
     UpdateRolePayload,
 )
@@ -71,6 +75,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionFilter as PermissionFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    PermissionNestedFilter as PermissionNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionOrderBy as PermissionOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -103,6 +110,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
+from ai.backend.manager.actions.action import build_operation_description
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.association_scopes_entities import (
@@ -131,6 +139,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
     EntityScopeConditions,
+    PermissionConditions,
     RoleConditions,
     ScopedPermissionConditions,
 )
@@ -174,6 +183,9 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role i
 )
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
+from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
+    GetPermissionMatrixAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
@@ -217,8 +229,8 @@ from .base import BaseAdapter
 @lru_cache(maxsize=1)
 def _permission_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ScopedPermissionOrders.id(ascending=False),
-        backward_order=ScopedPermissionOrders.id(ascending=True),
+        forward_order=ScopedPermissionOrders.created_at(ascending=False),
+        backward_order=ScopedPermissionOrders.created_at(ascending=True),
         forward_condition_factory=ScopedPermissionConditions.by_cursor_forward,
         backward_condition_factory=ScopedPermissionConditions.by_cursor_backward,
         tiebreaker_order=PermissionRow.id.asc(),
@@ -250,8 +262,8 @@ def _assignment_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _entity_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=EntityScopeOrders.id(ascending=False),
-        backward_order=EntityScopeOrders.id(ascending=True),
+        forward_order=EntityScopeOrders.registered_at(ascending=False),
+        backward_order=EntityScopeOrders.registered_at(ascending=True),
         forward_condition_factory=EntityScopeConditions.by_cursor_forward,
         backward_condition_factory=EntityScopeConditions.by_cursor_backward,
         tiebreaker_order=AssociationScopesEntitiesRow.id.asc(),
@@ -464,6 +476,45 @@ class RBACAdapter(BaseAdapter):
             for item in action_result.result.items
         }
         return [result_map.get(pair) for pair in pairs]
+
+    # ------------------------------------------------------------------ permission matrix
+
+    async def get_permission_matrix(self) -> list[ScopeEntityOperationCombinationInfo]:
+        """Return the complete RBAC scope-entity-operation permission matrix."""
+        action_result = (
+            await self._processors.permission_controller.get_permission_matrix.wait_for_complete(
+                GetPermissionMatrixAction()
+            )
+        )
+        matrix = action_result.matrix
+        return [
+            ScopeEntityOperationCombinationInfo(
+                scope_type=RBACElementTypeDTO(scope.value),
+                entities=sorted(
+                    [
+                        EntityActionInfo(
+                            entity_type=RBACElementTypeDTO(entity.value),
+                            actions=sorted(
+                                [
+                                    OperationInfo(
+                                        operation=action_name.value,
+                                        description=build_operation_description(
+                                            action_name, perm.element_type
+                                        ),
+                                        required_permission=OperationTypeDTO(perm.operation.value),
+                                    )
+                                    for action_name, perm in actions.items()
+                                ],
+                                key=lambda o: o.operation,
+                            ),
+                        )
+                        for entity, actions in entity_map.items()
+                    ],
+                    key=lambda e: e.entity_type,
+                ),
+            )
+            for scope, entity_map in sorted(matrix.items(), key=lambda e: e[0].value)
+        ]
 
     # ------------------------------------------------------------------ create
 
@@ -689,9 +740,9 @@ class RBACAdapter(BaseAdapter):
         creator: Creator[PermissionRow] = Creator(
             spec=PermissionCreatorSpec(
                 role_id=input.role_id,
-                scope_type=RBACElementType(input.scope_type).to_scope_type(),
+                scope_type=RBACElementType(input.scope_type),
                 scope_id=input.scope_id,
-                entity_type=RBACElementType(input.entity_type).to_entity_type(),
+                entity_type=RBACElementType(input.entity_type),
                 operation=InternalOperationType(input.operation),
             )
         )
@@ -706,7 +757,7 @@ class RBACAdapter(BaseAdapter):
         """Update an existing scoped permission."""
         spec = PermissionUpdaterSpec(
             scope_type=(
-                OptionalState.update(RBACElementType(input.scope_type).to_scope_type())
+                OptionalState.update(RBACElementType(input.scope_type))
                 if input.scope_type is not None
                 else OptionalState.nop()
             ),
@@ -716,7 +767,7 @@ class RBACAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
             entity_type=(
-                OptionalState.update(RBACElementType(input.entity_type).to_entity_type())
+                OptionalState.update(RBACElementType(input.entity_type))
                 if input.entity_type is not None
                 else OptionalState.nop()
             ),
@@ -791,7 +842,7 @@ class RBACAdapter(BaseAdapter):
                 for s in result.successes
             ],
             failed=[
-                BulkRoleOperationFailureInfo(user_id=f.user_id, message=f.message)
+                BulkAssignRoleFailureInfo(user_id=f.user_id, message=f.message)
                 for f in result.failures
             ],
         )
@@ -821,7 +872,7 @@ class RBACAdapter(BaseAdapter):
                 for s in result.successes
             ],
             failed=[
-                BulkRoleOperationFailureInfo(user_id=f.user_id, message=f.message)
+                BulkRevokeRoleFailureInfo(user_id=f.user_id, message=f.message)
                 for f in result.failures
             ],
         )
@@ -877,11 +928,21 @@ class RBACAdapter(BaseAdapter):
         if f.role_id is not None:
             conditions.append(ScopedPermissionConditions.by_role_id(f.role_id))
         if f.scope_type is not None:
-            scope_type = RBACElementType(f.scope_type).to_scope_type()
-            conditions.append(ScopedPermissionConditions.by_scope_type(scope_type))
+            conditions.append(
+                ScopedPermissionConditions.by_scope_type(RBACElementType(f.scope_type))
+            )
         if f.entity_type is not None:
-            entity_type = RBACElementType(f.entity_type).to_entity_type()
-            conditions.append(ScopedPermissionConditions.by_entity_type(entity_type))
+            conditions.append(
+                ScopedPermissionConditions.by_entity_type(RBACElementType(f.entity_type))
+            )
+        if f.created_at is not None:
+            cond = f.created_at.build_query_condition(
+                before_factory=ScopedPermissionConditions.by_created_at_before,
+                after_factory=ScopedPermissionConditions.by_created_at_after,
+                equals_factory=ScopedPermissionConditions.by_created_at_equals,
+            )
+            if cond is not None:
+                conditions.append(cond)
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_permission_filter(sub))
@@ -908,6 +969,8 @@ class RBACAdapter(BaseAdapter):
                 result.append(ScopedPermissionOrders.id(ascending))
             elif o.field == "entity_type":
                 result.append(ScopedPermissionOrders.entity_type(ascending))
+            elif o.field == "created_at":
+                result.append(ScopedPermissionOrders.created_at(ascending))
         return result
 
     def _convert_role_filter_gql(self, f: RoleFilterDTO) -> list[QueryCondition]:
@@ -1052,12 +1115,49 @@ class RBACAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
+    def _convert_permission_nested_filter(
+        self, f: PermissionNestedFilterDTO
+    ) -> list[QueryCondition]:
+        raw_conditions: list[QueryCondition] = []
+        if f.scope_id is not None:
+            raw_conditions.append(PermissionConditions.by_scope_id(f.scope_id))
+        if f.scope_type is not None:
+            scope_type = RBACElementType(f.scope_type).to_scope_type()
+            raw_conditions.append(PermissionConditions.by_scope_types([scope_type]))
+        if f.entity_type is not None:
+            entity_type = RBACElementType(f.entity_type).to_entity_type()
+            raw_conditions.append(PermissionConditions.by_entity_types([entity_type]))
+        if f.operation is not None:
+            operation = InternalOperationType(f.operation)
+            raw_conditions.append(PermissionConditions.by_operations([operation]))
+        conditions: list[QueryCondition] = []
+        if raw_conditions:
+            conditions.append(AssignedUserConditions.exists_permission_combined(raw_conditions))
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_permission_nested_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_permission_nested_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_permission_nested_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+        return conditions
+
     def _convert_assignment_filter(self, f: RoleAssignmentFilterDTO) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.role_id is not None:
             conditions.append(AssignedUserConditions.by_role_id(f.role_id))
         if f.role is not None:
             conditions.extend(self._convert_role_nested_filter(f.role))
+        if f.permission is not None:
+            conditions.extend(self._convert_permission_nested_filter(f.permission))
         if f.username is not None:
             condition = self.convert_string_filter(
                 f.username,
@@ -1111,8 +1211,7 @@ class RBACAdapter(BaseAdapter):
     def _convert_entity_filter(self, f: EntityFilterDTO) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.entity_type is not None:
-            entity_type = RBACElementType(f.entity_type).to_entity_type()
-            conditions.append(EntityScopeConditions.by_entity_type(entity_type))
+            conditions.append(EntityScopeConditions.by_entity_type(RBACElementType(f.entity_type)))
         if f.entity_id is not None:
             condition = self.convert_string_filter(
                 f.entity_id,
@@ -1204,6 +1303,7 @@ class RBACAdapter(BaseAdapter):
             scope_id=data.scope_id,
             entity_type=RBACElementTypeDTO(data.entity_type.to_element().value),
             operation=OperationTypeDTO(data.operation.value),
+            created_at=data.created_at,
         )
 
     @staticmethod

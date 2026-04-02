@@ -38,6 +38,7 @@ def test_auth_success_response_creation() -> None:
         secret_key="SKTEST",
         role="user",
         status="active",
+        session_token="test_session_token",
     )
     assert resp.access_key == "AKTEST"
     assert resp.secret_key == "SKTEST"
@@ -53,6 +54,7 @@ def test_auth_success_response_to_dict() -> None:
         secret_key="SK",
         role="admin",
         status="active",
+        session_token="test_session_token",
         type=AuthTokenType.JWT,
     )
     d = resp.to_dict()
@@ -112,6 +114,7 @@ def test_parse_auth_response_success() -> None:
         "secret_key": "SK",
         "role": "user",
         "status": "active",
+        "session_token": "test_token",
     }
     result = parse_auth_response(data)
     assert isinstance(result, AuthSuccessResponse)
@@ -146,6 +149,7 @@ def test_parse_auth_response_explicit_success() -> None:
         "secret_key": "SK",
         "role": "user",
         "status": "active",
+        "session_token": "test_token",
     }
     result = parse_auth_response(data)
     assert isinstance(result, AuthSuccessResponse)

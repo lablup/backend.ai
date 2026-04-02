@@ -108,9 +108,46 @@ class TestUserDotfileGet:
         await user_dotfile_factory(path=f".list-b-{unique2}", data="b", permission="644")
         result = await admin_registry.config.list_user_dotfiles()
         assert isinstance(result, ListDotfilesResponse)
-        paths = [item.path for item in result.items]
+        # List response is a plain array (via BaseRootResponseModel)
+        paths = [item.path for item in result.root]
         assert f".list-a-{unique1}" in paths
         assert f".list-b-{unique2}" in paths
+
+    async def test_list_user_dotfiles_returns_plain_array_json(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_dotfile_factory: UserDotfileFactory,
+    ) -> None:
+        """Verify the API returns a plain JSON array with 'permission' field.
+
+        This is a regression test for BA-5420 to ensure the response format
+        matches the legacy behavior (plain array with 'permission' field,
+        not {"items": [...]} with 'perm' field).
+        """
+        unique = secrets.token_hex(4)
+        path = f".list-test-{unique}"
+        await user_dotfile_factory(path=path, data="test-data", permission="755")
+        try:
+            result = await admin_registry.config.list_user_dotfiles()
+            # The response should be a plain array
+            assert isinstance(result.root, list)
+            # Verify model_dump returns the plain array (not wrapped)
+            dumped = result.model_dump()
+            assert isinstance(dumped, list)
+            # Find the test item and verify it has 'permission' field
+            test_items = [
+                item for item in dumped if isinstance(item, dict) and item.get("path") == path
+            ]
+            assert len(test_items) == 1
+            test_item = test_items[0]
+            # Verify field name is 'permission' (not 'perm')
+            assert "permission" in test_item
+            assert test_item["permission"] == "755"
+            # Verify no 'perm' field (should be renamed to 'permission')
+            assert "perm" not in test_item
+        finally:
+            # Cleanup
+            await admin_registry.config.delete_user_dotfile(DeleteUserDotfileRequest(path=path))
 
     async def test_get_nonexistent_user_dotfile(
         self,
@@ -190,7 +227,8 @@ class TestBootstrapScript:
     ) -> None:
         result = await admin_registry.config.get_bootstrap_script()
         assert isinstance(result, GetBootstrapScriptResponse)
-        assert result.script == ""
+        # Bootstrap script response is a plain string (via BaseRootResponseModel)
+        assert result.root == ""
 
     async def test_update_and_get_bootstrap_script(
         self,
@@ -203,9 +241,37 @@ class TestBootstrapScript:
         )
         assert isinstance(update_result, UpdateBootstrapScriptResponse)
         get_result = await admin_registry.config.get_bootstrap_script()
-        assert get_result.script == script_content
+        assert get_result.root == script_content
         # Reset to empty for cleanup
         await admin_registry.config.update_bootstrap_script(UpdateBootstrapScriptRequest(script=""))
+
+    async def test_get_bootstrap_script_returns_plain_string_json(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Verify the API returns a plain JSON string, not wrapped in an object.
+
+        This is a regression test for BA-5420 to ensure the response format
+        matches the legacy behavior (plain string, not {"script": "..."}).
+        """
+        unique = secrets.token_hex(4)
+        script_content = f"echo test-{unique}"
+        await admin_registry.config.update_bootstrap_script(
+            UpdateBootstrapScriptRequest(script=script_content)
+        )
+        try:
+            result = await admin_registry.config.get_bootstrap_script()
+            # The response should be a plain string
+            assert result.root == script_content
+            # Verify model_dump returns the plain string (not wrapped)
+            dumped = result.model_dump()
+            assert dumped == script_content
+            assert isinstance(dumped, str)
+        finally:
+            # Cleanup
+            await admin_registry.config.update_bootstrap_script(
+                UpdateBootstrapScriptRequest(script="")
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -276,9 +342,51 @@ class TestGroupDotfileGet:
             GetGroupDotfileRequest(group=str(group_fixture))
         )
         assert isinstance(result, ListDotfilesResponse)
-        paths = [item.path for item in result.items]
+        # List response is a plain array (via BaseRootResponseModel)
+        paths = [item.path for item in result.root]
         assert f".glist-a-{unique1}" in paths
         assert f".glist-b-{unique2}" in paths
+
+    async def test_list_group_dotfiles_returns_plain_array_json(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
+        group_dotfile_factory: GroupDotfileFactory,
+    ) -> None:
+        """Verify the API returns a plain JSON array with 'permission' field.
+
+        This is a regression test for BA-5420 to ensure the response format
+        matches the legacy behavior (plain array with 'permission' field,
+        not {"items": [...]} with 'perm' field).
+        """
+        unique = secrets.token_hex(4)
+        path = f".glist-test-{unique}"
+        await group_dotfile_factory(path=path, data="test-data", permission="755")
+        try:
+            result = await admin_registry.config.list_group_dotfiles(
+                GetGroupDotfileRequest(group=str(group_fixture))
+            )
+            # The response should be a plain array
+            assert isinstance(result.root, list)
+            # Verify model_dump returns the plain array (not wrapped)
+            dumped = result.model_dump()
+            assert isinstance(dumped, list)
+            # Find the test item and verify it has 'permission' field
+            test_items = [
+                item for item in dumped if isinstance(item, dict) and item.get("path") == path
+            ]
+            assert len(test_items) == 1
+            test_item = test_items[0]
+            # Verify field name is 'permission' (not 'perm')
+            assert "permission" in test_item
+            assert test_item["permission"] == "755"
+            # Verify no 'perm' field (should be renamed to 'permission')
+            assert "perm" not in test_item
+        finally:
+            # Cleanup
+            await admin_registry.config.delete_group_dotfile(
+                DeleteGroupDotfileRequest(group=str(group_fixture), path=path)
+            )
 
 
 class TestGroupDotfileUpdate:
@@ -396,9 +504,51 @@ class TestDomainDotfileGet:
             GetDomainDotfileRequest(domain=domain_fixture)
         )
         assert isinstance(result, ListDotfilesResponse)
-        paths = [item.path for item in result.items]
+        # List response is a plain array (via BaseRootResponseModel)
+        paths = [item.path for item in result.root]
         assert f".dlist-a-{unique1}" in paths
         assert f".dlist-b-{unique2}" in paths
+
+    async def test_list_domain_dotfiles_returns_plain_array_json(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: str,
+        domain_dotfile_factory: DomainDotfileFactory,
+    ) -> None:
+        """Verify the API returns a plain JSON array with 'permission' field.
+
+        This is a regression test for BA-5420 to ensure the response format
+        matches the legacy behavior (plain array with 'permission' field,
+        not {"items": [...]} with 'perm' field).
+        """
+        unique = secrets.token_hex(4)
+        path = f".dlist-test-{unique}"
+        await domain_dotfile_factory(path=path, data="test-data", permission="755")
+        try:
+            result = await admin_registry.config.list_domain_dotfiles(
+                GetDomainDotfileRequest(domain=domain_fixture)
+            )
+            # The response should be a plain array
+            assert isinstance(result.root, list)
+            # Verify model_dump returns the plain array (not wrapped)
+            dumped = result.model_dump()
+            assert isinstance(dumped, list)
+            # Find the test item and verify it has 'permission' field
+            test_items = [
+                item for item in dumped if isinstance(item, dict) and item.get("path") == path
+            ]
+            assert len(test_items) == 1
+            test_item = test_items[0]
+            # Verify field name is 'permission' (not 'perm')
+            assert "permission" in test_item
+            assert test_item["permission"] == "755"
+            # Verify no 'perm' field (should be renamed to 'permission')
+            assert "perm" not in test_item
+        finally:
+            # Cleanup
+            await admin_registry.config.delete_domain_dotfile(
+                DeleteDomainDotfileRequest(domain=domain_fixture, path=path)
+            )
 
 
 class TestDomainDotfileUpdate:

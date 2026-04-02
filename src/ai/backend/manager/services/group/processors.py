@@ -6,6 +6,10 @@ from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.services.group.actions.assign_users_to_project import (
+    AssignUsersToProjectAction,
+    AssignUsersToProjectActionResult,
+)
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
@@ -30,6 +34,10 @@ from ai.backend.manager.services.group.actions.search_projects import (
     SearchProjectsActionResult,
     SearchProjectsByDomainAction,
     SearchProjectsByUserAction,
+)
+from ai.backend.manager.services.group.actions.unassign_users import (
+    UnassignUsersFromProjectAction,
+    UnassignUsersFromProjectActionResult,
 )
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
@@ -57,6 +65,12 @@ class GroupProcessors(AbstractProcessorPackage):
         SearchProjectsByUserAction, ScopedSearchProjectsActionResult
     ]
     get_project: SingleEntityActionProcessor[GetProjectAction, GetProjectActionResult]
+    assign_users_to_project: SingleEntityActionProcessor[
+        AssignUsersToProjectAction, AssignUsersToProjectActionResult
+    ]
+    unassign_users_from_project: SingleEntityActionProcessor[
+        UnassignUsersFromProjectAction, UnassignUsersFromProjectActionResult
+    ]
 
     def __init__(
         self,
@@ -90,6 +104,16 @@ class GroupProcessors(AbstractProcessorPackage):
         self.get_project = SingleEntityActionProcessor(
             group_service.get_project, action_monitors, validators=rbac_single_entity_validators
         )
+        self.assign_users_to_project = SingleEntityActionProcessor(
+            group_service.assign_users_to_project,
+            action_monitors,
+            validators=rbac_single_entity_validators,
+        )
+        self.unassign_users_from_project = SingleEntityActionProcessor(
+            group_service.unassign_users_from_project,
+            action_monitors,
+            validators=rbac_single_entity_validators,
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -104,4 +128,6 @@ class GroupProcessors(AbstractProcessorPackage):
             SearchProjectsByDomainAction.spec(),
             SearchProjectsByUserAction.spec(),
             GetProjectAction.spec(),
+            AssignUsersToProjectAction.spec(),
+            UnassignUsersFromProjectAction.spec(),
         ]

@@ -17,9 +17,13 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, SlotQuantity
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.data.resource_preset.types import (
+    ResourcePresetData,
+    ResourcePresetSearchResult,
+)
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 
@@ -182,6 +186,14 @@ class ResourcePresetRepository:
             await self._cache_source.set_preset_list(presets, scaling_group_name)
 
         return presets
+
+    @resource_preset_repository_resilience.apply()
+    async def search_presets(
+        self,
+        querier: BatchQuerier,
+    ) -> ResourcePresetSearchResult:
+        """Search resource presets with filtering, ordering, and pagination."""
+        return await self._db_source.search_presets(querier)
 
     @resource_preset_repository_resilience.apply()
     async def check_presets(

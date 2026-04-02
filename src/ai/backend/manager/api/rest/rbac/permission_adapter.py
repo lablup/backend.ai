@@ -43,9 +43,9 @@ class PermissionAdapter:
         creator = Creator(
             spec=PermissionCreatorSpec(
                 role_id=request.role_id,
-                scope_type=request.scope_type,
+                scope_type=request.scope_type.to_element(),
                 scope_id=request.scope_id,
-                entity_type=request.entity_type,
+                entity_type=request.entity_type.to_element(),
                 operation=request.operation,
             )
         )

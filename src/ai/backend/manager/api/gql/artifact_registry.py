@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.manager.v2.artifact_registry.response import (
     ArtifactRegistryGQLNode,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_added_field,
+    gql_field,
+    gql_pydantic_type,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.types import (
     ArtifactType,
@@ -24,30 +29,28 @@ from ai.backend.manager.errors.common import ServerMisconfiguredError
     model=ArtifactRegistryGQLNode,
 )
 class ArtifactRegistry:
-    id: ID = strawberry.field(
-        description=(
-            "Added in 25.17.0. "
-            "Internal identifier for the artifact registry metadata record in the 'artifact_registries' table. "
-            "This ID is unique across all registry types and represents the metadata record itself. "
-            "Example: When you need to reference a registry entry in the metadata table, use this ID."
+    id: ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.17.0",
+            description="Internal identifier for the artifact registry metadata record in the 'artifact_registries' table. This ID is unique across all registry types and represents the metadata record itself. Example: When you need to reference a registry entry in the metadata table, use this ID.",
         )
     )
-    registry_id: ID = strawberry.field(
-        description=(
-            "Added in 25.17.0. "
-            "Identifier of the actual registry implementation (e.g., HuggingFace registry, Reservoir registry). "
-            "This ID corresponds to the primary key in the registry-type-specific table. "
-            "Example: For a HuggingFace registry, this value matches the 'id' field in the 'huggingface_registries' table. "
-            "Use this ID when you need to access type-specific registry details."
+    registry_id: ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.17.0",
+            description="Identifier of the actual registry implementation (e.g., HuggingFace registry, Reservoir registry). This ID corresponds to the primary key in the registry-type-specific table. Example: For a HuggingFace registry, this value matches the 'id' field in the 'huggingface_registries' table. Use this ID when you need to access type-specific registry details.",
         )
     )
-    name: str = strawberry.field(description="Name of the default artifact registry.")
-    type: ArtifactRegistryType = strawberry.field(
-        description="Type of the default artifact registry."
+    name: str = gql_field(description="Name of the default artifact registry.")
+    type: ArtifactRegistryType = gql_field(description="Type of the default artifact registry.")
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Get the default artifact registry for a given artifact type",
     )
-
-
-@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
+)  # type: ignore[misc]
 async def default_artifact_registry(
     artifact_type: ArtifactType, info: Info[StrawberryGQLContext]
 ) -> ArtifactRegistry | None:

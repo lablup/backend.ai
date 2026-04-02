@@ -8,6 +8,10 @@ from strawberry import Info
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.kernel.types import (
     KernelV2ConnectionGQL,
     KernelV2EdgeGQL,
@@ -20,7 +24,9 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 
-@strawberry.field(description="Added in 26.2.0. Query a single kernel by ID.")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="26.2.0", description="Query a single kernel by ID.")
+)  # type: ignore[misc]
 async def kernel_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
@@ -31,8 +37,11 @@ async def kernel_v2(
     return kernel_info
 
 
-@strawberry.field(
-    description="Added in 26.2.0. Query kernels with pagination and filtering. (admin only)"
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Query kernels with pagination and filtering. (admin only)",
+    )
 )  # type: ignore[misc]
 async def admin_kernels_v2(
     info: Info[StrawberryGQLContext],
@@ -72,9 +81,8 @@ async def admin_kernels_v2(
     )
 
 
-@strawberry.field(
-    name="sessionKernelsV2",
-    description="Added in 26.2.0. Query kernels within a specific session.",
+@gql_root_field(
+    BackendAIGQLMeta(added_version="26.2.0", description="Query kernels within a specific session.")
 )  # type: ignore[misc]
 async def session_kernels_v2(
     info: Info[StrawberryGQLContext],

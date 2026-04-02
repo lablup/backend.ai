@@ -1,0 +1,10 @@
+[Unit]
+Description=Backend.AI AppProxy Sync Inference Circuits
+
+[Service]
+Type=oneshot
+ExecStart={{ home_dir }}/scripts/sync_inference_circuits.sh
+User={{ bai_user }}
+WorkingDirectory={{ home_dir }}
+StandardOutput=journal
+StandardError=journal

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import strawberry
 from strawberry import ID
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
@@ -21,6 +20,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_field,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
@@ -74,10 +74,8 @@ class MetricResultValueGQL(PydanticOutputMixin[MetricValueInfo]):
     name="QueryDefinitionMetricResult",
 )
 class MetricResultGQL(PydanticOutputMixin[QueryDefinitionMetricResultInfo]):
-    metric: list[MetricLabelEntryGQL] = strawberry.field(
-        description="Metric labels as key-value entries."
-    )
-    values: list[MetricResultValueGQL] = strawberry.field(description="Time-series values.")
+    metric: list[MetricLabelEntryGQL] = gql_field(description="Metric labels as key-value entries.")
+    values: list[MetricResultValueGQL] = gql_field(description="Time-series values.")
 
 
 @gql_pydantic_type(
@@ -89,9 +87,9 @@ class MetricResultGQL(PydanticOutputMixin[QueryDefinitionMetricResultInfo]):
     name="QueryDefinitionExecuteResult",
 )
 class QueryDefinitionResultGQL(PydanticOutputMixin[QueryDefinitionResultInfoDTO]):
-    status: str = strawberry.field(description="Prometheus response status.")
-    result_type: str = strawberry.field(description="Result type (e.g., matrix).")
-    result: list[MetricResultGQL] = strawberry.field(description="Metric result entries.")
+    status: str = gql_field(description="Prometheus response status.")
+    result_type: str = gql_field(description="Result type (e.g., matrix).")
+    result: list[MetricResultGQL] = gql_field(description="Metric result entries.")
 
 
 @gql_pydantic_type(
@@ -104,4 +102,4 @@ class QueryDefinitionResultGQL(PydanticOutputMixin[QueryDefinitionResultInfoDTO]
     name="DeleteQueryDefinitionPayload",
 )
 class DeleteQueryDefinitionPayload(PydanticOutputMixin[DeleteQueryDefinitionPayloadDTO]):
-    id: ID = strawberry.field(description="Deleted query definition ID.")
+    id: ID = gql_field(description="Deleted query definition ID.")

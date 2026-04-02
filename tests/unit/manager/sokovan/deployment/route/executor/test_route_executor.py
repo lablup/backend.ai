@@ -17,6 +17,7 @@ import dataclasses
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+from ai.backend.common.clients.valkey_client.valkey_schedule import RouteHealthRecord
 from ai.backend.common.types import SessionId
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -151,36 +152,6 @@ class TestProvisionRoutes:
             revision_id=explicit_revision_id,
         )
 
-    async def test_provision_route_falls_back_to_deploying_revision(
-        self,
-        route_executor: RouteExecutor,
-        mock_deployment_repo: AsyncMock,
-        mock_scheduling_controller: AsyncMock,
-        provisioning_route: RouteData,
-    ) -> None:
-        """RP-004b: When route has no revision_id, falls back to deploying_revision_id."""
-        # Arrange
-        fallback_revision_id = uuid4()
-        route = dataclasses.replace(provisioning_route, revision_id=None)
-        deployment = MagicMock()
-        deployment.id = route.endpoint_id
-        deployment.deploying_revision_id = fallback_revision_id
-        deployment.current_revision_id = None
-        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
-
-        entity_ids = [route.route_id]
-        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await route_executor.provision_routes([route])
-
-        # Assert
-        assert len(result.successes) == 1
-        assert len(result.errors) == 0
-        mock_deployment_repo.fetch_deployment_context.assert_awaited_once_with(
-            deployment,
-            revision_id=fallback_revision_id,
-        )
-
 
 # =============================================================================
 # TestCheckRouteHealth (RH-001 ~ RH-004)
@@ -190,7 +161,8 @@ class TestProvisionRoutes:
 class TestCheckRouteHealth:
     """Tests for check_route_health functionality.
 
-    Verifies the executor correctly checks route health via Valkey.
+    Verifies the executor correctly checks route health via Valkey
+    using RouteHealthRecord-based classification.
     """
 
     async def test_healthy_route_in_successes(
@@ -198,19 +170,30 @@ class TestCheckRouteHealth:
         route_executor: RouteExecutor,
         mock_valkey_schedule: AsyncMock,
         healthy_route: RouteData,
-        health_status_healthy: MagicMock,
     ) -> None:
         """RH-001: Healthy route is in successes.
 
-        Given: Route with HEALTHY status in Valkey
+        Given: Route with healthy RouteHealthRecord in Valkey
         When: Check route health
         Then: Route in successes list
         """
         # Arrange
         route_id_str = str(healthy_route.route_id)
-        mock_valkey_schedule.check_route_health_status.return_value = {
-            route_id_str: health_status_healthy
+        current_time = 1000
+        record = RouteHealthRecord(
+            route_id=route_id_str,
+            created_at=900,
+            initial_delay_until=930,
+            health_path="/health",
+            inference_port=8000,
+            replica_host="10.0.0.1",
+            agent_healthy=True,
+            agent_last_check=current_time - 5,
+        )
+        mock_valkey_schedule.get_route_health_records_batch.return_value = {
+            route_id_str: record,
         }
+        mock_valkey_schedule.get_redis_time.return_value = current_time
 
         entity_ids = [healthy_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
@@ -227,19 +210,30 @@ class TestCheckRouteHealth:
         route_executor: RouteExecutor,
         mock_valkey_schedule: AsyncMock,
         healthy_route: RouteData,
-        health_status_unhealthy: MagicMock,
     ) -> None:
         """RH-002: Unhealthy route is in errors.
 
-        Given: Route with UNHEALTHY status in Valkey
+        Given: Route with unhealthy RouteHealthRecord in Valkey
         When: Check route health
         Then: Route in errors list
         """
         # Arrange
         route_id_str = str(healthy_route.route_id)
-        mock_valkey_schedule.check_route_health_status.return_value = {
-            route_id_str: health_status_unhealthy
+        current_time = 1000
+        record = RouteHealthRecord(
+            route_id=route_id_str,
+            created_at=900,
+            initial_delay_until=930,
+            health_path="/health",
+            inference_port=8000,
+            replica_host="10.0.0.1",
+            agent_healthy=False,
+            agent_last_check=current_time - 5,
+        )
+        mock_valkey_schedule.get_route_health_records_batch.return_value = {
+            route_id_str: record,
         }
+        mock_valkey_schedule.get_redis_time.return_value = current_time
 
         entity_ids = [healthy_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
@@ -256,19 +250,30 @@ class TestCheckRouteHealth:
         route_executor: RouteExecutor,
         mock_valkey_schedule: AsyncMock,
         healthy_route: RouteData,
-        health_status_stale: MagicMock,
     ) -> None:
         """RH-003: Stale route is in stale list.
 
-        Given: Route with STALE status in Valkey
+        Given: Route with stale RouteHealthRecord in Valkey (old last_check)
         When: Check route health
         Then: Route in stale list
         """
         # Arrange
         route_id_str = str(healthy_route.route_id)
-        mock_valkey_schedule.check_route_health_status.return_value = {
-            route_id_str: health_status_stale
+        current_time = 1000
+        record = RouteHealthRecord(
+            route_id=route_id_str,
+            created_at=100,
+            initial_delay_until=130,
+            health_path="/health",
+            inference_port=8000,
+            replica_host="10.0.0.1",
+            agent_healthy=True,
+            agent_last_check=100,  # Very old check, stale
+        )
+        mock_valkey_schedule.get_route_health_records_batch.return_value = {
+            route_id_str: record,
         }
+        mock_valkey_schedule.get_redis_time.return_value = current_time
 
         entity_ids = [healthy_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
@@ -288,12 +293,13 @@ class TestCheckRouteHealth:
     ) -> None:
         """RH-004: Missing health data is treated as stale.
 
-        Given: Route with no health data in Valkey
+        Given: Route with no RouteHealthRecord in Valkey
         When: Check route health
         Then: Route in stale list
         """
-        # Arrange - Empty health status response
-        mock_valkey_schedule.check_route_health_status.return_value = {}
+        # Arrange - Empty records response
+        mock_valkey_schedule.get_route_health_records_batch.return_value = {}
+        mock_valkey_schedule.get_redis_time.return_value = 1000
 
         entity_ids = [healthy_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):

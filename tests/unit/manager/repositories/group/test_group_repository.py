@@ -47,7 +47,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -247,6 +247,7 @@ class TestGroupRepository:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -629,14 +630,11 @@ class TestGroupRepository:
                 session_owner=test_user,
                 replicas=1,
                 desired_replicas=1,
-                image=uuid.uuid4(),  # Active endpoints need image
                 domain=test_domain,
                 project=group_id,
                 resource_group=test_scaling_group,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                resource_slots=ResourceSlot(),
-                cluster_mode="single-node",
-                cluster_size=1,
+                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
             await session.commit()

@@ -9,6 +9,10 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchResourceSlotTypesInput,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .types import (
@@ -20,8 +24,11 @@ from .types import (
 )
 
 
-@strawberry.field(
-    description="Added in 26.3.0. Returns a single resource slot type by slot_name, or null."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Returns a single resource slot type by slot_name, or null.",
+    )
 )  # type: ignore[misc]
 async def resource_slot_type(
     info: Info[StrawberryGQLContext],
@@ -31,8 +38,11 @@ async def resource_slot_type(
     return ResourceSlotTypeGQL.from_pydantic(node)
 
 
-@strawberry.field(
-    description="Added in 26.3.0. Returns resource slot types with pagination and filtering."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Returns resource slot types with pagination and filtering.",
+    )
 )  # type: ignore[misc]
 async def resource_slot_types(
     info: Info[StrawberryGQLContext],

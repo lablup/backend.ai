@@ -2,7 +2,7 @@
 Common types for the CSV export DTO v2.
 
 Defines shared enums and sub-models used across the export API v2,
-including order directions, report keys, field metadata, and boolean filters.
+including order directions, report keys, and field metadata.
 """
 
 from __future__ import annotations
@@ -11,11 +11,10 @@ from enum import StrEnum
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
-    "BooleanFilter",
     "ExportFieldInfoNode",
     "ExportReportInfoNode",
     "ExportReportKey",
@@ -79,17 +78,5 @@ class ExportReportInfoNode(BaseResponseModel):
         description=(
             "List of all fields available in this report. "
             "Each field can be selectively included or excluded when making export requests."
-        )
-    )
-
-
-class BooleanFilter(BaseRequestModel):
-    """Filter for boolean fields. Matches records where the field equals the specified value."""
-
-    equals: bool = Field(
-        description=(
-            "The boolean value to match. "
-            "Set to true to include only records where the field is true, "
-            "or false to include only records where the field is false."
         )
     )

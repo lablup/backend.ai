@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy import exc as sa_exc
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
@@ -15,7 +16,12 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderID
+from ai.backend.common.types import (
+    QuotaScopeID,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderID,
+)
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
@@ -24,9 +30,11 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     RBACElementRef,
     RBACElementType,
+    RelationType,
     RoleSource,
     ScopeType,
 )
+from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     ValidatedVFolderInfo,
     VFolderAccessInfo,
@@ -36,6 +44,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderListResult,
     VFolderMountPermission,
     VFolderPermissionData,
+    VFolderSearchResult,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
@@ -54,6 +63,10 @@ from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
@@ -81,6 +94,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
     delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
+    ensure_quota_scope_accessible_by_user,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
     get_sessions_by_mounted_folder,
@@ -91,6 +105,7 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
@@ -109,6 +124,10 @@ from ai.backend.manager.repositories.base.rbac.revoker import (
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
+from ai.backend.manager.repositories.vfolder.types import (
+    ProjectVFolderSearchScope,
+    UserVFolderSearchScope,
+)
 
 vfolder_repository_resilience = Resilience(
     policies=[
@@ -702,6 +721,24 @@ class VfolderRepository:
             if not user_row:
                 return None
             return user_row.email
+
+    @vfolder_repository_resilience.apply()
+    async def validate_quota_scope_access(
+        self,
+        quota_scope_id: QuotaScopeID,
+        user_identity: UserIdentity,
+    ) -> None:
+        """
+        Validate that the user has access to the given quota scope.
+        Raises InvalidAPIParameters if the user does not have access.
+        """
+        user_info: Mapping[str, Any] = {
+            "uuid": user_identity.user_uuid,
+            "role": user_identity.user_role,
+            "domain_name": user_identity.domain_name,
+        }
+        async with self._db.begin_readonly_session_read_committed() as session:
+            await ensure_quota_scope_accessible_by_user(session, quota_scope_id, user_info)
 
     @vfolder_repository_resilience.apply()
     async def get_users_by_ids(self, user_ids: list[uuid.UUID]) -> list[tuple[uuid.UUID, str]]:
@@ -1300,7 +1337,7 @@ class VfolderRepository:
         #       the actual object (with RETURNING clause).  In that case, we need to temporarily
         #       mark the object to be "unusable-yet" until the storage proxy creates the destination
         #       vfolder.  After done, we need to make another transaction to clear the unusable state.
-        target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
+        target_folder_id = VFolderID(vfolder_info.target_quota_scope_id, uuid.uuid4())
 
         # Clone the vfolder contents
         manager_client = storage_manager.get_manager_facing_client(source_proxy)
@@ -1322,14 +1359,13 @@ class VfolderRepository:
                     "permission": vfolder_info.permission,
                     "last_used": None,
                     "host": vfolder_info.target_host,
-                    # TODO: add quota_scope_id
                     "creator": vfolder_info.email,
                     "ownership_type": VFolderOwnershipType("user"),
                     "user": vfolder_info.user_id,
                     "group": None,
                     "unmanaged_path": None,
                     "cloneable": vfolder_info.cloneable,
-                    "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
+                    "quota_scope_id": vfolder_info.target_quota_scope_id,
                 }
                 query = sa.insert(vfolders).values(**insert_values)
                 await db_session.execute(query)
@@ -1732,18 +1768,20 @@ class VfolderRepository:
                 user_uuid=user_info.uuid,
             )
 
-        # Step 2: Check vfolder host is accessible by new owner
+        # Step 2: Check vfolder host is accessible by new owner and get old owner
         async with self._db.begin_readonly_session() as session:
             conn = await session.connection()
             db_query = (
-                sa.select(vfolders.c.host)
+                sa.select(vfolders.c.host, vfolders.c.user)
                 .select_from(vfolders)
                 .where(
                     (vfolders.c.id == vfolder_id)
                     & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
                 )
             )
-            folder_host = await conn.scalar(db_query)
+            row = (await conn.execute(db_query)).first()
+            folder_host = row.host if row else None
+            old_owner_uuid = row.user if row else None
         if folder_host not in allowed_hosts_by_user:
             raise VFolderOperationFailed(
                 "User to migrate vfolder needs an access to the storage host."
@@ -1774,13 +1812,93 @@ class VfolderRepository:
                     & (vfolder_invitations.c.vfolder == vfolder_id)
                 )
                 await conn.execute(del_query)
-                del_query = sa.delete(vfolder_permissions).where(
-                    (vfolder_permissions.c.vfolder == vfolder_id)
-                    & (vfolder_permissions.c.user == user_info.uuid)
+
+                # Also clean up new owner's RBAC records from when they were an invitee
+                new_owner_role_id = await self._get_user_role_id(session, user_info.uuid)
+                revoker = RBACRevoker(
+                    entity_id=ObjectId(
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=str(vfolder_id),
+                    ),
+                    entity_scope_type=RBACElementType.VFOLDER,
+                    target_role_ids=[new_owner_role_id],
+                    operations=None,
                 )
-                await conn.execute(del_query)
+                await execute_rbac_revoker(session, revoker)
 
         await execute_with_retry(_delete_related_rows)
+
+        # Step 5: Clean up old owner's RBAC records for this vfolder
+        if old_owner_uuid is not None and old_owner_uuid != user_info.uuid:
+
+            async def _cleanup_old_owner_rbac() -> None:
+                async with self._db.begin_session() as session:
+                    user_role_id = await self._get_user_role_id(session, old_owner_uuid)
+                    revoker = RBACRevoker(
+                        entity_id=ObjectId(
+                            entity_type=EntityType.VFOLDER,
+                            entity_id=str(vfolder_id),
+                        ),
+                        entity_scope_type=RBACElementType.VFOLDER,
+                        target_role_ids=[user_role_id],
+                        operations=None,
+                    )
+                    await execute_rbac_revoker(session, revoker)
+                    # Remove scope-entity mapping (visibility)
+                    await session.execute(
+                        sa.delete(AssociationScopesEntitiesRow).where(
+                            sa.and_(
+                                AssociationScopesEntitiesRow.scope_type == ScopeType.USER,
+                                AssociationScopesEntitiesRow.scope_id == str(old_owner_uuid),
+                                AssociationScopesEntitiesRow.entity_type == EntityType.VFOLDER,
+                                AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
+                            )
+                        )
+                    )
+
+            await execute_with_retry(_cleanup_old_owner_rbac)
+
+        # Step 6: Create owner RBAC records for new owner
+        async def _grant_new_owner_rbac() -> None:
+            async with self._db.begin_session() as session:
+                user_role_id = await self._get_user_role_id(session, user_info.uuid)
+
+                # Upsert scope-entity mapping (AUTO relation for owner)
+                # If new owner was previously invitee, upgrade REF -> AUTO
+                upsert_stmt = (
+                    pg_insert(AssociationScopesEntitiesRow)
+                    .values(
+                        scope_type=ScopeType.USER,
+                        scope_id=str(user_info.uuid),
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=str(vfolder_id),
+                        relation_type=RelationType.AUTO,
+                    )
+                    .on_conflict_do_update(
+                        constraint="uq_scope_id_entity_id",
+                        set_={"relation_type": RelationType.AUTO},
+                    )
+                )
+                await session.execute(upsert_stmt)
+
+                # Grant owner permission (ON CONFLICT DO NOTHING in case
+                # new owner already had permission as invitee)
+                perm_stmt = (
+                    pg_insert(PermissionRow)
+                    .values(
+                        role_id=user_role_id,
+                        scope_type=ScopeType.VFOLDER,
+                        scope_id=str(vfolder_id),
+                        entity_type=EntityType.VFOLDER,
+                        operation=OperationType.READ,
+                    )
+                    .on_conflict_do_nothing(
+                        constraint="uq_permissions_role_scope_entity_op",
+                    )
+                )
+                await session.execute(perm_stmt)
+
+        await execute_with_retry(_grant_new_owner_rbac)
 
     @vfolder_repository_resilience.apply()
     async def get_alive_agent_ids(
@@ -1808,3 +1926,71 @@ class VfolderRepository:
                 if row.mounts:
                     mounted.update(m[1] for m in row.mounts)
             return mounted
+
+    @vfolder_repository_resilience.apply()
+    async def search_in_project(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectVFolderSearchScope,
+    ) -> VFolderSearchResult:
+        """Search vfolders scoped to a project.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+            scope: ProjectVFolderSearchScope that filters by project and validates existence
+
+        Returns:
+            VFolderSearchResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(VFolderRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+                scope=scope,
+            )
+
+            items = [row.VFolderRow.to_data() for row in result.rows]
+
+            return VFolderSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @vfolder_repository_resilience.apply()
+    async def search_user_vfolders(
+        self,
+        querier: BatchQuerier,
+        scope: UserVFolderSearchScope,
+    ) -> VFolderSearchResult:
+        """Search vfolders scoped to a user.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+            scope: UserVFolderSearchScope that filters by user and validates existence
+
+        Returns:
+            VFolderSearchResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(VFolderRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+                scope=scope,
+            )
+
+            items = [row.VFolderRow.to_data() for row in result.rows]
+
+            return VFolderSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

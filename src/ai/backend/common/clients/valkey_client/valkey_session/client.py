@@ -38,6 +38,10 @@ valkey_session_resilience = Resilience(
 )
 
 
+SESSION_KEY_PREFIX = "AIOHTTP_SESSION_"
+LOGIN_HISTORY_KEY_PREFIX = "login_history_"
+
+
 class ValkeySessionClient:
     """
     Client for session management operations using Valkey/Glide.
@@ -117,6 +121,51 @@ class ValkeySessionClient:
         )
 
     @valkey_session_resilience.apply()
+    async def delete_session_data(self, session_key: str) -> None:
+        """
+        Delete session data by session key.
+
+        :param session_key: The session key to delete.
+        """
+        await self._client.client.delete([session_key])
+
+    @valkey_session_resilience.apply()
+    async def get_login_session(self, session_token: str) -> bytes | None:
+        """
+        Get login session data by session token.
+
+        :param session_token: The session token (prefix is added internally).
+        :return: The session data as bytes, or None if not found.
+        """
+        return await self._client.client.get(f"{SESSION_KEY_PREFIX}{session_token}")
+
+    @valkey_session_resilience.apply()
+    async def set_login_session(
+        self, session_token: str, session_data: str | bytes, ttl_seconds: int
+    ) -> None:
+        """
+        Set login session data with expiration.
+
+        :param session_token: The session token (prefix is added internally).
+        :param session_data: The session data to store.
+        :param ttl_seconds: Time to live in seconds.
+        """
+        await self._client.client.set(
+            f"{SESSION_KEY_PREFIX}{session_token}",
+            session_data,
+            expiry=ExpirySet(ExpiryType.SEC, ttl_seconds),
+        )
+
+    @valkey_session_resilience.apply()
+    async def delete_login_session(self, session_token: str) -> None:
+        """
+        Delete login session data by session token.
+
+        :param session_token: The session token (prefix is added internally).
+        """
+        await self._client.client.delete([f"{SESSION_KEY_PREFIX}{session_token}"])
+
+    @valkey_session_resilience.apply()
     async def get_login_history(self, username: str) -> bytes | None:
         """
         Get login failure history for a user.
@@ -124,7 +173,7 @@ class ValkeySessionClient:
         :param username: The username to check.
         :return: The login history data as bytes, or None if not found.
         """
-        key = f"login_history_{username}"
+        key = f"{LOGIN_HISTORY_KEY_PREFIX}{username}"
         return await self._client.client.get(key)
 
     @valkey_session_resilience.apply()
@@ -138,7 +187,7 @@ class ValkeySessionClient:
         :param block_data: The block data to store.
         :param block_duration_seconds: How long to block in seconds.
         """
-        key = f"login_history_{username}"
+        key = f"{LOGIN_HISTORY_KEY_PREFIX}{username}"
         await self._client.client.set(
             key,
             block_data,

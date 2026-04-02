@@ -9,7 +9,7 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 
 from .types import OrderDirection, RoleSource, RoleSourceFilter, RoleStatus, RoleStatusFilter
 
@@ -28,6 +28,7 @@ __all__ = (
     "EntityFilter",
     "EntityOrderBy",
     "PermissionFilter",
+    "PermissionNestedFilter",
     "PermissionOrderBy",
     "PurgeRoleInput",
     "RevokeRoleInput",
@@ -171,11 +172,27 @@ class RoleNestedFilter(BaseRequestModel):
 RoleNestedFilter.model_rebuild()
 
 
+class PermissionNestedFilter(BaseRequestModel):
+    """Nested filter for permissions within a role assignment."""
+
+    scope_id: str | None = None
+    scope_type: str | None = None
+    entity_type: str | None = None
+    operation: str | None = None
+    AND: list[PermissionNestedFilter] | None = None
+    OR: list[PermissionNestedFilter] | None = None
+    NOT: list[PermissionNestedFilter] | None = None
+
+
+PermissionNestedFilter.model_rebuild()
+
+
 class RoleAssignmentFilter(BaseRequestModel):
     """Filter for role assignments."""
 
     role_id: UUID | None = None
     role: RoleNestedFilter | None = None
+    permission: PermissionNestedFilter | None = None
     username: StringFilter | None = None
     email: StringFilter | None = None
     AND: list[RoleAssignmentFilter] | None = None
@@ -205,6 +222,7 @@ class PermissionFilter(BaseRequestModel):
     role_id: UUID | None = None
     scope_type: str | None = None
     entity_type: str | None = None
+    created_at: DateTimeFilter | None = None
     AND: list[PermissionFilter] | None = None
     OR: list[PermissionFilter] | None = None
     NOT: list[PermissionFilter] | None = None

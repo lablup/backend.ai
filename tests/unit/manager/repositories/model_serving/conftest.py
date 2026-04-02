@@ -249,11 +249,12 @@ def sample_route(sample_endpoint: EndpointRow) -> RoutingRow:
         id=uuid.uuid4(),
         endpoint=sample_endpoint.id,
         session=uuid.uuid4(),
-        status=RouteStatus.HEALTHY,
+        status=RouteStatus.RUNNING,
         traffic_ratio=1.0,
         session_owner=sample_endpoint.session_owner,
         domain=sample_endpoint.domain,
         project=sample_endpoint.project,
+        revision=uuid.uuid4(),
     )
 
 
@@ -453,6 +454,7 @@ def create_full_featured_endpoint(
         cluster_size=3,
         extra_mounts=[],
         created_user=sample_user.uuid,
+        current_revision=uuid.uuid4(),
     )
 
     # Set attributes normally set by database

@@ -435,6 +435,13 @@ async def login_handler(request: web.Request) -> web.Response:
                         "role": token.role,
                         "status": token.status,
                     }
+                    # Use Manager's session_token as session identity
+                    # so Valkey key matches DB session_token.
+                    # Bypass set_new_identity() since session may not be new
+                    # (e.g., browser has a cookie from a previous failed attempt).
+                    if token.session_token:
+                        session._identity = token.session_token
+                        session._new = True
                     session["authenticated"] = True
                     session["token"] = stored_token  # store full token
                     result["authenticated"] = True
@@ -487,8 +494,10 @@ async def login_handler(request: web.Request) -> web.Response:
             "details": e.data.get("msg"),
         }
         session["authenticated"] = False
-        login_fail_count += 1
-        await _set_login_history(last_login_attempt, login_fail_count)
+        if e.status == 401:
+            login_fail_count += 1
+            await _set_login_history(last_login_attempt, login_fail_count)
+        return web.json_response(result, status=e.status)
     return web.json_response(result)
 
 
@@ -496,7 +505,25 @@ async def logout_handler(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     stats.active_logout_handlers.add(asyncio.current_task())
     session = await get_session(request)
+    session_token = session.identity
     session.invalidate()
+
+    # Invalidate login session in Manager DB
+    if session_token:
+        config = cast(WebServerUnifiedConfig, request.app["config"])
+        try:
+            endpoint = str(config.api.endpoint[0])
+            async with aiohttp.ClientSession() as http_session:
+                await http_session.post(
+                    f"{endpoint}/auth/logout",
+                    json={"session_token": session_token},
+                    ssl=config.api.ssl_verify,
+                )
+        except Exception:
+            log.exception(
+                "Failed to invalidate login session in Manager DB (token={})", session_token
+            )
+
     return web.HTTPOk()
 
 

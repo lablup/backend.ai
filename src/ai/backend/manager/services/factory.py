@@ -1,5 +1,9 @@
+from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.repositories.resource_allocation.repository import (
+    ResourceAllocationRepository,
+)
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
@@ -18,6 +22,12 @@ from ai.backend.manager.services.container_registry.processors import ContainerR
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
+from ai.backend.manager.services.deployment_revision_preset.processors import (
+    DeploymentRevisionPresetProcessors,
+)
+from ai.backend.manager.services.deployment_revision_preset.service import (
+    DeploymentRevisionPresetService,
+)
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.dotfile.processors import DotfileProcessors
@@ -46,6 +56,8 @@ from ai.backend.manager.services.metric.processors.utilization_metric import (
     UtilizationMetricProcessors,
 )
 from ai.backend.manager.services.metric.root_service import UtilizationMetricService
+from ai.backend.manager.services.model_card.processors import ModelCardProcessors
+from ai.backend.manager.services.model_card.service import ModelCardService
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
 )
@@ -75,12 +87,22 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )
+from ai.backend.manager.services.resource_allocation.processors import (
+    ResourceAllocationProcessors,
+)
+from ai.backend.manager.services.resource_allocation.service import ResourceAllocationService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
+from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
+from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
+from ai.backend.manager.services.runtime_variant_preset.processors import (
+    RuntimeVariantPresetProcessors,
+)
+from ai.backend.manager.services.runtime_variant_preset.service import RuntimeVariantPresetService
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
@@ -105,12 +127,20 @@ from ai.backend.manager.services.vfolder.processors import (
     VFolderProcessors,
     VFolderSharingProcessors,
 )
+from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    ModelDefinitionGeneratorRegistry,
+)
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    RegistryArgs as ModelDefinitionRegistryArgs,
+)
 
 
 def create_services(args: ServiceArgs) -> Services:
@@ -177,6 +207,9 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.user.repository,
             args.valkey_stat_client,
         ),
+        vfolder_admin=VFolderAdminService(
+            vfolder_admin_repository=repositories.vfolder.admin_repository,
+        ),
         vfolder_file=VFolderFileService(
             args.config_provider,
             args.storage_manager,
@@ -231,6 +264,18 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.resource_preset.repository,
         ),
         resource_slot=ResourceSlotService(repositories.resource_slot.repository),
+        runtime_variant=RuntimeVariantService(
+            repositories.runtime_variant.repository,
+        ),
+        runtime_variant_preset=RuntimeVariantPresetService(
+            repositories.runtime_variant_preset.repository,
+        ),
+        deployment_revision_preset=DeploymentRevisionPresetService(
+            repositories.deployment_revision_preset.repository,
+        ),
+        model_card=ModelCardService(
+            repositories.model_card.repository,
+        ),
         resource_usage=ResourceUsageService(
             repository=repositories.resource_usage_history.repository,
         ),
@@ -264,6 +309,7 @@ def create_services(args: ServiceArgs) -> Services:
             hook_plugin_ctx=args.hook_plugin_ctx,
             auth_repository=repositories.auth.repository,
             config_provider=args.config_provider,
+            valkey_session_client=args.valkey_session_client,
         ),
         notification=NotificationService(
             repository=repositories.notification.repository,
@@ -278,6 +324,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
+            rbac_action_registry=RBAC_ACTION_REGISTRY,
         ),
         vfs_storage=VFSStorageService(
             vfs_storage_repository=repositories.vfs_storage.repository,
@@ -316,6 +363,13 @@ def create_services(args: ServiceArgs) -> Services:
             args.deployment_controller,
             args.deployment_controller._deployment_repository,
             args.revision_generator_registry,
+            ModelDefinitionGeneratorRegistry(
+                ModelDefinitionRegistryArgs(
+                    deployment_repository=args.deployment_controller._deployment_repository,
+                    enable_model_definition_override=args.config_provider.config.deployment.enable_model_definition_override,
+                )
+            ),
+            deployment_revision_preset_repository=repositories.deployment_revision_preset.repository,
         ),
         storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),
         audit_log=AuditLogService(repositories.audit_log.repository),
@@ -323,6 +377,13 @@ def create_services(args: ServiceArgs) -> Services:
         service_catalog=ServiceCatalogService(args.db),
         template=TemplateService(
             repository=repositories.template.repository,
+        ),
+        resource_allocation=ResourceAllocationService(
+            resource_allocation_repository=ResourceAllocationRepository(
+                db=args.db,
+                config_provider=args.config_provider,
+            ),
+            resource_preset_repository=repositories.resource_preset.repository,
         ),
         stream=StreamService(
             repository=repositories.stream.repository,
@@ -360,6 +421,7 @@ def create_processors(
             services.container_registry, action_monitors, validators
         ),
         vfolder=VFolderProcessors(services.vfolder, action_monitors, validators),
+        vfolder_admin=VFolderAdminProcessors(services.vfolder_admin, action_monitors),
         vfolder_file=VFolderFileProcessors(services.vfolder_file, action_monitors, validators),
         vfolder_invite=VFolderInviteProcessors(
             services.vfolder_invite, action_monitors, validators
@@ -385,6 +447,16 @@ def create_processors(
             services.resource_preset, action_monitors, validators
         ),
         resource_slot=ResourceSlotProcessors(services.resource_slot, action_monitors, validators),
+        runtime_variant=RuntimeVariantProcessors(
+            services.runtime_variant, action_monitors, validators
+        ),
+        runtime_variant_preset=RuntimeVariantPresetProcessors(
+            services.runtime_variant_preset, action_monitors, validators
+        ),
+        deployment_revision_preset=DeploymentRevisionPresetProcessors(
+            services.deployment_revision_preset, action_monitors, validators
+        ),
+        model_card=ModelCardProcessors(services.model_card, action_monitors, validators),
         resource_usage=ResourceUsageProcessors(
             services.resource_usage, action_monitors, validators
         ),
@@ -424,6 +496,9 @@ def create_processors(
             services.service_catalog, action_monitors, validators
         ),
         template=TemplateProcessors(services.template, action_monitors, validators),
+        resource_allocation=ResourceAllocationProcessors(
+            services.resource_allocation, action_monitors, validators
+        ),
         stream=StreamProcessors(services.stream, action_monitors),
         events=EventsProcessors(
             services.events,

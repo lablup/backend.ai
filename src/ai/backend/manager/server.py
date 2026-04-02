@@ -49,6 +49,7 @@ from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import (
+    OpenTelemetrySpec,
     instrument_aiohttp_client,
     instrument_aiohttp_server,
 )
@@ -356,6 +357,25 @@ async def server_main(
             ),
         )
 
+        # Set up XForwardedStrict middleware if trusted proxies are configured.
+        # This must be inserted BEFORE auth middleware so that request.remote is
+        # resolved to the real client IP before authentication runs.
+        trusted_proxies = dep_resources.bootstrap.config_provider.config.manager.trusted_proxies
+        if trusted_proxies:
+            from aiohttp_remotes import XForwardedStrict
+
+            xff_middleware = XForwardedStrict(
+                [trusted_proxies],
+                white_paths=root_app.get("auth_middleware_allowlist", []),
+            )
+            await xff_middleware.setup(root_app)
+            root_app["_trusted_proxies_enabled"] = True
+            log.info(
+                "XForwardedStrict middleware enabled with trusted proxies: {}", trusted_proxies
+            )
+        else:
+            root_app["_trusted_proxies_enabled"] = False
+
         # Build and mount the API module tree.
         # Must happen before runner.setup() which freezes the application router.
         from .api.rest.setup import setup_api
@@ -371,6 +391,18 @@ async def server_main(
         # instantiated before OTel config is available, so instrument_aiohttp_server()
         # (which patches the class via setattr) cannot take effect automatically.
         if config_provider.config.otel.enabled:
+            meta = dep_resources.system.sd_loop.metadata
+            otel_spec = OpenTelemetrySpec(
+                service_name=meta.service_group,
+                service_version=meta.version,
+                log_level=config_provider.config.otel.log_level,
+                endpoint=config_provider.config.otel.endpoint,
+                service_instance_id=meta.id,
+                service_instance_name=meta.display_name,
+                max_queue_size=config_provider.config.otel.max_queue_size,
+                max_export_batch_size=config_provider.config.otel.max_export_batch_size,
+            )
+            BraceStyleAdapter.apply_otel(otel_spec)
             instrument_aiohttp_server()
             instrument_aiohttp_client()
             root_app.middlewares.insert(0, otel_server_middleware)

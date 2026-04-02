@@ -83,6 +83,10 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
     UntagImageFromRegistryAction,
     UntagImageFromRegistryActionResult,
 )
+from ai.backend.manager.services.image.actions.update_image_by_id import (
+    UpdateImageByIdAction,
+    UpdateImageByIdActionResult,
+)
 
 from .service import ImageService
 
@@ -97,6 +101,7 @@ class ImageProcessors(AbstractProcessorPackage):
     alias_image_by_id: ActionProcessor[AliasImageByIdAction, AliasImageByIdActionResult]
     dealias_image: ActionProcessor[DealiasImageAction, DealiasImageActionResult]
     modify_image: ActionProcessor[ModifyImageAction, ModifyImageActionResult]
+    update_image_by_id: ActionProcessor[UpdateImageByIdAction, UpdateImageByIdActionResult]
     preload_image: ActionProcessor[PreloadImageAction, PreloadImageActionResult]
     unload_image: ActionProcessor[UnloadImageAction, UnloadImageActionResult]
     untag_image_from_registry: ActionProcessor[
@@ -165,6 +170,7 @@ class ImageProcessors(AbstractProcessorPackage):
         self.alias_image_by_id = ActionProcessor(service.alias_image_by_id, action_monitors)
         self.dealias_image = ActionProcessor(service.dealias_image, action_monitors)
         self.modify_image = ActionProcessor(service.modify_image, action_monitors)
+        self.update_image_by_id = ActionProcessor(service.update_image_by_id, action_monitors)
         self.preload_image = ActionProcessor(service.preload_image, action_monitors)
         self.unload_image = ActionProcessor(service.unload_image, action_monitors)
         self.untag_image_from_registry = ActionProcessor(
@@ -194,6 +200,7 @@ class ImageProcessors(AbstractProcessorPackage):
             AliasImageByIdAction.spec(),
             DealiasImageAction.spec(),
             ModifyImageAction.spec(),
+            UpdateImageByIdAction.spec(),
             PreloadImageAction.spec(),
             UnloadImageAction.spec(),
             UntagImageFromRegistryAction.spec(),

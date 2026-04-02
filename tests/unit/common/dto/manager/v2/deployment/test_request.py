@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateDeploymentInput,
@@ -34,6 +36,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ScaleDeploymentInput,
     UpdateDeploymentInput,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 
@@ -46,6 +49,7 @@ def _make_revision_input(**kwargs: object) -> RevisionInput:
         "resource_slots": {"cpu": "2", "mem": "4g"},
         "model_vfolder_id": uuid.uuid4(),
         "model_definition_path": "/models/model.yaml",
+        "model_definition": ModelDefinition(),
     }
     defaults.update(kwargs)
     return RevisionInput(**defaults)
@@ -70,6 +74,7 @@ def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInputDTO:
             mount_destination="/models",
             definition_path="/models/model.yaml",
         ),
+        "model_definition": ModelDefinition(),
     }
     defaults.update(kwargs)
     return CreateRevisionInputDTO(**defaults)
@@ -88,6 +93,7 @@ class TestRevisionInput:
             resource_slots={"cpu": "2"},
             model_vfolder_id=model_id,
             model_definition_path="/models/def.yaml",
+            model_definition=ModelDefinition(),
         )
         assert rev.image_id == image_id
         assert rev.cluster_mode == ClusterMode.SINGLE_NODE
@@ -153,26 +159,108 @@ class TestExtraVFolderMountInput:
             ExtraVFolderMountInput.model_validate({})
 
 
+@dataclass(frozen=True)
+class RollingUpdateValidScenario:
+    """A valid RollingUpdateConfigInput test scenario."""
+
+    surge: IntOrPercent
+    unavailable: IntOrPercent
+    expected_surge_value: int | float
+    expected_unavailable_value: int | float
+
+
 class TestRollingUpdateConfigInput:
     """Tests for RollingUpdateConfigInput model."""
 
-    def test_valid_creation(self) -> None:
-        config = RollingUpdateConfigInput(max_surge=2, max_unavailable=1)
-        assert config.max_surge == 2
-        assert config.max_unavailable == 1
+    @pytest.mark.parametrize(
+        "scenario",
+        [
+            pytest.param(
+                RollingUpdateValidScenario(
+                    surge=IntOrPercent(count=2),
+                    unavailable=IntOrPercent(count=1),
+                    expected_surge_value=2,
+                    expected_unavailable_value=1,
+                ),
+                id="count",
+            ),
+            pytest.param(
+                RollingUpdateValidScenario(
+                    surge=IntOrPercent(percent=0.25),
+                    unavailable=IntOrPercent(percent=0.5),
+                    expected_surge_value=0.25,
+                    expected_unavailable_value=0.5,
+                ),
+                id="percent",
+            ),
+        ],
+    )
+    def test_valid_surge_values(self, scenario: RollingUpdateValidScenario) -> None:
+        config = RollingUpdateConfigInput(
+            max_surge=scenario.surge, max_unavailable=scenario.unavailable
+        )
+        if scenario.surge.is_count:
+            assert config.max_surge.count == scenario.expected_surge_value
+            assert config.max_unavailable.count == scenario.expected_unavailable_value
+        else:
+            assert config.max_surge.percent == scenario.expected_surge_value
+            assert config.max_unavailable.percent == scenario.expected_unavailable_value
 
     def test_defaults(self) -> None:
         config = RollingUpdateConfigInput()
-        assert config.max_surge == 1
-        assert config.max_unavailable == 0
+        assert config.max_surge.is_percent
+        assert config.max_surge.percent == 0.5
+        assert config.max_unavailable.is_percent
+        assert config.max_unavailable.percent == 0.0
 
-    def test_negative_max_surge_raises_validation_error(self) -> None:
+    @pytest.mark.parametrize(
+        "raw_input",
+        [
+            pytest.param(
+                {"max_surge": {"count": -1}},
+                id="surge_negative_count",
+            ),
+            pytest.param(
+                {"max_surge": {"percent": 1.5}},
+                id="surge_percent_over_1",
+            ),
+            pytest.param(
+                {"max_surge": {"percent": -0.1}},
+                id="surge_negative_percent",
+            ),
+            pytest.param(
+                {"max_surge": {"count": 2, "percent": 0.5}},
+                id="surge_both_fields_set",
+            ),
+            pytest.param(
+                {"max_surge": {}},
+                id="surge_neither_field_set",
+            ),
+            pytest.param(
+                {"max_unavailable": {"count": -1}},
+                id="unavailable_negative_count",
+            ),
+            pytest.param(
+                {"max_unavailable": {"percent": 1.5}},
+                id="unavailable_percent_over_1",
+            ),
+            pytest.param(
+                {"max_unavailable": {"percent": -0.1}},
+                id="unavailable_negative_percent",
+            ),
+            pytest.param(
+                {"max_unavailable": {"count": 0, "percent": 0.0}},
+                id="unavailable_both_fields_set",
+            ),
+            pytest.param(
+                {"max_unavailable": {}},
+                id="unavailable_neither_field_set",
+            ),
+        ],
+    )
+    def test_invalid_input_raises_error(self, raw_input: dict[str, object]) -> None:
         with pytest.raises(ValidationError):
-            RollingUpdateConfigInput(max_surge=-1)
-
-    def test_negative_max_unavailable_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
-            RollingUpdateConfigInput(max_unavailable=-1)
+            RollingUpdateConfigInput.model_validate(raw_input)
 
 
 class TestBlueGreenConfigInput:
@@ -274,7 +362,10 @@ class TestCreateDeploymentInput:
         assert inp.default_deployment_strategy.type == DeploymentStrategy.BLUE_GREEN
 
     def test_with_rolling_update_config(self) -> None:
-        rolling = RollingUpdateConfigInput(max_surge=2, max_unavailable=1)
+        rolling = RollingUpdateConfigInput(
+            max_surge=IntOrPercent(count=2),
+            max_unavailable=IntOrPercent(count=1),
+        )
         inp = self._make_input(
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
@@ -282,7 +373,7 @@ class TestCreateDeploymentInput:
             ),
         )
         assert inp.default_deployment_strategy.rolling_update is not None
-        assert inp.default_deployment_strategy.rolling_update.max_surge == 2
+        assert inp.default_deployment_strategy.rolling_update.max_surge.count == 2
 
     def test_with_blue_green_config(self) -> None:
         bg = BlueGreenConfigInput(auto_promote=True, promote_delay_seconds=30)
@@ -299,6 +390,7 @@ class TestCreateDeploymentInput:
         image_id = uuid.uuid4()
         rev = _make_create_revision_input_dto(image=ImageInput(id=image_id))
         inp = self._make_input(initial_revision=rev)
+        assert inp.initial_revision is not None
         assert inp.initial_revision.image.id == image_id
 
     def test_missing_metadata_raises_validation_error(self) -> None:

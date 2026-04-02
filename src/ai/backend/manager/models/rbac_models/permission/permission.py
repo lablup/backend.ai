@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Self
 
 import sqlalchemy as sa
@@ -39,6 +40,7 @@ class PermissionRow(Base):  # type: ignore[misc]
     role_id: Mapped[uuid.UUID] = mapped_column(
         "role_id",
         GUID,
+        sa.ForeignKey("roles.id", ondelete="CASCADE"),
         nullable=False,
     )
     scope_type: Mapped[ScopeType] = mapped_column(
@@ -50,6 +52,9 @@ class PermissionRow(Base):  # type: ignore[misc]
     )
     operation: Mapped[OperationType] = mapped_column(
         "operation", StrEnumType(OperationType, length=32), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
 
     @classmethod
@@ -70,4 +75,5 @@ class PermissionRow(Base):  # type: ignore[misc]
             scope_id=self.scope_id,
             entity_type=self.entity_type,
             operation=self.operation,
+            created_at=self.created_at,
         )

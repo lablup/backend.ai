@@ -4,8 +4,6 @@ from abc import ABC
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     DomainUsageBucketScopeDTO,
     ProjectUsageBucketScopeDTO,
@@ -18,6 +16,7 @@ from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -61,9 +60,7 @@ class StrawberryGQLContext:
 class ResourceGroupDomainScope(PydanticInputMixin[ResourceGroupDomainScopeDTO]):
     """Scope for domain-level APIs within a resource group context."""
 
-    resource_group_name: str = strawberry.field(
-        description="Resource group name to scope the operation"
-    )
+    resource_group_name: str = gql_field(description="Resource group name to scope the operation")
 
 
 @gql_pydantic_input(
@@ -76,10 +73,8 @@ class ResourceGroupDomainScope(PydanticInputMixin[ResourceGroupDomainScopeDTO]):
 class ResourceGroupProjectScope(PydanticInputMixin[ResourceGroupProjectScopeDTO]):
     """Scope for project-level APIs within a resource group and domain context."""
 
-    resource_group_name: str = strawberry.field(
-        description="Resource group name to scope the operation"
-    )
-    domain_name: str = strawberry.field(description="Domain name to scope the operation")
+    resource_group_name: str = gql_field(description="Resource group name to scope the operation")
+    domain_name: str = gql_field(description="Domain name to scope the operation")
 
 
 @gql_pydantic_input(
@@ -92,11 +87,9 @@ class ResourceGroupProjectScope(PydanticInputMixin[ResourceGroupProjectScopeDTO]
 class ResourceGroupUserScope(PydanticInputMixin[ResourceGroupUserScopeDTO]):
     """Scope for user-level APIs within a resource group, domain, and project context."""
 
-    resource_group_name: str = strawberry.field(
-        description="Resource group name to scope the operation"
-    )
-    domain_name: str = strawberry.field(description="Domain name to scope the operation")
-    project_id: str = strawberry.field(description="Project ID to scope the operation")
+    resource_group_name: str = gql_field(description="Resource group name to scope the operation")
+    domain_name: str = gql_field(description="Domain name to scope the operation")
+    project_id: str = gql_field(description="Project ID to scope the operation")
 
 
 # Scope input types for Usage Bucket scoped APIs
@@ -109,8 +102,8 @@ class ResourceGroupUserScope(PydanticInputMixin[ResourceGroupUserScopeDTO]):
 class DomainUsageBucketScope(PydanticInputMixin[DomainUsageBucketScopeDTO]):
     """Scope for domain-level usage bucket APIs."""
 
-    resource_group_name: str = strawberry.field(description="Resource group name")
-    domain_name: str = strawberry.field(description="Domain name to retrieve usage buckets for")
+    resource_group_name: str = gql_field(description="Resource group name")
+    domain_name: str = gql_field(description="Domain name to retrieve usage buckets for")
 
 
 @gql_pydantic_input(
@@ -120,9 +113,9 @@ class DomainUsageBucketScope(PydanticInputMixin[DomainUsageBucketScopeDTO]):
 class ProjectUsageBucketScope(PydanticInputMixin[ProjectUsageBucketScopeDTO]):
     """Scope for project-level usage bucket APIs."""
 
-    resource_group_name: str = strawberry.field(description="Resource group name")
-    domain_name: str = strawberry.field(description="Domain name")
-    project_id: str = strawberry.field(description="Project ID (will be converted to UUID)")
+    resource_group_name: str = gql_field(description="Resource group name")
+    domain_name: str = gql_field(description="Domain name")
+    project_id: str = gql_field(description="Project ID (will be converted to UUID)")
 
 
 @gql_pydantic_input(
@@ -132,7 +125,7 @@ class ProjectUsageBucketScope(PydanticInputMixin[ProjectUsageBucketScopeDTO]):
 class UserUsageBucketScope(PydanticInputMixin[UserUsageBucketScopeDTO]):
     """Scope for user-level usage bucket APIs."""
 
-    resource_group_name: str = strawberry.field(description="Resource group name")
-    domain_name: str = strawberry.field(description="Domain name")
-    project_id: str = strawberry.field(description="Project ID (will be converted to UUID)")
-    user_uuid: str = strawberry.field(description="User UUID (will be converted to UUID)")
+    resource_group_name: str = gql_field(description="Resource group name")
+    domain_name: str = gql_field(description="Domain name")
+    project_id: str = gql_field(description="Project ID (will be converted to UUID)")
+    user_uuid: str = gql_field(description="User UUID (will be converted to UUID)")

@@ -1,0 +1,11 @@
+# ETCD Node Configuration for {{ pg_cluster_info.node_name }}
+{% for node in config.cluster_nodes -%}
+{{ node.hostname | upper }}_ETCD_CLIENT_PORT={{ node.etcd_client_port }}
+{{ node.hostname | upper }}_ETCD_PEER_PORT={{ node.etcd_peer_port }}
+{% endfor %}
+
+# ETCD Environment Variables
+ETCD_NAME=etcd{{ pg_cluster_info.node_number }}
+ETCD_ADVERTISE_CLIENT_URLS=http://{{ pg_cluster_info.node_name }}:{{ pg_cluster_info.etcd_client_port }}
+ETCD_INITIAL_ADVERTISE_PEER_URLS=http://{{ pg_cluster_info.node_name }}:{{ pg_cluster_info.etcd_peer_port }}
+ETCD_INITIAL_CLUSTER={% for node in config.cluster_nodes -%}etcd{{ loop.index }}=http://{{ node.hostname }}:{{ node.etcd_peer_port }}{% if not loop.last %},{% endif %}{% endfor %}

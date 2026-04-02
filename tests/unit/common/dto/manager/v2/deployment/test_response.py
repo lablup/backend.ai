@@ -11,6 +11,7 @@ from typing import Any
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -34,6 +35,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentPolicyInfo,
     DeploymentStrategyInfoDTO,
     ExtraVFolderMountGQLDTO,
+    IntOrPercent,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
     ReplicaStateInfo,
@@ -132,6 +134,7 @@ def _make_revision_node(**kwargs: object) -> RevisionNode:
         "resource_config": _make_resource_config(),
         "model_runtime_config": _make_model_runtime_config(),
         "model_mount_config": None,
+        "model_definition": None,
         "created_at": datetime.now(tz=UTC),
         "extra_mounts": [],
     }
@@ -147,7 +150,7 @@ def _make_deployment_node(**kwargs: object) -> DeploymentNode:
         "replica_state": _make_replica_state(),
         "default_deployment_strategy": _make_deployment_strategy(),
         "created_user_id": uuid.uuid4(),
-        "revision": None,
+        "current_revision_id": None,
         "policy": None,
     }
     defaults.update(kwargs)
@@ -230,13 +233,39 @@ class TestRevisionNode:
         assert len(node.extra_mounts) == 1
         assert node.extra_mounts[0].mount_destination == "/data"
 
+    def test_with_model_definition(self) -> None:
+        model_definition = {
+            "models": [
+                {
+                    "name": "sample-model",
+                    "model_path": "/models/sample",
+                    "service": {
+                        "start_command": "python serve.py",
+                        "port": 8000,
+                    },
+                }
+            ]
+        }
+        node = _make_revision_node(model_definition=model_definition)
+
+        assert node.model_definition is not None
+        assert node.model_definition.models[0].name == "sample-model"
+        assert node.model_definition.models[0].service is not None
+        assert node.model_definition.models[0].service.port == 8000
+
     def test_round_trip(self) -> None:
         revision_id = uuid.uuid4()
-        node = _make_revision_node(id=revision_id, name="v2")
+        node = _make_revision_node(
+            id=revision_id,
+            name="v2",
+            model_definition={"models": [{"name": "v2-model", "model_path": "/models/v2"}]},
+        )
         json_str = node.model_dump_json()
         restored = RevisionNode.model_validate_json(json_str)
         assert restored.id == revision_id
         assert restored.name == "v2"
+        assert restored.model_definition is not None
+        assert restored.model_definition.models[0].name == "v2-model"
 
 
 class TestDeploymentNode:
@@ -253,25 +282,28 @@ class TestDeploymentNode:
             created_user_id=uuid.uuid4(),
         )
         assert node.id == deployment_id
-        assert node.revision is None
+        assert node.current_revision_id is None
         assert node.policy is None
 
-    def test_revision_defaults_to_none(self) -> None:
+    def test_current_revision_id_defaults_to_none(self) -> None:
         node = _make_deployment_node()
-        assert node.revision is None
+        assert node.current_revision_id is None
 
     def test_policy_defaults_to_none(self) -> None:
         node = _make_deployment_node()
         assert node.policy is None
 
-    def test_with_current_revision(self) -> None:
-        rev = _make_revision_node()
-        node = _make_deployment_node(revision=rev)
-        assert node.revision is not None
-        assert node.revision.name == "v1"
+    def test_with_current_revision_id(self) -> None:
+        revision_id = uuid.uuid4()
+        node = _make_deployment_node(current_revision_id=revision_id)
+        assert node.current_revision_id is not None
+        assert node.current_revision_id == revision_id
 
     def test_with_rolling_policy(self) -> None:
-        rolling = RollingUpdateConfigInfo(max_surge=1, max_unavailable=0)
+        rolling = RollingUpdateConfigInfo(
+            max_surge=IntOrPercent(count=1),
+            max_unavailable=IntOrPercent(count=0),
+        )
         policy = DeploymentPolicyInfo(
             strategy=DeploymentStrategy.ROLLING,
             rolling_update=rolling,
@@ -320,17 +352,17 @@ class TestDeploymentNode:
         restored = DeploymentNode.model_validate_json(json_str)
         assert restored.id == deployment_id
         assert restored.metadata.name == "test-deployment"
-        assert restored.revision is None
+        assert restored.current_revision_id is None
 
-    def test_round_trip_with_revision(self) -> None:
+    def test_round_trip_with_current_revision_id(self) -> None:
         deployment_id = uuid.uuid4()
-        rev = _make_revision_node()
-        node = _make_deployment_node(id=deployment_id, revision=rev)
+        revision_id = uuid.uuid4()
+        node = _make_deployment_node(id=deployment_id, current_revision_id=revision_id)
         json_str = node.model_dump_json()
         restored = DeploymentNode.model_validate_json(json_str)
         assert restored.id == deployment_id
-        assert restored.revision is not None
-        assert restored.revision.name == "v1"
+        assert restored.current_revision_id is not None
+        assert restored.current_revision_id == revision_id
 
     def test_strategy_is_serialized_as_string(self) -> None:
         node = _make_deployment_node()
@@ -349,7 +381,8 @@ class TestRouteNode:
             id=route_id,
             deployment_id=deployment_id,
             session_id=None,
-            status=RouteStatus.HEALTHY,
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
             traffic_ratio=0.5,
             created_at=now,
             revision_id=None,
@@ -358,7 +391,8 @@ class TestRouteNode:
         )
         assert node.id == route_id
         assert node.deployment_id == deployment_id
-        assert node.status == RouteStatus.HEALTHY
+        assert node.status == RouteStatus.RUNNING
+        assert node.health_status == RouteHealthStatus.HEALTHY
         assert node.traffic_ratio == 0.5
         assert node.traffic_status == RouteTrafficStatus.ACTIVE
 
@@ -367,6 +401,7 @@ class TestRouteNode:
             id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
             status=RouteStatus.PROVISIONING,
+            health_status=RouteHealthStatus.NOT_CHECKED,
             traffic_ratio=1.0,
             created_at=datetime.now(tz=UTC),
             traffic_status=RouteTrafficStatus.INACTIVE,
@@ -377,7 +412,8 @@ class TestRouteNode:
         node = RouteNode(
             id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
-            status=RouteStatus.HEALTHY,
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
             traffic_ratio=1.0,
             created_at=datetime.now(tz=UTC),
             traffic_status=RouteTrafficStatus.ACTIVE,
@@ -388,7 +424,8 @@ class TestRouteNode:
         node = RouteNode(
             id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
-            status=RouteStatus.HEALTHY,
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
             traffic_ratio=1.0,
             created_at=datetime.now(tz=UTC),
             traffic_status=RouteTrafficStatus.ACTIVE,
@@ -402,7 +439,8 @@ class TestRouteNode:
         node = RouteNode(
             id=route_id,
             deployment_id=deployment_id,
-            status=RouteStatus.HEALTHY,
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
             traffic_ratio=0.5,
             created_at=now,
             traffic_status=RouteTrafficStatus.ACTIVE,
@@ -412,7 +450,8 @@ class TestRouteNode:
         restored = RouteNode.model_validate_json(json_str)
         assert restored.id == route_id
         assert restored.deployment_id == deployment_id
-        assert restored.status == RouteStatus.HEALTHY
+        assert restored.status == RouteStatus.RUNNING
+        assert restored.health_status == RouteHealthStatus.HEALTHY
         assert restored.traffic_ratio == 0.5
         assert restored.error_data == {"message": "ok"}
 

@@ -4,13 +4,10 @@ from .bulk_revoke_role import BulkRevokeRoleAction, BulkRevokeRoleActionResult
 from .check_permission import CheckPermissionAction, CheckPermissionActionResult
 from .create_role import CreateRoleAction, CreateRoleActionResult
 from .delete_role import DeleteRoleAction, DeleteRoleActionResult
+from .get_permission_matrix import GetPermissionMatrixAction, GetPermissionMatrixActionResult
 from .get_role_detail import GetRoleDetailAction, GetRoleDetailActionResult
 from .purge_role import PurgeRoleAction, PurgeRoleActionResult
 from .revoke_role import RevokeRoleAction, RevokeRoleActionResult
-from .search_object_permissions import (
-    SearchObjectPermissionsAction,
-    SearchObjectPermissionsActionResult,
-)
 from .search_permissions import (
     SearchPermissionsAction,
     SearchPermissionsActionResult,
@@ -40,14 +37,14 @@ __all__ = [
     "CreateRoleActionResult",
     "DeleteRoleAction",
     "DeleteRoleActionResult",
+    "GetPermissionMatrixAction",
+    "GetPermissionMatrixActionResult",
     "GetRoleDetailAction",
     "GetRoleDetailActionResult",
     "PurgeRoleAction",
     "PurgeRoleActionResult",
     "RevokeRoleAction",
     "RevokeRoleActionResult",
-    "SearchObjectPermissionsAction",
-    "SearchObjectPermissionsActionResult",
     "SearchRolesAction",
     "SearchRolesActionResult",
     "SearchPermissionsAction",

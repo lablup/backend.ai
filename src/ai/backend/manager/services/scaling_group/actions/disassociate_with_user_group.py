@@ -13,7 +13,7 @@ from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
 from .user_group_base import ScalingGroupUserGroupAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupUserGroupAction):
     """Action to disassociate scaling groups from a project."""
 
@@ -29,7 +29,7 @@ class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupUserGroupAction):
         return None
 
 
-@dataclass
+@dataclass(frozen=True)
 class DisassociateScalingGroupWithUserGroupsActionResult(BaseActionResult):
     """Result of disassociating a scaling group from a user group."""
 

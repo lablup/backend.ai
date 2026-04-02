@@ -11,6 +11,7 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.deployment import DeploymentClient
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     RouteTrafficStatus,
@@ -135,7 +136,8 @@ _SAMPLE_ROUTE_DTO: dict[str, Any] = {
     "id": str(_SAMPLE_ROUTE_ID),
     "endpoint_id": str(_SAMPLE_DEPLOYMENT_ID),
     "session_id": None,
-    "status": "healthy",
+    "status": "running",
+    "health_status": "healthy",
     "traffic_ratio": 1.0,
     "created_at": "2025-01-01T00:00:00",
     "revision_id": str(_SAMPLE_REVISION_ID),
@@ -178,6 +180,7 @@ class TestDeploymentCRUD:
                     vfolder_id=_SAMPLE_VFOLDER_ID,
                     definition_path="model.py",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
 

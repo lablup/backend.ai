@@ -27,6 +27,10 @@ pants check ::
 # Update VERSION file
 echo $TARGET_VERSION > VERSION
 
+# Freeze NEXT_RELEASE_VERSION to the actual version
+echo "Freezing NEXT_RELEASE_VERSION to ${TARGET_VERSION}..."
+sed -i'' -e "s/^NEXT_RELEASE_VERSION = .*/NEXT_RELEASE_VERSION = \"${TARGET_VERSION}\"/" src/ai/backend/common/meta/meta.py
+
 # Update the changelog
 LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier
 

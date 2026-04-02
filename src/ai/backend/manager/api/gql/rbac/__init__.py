@@ -18,6 +18,8 @@ from .resolver import (
     admin_update_permission,
     admin_update_role,
     my_roles,
+    rbac_entity_operation_combinations,
+    rbac_permission_matrix,
     rbac_scope_entity_combinations,
 )
 from .types import (
@@ -28,10 +30,13 @@ from .types import (
     BulkRevokeRolePayloadGQL,
     CreatePermissionInput,
     CreateRoleInput,
+    EntityActionInfoGQL,
     EntityConnection,
     EntityFilter,
+    EntityOperationCombinationGQL,
     EntityOrderBy,
     EntityRefGQL,
+    OperationInfoGQL,
     OperationTypeGQL,
     PermissionConnection,
     PermissionFilter,
@@ -49,6 +54,7 @@ from .types import (
     RoleSourceGQL,
     RoleStatusGQL,
     ScopeEntityCombinationGQL,
+    ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
     UpdateRoleInput,
 )
@@ -65,6 +71,10 @@ __all__ = (
     "RoleAssignmentGQL",
     "EntityRefGQL",
     "ScopeEntityCombinationGQL",
+    "EntityOperationCombinationGQL",
+    "OperationInfoGQL",
+    "EntityActionInfoGQL",
+    "ScopeEntityOperationCombinationGQL",
     # Filters
     "RoleFilter",
     "PermissionFilter",
@@ -98,6 +108,8 @@ __all__ = (
     "admin_role_assignments",
     "admin_entities",
     "my_roles",
+    "rbac_entity_operation_combinations",
+    "rbac_permission_matrix",
     "rbac_scope_entity_combinations",
     # Mutation resolvers
     "admin_create_role",

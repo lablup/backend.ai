@@ -13,15 +13,20 @@ from .permission import (
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
+    EntityActionInfoGQL,
+    EntityOperationCombinationGQL,
+    OperationInfoGQL,
     OperationTypeGQL,
     PermissionConnection,
     PermissionEdge,
     PermissionFilter,
     PermissionGQL,
+    PermissionNestedFilterGQL,
     PermissionOrderBy,
     PermissionOrderField,
     RBACElementTypeGQL,
     ScopeEntityCombinationGQL,
+    ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
 )
 from .role import (
@@ -83,6 +88,7 @@ __all__ = [
     "RoleFilter",
     "RoleAssignmentFilter",
     "RoleAssignmentRoleNestedFilterGQL",
+    "PermissionNestedFilterGQL",
     "EntityFilter",
     # OrderBy
     "PermissionOrderBy",
@@ -122,4 +128,10 @@ __all__ = [
     "EntityConnection",
     # Scope-entity combination
     "ScopeEntityCombinationGQL",
+    # Entity-operation combination
+    "EntityOperationCombinationGQL",
+    "OperationInfoGQL",
+    # Scope-entity-operation combination (permission matrix)
+    "EntityActionInfoGQL",
+    "ScopeEntityOperationCombinationGQL",
 ]

@@ -54,6 +54,12 @@ class UserOrders:
         return UserRow.status.desc()
 
     @staticmethod
+    def role(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return UserRow.role.asc()
+        return UserRow.role.desc()
+
+    @staticmethod
     def domain_name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return UserRow.domain_name.asc()

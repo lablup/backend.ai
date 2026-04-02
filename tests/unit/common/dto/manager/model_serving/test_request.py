@@ -79,7 +79,7 @@ class TestServiceConfigModel:
         assert model.extra_mounts == {}
         assert model.environ is None
         assert model.resources is None
-        assert model.resource_opts == {}
+        assert model.resource_opts is None
 
     def test_alias_resolution(self) -> None:
         model = ServiceConfigModel.model_validate({

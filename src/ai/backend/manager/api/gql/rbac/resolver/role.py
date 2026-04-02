@@ -13,6 +13,11 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchRolesGQLInput,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.rbac.types import (
     AssignRoleInput,
     BulkAssignRoleInputGQL,
@@ -43,7 +48,9 @@ from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditi
 # ==================== Query Resolvers ====================
 
 
-@strawberry.field(description="Added in 26.3.0. Get a single role by ID (admin only).")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="26.3.0", description="Get a single role by ID (admin only).")
+)  # type: ignore[misc]
 async def admin_role(
     info: Info[StrawberryGQLContext],
     id: uuid.UUID,
@@ -53,8 +60,10 @@ async def admin_role(
     return RoleGQL.from_pydantic(node)
 
 
-@strawberry.field(
-    description="Added in 26.3.0. List roles with filtering and pagination (admin only)."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="List roles with filtering and pagination (admin only)."
+    )
 )  # type: ignore[misc]
 async def admin_roles(
     info: Info[StrawberryGQLContext],
@@ -96,8 +105,11 @@ async def admin_roles(
     )
 
 
-@strawberry.field(
-    description="Added in 26.3.0. List role assignments with filtering and pagination (admin only)."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="List role assignments with filtering and pagination (admin only).",
+    )
 )  # type: ignore[misc]
 async def admin_role_assignments(
     info: Info[StrawberryGQLContext],
@@ -142,8 +154,10 @@ async def admin_role_assignments(
     )
 
 
-@strawberry.field(
-    description="Added in 26.3.0. List roles assigned to the current authenticated user.",
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="List roles assigned to the current authenticated user."
+    )
 )  # type: ignore[misc]
 async def my_roles(
     info: Info[StrawberryGQLContext],
@@ -197,7 +211,9 @@ async def my_roles(
 # ==================== Mutation Resolvers ====================
 
 
-@strawberry.mutation(description="Added in 26.3.0. Create a new role (admin only).")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="26.3.0", description="Create a new role (admin only).")
+)  # type: ignore[misc]
 async def admin_create_role(
     info: Info[StrawberryGQLContext],
     input: CreateRoleInput,
@@ -207,7 +223,9 @@ async def admin_create_role(
     return RoleGQL.from_pydantic(payload.role)
 
 
-@strawberry.mutation(description="Added in 26.3.0. Update an existing role (admin only).")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="26.3.0", description="Update an existing role (admin only).")
+)  # type: ignore[misc]
 async def admin_update_role(
     info: Info[StrawberryGQLContext],
     input: UpdateRoleInput,
@@ -217,7 +235,9 @@ async def admin_update_role(
     return RoleGQL.from_pydantic(payload.role)
 
 
-@strawberry.mutation(description="Added in 26.3.0. Soft-delete a role (admin only).")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="26.3.0", description="Soft-delete a role (admin only).")
+)  # type: ignore[misc]
 async def admin_delete_role(
     info: Info[StrawberryGQLContext],
     input: DeleteRoleInput,
@@ -227,7 +247,9 @@ async def admin_delete_role(
     return DeleteRolePayload.from_pydantic(result)
 
 
-@strawberry.mutation(description="Added in 26.3.0. Permanently remove a role (admin only).")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="26.3.0", description="Permanently remove a role (admin only).")
+)  # type: ignore[misc]
 async def admin_purge_role(
     info: Info[StrawberryGQLContext],
     input: PurgeRoleInput,
@@ -237,7 +259,9 @@ async def admin_purge_role(
     return PurgeRolePayload.from_pydantic(result)
 
 
-@strawberry.mutation(description="Added in 26.3.0. Assign a role to a user (admin only).")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="26.3.0", description="Assign a role to a user (admin only).")
+)  # type: ignore[misc]
 async def admin_assign_role(
     info: Info[StrawberryGQLContext],
     input: AssignRoleInput,
@@ -247,7 +271,9 @@ async def admin_assign_role(
     return RoleAssignmentGQL.from_pydantic(result)
 
 
-@strawberry.mutation(description="Added in 26.3.0. Revoke a role from a user (admin only).")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="26.3.0", description="Revoke a role from a user (admin only).")
+)  # type: ignore[misc]
 async def admin_revoke_role(
     info: Info[StrawberryGQLContext],
     input: RevokeRoleInput,
@@ -257,8 +283,10 @@ async def admin_revoke_role(
     return RoleAssignmentGQL.from_pydantic(result)
 
 
-@strawberry.mutation(
-    description="Added in 26.3.0. Bulk assign a role to multiple users (admin only)."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Bulk assign a role to multiple users (admin only)."
+    )
 )  # type: ignore[misc]
 async def admin_bulk_assign_role(
     info: Info[StrawberryGQLContext],
@@ -269,8 +297,10 @@ async def admin_bulk_assign_role(
     return BulkAssignRolePayloadGQL.from_pydantic(result)
 
 
-@strawberry.mutation(
-    description="Added in 26.3.0. Bulk revoke a role from multiple users (admin only)."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Bulk revoke a role from multiple users (admin only)."
+    )
 )  # type: ignore[misc]
 async def admin_bulk_revoke_role(
     info: Info[StrawberryGQLContext],

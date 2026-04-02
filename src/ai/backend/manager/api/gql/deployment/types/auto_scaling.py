@@ -9,7 +9,6 @@ from enum import StrEnum
 from typing import Any, Self, cast
 from uuid import UUID
 
-import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -45,6 +44,8 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -56,7 +57,9 @@ from ai.backend.manager.data.deployment.types import (
 )
 
 
-@strawberry.enum(description="Added in 25.1.0")
+@gql_enum(
+    BackendAIGQLMeta(added_version="25.1.0", description="Metric source for auto-scaling rules")
+)
 class AutoScalingMetricSource(StrEnum):
     KERNEL = "KERNEL"
     INFERENCE_FRAMEWORK = "INFERENCE_FRAMEWORK"
@@ -93,31 +96,23 @@ class AutoScalingRuleOrderBy(PydanticInputMixin[AutoScalingRuleOrderDTO]):
 class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     id: NodeID[str]
 
-    metric_source: AutoScalingMetricSource = strawberry.field(
-        description="Added in 25.19.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"
+    metric_source: AutoScalingMetricSource = gql_field(
+        description="The source of the scaling metric (e.g. KERNEL, INFERENCE_FRAMEWORK)."
     )
-    metric_name: str = strawberry.field()
+    metric_name: str = gql_field(description="The metric name field.")
 
-    min_threshold: Decimal | None = strawberry.field(
-        description="Added in 25.19.0: The minimum threshold for scaling (e.g. 0.5)"
+    min_threshold: Decimal | None = gql_field(
+        description="The minimum threshold for scaling (e.g. 0.5)."
     )
-    max_threshold: Decimal | None = strawberry.field(
-        description="Added in 25.19.0: The maximum threshold for scaling (e.g. 21.0)"
-    )
-
-    step_size: int = strawberry.field(
-        description="Added in 25.19.0: The step size for scaling (e.g. 1)."
-    )
-    time_window: int = strawberry.field(
-        description="Added in 25.19.0: The time window (seconds) for scaling (e.g. 60)."
+    max_threshold: Decimal | None = gql_field(
+        description="The maximum threshold for scaling (e.g. 21.0)."
     )
 
-    min_replicas: int | None = strawberry.field(
-        description="Added in 25.19.0: The minimum number of replicas (e.g. 1)."
-    )
-    max_replicas: int | None = strawberry.field(
-        description="Added in 25.19.0: The maximum number of replicas (e.g. 10)."
-    )
+    step_size: int = gql_field(description="The step size for scaling (e.g. 1).")
+    time_window: int = gql_field(description="The time window in seconds for scaling (e.g. 60).")
+
+    min_replicas: int | None = gql_field(description="The minimum number of replicas (e.g. 1).")
+    max_replicas: int | None = gql_field(description="The maximum number of replicas (e.g. 10).")
 
     created_at: datetime
     last_triggered_at: datetime

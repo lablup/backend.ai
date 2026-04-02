@@ -21,6 +21,11 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant, SessionId
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
+from ai.backend.manager.actions.validators.rbac.single_entity import (
+    SingleEntityActionRBACValidator,
+)
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     ClusterConfigData,
@@ -34,6 +39,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRuntimeConfigData,
     ReplicaSpec,
     ResourceConfigData,
+    RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
@@ -97,11 +103,21 @@ class DeploymentCRUDBaseFixtures:
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
             revision_generator_registry=mock_revision_generator_registry,
+            model_definition_generator_registry=MagicMock(),
         )
 
     @pytest.fixture
     def processors(self, deployment_service: DeploymentService) -> DeploymentProcessors:
-        return DeploymentProcessors(deployment_service, [], MagicMock(spec=ActionValidators))
+        return DeploymentProcessors(
+            deployment_service,
+            [],
+            ActionValidators(
+                rbac=RBACValidators(
+                    scope=MagicMock(spec=ScopeActionRBACValidator),
+                    single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                ),
+            ),
+        )
 
     @pytest.fixture
     def endpoint_id(self) -> uuid.UUID:
@@ -271,7 +287,8 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
             route_id=uuid.uuid4(),
             endpoint_id=endpoint_id,
             session_id=SessionId(uuid.uuid4()),
-            status=RouteStatus.HEALTHY,
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
             traffic_ratio=0.5,
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
@@ -321,7 +338,8 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
             route_id=uuid.uuid4(),
             endpoint_id=endpoint_id,
             session_id=SessionId(uuid.uuid4()),
-            status=RouteStatus.HEALTHY,
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
             traffic_ratio=0.0,
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
@@ -346,7 +364,8 @@ class TestSearchReplicas(DeploymentCRUDBaseFixtures):
             route_id=uuid.uuid4(),
             endpoint_id=endpoint_id,
             session_id=SessionId(uuid.uuid4()),
-            status=RouteStatus.HEALTHY,
+            status=RouteStatus.RUNNING,
+            health_status=RouteHealthStatus.HEALTHY,
             traffic_ratio=1.0,
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),

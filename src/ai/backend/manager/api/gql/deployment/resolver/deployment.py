@@ -5,13 +5,18 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from uuid import UUID
 
-import strawberry
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+    gql_root_field,
+    gql_subscription,
+)
 from ai.backend.manager.api.gql.deployment.types.deployment import (
     CreateDeploymentInput,
     CreateDeploymentPayload,
@@ -34,7 +39,12 @@ from ai.backend.manager.errors.user import UserNotFound
 # Query resolvers
 
 
-@strawberry.field(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="List deployments with optional filtering and pagination (admin, all deployments).",
+    )
+)  # type: ignore[misc]
 async def deployments(
     info: Info[StrawberryGQLContext],
     filter: DeploymentFilter | None = None,
@@ -75,7 +85,9 @@ async def deployments(
     )
 
 
-@strawberry.field(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.16.0", description="Get a specific deployment by ID.")
+)  # type: ignore[misc]
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> ModelDeployment | None:
     """Get a specific deployment by ID."""
     _, deployment_id = resolve_global_id(id)
@@ -86,7 +98,7 @@ async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> ModelDeploymen
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Create model deployment."))  # type: ignore[misc]
 async def create_model_deployment(
     input: CreateDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> CreateDeploymentPayload:
@@ -98,7 +110,7 @@ async def create_model_deployment(
     return CreateDeploymentPayload(deployment=ModelDeployment.from_pydantic(payload.deployment))
 
 
-@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Update model deployment."))  # type: ignore[misc]
 async def update_model_deployment(
     input: UpdateDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> UpdateDeploymentPayload:
@@ -107,7 +119,7 @@ async def update_model_deployment(
     return UpdateDeploymentPayload(deployment=ModelDeployment.from_pydantic(payload.deployment))
 
 
-@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Delete model deployment."))  # type: ignore[misc]
 async def delete_model_deployment(
     input: DeleteDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> DeleteDeploymentPayload:
@@ -116,9 +128,12 @@ async def delete_model_deployment(
     return DeleteDeploymentPayload(id=input.id)
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description="Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers"
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers.",
+    )
+)  # type: ignore[misc]
 async def sync_replicas(
     input: SyncReplicaInput, info: Info[StrawberryGQLContext]
 ) -> SyncReplicaPayload:
@@ -129,7 +144,9 @@ async def sync_replicas(
 # Subscription resolvers
 
 
-@strawberry.subscription(description="Added in 25.16.0. Subscribe to deployment status changes")  # type: ignore[misc]
+@gql_subscription(
+    BackendAIGQLMeta(added_version="25.16.0", description="Subscribe to deployment status changes.")
+)  # type: ignore[misc]
 async def deployment_status_changed(
     info: Info[StrawberryGQLContext],
 ) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:

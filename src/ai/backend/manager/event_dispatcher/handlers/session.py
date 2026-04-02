@@ -37,7 +37,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.routing import RouteHealthStatus, RouteStatus, RoutingRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
@@ -263,7 +263,8 @@ class SessionEventHandler:
 
                         query = sa.select(sa.func.count("*")).where(
                             (RoutingRow.endpoint == endpoint.id)
-                            & (RoutingRow.status == RouteStatus.HEALTHY)
+                            & (RoutingRow.status == RouteStatus.RUNNING)
+                            & (RoutingRow.health_status == RouteHealthStatus.HEALTHY)
                         )
                         healthy_routes = await db_sess.scalar(query)
                         if endpoint.replicas == healthy_routes:
@@ -293,6 +294,12 @@ class SessionEventHandler:
             "event": event.event_name().removeprefix("session_"),
             "session_id": str(event.session_id),
             "when": datetime.now(UTC).isoformat(),
+            # Enriched fields — allow the callback receiver to reconstruct
+            # intermediate status transitions with accurate timestamps and
+            # to read the session result/error details without an extra API call.
+            "status_history": dict(session.status_history or {}),
+            "result": session.result.name if session.result is not None else None,
+            "status_data": dict(session.status_data) if session.status_data is not None else None,
         }
 
         self._registry.webhook_ptask_group.create_task(

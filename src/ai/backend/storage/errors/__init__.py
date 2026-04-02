@@ -58,6 +58,7 @@ from .quota import (
     InvalidQuotaScopeError,
     QuotaDirectoryNotEmptyError,
     QuotaScopeAlreadyExists,
+    QuotaScopeCreationFailedError,
     QuotaScopeNotFoundError,
     QuotaTreeNotFoundError,
 )
@@ -96,6 +97,7 @@ __all__ = [
     "QuotaDirectoryNotEmptyError",
     "QuotaScopeNotFoundError",
     "QuotaScopeAlreadyExists",
+    "QuotaScopeCreationFailedError",
     "InvalidQuotaConfig",
     "InvalidQuotaScopeError",
     "InvalidQuotaFormatError",

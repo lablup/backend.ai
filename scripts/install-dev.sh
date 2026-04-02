@@ -1144,7 +1144,7 @@ configure_backendai() {
   # install and configure webui
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     install_editable_webui
-    sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/rollup"'"@" ./webserver.conf
+    sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/web"'"@" ./webserver.conf
   else
     webui_version=$(jq -r '.package + " (built at " + .buildDate + ", rev " + .revision + ")"' src/ai/backend/web/static/version.json)
     show_note "The currently embedded webui version: $webui_version"
@@ -1171,6 +1171,7 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-slot-types.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-runtime-variants.json
   ./backend.ai mgr fixture populate fixtures/manager/example-roles.json
 
   # Populate artifact registries with substituted MinIO credentials

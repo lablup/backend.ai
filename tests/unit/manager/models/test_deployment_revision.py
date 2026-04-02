@@ -26,7 +26,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -73,6 +73,7 @@ class TestDeploymentRevisionRow:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -264,27 +265,18 @@ class TestDeploymentRevisionRow:
         test_image: ImageRow,
         test_scaling_group: ScalingGroupRow,
     ) -> AsyncGenerator[EndpointRow, None]:
-        """Create test endpoint."""
+        """Create test endpoint without an initial deployment revision."""
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=test_user.uuid,
                 session_owner=test_user.uuid,
                 replicas=1,
-                image=test_image.id,
                 domain=test_domain.name,
                 project=test_group.id,
                 resource_group=test_scaling_group.name,
-                resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 url=f"https://test-{uuid.uuid4().hex[:8]}.example.com",
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                model_mount_destination="/models",
-                cluster_mode=ClusterMode.SINGLE_NODE.name,
-                cluster_size=1,
-                runtime_variant=RuntimeVariant.CUSTOM,
-                environ={},
-                resource_opts={},
-                extra_mounts=[],
             )
             db_sess.add(endpoint)
             await db_sess.flush()

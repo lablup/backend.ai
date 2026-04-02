@@ -5,7 +5,7 @@ from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class ScalingGroupAction(BaseAction):
     """Base action class for scaling group operations."""
 

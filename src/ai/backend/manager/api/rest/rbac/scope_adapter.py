@@ -41,8 +41,6 @@ class ScopeAdapter(BaseFilterAdapter):
     def build_querier(self, scope_type: ScopeType, request: SearchScopesRequest) -> BatchQuerier:
         """Build a BatchQuerier based on scope type."""
         match scope_type:
-            case ScopeType.GLOBAL:
-                return self._build_global_scope_querier(request)
             case ScopeType.DOMAIN:
                 return self._build_domain_scope_querier(request)
             case ScopeType.PROJECT:
@@ -77,11 +75,6 @@ class ScopeAdapter(BaseFilterAdapter):
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
-
-    def _build_global_scope_querier(self, request: SearchScopesRequest) -> BatchQuerier:
-        """Build a BatchQuerier for global scope (no filtering needed)."""
-        pagination = OffsetPagination(limit=request.limit, offset=request.offset)
-        return BatchQuerier(conditions=[], orders=[], pagination=pagination)
 
     def _convert_domain_filter(self, filter: ScopeFilter) -> list[QueryCondition]:
         """Convert scope filter to domain query conditions."""

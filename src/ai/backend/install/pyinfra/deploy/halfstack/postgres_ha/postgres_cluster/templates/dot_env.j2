@@ -1,0 +1,22 @@
+# PostgreSQL HA Cluster Configuration
+{% for node in config.cluster_nodes -%}
+{{ node.hostname | upper }}_IP={{ node.ip }}
+{{ node.hostname | upper }}_ETCD_CLIENT_PORT={{ node.etcd_client_port }}
+{{ node.hostname | upper }}_ETCD_PEER_PORT={{ node.etcd_peer_port }}
+{{ node.hostname | upper }}_PG_API_PORT={{ node.pg_api_port }}
+{{ node.hostname | upper }}_PG_SQL_PORT={{ node.pg_sql_port }}
+{% endfor %}
+PG_MAJOR_VERSION={{ config.pg_major_version }}
+PG_TARGET_API_PORT={{ pg_cluster_info.pg_api_port }}
+PG_TARGET_SQL_PORT={{ pg_cluster_info.pg_sql_port }}
+PG_ACTIVE_PORT={{ config.pg_active_port }}
+PG_STANDBY_PORT={{ config.pg_standby_port }}
+PG_REPLICATOR_ID={{ config.pg_replicator_id }}
+PG_REPLICATOR_PW={{ config.pg_replicator_password }}
+PG_SUPERUSER_ID={{ config.pg_superuser_id }}
+PG_SUPERUSER_PW={{ config.pg_superuser_password }}
+PG_REWIND_ID={{ config.pg_rewind_id }}
+PG_REWIND_PW={{ config.pg_rewind_password }}
+ETCD_ENDPOINTS={% for node in config.cluster_nodes -%}etcd{{ loop.index }}=http://{{ node.hostname }}:{{ node.etcd_peer_port }}{% if not loop.last %},{% endif %}{% endfor %}
+
+PIDS_LIMIT_VALUE=500

@@ -24,6 +24,9 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 
 __all__ = (
     "AdminSearchResourceGroupsPayload",
+    "AllowedDomainsPayload",
+    "AllowedProjectsPayload",
+    "AllowedResourceGroupsPayload",
     "CreateResourceGroupPayload",
     "DeleteResourceGroupPayload",
     "FairShareScalingGroupSpecInfo",
@@ -97,7 +100,7 @@ class DeleteResourceGroupPayload(BaseResponseModel):
 class AdminSearchResourceGroupsPayload(BaseResponseModel):
     """Payload for admin-scoped paginated resource group search results."""
 
-    items: list[ResourceGroupNode] = Field(description="List of resource group nodes.")
+    items: list[ResourceGroupDetailNode] = Field(description="List of resource group nodes.")
     total_count: int = Field(description="Total number of resource groups matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
@@ -219,3 +222,21 @@ class ResourceInfoNode(BaseResponseModel):
     capacity: ResourceSlotInfo = Field(description="Total available resources")
     used: ResourceSlotInfo = Field(description="Currently occupied resources")
     free: ResourceSlotInfo = Field(description="Available resources (capacity - used)")
+
+
+class AllowedResourceGroupsPayload(BaseResponseModel):
+    """Payload containing a list of allowed resource group names."""
+
+    items: list[str] = Field(description="Allowed resource group names.")
+
+
+class AllowedDomainsPayload(BaseResponseModel):
+    """Payload containing a list of allowed domain names."""
+
+    items: list[str] = Field(description="Allowed domain names.")
+
+
+class AllowedProjectsPayload(BaseResponseModel):
+    """Payload containing a list of allowed project IDs."""
+
+    items: list[UUID] = Field(description="Allowed project IDs.")

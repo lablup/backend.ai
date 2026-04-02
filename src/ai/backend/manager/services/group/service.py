@@ -21,6 +21,10 @@ from ai.backend.manager.models.resource_usage import (
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.services.group.actions.assign_users_to_project import (
+    AssignUsersToProjectAction,
+    AssignUsersToProjectActionResult,
+)
 from ai.backend.manager.services.group.actions.create_group import (
     CreateGroupAction,
     CreateGroupActionResult,
@@ -45,6 +49,10 @@ from ai.backend.manager.services.group.actions.search_projects import (
     SearchProjectsActionResult,
     SearchProjectsByDomainAction,
     SearchProjectsByUserAction,
+)
+from ai.backend.manager.services.group.actions.unassign_users import (
+    UnassignUsersFromProjectAction,
+    UnassignUsersFromProjectActionResult,
 )
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
@@ -102,6 +110,16 @@ class GroupService:
     async def purge_group(self, action: PurgeGroupAction) -> PurgeGroupActionResult:
         await self._group_repository.purge_group(action.group_id)
         return PurgeGroupActionResult(group_id=action.group_id)
+
+    async def unassign_users_from_project(
+        self, action: UnassignUsersFromProjectAction
+    ) -> UnassignUsersFromProjectActionResult:
+        result = await self._group_repository.unassign_users_from_project(action.unbinder)
+        return UnassignUsersFromProjectActionResult(
+            project_id=action.unbinder.project_id,
+            unassigned_users=result.unassigned_users,
+            failures=result.failures,
+        )
 
     async def _get_project_stats_for_period(
         self,
@@ -224,6 +242,16 @@ class GroupService:
             has_previous_page=result.has_previous_page,
             _scope_type=action.scope_type(),
             _scope_id=action.scope_id(),
+        )
+
+    async def assign_users_to_project(
+        self, action: AssignUsersToProjectAction
+    ) -> AssignUsersToProjectActionResult:
+        assigned_users = await self._group_repository.assign_users_to_project(
+            action.project_id, action.user_ids
+        )
+        return AssignUsersToProjectActionResult(
+            project_id=action.project_id, assigned_users=assigned_users
         )
 
     async def get_project(self, action: GetProjectAction) -> GetProjectActionResult:

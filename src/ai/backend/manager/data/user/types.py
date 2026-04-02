@@ -127,7 +127,9 @@ class UserData:
             domain_name=row.domain_name,
             role=row.role,
             resource_policy=row.resource_policy,
-            allowed_client_ip=row.allowed_client_ip,
+            allowed_client_ip=[str(ip) for ip in row.allowed_client_ip]
+            if row.allowed_client_ip
+            else None,
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,

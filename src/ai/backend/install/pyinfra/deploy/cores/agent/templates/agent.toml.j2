@@ -1,0 +1,151 @@
+[etcd]
+namespace = "local"
+addr = { host = "{{ etcd_ip }}", port = {{ etcd_port }} }
+user = ""
+password = ""
+
+[license]
+addr = { host = "{{ licensed_ip }}", port = {{ licensed_port }} }
+
+[agent]
+# NOTE: 'mode' is deprecated in Backend.AI 24.09+, use 'backend' instead
+backend = "docker"
+
+rpc-listen-addr = { host = "{{ rpc_listen_ip }}", port = 6001 }
+# Address where manager will actually try to establish connection.
+# Must be set if agent RPC layer is behind NAT.
+advertised-rpc-addr = { host = "{{ rpc_advertised_ip }}", port = 6001 }
+service-addr = { host = "0.0.0.0", port = {{ announce_internal_port }} }
+announce-addr = { host = "{{ announce_internal_host }}", port = {{ announce_internal_port }} }
+
+# The IP or Text URL that use to access publicly
+# Defaults to [container].advertised-host value when not specified
+{% if public_host %}
+public-host = "{{ public_host }}"
+{% else %}
+# public-host = ""
+{% endif %}
+
+# The port number of agent socket which provides access to host-side information
+# to the containers (such as PID conversion).
+agent-sock-port = 6007
+metadata-server-port = {{ metadata_server_port }}
+ipc-base-path = "./tmp/backend.ai/agent/ipc"
+# id = "i-something-special"
+
+scaling-group = "{{ resource_group }}"
+# "compute" or "storage". Use "storage" for sFTP upload agents.
+scaling-group-type = "{{ resource_group_type }}"
+
+pid-file = "{{ home_dir }}/{{ service_name }}/{{ service_name }}.pid"
+event-loop = "uvloop"
+
+# Concurrent kernel creation limit. Adjust for resource-constrained environments.
+# kernel-creation-concurrency = 4
+
+aiomonitor-termui-port = 28200
+aiomonitor-webui-port = 29200
+
+# abuse-report-path = "{{ home_dir }}/agent/abuse-reports"
+# force-terminate-abusing-containers = false
+
+# This should be set for normal agents since the default is true.
+cohabiting-storage-proxy = false
+# This should be set when manilla volume integration is activated.
+# mount-path = "{{ vfroot_path }}/nfs"
+
+[agent.sync-container-lifecycles]
+enabled = true
+
+[container]
+port-range = [{{ container_port_range_start }}, {{ container_port_range_end }}]
+
+kernel-uid = {{ user_id }}
+kernel-gid = {{ group_id }}
+bind-host = "{{ rpc_listen_ip }}"
+advertised-host = "{{ rpc_advertised_ip }}"
+
+stats-type = "cgroup"
+sandbox-type = "docker"
+jail-args = []
+
+# One of: "hostdir", "hostfile", "memory", "k8s-nfs"
+# "hostdir": creates an empty host directory and mount it as /home/work of containers.
+# "hostfile": creates an empty sparse file and mount it as /home/work of containers using loop. But this requires the agent to be run as root.
+# "memory": creates an in-memory tmpfs and mount it as /home/work of containers. (only supported in Linux)
+# "k8s-nfs": creates Kubernetes PV/PVC and mounts it when creating Pods. (only supported in Kubernetes mode)
+scratch-type = "{{ scratch_type }}"
+scratch-root = "{{ scratch_root }}"
+scratch-size = "{{ scratch_size }}"
+
+# Allow using an alternate Docker bridge network
+# alternative-bridge = "bai_alt_bridge"
+
+
+[resource]
+reserved-cpu = 2
+reserved-mem = "8G"
+reserved-disk = "8G"
+allocation-order = ["cuda", "rocm", "tpu", "atom", "atom-plus", "atom-max", "ipu", "cpu", "mem"]
+
+# How do we mix up devices from multiple different NUMA nodes?
+# Options: PREFER_SINGLE_NODE, INTERLEAVED
+affinity-policy = "INTERLEAVED"
+
+{%- if otel_collector_endpoint %}
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "{{ otel_collector_endpoint }}"
+{%- endif %}
+
+[watcher]
+service-addr = { host = "{{ rpc_listen_ip }}", port = 6009 }
+ssl-enabled = false
+# ssl-cert = ""
+# ssl-key = ""
+target-service = "backendai-agent.service"
+soft-reset-available = false
+
+
+[logging]
+level = "INFO"
+drivers = ["console", "file"]
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "{{ service_name }}.log"
+backup-count = 10
+rotation-size = "10M"
+
+[logging.logstash]
+endpoint = { host = "localhost", port = 9300 }
+protocol = "tcp"
+ssl-enabled = false
+ssl-verify = false
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiodocker" = "INFO"
+"aiotools" = "INFO"
+"aiohttp" = "WARNING"
+"ai.backend" = "INFO"
+
+
+[debug]
+enabled = false
+skip-container-deletion = false
+log-stats = false
+log-heartbeats = false
+log-docker-events = false
+log-kernel-config = false
+
+[debug.coredump]
+enabled = false
+path = "./coredumps"
+backup-count = 10
+size-limit = "64M"

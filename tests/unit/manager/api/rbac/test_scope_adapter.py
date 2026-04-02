@@ -216,31 +216,17 @@ class TestScopeAdapterBuildQuerier:
 
         assert len(querier.conditions) == 1
 
-    def test_build_querier_global_scope(self, adapter: ScopeAdapter) -> None:
-        """Test building querier for global scope returns empty querier."""
-        limit = 10
-        offset = 0
+    def test_build_querier_global_scope_raises(self, adapter: ScopeAdapter) -> None:
+        """Test building querier for global scope raises NotImplementedError."""
         request = SearchScopesRequest(
-            filter=ScopeFilter(
-                name=StringFilter(
-                    i_contains="anything",
-                )
-            ),
-            order=[
-                ScopeOrder(
-                    field=ScopeOrderField.NAME,
-                    direction=OrderDirection.ASC,
-                )
-            ],
-            limit=limit,
-            offset=offset,
+            filter=None,
+            order=[],
+            limit=10,
+            offset=0,
         )
 
-        querier = adapter.build_querier(ScopeType.GLOBAL, request)
-
-        # Global scope ignores filters and orders
-        assert querier.conditions == []
-        assert querier.orders == []
+        with pytest.raises(NotImplementedError):
+            adapter.build_querier(ScopeType.GLOBAL, request)
 
 
 class TestScopeAdapterConvertToDTO:

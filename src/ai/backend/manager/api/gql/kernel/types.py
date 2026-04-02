@@ -31,7 +31,10 @@ from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -58,12 +61,11 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-from ai.backend.manager.api.gql.utils import dedent_strip
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.2.0", description="Status of a kernel in its lifecycle."),
     name="KernelV2Status",
-    description="Added in 26.2.0. Status of a kernel in its lifecycle.",
 )
 class KernelV2StatusGQL(StrEnum):
     """GraphQL enum for kernel status."""
@@ -79,8 +81,9 @@ class KernelV2StatusGQL(StrEnum):
     CANCELLED = "CANCELLED"
 
 
-@strawberry.enum(
-    name="KernelV2OrderField", description="Added in 26.2.0. Fields available for ordering kernels."
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.2.0", description="Fields available for ordering kernels."),
+    name="KernelV2OrderField",
 )
 class KernelV2OrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
@@ -96,7 +99,9 @@ class KernelV2OrderFieldGQL(StrEnum):
     name="KernelV2StatusFilter",
 )
 class KernelV2StatusFilterGQL(PydanticInputMixin[KernelStatusFilter]):
-    in_: list[KernelV2StatusGQL] | None = strawberry.field(name="in", default=None)
+    in_: list[KernelV2StatusGQL] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     not_in: list[KernelV2StatusGQL] | None = None
 
 
@@ -138,14 +143,14 @@ class KernelV2OrderByGQL(PydanticInputMixin[KernelOrder]):
     name="KernelV2SessionInfo",
 )
 class KernelV2SessionInfoGQL:
-    session_id: UUID = strawberry.field(
+    session_id: UUID = gql_field(
         description="The unique identifier of the session this kernel belongs to."
     )
-    creation_id: str | None = strawberry.field(
+    creation_id: str | None = gql_field(
         description="The creation ID used when creating the session."
     )
-    name: str | None = strawberry.field(description="The name of the session.")
-    session_type: SessionTypes = strawberry.field(
+    name: str | None = gql_field(description="The name of the session.")
+    session_type: SessionTypes = gql_field(
         description="The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."
     )
 
@@ -159,16 +164,16 @@ class KernelV2SessionInfoGQL:
     name="KernelV2ClusterInfo",
 )
 class KernelV2ClusterInfoGQL:
-    cluster_role: str = strawberry.field(
+    cluster_role: str = gql_field(
         description="The role of this kernel in the cluster (e.g., main, sub)."
     )
-    cluster_idx: int = strawberry.field(
+    cluster_idx: int = gql_field(
         description="The index of this kernel within the cluster (0-based)."
     )
-    local_rank: int = strawberry.field(
+    local_rank: int = gql_field(
         description="The local rank of this kernel for distributed computing."
     )
-    cluster_hostname: str = strawberry.field(
+    cluster_hostname: str = gql_field(
         description="The hostname assigned to this kernel within the cluster network."
     )
 
@@ -182,16 +187,10 @@ class KernelV2ClusterInfoGQL:
     name="KernelV2UserInfo",
 )
 class KernelV2UserInfoGQL:
-    user_id: UUID | None = strawberry.field(
-        description="The UUID of the user who owns this kernel."
-    )
-    access_key: str | None = strawberry.field(
-        description="The access key used to create this kernel."
-    )
-    domain_name: str | None = strawberry.field(description="The domain this kernel belongs to.")
-    group_id: UUID | None = strawberry.field(
-        description="The group (project) ID this kernel belongs to."
-    )
+    user_id: UUID | None = gql_field(description="The UUID of the user who owns this kernel.")
+    access_key: str | None = gql_field(description="The access key used to create this kernel.")
+    domain_name: str | None = gql_field(description="The domain this kernel belongs to.")
+    group_id: UUID | None = gql_field(description="The group (project) ID this kernel belongs to.")
 
 
 @gql_pydantic_type(
@@ -203,10 +202,10 @@ class KernelV2UserInfoGQL:
     name="ResourceAllocation",
 )
 class ResourceAllocationGQL:
-    requested: ResourceSlotGQL = strawberry.field(
+    requested: ResourceSlotGQL = gql_field(
         description="The resource slots originally requested for this kernel."
     )
-    used: ResourceSlotGQL | None = strawberry.field(
+    used: ResourceSlotGQL | None = gql_field(
         description="The resource slots currently used by this kernel. May be null if not yet allocated."
     )
 
@@ -220,22 +219,22 @@ class ResourceAllocationGQL:
     name="KernelV2ResourceInfo",
 )
 class KernelV2ResourceInfoGQL:
-    agent_id: str | None = strawberry.field(
+    agent_id: str | None = gql_field(
         description="The ID of the agent running this kernel. Null if not yet assigned or hidden."
     )
-    resource_group_name: str | None = strawberry.field(
+    resource_group_name: str | None = gql_field(
         description="The resource group (scaling group) this kernel is assigned to."
     )
-    container_id: str | None = strawberry.field(
+    container_id: str | None = gql_field(
         description="The container ID on the agent. Null if container not yet created or hidden."
     )
-    allocation: ResourceAllocationGQL = strawberry.field(
+    allocation: ResourceAllocationGQL = gql_field(
         description="Resource allocation with requested and used slots."
     )
-    shares: ResourceSlotGQL = strawberry.field(
+    shares: ResourceSlotGQL = gql_field(
         description="The fractional resource shares occupied by this kernel."
     )
-    resource_opts: ResourceOptsGQL | None = strawberry.field(
+    resource_opts: ResourceOptsGQL | None = gql_field(
         description="Additional resource options and configurations for this kernel."
     )
 
@@ -249,10 +248,10 @@ class KernelV2ResourceInfoGQL:
     name="KernelV2NetworkInfo",
 )
 class KernelV2NetworkInfoGQL:
-    service_ports: ServicePortsGQL | None = strawberry.field(
+    service_ports: ServicePortsGQL | None = gql_field(
         description="Collection of service ports exposed by this kernel."
     )
-    preopen_ports: list[int] | None = strawberry.field(
+    preopen_ports: list[int] | None = gql_field(
         description="List of ports that are pre-opened for this kernel."
     )
 
@@ -266,22 +265,17 @@ class KernelV2NetworkInfoGQL:
     name="KernelV2LifecycleInfo",
 )
 class KernelV2LifecycleInfoGQL:
-    status: KernelV2StatusGQL = strawberry.field(
-        description=dedent_strip("""
-            Current status of the kernel (e.g., PENDING, RUNNING, TERMINATED).
-            Indicates the kernel's position in its lifecycle.
-        """)
+    status: KernelV2StatusGQL = gql_field(
+        description="Current status of the kernel (e.g., PENDING, RUNNING, TERMINATED). Indicates the kernel's position in its lifecycle."
     )
-    result: SessionV2ResultGQL = strawberry.field(
+    result: SessionV2ResultGQL = gql_field(
         description="The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."
     )
-    created_at: datetime | None = strawberry.field(
-        description="Timestamp when the kernel was created."
-    )
-    terminated_at: datetime | None = strawberry.field(
+    created_at: datetime | None = gql_field(description="Timestamp when the kernel was created.")
+    terminated_at: datetime | None = gql_field(
         description="Timestamp when the kernel was terminated. Null if still active."
     )
-    starts_at: datetime | None = strawberry.field(
+    starts_at: datetime | None = gql_field(
         description="Scheduled start time for the kernel, if applicable."
     )
 
@@ -302,31 +296,29 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     id: NodeID[str]
 
     # Inlined fields (from single-element types)
-    startup_command: str | None = strawberry.field(
+    startup_command: str | None = gql_field(
         description="Startup command executed when the kernel starts."
     )
 
     # Sub-info types
-    session_info: KernelV2SessionInfoGQL = strawberry.field(
+    session_info: KernelV2SessionInfoGQL = gql_field(
         description="Information about the session this kernel belongs to."
     )
-    user_info: KernelV2UserInfoGQL = strawberry.field(description="User and ownership information.")
-    network: KernelV2NetworkInfoGQL = strawberry.field(
+    user_info: KernelV2UserInfoGQL = gql_field(description="User and ownership information.")
+    network: KernelV2NetworkInfoGQL = gql_field(
         description="Network configuration and exposed ports."
     )
-    cluster: KernelV2ClusterInfoGQL = strawberry.field(
+    cluster: KernelV2ClusterInfoGQL = gql_field(
         description="Cluster configuration for distributed computing."
     )
-    resource: KernelV2ResourceInfoGQL = strawberry.field(
+    resource: KernelV2ResourceInfoGQL = gql_field(
         description="Resource allocation and agent information."
     )
-    lifecycle: KernelV2LifecycleInfoGQL = strawberry.field(
-        description="Lifecycle status and timestamps."
-    )
+    lifecycle: KernelV2LifecycleInfoGQL = gql_field(description="Lifecycle status and timestamps.")
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The agent running this kernel."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.2.0", description="The agent running this kernel.")
+    )  # type: ignore[misc]
     async def agent(self, info: Info[StrawberryGQLContext]) -> AgentV2GQL | None:
         if self.resource.agent_id is None:
             return None
@@ -337,9 +329,9 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
             return None
         return agent_data
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The user who owns this kernel."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.2.0", description="The user who owns this kernel.")
+    )  # type: ignore[misc]
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
         if self.user_info.user_id is None:
             return None
@@ -348,9 +340,9 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
             return None
         return user_data
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The project this kernel belongs to."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.2.0", description="The project this kernel belongs to.")
+    )  # type: ignore[misc]
     async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
         if self.user_info.group_id is None:
             return None
@@ -359,17 +351,19 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
             return None
         return project_data
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The domain this kernel belongs to."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.2.0", description="The domain this kernel belongs to.")
+    )  # type: ignore[misc]
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
         if self.user_info.domain_name is None:
             return None
         return await info.context.data_loaders.domain_loader.load(self.user_info.domain_name)
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.2.0. The resource group this kernel is assigned to."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.2.0", description="The resource group this kernel is assigned to."
+        )
+    )  # type: ignore[misc]
     async def resource_group(self, info: Info[StrawberryGQLContext]) -> ResourceGroupGQL | None:
         if self.resource.resource_group_name is None:
             return None
@@ -380,9 +374,9 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
             return None
         return resource_group_data
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The session this kernel belongs to."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.3.0", description="The session this kernel belongs to.")
+    )  # type: ignore[misc]
     async def session(
         self,
     ) -> (
@@ -394,9 +388,11 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     ):
         raise NotImplementedError
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. Per-slot resource allocation for this kernel."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0", description="Per-slot resource allocation for this kernel."
+        )
+    )  # type: ignore[misc]
     async def resource_allocations(
         self,
         info: Info[StrawberryGQLContext],

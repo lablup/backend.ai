@@ -5,11 +5,10 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Self
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.keypair.request import KeypairFilter, KeypairOrderBy
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_input
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_enum, gql_pydantic_input
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 
@@ -20,7 +19,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
             "Supports filtering by active state, admin flag, and access key. "
             "Multiple filters can be combined using AND, OR, and NOT logical operators."
         ),
-        added_version="26.5.0",
+        added_version=NEXT_RELEASE_VERSION,
     ),
     name="KeypairFilter",
 )
@@ -38,15 +37,18 @@ class KeypairFilterGQL(PydanticInputMixin[KeypairFilter]):
     NOT: list[Self] | None = None
 
 
-@strawberry.enum(
-    name="KeypairOrderField",
-    description=(
-        "Added in 26.5.0. Fields available for ordering keypair query results. "
-        "CREATED_AT: Order by creation timestamp. "
-        "LAST_USED: Order by last used timestamp. "
-        "ACCESS_KEY: Order by access key alphabetically. "
-        "IS_ACTIVE: Order by active status."
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Fields available for ordering keypair query results. "
+            "CREATED_AT: Order by creation timestamp. "
+            "LAST_USED: Order by last used timestamp. "
+            "ACCESS_KEY: Order by access key alphabetically. "
+            "IS_ACTIVE: Order by active status."
+        ),
     ),
+    name="KeypairOrderField",
 )
 class KeypairOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
@@ -59,7 +61,7 @@ class KeypairOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Specifies ordering for keypair query results. Default direction is DESC.",
-        added_version="26.5.0",
+        added_version=NEXT_RELEASE_VERSION,
     ),
     name="KeypairOrderBy",
 )

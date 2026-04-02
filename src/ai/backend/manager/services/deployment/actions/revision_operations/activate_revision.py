@@ -8,7 +8,7 @@ from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.data.deployment.types import DeploymentPolicyData, ModelDeploymentData
 
 from .base import RevisionOperationBaseAction
 
@@ -37,6 +37,7 @@ class ActivateRevisionActionResult(BaseActionResult):
     deployment: ModelDeploymentData
     previous_revision_id: UUID | None
     activated_revision_id: UUID
+    deployment_policy: DeploymentPolicyData
 
     @override
     def entity_id(self) -> str | None:

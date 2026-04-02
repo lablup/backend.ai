@@ -7,22 +7,32 @@ from collections.abc import Sequence
 from decimal import Decimal
 from functools import lru_cache
 
+from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
+    AliasImageInput,
+    DealiasImageInput,
+    ForgetImageInput,
     ImageAliasFilterInputDTO,
     ImageAliasOrderByInputDTO,
     ImageFilterInputDTO,
     ImageOrderByInputDTO,
+    PurgeImageInput,
+    UpdateImageInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     AdminSearchImageAliasesPayload,
     AdminSearchImagesPayload,
+    AliasImagePayload,
+    ForgetImagePayload,
     ImageAliasNode,
     ImageIdentityInfoDTO,
     ImageMetadataInfoDTO,
     ImageNode,
     ImageRequirementsInfoDTO,
+    PurgeImagePayload,
+    UpdateImagePayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageLabelInfo,
@@ -35,6 +45,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
 )
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
+from ai.backend.manager.models.image import ImageType
 from ai.backend.manager.models.image.conditions import (
     ImageAliasConditions,
     ImageConditions,
@@ -50,8 +61,15 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
+from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
+from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
+from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
+from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
+from ai.backend.manager.services.image.actions.update_image_by_id import UpdateImageByIdAction
+from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
 from .pagination import PaginationSpec
@@ -63,10 +81,10 @@ DEFAULT_PAGINATION_LIMIT = 50
 def _get_image_pagination_spec() -> PaginationSpec:
     """Get pagination spec for Image queries."""
     return PaginationSpec(
-        forward_order=ImageRow.id.asc(),
-        backward_order=ImageRow.id.desc(),
-        forward_condition_factory=lambda cursor_value: lambda: ImageRow.id > cursor_value,
-        backward_condition_factory=lambda cursor_value: lambda: ImageRow.id < cursor_value,
+        forward_order=ImageOrders.created_at(ascending=False),
+        backward_order=ImageOrders.created_at(ascending=True),
+        forward_condition_factory=ImageConditions.by_cursor_forward,
+        backward_condition_factory=ImageConditions.by_cursor_backward,
         tiebreaker_order=ImageRow.id.asc(),
     )
 
@@ -75,10 +93,10 @@ def _get_image_pagination_spec() -> PaginationSpec:
 def _get_alias_pagination_spec() -> PaginationSpec:
     """Get pagination spec for ImageAlias queries."""
     return PaginationSpec(
-        forward_order=ImageAliasRow.id.asc(),
-        backward_order=ImageAliasRow.id.desc(),
-        forward_condition_factory=lambda cursor_value: lambda: ImageAliasRow.id > cursor_value,
-        backward_condition_factory=lambda cursor_value: lambda: ImageAliasRow.id < cursor_value,
+        forward_order=ImageAliasOrders.alias(ascending=True),
+        backward_order=ImageAliasOrders.alias(ascending=False),
+        forward_condition_factory=ImageAliasConditions.by_cursor_forward,
+        backward_condition_factory=ImageAliasConditions.by_cursor_backward,
         tiebreaker_order=ImageAliasRow.id.asc(),
     )
 
@@ -208,6 +226,111 @@ class ImageAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    # ------------------------------------------------------------------ mutations
+
+    async def admin_forget(self, input: ForgetImageInput) -> ForgetImagePayload:
+        """Forget (soft-delete) an image by ID."""
+        result = await self._processors.image.forget_image_by_id.wait_for_complete(
+            ForgetImageByIdAction(image_id=ImageID(input.image_id))
+        )
+        return ForgetImagePayload(item=self._data_to_dto(result.image))
+
+    async def admin_purge(self, input: PurgeImageInput) -> PurgeImagePayload:
+        """Purge (hard-delete) an image by ID."""
+        result = await self._processors.image.purge_image_by_id.wait_for_complete(
+            PurgeImageByIdAction(image_id=ImageID(input.image_id))
+        )
+        return PurgeImagePayload(item=self._data_to_dto(result.image))
+
+    async def admin_alias(self, input: AliasImageInput) -> AliasImagePayload:
+        """Create an alias for an image."""
+        result = await self._processors.image.alias_image_by_id.wait_for_complete(
+            AliasImageByIdAction(image_id=ImageID(input.image_id), alias=input.alias)
+        )
+        return AliasImagePayload(
+            alias_id=result.image_alias.id,
+            alias=result.image_alias.alias,
+            image_id=result.image_id,
+        )
+
+    async def admin_dealias(self, input: DealiasImageInput) -> AliasImagePayload:
+        """Remove an image alias."""
+        result = await self._processors.image.dealias_image.wait_for_complete(
+            DealiasImageAction(alias=input.alias)
+        )
+        return AliasImagePayload(
+            alias_id=result.image_alias.id,
+            alias=result.image_alias.alias,
+            image_id=result.image_id,
+        )
+
+    async def admin_update(self, input: UpdateImageInput) -> UpdateImagePayload:
+        """Update an image by ID (superadmin only)."""
+        spec = ImageUpdaterSpec(
+            name=(
+                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
+            ),
+            registry=(
+                OptionalState.update(input.registry)
+                if input.registry is not None
+                else OptionalState.nop()
+            ),
+            image=(
+                OptionalState.update(input.image)
+                if input.image is not None
+                else OptionalState.nop()
+            ),
+            tag=(OptionalState.update(input.tag) if input.tag is not None else OptionalState.nop()),
+            architecture=(
+                OptionalState.update(input.architecture)
+                if input.architecture is not None
+                else OptionalState.nop()
+            ),
+            is_local=(
+                OptionalState.update(input.is_local)
+                if input.is_local is not None
+                else OptionalState.nop()
+            ),
+            size_bytes=(
+                OptionalState.update(input.size_bytes)
+                if input.size_bytes is not None
+                else OptionalState.nop()
+            ),
+            image_type=(
+                OptionalState.update(ImageType(input.type))
+                if input.type is not None
+                else OptionalState.nop()
+            ),
+            config_digest=(
+                OptionalState.update(input.config_digest)
+                if input.config_digest is not None
+                else OptionalState.nop()
+            ),
+            labels=(
+                OptionalState.update(input.labels)
+                if input.labels is not None
+                else OptionalState.nop()
+            ),
+            accelerators=(
+                TriState.nop()
+                if isinstance(input.supported_accelerators, Sentinel)
+                else TriState.nullify()
+                if input.supported_accelerators is None
+                else TriState.update(input.supported_accelerators)
+            ),
+            resources=(
+                OptionalState.update(input.resource_limits)
+                if input.resource_limits is not None
+                else OptionalState.nop()
+            ),
+        )
+        result = await self._processors.image.update_image_by_id.wait_for_complete(
+            UpdateImageByIdAction(image_id=ImageID(input.image_id), updater_spec=spec)
+        )
+        return UpdateImagePayload(item=self._data_to_dto(result.image))
+
+    # ------------------------------------------------------------------ querier builders
 
     def _build_offset_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
         """Build a BatchQuerier with offset pagination from the search input DTO."""
@@ -383,10 +506,12 @@ class ImageAdapter(BaseAdapter):
         return result
 
     @staticmethod
-    def _convert_max(value: Decimal | str) -> Decimal | None:
-        if isinstance(value, str):
-            value = Decimal(value)
-        return None if value.is_infinite() else value
+    def _convert_max(value: Decimal | str | None) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, Decimal):
+            return None if value.is_infinite() else str(value)
+        return str(value)
 
     def _data_to_dto(self, data: ImageData) -> ImageNode:
         """Convert data layer type to Pydantic DTO."""
@@ -396,7 +521,7 @@ class ImageAdapter(BaseAdapter):
         resource_limits_flat = [
             ImageResourceLimitInfo(
                 key=rl.key,
-                min=rl.min,
+                min=str(rl.min),
                 max=self._convert_max(rl.max),
             )
             for rl in data.resource_limits

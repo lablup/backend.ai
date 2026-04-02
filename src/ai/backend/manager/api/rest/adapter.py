@@ -6,10 +6,10 @@ Provides reusable conversion logic for common patterns.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import final
+from typing import Any, final
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
-from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import IntFilter, StringFilter, UUIDFilter
 from ai.backend.manager.repositories.base import QueryCondition
 
 
@@ -147,3 +147,31 @@ class BaseFilterAdapter:
             return in_factory(UUIDInMatchSpec(values=uuid_filter.not_in, negated=True))
 
         return None
+
+    @final
+    def convert_int_filter(
+        self,
+        int_filter: IntFilter,
+        int_conditions: Any,
+    ) -> QueryCondition | None:
+        """Convert IntFilter to QueryCondition using a conditions class.
+
+        The ``int_conditions`` object must have ``equals``, ``not_equals``,
+        ``gt``, ``gte``, ``lt``, ``lte`` factory methods (as produced by
+        ``_make_int_conditions`` in conditions modules).
+
+        Args:
+            int_filter: The integer filter to convert.
+            int_conditions: Object with factory methods for each comparison.
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise.
+        """
+        return int_filter.build_query_condition(
+            equals_factory=int_conditions.equals,
+            not_equals_factory=int_conditions.not_equals,
+            greater_than_factory=int_conditions.gt,
+            greater_than_or_equal_factory=int_conditions.gte,
+            less_than_factory=int_conditions.lt,
+            less_than_or_equal_factory=int_conditions.lte,
+        )

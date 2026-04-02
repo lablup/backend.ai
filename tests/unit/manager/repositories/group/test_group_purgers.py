@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.types import ResourceSlot, RuntimeVariant
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 
@@ -293,12 +293,8 @@ class TestGroupPurgersIntegration:
                     project=sample_group.id,
                     resource_group=sample_scaling_group,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    current_revision=uuid.uuid4(),
                     replicas=0,
-                    model_mount_destination="/models",
-                    cluster_mode="single-node",
-                    cluster_size=1,
-                    runtime_variant=RuntimeVariant.CUSTOM,
-                    resource_slots=ResourceSlot({}),
                 )
                 session.add(endpoint)
                 endpoints.append(endpoint)
@@ -353,6 +349,7 @@ class TestGroupPurgersIntegration:
                     project=sample_group.id,
                     status=RouteStatus.TERMINATED,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
                 session.add(routing)
                 routings.append(routing)

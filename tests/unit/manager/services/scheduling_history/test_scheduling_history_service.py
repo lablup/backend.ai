@@ -110,6 +110,7 @@ def _make_route_history() -> RouteHistoryData:
         id=uuid4(),
         route_id=uuid4(),
         deployment_id=uuid4(),
+        category="lifecycle",
         phase="CREATING",
         from_status=None,
         to_status=None,

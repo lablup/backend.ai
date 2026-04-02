@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import Any, Self, cast
 from uuid import UUID
 
-import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -40,6 +39,8 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -58,34 +59,49 @@ from .revision import ModelRevision
 
 # ========== Enums ==========
 
-ReadinessStatus: type[CommonReadinessStatus] = strawberry.enum(
+ReadinessStatus: type[CommonReadinessStatus] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.",
+    ),
     CommonReadinessStatus,
     name="ReadinessStatus",
-    description="Added in 25.19.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.",
 )
 
-LivenessStatus: type[CommonLivenessStatus] = strawberry.enum(
+LivenessStatus: type[CommonLivenessStatus] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.",
+    ),
     CommonLivenessStatus,
     name="LivenessStatus",
-    description="Added in 25.19.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.",
 )
 
-ActivenessStatus: type[CommonActivenessStatus] = strawberry.enum(
+ActivenessStatus: type[CommonActivenessStatus] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.",
+    ),
     CommonActivenessStatus,
     name="ActivenessStatus",
-    description="Added in 25.19.0. This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.",
 )
 
-ReplicaStatus: type[RouteStatus] = strawberry.enum(
+ReplicaStatus: type[RouteStatus] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="This enum represents the provisioning status of a replica.",
+    ),
     RouteStatus,
     name="ReplicaStatus",
-    description="Added in 25.19.0. This enum represents the provisioning status of a replica.",
 )
 
-TrafficStatus: type[RouteTrafficStatus] = strawberry.enum(
+TrafficStatus: type[RouteTrafficStatus] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="This enum represents the traffic status of a replica.",
+    ),
     RouteTrafficStatus,
     name="TrafficStatus",
-    description="Added in 25.19.0. This enum represents the traffic status of a replica.",
 )
 
 
@@ -96,7 +112,9 @@ TrafficStatus: type[RouteTrafficStatus] = strawberry.enum(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
 class ReplicaStatusFilter(PydanticInputMixin[ReplicaStatusFilterDTO]):
-    in_: list[ReplicaStatus] | None = strawberry.field(name="in", default=None)
+    in_: list[ReplicaStatus] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     equals: ReplicaStatus | None = None
 
 
@@ -104,7 +122,9 @@ class ReplicaStatusFilter(PydanticInputMixin[ReplicaStatusFilterDTO]):
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
 class TrafficStatusFilter(PydanticInputMixin[ReplicaTrafficStatusFilterDTO]):
-    in_: list[TrafficStatus] | None = strawberry.field(name="in", default=None)
+    in_: list[TrafficStatus] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     equals: TrafficStatus | None = None
 
 
@@ -142,30 +162,28 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     id: NodeID[str]
     session_id: ID
     revision_id: ID
-    readiness_status: ReadinessStatus = strawberry.field(
-        description="Whether the replica has been checked and its health state.",
+    readiness_status: ReadinessStatus = gql_field(
+        description="Whether the replica has been checked and its health state."
     )
-    liveness_status: LivenessStatus = strawberry.field(
-        description="Whether the replica is currently running and able to serve requests.",
+    liveness_status: LivenessStatus = gql_field(
+        description="Whether the replica is currently running and able to serve requests."
     )
-    activeness_status: ActivenessStatus = strawberry.field(
-        description="Whether the replica is currently active and able to serve requests.",
+    activeness_status: ActivenessStatus = gql_field(
+        description="Whether the replica is currently active and able to serve requests."
     )
-    weight: int = strawberry.field(
-        description="Traffic weight for load balancing between replicas."
-    )
-    created_at: datetime = strawberry.field(description="Timestamp when the replica was created.")
+    weight: int = gql_field(description="Traffic weight for load balancing between replicas.")
+    created_at: datetime = gql_field(description="Timestamp when the replica was created.")
 
-    @strawberry.field(  # type: ignore[misc]
+    @gql_field(
         description="The session ID associated with the replica. This can be null right after replica creation."
-    )
+    )  # type: ignore[misc]
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:
         session_global_id = to_global_id(
             ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
         )
         return Session(id=ID(session_global_id))
 
-    @strawberry.field
+    @gql_field(description="The revision of this entity.")  # type: ignore[misc]
     async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
         """Resolve revision by ID."""
         node = await info.context.adapters.deployment.get_revision(UUID(str(self.revision_id)))

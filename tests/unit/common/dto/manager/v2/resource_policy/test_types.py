@@ -51,7 +51,10 @@ class TestKeypairResourcePolicyOrderField:
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in KeypairResourcePolicyOrderField}
-        assert values == {"name", "created_at"}
+        assert "name" in values
+        assert "created_at" in values
+        assert "max_concurrent_sessions" in values
+        assert "idle_timeout" in values
 
 
 class TestUserResourcePolicyOrderField:
@@ -65,7 +68,10 @@ class TestUserResourcePolicyOrderField:
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in UserResourcePolicyOrderField}
-        assert values == {"name", "created_at"}
+        assert "name" in values
+        assert "created_at" in values
+        assert "max_vfolder_count" in values
+        assert "max_customized_image_count" in values
 
 
 class TestProjectResourcePolicyOrderField:
@@ -79,4 +85,7 @@ class TestProjectResourcePolicyOrderField:
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in ProjectResourcePolicyOrderField}
-        assert values == {"name", "created_at"}
+        assert "name" in values
+        assert "created_at" in values
+        assert "max_vfolder_count" in values
+        assert "max_network_count" in values

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Self
 
-from prometheus_client import Gauge
+from ai.backend.common.metrics.safe import SafeGauge as Gauge
 
 
 class VolumePerfMetricObserver:

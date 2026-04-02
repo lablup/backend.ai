@@ -46,6 +46,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpecDraft,
     MountMetadata,
     ResourceSpecDraft,
+    RouteHealthStatus,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
@@ -250,7 +251,7 @@ class ModelServingService:
                 cluster_mode=action.creator.cluster_mode,
                 cluster_size=action.creator.cluster_size,
                 resource_slots=action.creator.config.resources,
-                resource_opts=None,
+                resource_opts=action.creator.config.resource_opts,
             ),
             mounts=MountMetadata(
                 model_vfolder_id=model_vfolder_id,
@@ -268,6 +269,8 @@ class ModelServingService:
         action.creator = action.creator.with_revision(revision)
 
         creation_config = action.creator.config.to_dict()
+        # Override resource_opts with merged values from deployment config + API request
+        creation_config["resource_opts"] = dict(revision.resource_spec.resource_opts or {})
         creation_config["mounts"] = [
             model_vfolder_id,
             *[m.vfid.folder_id for m in service_prepare_ctx.extra_mounts],
@@ -406,7 +409,10 @@ class ModelServingService:
                     replicas=endpoint.replicas,
                     desired_session_count=endpoint.replicas,
                     active_route_count=len([
-                        r for r in endpoint.routings if r.status == RouteStatus.HEALTHY
+                        r
+                        for r in endpoint.routings
+                        if r.status == RouteStatus.RUNNING
+                        and r.health_status == RouteHealthStatus.HEALTHY
                     ])
                     if endpoint.routings
                     else 0,
@@ -482,7 +488,7 @@ class ModelServingService:
                 cluster_mode=action.cluster_mode,
                 cluster_size=action.cluster_size,
                 resource_slots=action.config.resources,
-                resource_opts=None,
+                resource_opts=action.config.resource_opts,
             ),
             mounts=MountMetadata(
                 model_vfolder_id=model_vfolder_id,

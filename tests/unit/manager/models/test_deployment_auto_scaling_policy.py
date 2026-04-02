@@ -15,9 +15,7 @@ from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     BinarySize,
-    ClusterMode,
     ResourceSlot,
-    RuntimeVariant,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
@@ -35,7 +33,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -84,6 +82,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -280,20 +279,12 @@ class TestDeploymentAutoScalingPolicyRow:
                 created_user=test_user.uuid,
                 session_owner=test_user.uuid,
                 replicas=1,
-                image=test_image.id,
                 domain=test_domain.name,
                 project=test_group.id,
                 resource_group=test_scaling_group.name,
-                resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 url=f"https://test-{uuid.uuid4().hex[:8]}.example.com",
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                model_mount_destination="/models",
-                cluster_mode=ClusterMode.SINGLE_NODE.name,
-                cluster_size=1,
-                runtime_variant=RuntimeVariant.CUSTOM,
-                environ={},
-                resource_opts={},
-                extra_mounts=[],
+                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.flush()

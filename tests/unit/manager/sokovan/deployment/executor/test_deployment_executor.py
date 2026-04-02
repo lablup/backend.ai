@@ -72,35 +72,37 @@ class TestCheckPendingDeployments:
         assert pending_deployment.deployment_info.id in url_updates
         assert url_updates[pending_deployment.deployment_info.id] == expected_url
 
-    async def test_deployment_without_revision_uses_endpoint_fallback(
+    async def test_deployment_without_revision_is_skipped(
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
         pending_deployment_no_revision: DeploymentWithHistory,
         proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
     ) -> None:
-        """CD-002: Deployment without current_revision_id falls back to endpoint-level fields.
+        """CD-002: Deployment without current_revision_id is skipped.
 
         Given: PENDING deployment without target revision
         When: Check pending deployments
-        Then: Falls back to get_revision_spec_from_endpoint and succeeds
+        Then: Deployment is skipped (not failed, not succeeded)
         """
         # Arrange
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
 
-        entity_ids = [pending_deployment_no_revision.deployment_info.id]
-        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await deployment_executor.check_pending_deployments([
-                pending_deployment_no_revision
-            ])
+        expected_url = "http://endpoint.test/v1"
+        with patch.object(deployment_executor, "_register_endpoint", return_value=expected_url):
+            entity_ids = [pending_deployment_no_revision.deployment_info.id]
+            with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
+                # Act
+                result = await deployment_executor.check_pending_deployments([
+                    pending_deployment_no_revision
+                ])
 
-        # Assert - Fallback succeeded, endpoint registered
-        assert len(result.successes) == 1
+        # Assert - Deployment skipped due to missing revision
+        assert len(result.successes) == 0
         assert len(result.failures) == 0
-        mock_deployment_repo.get_revision_spec_from_endpoint.assert_awaited_once()
+        assert len(result.skipped) == 1
 
     async def test_no_proxy_target_deployment_skipped(
         self,
@@ -127,6 +129,7 @@ class TestCheckPendingDeployments:
         # Assert
         assert len(result.successes) == 0
         assert len(result.failures) == 0
+        assert len(result.skipped) == 1
 
     async def test_endpoint_registration_failure_captured(
         self,
@@ -235,7 +238,6 @@ class TestCheckReadyDeployments:
     async def test_empty_deployment_list(
         self,
         deployment_executor: DeploymentExecutor,
-        mock_deployment_repo: AsyncMock,
     ) -> None:
         """CR-003: Empty deployment list returns empty result.
 
@@ -310,16 +312,13 @@ class TestScaleDeployment:
         # Arrange - 3 routes exist, target is 1, so need to terminate 2 routes
         mock_route1 = MagicMock()
         mock_route1.route_id = uuid4()
-        mock_route1.status = MagicMock()
-        mock_route1.status.termination_priority = MagicMock(return_value=1)
+        mock_route1.termination_priority = 1
         mock_route2 = MagicMock()
         mock_route2.route_id = uuid4()
-        mock_route2.status = MagicMock()
-        mock_route2.status.termination_priority = MagicMock(return_value=2)
+        mock_route2.termination_priority = 2
         mock_route3 = MagicMock()
         mock_route3.route_id = uuid4()
-        mock_route3.status = MagicMock()
-        mock_route3.status.termination_priority = MagicMock(return_value=3)
+        mock_route3.termination_priority = 3
 
         mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
             ready_deployment_needs_scale_down.deployment_info.id: [
@@ -393,6 +392,7 @@ class TestScaleDeployment:
             result = await deployment_executor.scale_deployment([ready_deployment_needs_scale_up])
 
         # Assert - KeyError since deployment.id not in empty dict
+        assert len(result.successes) == 0
         assert len(result.failures) == 1
 
 

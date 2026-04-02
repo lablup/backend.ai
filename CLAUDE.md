@@ -7,6 +7,7 @@ This file contains core rules for AI coding agents. For detailed patterns and wo
 **Core Documents (Read directly):**
 - `tests/CLAUDE.md` - Testing guidelines and strategies
 - `BUILDING.md` - Build system, quality enforcement, BUILD policies
+- `src/ai/backend/manager/models/alembic/README.md` - Alembic migration backport strategy
 - `README.md` - Project overview and architecture
 - `proposals/README.md` - BEP (Backend.AI Enhancement Proposals)
 
@@ -14,7 +15,7 @@ This file contains core rules for AI coding agents. For detailed patterns and wo
 
 Design: `/bep-guide`
 Development: `/repository-guide`, `/service-guide`, `/api-guide`, `/tdd-guide`
-Utilities: `/cli-executor`, `/db-status`, `/db-migrate`
+Utilities: `/cli-executor`, `/db-status`, `/db-migrate`, `/local-dev`, `/halfstack`
 
 Skills are in `.claude/skills/{name}/SKILL.md`. See `.claude/skills/README.md` for complete documentation.
 
@@ -49,6 +50,15 @@ pants test --changed-since=HEAD~1
 
 **Fix all lint, type, and test errors — never suppress or skip.**
 
+**After API/CLI changes, verify with live server using `./bai` CLI** — see `/local-dev` skill.
+If docker service changes are needed, see `/halfstack` skill.
+
+## Alembic Migration Backport
+
+When backporting migrations to release branches, both the backport and main branch
+migrations must be idempotent. See `src/ai/backend/manager/models/alembic/README.md`
+for the full strategy and examples.
+
 ## Layer Architecture
 
 API Handler → Processor → Service → Repository → DB
@@ -58,6 +68,25 @@ API Handler → Processor → Service → Repository → DB
 - Repositories handle all DB access via `begin_session()` / `begin_readonly_session()`
 - NEVER import from a lower layer to a higher layer
 - For detailed patterns, read skill files: `/repository-guide`, `/service-guide`, `/api-guide`
+
+## API Development Rules
+
+**All new features MUST use v2 patterns across the full stack:**
+- REST API: `api/rest/v2/{entity}/` (NEVER add new endpoints to REST v1)
+- DTOs: `common/dto/manager/v2/{entity}/` (shared across GQL and REST v2)
+- GraphQL: Strawberry-based `api/gql/{entity}/` (NEVER add to `gql_legacy/`)
+- Adapter: `api/adapters/{entity}.py` (shared between GQL and REST v2)
+- Client SDK: `client/v2/domains_v2/{entity}.py` (typed Pydantic request/response)
+- CLI: `client/cli/v2/{entity}/` (calls SDK v2)
+
+**Standard 6 operations per entity:** create, get, search, update, delete, purge
+- For detailed API patterns: `/api-guide`
+- For SDK/CLI patterns: `/cli-sdk-guide`
+
+**After implementing new API endpoints, verify with the live server:**
+1. Restart server: `./dev restart mgr`
+2. Test each operation via `./bai` CLI (see `/local-dev` skill for setup and commands)
+3. Verify both admin and non-admin scenarios
 
 ## Development Guidelines
 

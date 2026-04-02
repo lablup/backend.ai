@@ -15,7 +15,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
@@ -33,7 +33,7 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -89,6 +89,7 @@ class TestSchedulingHistoryRepository:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -499,7 +500,7 @@ class TestSchedulingHistoryRepository:
                 deployment_id=deployment_id,
                 phase="PROVISION",
                 from_status=str(RouteStatus.PROVISIONING.value),
-                to_status=str(RouteStatus.HEALTHY.value),
+                to_status=str(RouteHealthStatus.HEALTHY.value),
                 result=str(SchedulingResult.SUCCESS),
                 message="Route provisioned",
                 attempts=1,
@@ -517,8 +518,8 @@ class TestSchedulingHistoryRepository:
 
         assert result.total_count == 1
         item = result.items[0]
-        assert item.from_status == RouteStatus.PROVISIONING
-        assert item.to_status == RouteStatus.HEALTHY
+        assert item.from_status == RouteStatus.PROVISIONING.value
+        assert item.to_status == RouteHealthStatus.HEALTHY.value
 
     async def test_search_route_history_by_deployment_id(
         self,

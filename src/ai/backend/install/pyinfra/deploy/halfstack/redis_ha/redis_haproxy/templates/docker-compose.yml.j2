@@ -1,0 +1,44 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  extra_hosts:
+{%- for node in config.cluster_nodes %}
+    - "redis{{ node.node_number }}:{{ node.ip }}"
+{%- endfor %}
+  image: ${HAPROXY_BASE_IMG}
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cpu_count: {{ config.haproxy_cpu_count }}
+  mem_limit: "{{ config.haproxy_memory_limit }}"
+  pids_limit: {{ config.pids_limit }}
+
+services:
+  redis-haproxy:
+    <<: *base
+    container_name: {{ config.haproxy_container_name_prefix }}
+    sysctls:
+      - net.ipv4.tcp_tw_reuse=1
+    volumes:
+      - ./conf:/usr/local/etc/haproxy:ro
+    ports:
+      - "${REDIS_HAPROXY_SERVICE_PORT}:6379"
+      - "${REDIS_HAPROXY_STAT_PORT}:{{ config.haproxy_stat_port }}"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+{%- for node in config.cluster_nodes %}
+      REDIS{{ node.node_number }}_IP: {{ node.ip }}
+      REDIS{{ node.node_number }}_PORT: {{ node.port }}
+{%- endfor %}
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    command:
+      - haproxy
+      - -f
+      - /usr/local/etc/haproxy/haproxy.cfg

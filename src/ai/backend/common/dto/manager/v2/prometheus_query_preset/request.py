@@ -12,7 +12,6 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
-from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import OrderDirection, QueryDefinitionOrderField
@@ -192,7 +191,7 @@ class ExecuteQueryDefinitionInput(BaseRequestModel):
         pattern=PROMETHEUS_DURATION_PATTERN,
         description="Time window override (e.g. '5m', '1h')",
     )
-    time_range: QueryTimeRange | None = Field(
+    time_range: QueryTimeRangeInputDTO | None = Field(
         default=None,
         description=(
             "Time range for the query; if omitted, executes an instant query at the current time"

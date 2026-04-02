@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# Redis HAProxy status check script using text-based stats
+STATS_URL="http://127.0.0.1:{{ config.haproxy_stat_port }}/stats;csv"
+
+# Use wget if available, otherwise try basic tools
+if command -v wget >/dev/null 2>&1; then
+    STATUS=$(wget -qO- "$STATS_URL" 2>/dev/null)
+elif command -v nc >/dev/null 2>&1; then
+    STATUS=$(echo -e "GET /stats;csv HTTP/1.0\r\n\r\n" | nc 127.0.0.1 {{ config.haproxy_stat_port }} 2>/dev/null | tail -n +10)
+else
+    # Fallback: Direct Redis connection test
+    echo "=== HAProxy Redis Backend Status ==="
+    echo "HAProxy stats not available - checking Redis servers directly:"
+    {% for node in config.cluster_nodes -%}
+    redis_status=$(timeout 5 redis-cli -h {{ node.ip }} -p {{ node.port }} -a "{{ config.password }}" ping 2>/dev/null)
+    if [ "$redis_status" = "PONG" ]; then
+        echo "Redis{{ node.node_number }} ({{ node.hostname }}:{{ node.port }}): UP"
+    else
+        echo "Redis{{ node.node_number }} ({{ node.hostname }}:{{ node.port }}): DOWN"
+    fi
+    {% endfor -%}
+    exit 0
+fi
+
+if [ -z "$STATUS" ]; then
+    echo "=== HAProxy Redis Backend Status ==="
+    echo "HAProxy stats not available"
+    exit 0
+fi
+
+echo "=== HAProxy Redis Backend Status ==="
+# Parse CSV format HAProxy stats
+echo "$STATUS" | grep -v "^#" | grep "redis" | while IFS=',' read -r pxname svname qcur qmax scur smax slim stot bin bout dreq dresp ereq econ eresp wretr wredis status weight act bck chkfail chkdown lastchg downtime qlimit pid iid sid throttle lbtot tracked type rate rate_lim rate_max check_status check_code check_duration hrsp_1xx hrsp_2xx hrsp_3xx hrsp_4xx hrsp_5xx hrsp_other hanafail req_rate req_rate_max req_tot cli_abrt srv_abrt comp_in comp_out comp_byp comp_rsp lastsess last_chk last_agt qtime ctime rtime ttime
+do
+    if [ "$svname" != "BACKEND" ]; then
+        printf "%-12s : %-8s / check: %-8s / downtime: %-8s\n" "$svname" "$status" "$check_status" "$downtime"
+    fi
+done
+
+echo ""
+echo "=== Connection Statistics ==="
+# Get frontend stats
+frontend_stats=$(echo "$STATUS" | grep "FRONTEND" | head -1)
+if [ ! -z "$frontend_stats" ]; then
+    scur=$(echo "$frontend_stats" | cut -d',' -f5)
+    smax=$(echo "$frontend_stats" | cut -d',' -f6)
+    stot=$(echo "$frontend_stats" | cut -d',' -f8)
+    echo "Current connections: ${scur:-N/A}"
+    echo "Max connections: ${smax:-N/A}" 
+    echo "Total connections: ${stot:-N/A}"
+else
+    echo "Connection statistics not available"
+fi

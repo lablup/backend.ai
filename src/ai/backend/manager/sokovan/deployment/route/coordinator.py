@@ -19,6 +19,7 @@ from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
@@ -35,6 +36,10 @@ from ai.backend.manager.sokovan.deployment.route.handlers import (
     RouteHandler,
     ServiceDiscoverySyncHandler,
     TerminatingRouteHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
+    RouteHealthObserver,
+    RouteObserver,
 )
 from ai.backend.manager.sokovan.deployment.route.handlers.running import RunningRouteHandler
 from ai.backend.manager.sokovan.deployment.route.recorder import RouteRecorderContext
@@ -118,6 +123,16 @@ class RouteCoordinator:
             service_discovery=service_discovery,
         )
         self._route_handlers = self._init_handlers(executor)
+        self._route_observers = self._init_observers()
+
+    def _init_observers(self) -> Mapping[RouteLifecycleType, RouteObserver]:
+        """Initialize route observers (no state transitions)."""
+        return {
+            RouteLifecycleType.OBSERVE_HEALTH: RouteHealthObserver(
+                deployment_repository=self._deployment_repository,
+                valkey_schedule=self._valkey_schedule,
+            ),
+        }
 
     def _init_handlers(self, executor: RouteExecutor) -> Mapping[RouteLifecycleType, RouteHandler]:
         """Initialize and return the mapping of route lifecycle types to their handlers."""
@@ -157,6 +172,12 @@ class RouteCoordinator:
         Args:
             lifecycle_type: Type of route lifecycle operation to process
         """
+        # Check for observer first (no state transitions)
+        observer = self._route_observers.get(lifecycle_type)
+        if observer:
+            await self._process_observer(observer)
+            return
+
         handler = self._route_handlers.get(lifecycle_type)
         if not handler:
             log.warning("No handler for route lifecycle type: {}", lifecycle_type.value)
@@ -167,9 +188,11 @@ class RouteCoordinator:
                 lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
                 await stack.enter_async_context(self._lock_factory(handler.lock_id, lock_lifetime))
 
-            # Get routes by target statuses
+            # Get routes by target lifecycle + health statuses
+            target = handler.target_statuses()
             routes = await self._deployment_repository.get_routes_by_statuses(
-                handler.target_statuses()
+                target.lifecycle,
+                target.health,
             )
             if not routes:
                 log.trace("No routes to process for handler: {}", handler.name())
@@ -191,6 +214,29 @@ class RouteCoordinator:
             except Exception as e:
                 log.error("Error during post-processing: {}", e)
 
+    async def _process_observer(self, observer: RouteObserver) -> None:
+        """Process a route observer (no state transitions).
+
+        Observers collect data (e.g., health check results) without
+        changing route status in DB.
+        """
+        try:
+            routes = await self._deployment_repository.get_routes_by_statuses(
+                [RouteStatus.RUNNING],
+                list(RouteHealthStatus),
+            )
+            if not routes:
+                return
+
+            result = await observer.observe(routes)
+            log.debug(
+                "Observer {}: observed {} routes",
+                observer.name(),
+                result.observed_count,
+            )
+        except Exception:
+            log.exception("Error in route observer {}", observer.name())
+
     async def _handle_status_transitions(
         self,
         handler: RouteHandler,
@@ -208,54 +254,63 @@ class RouteCoordinator:
             records: Execution records from the recorder context
         """
         handler_name = handler.name()
-        target_statuses = handler.target_statuses()
-        from_status = target_statuses[0] if target_statuses else None
+        handler_category = handler.category()
+        transitions = handler.status_transitions()
+        target = handler.target_statuses()
+        from_status = target.lifecycle[0] if target.lifecycle else None
 
         # Collect all batch updaters and history specs
         batch_updaters: list[BatchUpdater[RoutingRow]] = []
         all_history_specs: list[RouteHistoryCreatorSpec] = []
 
         # Handle success transitions
-        next_status = handler.next_status()
-        if next_status is not None and result.successes:
+        if transitions.success is not None and result.successes:
             route_ids = [r.route_id for r in result.successes]
+            to_status = transitions.success.status or from_status
             success_history_specs = [
                 RouteHistoryCreatorSpec(
                     route_id=r.route_id,
                     deployment_id=r.endpoint_id,
+                    category=handler_category,
                     phase=handler_name,
                     result=SchedulingResult.SUCCESS,
                     message=f"{handler_name} completed successfully",
                     from_status=from_status,
-                    to_status=next_status,
+                    to_status=to_status,
+                    to_health_status=transitions.success.health_status,
                     sub_steps=extract_sub_steps_for_entity(r.route_id, records),
                 )
                 for r in result.successes
             ]
             batch_updaters.append(
                 BatchUpdater(
-                    spec=RouteBatchUpdaterSpec(status=next_status),
+                    spec=RouteBatchUpdaterSpec(
+                        status=transitions.success.status,
+                        health_status=transitions.success.health_status,
+                    ),
                     conditions=[
                         RouteConditions.by_ids(route_ids),
-                        RouteConditions.by_statuses(target_statuses),
+                        RouteConditions.by_lifecycle_statuses(target.lifecycle),
                     ],
                 )
             )
             all_history_specs.extend(success_history_specs)
 
         # Handle failure transitions
-        failure_status = handler.failure_status()
-        if failure_status is not None and result.errors:
+        if transitions.failure is not None and result.errors:
             route_ids = [e.route_info.route_id for e in result.errors]
+            to_status = transitions.failure.status or from_status
             failure_history_specs = [
                 RouteHistoryCreatorSpec(
                     route_id=e.route_info.route_id,
                     deployment_id=e.route_info.endpoint_id,
+                    category=handler_category,
                     phase=handler_name,
                     result=SchedulingResult.FAILURE,
                     message=e.reason,
                     from_status=from_status,
-                    to_status=failure_status,
+                    to_status=to_status,
+                    to_health_status=transitions.failure.health_status,
                     error_code=e.error_code,
                     sub_steps=extract_sub_steps_for_entity(e.route_info.route_id, records),
                 )
@@ -263,38 +318,46 @@ class RouteCoordinator:
             ]
             batch_updaters.append(
                 BatchUpdater(
-                    spec=RouteBatchUpdaterSpec(status=failure_status),
+                    spec=RouteBatchUpdaterSpec(
+                        status=transitions.failure.status,
+                        health_status=transitions.failure.health_status,
+                    ),
                     conditions=[
                         RouteConditions.by_ids(route_ids),
-                        RouteConditions.by_statuses(target_statuses),
+                        RouteConditions.by_lifecycle_statuses(target.lifecycle),
                     ],
                 )
             )
             all_history_specs.extend(failure_history_specs)
 
         # Handle stale transitions
-        stale_status = handler.stale_status()
-        if stale_status is not None and result.stale:
+        if transitions.stale is not None and result.stale:
             route_ids = [r.route_id for r in result.stale]
+            to_status = transitions.stale.status or from_status
             stale_history_specs = [
                 RouteHistoryCreatorSpec(
                     route_id=r.route_id,
                     deployment_id=r.endpoint_id,
+                    category=handler_category,
                     phase=handler_name,
-                    result=SchedulingResult.SUCCESS,  # Stale is not a failure, it's a cleanup
+                    result=SchedulingResult.SUCCESS,
                     message=f"{handler_name} marked route as stale",
                     from_status=from_status,
-                    to_status=stale_status,
+                    to_status=to_status,
+                    to_health_status=transitions.stale.health_status,
                     sub_steps=extract_sub_steps_for_entity(r.route_id, records),
                 )
                 for r in result.stale
             ]
             batch_updaters.append(
                 BatchUpdater(
-                    spec=RouteBatchUpdaterSpec(status=stale_status),
+                    spec=RouteBatchUpdaterSpec(
+                        status=transitions.stale.status,
+                        health_status=transitions.stale.health_status,
+                    ),
                     conditions=[
                         RouteConditions.by_ids(route_ids),
-                        RouteConditions.by_statuses(target_statuses),
+                        RouteConditions.by_lifecycle_statuses(target.lifecycle),
                     ],
                 )
             )
@@ -366,6 +429,13 @@ class RouteCoordinator:
                 short_interval=None,  # No short-cycle for sync
                 long_interval=60.0,
                 initial_delay=30.0,
+            ),
+            # Health observer - manager fallback health check for stale routes
+            RouteTaskSpec(
+                RouteLifecycleType.OBSERVE_HEALTH,
+                short_interval=None,
+                long_interval=30.0,
+                initial_delay=15.0,
             ),
         ]
 

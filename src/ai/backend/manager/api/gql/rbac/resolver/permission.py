@@ -8,18 +8,30 @@ from strawberry import Info
 from ai.backend.common.data.permission.scope_entity_combinations import (
     VALID_SCOPE_ENTITY_COMBINATIONS,
 )
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY, build_operation_description
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.rbac.types import (
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
+    EntityOperationCombinationGQL,
+    OperationInfoGQL,
+    OperationTypeGQL,
     PermissionConnection,
     PermissionFilter,
     PermissionGQL,
     PermissionOrderBy,
     RBACElementTypeGQL,
     ScopeEntityCombinationGQL,
+    ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
 )
 from ai.backend.manager.api.gql.rbac.types.permission import PermissionEdge
@@ -29,8 +41,11 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 # ==================== Query Resolvers ====================
 
 
-@strawberry.field(
-    description="Added in 26.3.0. List scoped permissions with filtering and pagination (admin only)."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="List scoped permissions with filtering and pagination (admin only).",
+    )
 )  # type: ignore[misc]
 async def admin_permissions(
     info: Info[StrawberryGQLContext],
@@ -75,7 +90,11 @@ async def admin_permissions(
     )
 
 
-@strawberry.field(description="Added in 26.3.0. List valid RBAC scope-entity type combinations.")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="List valid RBAC scope-entity type combinations."
+    )
+)  # type: ignore[misc]
 async def rbac_scope_entity_combinations(
     info: Info[StrawberryGQLContext],
 ) -> list[ScopeEntityCombinationGQL]:
@@ -84,17 +103,62 @@ async def rbac_scope_entity_combinations(
             scope_type=RBACElementTypeGQL(scope.value),
             valid_entity_types=sorted(
                 [RBACElementTypeGQL(entity.value) for entity in entities],
-                key=lambda e: e.value,
+                key=lambda e: e.value,  # type: ignore[attr-defined]
             ),
         )
         for scope, entities in VALID_SCOPE_ENTITY_COMBINATIONS.items()
     ]
 
 
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="List valid RBAC entity-operation combinations.",
+    )
+)  # type: ignore[misc]
+async def rbac_entity_operation_combinations(
+    info: Info[StrawberryGQLContext],
+) -> list[EntityOperationCombinationGQL]:
+    entity_ops: dict[RBACElementType, list[OperationInfoGQL]] = {}
+    for action_cls in RBAC_ACTION_REGISTRY:
+        perm = action_cls.required_permission()
+        name = action_cls.action_name()
+        desc = build_operation_description(name, perm.element_type)
+        entity_ops.setdefault(perm.element_type, []).append(
+            OperationInfoGQL(
+                operation=name.value,
+                description=desc,
+                required_permission=OperationTypeGQL(perm.operation.value),
+            )
+        )
+    return [
+        EntityOperationCombinationGQL(
+            entity_type=RBACElementTypeGQL(entity.value),
+            operations=sorted(ops, key=lambda o: o.operation),
+        )
+        for entity, ops in sorted(entity_ops.items(), key=lambda e: e[0].value)
+    ]
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="List complete RBAC scope-entity-operation combinations (permission matrix).",
+    )
+)  # type: ignore[misc]
+async def rbac_permission_matrix(
+    info: Info[StrawberryGQLContext],
+) -> list[ScopeEntityOperationCombinationGQL]:
+    dto_items = await info.context.adapters.rbac.get_permission_matrix()
+    return [ScopeEntityOperationCombinationGQL.from_pydantic(item) for item in dto_items]
+
+
 # ==================== Mutation Resolvers ====================
 
 
-@strawberry.mutation(description="Added in 26.3.0. Create a scoped permission (admin only).")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="26.3.0", description="Create a scoped permission (admin only).")
+)  # type: ignore[misc]
 async def admin_create_permission(
     info: Info[StrawberryGQLContext],
     input: CreatePermissionInput,
@@ -104,7 +168,9 @@ async def admin_create_permission(
     return PermissionGQL.from_pydantic(result)
 
 
-@strawberry.mutation(description="Added in 26.3.0. Update a scoped permission (admin only).")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="26.3.0", description="Update a scoped permission (admin only).")
+)  # type: ignore[misc]
 async def admin_update_permission(
     info: Info[StrawberryGQLContext],
     input: UpdatePermissionInput,
@@ -114,7 +180,9 @@ async def admin_update_permission(
     return PermissionGQL.from_pydantic(result)
 
 
-@strawberry.mutation(description="Added in 26.3.0. Delete a scoped permission (admin only).")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="26.3.0", description="Delete a scoped permission (admin only).")
+)  # type: ignore[misc]
 async def admin_delete_permission(
     info: Info[StrawberryGQLContext],
     input: DeletePermissionInput,

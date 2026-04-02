@@ -20,26 +20,26 @@ class TestEndpointType:
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
 
         unhealthy_route = Mock()
-        unhealthy_route.status = RouteStatus.UNHEALTHY.name
+        unhealthy_route.status = RouteStatus.FAILED_TO_START.name
         mock_endpoint.routings = [unhealthy_route, unhealthy_route]
 
         result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
         assert result == EndpointStatus.UNHEALTHY
 
-    async def test_status_degraded_when_healthy_and_degraded_routes_mixed(self) -> None:
+    async def test_status_degraded_when_healthy_and_provisioning_routes_mixed_1(self) -> None:
         """
-        When some routes are healthy and others are degraded/unhealthy,
+        When some routes are RUNNING and others are PROVISIONING,
         the endpoint status should be DEGRADED.
         """
         mock_endpoint = Mock(spec=Endpoint)
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
 
         healthy_route = Mock()
-        healthy_route.status = RouteStatus.HEALTHY.name
-        degraded_route = Mock()
-        degraded_route.status = RouteStatus.DEGRADED.name
+        healthy_route.status = RouteStatus.RUNNING.name
+        provisioning_route = Mock()
+        provisioning_route.status = RouteStatus.PROVISIONING.name
 
-        mock_endpoint.routings = [healthy_route, degraded_route]
+        mock_endpoint.routings = [healthy_route, provisioning_route]
 
         result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
         assert result == EndpointStatus.DEGRADED
@@ -56,7 +56,7 @@ class TestEndpointType:
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
 
         healthy_route = Mock()
-        healthy_route.status = RouteStatus.HEALTHY.name
+        healthy_route.status = RouteStatus.RUNNING.name
         provisioning_route = Mock()
         provisioning_route.status = RouteStatus.PROVISIONING.name
 
@@ -95,7 +95,7 @@ class TestEndpointType:
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
 
         healthy_route = Mock()
-        healthy_route.status = RouteStatus.HEALTHY.name
+        healthy_route.status = RouteStatus.RUNNING.name
         terminated_route = Mock()
         terminated_route.status = RouteStatus.TERMINATED.name
 

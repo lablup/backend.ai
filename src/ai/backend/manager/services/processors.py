@@ -15,6 +15,9 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_live.client import (
         ValkeyLiveClient,  # pants: no-infer-dep
     )
+    from ai.backend.common.clients.valkey_client.valkey_session.client import (
+        ValkeySessionClient,  # pants: no-infer-dep
+    )
     from ai.backend.common.clients.valkey_client.valkey_stat.client import (
         ValkeyStatClient,  # pants: no-infer-dep
     )
@@ -81,6 +84,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.deployment.service import (
         DeploymentService,  # pants: no-infer-dep
     )
+    from ai.backend.manager.services.deployment_revision_preset.processors import (
+        DeploymentRevisionPresetProcessors,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.deployment_revision_preset.service import (
+        DeploymentRevisionPresetService,  # pants: no-infer-dep
+    )
     from ai.backend.manager.services.domain.processors import (
         DomainProcessors,  # pants: no-infer-dep
     )
@@ -135,6 +144,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.metric.root_service import (
         UtilizationMetricService,  # pants: no-infer-dep
     )
+    from ai.backend.manager.services.model_card.processors import (
+        ModelCardProcessors,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.model_card.service import (
+        ModelCardService,  # pants: no-infer-dep
+    )
     from ai.backend.manager.services.model_serving.processors.auto_scaling import (
         ModelServingAutoScalingProcessors,  # pants: no-infer-dep
     )
@@ -177,6 +192,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.prometheus_query_preset.service import (
         PrometheusQueryPresetService,  # pants: no-infer-dep
     )
+    from ai.backend.manager.services.resource_allocation.processors import (
+        ResourceAllocationProcessors,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.resource_allocation.service import (
+        ResourceAllocationService,  # pants: no-infer-dep
+    )
     from ai.backend.manager.services.resource_preset.processors import (
         ResourcePresetProcessors,  # pants: no-infer-dep
     )
@@ -194,6 +215,18 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.resource_usage.service import (
         ResourceUsageService,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.runtime_variant.processors import (
+        RuntimeVariantProcessors,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.runtime_variant.service import (
+        RuntimeVariantService,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.runtime_variant_preset.processors import (
+        RuntimeVariantPresetProcessors,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.runtime_variant_preset.service import (
+        RuntimeVariantPresetService,  # pants: no-infer-dep
     )
     from ai.backend.manager.services.scaling_group.processors import (
         ScalingGroupProcessors,  # pants: no-infer-dep
@@ -245,6 +278,9 @@ if TYPE_CHECKING:
         VFolderProcessors,  # pants: no-infer-dep
         VFolderSharingProcessors,  # pants: no-infer-dep
     )
+    from ai.backend.manager.services.vfolder.processors.vfolder_admin import (
+        VFolderAdminProcessors,  # pants: no-infer-dep
+    )
     from ai.backend.manager.services.vfolder.services.file import (
         VFolderFileService,  # pants: no-infer-dep
     )
@@ -256,6 +292,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.vfolder.services.vfolder import (
         VFolderService,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.vfolder.services.vfolder_admin import (
+        VFolderAdminService,  # pants: no-infer-dep
     )
     from ai.backend.manager.services.vfs_storage.processors import (
         VFSStorageProcessors,  # pants: no-infer-dep
@@ -283,6 +322,7 @@ class ServiceArgs:
     valkey_stat_client: ValkeyStatClient
     valkey_live: ValkeyLiveClient
     valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
+    valkey_session_client: ValkeySessionClient
     event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
     event_hub: EventHub
@@ -317,6 +357,7 @@ class Services:
     image: ImageService
     container_registry: ContainerRegistryService
     vfolder: VFolderService
+    vfolder_admin: VFolderAdminService
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
     vfolder_sharing: VFolderSharingService
@@ -328,6 +369,10 @@ class Services:
     prometheus_query_preset: PrometheusQueryPresetService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
+    runtime_variant: RuntimeVariantService
+    runtime_variant_preset: RuntimeVariantPresetService
+    deployment_revision_preset: DeploymentRevisionPresetService
+    model_card: ModelCardService
     resource_usage: ResourceUsageService
     scaling_group: ScalingGroupService
     utilization_metric: UtilizationMetricService
@@ -347,6 +392,7 @@ class Services:
     scheduling_history: SchedulingHistoryService
     service_catalog: ServiceCatalogService
     template: TemplateService
+    resource_allocation: ResourceAllocationService
     stream: StreamService
     events: EventsService
 
@@ -372,6 +418,7 @@ class Processors(AbstractProcessorPackage):
     user: UserProcessors
     image: ImageProcessors
     vfolder: VFolderProcessors
+    vfolder_admin: VFolderAdminProcessors
     vfolder_invite: VFolderInviteProcessors
     vfolder_sharing: VFolderSharingProcessors
     vfolder_file: VFolderFileProcessors
@@ -384,6 +431,10 @@ class Processors(AbstractProcessorPackage):
     prometheus_query_preset: PrometheusQueryPresetProcessors
     resource_preset: ResourcePresetProcessors
     resource_slot: ResourceSlotProcessors
+    runtime_variant: RuntimeVariantProcessors
+    runtime_variant_preset: RuntimeVariantPresetProcessors
+    deployment_revision_preset: DeploymentRevisionPresetProcessors
+    model_card: ModelCardProcessors
     resource_usage: ResourceUsageProcessors
     scaling_group: ScalingGroupProcessors
     utilization_metric: UtilizationMetricProcessors
@@ -403,6 +454,7 @@ class Processors(AbstractProcessorPackage):
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors
     template: TemplateProcessors
+    resource_allocation: ResourceAllocationProcessors
     stream: StreamProcessors
     events: EventsProcessors
 
@@ -422,6 +474,7 @@ class Processors(AbstractProcessorPackage):
             *self.image.supported_actions(),
             *self.container_registry.supported_actions(),
             *self.vfolder.supported_actions(),
+            *self.vfolder_admin.supported_actions(),
             *self.vfolder_file.supported_actions(),
             *self.vfolder_invite.supported_actions(),
             *self.vfolder_sharing.supported_actions(),
@@ -433,6 +486,10 @@ class Processors(AbstractProcessorPackage):
             *self.prometheus_query_preset.supported_actions(),
             *self.resource_preset.supported_actions(),
             *self.resource_slot.supported_actions(),
+            *self.runtime_variant.supported_actions(),
+            *self.runtime_variant_preset.supported_actions(),
+            *self.deployment_revision_preset.supported_actions(),
+            *self.model_card.supported_actions(),
             *self.resource_usage.supported_actions(),
             *self.scaling_group.supported_actions(),
             *self.utilization_metric.supported_actions(),
@@ -446,12 +503,13 @@ class Processors(AbstractProcessorPackage):
             *self.artifact_registry.supported_actions(),
             *self.artifact_revision.supported_actions(),
             *self.artifact.supported_actions(),
-            *(self.deployment.supported_actions() if self.deployment else []),
+            *self.deployment.supported_actions(),
             *self.storage_namespace.supported_actions(),
             *self.audit_log.supported_actions(),
             *self.scheduling_history.supported_actions(),
             *self.service_catalog.supported_actions(),
             *self.template.supported_actions(),
+            *self.resource_allocation.supported_actions(),
             *self.stream.supported_actions(),
             *self.events.supported_actions(),
         ]

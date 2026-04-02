@@ -144,24 +144,6 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
             # Network fields
             open_to_public=self.open_to_public,
             url=self.url,
-            # Image
-            image=self.image_id,
-            # Resource fields
-            cluster_mode=self.cluster_mode.value,
-            cluster_size=self.cluster_size,
-            resource_slots=self.resource_slots,
-            resource_opts=dict(self.resource_opts) if self.resource_opts else {},
-            # Mount fields
-            model=self.model,
-            model_mount_destination=self.model_mount_destination,
-            model_definition_path=self.model_definition_path,
-            extra_mounts=list(self.extra_mounts),
-            # Execution fields
-            runtime_variant=self.runtime_variant,
-            startup_command=self.startup_command,
-            bootstrap_script=self.bootstrap_script,
-            environ=dict(self.environ) if self.environ else {},
-            callback_url=self.callback_url,
             # Default state fields
             lifecycle_stage=EndpointLifecycle.PENDING,
             retries=0,

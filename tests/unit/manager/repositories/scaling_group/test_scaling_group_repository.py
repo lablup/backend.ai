@@ -25,7 +25,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import AssociationScopesEntitiesRow, UserRoleRow
+from ai.backend.manager.models.rbac_models import AssociationScopesEntitiesRow, RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -99,6 +99,7 @@ class TestScalingGroupRepositoryDB:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -430,8 +431,8 @@ class TestScalingGroupRepositoryDB:
                     domain=test_domain,
                     project=test_group_id,
                     resource_group=sgroup_name,
-                    image=None,  # Allowed when lifecycle_stage=DESTROYED
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    current_revision=uuid.uuid4(),
                     session_owner=test_user_uuid,
                     created_user=test_user_uuid,
                 )
@@ -446,6 +447,7 @@ class TestScalingGroupRepositoryDB:
                     domain=test_domain,
                     project=test_group_id,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
                 db_sess.add(routing)
 
@@ -1333,8 +1335,8 @@ class TestScalingGroupRepositoryDB:
                     domain=test_domain,
                     project=test_group_id,
                     resource_group=sample_scaling_group_for_hierarchy,
-                    image=None,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    current_revision=uuid.uuid4(),
                     session_owner=test_user_uuid,
                     created_user=test_user_uuid,
                 )
@@ -1363,6 +1365,7 @@ class TestScalingGroupRepositoryDB:
                     domain=test_domain,
                     project=test_group_id,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
             )
             await db_sess.flush()

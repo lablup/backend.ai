@@ -1,0 +1,127 @@
+#!/bin/bash
+set -euo pipefail
+
+BACKUP_DIR="$(dirname "$0")/backups"
+CONTAINER_NAME="{{ config.container_name_prefix }}-{{ pg_cluster_info.node_name }}"
+DB_USER="{{ config.pg_superuser_id }}"
+API_PORT="{{ pg_cluster_info.pg_api_port }}"
+
+show_usage() {
+    echo "Usage: $0 <backup_file>"
+    echo ""
+    echo "Available backup files:"
+    find "${BACKUP_DIR}" -name "postgres_ha_backup_*.dump.gz" -type f 2>/dev/null | sort -r | head -10
+    echo ""
+    echo "IMPORTANT NOTES FOR HA CLUSTER RESTORE:"
+    echo "1. Restore should ideally be performed on the PRIMARY node"
+    echo "2. It is STRONGLY RECOMMENDED to stop all cluster nodes before restore"
+    echo "3. After restore, you may need to restart the entire cluster"
+    echo "4. All databases and users will be replaced with the backup content"
+    exit 1
+}
+
+if [ $# -eq 0 ]; then
+    show_usage
+fi
+
+BACKUP_FILE="$1"
+if [ ! -f "$BACKUP_FILE" ]; then
+    echo "Error: Backup file '$BACKUP_FILE' not found"
+    show_usage
+fi
+
+echo "=== PostgreSQL HA Cluster Restore ==="
+echo "Node: {{ pg_cluster_info.node_name }}"
+echo "Container: ${CONTAINER_NAME}"
+echo "Backup file: ${BACKUP_FILE}"
+echo ""
+
+# Check if container is running
+if ! docker ps --format "table {{ '{{.Names}}' }}" | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Error: PostgreSQL container '${CONTAINER_NAME}' is not running"
+    exit 1
+fi
+
+# Check Patroni cluster status
+echo "Checking cluster status..."
+STATUS=$(curl -s http://127.0.0.1:${API_PORT}/ 2>/dev/null)
+ROLE=$(echo "$STATUS" | jq -r '.role // "unknown"')
+STATE=$(echo "$STATUS" | jq -r '.state // "unknown"')
+
+echo "Current node role: ${ROLE}"
+echo "Current node state: ${STATE}"
+echo ""
+
+# Warn if not on primary
+if [ "$ROLE" != "master" ] && [ "$ROLE" != "leader" ]; then
+    echo "WARNING: This node is NOT the PRIMARY (current role: ${ROLE})"
+    echo "Restore should preferably be performed on the PRIMARY node"
+    echo ""
+fi
+
+# Strong warning
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║                    *** DANGER ***                          ║"
+echo "║  This will COMPLETELY REPLACE all databases and users!    ║"
+echo "║                                                            ║"
+echo "║  RECOMMENDED STEPS:                                        ║"
+echo "║  1. Stop ALL Backend.AI services first                    ║"
+echo "║  2. Stop ALL cluster nodes (stop.sh on each node)         ║"
+echo "║  3. Perform restore on PRIMARY node only                  ║"
+echo "║  4. Start PRIMARY node first (start.sh)                   ║"
+echo "║  5. Wait for PRIMARY to be fully ready                    ║"
+echo "║  6. Start other nodes                                     ║"
+echo "║  7. Verify cluster health (show_status.sh on all nodes)   ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+echo "Container: ${CONTAINER_NAME}"
+echo "Backup file: ${BACKUP_FILE}"
+echo "Backup size: $(du -h "${BACKUP_FILE}" | cut -f1)"
+echo ""
+read -p "Have you stopped all cluster nodes and Backend.AI services? (yes/no): " confirm1
+if [ "$confirm1" != "yes" ]; then
+    echo "Please stop all cluster nodes and services first, then try again."
+    exit 0
+fi
+
+read -p "Are you ABSOLUTELY SURE you want to restore? Type 'restore-now' to confirm: " confirm2
+if [ "$confirm2" != "restore-now" ]; then
+    echo "Restore cancelled."
+    exit 0
+fi
+
+# Terminate active connections
+echo ""
+echo "Terminating active connections to all databases..."
+docker exec "${CONTAINER_NAME}" psql -U "${DB_USER}" -d postgres -c "
+    SELECT pg_terminate_backend(pg_stat_activity.pid)
+    FROM pg_stat_activity
+    WHERE pg_stat_activity.datname NOT IN ('template0', 'template1', 'postgres')
+      AND pid <> pg_backend_pid();
+" 2>/dev/null || echo "Warning: Could not terminate connections"
+
+# Restore from backup
+echo ""
+echo "Restoring from backup..."
+echo "This may take several minutes depending on backup size..."
+echo ""
+
+if [[ "$BACKUP_FILE" =~ \.gz$ ]]; then
+    zcat "$BACKUP_FILE" | docker exec -i "${CONTAINER_NAME}" psql -U "${DB_USER}" -d postgres
+else
+    cat "$BACKUP_FILE" | docker exec -i "${CONTAINER_NAME}" psql -U "${DB_USER}" -d postgres
+fi
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║           Restore completed successfully!                 ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+echo "NEXT STEPS:"
+echo "1. Verify database content on this node"
+echo "2. Start other cluster nodes (if stopped)"
+echo "3. Verify cluster synchronization with show_status.sh on all nodes"
+echo "4. Check replication lag and cluster member status"
+echo "5. Start Backend.AI services"
+echo "6. Test application connectivity"
+echo ""

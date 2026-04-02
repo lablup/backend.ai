@@ -5,16 +5,17 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     OrderDirection,
-    VFolderBasicInfo,
+    VFolderAccessControlInfo,
     VFolderInvitationState,
+    VFolderMetadataInfo,
     VFolderOperationStatusField,
     VFolderOrderField,
-    VFolderOwnerInfo,
+    VFolderOwnershipInfo,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
-    VFolderPermissionInfo,
     VFolderUsageInfo,
     VFolderUsageMode,
 )
@@ -108,92 +109,96 @@ class TestReExportedEnums:
         assert VFolderUsageMode.DATA.value == "data"
 
 
-class TestVFolderBasicInfo:
-    """Tests for VFolderBasicInfo sub-model."""
+class TestVFolderMetadataInfo:
+    """Tests for VFolderMetadataInfo sub-model."""
 
     def test_creation(self) -> None:
         now = datetime.now(tz=UTC)
-        info = VFolderBasicInfo(
-            id=uuid4(),
+        info = VFolderMetadataInfo(
             name="my-folder",
-            host="nfs01",
-            quota_scope_id="user:abc",
             usage_mode=VFolderUsageMode.GENERAL,
-            status=VFolderOperationStatusField.READY,
+            quota_scope_id="user:abc",
             created_at=now,
             last_used=None,
+            cloneable=False,
         )
         assert info.name == "my-folder"
         assert info.last_used is None
-
-    def test_round_trip(self) -> None:
-        now = datetime.now(tz=UTC)
-        info = VFolderBasicInfo(
-            id=uuid4(),
-            name="test",
-            host="nfs01",
-            quota_scope_id=None,
-            usage_mode=VFolderUsageMode.MODEL,
-            status=VFolderOperationStatusField.READY,
-            created_at=now,
-            last_used=now,
-        )
-        restored = VFolderBasicInfo.model_validate_json(info.model_dump_json())
-        assert restored.name == info.name
-        assert restored.usage_mode == VFolderUsageMode.MODEL
-
-
-class TestVFolderPermissionInfo:
-    """Tests for VFolderPermissionInfo sub-model."""
-
-    def test_creation(self) -> None:
-        info = VFolderPermissionInfo(
-            permission=VFolderPermissionField.READ_WRITE,
-            ownership_type=VFolderOwnershipTypeField.USER,
-            is_owner=True,
-            cloneable=False,
-        )
-        assert info.is_owner is True
         assert info.cloneable is False
 
     def test_round_trip(self) -> None:
-        info = VFolderPermissionInfo(
-            permission=VFolderPermissionField.READ_ONLY,
-            ownership_type=VFolderOwnershipTypeField.GROUP,
-            is_owner=False,
+        now = datetime.now(tz=UTC)
+        info = VFolderMetadataInfo(
+            name="test",
+            usage_mode=VFolderUsageMode.MODEL,
+            quota_scope_id=None,
+            created_at=now,
+            last_used=now,
             cloneable=True,
         )
-        restored = VFolderPermissionInfo.model_validate_json(info.model_dump_json())
+        restored = VFolderMetadataInfo.model_validate_json(info.model_dump_json())
+        assert restored.name == info.name
+        assert restored.usage_mode == VFolderUsageMode.MODEL
+        assert restored.cloneable is True
+
+
+class TestVFolderAccessControlInfo:
+    """Tests for VFolderAccessControlInfo sub-model."""
+
+    def test_creation(self) -> None:
+        info = VFolderAccessControlInfo(
+            permission=VFolderPermissionField.READ_WRITE,
+            ownership_type=VFolderOwnershipTypeField.USER,
+        )
+        assert info.permission == VFolderPermissionField.READ_WRITE
+
+    def test_round_trip(self) -> None:
+        info = VFolderAccessControlInfo(
+            permission=VFolderPermissionField.READ_ONLY,
+            ownership_type=VFolderOwnershipTypeField.GROUP,
+        )
+        restored = VFolderAccessControlInfo.model_validate_json(info.model_dump_json())
         assert restored.permission == VFolderPermissionField.READ_ONLY
         assert restored.ownership_type == VFolderOwnershipTypeField.GROUP
 
 
-class TestVFolderOwnerInfo:
-    """Tests for VFolderOwnerInfo sub-model."""
+class TestVFolderOwnershipInfo:
+    """Tests for VFolderOwnershipInfo sub-model."""
 
     def test_creation_with_all_none(self) -> None:
-        info = VFolderOwnerInfo(user=None, group=None, creator=None)
-        assert info.user is None
-        assert info.group is None
-        assert info.creator is None
+        info = VFolderOwnershipInfo(user_id=None, project_id=None, creator_email=None)
+        assert info.user_id is None
+        assert info.project_id is None
+        assert info.creator_email is None
 
     def test_creation_with_values(self) -> None:
         uid = uuid4()
-        info = VFolderOwnerInfo(user=uid, group=None, creator="user@example.com")
-        assert info.user == uid
-        assert info.creator == "user@example.com"
+        info = VFolderOwnershipInfo(user_id=uid, project_id=None, creator_email="user@example.com")
+        assert info.user_id == uid
+        assert info.creator_email == "user@example.com"
 
 
 class TestVFolderUsageInfo:
     """Tests for VFolderUsageInfo sub-model."""
 
     def test_creation(self) -> None:
-        info = VFolderUsageInfo(num_files=10, used_bytes=1024, max_size=None, max_files=1000)
+        info = VFolderUsageInfo(
+            num_files=10,
+            used_bytes=BinarySizeInfo(value=1024, display="1024"),
+            max_size=None,
+            max_files=1000,
+        )
         assert info.num_files == 10
         assert info.max_size is None
 
     def test_round_trip(self) -> None:
-        info = VFolderUsageInfo(num_files=5, used_bytes=512, max_size=1048576, max_files=500)
+        info = VFolderUsageInfo(
+            num_files=5,
+            used_bytes=BinarySizeInfo(value=512, display="512"),
+            max_size=BinarySizeInfo(value=1048576, display="1m"),
+            max_files=500,
+        )
         restored = VFolderUsageInfo.model_validate_json(info.model_dump_json())
         assert restored.num_files == 5
-        assert restored.max_size == 1048576
+        assert restored.max_size is not None
+        assert restored.max_size.value == 1048576

@@ -14,10 +14,12 @@ from ai.backend.common.dto.manager.v2.session.request import (
     RestartSessionInput,
     SearchSessionsInput,
     SessionFilter,
+    SessionIdPathParam,
     SessionOrder,
     SessionPathParam,
     ShutdownServiceInput,
     StartServiceInput,
+    TerminateSessionsInProjectInput,
     UploadFilesInput,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
@@ -37,6 +39,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
 )
 from ai.backend.common.dto.manager.v2.session.types import (
     OrderDirection,
+    ProjectSessionScope,
     SessionOrderField,
     SessionResultEnum,
     SessionStatusEnum,
@@ -47,6 +50,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
 __all__ = (
     # Types
     "OrderDirection",
+    "ProjectSessionScope",
     "SessionOrderField",
     "SessionResultEnum",
     "SessionStatusEnum",
@@ -64,10 +68,12 @@ __all__ = (
     "RestartSessionInput",
     "SearchSessionsInput",
     "SessionFilter",
+    "SessionIdPathParam",
     "SessionOrder",
     "SessionPathParam",
     "ShutdownServiceInput",
     "StartServiceInput",
+    "TerminateSessionsInProjectInput",
     "UploadFilesInput",
     # Node and Payload models (response)
     "AdminSearchSessionsPayload",

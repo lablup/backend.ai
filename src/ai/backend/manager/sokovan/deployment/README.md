@@ -74,7 +74,7 @@ DeploymentCoordinator acts as the top-level orchestrator of deployment lifecycle
 
 ### DeploymentController
 
-DeploymentController performs the actual control logic for deployments. It handles basic CRUD operations such as creating, updating, and deleting deployments, and manages the replica count for each deployment. It automatically generates final revision spec tailored to deployment types (vLLM, TGI, SGLang, etc.) with deployment user request, service-definition toml file, and applies configured auto-scaling policies to deployments.
+DeploymentController performs the actual control logic for deployments. It handles basic CRUD operations such as creating, updating, and deleting deployments, and manages the replica count for each deployment. It automatically generates final revision spec tailored to deployment types (vLLM, TGI, SGLang, etc.) with deployment user request, deployment-config.yaml file, and applies configured auto-scaling policies to deployments.
 
 **Key Methods:**
 - `create_deployment()`: Creates a new deployment
@@ -92,8 +92,8 @@ DeploymentController performs the actual control logic for deployments. It handl
 3. Select Revision Generator based on runtime variant
    ↓
 4. Generate final deployment creator
-   ├─ Load service definition from vfolder (if exists)
-   ├─ Merge service definition with API request
+   ├─ Load deployment config from vfolder (if exists)
+   ├─ Merge deployment config with API request
    └─ Validate the final revision
    ↓
 5. Validate session specification with SchedulingController
@@ -123,55 +123,59 @@ Definition Generators transform finalized model revisions into runtime-specific 
 
 ## Revision Generators
 
-Revision Generators process draft model revisions from API requests and produce validated, deployment-ready model revision specifications. They handle the integration of service definitions stored in vfolders with user-provided parameters, implementing a sophisticated override mechanism.
+Revision Generators process draft model revisions from API requests and produce validated, deployment-ready model revision specifications. They handle the integration of deployment configs stored in vfolders with user-provided parameters, implementing a sophisticated override mechanism.
 
 **Key Responsibilities:**
-- Load and parse service definition files from vfolders
-- Merge service definitions with API request parameters
+- Load and parse deployment config files from vfolders
+- Merge deployment configs with API request parameters
 - Validate final revision specifications
 - Support variant-specific validation rules
 
-**Service Definition Override Mechanism:**
+**Deployment Config Override Mechanism:**
 
-Service definitions are TOML files stored in model vfolders that provide default configurations for deployments. The override priority follows a three-level hierarchy:
+Deployment configs are YAML files (`deployment-config.yaml`) stored in model vfolders that provide default configurations for deployments. The legacy `service-definition.toml` (TOML) format is also supported as a fallback but is deprecated. The override priority follows a three-level hierarchy:
 
 ```
-1. Root-level service definition (lowest priority, base configuration)
+1. Root-level deployment config (lowest priority, base configuration)
    ↓
 2. Runtime variant-specific section (field-level override)
    ↓
 3. API request parameters (highest priority, explicit user input)
 ```
 
-**Service Definition Structure:**
+**Deployment Config Structure:**
 
-```toml
-# service-definition.toml
+```yaml
+# deployment-config.yaml
 
 # Root level - Default configuration for all variants
-[environment]
-image = "default-inference:latest"
-architecture = "x86_64"
+environment:
+  image: "default-inference:latest"
+  architecture: "x86_64"
 
-[resource_slots]
-cpu = 4
-mem = "16gb"
-gpu = 1
+resource_slots:
+  cpu: 4
+  mem: "16gb"
+  gpu: 1
 
-[environ]
-LOG_LEVEL = "INFO"
-MAX_BATCH_SIZE = "32"
+environ:
+  LOG_LEVEL: "INFO"
+  MAX_BATCH_SIZE: "32"
+
+resource_opts:
+  shmem: "8g"
 
 # vLLM variant - Overrides specific fields only
-[vllm.environment]
-image = "vllm-optimized:0.4.0"
-
-[vllm.resource_slots]
-cpu = 8
-gpu = 2
-
-[vllm.environ]
-VLLM_GPU_MEMORY_UTILIZATION = "0.95"
+vllm:
+  environment:
+    image: "vllm-optimized:0.4.0"
+  resource_slots:
+    cpu: 8
+    gpu: 2
+  environ:
+    VLLM_GPU_MEMORY_UTILIZATION: "0.95"
+  resource_opts:
+    shmem: "32g"
 ```
 
 **Override Resolution Example:**
@@ -182,6 +186,7 @@ For a vLLM deployment, the final configuration merges:
 - `resource_slots.cpu`: `8` (from vllm variant)
 - `resource_slots.mem`: `"16gb"` (from root, not overridden)
 - `resource_slots.gpu`: `2` (from vllm variant)
+- `resource_opts.shmem`: `"32g"` (from vllm variant)
 - `environ`: `{LOG_LEVEL: "INFO", MAX_BATCH_SIZE: "32", VLLM_GPU_MEMORY_UTILIZATION: "0.95"}` (merged)
 
 If the API request specifies `resource_slots.gpu = 4`, the final value will be `4` (API request overrides all).
@@ -189,10 +194,10 @@ If the API request specifies `resource_slots.gpu = 4`, the final value will be `
 **Revision Generation Process:**
 
 ```
-1. Load service-definition.toml from vfolder (if exists)
+1. Load deployment-config.yaml from vfolder (if exists)
    ↓
-2. Merge service definition with API request (draft revision)
-   ├─ Service definition provides defaults
+2. Merge deployment config with API request (draft revision)
+   ├─ Deployment config provides defaults
    └─ API request overrides specific fields
    ↓
 3. Validate final ModelRevisionSpec
@@ -200,7 +205,7 @@ If the API request specifies `resource_slots.gpu = 4`, the final value will be `
 4. Return validated ModelRevisionSpec
 ```
 
-> **Note**: Service definition files are optional. If no service definition exists, the API request must provide all required configuration. When a service definition is present, it serves as a template that users can selectively override through API parameters, reducing repetitive configuration for commonly deployed models.
+> **Note**: Deployment config files are optional. If no deployment config exists, the API request must provide all required configuration. When a deployment config is present, it serves as a template that users can selectively override through API parameters, reducing repetitive configuration for commonly deployed models.
 
 ## State-Specific Handlers
 

@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.config import ModelDefinition, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
@@ -48,12 +48,13 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSummarySearchResult,
     DeploymentWithHistory,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
-    ModelRevisionSpec,
     RevisionSearchResult,
+    RouteHealthStatus,
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
@@ -64,6 +65,7 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import (
     DeploymentHasNoTargetRevision,
     DeploymentRevisionNotFound,
@@ -140,6 +142,7 @@ from ai.backend.manager.repositories.deployment.creators import (
 )
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.types import (
+    ProjectDeploymentSearchScope,
     RouteData,
     RouteServiceDiscoveryInfo,
 )
@@ -255,27 +258,35 @@ class DeploymentDBSource:
 
             # Create deployment policy if provided
             if policy_config is not None:
-                policy_spec = DeploymentPolicyCreatorSpec(
+                policy_creator_spec = DeploymentPolicyCreatorSpec(
                     endpoint_id=endpoint.id,
                     strategy=policy_config.strategy,
                     strategy_spec=policy_config.strategy_spec,
                 )
-                policy_creator = RBACEntityCreator(
-                    spec=policy_spec,
-                    element_type=RBACElementType.DEPLOYMENT_POLICY,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.MODEL_DEPLOYMENT,
-                        element_id=str(endpoint.id),
-                    ),
-                )
-                await execute_rbac_entity_creator(db_sess, policy_creator)
+            else:
+                policy_creator_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
+            policy_creator = RBACEntityCreator(
+                spec=policy_creator_spec,
+                element_type=RBACElementType.DEPLOYMENT_POLICY,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(endpoint.id),
+                ),
+            )
+            await execute_rbac_entity_creator(db_sess, policy_creator)
+            await db_sess.flush()
 
             stmt = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint.id)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.deployment_policy),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                 )
             )
             result = await db_sess.execute(stmt)
@@ -306,24 +317,59 @@ class DeploymentDBSource:
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint = rbac_result.row
 
+            # Create the initial deployment revision and link it to the endpoint
+            if spec.image_id is None:
+                raise InvalidAPIParameters("image_id is required for legacy endpoint creation")
+            initial_revision = DeploymentRevisionRow(
+                endpoint=endpoint.id,
+                revision_number=1,
+                image=spec.image_id,
+                model=spec.model,
+                model_mount_destination=spec.model_mount_destination,
+                model_definition_path=spec.model_definition_path,
+                resource_group=spec.resource_group,
+                resource_slots=spec.resource_slots,
+                resource_opts=dict(spec.resource_opts) if spec.resource_opts else {},
+                cluster_mode=spec.cluster_mode.value,
+                cluster_size=spec.cluster_size,
+                startup_command=spec.startup_command,
+                bootstrap_script=spec.bootstrap_script,
+                environ=dict(spec.environ) if spec.environ else {},
+                callback_url=spec.callback_url,
+                runtime_variant=spec.runtime_variant,
+                extra_mounts=list(spec.extra_mounts),
+            )
+            db_sess.add(initial_revision)
+            await db_sess.flush()
+            endpoint.current_revision = initial_revision.id
+
             # Create deployment policy if provided
             if spec.policy is not None:
-                policy_creator = RBACEntityCreator(
-                    spec=spec.policy,
-                    element_type=RBACElementType.DEPLOYMENT_POLICY,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.MODEL_DEPLOYMENT,
-                        element_id=str(endpoint.id),
-                    ),
-                )
-                await execute_rbac_entity_creator(db_sess, policy_creator)
+                policy_spec = spec.policy
+            else:
+                policy_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
+            policy_creator = RBACEntityCreator(
+                spec=policy_spec,
+                element_type=RBACElementType.DEPLOYMENT_POLICY,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(endpoint.id),
+                ),
+            )
+            await execute_rbac_entity_creator(db_sess, policy_creator)
+            await db_sess.flush()
 
             stmt = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint.id)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.deployment_policy),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                 )
             )
             result = await db_sess.execute(stmt)
@@ -408,7 +454,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
@@ -441,7 +489,9 @@ class DeploymentDBSource:
                     )
                 )
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
@@ -476,12 +526,12 @@ class DeploymentDBSource:
 
             cleanup_configs: dict[str, ScalingGroupCleanupConfig] = {}
             for row in result:
-                # Convert str to RouteStatus
+                # Convert str to RouteHealthStatus
                 status_strs = row.scheduler_opts.route_cleanup_target_statuses
-                statuses = []
+                statuses: list[RouteHealthStatus] = []
                 for status_str in status_strs:
                     try:
-                        statuses.append(RouteStatus(status_str))
+                        statuses.append(RouteHealthStatus(status_str))
                     except ValueError:
                         # Skip invalid status strings
                         pass
@@ -561,7 +611,7 @@ class DeploymentDBSource:
             sa.select(EndpointRow)
             .where(where_clause)
             .options(
-                selectinload(EndpointRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.deployment_policy),
             )
@@ -583,7 +633,14 @@ class DeploymentDBSource:
                     EndpointRow.session_owner == session_owner_id,
                     EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED,
                 )
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
             )
 
             # Add name filter if provided
@@ -632,7 +689,14 @@ class DeploymentDBSource:
             query = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
             )
             result = await db_sess.execute(query)
             existing_row: EndpointRow | None = result.scalar_one_or_none()
@@ -663,7 +727,22 @@ class DeploymentDBSource:
             result = await execute_updater(db_sess, updater)
             if result is None:
                 raise EndpointNotFound(f"Endpoint {updater.pk_value} not found")
-            return result.row.to_deployment_info()
+            stmt = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == updater.pk_value)
+                .options(
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                    selectinload(EndpointRow.deployment_policy),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
+            )
+            query_result = await db_sess.execute(stmt)
+            row: EndpointRow = query_result.scalar_one()
+            return row.to_deployment_info()
 
     async def update_endpoint_lifecycle_bulk(
         self,
@@ -983,9 +1062,12 @@ class DeploymentDBSource:
                     endpoint_id=row.endpoint,
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
+                    health_status=row.health_status,
                     traffic_ratio=row.traffic_ratio,
                     created_at=row.created_at,
                     revision_id=row.revision,
+                    replica_host=row.replica_host,
+                    replica_port=row.replica_port,
                     error_data=row.error_data or {},
                 )
                 for row in rows
@@ -1124,7 +1206,7 @@ class DeploymentDBSource:
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).options(
-                selectinload(EndpointRow.image_row),
+                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row),
                 selectinload(EndpointRow.deployment_policy),
             )
@@ -1138,6 +1220,36 @@ class DeploymentDBSource:
             items = [row.EndpointRow.to_deployment_info() for row in result.rows]
 
             return DeploymentInfoSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_deployments_in_project(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectDeploymentSearchScope,
+    ) -> DeploymentSummarySearchResult:
+        """Search endpoints within a project scope with pagination and filtering.
+
+        Returns lightweight DeploymentSummaryData built from EndpointRow scalar
+        columns only (no eager-loaded relationships). Revision and policy
+        details are not included.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+                scope=scope,
+            )
+
+            items = [row.EndpointRow.to_summary_data() for row in result.rows]
+
+            return DeploymentSummarySearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
@@ -1187,7 +1299,7 @@ class DeploymentDBSource:
                     RoutingRow.id.label("route_id"),
                     RoutingRow.endpoint.label("endpoint_id"),
                     EndpointRow.name.label("endpoint_name"),
-                    EndpointRow.runtime_variant.label("runtime_variant"),
+                    DeploymentRevisionRow.runtime_variant.label("runtime_variant"),
                     EndpointRow.session_owner.label("session_owner"),
                     EndpointRow.project.label("project"),
                     KernelRow.kernel_host,
@@ -1195,6 +1307,10 @@ class DeploymentDBSource:
                 )
                 .select_from(RoutingRow)
                 .join(EndpointRow, RoutingRow.endpoint == EndpointRow.id)
+                .join(
+                    DeploymentRevisionRow,
+                    EndpointRow.current_revision == DeploymentRevisionRow.id,
+                )
                 .join(
                     KernelRow,
                     sa.and_(
@@ -1299,6 +1415,11 @@ class DeploymentDBSource:
                 .join(
                     EndpointAutoScalingRuleRow,
                     EndpointRow.id == EndpointAutoScalingRuleRow.endpoint_id,
+                )
+                .options(
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                 )
                 .distinct()
             )
@@ -1536,17 +1657,14 @@ class DeploymentDBSource:
     async def get_routes_by_statuses(
         self,
         statuses: list[RouteStatus],
+        health_statuses: list[RouteHealthStatus],
     ) -> list[RouteData]:
-        """Get routes by their statuses.
-
-        Args:
-            statuses: List of route statuses to filter by
-
-        Returns:
-            List of RouteData objects matching the statuses
-        """
+        """Get routes by lifecycle and health statuses."""
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(RoutingRow).where(RoutingRow.status.in_(statuses))
+            query = sa.select(RoutingRow).where(
+                RoutingRow.status.in_(statuses),
+                RoutingRow.health_status.in_(health_statuses),
+            )
             result = await db_sess.execute(query)
             rows: Sequence[RoutingRow] = result.scalars().all()
 
@@ -1557,9 +1675,12 @@ class DeploymentDBSource:
                     endpoint_id=row.endpoint,
                     session_id=SessionId(row.session) if row.session else None,
                     status=row.status,
+                    health_status=row.health_status,
                     traffic_ratio=row.traffic_ratio,
                     created_at=row.created_at,
                     revision_id=row.revision,
+                    replica_host=row.replica_host,
+                    replica_port=row.replica_port,
                     error_data=row.error_data or {},
                 )
                 route_data_list.append(route_data)
@@ -1767,6 +1888,83 @@ class DeploymentDBSource:
                 )
                 await db_sess.execute(query)
 
+    async def fetch_kernel_connection_info(
+        self,
+        session_ids: list[SessionId],
+    ) -> dict[SessionId, tuple[str, int]]:
+        """Fetch kernel_host and inference port for sessions."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(
+                KernelRow.session_id,
+                KernelRow.kernel_host,
+                KernelRow.service_ports,
+            ).where(
+                KernelRow.session_id.in_(session_ids),
+                KernelRow.cluster_role == "main",
+            )
+            result = await db_sess.execute(query)
+            info: dict[SessionId, tuple[str, int]] = {}
+            for row in result:
+                if not row.kernel_host or not row.service_ports:
+                    continue
+                for sp in row.service_ports:
+                    if sp.get("is_inference"):
+                        host_ports = sp.get("host_ports", [])
+                        if host_ports:
+                            info[SessionId(row.session_id)] = (row.kernel_host, host_ports[0])
+                        break
+            return info
+
+    async def update_route_replica_info(
+        self,
+        updates: dict[uuid.UUID, tuple[str, int]],
+    ) -> None:
+        """Update replica_host and replica_port for routes."""
+        async with self._begin_session_read_committed() as db_sess:
+            for route_id, (host, port) in updates.items():
+                query = (
+                    sa.update(RoutingRow)
+                    .where(RoutingRow.id == route_id)
+                    .values(replica_host=host, replica_port=port)
+                )
+                await db_sess.execute(query)
+
+    async def fetch_health_check_configs_by_revision_ids(
+        self,
+        revision_ids: set[uuid.UUID],
+    ) -> dict[uuid.UUID, ModelHealthCheck | None]:
+        """Fetch health check configurations for revisions.
+
+        For non-CUSTOM runtimes, uses the runtime profile's health_check_endpoint.
+        For CUSTOM runtimes, parses the model_definition JSONB column.
+
+        Returns:
+            Mapping of revision_id to ModelHealthCheck (None if no health check configured)
+        """
+        if not revision_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(
+                DeploymentRevisionRow.id,
+                DeploymentRevisionRow.runtime_variant,
+                DeploymentRevisionRow.model_definition,
+            ).where(DeploymentRevisionRow.id.in_(revision_ids))
+            result = await db_sess.execute(query)
+
+            configs: dict[uuid.UUID, ModelHealthCheck | None] = {}
+            for row in result:
+                profile = MODEL_SERVICE_RUNTIME_PROFILES[row.runtime_variant]
+                if profile.health_check_endpoint:
+                    configs[row.id] = ModelHealthCheck(path=profile.health_check_endpoint)
+                elif row.runtime_variant == RuntimeVariant.CUSTOM and row.model_definition:
+                    md = ModelDefinition.model_validate(row.model_definition)
+                    configs[row.id] = md.health_check_config()
+                else:
+                    configs[row.id] = None
+
+            return configs
+
     async def delete_routes_by_route_ids(
         self,
         route_ids: set[uuid.UUID],
@@ -1892,100 +2090,6 @@ class DeploymentDBSource:
                 ),
             )
 
-    async def fetch_deployment_context_from_endpoint(
-        self,
-        deployment_info: DeploymentInfo,
-    ) -> DeploymentContext:
-        """Fetch deployment context using endpoint-level fields as image source.
-
-        Used when no revision exists yet (e.g., newly created deployments
-        before any revision is explicitly added/activated).
-        """
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            created_user_query = (
-                sa.select(UserRow, keypairs.c.access_key)
-                .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
-                .where(UserRow.uuid == deployment_info.metadata.created_user)
-            )
-            created_user_result = await db_sess.execute(created_user_query)
-            created_user_row = created_user_result.first()
-            if not created_user_row:
-                raise UserNotFoundInDeployment(
-                    f"Created user {deployment_info.metadata.created_user} not found"
-                )
-
-            if deployment_info.metadata.session_owner != deployment_info.metadata.created_user:
-                session_owner_query = (
-                    sa.select(UserRow, keypairs.c.access_key)
-                    .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
-                    .where(UserRow.uuid == deployment_info.metadata.session_owner)
-                )
-                session_owner_result = await db_sess.execute(session_owner_query)
-                session_owner_row = session_owner_result.first()
-                if not session_owner_row:
-                    raise UserNotFoundInDeployment(
-                        f"Session owner {deployment_info.metadata.session_owner} not found"
-                    )
-            else:
-                session_owner_row = created_user_row
-
-            _owner_uuid, group_id, resource_policy = await query_userinfo_from_session(
-                db_sess,
-                created_user_row.UserRow.uuid,
-                AccessKey(created_user_row.access_key),
-                created_user_row.UserRow.role,
-                created_user_row.UserRow.domain_name,
-                None,
-                deployment_info.metadata.domain,
-                deployment_info.metadata.project,
-                query_on_behalf_of=AccessKey(session_owner_row.access_key)
-                if session_owner_row != created_user_row
-                else None,
-            )
-
-            endpoint_query = (
-                sa.select(EndpointRow)
-                .where(EndpointRow.id == deployment_info.id)
-                .options(selectinload(EndpointRow.image_row))
-            )
-            endpoint_result = await db_sess.execute(endpoint_query)
-            endpoint_row = endpoint_result.scalar_one_or_none()
-            if endpoint_row is None or endpoint_row.image_row is None:
-                raise DeploymentHasNoTargetRevision(
-                    f"Endpoint {deployment_info.id} not found or has no image"
-                )
-            image_identifier = ImageIdentifier(
-                canonical=endpoint_row.image_row.name,
-                architecture=endpoint_row.image_row.architecture,
-            )
-            image_row = await ImageRow.resolve(db_sess, [image_identifier])
-
-            return DeploymentContext(
-                created_user=UserContext(
-                    uuid=created_user_row.UserRow.uuid,
-                    access_key=AccessKey(created_user_row.access_key),
-                    role=str(created_user_row.UserRow.role),
-                    sudo_session_enabled=created_user_row.UserRow.sudo_session_enabled or False,
-                ),
-                session_owner=UserContext(
-                    uuid=session_owner_row.UserRow.uuid,
-                    access_key=AccessKey(session_owner_row.access_key),
-                    role=str(session_owner_row.UserRow.role),
-                    sudo_session_enabled=session_owner_row.UserRow.sudo_session_enabled or False,
-                ),
-                container_user=ContainerUserContext(
-                    uid=session_owner_row.UserRow.container_uid,
-                    main_gid=session_owner_row.UserRow.container_main_gid,
-                    supplementary_gids=session_owner_row.UserRow.container_gids or [],
-                ),
-                group_id=group_id,
-                resource_policy=dict(resource_policy),
-                image=ImageContext(
-                    ref=image_row.image_ref,
-                    labels=image_row.labels or {},
-                ),
-            )
-
     async def fetch_session_statuses_by_route_ids(
         self,
         route_ids: set[uuid.UUID],
@@ -2047,16 +2151,17 @@ class DeploymentDBSource:
                 endpoint_id,
                 load_created_user=True,
                 load_session_owner=True,
-                load_image=True,
+                load_revisions=True,
                 load_routes=True,
             )
             if not endpoint:
                 raise EndpointNotFound(str(endpoint_id))
 
-            # Get model vfolder for health check config
-            if endpoint.model is None:
+            # Get model vfolder from current revision for health check config
+            current_rev = endpoint._find_current_revision()
+            if current_rev is None or current_rev.model is None:
                 return None
-            model = await VFolderRow.get(db_sess, endpoint.model)
+            model = await VFolderRow.get(db_sess, current_rev.model)
             if not model:
                 return None
 
@@ -2281,27 +2386,6 @@ class DeploymentDBSource:
                 )
             return row.to_data()
 
-    async def get_revision_spec_from_endpoint(
-        self,
-        endpoint_id: uuid.UUID,
-    ) -> ModelRevisionSpec:
-        """Build a ModelRevisionSpec from the endpoint-level fields.
-
-        Used when no deployment_revisions record exists yet (e.g., newly
-        created deployments before any revision is explicitly added/activated).
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = (
-                sa.select(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .options(selectinload(EndpointRow.image_row))
-            )
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one_or_none()
-            if endpoint is None:
-                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
-            return endpoint.build_revision_spec_from_endpoint()
-
     async def search_revisions(
         self,
         querier: BatchQuerier,
@@ -2347,7 +2431,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == updater.pk_value)
                 .options(
-                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                     selectinload(EndpointRow.revisions).selectinload(
                         DeploymentRevisionRow.image_row
                     ),

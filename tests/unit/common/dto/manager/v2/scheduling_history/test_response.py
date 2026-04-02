@@ -211,6 +211,7 @@ class TestRouteHistoryNodeCreation:
             id=uuid.uuid4(),
             route_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
+            category="lifecycle",
             phase="routing",
             result="SUCCESS",
             attempts=1,
@@ -220,6 +221,7 @@ class TestRouteHistoryNodeCreation:
         assert node.sub_steps == []
         assert node.from_status is None
         assert node.to_status is None
+        assert node.category == "lifecycle"
 
     def test_route_and_deployment_ids_stored(self) -> None:
         now = datetime.now(tz=UTC)
@@ -229,6 +231,7 @@ class TestRouteHistoryNodeCreation:
             id=uuid.uuid4(),
             route_id=route_id,
             deployment_id=dep_id,
+            category="lifecycle",
             phase="routing",
             result="SUCCESS",
             attempts=1,
@@ -247,6 +250,7 @@ class TestRouteHistoryNodeCreation:
             id=record_id,
             route_id=route_id,
             deployment_id=dep_id,
+            category="health",
             phase="routing",
             result="FAILURE",
             error_code="ERR_ROUTE",
@@ -260,6 +264,7 @@ class TestRouteHistoryNodeCreation:
         assert restored.route_id == route_id
         assert restored.deployment_id == dep_id
         assert restored.error_code == "ERR_ROUTE"
+        assert restored.category == "health"
 
 
 class TestListSessionHistoryPayload:
@@ -353,6 +358,7 @@ class TestListRouteHistoryPayload:
             id=uuid.uuid4(),
             route_id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
+            category="lifecycle",
             phase="routing",
             result="SUCCESS",
             attempts=1,
@@ -372,6 +378,7 @@ class TestListRouteHistoryPayload:
             id=record_id,
             route_id=route_id,
             deployment_id=dep_id,
+            category="lifecycle",
             phase="routing",
             result="STALE",
             attempts=1,

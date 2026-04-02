@@ -8,7 +8,6 @@ from enum import StrEnum
 from typing import Self, cast
 from uuid import UUID
 
-import strawberry
 from strawberry import ID, Info
 from strawberry.relay import NodeID
 
@@ -52,6 +51,8 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -93,7 +94,10 @@ __all__ = (
 # Enums
 
 
-@strawberry.enum(name="SchedulingResult", description="Scheduling result status")
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="Scheduling result status"),
+    name="SchedulingResult",
+)
 class SchedulingResultGQL(StrEnum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
@@ -104,19 +108,33 @@ class SchedulingResultGQL(StrEnum):
     SKIPPED = "SKIPPED"
 
 
-@strawberry.enum
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Fields available for ordering session scheduling history",
+    )
+)
 class SessionSchedulingHistoryOrderField(StrEnum):
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
 
 
-@strawberry.enum
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Fields available for ordering deployment history",
+    )
+)
 class DeploymentHistoryOrderField(StrEnum):
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
 
 
-@strawberry.enum
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Fields available for ordering route history"
+    )
+)
 class RouteHistoryOrderField(StrEnum):
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
@@ -131,7 +149,10 @@ class RouteHistoryOrderField(StrEnum):
         description="Sub-step result in scheduling history.",
     ),
     model=SubStepResultInfo,
-    name="SubStepResult",
+    # Keep the original GQL type name to avoid breaking existing clients.
+    # Before the Pydantic migration (34af67f180), @strawberry.type without
+    # an explicit name exposed the class name "SubStepResultGQL" as-is.
+    name="SubStepResultGQL",
 )
 class SubStepResultGQL(PydanticOutputMixin[SubStepResultInfo]):
     step: str
@@ -209,6 +230,7 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     id: NodeID[str]
     route_id: ID
     deployment_id: ID
+    category: str
     phase: str
     from_status: str | None
     to_status: str | None
@@ -247,7 +269,7 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
 class SessionScope(PydanticInputMixin[SessionHistoryScopeDTO]):
     """Scope for session-level scheduling history queries."""
 
-    session_id: UUID = strawberry.field(description="Session ID to get history for")
+    session_id: UUID = gql_field(description="Session ID to get history for")
 
 
 @gql_pydantic_input(
@@ -259,7 +281,7 @@ class SessionScope(PydanticInputMixin[SessionHistoryScopeDTO]):
 class DeploymentScope(PydanticInputMixin[DeploymentHistoryScopeDTO]):
     """Scope for deployment-level scheduling history queries."""
 
-    deployment_id: UUID = strawberry.field(description="Deployment ID to get history for")
+    deployment_id: UUID = gql_field(description="Deployment ID to get history for")
 
 
 @gql_pydantic_input(
@@ -271,7 +293,7 @@ class DeploymentScope(PydanticInputMixin[DeploymentHistoryScopeDTO]):
 class RouteScope(PydanticInputMixin[RouteHistoryScopeDTO]):
     """Scope for route-level scheduling history queries."""
 
-    route_id: UUID = strawberry.field(description="Route ID to get history for")
+    route_id: UUID = gql_field(description="Route ID to get history for")
 
 
 # Filters and orders (pydantic-backed inputs)
@@ -286,7 +308,9 @@ class RouteScope(PydanticInputMixin[RouteHistoryScopeDTO]):
 )
 class SchedulingResultFilterGQL(PydanticInputMixin[SchedulingResultFilterDTO]):
     equals: SchedulingResultGQL | None = None
-    in_: list[SchedulingResultGQL] | None = strawberry.field(name="in", default=None)
+    in_: list[SchedulingResultGQL] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     not_equals: SchedulingResultGQL | None = None
     not_in: list[SchedulingResultGQL] | None = None
 

@@ -1,0 +1,18 @@
+#!/bin/bash
+set -e
+
+IMAGE=<image-name>
+declare -a AGENTS=(
+  "i-agent1"
+  "i-agent2"
+)
+
+for agent in "${AGENTS[@]}"; do
+  echo "Creating session in $agent..."
+  backend.ai create -t bai-test-${agent} \
+    -g default \
+    -r cpu=4 -r mem=16g -r cuda.shares=0.5 --resource-opts shmem=2g \
+    -m examples \
+    --assign-agent "$agent" \
+    "$IMAGE"
+done

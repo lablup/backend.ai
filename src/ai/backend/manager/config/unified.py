@@ -205,7 +205,12 @@ from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep, NamedStorageTarget
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
@@ -503,6 +508,24 @@ class AuthConfig(BaseConfigSchema):
             example=ConfigExample(local="32", prod="32"),
         ),
     ]
+    login_session_max_age: Annotated[
+        int,
+        Field(
+            default=604800,
+            ge=60,
+            validation_alias=AliasChoices("login-session-max-age", "login_session_max_age"),
+            serialization_alias="login-session-max-age",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum login session age in seconds. "
+                "Default is 604800 (7 days). "
+                "Sessions older than this are considered expired."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="604800", prod="604800"),
+        ),
+    ]
 
 
 class ManagerConfig(BaseConfigSchema):
@@ -761,6 +784,25 @@ class ManagerConfig(BaseConfigSchema):
             added_version="25.8.0",
             secret=True,
             example=ConfigExample(local="", prod="/etc/backend.ai/ssl/manager.key"),
+        ),
+    ]
+    trusted_proxies: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            validation_alias=AliasChoices("trusted-proxies", "trusted_proxies"),
+            serialization_alias="trusted-proxies",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "List of trusted reverse proxy IP addresses or CIDR ranges. "
+                "When configured, the manager uses aiohttp_remotes.XForwardedStrict middleware "
+                "to securely resolve client IPs from X-Forwarded-For headers. "
+                "Only proxies in this list are trusted to set forwarding headers. "
+                "If empty (default), the manager falls back to manual X-Forwarded-For parsing."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="", prod='["10.0.0.0/8", "172.16.0.0/12"]'),
         ),
     ]
     event_loop: Annotated[

@@ -1,10 +1,11 @@
+import re
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
@@ -544,6 +545,10 @@ class TokenOperationType(StrEnum):
     UPLOAD = "upload"
 
 
+# Matches control characters (0x00-0x1F, 0x7F) and path separators (/ \).
+_UNSAFE_FILENAME_RE = re.compile(r"[\x00-\x1f\x7f/\\]")
+
+
 # Client-facing API request models for download archive endpoint
 class ArchiveDownloadTokenData(BaseModel):
     """Pydantic model for validating the JWT payload of archive download tokens."""
@@ -561,10 +566,30 @@ class ArchiveDownloadTokenData(BaseModel):
         min_length=1,
         description="List of relative file paths within the virtual folder to include in the archive.",
     )
+    filename: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Custom filename for the downloaded ZIP archive. Defaults to 'archive.zip' when omitted.",
+    )
     exp: datetime = Field(
         description="Token expiration time as a Unix timestamp.",
     )
     model_config = ConfigDict(extra="allow")  # allow JWT-intrinsic keys
+
+    @field_validator("filename", mode="after")
+    @classmethod
+    def _validate_filename(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Filename must not be empty or whitespace-only.")
+        if v in (".", ".."):
+            raise ValueError("Filename must not be a relative path segment ('.' or '..').")
+        if _UNSAFE_FILENAME_RE.search(v):
+            raise ValueError(
+                "Filename must not contain control characters or path separators (/ or \\)."
+            )
+        return v
 
     @field_serializer("exp")
     def serialize_exp(self, exp: datetime) -> int:
@@ -591,3 +616,23 @@ class CreateArchiveDownloadSessionRequest(BaseRequestModel):
         min_length=1,
         description="List of relative file paths within the virtual folder to include in the archive.",
     )
+    filename: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Custom filename for the downloaded ZIP archive. Defaults to 'archive.zip' when omitted.",
+    )
+
+    @field_validator("filename", mode="after")
+    @classmethod
+    def _validate_filename(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Filename must not be empty or whitespace-only.")
+        if v in (".", ".."):
+            raise ValueError("Filename must not be a relative path segment ('.' or '..').")
+        if _UNSAFE_FILENAME_RE.search(v):
+            raise ValueError(
+                "Filename must not contain control characters or path separators (/ or \\)."
+            )
+        return v

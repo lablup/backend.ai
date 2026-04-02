@@ -18,8 +18,10 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -28,17 +30,28 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentState,
     ReplicaSpec,
+    RouteHealthStatus,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
 from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
+from ai.backend.manager.sokovan.deployment.exceptions import InvalidEndpointState
 from ai.backend.manager.sokovan.deployment.strategy.rolling_update import (
     RollingUpdateStrategy,
 )
 
 ENDPOINT_ID = UUID("aaaaaaaa-0000-0000-0000-aaaaaaaaaaaa")
+
+
+def make_int_or_percent(value: int | float) -> IntOrPercent:
+    """Shorthand to build a IntOrPercent from a plain int or float."""
+    if isinstance(value, float):
+        return IntOrPercent(percent=value)
+    return IntOrPercent(count=value)
+
+
 OLD_REV = UUID("11111111-1111-1111-1111-111111111111")
 NEW_REV = UUID("22222222-2222-2222-2222-222222222222")
 PROJECT_ID = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
@@ -55,8 +68,8 @@ class RollingUpdateInput:
     """Input conditions for a rolling update cycle test."""
 
     desired_replicas: int
-    max_surge: int
-    max_unavailable: int
+    max_surge: IntOrPercent
+    max_unavailable: IntOrPercent
     old_count: int
 
 
@@ -113,7 +126,8 @@ def make_deployment(
 def make_route(
     *,
     revision_id: UUID,
-    status: RouteStatus = RouteStatus.HEALTHY,
+    status: RouteStatus = RouteStatus.RUNNING,
+    health_status: RouteHealthStatus = RouteHealthStatus.HEALTHY,
     endpoint_id: UUID = ENDPOINT_ID,
     route_id: UUID | None = None,
 ) -> RouteInfo:
@@ -122,6 +136,7 @@ def make_route(
         endpoint_id=endpoint_id,
         session_id=SessionId(uuid4()),
         status=status,
+        health_status=health_status,
         traffic_ratio=1.0 if status.is_active() else 0.0,
         created_at=datetime.now(UTC),
         revision_id=revision_id,
@@ -142,7 +157,9 @@ class TestBasicFSMStates:
     def test_no_routes_creates_new(self) -> None:
         """First cycle with 0 routes → PROVISIONING with route creation."""
         deployment = make_deployment(desired=1)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, [], spec)
 
@@ -153,9 +170,11 @@ class TestBasicFSMStates:
     def test_new_provisioning_waits(self) -> None:
         """New routes in PROVISIONING → wait (PROVISIONING sub-step)."""
         deployment = make_deployment(desired=1)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
             make_route(revision_id=NEW_REV, status=RouteStatus.PROVISIONING),
         ]
 
@@ -168,10 +187,12 @@ class TestBasicFSMStates:
     def test_completed_when_all_new_healthy_and_no_old(self) -> None:
         """All old gone + new_healthy >= desired → completed."""
         deployment = make_deployment(desired=2)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -191,9 +212,11 @@ class TestBasicFSMStates:
         Rollback is handled by the coordinator's timeout sweep, not the FSM.
         """
         deployment = make_deployment(desired=1)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
             make_route(revision_id=NEW_REV, status=failed_status),
         ]
 
@@ -215,7 +238,12 @@ ROLLING_UPDATE_SCENARIOS = [
             " With 1 old route and desired=1, max_total=2 so 1 new route is created."
             " No termination because max_unavailable=0 and no new healthy routes exist yet."
         ),
-        input=RollingUpdateInput(desired_replicas=1, max_surge=1, max_unavailable=0, old_count=1),
+        input=RollingUpdateInput(
+            desired_replicas=1,
+            max_surge=make_int_or_percent(1),
+            max_unavailable=make_int_or_percent(0),
+            old_count=1,
+        ),
         expected=RollingUpdateExpected(create=1, terminate=0),
     ),
     RollingUpdateScenario(
@@ -223,7 +251,12 @@ ROLLING_UPDATE_SCENARIOS = [
             "max_surge=2 with desired=3 and 3 old routes: max_total=5, current=3,"
             " so can_create=2. still_needed=3 (no new yet), min(2,3)=2 routes created."
         ),
-        input=RollingUpdateInput(desired_replicas=3, max_surge=2, max_unavailable=0, old_count=3),
+        input=RollingUpdateInput(
+            desired_replicas=3,
+            max_surge=make_int_or_percent(2),
+            max_unavailable=make_int_or_percent(0),
+            old_count=3,
+        ),
         expected=RollingUpdateExpected(create=2, terminate=0),
     ),
     RollingUpdateScenario(
@@ -231,7 +264,12 @@ ROLLING_UPDATE_SCENARIOS = [
             "max_surge=3 exceeds desired=2: max_total=5, can_create=3,"
             " but still_needed=2 (only 2 new routes needed), so creation is capped at 2."
         ),
-        input=RollingUpdateInput(desired_replicas=2, max_surge=3, max_unavailable=0, old_count=2),
+        input=RollingUpdateInput(
+            desired_replicas=2,
+            max_surge=make_int_or_percent(3),
+            max_unavailable=make_int_or_percent(0),
+            old_count=2,
+        ),
         expected=RollingUpdateExpected(create=2, terminate=0),
     ),
     # -- max_unavailable controls termination --
@@ -241,7 +279,12 @@ ROLLING_UPDATE_SCENARIOS = [
             " With 2 old routes and 0 new healthy, available=2=min_available,"
             " so no old route can be terminated yet."
         ),
-        input=RollingUpdateInput(desired_replicas=2, max_surge=1, max_unavailable=0, old_count=2),
+        input=RollingUpdateInput(
+            desired_replicas=2,
+            max_surge=make_int_or_percent(1),
+            max_unavailable=make_int_or_percent(0),
+            old_count=2,
+        ),
         expected=RollingUpdateExpected(create=1, terminate=0),
     ),
     RollingUpdateScenario(
@@ -249,7 +292,12 @@ ROLLING_UPDATE_SCENARIOS = [
             "max_unavailable=1 allows 1 route to be unavailable: min_available=3-1=2."
             " With 3 old routes and 0 new healthy, available=3, can_terminate=3-2=1."
         ),
-        input=RollingUpdateInput(desired_replicas=3, max_surge=1, max_unavailable=1, old_count=3),
+        input=RollingUpdateInput(
+            desired_replicas=3,
+            max_surge=make_int_or_percent(1),
+            max_unavailable=make_int_or_percent(1),
+            old_count=3,
+        ),
         expected=RollingUpdateExpected(create=1, terminate=1),
     ),
     # -- combined surge + unavailable --
@@ -259,7 +307,12 @@ ROLLING_UPDATE_SCENARIOS = [
             " (max_total=6, current=4, can_create=2) while max_unavailable=1"
             " allows terminating 1 old (min_available=3, available=4, can_terminate=1)."
         ),
-        input=RollingUpdateInput(desired_replicas=4, max_surge=2, max_unavailable=1, old_count=4),
+        input=RollingUpdateInput(
+            desired_replicas=4,
+            max_surge=make_int_or_percent(2),
+            max_unavailable=make_int_or_percent(1),
+            old_count=4,
+        ),
         expected=RollingUpdateExpected(create=2, terminate=1),
     ),
     RollingUpdateScenario(
@@ -268,7 +321,12 @@ ROLLING_UPDATE_SCENARIOS = [
             " All 3 new routes created at once (max_total=6, can_create=3=still_needed)"
             " and 2 old terminated immediately (min_available=1, available=3, can_terminate=2)."
         ),
-        input=RollingUpdateInput(desired_replicas=3, max_surge=3, max_unavailable=2, old_count=3),
+        input=RollingUpdateInput(
+            desired_replicas=3,
+            max_surge=make_int_or_percent(3),
+            max_unavailable=make_int_or_percent(2),
+            old_count=3,
+        ),
         expected=RollingUpdateExpected(create=3, terminate=2),
     ),
     # -- boundary: unavailable > desired --
@@ -278,7 +336,12 @@ ROLLING_UPDATE_SCENARIOS = [
             " The operator has opted into full unavailability,"
             " so the single old route can be terminated immediately."
         ),
-        input=RollingUpdateInput(desired_replicas=1, max_surge=0, max_unavailable=5, old_count=1),
+        input=RollingUpdateInput(
+            desired_replicas=1,
+            max_surge=make_int_or_percent(0),
+            max_unavailable=make_int_or_percent(5),
+            old_count=1,
+        ),
         expected=RollingUpdateExpected(create=0, terminate=1),
     ),
 ]
@@ -300,7 +363,7 @@ class TestSurgeAndUnavailabilityBudget:
             max_unavailable=scenario.input.max_unavailable,
         )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY)
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING)
             for _ in range(scenario.input.old_count)
         ]
 
@@ -312,11 +375,13 @@ class TestSurgeAndUnavailabilityBudget:
     def test_surge_already_at_max_no_create(self) -> None:
         """Already at max_total → no new creates."""
         deployment = make_deployment(desired=2)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -326,12 +391,14 @@ class TestSurgeAndUnavailabilityBudget:
     def test_new_healthy_allows_more_termination(self) -> None:
         """With new healthy routes, more old can be terminated."""
         deployment = make_deployment(desired=3)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -341,7 +408,23 @@ class TestSurgeAndUnavailabilityBudget:
     def test_surge_and_unavailable_both_zero_rejected(self) -> None:
         """surge=0, unavailable=0: rejected by Pydantic validation."""
         with pytest.raises(ValueError, match="max_surge or max_unavailable must be positive"):
-            RollingUpdateSpec(max_surge=0, max_unavailable=0)
+            RollingUpdateSpec(
+                max_surge=make_int_or_percent(0), max_unavailable=make_int_or_percent(0)
+            )
+
+    def test_surge_and_unavailable_both_zero_float_rejected(self) -> None:
+        """surge=0.0, unavailable=0.0: rejected by Pydantic validation."""
+        with pytest.raises(ValueError, match="max_surge or max_unavailable must be positive"):
+            RollingUpdateSpec(
+                max_surge=make_int_or_percent(0.0), max_unavailable=make_int_or_percent(0.0)
+            )
+
+    def test_surge_and_unavailable_mixed_zero_rejected(self) -> None:
+        """surge=0, unavailable=0.0: rejected by Pydantic validation."""
+        with pytest.raises(ValueError, match="max_surge or max_unavailable must be positive"):
+            RollingUpdateSpec(
+                max_surge=make_int_or_percent(0), max_unavailable=make_int_or_percent(0.0)
+            )
 
 
 # ===========================================================================
@@ -355,11 +438,13 @@ class TestMultiCycleProgression:
     def test_new_healthy_enables_further_creation(self) -> None:
         """After new routes become healthy, more new routes can be created."""
         deployment = make_deployment(desired=3)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -370,12 +455,14 @@ class TestMultiCycleProgression:
     def test_multiple_new_healthy_enables_old_termination(self) -> None:
         """2 new healthy, 2 old: can terminate 1 old."""
         deployment = make_deployment(desired=3)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -386,11 +473,13 @@ class TestMultiCycleProgression:
     def test_not_completed_when_old_still_exists(self) -> None:
         """Even with enough new healthy, old still exists → not completed."""
         deployment = make_deployment(desired=2)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -410,9 +499,15 @@ class TestRouteStatusClassification:
     def test_degraded_new_waits_provisioning(self) -> None:
         """DEGRADED new routes are treated as PROVISIONING (still warming up)."""
         deployment = make_deployment(desired=1)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=NEW_REV, status=RouteStatus.DEGRADED),
+            make_route(
+                revision_id=NEW_REV,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.DEGRADED,
+            ),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -422,9 +517,15 @@ class TestRouteStatusClassification:
     def test_unhealthy_new_retries(self) -> None:
         """All new UNHEALTHY → PROVISIONING (retries, timeout handles rollback)."""
         deployment = make_deployment(desired=1)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=NEW_REV, status=RouteStatus.UNHEALTHY),
+            make_route(
+                revision_id=NEW_REV,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.UNHEALTHY,
+            ),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -441,10 +542,12 @@ class TestRouteStatusClassification:
     def test_old_inactive_not_counted_as_active(self, inactive_status: RouteStatus) -> None:
         """Old routes in terminal states are not counted as old_active."""
         deployment = make_deployment(desired=1)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
             make_route(revision_id=OLD_REV, status=inactive_status),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -454,10 +557,12 @@ class TestRouteStatusClassification:
     def test_partial_new_failure_continues_progress(self) -> None:
         """Some new failed, some healthy → no rollback (live routes exist)."""
         deployment = make_deployment(desired=2)
-        spec = RollingUpdateSpec(max_surge=2, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(2), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
             make_route(revision_id=NEW_REV, status=RouteStatus.FAILED_TO_START),
         ]
 
@@ -468,10 +573,12 @@ class TestRouteStatusClassification:
     def test_old_provisioning_counted_as_active(self) -> None:
         """Old routes in PROVISIONING are counted as old_active."""
         deployment = make_deployment(desired=2)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
             make_route(revision_id=OLD_REV, status=RouteStatus.PROVISIONING),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -488,25 +595,36 @@ class TestTerminationPriority:
     """Test that old routes are terminated in priority order."""
 
     def test_full_priority_order(self) -> None:
-        """Termination order: UNHEALTHY → DEGRADED → PROVISIONING → HEALTHY."""
+        """Termination order: PROVISIONING(0) → UNHEALTHY(1) → DEGRADED(2) → HEALTHY(4).
+
+        Non-RUNNING routes (priority 0) are terminated first, then by health status.
+        """
         unhealthy_id = UUID("00000000-0000-0000-0000-000000000001")
         degraded_id = UUID("00000000-0000-0000-0000-000000000002")
         provisioning_id = UUID("00000000-0000-0000-0000-000000000003")
         healthy_id = UUID("00000000-0000-0000-0000-000000000004")
 
         deployment = make_deployment(desired=4)
-        spec = RollingUpdateSpec(max_surge=0, max_unavailable=3)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(0), max_unavailable=make_int_or_percent(3)
+        )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY, route_id=healthy_id),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING, route_id=healthy_id),
             make_route(
                 revision_id=OLD_REV,
                 status=RouteStatus.PROVISIONING,
                 route_id=provisioning_id,
             ),
-            make_route(revision_id=OLD_REV, status=RouteStatus.DEGRADED, route_id=degraded_id),
             make_route(
                 revision_id=OLD_REV,
-                status=RouteStatus.UNHEALTHY,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.DEGRADED,
+                route_id=degraded_id,
+            ),
+            make_route(
+                revision_id=OLD_REV,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.UNHEALTHY,
                 route_id=unhealthy_id,
             ),
         ]
@@ -515,9 +633,9 @@ class TestTerminationPriority:
 
         terminated = result.route_changes.drain_route_ids
         assert len(terminated) == 3
-        assert terminated[0] == unhealthy_id
-        assert terminated[1] == degraded_id
-        assert terminated[2] == provisioning_id
+        assert terminated[0] == provisioning_id
+        assert terminated[1] == unhealthy_id
+        assert terminated[2] == degraded_id
 
 
 # ===========================================================================
@@ -531,7 +649,9 @@ class TestEdgeCases:
     def test_desired_0_no_routes_completed(self) -> None:
         """desired=0, no routes → completed (vacuously true)."""
         deployment = make_deployment(desired=0)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, [], spec)
 
@@ -540,11 +660,13 @@ class TestEdgeCases:
     def test_more_new_healthy_than_desired_still_completes(self) -> None:
         """new_healthy > desired and no old → completed."""
         deployment = make_deployment(desired=2)
-        spec = RollingUpdateSpec(max_surge=2, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(2), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -554,7 +676,9 @@ class TestEdgeCases:
     def test_only_failed_new_no_old_rolls_back(self) -> None:
         """Only failed new routes, no old → PROVISIONING (retries creation)."""
         deployment = make_deployment(desired=2)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
             make_route(revision_id=NEW_REV, status=RouteStatus.FAILED_TO_START),
             make_route(revision_id=NEW_REV, status=RouteStatus.FAILED_TO_START),
@@ -567,7 +691,9 @@ class TestEdgeCases:
     def test_all_old_inactive_no_new_creates_desired(self) -> None:
         """All old routes are terminated, no new → create desired."""
         deployment = make_deployment(desired=2)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
             make_route(revision_id=OLD_REV, status=RouteStatus.TERMINATED),
             make_route(revision_id=OLD_REV, status=RouteStatus.TERMINATED),
@@ -580,28 +706,22 @@ class TestEdgeCases:
     def test_deploying_rev_none_rejected(self) -> None:
         """If deploying_revision_id is None, evaluate_cycle raises."""
         deployment = make_deployment(desired=1, deploying_revision_id=None)  # type: ignore[arg-type]
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
-        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY)]
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING)]
 
-        with pytest.raises(Exception):  # InvalidEndpointState
+        with pytest.raises(InvalidEndpointState):
             RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
-
-    def test_route_without_revision_classified_as_old(self) -> None:
-        """Routes with revision_id=None are classified as old."""
-        deployment = make_deployment(desired=1)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
-        routes = [make_route(revision_id=None, status=RouteStatus.HEALTHY)]  # type: ignore[arg-type]
-
-        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
-
-        assert len(result.route_changes.rollout_specs) == 1
 
     def test_provisioning_prioritized_over_completion_check(self) -> None:
         """PROVISIONING check comes before completion check in FSM."""
         deployment = make_deployment(desired=1)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
             make_route(revision_id=NEW_REV, status=RouteStatus.PROVISIONING),
         ]
 
@@ -621,7 +741,9 @@ class TestRouteCreatorSpecs:
     def test_creator_specs_use_deploying_revision(self) -> None:
         """Created routes should use the deploying revision metadata."""
         deployment = make_deployment(desired=1)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, [], spec)
 
@@ -646,18 +768,20 @@ class TestRealisticScenario:
     def test_step_by_step_rolling_update(self) -> None:
         """Full simulation of a rolling update across multiple cycles."""
         deployment = make_deployment(desired=5)
-        spec = RollingUpdateSpec(max_surge=2, max_unavailable=1)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(2), max_unavailable=make_int_or_percent(1)
+        )
 
         # Cycle 1: 5 old → create 2, terminate 1
-        old_routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(5)]
+        old_routes = [make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING) for _ in range(5)]
         r1 = RollingUpdateStrategy().evaluate_cycle(deployment, old_routes, spec)
         assert len(r1.route_changes.rollout_specs) == 2
         assert len(r1.route_changes.drain_route_ids) == 1
 
         # Cycle 2: 4 old, 2 new healthy → create 1, terminate 2
         routes_c2 = [
-            *[make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(4)],
-            *[make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY) for _ in range(2)],
+            *[make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING) for _ in range(4)],
+            *[make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING) for _ in range(2)],
         ]
         r2 = RollingUpdateStrategy().evaluate_cycle(deployment, routes_c2, spec)
         assert len(r2.route_changes.rollout_specs) == 1
@@ -665,8 +789,8 @@ class TestRealisticScenario:
 
         # Cycle 3: 2 old, 3 new healthy → create 2, terminate 1
         routes_c3 = [
-            *[make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(2)],
-            *[make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY) for _ in range(3)],
+            *[make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING) for _ in range(2)],
+            *[make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING) for _ in range(3)],
         ]
         r3 = RollingUpdateStrategy().evaluate_cycle(deployment, routes_c3, spec)
         assert len(r3.route_changes.rollout_specs) == 2
@@ -674,8 +798,8 @@ class TestRealisticScenario:
 
         # Cycle 4: 1 old, 5 new healthy → create 0, terminate 1
         routes_c4 = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            *[make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY) for _ in range(5)],
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            *[make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING) for _ in range(5)],
         ]
         r4 = RollingUpdateStrategy().evaluate_cycle(deployment, routes_c4, spec)
         assert len(r4.route_changes.rollout_specs) == 0
@@ -683,7 +807,7 @@ class TestRealisticScenario:
         assert r4.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
 
         # Cycle 5: 0 old, 5 new healthy → completed
-        routes_c5 = [make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY) for _ in range(5)]
+        routes_c5 = [make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING) for _ in range(5)]
         r5 = RollingUpdateStrategy().evaluate_cycle(deployment, routes_c5, spec)
         assert r5.sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED
 
@@ -699,16 +823,18 @@ class TestDeadlockPrevention:
     def test_surge_0_terminates_first_then_creates(self) -> None:
         """surge=0, unavailable=1 → terminate first, next cycle creates."""
         deployment = make_deployment(desired=3)
-        spec = RollingUpdateSpec(max_surge=0, max_unavailable=1)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(0), max_unavailable=make_int_or_percent(1)
+        )
 
         # Cycle 1: 3 old → terminate 1, create 0
-        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(3)]
+        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING) for _ in range(3)]
         r1 = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
         assert len(r1.route_changes.rollout_specs) == 0
         assert len(r1.route_changes.drain_route_ids) == 1
 
         # Cycle 2: 2 old → create 1, terminate 0
-        routes_c2 = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(2)]
+        routes_c2 = [make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING) for _ in range(2)]
         r2 = RollingUpdateStrategy().evaluate_cycle(deployment, routes_c2, spec)
         assert len(r2.route_changes.rollout_specs) == 1
         assert len(r2.route_changes.drain_route_ids) == 0
@@ -716,12 +842,14 @@ class TestDeadlockPrevention:
     def test_new_routes_exceed_desired_no_extra_create(self) -> None:
         """More new_live than desired → no extra creation (still_needed < 0)."""
         deployment = make_deployment(desired=2)
-        spec = RollingUpdateSpec(max_surge=2, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(2), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -732,11 +860,13 @@ class TestDeadlockPrevention:
     def test_provisioning_blocks_all_further_actions(self) -> None:
         """Any new route in PROVISIONING → wait, even if old can be terminated."""
         deployment = make_deployment(desired=3)
-        spec = RollingUpdateSpec(max_surge=2, max_unavailable=1)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(2), max_unavailable=make_int_or_percent(1)
+        )
         routes = [
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
             make_route(revision_id=NEW_REV, status=RouteStatus.PROVISIONING),
         ]
 
@@ -762,8 +892,10 @@ class TestDesiredReplicaCount:
             replica_count=1,
             desired_replica_count=3,
         )
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
-        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY)]
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING)]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
@@ -776,10 +908,12 @@ class TestDesiredReplicaCount:
             replica_count=2,
             desired_replica_count=None,
         )
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
         routes = [
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
-            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
         ]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
@@ -798,8 +932,10 @@ class TestScaleChangeDuringRollingUpdate:
     def test_desired_reduced_terminates_excess_old(self) -> None:
         """If desired is lowered, more old can be terminated."""
         deployment = make_deployment(desired=1)
-        spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
-        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(3)]
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING) for _ in range(3)]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
@@ -809,9 +945,143 @@ class TestScaleChangeDuringRollingUpdate:
     def test_desired_increased_creates_more(self) -> None:
         """If desired is raised, more new routes are created."""
         deployment = make_deployment(desired=5)
-        spec = RollingUpdateSpec(max_surge=2, max_unavailable=0)
-        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(2)]
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(2), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING) for _ in range(2)]
 
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 5
+
+
+# ===========================================================================
+# 12. Fractional (float) max_surge / max_unavailable
+# ===========================================================================
+
+
+class TestFractionSpec:
+    """Test RollingUpdateSpec with float fraction values."""
+
+    def test_fraction_max_surge_accepted(self) -> None:
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(0.25), max_unavailable=make_int_or_percent(0)
+        )
+        assert spec.max_surge.is_percent
+        assert spec.max_surge.percent == 0.25
+
+    def test_fraction_max_unavailable_accepted(self) -> None:
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0.5)
+        )
+        assert spec.max_unavailable.is_percent
+        assert spec.max_unavailable.percent == 0.5
+
+    def test_resolve_max_surge_rounds_up(self) -> None:
+        """0.25 of 10 = 2.5 → rounds up to 3."""
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(0.25), max_unavailable=make_int_or_percent(1)
+        )
+        assert spec.resolve_max_surge(10) == 3
+
+    def test_resolve_max_unavailable_rounds_down(self) -> None:
+        """0.25 of 10 = 2.5 → rounds down to 2."""
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0.25)
+        )
+        assert spec.resolve_max_unavailable(10) == 2
+
+    def test_resolve_exact_fraction(self) -> None:
+        """0.5 of 4 = 2.0 → exactly 2 for both."""
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(0.5), max_unavailable=make_int_or_percent(0.5)
+        )
+        assert spec.resolve_max_surge(4) == 2
+        assert spec.resolve_max_unavailable(4) == 2
+
+    def test_resolve_full_fraction(self) -> None:
+        """1.0 of 5 = 5."""
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1.0), max_unavailable=make_int_or_percent(1.0)
+        )
+        assert spec.resolve_max_surge(5) == 5
+        assert spec.resolve_max_unavailable(5) == 5
+
+    def test_resolve_zero_fraction(self) -> None:
+        """0.0 of anything = 0."""
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(0.0), max_unavailable=make_int_or_percent(1)
+        )
+        assert spec.resolve_max_surge(10) == 0
+
+    def test_resolve_integer_passthrough(self) -> None:
+        """Integer values pass through unchanged regardless of desired."""
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(3), max_unavailable=make_int_or_percent(2)
+        )
+        assert spec.resolve_max_surge(100) == 3
+        assert spec.resolve_max_unavailable(100) == 2
+
+    def test_fraction_over_1_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            RollingUpdateSpec(
+                max_surge=make_int_or_percent(1.5), max_unavailable=make_int_or_percent(0)
+            )
+
+    def test_negative_fraction_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            RollingUpdateSpec(
+                max_surge=make_int_or_percent(-0.1), max_unavailable=make_int_or_percent(0)
+            )
+
+
+class TestFractionStrategy:
+    """Test rolling update strategy evaluation with fractional specs."""
+
+    def test_fraction_surge_creates_correct_routes(self) -> None:
+        """0.25 surge with 4 desired → max_surge=1 (ceil(1.0))."""
+        deployment = make_deployment(desired=4)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(0.25), max_unavailable=make_int_or_percent(0.25)
+        )
+        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING) for _ in range(4)]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
+        assert len(result.route_changes.rollout_specs) == 1
+
+    def test_fraction_unavailable_terminates_correct_routes(self) -> None:
+        """0.5 unavailable with 4 desired → max_unavailable=2.
+
+        4 old + 2 new healthy = 6 available, min_available = 4-2 = 2
+        can_terminate = 6-2 = 4, but old=4 so terminate up to 4.
+        """
+        deployment = make_deployment(desired=4)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(0.5), max_unavailable=make_int_or_percent(0.5)
+        )
+        routes = [
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
+            make_route(revision_id=NEW_REV, status=RouteStatus.RUNNING),
+        ]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert len(result.route_changes.drain_route_ids) == 4
+
+    def test_small_fraction_with_few_replicas(self) -> None:
+        """0.1 surge with 3 desired → ceil(0.3) = 1."""
+        deployment = make_deployment(desired=3)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(0.1), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.RUNNING) for _ in range(3)]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert len(result.route_changes.rollout_specs) == 1

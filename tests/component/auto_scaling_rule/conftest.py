@@ -11,8 +11,12 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
+from ai.backend.manager.actions.validators.rbac.single_entity import (
+    SingleEntityActionRBACValidator,
+)
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.auto_scaling_rule.handler import AutoScalingRuleHandler
@@ -26,6 +30,9 @@ from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 
@@ -59,9 +66,23 @@ def deployment_processors(
     )
     deployment_controller = AsyncMock()
     revision_generator_registry = MagicMock()
-    service = DeploymentService(deployment_controller, repo, revision_generator_registry)
+    model_definition_generator_registry = MagicMock()
+    service = DeploymentService(
+        deployment_controller,
+        repo,
+        revision_generator_registry,
+        model_definition_generator_registry,
+    )
+    permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(
+                scope=ScopeActionRBACValidator(permission_controller_repo),
+                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
+            ),
+        ),
     )
 
 
@@ -142,9 +163,7 @@ async def model_deployment_fixture(
                 domain=domain_fixture,
                 project=str(group_fixture),
                 resource_group=scaling_group_fixture,
-                image=image_id,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                resource_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                 url=None,
             )
         )

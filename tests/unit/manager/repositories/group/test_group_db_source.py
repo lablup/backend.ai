@@ -25,7 +25,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -82,6 +82,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -250,14 +251,11 @@ class TestGroupDBSourceDeleteEndpoints:
                     session_owner=test_user,
                     replicas=1,
                     desired_replicas=1,
-                    image=None,
                     domain=test_domain,
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    resource_slots=ResourceSlot(),
-                    cluster_mode="single-node",
-                    cluster_size=1,
+                    current_revision=uuid.uuid4(),
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)
@@ -271,6 +269,7 @@ class TestGroupDBSourceDeleteEndpoints:
                     domain=test_domain,
                     project=test_group,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
                 session.add(routing)
 
@@ -313,14 +312,11 @@ class TestGroupDBSourceDeleteEndpoints:
                 session_owner=test_user,
                 replicas=1,
                 desired_replicas=1,
-                image=None,
                 domain=test_domain,
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                resource_slots=ResourceSlot(),
-                cluster_mode="single-node",
-                cluster_size=1,
+                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
 
@@ -353,6 +349,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 domain=test_domain,
                 project=test_group,
                 traffic_ratio=1.0,
+                revision=uuid.uuid4(),
             )
             session.add(routing)
 
@@ -370,7 +367,6 @@ class TestGroupDBSourceDeleteEndpoints:
     ) -> uuid.UUID:
         """Create one active endpoint (lifecycle_stage=CREATED)"""
         endpoint_id = uuid.uuid4()
-        image_id = uuid.uuid4()
         sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
@@ -394,14 +390,11 @@ class TestGroupDBSourceDeleteEndpoints:
                 session_owner=test_user,
                 replicas=1,
                 desired_replicas=1,
-                image=image_id,
                 domain=test_domain,
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                resource_slots=ResourceSlot(),
-                cluster_mode="single-node",
-                cluster_size=1,
+                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
             await session.commit()
@@ -446,14 +439,11 @@ class TestGroupDBSourceDeleteEndpoints:
                     session_owner=test_user,
                     replicas=1,
                     desired_replicas=1,
-                    image=None,
                     domain=test_domain,
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    resource_slots=ResourceSlot(),
-                    cluster_mode="single-node",
-                    cluster_size=1,
+                    current_revision=uuid.uuid4(),
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)
@@ -488,6 +478,7 @@ class TestGroupDBSourceDeleteEndpoints:
                     domain=test_domain,
                     project=test_group,
                     traffic_ratio=1.0,
+                    revision=uuid.uuid4(),
                 )
                 session.add(routing)
 

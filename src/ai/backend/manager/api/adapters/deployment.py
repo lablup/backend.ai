@@ -11,6 +11,7 @@ from uuid import UUID
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -81,6 +82,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
     ExtraVFolderMountGQLDTO,
+    ModelDefinitionInfoDTO,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
     OrderDirection,
@@ -133,14 +135,19 @@ from ai.backend.manager.data.deployment.types import (
     RouteSearchScope,
 )
 from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus as ManagerRouteHealthStatus,
+)
+from ai.backend.manager.data.deployment.types import (
     RouteStatus as ManagerRouteStatus,
 )
 from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
 from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
@@ -254,7 +261,17 @@ def _get_deployment_pagination_spec() -> PaginationSpec:
         backward_order=DeploymentOrders.created_at(ascending=True),
         forward_condition_factory=DeploymentConditions.by_cursor_forward,
         backward_condition_factory=DeploymentConditions.by_cursor_backward,
-        tiebreaker_order=EndpointRow.name.asc(),
+        tiebreaker_order=EndpointRow.id.asc(),
+    )
+
+
+def _get_deployment_policy_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=DeploymentPolicyRow.created_at.desc(),
+        backward_order=DeploymentPolicyRow.created_at.asc(),
+        forward_condition_factory=DeploymentConditions.by_cursor_forward,
+        backward_condition_factory=DeploymentConditions.by_cursor_backward,
+        tiebreaker_order=DeploymentPolicyRow.id.asc(),
     )
 
 
@@ -326,36 +343,47 @@ class DeploymentAdapter(BaseAdapter):
         created_user_id: UUID,
     ) -> CreateDeploymentPayload:
         """Create a new deployment."""
-        ir = input.initial_revision
+        initial_revision = input.initial_revision
+        if initial_revision is None:
+            raise ValueError("initial_revision is required for deployment creation")
         mounts_creator = VFolderMountsCreator(
-            model_vfolder_id=ir.model_mount_config.vfolder_id,
-            model_definition_path=ir.model_mount_config.definition_path,
-            model_mount_destination=ir.model_mount_config.mount_destination,
+            model_vfolder_id=initial_revision.model_mount_config.vfolder_id,
+            model_definition_path=initial_revision.model_mount_config.definition_path,
+            model_mount_destination=initial_revision.model_mount_config.mount_destination,
             extra_mounts=[
                 MountInfo(
                     vfolder_id=m.vfolder_id,
                     kernel_path=PurePosixPath(m.mount_destination) if m.mount_destination else None,
                 )
-                for m in (ir.extra_mounts or [])
+                for m in (initial_revision.extra_mounts or [])
             ],
         )
         model_revision_creator = ModelRevisionCreator(
-            image_id=ir.image.id,
+            image_id=initial_revision.image.id,
             resource_spec=ResourceSpec(
-                cluster_mode=ir.cluster_config.mode,
-                cluster_size=ir.cluster_config.size,
+                cluster_mode=initial_revision.cluster_config.mode,
+                cluster_size=initial_revision.cluster_config.size,
                 resource_slots={
-                    e.resource_type: e.quantity for e in ir.resource_config.resource_slots.entries
+                    e.resource_type: e.quantity
+                    for e in initial_revision.resource_config.resource_slots.entries
                 },
-                resource_opts={e.name: e.value for e in ir.resource_config.resource_opts.entries}
-                if ir.resource_config.resource_opts
+                resource_opts={
+                    e.name: e.value for e in initial_revision.resource_config.resource_opts.entries
+                }
+                if initial_revision.resource_config.resource_opts
                 else None,
             ),
             mounts=mounts_creator,
+            model_definition=initial_revision.model_definition,
+            revision_preset_id=initial_revision.revision_preset_id,
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant(ir.model_runtime_config.runtime_variant),
-                environ={e.name: e.value for e in ir.model_runtime_config.environ.entries}
-                if ir.model_runtime_config.environ
+                runtime_variant=RuntimeVariant(
+                    initial_revision.model_runtime_config.runtime_variant
+                ),
+                environ={
+                    e.name: e.value for e in initial_revision.model_runtime_config.environ.entries
+                }
+                if initial_revision.model_runtime_config.environ
                 else None,
             ),
         )
@@ -388,7 +416,7 @@ class DeploymentAdapter(BaseAdapter):
                 name=meta.name or f"deployment-{created_user_id.hex[:8]}",
                 domain=meta.domain_name,
                 project=meta.project_id,
-                resource_group=ir.resource_config.resource_group.name,
+                resource_group=initial_revision.resource_config.resource_group.name,
                 created_user=created_user_id,
                 session_owner=created_user_id,
                 created_at=None,
@@ -430,6 +458,13 @@ class DeploymentAdapter(BaseAdapter):
             GetDeploymentByIdAction(deployment_id=deployment_id)
         )
         return self._deployment_data_to_dto(action_result.data)
+
+    async def get_current_revision(self, deployment_id: UUID) -> RevisionNode:
+        """Retrieve the current active revision of a deployment."""
+        deployment = await self.get(deployment_id)
+        if deployment.current_revision_id is None:
+            raise DeploymentRevisionNotFound(f"Deployment {deployment_id} has no current revision")
+        return await self.get_revision(deployment.current_revision_id)
 
     async def update(
         self,
@@ -505,6 +540,7 @@ class DeploymentAdapter(BaseAdapter):
             deployment=self._deployment_data_to_dto(action_result.deployment),
             previous_revision_id=action_result.previous_revision_id,
             activated_revision_id=action_result.activated_revision_id,
+            deployment_policy=self._policy_data_to_dto(action_result.deployment_policy),
         )
 
     async def delete(self, input: DeleteDeploymentInput) -> DeleteDeploymentPayload:
@@ -709,10 +745,13 @@ class DeploymentAdapter(BaseAdapter):
         match input.strategy:
             case DeploymentStrategy.ROLLING:
                 rolling = input.rolling_update
-                strategy_spec = RollingUpdateSpec(
-                    max_surge=rolling.max_surge if rolling is not None else 1,
-                    max_unavailable=rolling.max_unavailable if rolling is not None else 0,
-                )
+                if rolling is not None:
+                    strategy_spec = RollingUpdateSpec(
+                        max_surge=rolling.max_surge,
+                        max_unavailable=rolling.max_unavailable,
+                    )
+                else:
+                    strategy_spec = RollingUpdateSpec()
             case DeploymentStrategy.BLUE_GREEN:
                 bg = input.blue_green
                 strategy_spec = BlueGreenSpec(
@@ -773,6 +812,8 @@ class DeploymentAdapter(BaseAdapter):
                 else None,
                 inference_runtime_config=input.model_runtime_config.inference_runtime_config,
             ),
+            model_definition=input.model_definition,
+            revision_preset_id=input.revision_preset_id,
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(model_deployment_id=input.deployment_id, adder=adder)
@@ -1143,6 +1184,12 @@ class DeploymentAdapter(BaseAdapter):
                 conditions.append(
                     RouteConditions.by_statuses([ManagerRouteStatus(s.value) for s in f.status])
                 )
+            if f.health_status is not None:
+                conditions.append(
+                    RouteConditions.by_health_statuses([
+                        ManagerRouteHealthStatus(s.value) for s in f.health_status
+                    ])
+                )
             if f.traffic_status is not None:
                 conditions.append(
                     RouteConditions.by_traffic_statuses([
@@ -1233,7 +1280,7 @@ class DeploymentAdapter(BaseAdapter):
         return self._build_querier(
             conditions=conditions,
             orders=[],
-            pagination_spec=_get_deployment_pagination_spec(),
+            pagination_spec=_get_deployment_policy_pagination_spec(),
             limit=input.limit,
             offset=input.offset,
         )
@@ -1393,11 +1440,7 @@ class DeploymentAdapter(BaseAdapter):
                 type=data.default_deployment_strategy,
             ),
             created_user_id=data.created_user_id,
-            revision=(
-                DeploymentAdapter._revision_data_to_dto(data.revision)
-                if data.revision is not None
-                else None
-            ),
+            current_revision_id=data.revision.id if data.revision is not None else None,
             policy=policy_info,
         )
 
@@ -1455,6 +1498,13 @@ class DeploymentAdapter(BaseAdapter):
                 environ=environ_dto,
             ),
             model_mount_config=model_mount_config_dto,
+            model_definition=(
+                ModelDefinitionInfoDTO.model_validate(
+                    data.model_definition.model_dump(by_alias=False)
+                )
+                if data.model_definition is not None
+                else None
+            ),
             created_at=data.created_at,
             extra_mounts=[
                 ExtraVFolderMountGQLDTO(
@@ -1472,6 +1522,7 @@ class DeploymentAdapter(BaseAdapter):
             deployment_id=data.endpoint_id,
             session_id=str(data.session_id) if data.session_id is not None else None,
             status=RouteStatus(data.status.value),
+            health_status=RouteHealthStatus(data.health_status.value),
             traffic_ratio=data.traffic_ratio,
             created_at=data.created_at,
             revision_id=data.revision_id,

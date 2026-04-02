@@ -20,6 +20,7 @@ VALID_SCOPE_ENTITY_COMBINATIONS: Mapping[RBACElementType, frozenset[RBACElementT
         RBACElementType.PROJECT,
         RBACElementType.NETWORK,
         RBACElementType.STORAGE_HOST,
+        RBACElementType.DOMAIN_ADMIN_PAGE,
     }),
     RBACElementType.PROJECT: frozenset({
         RBACElementType.RESOURCE_GROUP,
@@ -30,6 +31,7 @@ VALID_SCOPE_ENTITY_COMBINATIONS: Mapping[RBACElementType, frozenset[RBACElementT
         RBACElementType.NETWORK,
         RBACElementType.USER,
         RBACElementType.STORAGE_HOST,
+        RBACElementType.PROJECT_ADMIN_PAGE,
     }),
     RBACElementType.USER: frozenset({
         RBACElementType.RESOURCE_GROUP,

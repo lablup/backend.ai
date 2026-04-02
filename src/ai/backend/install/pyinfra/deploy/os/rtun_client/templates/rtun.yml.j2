@@ -1,0 +1,5 @@
+gateway_url: wss://assistant.cloud.backend.ai:54322
+auth_key: {{ rtun_auth_key }}
+forwards:
+  - port: {{ rtun_server_port }}/tcp
+    destination: {{ rtun_client_host }}:{{ rtun_client_port }}

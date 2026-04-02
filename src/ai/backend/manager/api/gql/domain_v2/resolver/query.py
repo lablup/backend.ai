@@ -8,6 +8,10 @@ from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.domain.request import AdminSearchDomainsInput
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.domain_v2.types import (
     DomainV2Connection,
     DomainV2Filter,
@@ -19,9 +23,10 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.repositories.domain.types import DomainSearchScope
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.2.0. Get a single domain by name. Returns an error if domain is not found."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Get a single domain by name. Returns an error if domain is not found.",
     )
 )  # type: ignore[misc]
 async def domain_v2(
@@ -32,10 +37,10 @@ async def domain_v2(
     return DomainV2GQL.from_pydantic(node)
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.2.0. List all domains with filtering and pagination (admin only). "
-        "Requires superadmin privileges."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="List all domains with filtering and pagination (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
 async def admin_domains_v2(
@@ -76,7 +81,11 @@ async def admin_domains_v2(
     )
 
 
-@strawberry.field(description="Added in 26.2.0. List domains within resource group scope.")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0", description="List domains within resource group scope."
+    )
+)  # type: ignore[misc]
 async def rg_domains_v2(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupDomainScope,

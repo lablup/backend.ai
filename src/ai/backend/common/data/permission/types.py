@@ -89,6 +89,8 @@ class EntityType(enum.StrEnum):
     # === Standalone entity types ===
     AGENT = "agent"
     AUTH = "auth"
+    PROJECT_ADMIN_PAGE = "project_admin_page"
+    DOMAIN_ADMIN_PAGE = "domain_admin_page"
     SERVICE_CATALOG = "service_catalog"
     AUDIT_LOG = "audit_log"
     CONTAINER_METRIC = "container_metric"
@@ -100,6 +102,7 @@ class EntityType(enum.StrEnum):
     GROUP = "group"
     KERNEL = "kernel"
     KEYPAIR = "keypair"
+    LOGIN_SESSION = "login_session"
     MODEL_SERVICE = "model_service"
     NETWORK = "network"
     NOTIFICATION = "notification"
@@ -113,7 +116,9 @@ class EntityType(enum.StrEnum):
     RESOURCE_GROUP = "resource_group"
     PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     RESOURCE_PRESET = "resource_preset"
+    MODEL_CARD = "model_card"
     ROLE = "role"
+    RUNTIME_VARIANT = "runtime_variant"
     ROUTING = "routing"
     DOTFILE = "dotfile"
     ETCD_CONFIG = "etcd_config"
@@ -169,14 +174,14 @@ class EntityType(enum.StrEnum):
     IMAGE_AGENT = "image:agent"
     IMAGE_RESOURCE_LIMIT = "image:resource_limit"
     # Artifact sub
-    ARTIFACT_REVISION = "artifact:revision"
+    ARTIFACT_REVISION = "artifact_revision"
     ARTIFACT_SCAN = "artifact:scan"
     ARTIFACT_MODEL = "artifact:model"
     ARTIFACT_IMPORT = "artifact:import"
     ARTIFACT_DOWNLOAD = "artifact:download"
     ARTIFACT_README = "artifact:readme"
     ARTIFACT_VERIFICATION = "artifact:verification"
-    ARTIFACT_REVISION_STORAGE_LINK = "artifact:revision:storage_link"
+    ARTIFACT_REVISION_STORAGE_LINK = "artifact_revision:storage_link"
     # VFolder sub
     VFOLDER_FILE = "vfolder:file"
     VFOLDER_DIRECTORY = "vfolder:directory"
@@ -384,6 +389,10 @@ class RBACElementType(enum.StrEnum):
     ROLE = "role"
     AUDIT_LOG = "audit_log"
     EVENT_LOG = "event_log"
+
+    # === Admin page access control ===
+    PROJECT_ADMIN_PAGE = "project_admin_page"
+    DOMAIN_ADMIN_PAGE = "domain_admin_page"
 
     # === Auto-only entities used in permissions ===
     NOTIFICATION_RULE = "notification_rule"

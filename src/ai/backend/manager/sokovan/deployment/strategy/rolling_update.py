@@ -17,10 +17,12 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
+    RouteHealthStatus,
     RouteInfo,
     RouteStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.deployment import DeploymentHasNoTargetRevision
 from ai.backend.manager.models.deployment_policy import DeploymentStrategySpec, RollingUpdateSpec
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -120,13 +122,19 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
                     classified.old_active.append(route)
                 continue
 
-            if route.status.is_provisioning():
+            if route.status == RouteStatus.PROVISIONING:
                 classified.new_provisioning_count += 1
             elif route.status.is_inactive():
                 classified.new_failed_count += 1
-            elif route.status == RouteStatus.HEALTHY:
+            elif (
+                route.status == RouteStatus.RUNNING
+                and route.health_status == RouteHealthStatus.HEALTHY
+            ):
                 classified.new_healthy_count += 1
-            elif route.status == RouteStatus.UNHEALTHY:
+            elif (
+                route.status == RouteStatus.RUNNING
+                and route.health_status == RouteHealthStatus.UNHEALTHY
+            ):
                 classified.new_unhealthy_count += 1
         return classified
 
@@ -170,8 +178,8 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
             )
             return StrategyCycleResult(sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING)
 
-        max_surge = spec.max_surge  # extra routes allowed above desired
-        max_unavailable = spec.max_unavailable  # routes allowed to be down
+        max_surge = spec.resolve_max_surge(desired)  # extra routes allowed above desired
+        max_unavailable = spec.resolve_max_unavailable(desired)  # routes allowed to be down
 
         max_total = desired + max_surge  # upper bound on simultaneous routes
         current_total = (
@@ -188,7 +196,8 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         to_terminate = self._compute_routes_to_terminate(classified, min_available)
         if to_terminate > 0:
             sorted_old = sorted(
-                classified.old_active, key=lambda route: route.status.termination_priority()
+                classified.old_active,
+                key=lambda route: route.termination_priority,
             )
             for route in sorted_old[:to_terminate]:
                 route_changes.drain_route_ids.append(route.route_id)
@@ -257,6 +266,10 @@ def _build_route_creators(
     count: int,
 ) -> list[RBACEntityCreator[RoutingRow]]:
     """Build route creator specs for new revision routes."""
+    if deployment.deploying_revision_id is None:
+        raise DeploymentHasNoTargetRevision(
+            f"Cannot create routes: deployment {deployment.id} has no deploying revision"
+        )
     creators: list[RBACEntityCreator[RoutingRow]] = []
     for _ in range(count):
         spec = RouteCreatorSpec(

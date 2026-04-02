@@ -147,6 +147,12 @@ class ScopedPermissionOrders:
             return PermissionRow.entity_type.asc()
         return PermissionRow.entity_type.desc()
 
+    @staticmethod
+    def created_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return PermissionRow.created_at.asc()
+        return PermissionRow.created_at.desc()
+
 
 class ObjectPermissionOrders:
     """Query orders for object permissions."""

@@ -130,7 +130,6 @@ class ImageLoadFilter(enum.StrEnum):
 
 class RelationLoadingOption(enum.StrEnum):
     ALIASES = enum.auto()
-    ENDPOINTS = enum.auto()
     REGISTRY = enum.auto()
 
 
@@ -143,8 +142,6 @@ def _apply_loading_option(
                 query_stmt = query_stmt.options(selectinload(ImageRow.aliases))
             case RelationLoadingOption.REGISTRY:
                 query_stmt = query_stmt.options(joinedload(ImageRow.registry_row))
-            case RelationLoadingOption.ENDPOINTS:
-                query_stmt = query_stmt.options(selectinload(ImageRow.endpoints))
     return query_stmt
 
 
@@ -302,13 +299,6 @@ async def rescan_images(
 type Resources = dict[SlotName, dict[str, Any]]
 
 
-# Defined for avoiding circular import
-def _get_image_endpoint_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.endpoint import EndpointRow
-
-    return ImageRow.id == foreign(EndpointRow.image)
-
-
 def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
@@ -383,12 +373,6 @@ class ImageRow(Base):  # type: ignore[misc]
 
     aliases = relationship("ImageAliasRow", back_populates="image")
     # sessions = relationship("SessionRow", back_populates="image_row")
-    endpoints = relationship(
-        "EndpointRow",
-        primaryjoin=_get_image_endpoint_join_condition,
-        back_populates="image_row",
-    )
-
     registry_row = relationship(
         "ContainerRegistryRow",
         back_populates="image_rows",
@@ -1442,9 +1426,9 @@ class ImagePermissionContextBuilder(
                     for assoc in img_row.registry_row.association_container_registries_groups_rows
                 ]
                 for project_id in assoc_project_ids:
-                    image_id_to_permission_map[img_row.id] = project_id_to_permission_map[
-                        str(project_id)
-                    ]
+                    perm = project_id_to_permission_map.get(str(project_id))
+                    if perm is not None:
+                        image_id_to_permission_map[img_row.id] = perm
 
         return ImagePermissionContext(
             object_id_to_additional_permission_map=image_id_to_permission_map

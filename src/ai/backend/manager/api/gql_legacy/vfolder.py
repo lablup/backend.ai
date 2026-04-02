@@ -587,7 +587,7 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
             title=metadata.get("title") or vfolder_row.name,
             version=metadata.get("version") or "",
             created_at=metadata.get("created") or vfolder_row.created_at,
-            modified_at=metadata.get("last_modified") or vfolder_row.created_at,
+            modified_at=metadata.get("last_modified") or vfolder_row.last_used,
             description=metadata.get("description") or "",
             task=metadata.get("task") or "",
             architecture=metadata.get("architecture") or "",

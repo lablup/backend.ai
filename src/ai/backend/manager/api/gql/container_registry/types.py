@@ -7,18 +7,25 @@ from enum import StrEnum
 from typing import Any, Self, cast
 from uuid import UUID
 
-import strawberry
 from strawberry import Info
-from strawberry.relay import NodeID
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_enum,
+    gql_field,
+    gql_node_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
-@strawberry.enum(
-    name="ContainerRegistryType", description="Added in 26.4.0. Container registry type."
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.4.0", description="Container registry type."),
+    name="ContainerRegistryType",
 )
 class ContainerRegistryTypeGQL(StrEnum):
     DOCKER = "docker"
@@ -40,28 +47,28 @@ class ContainerRegistryTypeGQL(StrEnum):
     name="ContainerRegistryV2",
 )
 class ContainerRegistryGQL(PydanticNodeMixin[Any]):
-    id: NodeID[str] = strawberry.field(
+    id: NodeID[str] = gql_field(
         description="Relay-style global node identifier for the container registry"
     )
-    url: str = strawberry.field(description="URL of the container registry")
-    registry_name: str = strawberry.field(description="Name of the container registry")
-    type: ContainerRegistryTypeGQL = strawberry.field(description="Type of the container registry")
-    project: str | None = strawberry.field(
+    url: str = gql_field(description="URL of the container registry")
+    registry_name: str = gql_field(description="Name of the container registry")
+    type: ContainerRegistryTypeGQL = gql_field(description="Type of the container registry")
+    project: str | None = gql_field(
         description="Project or namespace within the registry", default=None
     )
-    username: str | None = strawberry.field(
+    username: str | None = gql_field(
         description="Username for registry authentication", default=None
     )
-    password: str | None = strawberry.field(
+    password: str | None = gql_field(
         description="Masked password for registry authentication", default=None
     )
-    ssl_verify: bool | None = strawberry.field(
+    ssl_verify: bool | None = gql_field(
         description="Whether SSL verification is enabled", default=None
     )
-    is_global: bool | None = strawberry.field(
+    is_global: bool | None = gql_field(
         description="Whether this registry is globally accessible", default=None
     )
-    extra: JSON | None = strawberry.field(
+    extra: JSON | None = gql_field(
         description="Extra metadata for the container registry", default=None
     )
 
@@ -77,3 +84,20 @@ class ContainerRegistryGQL(PydanticNodeMixin[Any]):
             UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
+
+
+ContainerRegistryV2Edge = Edge[ContainerRegistryGQL]
+
+
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Paginated connection for container registries.",
+    )
+)
+class ContainerRegistryV2Connection(Connection[ContainerRegistryGQL]):
+    count: int = gql_field(description="Total number of matching registries.")
+
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count

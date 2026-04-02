@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.config.request import (
 from ai.backend.common.dto.manager.config.response import (
     CreateDotfileResponse,
     DeleteDotfileResponse,
-    DotfileItem,
+    DotfileListItem,
     GetDotfileResponse,
     ListDotfilesResponse,
     UpdateDotfileResponse,
@@ -114,8 +114,10 @@ class GroupConfigHandler:
                 HTTPStatus.OK,
                 GetDotfileResponse(path=entry.path, perm=entry.perm, data=entry.data),
             )
-        items = [DotfileItem(path=e.path, perm=e.perm, data=e.data) for e in result.entries]
-        return APIResponse.build(HTTPStatus.OK, ListDotfilesResponse(items=items))
+        items = [
+            DotfileListItem(path=e.path, permission=e.perm, data=e.data) for e in result.entries
+        ]
+        return APIResponse.build(HTTPStatus.OK, ListDotfilesResponse(root=items))
 
     async def update(
         self,

@@ -1,0 +1,42 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  extra_hosts:
+  {%- for node in config.cluster_nodes %}
+    - "{{ node.hostname }}:${{ '{' }}{{ node.hostname | upper }}_IP:?error{{ '}' }}"
+  {%- endfor %}
+  image: {{ config.container_image }}
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cpu_count: {{ config.cpu_count | default(4) }}
+  mem_limit: "{{ config.memory_limit | default('8g') }}"
+  shm_size: "{{ config.shm_size | default('2g') }}"
+
+services:
+  postgres{{ pg_cluster_info.node_number }}:
+    <<: *base
+    container_name: {{ config.container_name_prefix }}-{{ pg_cluster_info.node_name }}
+    user: "postgres:postgres"
+    env_file:
+      - .env
+      - {{ pg_cluster_info.node_name }}.env
+    volumes:
+      - "{{ data_dir }}:/var/lib/postgresql/${PG_MAJOR_VERSION}:rw"
+      - "./postgres.yml:/work/postgres.yml:ro"
+      - "./post_init.sh:/var/lib/postgresql/post_init.sh:ro"
+    ports:
+      # Rest API
+      - "${{ '{' }}{{ pg_cluster_info.node_name | upper }}_PG_API_PORT:?error{{ '}' }}:8008"
+      # DB
+      - "${{ '{' }}{{ pg_cluster_info.node_name | upper }}_PG_SQL_PORT:?error{{ '}' }}:5432"
+    command: ["/usr/bin/python3", "/usr/bin/patroni", "/work/postgres.yml"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_SUPERUSER_ID} -d postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

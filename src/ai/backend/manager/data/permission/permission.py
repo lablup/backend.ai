@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 
 from ai.backend.manager.data.common.types import SearchResult
 
@@ -26,6 +27,7 @@ class PermissionData:
     scope_id: str
     entity_type: EntityType
     operation: OperationType
+    created_at: datetime
 
 
 @dataclass

@@ -112,6 +112,18 @@ class Auth(BaseFunction):
 
     @api_function
     @classmethod
+    async def get_my_ip(cls) -> dict[str, Any]:
+        """
+        Return the client's IP address as seen by the server.
+        Useful for configuring IP whitelists (allowed_client_ip).
+        """
+        rqst = Request("GET", "/auth/my-ip")
+        async with rqst.fetch() as resp:
+            result: dict[str, Any] = await resp.json()
+            return result
+
+    @api_function
+    @classmethod
     async def update_password_no_auth_in_session(
         cls, user_id: str, current_password: str, new_password: str
     ) -> dict[str, Any]:

@@ -27,6 +27,15 @@ class DeploymentPolicyCreatorSpec(CreatorSpec[DeploymentPolicyRow]):
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
 
+    @classmethod
+    def build_default(cls, endpoint_id: uuid.UUID) -> DeploymentPolicyCreatorSpec:
+        """Create a default rolling deployment policy spec."""
+        return cls(
+            endpoint_id=endpoint_id,
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(),
+        )
+
     @override
     def build_row(self) -> DeploymentPolicyRow:
         return DeploymentPolicyRow(

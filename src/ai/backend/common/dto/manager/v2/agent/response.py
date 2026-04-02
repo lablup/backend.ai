@@ -276,7 +276,7 @@ class ComputePluginEntryDTO(BaseResponseModel):
     )
     value: str = Field(
         description=(
-            "Plugin value string containing plugin-specific information. "
+            "Plugin value as a JSON-encoded string containing plugin-specific information. "
             "The content varies by plugin type and may include version or configuration details."
         )
     )

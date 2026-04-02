@@ -1,0 +1,68 @@
+#!/bin/bash
+set -e
+
+EXPORTER_URL="http://localhost:{{ exporter_port }}"
+HEALTH_ENDPOINT="/metrics"
+
+echo "=== PostgreSQL Exporter Status Check ==="
+echo "Endpoint: ${EXPORTER_URL}${HEALTH_ENDPOINT}"
+echo
+
+# Check Docker container status
+echo "1. Container Status:"
+docker compose ps postgres-exporter 2>/dev/null || echo "  Container not found or not running"
+echo
+
+# Check if exporter endpoint is responding
+echo "2. Endpoint Health:"
+if curl -sf "${EXPORTER_URL}${HEALTH_ENDPOINT}" >/dev/null 2>&1; then
+    echo "  ✓ Exporter endpoint is responding"
+else
+    echo "  ✗ Exporter endpoint is not responding"
+    exit 1
+fi
+
+# Check PostgreSQL connection status
+echo "3. PostgreSQL Connection:"
+response=$(curl -s "${EXPORTER_URL}${HEALTH_ENDPOINT}")
+pg_up_line=$(echo "$response" | grep "^pg_up " | head -1)
+echo "  Debug: pg_up line = '$pg_up_line'"
+
+if echo "$response" | grep -q "^pg_up 1"; then
+    echo "  ✓ PostgreSQL database is connected and accessible"
+elif echo "$response" | grep -q "^pg_up 0"; then
+    echo "  ✗ PostgreSQL database connection failed"
+    echo "  Checking database configuration..."
+    echo "  Environment variables from .env:"
+    cat .env | grep -E "^(DB_HOST|DB_PORT|DB_NAME|DB_USER)" || echo "  .env file not found"
+    echo
+    echo "  Testing PostgreSQL connectivity:"
+    # Extract DB_PORT from .env
+    DB_PORT=$(grep "^DB_PORT=" .env | cut -d'=' -f2)
+    if nc -z localhost ${DB_PORT} 2>/dev/null; then
+        echo "    ✓ PostgreSQL port ${DB_PORT} is accessible"
+    else
+        echo "    ✗ PostgreSQL port ${DB_PORT} is not accessible"
+    fi
+    echo
+    echo "  PostgreSQL Exporter container logs (last 10 lines):"
+    docker compose logs --tail=10 postgres-exporter 2>/dev/null || echo "    Cannot retrieve logs"
+    exit 1
+else
+    echo "  ? Unable to determine PostgreSQL connection status"
+    echo "  First 10 lines of metrics response:"
+    echo "$response" | head -10 | sed 's/^/    /'
+fi
+
+# Show key metrics summary
+echo "4. Key Metrics Summary:"
+if [ -n "$response" ]; then
+    echo "$response" | grep -E "^(pg_up|pg_stat_database_numbackends|pg_database_size_bytes)" | head -10 | while read -r line; do
+        echo "  $line"
+    done
+else
+    echo "  No metrics available"
+fi
+
+echo
+echo "✓ PostgreSQL Exporter Status: Healthy"

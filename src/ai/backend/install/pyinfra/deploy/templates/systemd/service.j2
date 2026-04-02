@@ -1,0 +1,24 @@
+[Unit]
+Description={{ description }}
+Requires=network.target
+After=network.target remote-fs.target
+
+[Service]
+Type=simple
+ExecStart={{ exec_start }}
+PIDFile={{ service_dir }}/{{ service_name }}.pid
+User={{ user_id | default('root') }}
+Group={{ group_id | default('root')}}
+
+WorkingDirectory={{ service_dir }}
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+PrivateTmp=false
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=5242880
+LimitNPROC=131072
+
+[Install]
+WantedBy=multi-user.target

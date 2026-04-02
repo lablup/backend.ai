@@ -362,7 +362,7 @@ class CancelImportArtifactGQLPayload(BaseResponseModel):
 class ScanArtifactModelsGQLPayload(BaseResponseModel):
     """GQL payload for batch model scanning operations."""
 
-    artifact_revisions: list[ArtifactRevisionNode] = Field(
+    artifact_revision: list[ArtifactRevisionNode] = Field(
         description="Artifact revisions discovered during model scanning."
     )
 

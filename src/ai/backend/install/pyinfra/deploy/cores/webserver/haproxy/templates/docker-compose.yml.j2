@@ -1,0 +1,29 @@
+x-base: &base
+  logging:
+    driver: "json-file"
+    options:
+      max-file: "5"
+      max-size: "10m"
+  extra_hosts:
+{%- for node in webserver_nodes %}
+    - "{{ node.hostname }}:{{ node.ip }}"
+{%- endfor %}
+  image: {{ haproxy_image }}
+  restart: unless-stopped
+
+services:
+  webserver-terminator:
+    <<: *base
+    ports:
+      - "{{ service_port }}:8080"  # http
+      # - "443:443"    # https
+      - "7900:7999"  # haproxy stats (for operation only)
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - {{ home_dir }}/ssl_cert/current:/etc/web_cert:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:7999/stats || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

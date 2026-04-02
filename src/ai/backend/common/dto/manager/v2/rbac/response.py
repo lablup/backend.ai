@@ -19,19 +19,28 @@ from .types import (
 )
 
 __all__ = (
+    "AdminSearchAssociationsPayload",
+    "AdminSearchPermissionsPayload",
+    "AdminSearchRoleAssignmentsPayload",
+    "AdminSearchRolesPayload",
     "AssociationScopesEntitiesNode",
+    "BulkAssignRoleFailureInfo",
     "BulkAssignRoleResultPayload",
+    "BulkRevokeRoleFailureInfo",
     "BulkRevokeRoleResultPayload",
-    "BulkRoleOperationFailureInfo",
     "CreateRolePayload",
     "DeletePermissionPayload",
     "DeleteRolePayload",
+    "EntityActionInfo",
     "EntityNode",
+    "EntityOperationCombinationInfo",
+    "OperationInfo",
     "PermissionNode",
     "PurgeRolePayload",
     "RoleAssignmentNode",
     "RoleNode",
     "ScopeEntityCombinationInfo",
+    "ScopeEntityOperationCombinationInfo",
     "UpdateRolePayload",
 )
 
@@ -89,8 +98,15 @@ class RoleAssignmentNode(BaseResponseModel):
     granted_at: datetime = Field(description="Timestamp when the assignment was created")
 
 
-class BulkRoleOperationFailureInfo(BaseResponseModel):
-    """Failure detail for a single user in a bulk role operation."""
+class BulkAssignRoleFailureInfo(BaseResponseModel):
+    """Failure detail for a single user in a bulk role assignment."""
+
+    user_id: UUID = Field(description="UUID of the user that failed")
+    message: str = Field(description="Error message describing the failure")
+
+
+class BulkRevokeRoleFailureInfo(BaseResponseModel):
+    """Failure detail for a single user in a bulk role revocation."""
 
     user_id: UUID = Field(description="UUID of the user that failed")
     message: str = Field(description="Error message describing the failure")
@@ -102,7 +118,7 @@ class BulkAssignRoleResultPayload(BaseResponseModel):
     assigned: list[RoleAssignmentNode] = Field(
         default_factory=list, description="Successfully created role assignments"
     )
-    failed: list[BulkRoleOperationFailureInfo] = Field(
+    failed: list[BulkAssignRoleFailureInfo] = Field(
         default_factory=list, description="Users that failed to be assigned"
     )
 
@@ -113,7 +129,7 @@ class BulkRevokeRoleResultPayload(BaseResponseModel):
     revoked: list[RoleAssignmentNode] = Field(
         default_factory=list, description="Successfully revoked role assignments"
     )
-    failed: list[BulkRoleOperationFailureInfo] = Field(
+    failed: list[BulkRevokeRoleFailureInfo] = Field(
         default_factory=list, description="Users that failed to be revoked"
     )
 
@@ -127,6 +143,7 @@ class PermissionNode(BaseResponseModel):
     scope_id: str = Field(description="Scope element ID")
     entity_type: RBACElementTypeDTO = Field(description="Entity element type")
     operation: OperationTypeDTO = Field(description="Operation type")
+    created_at: datetime = Field(description="Creation timestamp")
 
 
 class EntityNode(BaseResponseModel):
@@ -148,10 +165,79 @@ class AssociationScopesEntitiesNode(BaseResponseModel):
     registered_at: datetime = Field(description="Registration timestamp")
 
 
+class AdminSearchRolesPayload(BaseResponseModel):
+    """Paginated result for role search."""
+
+    items: list[RoleNode] = Field(description="List of role nodes.")
+    total_count: int = Field(description="Total number of roles matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class AdminSearchPermissionsPayload(BaseResponseModel):
+    """Paginated result for permission search."""
+
+    items: list[PermissionNode] = Field(description="List of permission nodes.")
+    total_count: int = Field(description="Total number of permissions matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class AdminSearchRoleAssignmentsPayload(BaseResponseModel):
+    """Paginated result for role assignment search."""
+
+    items: list[RoleAssignmentNode] = Field(description="List of role assignment nodes.")
+    total_count: int = Field(description="Total number of assignments matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class AdminSearchAssociationsPayload(BaseResponseModel):
+    """Paginated result for scope-entity association search."""
+
+    items: list[AssociationScopesEntitiesNode] = Field(description="List of association nodes.")
+    total_count: int = Field(description="Total number of associations matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
 class ScopeEntityCombinationInfo(BaseResponseModel):
     """Valid scope-entity type combination for RBAC permissions."""
 
     scope_type: RBACElementTypeDTO = Field(description="Scope element type")
     valid_entity_types: list[RBACElementTypeDTO] = Field(
         description="Valid entity types for this scope type"
+    )
+
+
+class OperationInfo(BaseResponseModel):
+    """Information about a single RBAC operation."""
+
+    operation: str = Field(description="Operation name")
+    description: str = Field(description="Human-readable description")
+    required_permission: OperationTypeDTO = Field(description="Required RBAC permission")
+
+
+class EntityOperationCombinationInfo(BaseResponseModel):
+    """Valid entity-operation combinations for RBAC actions."""
+
+    entity_type: RBACElementTypeDTO = Field(description="Entity element type")
+    operations: list[OperationInfo] = Field(description="Valid operations for this entity")
+
+
+class EntityActionInfo(BaseResponseModel):
+    """Entity type with its allowed actions within a specific scope."""
+
+    entity_type: RBACElementTypeDTO = Field(description="Entity element type")
+    actions: list[OperationInfo] = Field(
+        description="Valid operations for this entity in the given scope"
+    )
+
+
+class ScopeEntityOperationCombinationInfo(BaseResponseModel):
+    """Complete scope-entity-operation combination for RBAC permission matrix."""
+
+    scope_type: RBACElementTypeDTO = Field(description="Scope element type")
+    entities: list[EntityActionInfo] = Field(
+        description="Entities and their valid operations within this scope"
     )

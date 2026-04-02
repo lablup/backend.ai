@@ -48,10 +48,6 @@ from ai.backend.manager.repositories.deployment.repository import (
     AutoScalingMetricsData,
     DeploymentRepository,
 )
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    ModelDefinitionGeneratorRegistry,
-    RegistryArgs,
-)
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -103,12 +99,6 @@ class DeploymentExecutor:
         self._config_provider = config_provider
         self._client_pool = client_pool
         self._valkey_stat = valkey_stat
-        self._model_definition_generator_registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(
-                deployment_repository=self._deployment_repo,
-                enable_model_definition_override=self._config_provider.config.deployment.enable_model_definition_override,
-            )
-        )
 
     async def check_pending_deployments(
         self, deployments: Sequence[DeploymentWithHistory]
@@ -126,6 +116,7 @@ class DeploymentExecutor:
         # Collect registration tasks
         registration_tasks: list[Coroutine[Any, Any, str]] = []
         valid_deployments: list[DeploymentWithHistory] = []
+        skipped_deployments: list[DeploymentWithHistory] = []
         for deployment in deployments:
             info = deployment.deployment_info
             targets = scaling_group_targets[info.metadata.resource_group]
@@ -135,8 +126,14 @@ class DeploymentExecutor:
                     info.metadata.resource_group,
                     info.id,
                 )
+                skipped_deployments.append(deployment)
                 continue
-            registration_tasks.append(self._register_endpoint(info, targets))
+            if info.current_revision_id is None:
+                skipped_deployments.append(deployment)
+                continue
+            registration_tasks.append(
+                self._register_endpoint(info, targets, info.current_revision_id)
+            )
             valid_deployments.append(deployment)
 
         # Wait for all tasks to complete
@@ -185,6 +182,7 @@ class DeploymentExecutor:
         return DeploymentExecutionResult(
             successes=successful_deployments,
             failures=errors,
+            skipped=skipped_deployments,
         )
 
     async def check_ready_deployments_that_need_scaling(
@@ -245,9 +243,13 @@ class DeploymentExecutor:
 
         # Phase 2: Evaluate scaling (per-deployment)
         for deployment in deployments:
+            info = deployment.deployment_info
+            if info.current_revision_id is None:
+                skipped.append(deployment)
+                continue
             try:
                 out_creators, in_route_ids = self._evaluate_deployment_scaling(
-                    deployment.deployment_info, route_map
+                    info, route_map, info.current_revision_id
                 )
                 if out_creators or in_route_ids:
                     scale_out_creators.extend(out_creators)
@@ -431,28 +433,23 @@ class DeploymentExecutor:
         self,
         deployment: DeploymentInfo,
         scaling_group_target: ScalingGroupProxyTarget,
+        revision_id: UUID,
     ) -> str:
+        """Resolve the target revision's model definition and register the endpoint to the app proxy.
+
+        Returns the registered endpoint URL.
+        """
         pool = DeploymentRecorderContext.current_pool()
         recorder = pool.recorder(deployment.id)
 
         with recorder.phase("register_endpoint"):
             with recorder.step("check_target_revision"):
-                if deployment.current_revision_id is not None:
-                    target_revision = deployment.resolve_revision_spec(
-                        deployment.current_revision_id
-                    )
-                else:
-                    target_revision = await self._deployment_repo.get_revision_spec_from_endpoint(
-                        deployment.id
-                    )
+                target_revision = deployment.resolve_revision_spec(revision_id)
 
-            with recorder.step("generate_model_definition"):
-                model_definition = (
-                    await self._model_definition_generator_registry.generate_model_definition(
-                        target_revision
-                    )
-                )
-                health_check_config = model_definition.health_check_config()
+            with recorder.step("extract_health_check_config"):
+                health_check_config = None
+                if target_revision.model_definition:
+                    health_check_config = target_revision.model_definition.health_check_config()
                 if not health_check_config:
                     log.debug(
                         "No health check configuration found in model definition for deployment {}",
@@ -581,6 +578,7 @@ class DeploymentExecutor:
         self,
         deployment: DeploymentInfo,
         route_map: Mapping[UUID, Sequence[RouteInfo]],
+        revision_id: UUID,
     ) -> tuple[list[RBACEntityCreator[RoutingRow]], list[UUID]]:
         """Evaluate scaling action for a deployment and return creators/route IDs."""
         pool = DeploymentRecorderContext.current_pool()
@@ -602,7 +600,7 @@ class DeploymentExecutor:
                             session_owner_id=deployment.metadata.session_owner,
                             domain=deployment.metadata.domain,
                             project_id=deployment.metadata.project,
-                            revision_id=deployment.current_revision_id,
+                            revision_id=revision_id,
                         )
                         scale_out_creators.append(
                             RBACEntityCreator(
@@ -616,7 +614,7 @@ class DeploymentExecutor:
                         )
                 elif len(routes) > target_count:
                     termination_route_candidates = sorted(
-                        routes, key=lambda r: (r.status.termination_priority())
+                        routes, key=lambda r: r.termination_priority
                     )
                     candidates = termination_route_candidates[: len(routes) - target_count]
                     scale_in_route_ids.extend(r.route_id for r in candidates)

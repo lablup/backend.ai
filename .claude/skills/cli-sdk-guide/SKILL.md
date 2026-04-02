@@ -274,6 +274,39 @@ When implementing new CLI/SDK feature:
 - `client/cli/types.py` - CLIContext and ExitCode
 - `client/exceptions.py` - Exception hierarchy
 
+## V2 SDK/CLI (New Pattern)
+
+**All new SDK/CLI work MUST use the v2 pattern.**
+
+### V2 SDK Client (`client/v2/domains_v2/`)
+
+- Inherits `BaseDomainClient`, receives `BackendAIAuthClient` via constructor
+- Uses v2 DTOs from `common/dto/manager/v2/` exclusively
+- `typed_request()` handles serialization and response parsing
+- Registry: `V2ClientRegistry` (`client/v2/v2_registry.py`) with `@cached_property` per domain
+
+### V2 CLI (`client/cli/v2/`)
+
+**Command pattern:** `./bai [admin] {entity} [{sub-entity}] {operation}`
+
+- `admin_` SDK methods → commands under `./bai admin {entity} ...`
+- Non-admin methods → `./bai {entity} ...`
+- Entity names are **singular** (domain, user, agent)
+- Each entity has its own directory with `__init__.py` + `commands.py`
+- Admin commands in `admin/{entity}.py`
+- Sub-entities as separate Click sub-groups (e.g., revision, channel, role)
+- Construct Pydantic DTOs with **explicit field arguments** (never kwargs unpacking)
+- Filter options are domain-specific CLI args (`--name-contains`, `--status`, etc.)
+- `--order-by field:direction` supports multiple values
+- Config from `~/.backend.ai/` via `load_v2_config()` → `V2ConnectionConfig` dataclass
+
+### V2 Config (`~/.backend.ai/`)
+
+- `config.toml` — endpoint, endpoint_type, api_version
+- `credentials.toml` — access_key, secret_key
+- `session/cookie.dat` — webserver session cookie (login/logout)
+
 **Related skills:**
 - `/api-guide` - REST API implementation (prerequisite)
 - `/tdd-guide` - Testing workflow
+- `/local-dev` - Service management and CLI testing

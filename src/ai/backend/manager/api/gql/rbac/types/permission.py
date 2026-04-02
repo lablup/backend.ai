@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
+from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 
@@ -22,6 +23,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionFilter as PermissionFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    PermissionNestedFilter as PermissionNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionOrderBy as PermissionOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -31,21 +35,28 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     DeletePermissionPayload as DeletePermissionPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    PermissionNode as PermissionNodeDTO,
+    EntityActionInfo,
+    EntityOperationCombinationInfo,
+    OperationInfo,
+    ScopeEntityCombinationInfo,
+    ScopeEntityOperationCombinationInfo,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    ScopeEntityCombinationInfo,
+    PermissionNode as PermissionNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
     RBACElementTypeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
-from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -59,24 +70,27 @@ if TYPE_CHECKING:
 
 # ==================== Enums ====================
 
-
-RBACElementTypeGQL: type[RBACElementTypeDTO] = strawberry.enum(
+RBACElementTypeGQL: type[RBACElementTypeDTO] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Unified RBAC element type for scope-entity relationships",
+    ),
     RBACElementTypeDTO,
     name="RBACElementType",
-    description="Added in 26.3.0. Unified RBAC element type for scope-entity relationships",
 )
 
-OperationTypeGQL: type[OperationTypeDTO] = strawberry.enum(
+OperationTypeGQL: type[OperationTypeDTO] = gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="RBAC operation type"),
     OperationTypeDTO,
     name="OperationType",
-    description="Added in 26.3.0. RBAC operation type",
 )
 
 
-@strawberry.enum(description="Added in 26.3.0. Permission ordering field")
+@gql_enum(BackendAIGQLMeta(added_version="26.3.0", description="Permission ordering field"))
 class PermissionOrderField(StrEnum):
     ID = "id"
     ENTITY_TYPE = "entity_type"
+    CREATED_AT = "created_at"
 
 
 # ==================== Node Types ====================
@@ -93,6 +107,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     scope_id: str
     entity_type: RBACElementTypeGQL
     operation: OperationTypeGQL
+    created_at: datetime
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]
@@ -108,7 +123,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         ])
         return cast(list[Self | None], results)
 
-    @strawberry.field(description="The role this permission belongs to.")  # type: ignore[misc]
+    @gql_field(description="The role this permission belongs to.")  # type: ignore[misc]
     async def role(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -121,15 +136,13 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         return await info.context.data_loaders.role_loader.load(self.role_id)
 
-    @strawberry.field(  # type: ignore[misc]
-        description="The scope this permission applies to."
-    )
+    @gql_field(description="The scope this permission applies to.")  # type: ignore[misc]
     async def scope(
         self,
         *,
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
-        element_type = RBACElementType(self.scope_type.value)
+        element_type = RBACElementType(self.scope_type.value)  # type: ignore[attr-defined]
         data_loaders = info.context.data_loaders
         match element_type:
             case RBACElementType.USER:
@@ -182,11 +195,31 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.DEPLOYMENT_POLICY
                 | RBACElementType.DEPLOYMENT_REVISION
                 | RBACElementType.IMAGE_ALIAS
+                | RBACElementType.PROJECT_ADMIN_PAGE
+                | RBACElementType.DOMAIN_ADMIN_PAGE
             ):
                 return None
 
 
 # ==================== Filter Types ====================
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.",
+        added_version="26.4.0",
+    ),
+    name="PermissionNestedFilter",
+)
+class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
+    scope_id: str | None = None
+    scope_type: RBACElementTypeGQL | None = None
+    entity_type: RBACElementTypeGQL | None = None
+    operation: OperationTypeGQL | None = None
+
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
 @gql_pydantic_input(
@@ -197,6 +230,7 @@ class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: uuid.UUID | None = None
     scope_type: RBACElementTypeGQL | None = None
     entity_type: RBACElementTypeGQL | None = None
+    created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
@@ -256,7 +290,7 @@ class DeletePermissionInput(PydanticInputMixin[DeletePermissionInputDTO]):
     name="DeletePermissionPayload",
 )
 class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
-    id: ID = strawberry.field(description="ID of the deleted permission.")
+    id: ID = gql_field(description="ID of the deleted permission.")
 
 
 # ==================== Connection Types ====================
@@ -273,6 +307,61 @@ class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
 class ScopeEntityCombinationGQL(PydanticOutputMixin[ScopeEntityCombinationInfo]):
     scope_type: RBACElementTypeGQL
     valid_entity_types: list[RBACElementTypeGQL]
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Information about a single RBAC operation.",
+    ),
+    model=OperationInfo,
+    name="OperationInfo",
+)
+class OperationInfoGQL(PydanticOutputMixin[OperationInfo]):
+    operation: str
+    description: str
+    required_permission: OperationTypeGQL
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Valid entity-operation combination for RBAC actions.",
+    ),
+    model=EntityOperationCombinationInfo,
+    name="EntityOperationCombination",
+)
+class EntityOperationCombinationGQL(PydanticOutputMixin[EntityOperationCombinationInfo]):
+    entity_type: RBACElementTypeGQL
+    operations: list[OperationInfoGQL]
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Entity with its allowed actions within a scope.",
+    ),
+    model=EntityActionInfo,
+    name="EntityActionInfo",
+)
+class EntityActionInfoGQL(PydanticOutputMixin[EntityActionInfo]):
+    entity_type: RBACElementTypeGQL
+    actions: list[OperationInfoGQL]
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Scope-entity-operation combination for RBAC permission matrix.",
+    ),
+    model=ScopeEntityOperationCombinationInfo,
+    name="ScopeEntityOperationCombination",
+)
+class ScopeEntityOperationCombinationGQL(
+    PydanticOutputMixin[ScopeEntityOperationCombinationInfo],
+):
+    scope_type: RBACElementTypeGQL
+    entities: list[EntityActionInfoGQL]
 
 
 PermissionEdge = Edge[PermissionGQL]

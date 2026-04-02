@@ -9,12 +9,21 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.typed_validators import VFolderName
 
-from .types import VFolderPermissionField, VFolderUsageMode
+from .types import (
+    OrderDirection,
+    VFolderOrderField,
+    VFolderPermissionField,
+    VFolderStatusFilter,
+    VFolderUsageMode,
+    VFolderUsageModeFilter,
+)
 
 __all__ = (
     "AcceptInvitationInput",
+    "SearchVFoldersInput",
     "CloneVFolderInput",
     "CreateDownloadSessionInput",
     "CreateUploadSessionInput",
@@ -32,6 +41,8 @@ __all__ = (
     "ShareVFolderInput",
     "UnshareVFolderInput",
     "UpdateVFolderInput",
+    "VFolderFilter",
+    "VFolderOrder",
 )
 
 
@@ -229,3 +240,49 @@ class DeleteInvitationInput(BaseRequestModel):
     """Input for deleting a virtual folder invitation."""
 
     invitation_id: UUID = Field(description="Invitation ID to delete")
+
+
+# ============================================================
+# Search / Filter / Order
+# ============================================================
+
+
+class VFolderFilter(BaseRequestModel):
+    """Filter criteria for searching virtual folders."""
+
+    name: StringFilter | None = Field(default=None, description="Filter by vfolder name.")
+    host: StringFilter | None = Field(default=None, description="Filter by storage host.")
+    status: VFolderStatusFilter | None = Field(
+        default=None, description="Filter by operation status."
+    )
+    usage_mode: VFolderUsageModeFilter | None = Field(
+        default=None, description="Filter by usage mode."
+    )
+    cloneable: bool | None = Field(default=None, description="Filter by cloneable flag.")
+    created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
+    AND: list[VFolderFilter] | None = Field(default=None, description="AND logical combinator.")
+    OR: list[VFolderFilter] | None = Field(default=None, description="OR logical combinator.")
+    NOT: list[VFolderFilter] | None = Field(default=None, description="NOT logical combinator.")
+
+
+VFolderFilter.model_rebuild()
+
+
+class VFolderOrder(BaseRequestModel):
+    """Order specification for virtual folder search results."""
+
+    field: VFolderOrderField
+    direction: OrderDirection
+
+
+class SearchVFoldersInput(BaseRequestModel):
+    """Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches)."""
+
+    filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[VFolderOrder] | None = Field(default=None, description="Order specifications.")
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")

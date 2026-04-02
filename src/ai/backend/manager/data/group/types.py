@@ -15,6 +15,7 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     ScopeType,
 )
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
@@ -106,3 +107,15 @@ class GroupModifier(PartialModifier):
         self.resource_policy.update_dict(to_update, "resource_policy")
         self.container_registry.update_dict(to_update, "container_registry")
         return to_update
+
+
+@dataclass
+class UnassignUserFailure:
+    user_id: uuid.UUID
+    reason: str
+
+
+@dataclass
+class UnassignUsersResult:
+    unassigned_users: list[UserData]
+    failures: list[UnassignUserFailure]

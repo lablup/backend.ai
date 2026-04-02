@@ -15,6 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
@@ -24,6 +25,7 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     EnumValueType,
+    StrEnumType,
 )
 
 if TYPE_CHECKING:
@@ -80,6 +82,13 @@ class RoutingRow(Base):  # type: ignore[misc]
         nullable=False,
         default=RouteStatus.PROVISIONING,
     )
+    health_status: Mapped[RouteHealthStatus] = mapped_column(
+        "health_status",
+        StrEnumType(RouteHealthStatus),
+        nullable=False,
+        default=RouteHealthStatus.NOT_CHECKED,
+        server_default=sa.text("'not_checked'"),
+    )
     weight: Mapped[int | None] = mapped_column("weight", sa.Integer(), nullable=True, default=None)
     traffic_ratio: Mapped[float] = mapped_column("traffic_ratio", sa.Float(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -93,8 +102,14 @@ class RoutingRow(Base):  # type: ignore[misc]
         "error_data", pgsql.JSONB(), nullable=True, default=sa.null()
     )
 
+    # Replica connection info (populated when provisioning completes)
+    replica_host: Mapped[str | None] = mapped_column(
+        "replica_host", sa.String(length=256), nullable=True
+    )
+    replica_port: Mapped[int | None] = mapped_column("replica_port", sa.Integer, nullable=True)
+
     # Revision reference without FK (relationship only)
-    revision: Mapped[uuid.UUID | None] = mapped_column("revision", GUID, nullable=True)
+    revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
     traffic_status: Mapped[RouteTrafficStatus] = mapped_column(
         "traffic_status",
         EnumValueType(RouteTrafficStatus),
@@ -215,9 +230,9 @@ class RoutingRow(Base):  # type: ignore[misc]
         session_owner: uuid.UUID,
         domain: str,
         project: uuid.UUID,
+        revision: uuid.UUID,
         status: RouteStatus = RouteStatus.PROVISIONING,
         traffic_ratio: float = 1.0,
-        revision: uuid.UUID | None = None,
         traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE,
     ) -> None:
         self.id = id
@@ -240,6 +255,7 @@ class RoutingRow(Base):  # type: ignore[misc]
             endpoint=self.endpoint,
             session=self.session,
             status=self.status,
+            health_status=self.health_status,
             traffic_ratio=self.traffic_ratio,
             created_at=self.created_at,
             error_data=self.error_data or {},
@@ -251,6 +267,7 @@ class RoutingRow(Base):  # type: ignore[misc]
             endpoint_id=self.endpoint,
             session_id=SessionId(self.session) if self.session else None,
             status=self.status,
+            health_status=self.health_status,
             traffic_ratio=self.traffic_ratio,
             created_at=self.created_at,
             revision_id=self.revision,

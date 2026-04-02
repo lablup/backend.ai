@@ -7,6 +7,7 @@ import numbers
 import random
 import re
 import sys
+import textwrap
 import uuid
 from collections import OrderedDict
 from collections.abc import AsyncIterator, Iterable, Iterator, Mapping
@@ -644,3 +645,11 @@ def addr_to_hostport_pair(addr: str) -> tuple[str, int]:
     host = parts[0]
     port = int(parts[1])
     return host, port
+
+
+def dedent_strip(text: str) -> str:
+    """
+    Apply textwrap.dedent and strip to remove both indentation and leading/trailing whitespace.
+    Useful for multi-line descriptions in API schemas and GraphQL types.
+    """
+    return textwrap.dedent(text).strip()

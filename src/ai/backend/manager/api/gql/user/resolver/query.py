@@ -4,16 +4,22 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.user.request import AdminSearchUsersInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
     DomainUserScopeGQL,
+    MyClientIpGQL,
     ProjectUserScopeGQL,
     UserFilterGQL,
     UserOrderByGQL,
@@ -28,10 +34,10 @@ from ai.backend.manager.repositories.user.types import (
 )
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.2.0. Get a single user by UUID (admin only). "
-        "Requires superadmin privileges. Returns an error if user is not found."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Get a single user by UUID (admin only). Requires superadmin privileges. Returns an error if user is not found.",
     )
 )  # type: ignore[misc]
 async def admin_user_v2(
@@ -43,10 +49,10 @@ async def admin_user_v2(
     return UserV2GQL.from_pydantic(payload.user)
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.2.0. List all users with filtering and pagination (admin only). "
-        "Requires superadmin privileges."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="List all users with filtering and pagination (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
 async def admin_users_v2(
@@ -87,10 +93,10 @@ async def admin_users_v2(
     )
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.2.0. List users within a specific domain. "
-        "Requires domain admin privileges or higher."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="List users within a specific domain. Requires domain admin privileges or higher.",
     )
 )  # type: ignore[misc]
 async def domain_users_v2(
@@ -132,10 +138,10 @@ async def domain_users_v2(
     )
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.2.0. List users within a specific project. "
-        "Requires project membership or higher privileges."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="List users within a specific project. Requires project membership or higher privileges.",
     )
 )  # type: ignore[misc]
 async def project_users_v2(
@@ -177,11 +183,10 @@ async def project_users_v2(
     )
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.2.0. Get the current authenticated user's information. "
-        "Returns the user associated with the current session. "
-        "Returns an error if not authenticated."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Get the current authenticated user's information. Returns the user associated with the current session. Returns an error if not authenticated.",
     )
 )  # type: ignore[misc]
 async def my_user_v2(
@@ -195,3 +200,16 @@ async def my_user_v2(
 
     payload = await info.context.adapters.user.get(me.user_id)
     return UserV2GQL.from_pydantic(payload.user)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get the current client's IP address as seen by the server. Useful for configuring IP allowlists.",
+    )
+)  # type: ignore[misc]
+async def my_client_ip(
+    info: Info[StrawberryGQLContext],
+) -> MyClientIpGQL:
+    ip = current_client_ip() or ""
+    return MyClientIpGQL(client_ip=ip)

@@ -48,9 +48,12 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_field,
+    gql_mutation,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
@@ -90,7 +93,7 @@ class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
         ])
         return cast(list[Self | None], results)
 
-    @strawberry.field
+    @gql_field(description="The namespaces of this entity.")  # type: ignore[misc]
     async def namespaces(
         self,
         info: Info[StrawberryGQLContext],
@@ -127,18 +130,20 @@ ObjectStorageEdge = Edge[ObjectStorage]
     ),
 )
 class ObjectStorageConnection(Connection[ObjectStorage]):
-    @strawberry.field
+    @gql_field(description="The count of this entity.")  # type: ignore[misc]
     def count(self) -> int:
         return len(self.edges)
 
 
-@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.14.0", description="Get an object storage by ID")
+)  # type: ignore[misc]
 async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> ObjectStorage | None:
     node = await info.context.adapters.object_storage.get(uuid.UUID(id))
     return ObjectStorage.from_pydantic(node, extra={"region": node.region or ""})
 
 
-@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="25.14.0", description="List all object storages"))  # type: ignore[misc]
 async def object_storages(
     info: Info[StrawberryGQLContext],
     before: str | None = None,
@@ -256,7 +261,7 @@ class UpdateObjectStoragePayload:
     name="DeleteObjectStoragePayload",
 )
 class DeleteObjectStoragePayload(PydanticOutputMixin[DeleteObjectStoragePayloadDTO]):
-    id: ID = strawberry.field(description="ID of the deleted object storage.")
+    id: ID = gql_field(description="ID of the deleted object storage.")
 
 
 @gql_pydantic_type(
@@ -288,7 +293,7 @@ class GetPresignedUploadURLPayload:
     fields: strawberry.auto
 
 
-@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create an object storage."))  # type: ignore[misc]
 async def create_object_storage(
     input: CreateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateObjectStoragePayload:
@@ -300,7 +305,7 @@ async def create_object_storage(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update an object storage."))  # type: ignore[misc]
 async def update_object_storage(
     input: UpdateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateObjectStoragePayload:
@@ -312,7 +317,7 @@ async def update_object_storage(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete an object storage."))  # type: ignore[misc]
 async def delete_object_storage(
     input: DeleteObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteObjectStoragePayload:
@@ -321,7 +326,9 @@ async def delete_object_storage(
     return DeleteObjectStoragePayload.from_pydantic(result)
 
 
-@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="25.14.0", description="Get a presigned download URL.")
+)  # type: ignore[misc]
 async def get_presigned_download_url(
     input: GetPresignedDownloadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedDownloadURLPayload:
@@ -334,7 +341,7 @@ async def get_presigned_download_url(
     return GetPresignedDownloadURLPayload(presigned_url=result.presigned_url)
 
 
-@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Get a presigned upload URL."))  # type: ignore[misc]
 async def get_presigned_upload_url(
     input: GetPresignedUploadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedUploadURLPayload:

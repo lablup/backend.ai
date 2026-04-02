@@ -1,0 +1,22 @@
+HAPROXY_BASE_IMG={{ config.haproxy_container_image }}
+REDIS_PASSWORD={{ config.password }}
+
+# Cluster node IPs
+{% for node in config.cluster_nodes -%}
+REDIS{{ node.node_number }}_IP={{ node.ip }}
+{% endfor -%}
+
+# Cluster node ports
+{% for node in config.cluster_nodes -%}
+REDIS{{ node.node_number }}_PORT={{ node.port }}
+{% endfor -%}
+
+# HAProxy configuration
+REDIS_CLUSTER_NAME={{ config.name }}
+REDIS_HAPROXY_SERVICE_PORT={{ config.haproxy_service_port }}
+REDIS_HAPROXY_STAT_PORT={{ config.haproxy_stat_port }}
+
+# Deployment configuration
+TARGET_HOME_DIR={{ home_dir }}
+TARGET_UNAME={{ target_uname }}
+PIDS_LIMIT_VALUE={{ config.pids_limit }}

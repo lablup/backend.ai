@@ -9,7 +9,7 @@ import shutil
 import tempfile
 import textwrap
 import uuid
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -38,6 +38,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.configs.etcd import EtcdConfig
@@ -958,6 +959,12 @@ def config_provider(
     return _TestConfigProvider(unified_config)
 
 
+@pytest.fixture()
+def config_provider_factory() -> Callable[[ManagerUnifiedConfig], ManagerConfigProvider]:
+    """Factory for creating _TestConfigProvider instances with custom configs."""
+    return _TestConfigProvider
+
+
 # ---------------------------------------------------------------------------
 # Real infrastructure fixtures (Valkey, events, plugins, etc.)
 # ---------------------------------------------------------------------------
@@ -1014,6 +1021,11 @@ async def valkey_clients(
             valkey_profile_target.profile_target(RedisRole.RATE_LIMIT),
             db_id=REDIS_RATE_LIMIT_DB,
             human_readable_name="test_ratelimit",
+        ),
+        session=await ValkeySessionClient.create(
+            valkey_profile_target.profile_target(RedisRole.STATISTICS),
+            db_id=REDIS_STATISTICS_DB,
+            human_readable_name="test_session",
         ),
     )
     try:
@@ -1181,6 +1193,7 @@ def auth_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
     hook_plugin_ctx: HookPluginContext,
+    valkey_clients: ValkeyClients,
 ) -> AuthProcessors:
     """Real AuthProcessors wired with real AuthService and AuthRepository."""
     repo = AuthRepository(database_engine)
@@ -1188,6 +1201,7 @@ def auth_processors(
         hook_plugin_ctx=hook_plugin_ctx,
         auth_repository=repo,
         config_provider=config_provider,
+        valkey_session_client=valkey_clients.session,
     )
     return AuthProcessors(
         service=service,
