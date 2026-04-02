@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
     ModelCardFilter,
@@ -17,10 +18,12 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
     ModelCardMetadata,
     ModelCardNode,
     ResourceSlotEntryInfo,
+    ScanProjectModelCardsPayload,
     SearchModelCardsPayload,
     UpdateModelCardPayload,
 )
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.errors.resource import ModelCardNotFound
@@ -35,6 +38,7 @@ from ai.backend.manager.repositories.model_card.creators import ModelCardCreator
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
+from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
 from ai.backend.manager.services.model_card.actions.search import SearchModelCardsAction
 from ai.backend.manager.services.model_card.actions.update import UpdateModelCardAction
 from ai.backend.manager.types import OptionalState, TriState
@@ -235,6 +239,22 @@ class ModelCardAdapter(BaseAdapter):
             DeleteModelCardAction(id=card_id)
         )
         return DeleteModelCardPayload(id=result.model_card.id)
+
+    async def scan_project(self, project_id: UUID) -> ScanProjectModelCardsPayload:
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        result = await self._processors.model_card.scan.wait_for_complete(
+            ScanProjectModelCardsAction(
+                project_id=project_id,
+                requester_id=me.user_id,
+            )
+        )
+        return ScanProjectModelCardsPayload(
+            created_count=result.created_count,
+            updated_count=result.updated_count,
+            errors=result.errors,
+        )
 
     def _convert_filter(self, filter_: ModelCardFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

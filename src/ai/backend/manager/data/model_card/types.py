@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from ai.backend.common.types import QuotaScopeID
+
 
 @dataclass(frozen=True)
 class ModelCardData:
@@ -27,3 +29,17 @@ class ModelCardData:
     readme: str | None
     created_at: datetime
     updated_at: datetime | None
+
+
+@dataclass(frozen=True)
+class VFolderScanData:
+    """Minimal vfolder data needed for model card scan."""
+
+    id: UUID
+    name: str
+    host: str
+    quota_scope_id: QuotaScopeID
+    unmanaged_path: str | None
+    domain_name: str
+    group_id: UUID
+    creator_uuid: UUID

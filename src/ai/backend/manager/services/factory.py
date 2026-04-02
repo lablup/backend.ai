@@ -275,6 +275,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         model_card=ModelCardService(
             repositories.model_card.repository,
+            args.storage_manager,
         ),
         resource_usage=ResourceUsageService(
             repository=repositories.resource_usage_history.repository,
