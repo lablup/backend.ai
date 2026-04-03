@@ -142,6 +142,8 @@ __all__ = (
     "VFolderHostPermission",
     "VFolderID",
     "VFolderMount",
+    "VFolderMountOptions",
+    "VFolderMountRequest",
     "VFolderUsageMode",
     "VolumeMountableNodeType",
     "aobject",
@@ -623,6 +625,24 @@ class MountTypes(enum.StrEnum):
 class MountMode(enum.StrEnum):
     BIND = "bind"
     OVERLAY = "overlay"
+
+
+@attrs.define(slots=True)
+class VFolderMountOptions:
+    """Typed mount options for a single vfolder mount request."""
+
+    permission: MountPermission | None = None
+    mount_mode: MountMode | None = None
+    overlay_target: str | None = None  # UUID string or "temp"
+
+
+@attrs.define(slots=True)
+class VFolderMountRequest:
+    """A single vfolder mount request combining reference, destination path, and options."""
+
+    ref: str | uuid.UUID  # vfolder name (with optional /subpath) or UUID
+    dst_path: str | None = None  # custom mount destination path
+    options: VFolderMountOptions = attrs.Factory(VFolderMountOptions)
 
 
 class MountPoint(BaseModel):

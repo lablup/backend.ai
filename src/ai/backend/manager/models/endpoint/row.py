@@ -46,6 +46,8 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderID,
     VFolderMount,
+    VFolderMountOptions,
+    VFolderMountRequest,
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -1160,25 +1162,16 @@ class ModelServiceHelper:
                 "Same VFolder appears on both model specification and VFolder mount"
             )
 
-        requested_mounts = [*extra_mounts.keys()]
-        requested_mount_map: dict[str | UUID, str] = {
-            folder_id: options.mount_destination
+        mount_requests = [
+            VFolderMountRequest(
+                ref=folder_id,
+                dst_path=options.mount_destination,
+                options=VFolderMountOptions(
+                    permission=options.permission,
+                ),
+            )
             for folder_id, options in extra_mounts.items()
-            if options.mount_destination
-        }
-        requested_mount_options: dict[str | UUID, Any] = {
-            folder_id: {
-                "type": options.type,
-                "permission": options.permission,
-            }
-            for folder_id, options in extra_mounts.items()
-        }
-        log.debug(
-            "requested mounts: {}, mount_map: {}, mount_options: {}",
-            requested_mounts,
-            requested_mount_map,
-            requested_mount_options,
-        )
+        ]
         allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
         vfolder_mounts = await prepare_vfolder_mounts(
             conn,
@@ -1186,9 +1179,7 @@ class ModelServiceHelper:
             allowed_vfolder_types,
             user_scope,
             resource_policy,
-            requested_mounts,
-            requested_mount_map,
-            requested_mount_options,
+            mount_requests,
         )
 
         for vfolder in vfolder_mounts:

@@ -26,6 +26,7 @@ from ai.backend.common.types import (
     SlotQuantity,
     SlotTypes,
     VFolderMount,
+    VFolderMountRequest,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -304,9 +305,7 @@ class SchedulerRepository:
         allowed_vfolder_types: Sequence[str],
         user_scope: UserScope,
         resource_policy: Mapping[str, object],
-        combined_mounts: Sequence[str | UUID],
-        combined_mount_map: Mapping[str | UUID, str],
-        requested_mount_options: Mapping[str | UUID, object],
+        mount_requests: Sequence[VFolderMountRequest],
     ) -> Sequence[VFolderMount]:
         """
         Prepare vfolder mounts for the session.
@@ -316,9 +315,7 @@ class SchedulerRepository:
             list(allowed_vfolder_types),
             user_scope,
             dict(resource_policy),
-            [str(m) if isinstance(m, UUID) else m for m in combined_mounts],
-            dict(combined_mount_map),
-            dict(requested_mount_options),
+            list(mount_requests),
         )
 
     @scheduler_repository_resilience.apply()

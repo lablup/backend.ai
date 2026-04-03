@@ -38,6 +38,8 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderID,
     VFolderMount,
+    VFolderMountOptions,
+    VFolderMountRequest,
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -921,33 +923,27 @@ async def prepare_vfolder_mounts(
     allowed_vfolder_types: Sequence[str],
     user_scope: UserScope,
     resource_policy: Mapping[str, Any],
-    requested_mount_references: Sequence[str | uuid.UUID],
-    requested_mount_reference_map: Mapping[str | uuid.UUID, str],
-    requested_mount_reference_options: Mapping[str | uuid.UUID, Any],
+    mount_requests: Sequence[VFolderMountRequest],
 ) -> Sequence[VFolderMount]:
     """
     Determine the actual mount information from the requested vfolder lists,
     vfolder configurations, and the given user scope.
     """
-    # TODO: Refactor the whole function:
-    # - Replace 'requested_mount_references', 'requested_mount_reference_map' and 'requested_mount_reference_options' with one mapping parameter.
-    # - DO NOT validate value of subdirectories here.
-    requested_mounts: list[str] = [
-        name for name in requested_mount_references if isinstance(name, str)
-    ]
-    requested_mount_name_map: dict[str, str] = {
-        name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
-    }
-    requested_mount_map: dict[uuid.UUID, str] = {
-        vfolder_uuid: path
-        for vfolder_uuid, path in requested_mount_reference_map.items()
-        if isinstance(vfolder_uuid, uuid.UUID)
-    }
-    requested_mount_options: dict[str | uuid.UUID, dict[str, Any]] = {
-        name: options
-        for name, options in requested_mount_reference_options.items()
-        if isinstance(name, str)
-    }
+    requested_mounts: list[str] = []
+    requested_mount_name_map: dict[str, str] = {}
+    requested_mount_map: dict[uuid.UUID, str] = {}
+    requested_mount_options: dict[str | uuid.UUID, VFolderMountOptions] = {}
+
+    for req in mount_requests:
+        if isinstance(req.ref, uuid.UUID):
+            if req.dst_path is not None:
+                requested_mount_map[req.ref] = req.dst_path
+            requested_mount_options[req.ref] = req.options
+        else:
+            requested_mounts.append(req.ref)
+            if req.dst_path is not None:
+                requested_mount_name_map[req.ref] = req.dst_path
+            requested_mount_options[req.ref] = req.options
 
     requested_vfolder_names: dict[str | uuid.UUID, str] = {}
     requested_vfolder_ids: set[uuid.UUID] = set()
@@ -957,7 +953,8 @@ async def prepare_vfolder_mounts(
     _already_resolved: set[str] = set()
 
     # Split the vfolder name and subpaths
-    for key in requested_mount_references:
+    for req in mount_requests:
+        key = req.ref
         if isinstance(key, uuid.UUID):
             requested_vfolder_ids.add(key)
             continue
@@ -1044,11 +1041,10 @@ async def prepare_vfolder_mounts(
         if name not in requested_names:
             requested_vfolder_names[vfid] = name
         requested_mounts.append(name)
-        if path := requested_mount_reference_map.get(vfid):
-            requested_mount_name_map[name] = path
-        if options := requested_mount_reference_options.get(vfid):
-            requested_mount_options[name] = options
-            requested_mount_options[vfid] = options
+        if vfid in requested_mount_map:
+            requested_mount_name_map[name] = requested_mount_map[vfid]
+        if vfid in requested_mount_options:
+            requested_mount_options[name] = requested_mount_options[vfid]
 
     # Check if there are overlapping mount sources
     check_overlapping_mounts(requested_mounts)
@@ -1172,33 +1168,33 @@ async def prepare_vfolder_mounts(
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
                     kernel_path = PurePosixPath("/home/work", kernel_path_raw)
-            mount_opts = requested_mount_options.get(requested_key, {})
+            mount_opts = requested_mount_options.get(requested_key, VFolderMountOptions())
             if is_cross_project and is_model_store_vfolder:
                 mount_perm = MountPermission.READ_ONLY
             else:
-                match requested_perm := mount_opts.get("permission"):
+                match mount_opts.permission:
                     case MountPermission.READ_ONLY:
                         mount_perm = MountPermission.READ_ONLY
                     case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
                         if vfolder["permission"] == VFolderPermission.READ_ONLY:
                             raise VFolderPermissionError(
                                 f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
-                                f"but attempted with '{requested_perm.value}' mode."
+                                f"but attempted with '{mount_opts.permission.value}' mode."
                             )
-                        mount_perm = requested_perm
+                        mount_perm = mount_opts.permission
                     case _:  # None if unset
                         mount_perm = vfolder["permission"]
 
             # Build overlay_target if mount_mode is overlay
             overlay_target: OverlayTarget | None = None
-            mount_mode_raw = mount_opts.get("mount_mode")
-            if mount_mode_raw == MountMode.OVERLAY or (is_cross_project and is_model_store_vfolder):
-                overlay_target_vfid_raw = mount_opts.get("overlay_target")
-                if overlay_target_vfid_raw and overlay_target_vfid_raw != "temp":
+            if mount_opts.mount_mode == MountMode.OVERLAY or (
+                is_cross_project and is_model_store_vfolder
+            ):
+                if mount_opts.overlay_target and mount_opts.overlay_target != "temp":
                     overlay_target = await _resolve_overlay_target(
                         conn,
                         storage_manager,
-                        uuid.UUID(overlay_target_vfid_raw),
+                        uuid.UUID(mount_opts.overlay_target),
                     )
                 else:
                     overlay_target = OverlayTarget()
