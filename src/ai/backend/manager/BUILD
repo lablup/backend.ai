@@ -57,6 +57,12 @@ python_distribution(
         "backendai_event_dispatcher_v20": {
             "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorEventDispatcher",
         },
+        "backendai_hook_v20": {
+            "totp": "ai.backend.manager.plugin.totp.hook:TOTPHook",
+        },
+        "backendai_webapp_v20": {
+            "totp": "ai.backend.manager.plugin.totp.webapp:TOTPWebapp",
+        },
         "backendai_network_manager_v1": {
             "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
         },

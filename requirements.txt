@@ -67,6 +67,7 @@ pycares~=4.11.0
 pycryptodome>=3.20.0
 habana-pyhlml~=1.22.1.6
 pyhumps~=3.8.0
+pyotp~=2.9.0
 pyroscope-io~=0.8.8
 python-dateutil>=2.9
 python-dotenv~=0.20.0
