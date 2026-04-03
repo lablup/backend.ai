@@ -37,6 +37,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     CreateRolePayload,
     DeletePermissionPayload,
     DeleteRolePayload,
+    EntityActionInfo,
     EntityNode,
     EntityOperationCombinationInfo,
     OperationInfo,
@@ -45,6 +46,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleAssignmentNode,
     RoleNode,
     ScopeEntityCombinationInfo,
+    ScopeEntityOperationCombinationInfo,
     UpdateRolePayload,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
@@ -113,6 +115,7 @@ __all__ = (
     "UpdateRoleInput",
     # Node and Payload models (response)
     "AssociationScopesEntitiesNode",
+    "EntityActionInfo",
     "EntityOperationCombinationInfo",
     "OperationInfo",
     "BulkAssignRoleFailureInfo",
@@ -130,5 +133,6 @@ __all__ = (
     "RoleAssignmentNode",
     "RoleNode",
     "ScopeEntityCombinationInfo",
+    "ScopeEntityOperationCombinationInfo",
     "UpdateRolePayload",
 )

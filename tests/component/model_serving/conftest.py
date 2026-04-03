@@ -21,6 +21,9 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
@@ -72,13 +75,14 @@ def model_serving_processors(
         scheduling_controller=AsyncMock(),
         revision_generator_registry=revision_gen,
     )
+    permission_controller_repo = PermissionControllerRepository(database_engine)
     return ModelServingProcessors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=MagicMock(spec=ScopeActionRBACValidator),
-                single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                scope=ScopeActionRBACValidator(permission_controller_repo),
+                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
             ),
         ),
     )
@@ -91,8 +95,16 @@ def auto_scaling_processors(
     """Real ModelServingAutoScalingProcessors with real AutoScalingService."""
     repo = ModelServingRepository(database_engine)
     service = AutoScalingService(repository=repo)
+    permission_controller_repo = PermissionControllerRepository(database_engine)
     return ModelServingAutoScalingProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(
+                scope=ScopeActionRBACValidator(permission_controller_repo),
+                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
+            ),
+        ),
     )
 
 
@@ -121,8 +133,16 @@ def deployment_processors(
         revision_generator_registry,
         model_definition_generator_registry,
     )
+    permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(
+                scope=ScopeActionRBACValidator(permission_controller_repo),
+                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
+            ),
+        ),
     )
 
 

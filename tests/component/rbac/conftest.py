@@ -61,6 +61,7 @@ def server_module_registries(
             ),
             route_deps,
             sub_registries=[rbac_registry],
+            gql_ws_handler=MagicMock(),
         ),
     ]
 
