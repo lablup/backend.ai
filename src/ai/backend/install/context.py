@@ -42,6 +42,7 @@ from .config_gen.appproxy import (
     apply_coordinator_config,
     apply_worker_config,
 )
+from .config_gen.storage_proxy import StorageProxyParams, apply_storage_proxy_config
 from .config_gen.webserver import WebserverParams, apply_webserver_config
 from .dev import (
     bootstrap_pants,
@@ -627,14 +628,12 @@ class Context(metaclass=ABCMeta):
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
-        toml_path = self.copy_config("storage-proxy.toml")
 
+        # Generate self-signed SSL certificate (stays in context.py — not config generation)
         ssl_dir = self.install_info.base_path / "configs" / "storage-proxy" / "ssl"
         ssl_dir.mkdir(parents=True, exist_ok=True)
         cert_path = ssl_dir / "manager-api-selfsigned.cert.pem"
         key_path = ssl_dir / "manager-api-selfsigned.key.pem"
-
-        # TODO: If the user disables SSL in the configuration, skip creating the PEM files.
         self.log_header("Generating self-signed SSL certificate for storage-proxy (manager API)...")
         public_addr = self.install_variable.public_facing_address
         subj = f"/C=KR/ST=Seoul/L=Seoul/O=BackendAI/OU=StorageProxy/CN={public_addr}"
@@ -656,37 +655,27 @@ class Context(metaclass=ABCMeta):
         )
         self.log.write(Text.from_markup(f"Created SSL cert/key under {ssl_dir}"))
 
+        # Apply config using shared module
+        params = StorageProxyParams(
+            etcd_host=halfstack.etcd_addr[0].face.host,
+            etcd_port=halfstack.etcd_addr[0].face.port,
+            etcd_user=halfstack.etcd_user,
+            etcd_password=halfstack.etcd_password,
+            secret=service.storage_proxy_random,
+            ipc_base_path=service.storage_proxy_ipc_base_path,
+            client_host=service.storage_proxy_client_facing_addr.bind.host,
+            client_port=service.storage_proxy_client_facing_addr.bind.port,
+            manager_host=service.storage_proxy_manager_facing_addr.bind.host,
+            manager_port=service.storage_proxy_manager_facing_addr.bind.port,
+            manager_secret=service.storage_proxy_manager_auth_key,
+            volume_path=service.vfolder_relpath,
+        )
+        toml_path = self.copy_config("storage-proxy.toml")
         with toml_path.open("r") as fp:
-            data = tomlkit.load(fp)
-            etcd_table = tomlkit.table()
-            etcd_addr_table = tomlkit.inline_table()
-            etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
-            etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
-            etcd_table["addr"] = etcd_addr_table
-            etcd_table["namespace"] = "local"
-            if halfstack.etcd_user:
-                etcd_table["user"] = halfstack.etcd_user
-            else:
-                etcd_table.pop("user", None)
-            if halfstack.etcd_password:
-                etcd_table["password"] = halfstack.etcd_password
-            else:
-                etcd_table.pop("password", None)
-            data["etcd"] = etcd_table
-            data["storage-proxy"]["secret"] = service.storage_proxy_random
-            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path
-            client_facing_addr_table = tomlkit.inline_table()
-            client_facing_addr_table["host"] = service.storage_proxy_client_facing_addr.bind.host
-            client_facing_addr_table["port"] = service.storage_proxy_client_facing_addr.bind.port
-            data["api"]["client"]["service-addr"] = client_facing_addr_table
-            manager_facing_addr_table = tomlkit.inline_table()
-            manager_facing_addr_table["host"] = service.storage_proxy_manager_facing_addr.bind.host
-            manager_facing_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
-            data["api"]["manager"]["service-addr"] = manager_facing_addr_table
-            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key
-            data["volume"]["volume1"]["path"] = service.vfolder_relpath
+            doc = tomlkit.load(fp)
+        apply_storage_proxy_config(doc, params)
         with toml_path.open("w") as fp:
-            tomlkit.dump(data, fp)
+            tomlkit.dump(doc, fp)
 
     async def configure_webserver(self) -> None:
         halfstack = self.install_info.halfstack_config
