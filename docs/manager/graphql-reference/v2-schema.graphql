@@ -11304,6 +11304,9 @@ type UserV2BasicInfo {
 
   """Optional description or notes about the user."""
   description: String
+
+  """External system integration identifier."""
+  integrationName: String
 }
 
 """
