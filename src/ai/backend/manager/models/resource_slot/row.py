@@ -13,7 +13,7 @@ from datetime import datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.manager.models.base import (
     GUID,
@@ -120,6 +120,10 @@ class AgentResourceRow(Base):  # type: ignore[misc]
         nullable=False,
         server_default=sa.func.now(),
         onupdate=sa.func.now(),
+    )
+
+    slot_type_row: Mapped[ResourceSlotTypeRow] = relationship(
+        "ResourceSlotTypeRow", foreign_keys=[slot_name], lazy="raise"
     )
 
     __table_args__ = (

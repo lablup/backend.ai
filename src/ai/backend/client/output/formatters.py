@@ -175,21 +175,12 @@ class CustomizedImageOutputFormatter(OutputFormatter):
 
 
 class ResourceSlotFormatter(OutputFormatter):
-    _priority_slots = ("cpu", "mem")
-
-    def _sort_slot_key(self, item: tuple[str, Any]) -> tuple[int, str]:
-        key = item[0]
-        try:
-            return (self._priority_slots.index(key), key)
-        except ValueError:
-            return (len(self._priority_slots), key)
-
     def format_console(self, value: Any, field: FieldSpec) -> str:
         value = json.loads(value)
         if mem := value.get("mem"):
             value["mem"] = humanize.naturalsize(mem, binary=True, gnu=True)
 
-        return ", ".join(f"{k}:{v}" for k, v in sorted(value.items(), key=self._sort_slot_key))
+        return ", ".join(f"{k}:{v}" for k, v in value.items())
 
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         return json.loads(value)

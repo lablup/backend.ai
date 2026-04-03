@@ -44,6 +44,7 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 
@@ -743,7 +744,11 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         query = (
             sa.select(AgentRow)
             .where(AgentRow.id.in_(agent_ids))
-            .options(sa.orm.selectinload(AgentRow.agent_resource_rows))
+            .options(
+                sa.orm.selectinload(AgentRow.agent_resource_rows).joinedload(
+                    AgentResourceRow.slot_type_row
+                )
+            )
             .order_by(
                 AgentRow.id,
             )
