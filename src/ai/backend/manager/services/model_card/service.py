@@ -8,11 +8,14 @@ from ai.backend.common.config import ModelDefinition
 from ai.backend.common.types import VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.model_card.types import VFolderScanData
+from ai.backend.manager.data.model_card.types import ResourceRequirementEntry, VFolderScanData
 from ai.backend.manager.errors.storage import ModelCardParseError
-from ai.backend.manager.models.model_card.types import MinResourceSpec
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
+from ai.backend.manager.services.model_card.actions.available_presets import (
+    AvailablePresetsAction,
+    AvailablePresetsActionResult,
+)
 from ai.backend.manager.services.model_card.actions.create import (
     CreateModelCardAction,
     CreateModelCardActionResult,
@@ -89,6 +92,14 @@ class ModelCardService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def available_presets(
+        self, action: AvailablePresetsAction
+    ) -> AvailablePresetsActionResult:
+        result = await self._repository.search_available_presets(
+            action.model_card_id, action.search_input
+        )
+        return AvailablePresetsActionResult(result=result)
 
     async def scan(self, action: ScanProjectModelCardsAction) -> ScanProjectModelCardsActionResult:
         vfolders = await self._repository.get_scan_target_vfolders(action.project_id)
@@ -185,11 +196,12 @@ class ModelCardService:
             except Exception:
                 log.warning("Failed to fetch README from vfolder {}", vf.id)
 
-        min_resource: MinResourceSpec | None = None
+        min_resource: list[ResourceRequirementEntry] = []
         if metadata and metadata.min_resource:
-            min_resource = MinResourceSpec(
-                slots={k: str(v) for k, v in metadata.min_resource.items()}
-            )
+            min_resource = [
+                ResourceRequirementEntry(slot_name=k, min_quantity=str(v))
+                for k, v in metadata.min_resource.items()
+            ]
 
         return ModelCardScanUpserterSpec(
             name=name,

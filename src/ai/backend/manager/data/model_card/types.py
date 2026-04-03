@@ -8,6 +8,14 @@ from ai.backend.common.types import QuotaScopeID
 
 
 @dataclass(frozen=True)
+class ResourceRequirementEntry:
+    """A single resource requirement entry (slot_name → min_quantity)."""
+
+    slot_name: str
+    min_quantity: str
+
+
+@dataclass(frozen=True)
 class ModelCardData:
     id: UUID
     name: str
@@ -25,7 +33,7 @@ class ModelCardData:
     framework: list[str]
     label: list[str]
     license: str | None
-    min_resource: dict[str, str] | None
+    min_resource: list[ResourceRequirementEntry]
     readme: str | None
     access_level: str
     created_at: datetime

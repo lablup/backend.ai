@@ -10,6 +10,9 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    SearchDeploymentRevisionPresetsInput,
+)
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.group.types import ProjectType
@@ -20,10 +23,15 @@ from ai.backend.manager.errors.resource import (
     ModelCardNotFound,
     ProjectNotFound,
 )
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.resource_slot.row import (
+    ModelCardResourceRequirementRow,
+    PresetResourceSlotRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import DEAD_VFOLDER_STATUSES, VFolderRow
@@ -35,6 +43,7 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.model_card.types import (
+    AvailablePresetsSearchResult,
     ModelCardSearchResult,
     ProjectModelCardSearchScope,
 )
@@ -109,6 +118,62 @@ class ModelCardDBSource:
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
+            )
+
+    async def search_available_presets(
+        self,
+        model_card_id: UUID,
+        search_input: SearchDeploymentRevisionPresetsInput,
+    ) -> AvailablePresetsSearchResult:
+        """Find presets whose resource_slots satisfy the model card's min_resource requirements.
+
+        Uses relational division: a preset is "available" iff for every required slot_name
+        in model_card_resource_requirements, there exists a matching row in
+        preset_resource_slots with quantity >= min_quantity.
+        """
+        mcr = ModelCardResourceRequirementRow.__table__
+        prs = PresetResourceSlotRow.__table__
+        drp = DeploymentRevisionPresetRow.__table__
+
+        satisfying_condition = ~sa.exists(
+            sa.select(sa.literal(1))
+            .select_from(mcr)
+            .where(
+                mcr.c.model_card_id == model_card_id,
+                ~sa.exists(
+                    sa.select(sa.literal(1))
+                    .select_from(prs)
+                    .where(
+                        prs.c.preset_id == drp.c.id,
+                        prs.c.slot_name == mcr.c.slot_name,
+                        prs.c.quantity >= mcr.c.min_quantity,
+                    )
+                ),
+            )
+        )
+
+        async with self._db.begin_readonly_session() as db_sess:
+            count_stmt = sa.select(sa.func.count()).select_from(drp).where(satisfying_condition)
+            total_count = (await db_sess.execute(count_stmt)).scalar() or 0
+
+            query = sa.select(DeploymentRevisionPresetRow).where(satisfying_condition)
+
+            offset = search_input.offset or 0
+            limit = search_input.limit or 20
+            query = query.offset(offset).limit(limit + 1)
+
+            result = await db_sess.execute(query)
+            rows = list(result.scalars().all())
+
+            has_next_page = len(rows) > limit
+            if has_next_page:
+                rows = rows[:limit]
+
+            return AvailablePresetsSearchResult(
+                items=[row.to_data() for row in rows],
+                total_count=total_count,
+                has_next_page=has_next_page,
+                has_previous_page=offset > 0,
             )
 
     async def get_scan_target_vfolders(self, project_id: UUID) -> list[VFolderScanData]:

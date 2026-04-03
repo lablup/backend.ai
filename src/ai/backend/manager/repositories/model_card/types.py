@@ -8,6 +8,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
@@ -15,9 +16,20 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 __all__ = (
+    "AvailablePresetsSearchResult",
     "ModelCardSearchResult",
     "ProjectModelCardSearchScope",
 )
+
+
+@dataclass
+class AvailablePresetsSearchResult:
+    """Result from searching available presets for a model card."""
+
+    items: list[DeploymentRevisionPresetData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass

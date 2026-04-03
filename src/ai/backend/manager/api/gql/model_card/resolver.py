@@ -6,6 +6,17 @@ from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    DeploymentRevisionPresetFilter,
+    DeploymentRevisionPresetOrder,
+    SearchDeploymentRevisionPresetsInput,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
+    SearchDeploymentRevisionPresetsPayload,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
+    DeploymentRevisionPresetOrderField,
+)
 from ai.backend.common.dto.manager.v2.model_card.request import (
     ModelCardFilter,
     ModelCardOrder,
@@ -15,12 +26,20 @@ from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCard
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
+from ai.backend.manager.api.gql.deployment.types.revision_preset import (
+    DeploymentRevisionPresetConnection,
+    DeploymentRevisionPresetEdge,
+    DeploymentRevisionPresetFilterGQL,
+    DeploymentRevisionPresetGQL,
+    DeploymentRevisionPresetOrderByGQL,
+)
 from ai.backend.manager.api.gql.model_card.types import (
     CreateModelCardInputGQL,
     CreateModelCardPayloadGQL,
     DeleteModelCardPayloadGQL,
     DeployModelCardInputGQL,
     DeployModelCardPayloadGQL,
+    ModelCardAvailablePresetsScopeGQL,
     ModelCardFilterGQL,
     ModelCardGQL,
     ModelCardOrderByGQL,
@@ -200,6 +219,72 @@ def _build_search_input(
         before=before,
         limit=limit,
         offset=offset,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Search deployment revision presets that satisfy a model card's minimum resource requirements.",
+    )
+)  # type: ignore[misc]
+async def model_card_available_presets_v2(
+    info: Info[StrawberryGQLContext],
+    scope: ModelCardAvailablePresetsScopeGQL,
+    filter: DeploymentRevisionPresetFilterGQL | None = None,
+    order_by: list[DeploymentRevisionPresetOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> DeploymentRevisionPresetConnection | None:
+    filter_dto: DeploymentRevisionPresetFilter | None = filter.to_pydantic() if filter else None
+    orders_dto: list[DeploymentRevisionPresetOrder] | None = None
+    if order_by:
+        orders_dto = [
+            DeploymentRevisionPresetOrder(
+                field=DeploymentRevisionPresetOrderField(o.field.value),
+                direction=OrderDirection(o.direction),
+            )
+            for o in order_by
+        ]
+    search_input = SearchDeploymentRevisionPresetsInput(
+        filter=filter_dto,
+        order=orders_dto,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+    result = await info.context.adapters.model_card.available_presets(
+        scope.model_card_id, search_input
+    )
+    return _build_preset_connection(result)
+
+
+def _build_preset_connection(
+    result: SearchDeploymentRevisionPresetsPayload,
+) -> DeploymentRevisionPresetConnection:
+    edges = [
+        DeploymentRevisionPresetEdge(
+            node=DeploymentRevisionPresetGQL.from_pydantic(item),
+            cursor=str(item.id),
+        )
+        for item in result.items
+    ]
+    return DeploymentRevisionPresetConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )
 
 

@@ -36,7 +36,6 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     PydanticListColumn,
-    ResourceSlotColumn,
     StructuredJSONObjectListColumn,
     URLColumn,
 )
@@ -45,6 +44,7 @@ from ai.backend.manager.models.deployment_revision_preset.types import PresetVal
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint import EndpointRow
     from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
     from ai.backend.manager.models.routing import RoutingRow
 
 __all__ = ("DeploymentRevisionRow",)
@@ -119,9 +119,6 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False
     )
-    resource_slots: Mapped[ResourceSlot] = mapped_column(
-        "resource_slots", ResourceSlotColumn(), nullable=False
-    )
     resource_opts: Mapped[dict[str, Any]] = mapped_column(
         "resource_opts", pgsql.JSONB(), nullable=False, default={}, server_default="{}"
     )
@@ -182,6 +179,13 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
+    # Normalized resource slot rows
+    resource_slot_rows: Mapped[list[DeploymentRevisionResourceSlotRow]] = relationship(
+        "DeploymentRevisionResourceSlotRow",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
     # Relationships (without FK constraints)
     endpoint_row: Mapped[EndpointRow] = relationship(
         "EndpointRow",
@@ -214,7 +218,9 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode(self.cluster_mode),
                 cluster_size=self.cluster_size,
-                resource_slots=self.resource_slots,
+                resource_slots=ResourceSlot({
+                    r.slot_name: r.quantity for r in self.resource_slot_rows
+                }),
                 resource_opts=self.resource_opts,
             ),
             mounts=MountMetadata(
@@ -252,7 +258,9 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             ),
             resource_config=ResourceConfigData(
                 resource_group_name=self.resource_group,
-                resource_slot=self.resource_slots,
+                resource_slot=ResourceSlot({
+                    r.slot_name: r.quantity for r in self.resource_slot_rows
+                }),
                 resource_opts=self.resource_opts or {},
             ),
             model_runtime_config=ModelRuntimeConfigData(

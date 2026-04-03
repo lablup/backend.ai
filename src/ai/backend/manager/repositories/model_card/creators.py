@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import ModelCardConflict
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.model_card.types import MinResourceSpec
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
@@ -30,7 +30,7 @@ class ModelCardCreatorSpec(CreatorSpec[ModelCardRow]):
     framework: list[str]
     label: list[str]
     license: str | None
-    min_resource: MinResourceSpec | None
+    min_resource: list[ResourceRequirementEntry]
     readme: str | None
     access_level: str
 
@@ -62,7 +62,6 @@ class ModelCardCreatorSpec(CreatorSpec[ModelCardRow]):
         row.framework = self.framework
         row.label = self.label
         row.license = self.license
-        row.min_resource = self.min_resource
         row.readme = self.readme
         row.access_level = self.access_level
         return row

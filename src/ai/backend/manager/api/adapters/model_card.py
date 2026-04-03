@@ -6,6 +6,12 @@ from uuid import UUID
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    SearchDeploymentRevisionPresetsInput,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
+    SearchDeploymentRevisionPresetsPayload,
+)
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
     DeployModelCardInput,
@@ -32,6 +38,9 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.manager.api.adapters.deployment_revision_preset import (
+    DeploymentRevisionPresetAdapter,
+)
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
@@ -45,13 +54,12 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
     ResourceSpec,
 )
-from ai.backend.manager.data.model_card.types import ModelCardData
+from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ModelCardNotFound
 from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.model_card.types import MinResourceSpec
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder, combine_conditions_or
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -59,6 +67,9 @@ from ai.backend.manager.repositories.model_card.creators import ModelCardCreator
 from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
+from ai.backend.manager.services.model_card.actions.available_presets import (
+    AvailablePresetsAction,
+)
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
@@ -82,12 +93,19 @@ def _model_card_pagination_spec() -> PaginationSpec:
     )
 
 
-def _entries_to_min_resource(entries: list[ResourceSlotEntryInput]) -> MinResourceSpec:
-    return MinResourceSpec(slots={e.resource_type: e.quantity for e in entries})
+def _entries_to_requirements(
+    entries: list[ResourceSlotEntryInput],
+) -> list[ResourceRequirementEntry]:
+    return [
+        ResourceRequirementEntry(slot_name=e.resource_type, min_quantity=e.quantity)
+        for e in entries
+    ]
 
 
-def _min_resource_to_entries(slots: dict[str, str]) -> list[ResourceSlotEntryInfo]:
-    return [ResourceSlotEntryInfo(resource_type=k, quantity=v) for k, v in slots.items()]
+def _requirements_to_entries(
+    reqs: list[ResourceRequirementEntry],
+) -> list[ResourceSlotEntryInfo]:
+    return [ResourceSlotEntryInfo(resource_type=r.slot_name, quantity=r.min_quantity) for r in reqs]
 
 
 class ModelCardAdapter(BaseAdapter):
@@ -172,7 +190,7 @@ class ModelCardAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        min_resource = _entries_to_min_resource(input.min_resource) if input.min_resource else None
+        min_resource = _entries_to_requirements(input.min_resource) if input.min_resource else []
         creator: RBACEntityCreator[ModelCardRow] = RBACEntityCreator(
             spec=ModelCardCreatorSpec(
                 name=input.name,
@@ -209,12 +227,12 @@ class ModelCardAdapter(BaseAdapter):
         self,
         input: UpdateModelCardInput,
     ) -> UpdateModelCardPayload:
-        min_resource_state: TriState[MinResourceSpec] = TriState.nop()
+        min_resource_state: TriState[list[ResourceRequirementEntry]] = TriState.nop()
         if input.min_resource is not SENTINEL:
             if input.min_resource is None:
                 min_resource_state = TriState.nullify()
             else:
-                min_resource_state = TriState.update(_entries_to_min_resource(input.min_resource))
+                min_resource_state = TriState.update(_entries_to_requirements(input.min_resource))
 
         spec = ModelCardUpdaterSpec(
             name=(
@@ -386,6 +404,25 @@ class ModelCardAdapter(BaseAdapter):
             deployment_name=result.data.metadata.name,
         )
 
+    async def available_presets(
+        self,
+        model_card_id: UUID,
+        input: SearchDeploymentRevisionPresetsInput,
+    ) -> SearchDeploymentRevisionPresetsPayload:
+        action_result = await self._processors.model_card.available_presets.wait_for_complete(
+            AvailablePresetsAction(
+                model_card_id=model_card_id,
+                search_input=input,
+            )
+        )
+        search_result = action_result.result
+        return SearchDeploymentRevisionPresetsPayload(
+            items=[DeploymentRevisionPresetAdapter._data_to_node(d) for d in search_result.items],
+            total_count=search_result.total_count,
+            has_next_page=search_result.has_next_page,
+            has_previous_page=search_result.has_previous_page,
+        )
+
     async def _get_model_card_data(self, card_id: UUID) -> ModelCardData:
         """Fetch a single model card by ID."""
         conditions: list[QueryCondition] = [lambda: ModelCardRow.id == card_id]
@@ -463,7 +500,7 @@ class ModelCardAdapter(BaseAdapter):
                 license=data.license,
             ),
             min_resource=(
-                _min_resource_to_entries(data.min_resource) if data.min_resource else None
+                _requirements_to_entries(data.min_resource) if data.min_resource else None
             ),
             readme=data.readme,
             access_level=ModelCardAccessLevel(data.access_level),

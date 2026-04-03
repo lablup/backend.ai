@@ -30,9 +30,12 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
-from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
+from ai.backend.manager.data.deployment_revision_preset.types import (
+    DeploymentRevisionPresetData,
+    ResourceSlotEntryData,
+)
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
-from ai.backend.manager.models.base import ResourceOptsEntry, ResourceSlotEntry
+from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.conditions import (
     DeploymentRevisionPresetConditions,
 )
@@ -157,7 +160,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         self,
         input: UpdateDeploymentRevisionPresetInput,
     ) -> UpdateDeploymentRevisionPresetPayload:
-        resource_slots_state: OptionalState[list[ResourceSlotEntry]] = (
+        resource_slots_state: OptionalState[list[ResourceSlotEntryData]] = (
             OptionalState.update(self._convert_resource_slots_input(input.resource_slots))
             if input.resource_slots is not None
             else OptionalState.nop()
@@ -286,11 +289,11 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
     @staticmethod
     def _convert_resource_slots_input(
         slots: list[Any] | None,
-    ) -> list[ResourceSlotEntry]:
+    ) -> list[ResourceSlotEntryData]:
         if not slots:
             return []
         return [
-            ResourceSlotEntry(resource_type=s.resource_type, quantity=s.quantity) for s in slots
+            ResourceSlotEntryData(resource_type=s.resource_type, quantity=s.quantity) for s in slots
         ]
 
     @staticmethod

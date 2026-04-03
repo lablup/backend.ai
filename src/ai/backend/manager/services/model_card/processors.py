@@ -5,6 +5,10 @@ from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.services.model_card.actions.available_presets import (
+    AvailablePresetsAction,
+    AvailablePresetsActionResult,
+)
 from ai.backend.manager.services.model_card.actions.create import (
     CreateModelCardAction,
     CreateModelCardActionResult,
@@ -41,6 +45,7 @@ class ModelCardProcessors(AbstractProcessorPackage):
         SearchModelCardsInProjectAction, SearchModelCardsInProjectActionResult
     ]
     scan: ActionProcessor[ScanProjectModelCardsAction, ScanProjectModelCardsActionResult]
+    available_presets: ActionProcessor[AvailablePresetsAction, AvailablePresetsActionResult]
 
     def __init__(
         self,
@@ -60,6 +65,7 @@ class ModelCardProcessors(AbstractProcessorPackage):
             validators=[cast(ActionValidator, scope_validator)],
         )
         self.scan = ActionProcessor(service.scan, action_monitors)
+        self.available_presets = ActionProcessor(service.available_presets, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -70,4 +76,5 @@ class ModelCardProcessors(AbstractProcessorPackage):
             SearchModelCardsAction.spec(),
             SearchModelCardsInProjectAction.spec(),
             ScanProjectModelCardsAction.spec(),
+            AvailablePresetsAction.spec(),
         ]

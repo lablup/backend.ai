@@ -43,6 +43,9 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
     UpdateModelCardPayload as UpdatePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.types import (
+    ModelCardAvailablePresetsScope as AvailablePresetsScopeDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -185,6 +188,19 @@ class ModelCardV2Connection(Connection[ModelCardGQL]):
 )
 class ProjectModelCardScopeGQL(PydanticInputMixin[ProjectModelCardScopeDTO]):
     project_id: UUID = gql_field(description="MODEL_STORE project UUID.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Scope for querying available presets that satisfy a model card's resource requirements.",
+    ),
+    name="ModelCardAvailablePresetsV2Scope",
+)
+class ModelCardAvailablePresetsScopeGQL(PydanticInputMixin[AvailablePresetsScopeDTO]):
+    model_card_id: UUID = gql_field(
+        description="Model card UUID to check resource requirements against."
+    )
 
 
 @gql_pydantic_input(

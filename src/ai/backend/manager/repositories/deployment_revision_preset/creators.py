@@ -6,9 +6,10 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.config import ModelDefinition
+from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetConflict
-from ai.backend.manager.models.base import ResourceOptsEntry, ResourceSlotEntry
+from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.repositories.base.creator import CreatorSpec
@@ -23,7 +24,7 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
     rank: int
     image_id: UUID
     model_definition: ModelDefinition | None
-    resource_slots: list[ResourceSlotEntry]
+    resource_slots: list[ResourceSlotEntryData]
     resource_opts: list[ResourceOptsEntry]
     cluster_mode: str
     cluster_size: int
@@ -53,7 +54,6 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
         row.rank = self.rank
         row.image_id = self.image_id
         row.model_definition = self.model_definition
-        row.resource_slots = self.resource_slots
         row.resource_opts = self.resource_opts
         row.cluster_mode = self.cluster_mode
         row.cluster_size = self.cluster_size

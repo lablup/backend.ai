@@ -57,6 +57,7 @@ from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
@@ -829,6 +830,14 @@ class ModelServingRepository:
                         )
                         image_id = resolved_image.id
 
+                    # Merge resource_slots: spec overrides current revision
+                    merged_slots: ResourceSlot = (
+                        spec.resource_slots.optional_value()
+                        or ResourceSlot({
+                            r.slot_name: r.quantity for r in current_rev.resource_slot_rows
+                        })
+                    )
+
                     # Merge revision fields: current revision as base, spec overrides
                     new_revision = DeploymentRevisionRow(
                         endpoint=endpoint_row.id,
@@ -842,9 +851,6 @@ class ModelServingRepository:
                             else current_rev.model_definition_path
                         ),
                         resource_group=endpoint_row.resource_group,
-                        resource_slots=(
-                            spec.resource_slots.optional_value() or current_rev.resource_slots
-                        ),
                         resource_opts=(
                             spec.resource_opts.optional_value()
                             if spec.resource_opts.optional_value() is not None
@@ -881,6 +887,17 @@ class ModelServingRepository:
                     new_revision.revision_number = (latest or 0) + 1
 
                     db_session.add(new_revision)
+                    await db_session.flush()
+
+                    # Write normalized resource slot rows
+                    for slot_name, quantity in merged_slots.items():
+                        db_session.add(
+                            DeploymentRevisionResourceSlotRow(
+                                revision_id=new_revision.id,
+                                slot_name=str(slot_name),
+                                quantity=quantity,
+                            )
+                        )
                     await db_session.flush()
 
                     # Activate: set as current revision
