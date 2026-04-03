@@ -386,7 +386,22 @@ from .user import (
     update_my_allowed_client_ip,
     update_user_v2,
 )
-from .vfolder_v2 import my_vfolders, project_vfolders
+from .vfolder_v2 import (
+    admin_vfolders_v2,
+    clone_vfolder_v2,
+    create_vfolder_v2,
+    delete_vfolder_v2,
+    my_vfolders,
+    project_vfolders,
+    purge_vfolder_v2,
+    vfolder_create_download_session_v2,
+    vfolder_create_upload_session_v2,
+    vfolder_delete_files_v2,
+    vfolder_list_files_v2,
+    vfolder_mkdir_v2,
+    vfolder_move_file_v2,
+    vfolder_v2,
+)
 from .vfs_storage import (
     create_vfs_storage,
     delete_vfs_storage,
@@ -576,6 +591,8 @@ class Query:
     admin_effective_resource_allocation_v2 = admin_effective_resource_allocation_v2
     check_preset_availability_v2 = check_preset_availability_v2
     # VFolder APIs
+    admin_vfolders_v2 = admin_vfolders_v2
+    vfolder_v2 = vfolder_v2
     project_vfolders = project_vfolders
     my_vfolders = my_vfolders
 
@@ -768,6 +785,17 @@ class Mutation:
     admin_delete_model_card_v2 = admin_delete_model_card_v2
     scan_project_model_cards_v2 = scan_project_model_cards_v2
     deploy_model_card_v2 = deploy_model_card_v2
+    # VFolder V2 mutations
+    create_vfolder_v2 = create_vfolder_v2
+    delete_vfolder_v2 = delete_vfolder_v2
+    purge_vfolder_v2 = purge_vfolder_v2
+    clone_vfolder_v2 = clone_vfolder_v2
+    vfolder_list_files_v2 = vfolder_list_files_v2
+    vfolder_mkdir_v2 = vfolder_mkdir_v2
+    vfolder_move_file_v2 = vfolder_move_file_v2
+    vfolder_delete_files_v2 = vfolder_delete_files_v2
+    vfolder_create_upload_session_v2 = vfolder_create_upload_session_v2
+    vfolder_create_download_session_v2 = vfolder_create_download_session_v2
     # Session V2 mutations
     terminate_project_sessions_v2 = terminate_project_sessions_v2
 
