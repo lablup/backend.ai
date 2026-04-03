@@ -1814,6 +1814,39 @@ input CreateModelCardV2Input {
 
   """Domain name."""
   domainName: String = null
+
+  """Author."""
+  author: String = null
+
+  """Model title."""
+  title: String = null
+
+  """Model version."""
+  modelVersion: String = null
+
+  """Description."""
+  description: String = null
+
+  """ML task."""
+  task: String = null
+
+  """Category."""
+  category: String = null
+
+  """Architecture."""
+  architecture: String = null
+
+  """Frameworks."""
+  framework: [String!] = null
+
+  """Labels."""
+  label: [String!] = null
+
+  """License."""
+  license: String = null
+
+  """README content."""
+  readme: String = null
 }
 
 """Added in 24.09.0. Input for creating a notification channel"""
@@ -10535,8 +10568,38 @@ input UpdateModelCardV2Input {
   """New name."""
   name: String = null
 
-  """New description."""
+  """Author."""
+  author: String = null
+
+  """Title."""
+  title: String = null
+
+  """Version."""
+  modelVersion: String = null
+
+  """Description."""
   description: String = null
+
+  """ML task."""
+  task: String = null
+
+  """Category."""
+  category: String = null
+
+  """Architecture."""
+  architecture: String = null
+
+  """Frameworks."""
+  framework: [String!] = null
+
+  """Labels."""
+  label: [String!] = null
+
+  """License."""
+  license: String = null
+
+  """README content."""
+  readme: String = null
 }
 
 """

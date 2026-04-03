@@ -200,6 +200,17 @@ class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
     vfolder_id: UUID = gql_field(description="VFolder ID.")
     project_id: UUID = gql_field(description="Project ID.")
     domain_name: str | None = gql_field(default=None, description="Domain name.")
+    author: str | None = gql_field(default=None, description="Author.")
+    title: str | None = gql_field(default=None, description="Model title.")
+    model_version: str | None = gql_field(default=None, description="Model version.")
+    description: str | None = gql_field(default=None, description="Description.")
+    task: str | None = gql_field(default=None, description="ML task.")
+    category: str | None = gql_field(default=None, description="Category.")
+    architecture: str | None = gql_field(default=None, description="Architecture.")
+    framework: list[str] | None = gql_field(default=None, description="Frameworks.")
+    label: list[str] | None = gql_field(default=None, description="Labels.")
+    license: str | None = gql_field(default=None, description="License.")
+    readme: str | None = gql_field(default=None, description="README content.")
 
 
 @gql_pydantic_input(
@@ -209,7 +220,17 @@ class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
 class UpdateModelCardInputGQL(PydanticInputMixin[UpdateInputDTO]):
     id: UUID = gql_field(description="Model card ID.")
     name: str | None = gql_field(default=None, description="New name.")
-    description: str | None = gql_field(default=None, description="New description.")
+    author: str | None = gql_field(default=None, description="Author.")
+    title: str | None = gql_field(default=None, description="Title.")
+    model_version: str | None = gql_field(default=None, description="Version.")
+    description: str | None = gql_field(default=None, description="Description.")
+    task: str | None = gql_field(default=None, description="ML task.")
+    category: str | None = gql_field(default=None, description="Category.")
+    architecture: str | None = gql_field(default=None, description="Architecture.")
+    framework: list[str] | None = gql_field(default=None, description="Frameworks.")
+    label: list[str] | None = gql_field(default=None, description="Labels.")
+    license: str | None = gql_field(default=None, description="License.")
+    readme: str | None = gql_field(default=None, description="README content.")
 
 
 @gql_pydantic_type(
