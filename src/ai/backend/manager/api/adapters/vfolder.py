@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    CreateUploadSessionInput,
+    CreateVFolderInput,
     SearchVFoldersInput,
     VFolderFilter,
     VFolderOrder,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
+    CreateUploadSessionPayload,
+    CreateVFolderPayload,
     SearchVFoldersPayload,
     VFolderNode,
 )
@@ -31,6 +34,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderOperationStatus,
 )
+from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.orders import (
     DEFAULT_BACKWARD_ORDER as VFOLDER_DEFAULT_BACKWARD_ORDER,
@@ -57,11 +61,15 @@ from ai.backend.manager.repositories.vfolder.types import (
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     AdminSearchVFoldersAction,
 )
+from ai.backend.manager.services.vfolder.actions.create_v2 import CreateVFolderV2Action
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
 )
 from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
     SearchUserVFoldersAction,
+)
+from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
+    CreateUploadSessionV2Action,
 )
 
 from .base import BaseAdapter
@@ -218,11 +226,39 @@ class VFolderAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def create(self, input: Any) -> Any:
-        raise NotImplementedError("VFolder create not yet implemented in v2 adapter")
+    async def create(self, input: CreateVFolderInput) -> CreateVFolderPayload:
+        """Create a new vfolder."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action = CreateVFolderV2Action(
+            name=input.name,
+            user_id=me.user_id,
+            domain_name=me.domain_name,
+            project_id=input.group_id,
+            host=input.host,
+            usage_mode=VFolderUsageMode(input.usage_mode.value),
+            permission=VFolderPermission(input.permission.value),
+            cloneable=input.cloneable,
+        )
+        result = await self._processors.vfolder.create_vfolder_v2.wait_for_complete(action)
+        return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
 
-    async def create_upload_session(self, vfolder_id: UUID, input: Any) -> Any:
-        raise NotImplementedError("VFolder create_upload_session not yet implemented in v2 adapter")
+    async def create_upload_session(
+        self, vfolder_id: UUID, input: CreateUploadSessionInput
+    ) -> CreateUploadSessionPayload:
+        """Create an upload session for a vfolder."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action = CreateUploadSessionV2Action(
+            user_id=me.user_id,
+            vfolder_id=vfolder_id,
+            path=input.path,
+            size=input.size,
+        )
+        result = await self._processors.vfolder.create_upload_session_v2.wait_for_complete(action)
+        return CreateUploadSessionPayload(token=result.token, url=result.url)
 
     # -------------------------------------------------------------------------
     # Filter / Order conversion

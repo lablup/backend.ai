@@ -94,6 +94,10 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.create_v2 import (
+    CreateVFolderV2Action,
+    CreateVFolderV2ActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
@@ -130,6 +134,10 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     UmountHostActionResult,
     UpdateQuotaAction,
     UpdateQuotaActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
+    CreateUploadSessionV2Action,
+    CreateUploadSessionV2ActionResult,
 )
 from ai.backend.manager.services.vfolder.types import (
     VFolderBaseInfo,
@@ -1358,3 +1366,192 @@ class VFolderService:
         if action.required_status is not None:
             await _check_vfolder_status(row["status"], action.required_status)
         return GetAccessibleVFolderActionResult(row=row)
+
+    async def create_v2(self, action: CreateVFolderV2Action) -> CreateVFolderV2ActionResult:
+        """Create a new vfolder (v2). Resolves policy internally from user_id."""
+        user_uuid = action.user_id
+        domain_name = action.domain_name
+        project_id = action.project_id
+
+        # Resolve user info from DB
+        user = await self._user_repository.get_user_by_uuid(user_uuid)
+        if user.role is None or user.domain_name is None:
+            raise ObjectNotFound(object_name="User")
+        user_role = user.role
+
+        # Resolve host
+        folder_host = action.host
+        if not folder_host:
+            folder_host = self._config_provider.config.volumes.default_host
+            if not folder_host:
+                raise VFolderInvalidParameter(
+                    "You must specify the vfolder host because the default host is not configured."
+                )
+
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+
+        if action.name.startswith(".") and action.name != ".local":
+            if project_id is not None:
+                raise VFolderInvalidParameter("dot-prefixed vfolders cannot be a group folder.")
+
+        group_uuid: uuid.UUID | None = None
+        group_type: ProjectType | None = None
+        max_vfolder_count: int
+        max_quota_scope_size: int
+        container_uid: int | None = None
+
+        if project_id is not None:
+            group_info = await self._vfolder_repository.get_group_resource_info(
+                project_id, domain_name
+            )
+            if not group_info:
+                raise ProjectNotFound(f"Project with {project_id} not found.")
+            group_uuid, max_vfolder_count, max_quota_scope_size, group_type = group_info
+            container_uid = None
+        else:
+            user_info = await self._vfolder_repository.get_user_resource_info(user_uuid)
+            if not user_info:
+                raise ObjectNotFound(object_name="User")
+            max_vfolder_count, max_quota_scope_size, container_uid = user_info
+
+        vfolder_permission_mode = (
+            VFOLDER_GROUP_PERMISSION_MODE if container_uid is not None else None
+        )
+
+        # Determine ownership
+        if group_uuid is not None:
+            ownership_type = "group"
+            quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, group_uuid)
+            if (
+                user_role not in (UserRole.SUPERADMIN, UserRole.ADMIN)
+                and group_type != ProjectType.MODEL_STORE
+            ):
+                raise Forbidden("no permission")
+        else:
+            ownership_type = "user"
+            quota_scope_id = QuotaScopeID(QuotaScopeType.USER, user_uuid)
+        if ownership_type not in allowed_vfolder_types:
+            raise VFolderInvalidParameter(
+                f"{ownership_type}-owned vfolder is not allowed in this cluster"
+            )
+
+        if group_type == ProjectType.MODEL_STORE:
+            if action.usage_mode != VFolderUsageMode.MODEL:
+                raise VFolderInvalidParameter(
+                    "Only Model VFolder can be created under the model store project"
+                )
+
+        # Host permission check — resolved from user_id, not passed resource_policy
+        await self._vfolder_repository.ensure_host_permission_allowed_by_user(
+            folder_host,
+            permission=VFolderHostPermission.CREATE,
+            user_uuid=user_uuid,
+            group_id=group_uuid,
+        )
+
+        # Quota check
+        if max_vfolder_count > 0:
+            if ownership_type == "user":
+                current_count = await self._vfolder_repository.count_vfolders_by_user(user_uuid)
+            else:
+                if group_uuid is None:
+                    raise VFolderInvalidParameter("Group UUID is required for group-owned vfolders")
+                current_count = await self._vfolder_repository.count_vfolders_by_group(group_uuid)
+            if current_count >= max_vfolder_count:
+                raise VFolderInvalidParameter("You cannot create more vfolders.")
+
+        # Name uniqueness check
+        name_exists = await self._vfolder_repository.check_vfolder_name_exists(
+            action.name, user_uuid, user_role, domain_name, list(allowed_vfolder_types)
+        )
+        if name_exists:
+            raise VFolderAlreadyExists(
+                f"VFolder with the given name already exists. ({action.name})"
+            )
+
+        # Create in storage
+        folder_id = uuid.uuid4()
+        try:
+            vfid = VFolderID(quota_scope_id, folder_id)
+            proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(folder_host, False)
+            manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+            await manager_client.create_folder(
+                volume_name, str(vfid), max_quota_scope_size, vfolder_permission_mode
+            )
+        except aiohttp.ClientResponseError as e:
+            raise VFolderCreationFailure from e
+
+        mount_permission = action.permission
+        if group_type == ProjectType.MODEL_STORE:
+            mount_permission = VFolderPermission.READ_ONLY
+
+        # Create in DB
+        params = VFolderCreateParams(
+            id=folder_id,
+            name=action.name,
+            domain_name=domain_name,
+            quota_scope_id=str(quota_scope_id),
+            usage_mode=action.usage_mode,
+            permission=mount_permission,
+            host=folder_host,
+            creator=user.email,
+            ownership_type=VFolderOwnershipType(ownership_type),
+            user=user_uuid if ownership_type == "user" else None,
+            group=group_uuid if ownership_type == "group" else None,
+            unmanaged_path=None,
+            cloneable=action.cloneable,
+            status=VFolderOperationStatus.READY,
+        )
+
+        try:
+            create_owner_permission = group_type == ProjectType.MODEL_STORE
+            await self._vfolder_repository.create_vfolder_with_permission(
+                params, create_owner_permission=create_owner_permission
+            )
+        except sa_exc.DataError as e:
+            raise VFolderInvalidParameter from e
+
+        # Fetch created vfolder data for response
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            folder_id, user_uuid, domain_name
+        )
+        return CreateVFolderV2ActionResult(vfolder=vfolder_data)
+
+    async def create_upload_session_v2(
+        self, action: CreateUploadSessionV2Action
+    ) -> CreateUploadSessionV2ActionResult:
+        """Create an upload session (v2). Resolves policy internally from user_id."""
+        user = await self._user_repository.get_user_by_uuid(action.user_id)
+        if user.domain_name is None:
+            raise VFolderInvalidParameter("User has no domain assigned")
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_id, user.id, user.domain_name
+        )
+        if not vfolder_data:
+            raise VFolderNotFound("VFolder not found")
+
+        # Host permission check — resolved from user_id
+        await self._vfolder_repository.ensure_host_permission_allowed_by_user(
+            vfolder_data.host,
+            permission=VFolderHostPermission.UPLOAD_FILE,
+            user_uuid=action.user_id,
+        )
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+        )
+        vfolder_id = VFolderID(
+            quota_scope_id=vfolder_data.quota_scope_id,
+            folder_id=vfolder_data.id,
+        )
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.upload_file(
+            volume_name, str(vfolder_id), action.path, str(action.size)
+        )
+        client_api_url = self._storage_manager.get_client_api_url(proxy_name)
+        return CreateUploadSessionV2ActionResult(
+            token=storage_reply["token"],
+            url=str(client_api_url / "upload"),
+        )

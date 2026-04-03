@@ -51,6 +51,7 @@ from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
+    InsufficientStoragePermission,
     VFolderDeletionNotAllowed,
     VFolderFilterStatusFailed,
     VFolderInvalidParameter,
@@ -1234,6 +1235,22 @@ class VfolderRepository:
                 resource_policy=resource_policy,
                 domain_name=domain_name,
                 group_id=group_id,
+            )
+
+    @vfolder_repository_resilience.apply()
+    async def ensure_host_permission_allowed_by_user(
+        self,
+        folder_host: str,
+        *,
+        permission: VFolderHostPermission,
+        user_uuid: uuid.UUID,
+        group_id: uuid.UUID | None = None,
+    ) -> None:
+        """Check host permission by looking up the user's resource policy from DB."""
+        allowed_hosts = await self.get_allowed_vfolder_hosts(user_uuid, group_id)
+        if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
+            raise InsufficientStoragePermission(
+                f"`{permission}` Not allowed in vfolder host(`{folder_host}`)"
             )
 
     @vfolder_repository_resilience.apply()
