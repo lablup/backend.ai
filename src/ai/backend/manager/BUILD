@@ -59,18 +59,14 @@ python_distribution(
         },
         "backendai_hook_v20": {
             "totp": "ai.backend.manager.plugin.totp.hook:TOTPHook",
-        },
-        "backendai_webapp_v20": {
-            "totp": "ai.backend.manager.plugin.totp.webapp:TOTPWebapp",
-        },
-        "backendai_network_manager_v1": {
-            "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
-        },
-        "backendai_hook_v20": {
             "openid": "ai.backend.manager.plugin.openid.hook:OIDCHookPlugin",
         },
         "backendai_webapp_v20": {
+            "totp": "ai.backend.manager.plugin.totp.webapp:TOTPWebapp",
             "openid": "ai.backend.manager.plugin.openid.webapp:OIDCWebAppPlugin",
+        },
+        "backendai_network_manager_v1": {
+            "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
         },
     },
     generate_setup=True,
