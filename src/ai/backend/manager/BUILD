@@ -4,6 +4,8 @@ python_sources(
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
         ":resources",
+        "//:reqs#authlib",  # pants: no-infer-dep in plugin/openid/webapp.py
+        "//:reqs#httpx",  # pants: no-infer-dep in plugin/openid/webapp.py (authlib dep)
     ],
 )
 
@@ -57,6 +59,12 @@ python_distribution(
         },
         "backendai_network_manager_v1": {
             "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
+        },
+        "backendai_hook_v20": {
+            "openid": "ai.backend.manager.plugin.openid.hook:OIDCHookPlugin",
+        },
+        "backendai_webapp_v20": {
+            "openid": "ai.backend.manager.plugin.openid.webapp:OIDCWebAppPlugin",
         },
     },
     generate_setup=True,
