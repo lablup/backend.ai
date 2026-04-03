@@ -34,6 +34,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.webapp import WebappPlugin
 
 from . import __version__
+from .config import OIDCPluginConfig
 from .valkey_client import ValkeyOpenIDClient
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -226,35 +227,33 @@ async def update_jwks(app: web.Application, _interval: float) -> None:
 
 
 class OIDCWebAppPlugin(WebappPlugin):
+    _config: OIDCPluginConfig
+
     async def init(self, context: Any = None) -> None:
-        if "openid" not in self.plugin_config:
-            raise OpenIDError(
-                "OpenID plugin is not configured. "
-                "Provide the 'openid' section in the plugin configuration via etcd."
-            )
+        self._config = OIDCPluginConfig(**self.plugin_config)
 
     async def cleanup(self) -> None:
         pass
 
     async def update_plugin_config(self, new_etcd_config: Mapping[str, Any]) -> None:
         self.plugin_config = new_etcd_config
+        self._config = OIDCPluginConfig(**new_etcd_config)
 
     async def _webapp_init(self, app: web.Application) -> None:
-        openid_config = self.plugin_config["openid"]
+        openid_config = self._config.openid
 
-        config_keys = ["authorization_endpoint", "token_endpoint", "jwks_uri"]
-
-        if "well_known" in openid_config:
+        if openid_config.well_known is not None:
             async with aiohttp.ClientSession() as sess:
-                async with sess.get(openid_config["well_known"]) as resp:
+                async with sess.get(openid_config.well_known) as resp:
                     app["openid.well_known"] = await resp.json()
-                    for key in config_keys:
+                    for key in ("authorization_endpoint", "token_endpoint", "jwks_uri"):
                         app[f"openid.{key}"] = app["openid.well_known"][key]
         else:
-            for key in config_keys:
-                if key not in openid_config:
+            for key in ("authorization_endpoint", "token_endpoint", "jwks_uri"):
+                value = getattr(openid_config, key)
+                if value is None:
                     raise OpenIDError(f"both well_known and {key} not configured")
-                app[f"openid.{key}"] = openid_config[key]
+                app[f"openid.{key}"] = value
 
         app["openid.jwks_refresh_task"] = aiotools.create_timer(
             functools.partial(update_jwks, app), 86400
@@ -279,14 +278,14 @@ class OIDCWebAppPlugin(WebappPlugin):
         post_data = await request.post()
         redirect_to = post_data.get("redirect_to", None)
         force = post_data.get("force", "false")
-        openid_config = self.plugin_config["openid"]
+        openid_config = self._config.openid
         authorization_endpoint = request.app["openid.authorization_endpoint"]
 
-        redirect_uri = yarl.URL(self.plugin_config["login_uri"])
+        redirect_uri = yarl.URL(self._config.login_uri)
 
         client = AsyncOAuth2Client(
-            openid_config["client_id"],
-            openid_config["client_secret"],
+            openid_config.client_id,
+            openid_config.client_secret,
             scope=scope,
             proxies={},
             code_challenge_method="S256",
@@ -313,20 +312,20 @@ class OIDCWebAppPlugin(WebappPlugin):
         root_app = request.app["_root_app"]
         config_provider = root_app["_config_provider"]
         db = root_app["_db"]
-        openid_config = self.plugin_config["openid"]
+        openid_config = self._config.openid
         token_endpoint = request.app["openid.token_endpoint"]
         state = urllib.parse.parse_qs(request.query["state"])
         if "redirect" in state:
             redirect_uri = yarl.URL(state["redirect"][0])
         else:
-            redirect_uri = yarl.URL(self.plugin_config["login_uri"])
+            redirect_uri = yarl.URL(self._config.login_uri)
 
         valkey_client: ValkeyOpenIDClient = request.app["valkey_client"]
         code_verifier = await valkey_client.get_openid_key(state["session"][0])
 
         client = AsyncOAuth2Client(
-            openid_config["client_id"],
-            openid_config["client_secret"],
+            openid_config.client_id,
+            openid_config.client_secret,
             scope=scope,
             proxies={},
             code_challenge_method="S256",
@@ -359,8 +358,8 @@ class OIDCWebAppPlugin(WebappPlugin):
         )
         user = await create_user_if_not_exists(
             claims,
-            openid_config.get("group_mapping", {}),
-            [x.strip() for x in openid_config.get("group_order", "").split(",")],
+            openid_config.group_mapping,
+            [x.strip() for x in openid_config.group_order.split(",")],
             db,
             password_info,
         )
@@ -371,7 +370,7 @@ class OIDCWebAppPlugin(WebappPlugin):
             "exp": datetime.now(UTC) + timedelta(seconds=60),
             "force": force,
         }
-        token = encode_jwt_token(token_data, self.plugin_config["secret"])
+        token = encode_jwt_token(token_data, self._config.secret)
         return web.HTTPFound(redirect_uri.update_query({"sToken": token}))
 
     async def create_app(

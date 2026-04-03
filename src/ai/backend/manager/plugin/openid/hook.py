@@ -17,6 +17,8 @@ from ai.backend.manager.models.login_session.enums import LoginSessionStatus
 from ai.backend.manager.models.login_session.row import LoginSessionRow
 from ai.backend.manager.models.user import UserStatus, users
 
+from .config import OIDCPluginConfig
+
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
@@ -24,16 +26,14 @@ class OIDCHookPlugin(HookPlugin):
     # Pre-defined attributes from the base class:
     #   - local_config is populated from the manager TOML.
     #   - plugin_config is populated from the "/config/plugins/hook/openid/" etcd key
+    _config: OIDCPluginConfig
 
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         self.plugin_config = plugin_config
+        self._config = OIDCPluginConfig(**plugin_config)
 
     async def init(self, context: Any = None) -> None:
-        if "secret" not in self.plugin_config:
-            raise RuntimeError(
-                "OpenID hook plugin is not configured. "
-                "Provide the 'secret' key in the plugin configuration via etcd."
-            )
+        self._config = OIDCPluginConfig(**self.plugin_config)
 
     async def cleanup(self) -> None:
         pass
@@ -50,7 +50,7 @@ class OIDCHookPlugin(HookPlugin):
     ) -> Any:
         root_app = request.app["_root_app"]
         db = root_app["_db"]
-        secret = self.plugin_config["secret"]
+        secret = self._config.secret
 
         stoken = request.cookies.get("sToken")
         if not stoken:
