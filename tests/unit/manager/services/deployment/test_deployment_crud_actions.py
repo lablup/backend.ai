@@ -21,6 +21,11 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant, SessionId
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
+from ai.backend.manager.actions.validators.rbac.single_entity import (
+    SingleEntityActionRBACValidator,
+)
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     ClusterConfigData,
@@ -103,7 +108,16 @@ class DeploymentCRUDBaseFixtures:
 
     @pytest.fixture
     def processors(self, deployment_service: DeploymentService) -> DeploymentProcessors:
-        return DeploymentProcessors(deployment_service, [], MagicMock(spec=ActionValidators))
+        return DeploymentProcessors(
+            deployment_service,
+            [],
+            ActionValidators(
+                rbac=RBACValidators(
+                    scope=MagicMock(spec=ScopeActionRBACValidator),
+                    single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                ),
+            ),
+        )
 
     @pytest.fixture
     def endpoint_id(self) -> uuid.UUID:

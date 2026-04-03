@@ -1,5 +1,11 @@
 """
-Wrapper to run pyinfra locally with gevent subprocess fix for macOS + Python 3.13.
+Wrapper to run pyinfra locally on macOS + Python 3.13.
+
+Workaround for gevent's monkey.patch_all() not fully patching subprocess.Popen
+in pyinfra's greenlet execution context. The fix patches pyinfra's connectors/util
+to use gevent.subprocess directly instead of relying on the monkey-patched stdlib.
+
+See: https://github.com/pyinfra-dev/pyinfra/issues/1652
 
 Usage:
     PYTHONPATH=src python src/ai/backend/install/pyinfra/inventory/run_local.py [--dry] <deploy_script>
@@ -11,19 +17,23 @@ Example:
 
 from __future__ import annotations
 
-import subprocess
 import sys
 
-# Save _fork_exec before gevent monkey-patches it to None (macOS + Python 3.13 bug)
-# https://github.com/gevent/gevent/issues/2169
-_original_fork_exec = subprocess._fork_exec
-
-from gevent import monkey  # noqa: E402
+from gevent import monkey
 
 monkey.patch_all()
 
-# Restore _fork_exec after monkey patching
-subprocess._fork_exec = _original_fork_exec
+# Patch pyinfra's connectors/util to use gevent.subprocess directly.
+# After monkey.patch_all(), subprocess.Popen should be gevent's version,
+# but pyinfra's greenlet execution context triggers a code path where
+# CPython's original Popen.__init__ is called instead of gevent's,
+# causing _fork_exec (intentionally None in gevent) to be invoked.
+# Using gevent.subprocess explicitly avoids this issue.
+import pyinfra.connectors.util as _pyinfra_util  # noqa: E402
+from gevent.subprocess import PIPE, Popen  # noqa: E402
+
+_pyinfra_util.Popen = Popen  # type: ignore[attr-defined]
+_pyinfra_util.PIPE = PIPE  # type: ignore[attr-defined]
 
 # Now run pyinfra CLI
 from pyinfra_cli.cli import cli  # noqa: E402

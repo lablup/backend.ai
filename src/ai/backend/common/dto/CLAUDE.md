@@ -19,3 +19,4 @@ Organize by target component: `common/dto/{manager|agent|storage|clients|interna
   (`manager/`, `agent/`, `storage/`).
 - No business logic — validation and serialization only.
 - Before modifying any field, verify all callers across components.
+- **Use only `v2/` DTOs** (e.g., `common/dto/manager/v2/`). DTOs outside `v2/` are deprecated and must not be used in new code.
