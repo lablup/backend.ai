@@ -19,6 +19,8 @@ from ai.backend.manager.api.gql.model_card.types import (
     CreateModelCardInputGQL,
     CreateModelCardPayloadGQL,
     DeleteModelCardPayloadGQL,
+    DeployModelCardInputGQL,
+    DeployModelCardPayloadGQL,
     ModelCardFilterGQL,
     ModelCardGQL,
     ModelCardOrderByGQL,
@@ -152,6 +154,21 @@ async def scan_project_model_cards_v2(
 ) -> ScanProjectModelCardsPayloadGQL:
     payload = await info.context.adapters.model_card.scan_project(project_id)
     return ScanProjectModelCardsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Deploy a model card by creating a deployment with a revision preset.",
+    )
+)  # type: ignore[misc]
+async def deploy_model_card_v2(
+    info: Info[StrawberryGQLContext],
+    card_id: UUID,
+    input: DeployModelCardInputGQL,
+) -> DeployModelCardPayloadGQL:
+    payload = await info.context.adapters.model_card.deploy(card_id, input.to_pydantic())
+    return DeployModelCardPayloadGQL.from_pydantic(payload)
 
 
 def _build_search_input(

@@ -46,7 +46,7 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
     rank: Mapped[int] = mapped_column("rank", sa.Integer, nullable=False)
 
-    image: Mapped[str | None] = mapped_column("image", sa.String(length=512), nullable=True)
+    image_id: Mapped[uuid.UUID] = mapped_column("image_id", GUID, nullable=False)
     model_definition: Mapped[ModelDefinition | None] = mapped_column(
         "model_definition", PydanticColumn(ModelDefinition), nullable=True
     )
@@ -91,7 +91,7 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
             name=self.name,
             description=self.description,
             rank=self.rank,
-            image=self.image,
+            image_id=self.image_id,
             model_definition=(
                 self.model_definition.model_dump(by_alias=True, exclude_none=True)
                 if self.model_definition

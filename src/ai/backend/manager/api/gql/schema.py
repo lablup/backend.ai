@@ -175,6 +175,7 @@ from .model_card import (
     admin_delete_model_card_v2,
     admin_model_cards_v2,
     admin_update_model_card_v2,
+    deploy_model_card_v2,
     model_card_v2,
     project_model_cards_v2,
     scan_project_model_cards_v2,
@@ -766,6 +767,7 @@ class Mutation:
     admin_update_model_card_v2 = admin_update_model_card_v2
     admin_delete_model_card_v2 = admin_delete_model_card_v2
     scan_project_model_cards_v2 = scan_project_model_cards_v2
+    deploy_model_card_v2 = deploy_model_card_v2
     # Session V2 mutations
     terminate_project_sessions_v2 = terminate_project_sessions_v2
 

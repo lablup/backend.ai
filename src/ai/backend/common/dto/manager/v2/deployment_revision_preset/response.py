@@ -39,7 +39,7 @@ class PresetResourceAllocation(BaseResponseModel):
 
 
 class PresetExecutionSpec(BaseResponseModel):
-    image: str | None = Field(default=None, description="Container image reference.")
+    image_id: UUID | None = Field(default=None, description="Container image UUID.")
     startup_command: str | None = Field(default=None, description="Startup command.")
     bootstrap_script: str | None = Field(default=None, description="Bootstrap script.")
     environ: list[EnvironEntryInfo] = Field(

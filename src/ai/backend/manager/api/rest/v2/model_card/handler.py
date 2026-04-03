@@ -8,6 +8,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
+    DeployModelCardInput,
     SearchModelCardsInput,
     UpdateModelCardInput,
 )
@@ -74,3 +75,11 @@ class V2ModelCardHandler:
     ) -> APIResponse:
         result = await self._adapter.scan_project(path.parsed.project_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def deploy(
+        self,
+        path: PathParam[CardIdPathParam],
+        body: BodyParam[DeployModelCardInput],
+    ) -> APIResponse:
+        result = await self._adapter.deploy(path.parsed.card_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)

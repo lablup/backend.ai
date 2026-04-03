@@ -63,3 +63,8 @@ class ScanProjectModelCardsPayload(BaseResponseModel):
     created_count: int = Field(description="Number of newly created model cards.")
     updated_count: int = Field(description="Number of updated existing model cards.")
     errors: list[str] = Field(default_factory=list, description="Per-vfolder error messages.")
+
+
+class DeployModelCardPayload(BaseResponseModel):
+    deployment_id: UUID = Field(description="ID of the created deployment.")
+    deployment_name: str = Field(description="Name of the created deployment.")

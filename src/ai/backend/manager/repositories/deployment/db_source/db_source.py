@@ -1525,6 +1525,7 @@ class DeploymentDBSource:
                 quota_scope_id=row.quota_scope_id,
                 host=row.host,
                 ownership_type=row.ownership_type,
+                usage_mode=row.usage_mode,
             )
 
     async def fetch_scaling_group_proxy_targets(

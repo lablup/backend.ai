@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, override
 
@@ -16,7 +17,7 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    image: TriState[str] = field(default_factory=TriState[str].nop)
+    image_id: TriState[uuid.UUID] = field(default_factory=TriState[uuid.UUID].nop)
     model_definition: TriState[ModelDefinition] = field(
         default_factory=TriState[ModelDefinition].nop
     )
@@ -48,7 +49,7 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
         self.name.update_dict(to_update, "name")
         self.description.update_dict(to_update, "description")
         self.rank.update_dict(to_update, "rank")
-        self.image.update_dict(to_update, "image")
+        self.image_id.update_dict(to_update, "image_id")
         self.model_definition.update_dict(to_update, "model_definition")
         self.resource_slots.update_dict(to_update, "resource_slots")
         self.resource_opts.update_dict(to_update, "resource_opts")

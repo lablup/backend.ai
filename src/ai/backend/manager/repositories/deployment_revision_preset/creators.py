@@ -21,7 +21,7 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
     name: str
     description: str | None
     rank: int
-    image: str | None
+    image_id: UUID
     model_definition: ModelDefinition | None
     resource_slots: list[ResourceSlotEntry]
     resource_opts: list[ResourceOptsEntry]
@@ -51,7 +51,7 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
         row.name = self.name
         row.description = self.description
         row.rank = self.rank
-        row.image = self.image
+        row.image_id = self.image_id
         row.model_definition = self.model_definition
         row.resource_slots = self.resource_slots
         row.resource_opts = self.resource_opts

@@ -123,3 +123,37 @@ def get(card_id: uuid.UUID) -> None:
             await registry.close()
 
     _run_async(_run)
+
+
+@model_card.command()
+@click.argument("card_id", type=click.UUID)
+@click.option("--project-id", required=True, type=click.UUID, help="Target project UUID.")
+@click.option("--revision-preset-id", required=True, type=click.UUID, help="Revision preset UUID.")
+@click.option("--resource-group", required=True, type=str, help="Resource group name.")
+@click.option("--replicas", default=1, type=int, help="Number of replicas.")
+def deploy(
+    card_id: uuid.UUID,
+    project_id: uuid.UUID,
+    revision_preset_id: uuid.UUID,
+    resource_group: str,
+    replicas: int,
+) -> None:
+    """Deploy a model card as a new deployment."""
+    from ai.backend.common.dto.manager.v2.model_card.request import DeployModelCardInput
+
+    deploy_input = DeployModelCardInput(
+        project_id=project_id,
+        revision_preset_id=revision_preset_id,
+        resource_group=resource_group,
+        desired_replica_count=replicas,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.model_card.deploy(card_id, deploy_input)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    _run_async(_run)

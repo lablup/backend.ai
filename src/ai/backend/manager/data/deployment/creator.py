@@ -36,7 +36,7 @@ class ModelRevisionCreator:
     The image_id is resolved by the GQL layer before being passed here.
     """
 
-    image_id: UUID
+    image_id: UUID | None
     resource_spec: ResourceSpec
     mounts: VFolderMountsCreator
     execution: ExecutionSpec

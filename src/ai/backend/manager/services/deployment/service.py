@@ -573,7 +573,7 @@ class DeploymentService:
         )
 
         preset_draft = RevisionDraft(
-            image_id=None,
+            image_id=preset_data.image_id,
             resource_slots={s.resource_type: s.quantity for s in preset_data.resource_slots},
             resource_opts={o.name: o.value for o in preset_data.resource_opts},
             cluster_mode=ClusterMode(preset_data.cluster_mode)

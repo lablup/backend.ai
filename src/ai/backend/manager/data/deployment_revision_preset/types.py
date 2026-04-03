@@ -37,7 +37,7 @@ class DeploymentRevisionPresetData:
     name: str
     description: str | None
     rank: int
-    image: str | None
+    image_id: UUID
     model_definition: dict[str, Any] | None
     resource_slots: list[ResourceSlotEntryData]
     resource_opts: list[ResourceOptsEntryData]

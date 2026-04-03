@@ -28,7 +28,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     """
 
     endpoint_id: uuid.UUID
-    image_id: uuid.UUID
+    image_id: uuid.UUID | None
     resource_group: str
     resource_slots: ResourceSlot
     resource_opts: Mapping[str, Any]

@@ -10,6 +10,9 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput as CreateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    DeployModelCardInput as DeployInputDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
     ModelCardFilter as FilterDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
@@ -23,6 +26,9 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
     DeleteModelCardPayload as DeletePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.response import (
+    DeployModelCardPayload as DeployPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
     ModelCardMetadata as ModelCardMetadataDTO,
@@ -242,3 +248,30 @@ class ScanProjectModelCardsPayloadGQL(PydanticOutputMixin[ScanPayloadDTO]):
     created_count: int = gql_field(description="Number of newly created model cards.")
     updated_count: int = gql_field(description="Number of updated model cards.")
     errors: list[str] = gql_field(description="Per-vfolder error messages.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for deploying a model card as a new deployment.",
+    ),
+    name="DeployModelCardV2Input",
+)
+class DeployModelCardInputGQL(PydanticInputMixin[DeployInputDTO]):
+    project_id: UUID = gql_field(description="Target project UUID for the deployment.")
+    revision_preset_id: UUID = gql_field(description="Deployment revision preset UUID.")
+    resource_group: str = gql_field(description="Resource group name.")
+    desired_replica_count: int = gql_field(default=1, description="Number of replicas.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Result of deploying a model card.",
+    ),
+    model=DeployPayloadDTO,
+    name="DeployModelCardV2Payload",
+)
+class DeployModelCardPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
+    deployment_id: UUID = gql_field(description="ID of the created deployment.")
+    deployment_name: str = gql_field(description="Name of the created deployment.")

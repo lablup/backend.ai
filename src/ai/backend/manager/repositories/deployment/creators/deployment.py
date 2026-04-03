@@ -112,7 +112,7 @@ class ModelRevisionFields:
     Note: image_id is a resolved UUID, not ImageIdentifier.
     """
 
-    image_id: uuid.UUID
+    image_id: uuid.UUID | None
     resource: DeploymentResourceFields
     mounts: DeploymentMountFields
     execution: DeploymentExecutionFields

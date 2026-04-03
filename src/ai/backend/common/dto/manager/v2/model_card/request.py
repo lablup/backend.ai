@@ -78,3 +78,24 @@ class SearchModelCardsInput(BaseRequestModel):
     before: str | None = Field(default=None)
     limit: int | None = Field(default=None, ge=1)
     offset: int | None = Field(default=None, ge=0)
+
+
+class DeployModelCardInput(BaseRequestModel):
+    """Input for creating a deployment from a model card."""
+
+    project_id: UUID = Field(
+        description="Target project UUID where the deployment will be created. "
+        "Must be a general project, not MODEL_STORE.",
+    )
+    revision_preset_id: UUID = Field(
+        description="Deployment revision preset UUID that provides image, "
+        "runtime variant, resource slots, environ, and startup command.",
+    )
+    resource_group: str = Field(
+        description="Resource group (scaling group) name for scheduling.",
+    )
+    desired_replica_count: int = Field(
+        default=1,
+        ge=1,
+        description="Number of replicas to deploy.",
+    )

@@ -136,7 +136,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 name=input.name,
                 description=input.description,
                 rank=0,
-                image=input.image,
+                image_id=input.image_id,
                 model_definition=model_def,
                 resource_slots=resource_slots,
                 resource_opts=resource_opts,
@@ -190,12 +190,12 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             rank=(
                 OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
             ),
-            image=(
+            image_id=(
                 TriState.nop()
-                if input.image is SENTINEL
+                if input.image_id is SENTINEL
                 else TriState.nullify()
-                if input.image is None
-                else TriState.update(input.image)
+                if input.image_id is None
+                else TriState.update(input.image_id)
             ),
             model_definition=model_def_state,
             resource_slots=resource_slots_state,
@@ -358,7 +358,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 resource_opts=resource_opts_entries,
             ),
             execution=PresetExecutionSpec(
-                image=data.image,
+                image_id=data.image_id,
                 startup_command=data.startup_command,
                 bootstrap_script=data.bootstrap_script,
                 environ=environ_entries,

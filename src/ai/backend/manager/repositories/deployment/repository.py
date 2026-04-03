@@ -29,6 +29,7 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     KernelId,
     SessionId,
+    VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.gql_legacy.statistics import EndpointStatistics, KernelStatistics
@@ -456,7 +457,10 @@ class DeploymentRepository:
             dict: Parsed model definition content
         """
         vfolder_location = await self._db_source.get_vfolder_by_id(vfolder_id)
-        if vfolder_location.ownership_type == VFolderOwnershipType.GROUP:
+        if (
+            vfolder_location.ownership_type == VFolderOwnershipType.GROUP
+            and vfolder_location.usage_mode != VFolderUsageMode.MODEL
+        ):
             raise InvalidAPIParameters(
                 "Cannot create model service with the project type's vfolder"
             )
@@ -519,7 +523,10 @@ class DeploymentRepository:
             dict: Parsed deployment config content, or None if not found
         """
         vfolder_location = await self._db_source.get_vfolder_by_id(vfolder_id)
-        if vfolder_location.ownership_type == VFolderOwnershipType.GROUP:
+        if (
+            vfolder_location.ownership_type == VFolderOwnershipType.GROUP
+            and vfolder_location.usage_mode != VFolderUsageMode.MODEL
+        ):
             raise InvalidAPIParameters(
                 "Cannot create model service with the project type's vfolder"
             )

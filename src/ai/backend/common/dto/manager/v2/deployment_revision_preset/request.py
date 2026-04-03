@@ -34,9 +34,7 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     )
     name: str = Field(min_length=1, max_length=256, description="Preset name.")
     description: str | None = Field(default=None, description="Description.")
-    image: str | None = Field(
-        default=None, max_length=512, description="Container image reference."
-    )
+    image_id: UUID = Field(description="Container image UUID.")
     model_definition: dict[str, Any] | None = Field(
         default=None, description="Model definition configuration."
     )
@@ -63,7 +61,7 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     name: str | None = Field(default=None, min_length=1, max_length=256)
     description: str | Sentinel | None = Field(default=SENTINEL)
     rank: int | None = Field(default=None, ge=0)
-    image: str | Sentinel | None = Field(default=SENTINEL)
+    image_id: UUID | Sentinel | None = Field(default=SENTINEL)
     model_definition: dict[str, Any] | Sentinel | None = Field(default=SENTINEL)
     resource_slots: list[ResourceSlotEntryInput] | None = Field(default=None)
     resource_opts: list[ResourceOptsEntryInput] | None = Field(default=None)

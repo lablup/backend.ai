@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
@@ -7,6 +8,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
+    DeployModelCardInput,
     ModelCardFilter,
     ModelCardOrder,
     ResourceSlotEntryInput,
@@ -16,6 +18,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
 from ai.backend.common.dto.manager.v2.model_card.response import (
     CreateModelCardPayload,
     DeleteModelCardPayload,
+    DeployModelCardPayload,
     ModelCardMetadata,
     ModelCardNode,
     ResourceSlotEntryInfo,
@@ -25,7 +28,20 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
 )
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import ClusterMode
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
+from ai.backend.manager.data.deployment.creator import (
+    ModelRevisionCreator,
+    NewDeploymentCreator,
+    VFolderMountsCreator,
+)
+from ai.backend.manager.data.deployment.types import (
+    DeploymentMetadata,
+    DeploymentNetworkSpec,
+    ExecutionSpec,
+    ReplicaSpec,
+    ResourceSpec,
+)
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ModelCardNotFound
@@ -39,6 +55,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
+from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
@@ -298,6 +315,79 @@ class ModelCardAdapter(BaseAdapter):
             updated_count=result.updated_count,
             errors=result.errors,
         )
+
+    async def deploy(
+        self,
+        card_id: UUID,
+        input: DeployModelCardInput,
+    ) -> DeployModelCardPayload:
+        """Create a deployment from a model card using a revision preset.
+
+        The revision preset provides image_id, resource_slots, environ,
+        startup_command, and runtime_variant_id. The model card provides
+        the model vfolder and project scope. The deployment service's
+        _apply_preset() merges preset values into the revision creator.
+        """
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+
+        model_card = await self._get_model_card_data(card_id)
+
+        creator = NewDeploymentCreator(
+            metadata=DeploymentMetadata(
+                name=f"{model_card.name}-{secrets.token_hex(4)}",
+                domain=model_card.domain,
+                project=input.project_id,
+                resource_group=input.resource_group,
+                created_user=me.user_id,
+                session_owner=me.user_id,
+                created_at=None,
+                revision_history_limit=10,
+            ),
+            replica_spec=ReplicaSpec(replica_count=input.desired_replica_count),
+            network=DeploymentNetworkSpec(open_to_public=False),
+            model_revision=ModelRevisionCreator(
+                image_id=None,
+                resource_spec=ResourceSpec(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                    resource_slots={},
+                ),
+                mounts=VFolderMountsCreator(
+                    model_vfolder_id=model_card.vfolder_id,
+                ),
+                execution=ExecutionSpec(),
+                model_definition=None,
+                revision_preset_id=input.revision_preset_id,
+                auto_activate=True,
+            ),
+        )
+
+        result = await self._processors.deployment.create_deployment.wait_for_complete(
+            CreateDeploymentAction(creator=creator)
+        )
+        return DeployModelCardPayload(
+            deployment_id=result.data.id,
+            deployment_name=result.data.metadata.name,
+        )
+
+    async def _get_model_card_data(self, card_id: UUID) -> ModelCardData:
+        """Fetch a single model card by ID."""
+        conditions: list[QueryCondition] = [lambda: ModelCardRow.id == card_id]
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=[],
+            pagination_spec=_model_card_pagination_spec(),
+            limit=1,
+        )
+        result = await self._processors.model_card.search.wait_for_complete(
+            SearchModelCardsAction(querier=querier)
+        )
+        items: list[ModelCardData] = result.items
+        if not items:
+            raise ModelCardNotFound()
+        return items[0]
 
     def _convert_filter(self, filter_: ModelCardFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

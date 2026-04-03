@@ -295,3 +295,4 @@ class VFolderLocation:
     quota_scope_id: QuotaScopeID | None
     host: str
     ownership_type: VFolderOwnershipType
+    usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
