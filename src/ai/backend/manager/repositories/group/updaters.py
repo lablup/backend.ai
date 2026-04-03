@@ -23,7 +23,7 @@ class GroupUpdaterSpec(UpdaterSpec[GroupRow]):
     allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
         default_factory=OptionalState[dict[str, str]].nop
     )
-    integration_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    integration_name: TriState[str] = field(default_factory=TriState[str].nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     container_registry: TriState[dict[str, str]] = field(
         default_factory=TriState[dict[str, str]].nop

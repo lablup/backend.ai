@@ -196,11 +196,11 @@ class ProjectAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
             integration_name=(
-                OptionalState.nop()
+                TriState.nop()
                 if isinstance(input.integration_name, Sentinel)
-                else OptionalState.nop()
+                else TriState.nullify()
                 if input.integration_name is None
-                else OptionalState.update(input.integration_name)
+                else TriState.update(input.integration_name)
             ),
             resource_policy=(
                 OptionalState.update(input.resource_policy)

@@ -636,7 +636,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
                 self.allowed_vfolder_hosts,
             ),
-            integration_name=OptionalState[str].from_graphql(
+            integration_name=TriState[str].from_graphql(
                 self.integration_id,
             ),
             resource_policy=OptionalState[str].from_graphql(
