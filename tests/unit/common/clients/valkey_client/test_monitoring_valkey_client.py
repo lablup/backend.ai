@@ -322,45 +322,46 @@ class TestMonitoringValkeyClientAcquire:
             result = await conn.ping()
             assert result == b"PONG"
 
-    async def test_acquire_resets_counter_and_reconnects_at_threshold(
+    async def test_operation_client_recovery_while_monitor_healthy(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
-        """Test that reaching the failure threshold resets counter and triggers reconnection."""
+        """Test that operation client recovers via acquire() even when monitor client is healthy.
+
+        This is the core scenario where the monitor loop alone cannot detect the problem:
+        the monitor client pings successfully, but the operation client is broken.
+        The acquire() failure tracking should detect the operation failures and
+        trigger reconnection independently of the monitor loop.
+        """
         threshold = monitoring_client._spec.consecutive_failure_threshold
 
-        # Set failure count just below threshold
-        monitoring_client._operation_failure_count = threshold - 1
+        # 1. Verify both clients are initially healthy
+        await monitoring_client.ping()  # monitor client ping
+        async with monitoring_client.acquire() as conn:
+            assert await conn.ping() == b"PONG"  # operation client works
 
-        # Force disconnect to cause a real connection error at threshold
+        # 2. Break ONLY the operation client — monitor client stays healthy
         await monitoring_client._operation_client.disconnect()
 
-        # This failure should reach the threshold and trigger reconnection
-        with pytest.raises(_VALKEY_CONNECTION_ERRORS):
-            async with monitoring_client.acquire() as conn:
-                await conn.ping()
+        # 3. Verify monitor client is still healthy (this is the key distinction)
+        await monitoring_client._monitor_client.ping()
 
-        # Counter should be reset after reconnect
-        assert monitoring_client._operation_failure_count == 0
-
-    async def test_acquire_reconnect_restores_connectivity(
-        self, monitoring_client: MonitoringValkeyClient
-    ) -> None:
-        """Test that after threshold-triggered reconnection, the client is operational."""
-        threshold = monitoring_client._spec.consecutive_failure_threshold
-
-        # Force disconnect the operation client to cause real connection errors
-        await monitoring_client._operation_client.disconnect()
-
-        # Simulate failures until threshold is reached
-        for _ in range(threshold):
+        # 4. Operation requests fail, acquire() tracks failures
+        for i in range(threshold):
             with pytest.raises(_VALKEY_CONNECTION_ERRORS):
                 async with monitoring_client.acquire() as conn:
                     await conn.ping()
 
-        # After reconnection, the client should be operational again
+        # 5. Counter should be reset after reconnect
+        assert monitoring_client._operation_failure_count == 0
+
+        # 6. acquire() should have triggered _reconnect() at threshold,
+        #    restoring the operation client
         async with monitoring_client.acquire() as conn:
             result = await conn.ping()
             assert result == b"PONG"
+
+        # 7. Monitor client should also still be healthy after reconnect
+        await monitoring_client._monitor_client.ping()
 
     async def test_acquire_tracks_each_connection_error_type(
         self, monitoring_client: MonitoringValkeyClient
