@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field
@@ -24,6 +25,10 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
     value_type: PresetValueType = Field(description="Value type: str, int, float, bool.")
     default_value: str | None = Field(default=None, max_length=512, description="Default value.")
     key: str = Field(min_length=1, max_length=256, description="Env key or args flag.")
+    category: str | None = Field(default=None, max_length=64, description="UI category group.")
+    ui_type: str | None = Field(default=None, max_length=32, description="UI render type.")
+    display_name: str | None = Field(default=None, max_length=256, description="UI display name.")
+    ui_option: dict[str, Any] | None = Field(default=None, description="UI rendering config.")
 
 
 class UpdateRuntimeVariantPresetInput(BaseRequestModel):
@@ -35,6 +40,10 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
     value_type: PresetValueType | None = Field(default=None)
     default_value: str | Sentinel | None = Field(default=SENTINEL)
     key: str | None = Field(default=None, min_length=1, max_length=256)
+    category: str | Sentinel | None = Field(default=SENTINEL)
+    ui_type: str | Sentinel | None = Field(default=SENTINEL)
+    display_name: str | Sentinel | None = Field(default=SENTINEL)
+    ui_option: dict[str, Any] | Sentinel | None = Field(default=SENTINEL)
 
 
 class RuntimeVariantPresetFilter(BaseRequestModel):

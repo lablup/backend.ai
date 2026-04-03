@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field
@@ -22,6 +23,10 @@ class RuntimeVariantPresetNode(BaseResponseModel):
     description: str | None = Field(default=None, description="Description.")
     rank: int = Field(description="Display order rank.")
     target_spec: PresetTargetSpec = Field(description="Preset target specification.")
+    category: str | None = Field(default=None, description="UI category group.")
+    ui_type: str | None = Field(default=None, description="UI render type.")
+    display_name: str | None = Field(default=None, description="UI display name.")
+    ui_option: dict[str, Any] | None = Field(default=None, description="UI rendering config.")
     created_at: datetime = Field(description="Creation timestamp.")
     updated_at: datetime | None = Field(default=None, description="Last update timestamp.")
 

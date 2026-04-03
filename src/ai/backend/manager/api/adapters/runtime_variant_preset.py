@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
@@ -29,6 +30,7 @@ from ai.backend.manager.models.runtime_variant_preset.conditions import (
 )
 from ai.backend.manager.models.runtime_variant_preset.orders import RuntimeVariantPresetOrders
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
+from ai.backend.manager.models.runtime_variant_preset.types import UIOption
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder, combine_conditions_or
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -122,6 +124,10 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 value_type=input.value_type.value,
                 default_value=input.default_value,
                 key=input.key,
+                category=input.category,
+                ui_type=input.ui_type,
+                display_name=input.display_name,
+                ui_option=UIOption(**input.ui_option) if input.ui_option else None,
             )
         )
         result = await self._processors.runtime_variant_preset.create.wait_for_complete(
@@ -165,6 +171,34 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 else TriState.update(input.default_value)
             ),
             key=(OptionalState.update(input.key) if input.key is not None else OptionalState.nop()),
+            category=(
+                TriState.nop()
+                if input.category is SENTINEL
+                else TriState.nullify()
+                if input.category is None
+                else TriState.update(input.category)
+            ),
+            ui_type=(
+                TriState.nop()
+                if input.ui_type is SENTINEL
+                else TriState.nullify()
+                if input.ui_type is None
+                else TriState.update(input.ui_type)
+            ),
+            display_name=(
+                TriState.nop()
+                if input.display_name is SENTINEL
+                else TriState.nullify()
+                if input.display_name is None
+                else TriState.update(input.display_name)
+            ),
+            ui_option=(
+                TriState.nop()
+                if input.ui_option is SENTINEL
+                else TriState.nullify()
+                if input.ui_option is None
+                else TriState.update(UIOption(**input.ui_option))
+            ),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=input.id)
         result = await self._processors.runtime_variant_preset.update.wait_for_complete(
@@ -232,6 +266,10 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 default_value=data.default_value,
                 key=data.key,
             ),
+            category=data.category,
+            ui_type=data.ui_type,
+            display_name=data.display_name,
+            ui_option=dataclasses.asdict(data.ui_option) if data.ui_option else None,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )
