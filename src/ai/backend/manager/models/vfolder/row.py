@@ -29,9 +29,7 @@ from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationsh
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.types import (
-    MountMode,
     MountPermission,
-    OverlayTarget,
     QuotaScopeID,
     SessionId,
     VFolderHostPermission,
@@ -881,42 +879,6 @@ def check_overlapping_mounts(mounts: Iterable[str] | Iterable[PurePosixPath]) ->
                 )
 
 
-async def _resolve_overlay_target(
-    conn: SAConnection,
-    storage_manager: StorageSessionManager,
-    target_vfolder_uuid: uuid.UUID,
-) -> OverlayTarget:
-    """Resolve overlay target vfolder's host_path from storage proxy."""
-    query = sa.select(
-        vfolders.c.id,
-        vfolders.c.host,
-        vfolders.c.quota_scope_id,
-    ).where(vfolders.c.id == target_vfolder_uuid)
-    result = await conn.execute(query)
-    row = result.first()
-    if row is None:
-        raise VFolderNotFound(f"Overlay target vfolder {target_vfolder_uuid} not found.")
-    target_vfid = VFolderID(row.quota_scope_id, row.id)
-    try:
-        proxy_name, volume_name = storage_manager.get_proxy_and_volume(row.host)
-        manager_client = storage_manager.get_manager_facing_client(proxy_name)
-        mount_path_result = await manager_client.get_mount_path(
-            volume_name,
-            str(target_vfid),
-            ".",
-        )
-        host_path = PurePosixPath(mount_path_result["path"])
-    except VFolderOperationFailed as e:
-        raise InvalidAPIParameters(
-            f"Cannot resolve overlay target vfolder path: {e.extra_msg}",
-            e.extra_data,
-        ) from None
-    return OverlayTarget(
-        vfolder_id=target_vfid,
-        host_path=host_path,
-    )
-
-
 async def prepare_vfolder_mounts(
     conn: SAConnection,
     storage_manager: StorageSessionManager,
@@ -1185,20 +1147,6 @@ async def prepare_vfolder_mounts(
                     case _:  # None if unset
                         mount_perm = vfolder["permission"]
 
-            # Build overlay_target if mount_mode is overlay
-            overlay_target: OverlayTarget | None = None
-            if mount_opts.mount_mode == MountMode.OVERLAY or (
-                is_cross_project and is_model_store_vfolder
-            ):
-                if mount_opts.overlay_target and mount_opts.overlay_target != "temp":
-                    overlay_target = await _resolve_overlay_target(
-                        conn,
-                        storage_manager,
-                        uuid.UUID(mount_opts.overlay_target),
-                    )
-                else:
-                    overlay_target = OverlayTarget()
-
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
@@ -1208,7 +1156,6 @@ async def prepare_vfolder_mounts(
                     kernel_path=kernel_path,
                     mount_perm=mount_perm,
                     usage_mode=vfolder["usage_mode"],
-                    overlay_target=overlay_target,
                 )
             )
 

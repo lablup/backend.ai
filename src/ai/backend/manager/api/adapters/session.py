@@ -245,8 +245,6 @@ class SessionAdapter(BaseAdapter):
                     vfolder_id=m.vfolder_id,
                     mount_path=m.mount_path,
                     permission=(MountPermission(m.permission) if m.permission else None),
-                    mount_mode=m.mount_mode,
-                    overlay_target_vfolder_id=m.overlay_target_vfolder_id,
                 )
                 for m in input.mounts
             ]

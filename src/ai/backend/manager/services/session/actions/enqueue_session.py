@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.types import AccessKey, ClusterMode, MountMode, MountPermission, SessionTypes
+from ai.backend.common.types import AccessKey, ClusterMode, MountPermission, SessionTypes
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -30,8 +30,6 @@ class VFolderMountItem:
     vfolder_id: uuid.UUID
     mount_path: str | None = None
     permission: MountPermission | None = None
-    mount_mode: MountMode | None = None
-    overlay_target_vfolder_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)

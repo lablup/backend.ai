@@ -1624,8 +1624,6 @@ class ScheduleDBSource:
                     dst_path=requested_mount_map.get(name),
                     options=VFolderMountOptions(
                         permission=raw_opts.get("permission"),
-                        mount_mode=raw_opts.get("mount_mode"),
-                        overlay_target=raw_opts.get("overlay_target"),
                     ),
                 )
             )
@@ -1637,8 +1635,6 @@ class ScheduleDBSource:
                     dst_path=requested_mount_id_map.get(vfid),
                     options=VFolderMountOptions(
                         permission=raw_opts.get("permission"),
-                        mount_mode=raw_opts.get("mount_mode"),
-                        overlay_target=raw_opts.get("overlay_target"),
                     ),
                 )
             )

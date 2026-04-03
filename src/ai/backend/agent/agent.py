@@ -561,38 +561,17 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         vfolders: Sequence[VFolderMount],
         resource_spec: KernelResourceSpec,
     ) -> None:
-        from ai.backend.agent.stage.kernel_lifecycle.docker.mount.overlay import (
-            OverlayMountProvisioner,
-            OverlayMountSpec,
-        )
-
-        overlay_vfolders: list[VFolderMount] = []
         for vfolder in vfolders:
             if self.internal_data.get("prevent_vfolder_mounts", False):
                 if vfolder.name != ".logs":
                     continue
-            if vfolder.overlay_target is not None:
-                overlay_vfolders.append(vfolder)
-            else:
-                mount = Mount(
-                    MountTypes.BIND,
-                    Path(vfolder.host_path),
-                    Path(vfolder.kernel_path),
-                    vfolder.mount_perm,
-                )
-                resource_spec.mounts.append(mount)
-
-        if overlay_vfolders:
-            provisioner = OverlayMountProvisioner()
-            scratch_root = self.local_config.container.scratch_root
-            spec = OverlayMountSpec(
-                overlay_mounts=overlay_vfolders,
-                scratch_root=scratch_root,
-                kernel_id=self.kernel_id,
+            mount = Mount(
+                MountTypes.BIND,
+                Path(vfolder.host_path),
+                Path(vfolder.kernel_path),
+                vfolder.mount_perm,
             )
-            result = await provisioner.setup(spec)
-            resource_spec.mounts.extend(result.mounts)
-            self.overlay_merged_paths = [str(p) for p in result.merged_paths]
+            resource_spec.mounts.append(mount)
 
     async def mount_krunner(
         self,
@@ -3024,8 +3003,6 @@ class AbstractAgent[
                         session_id,
                     )
                     kernel_obj.session_type = kernel_config["session_type"]
-                    if overlay_paths := getattr(ctx, "overlay_merged_paths", None):
-                        kernel_obj["overlay_merged_paths"] = overlay_paths
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id] = kernel_obj
                     log.info(

@@ -622,18 +622,11 @@ class MountTypes(enum.StrEnum):
     K8S_HOSTPATH = "k8s-hostpath"
 
 
-class MountMode(enum.StrEnum):
-    BIND = "bind"
-    OVERLAY = "overlay"
-
-
 @attrs.define(slots=True)
 class VFolderMountOptions:
     """Typed mount options for a single vfolder mount request."""
 
     permission: MountPermission | None = None
-    mount_mode: MountMode | None = None
-    overlay_target: str | None = None  # UUID string or "temp"
 
 
 @attrs.define(slots=True)
@@ -1323,19 +1316,6 @@ class VFolderUsageMode(CIStrEnum):
     DATA = "data"
 
 
-class OverlayTarget(BaseModel):
-    """Writable layer for overlay mount.
-
-    If vfolder_id is None, agent creates a temporary directory (deleted on session end).
-    If vfolder_id is set, the specified vfolder is used as the writable layer (persisted).
-    """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    vfolder_id: VFolderID | None = None
-    host_path: PurePosixPath | None = None
-
-
 @attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):
     name: str
@@ -1345,10 +1325,9 @@ class VFolderMount(JSONSerializableMixin):
     kernel_path: PurePosixPath
     mount_perm: MountPermission
     usage_mode: VFolderUsageMode
-    overlay_target: OverlayTarget | None = None
 
     def to_json(self) -> dict[str, Any]:
-        result: dict[str, Any] = {
+        return {
             "name": self.name,
             "vfid": str(self.vfid),
             "vfsubpath": str(self.vfsubpath),
@@ -1357,30 +1336,11 @@ class VFolderMount(JSONSerializableMixin):
             "mount_perm": self.mount_perm.value,
             "usage_mode": self.usage_mode.value,
         }
-        if self.overlay_target is not None:
-            result["overlay_target"] = {
-                "vfolder_id": str(self.overlay_target.vfolder_id)
-                if self.overlay_target.vfolder_id
-                else None,
-                "host_path": str(self.overlay_target.host_path)
-                if self.overlay_target.host_path
-                else None,
-            }
-        return result
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
         base = cls.as_trafaret().check(obj)
-        base.pop("overlay_target", None)
-        overlay_target: OverlayTarget | None = None
-        if overlay_raw := obj.get("overlay_target"):
-            vfolder_id_raw = overlay_raw.get("vfolder_id")
-            host_path_raw = overlay_raw.get("host_path")
-            overlay_target = OverlayTarget(
-                vfolder_id=VFolderID.from_str(vfolder_id_raw) if vfolder_id_raw else None,
-                host_path=PurePosixPath(host_path_raw) if host_path_raw else None,
-            )
-        return cls(**base, overlay_target=overlay_target)
+        return cls(**base)
 
     @classmethod
     def from_dataclass(cls, obj: VFolderMountData) -> Self:
@@ -1420,7 +1380,6 @@ class VFolderMount(JSONSerializableMixin):
             t.Key("mount_perm"): tx.Enum(MountPermission),
             t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null
             | tx.Enum(VFolderUsageMode),
-            t.Key("overlay_target", optional=True, default=None): t.Null | t.Any,
         })
 
 

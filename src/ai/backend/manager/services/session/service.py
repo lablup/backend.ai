@@ -1623,10 +1623,6 @@ class SessionService:
                 opts: dict[str, str] = {}
                 if item.permission is not None:
                     opts["permission"] = item.permission.value
-                if item.mount_mode is not None:
-                    opts["mount_mode"] = item.mount_mode.value
-                if item.overlay_target_vfolder_id is not None:
-                    opts["overlay_target"] = str(item.overlay_target_vfolder_id)
                 if opts:
                     mount_options[item.vfolder_id] = opts
 
