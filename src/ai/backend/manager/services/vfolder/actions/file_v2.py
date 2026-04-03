@@ -130,6 +130,8 @@ class DeleteFilesV2Action(_VFolderFileV2ActionBase):
 
 @dataclass
 class DeleteFilesV2ActionResult(BaseActionResult):
+    bgtask_id: str = ""
+
     @override
     def entity_id(self) -> str | None:
         return None

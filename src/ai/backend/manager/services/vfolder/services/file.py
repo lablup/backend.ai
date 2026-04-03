@@ -531,14 +531,15 @@ class VFolderFileService:
             quota_scope_id=vfolder_data.quota_scope_id,
             folder_id=vfolder_data.id,
         )
-        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
-        await manager_client.delete_files(
-            volume_name,
-            str(vfolder_id),
-            action.files,
-            action.recursive,
+        request = FileDeleteAsyncRequest(
+            volume=volume_name,
+            vfid=vfolder_id,
+            relpaths=[PurePosixPath(f) for f in action.files],
+            recursive=action.recursive,
         )
-        return DeleteFilesV2ActionResult()
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        response = await manager_client.delete_files_async(request)
+        return DeleteFilesV2ActionResult(bgtask_id=str(response.bgtask_id))
 
     async def download_file_v2(
         self, action: CreateDownloadSessionV2Action

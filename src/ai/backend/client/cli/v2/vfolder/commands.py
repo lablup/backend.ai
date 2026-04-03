@@ -177,7 +177,7 @@ def purge(vfolder_id: UUID) -> None:
 
 @vfolder.command()
 @click.argument("vfolder_id", type=click.UUID)
-@click.option("--path", default=".", help="Directory path to list.")
+@click.argument("path", type=str)
 def ls(vfolder_id: UUID, path: str) -> None:
     """List files in a vfolder."""
 
@@ -282,9 +282,12 @@ def download(vfolder_id: UUID, path: str, archive: bool) -> None:
 
 @vfolder.command()
 @click.argument("vfolder_id", type=click.UUID)
-@click.option("--target-name", required=True, help="Name for the cloned vfolder.")
-@click.option("--target-host", default=None, help="Target storage host.")
-def clone(vfolder_id: UUID, target_name: str, target_host: str | None) -> None:
+@click.option("--name", required=True, help="Name for the cloned vfolder.")
+@click.option("--host", default=None, help="Target storage host.")
+@click.option(
+    "--project-id", default=None, type=click.UUID, help="Project ID for project-owned clone."
+)
+def clone(vfolder_id: UUID, name: str, host: str | None, project_id: UUID | None) -> None:
     """Clone a vfolder."""
 
     from ai.backend.common.dto.manager.v2.vfolder.request import CloneVFolderInput
@@ -293,9 +296,9 @@ def clone(vfolder_id: UUID, target_name: str, target_host: str | None) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             request = CloneVFolderInput(
-                source_id=vfolder_id,
-                target_name=target_name,
-                target_host=target_host,
+                name=name,
+                host=host,
+                project_id=project_id,
             )
             result = await registry.vfolder.clone(vfolder_id, request)
             print_result(result)

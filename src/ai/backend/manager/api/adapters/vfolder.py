@@ -263,7 +263,7 @@ class VFolderAdapter(BaseAdapter):
             name=input.name,
             user_id=me.user_id,
             domain_name=me.domain_name,
-            project_id=input.group_id,
+            project_id=input.project_id,
             host=input.host,
             usage_mode=VFolderUsageMode(input.usage_mode.value),
             permission=VFolderPermission(input.permission.value),
@@ -335,9 +335,9 @@ class VFolderAdapter(BaseAdapter):
                     name=f.name,
                     type=f.type,
                     size=f.size,
-                    mode=str(f.mode),
-                    created=str(f.created),
-                    modified=str(f.modified),
+                    mode=f.mode,
+                    created_at=str(f.created),
+                    updated_at=str(f.modified),
                 )
                 for f in result.files
             ]
@@ -368,7 +368,7 @@ class VFolderAdapter(BaseAdapter):
             user_id=me.user_id, vfolder_id=vfolder_id, src=input.src, dst=input.dst
         )
         await self._processors.vfolder_file.move_file_v2.wait_for_complete(action)
-        return MoveFilePayload()
+        return MoveFilePayload(src=input.src, dst=input.dst)
 
     async def delete_files(self, vfolder_id: UUID, input: DeleteFilesInput) -> DeleteFilesPayload:
         """Delete files in a vfolder."""
@@ -381,8 +381,8 @@ class VFolderAdapter(BaseAdapter):
             files=input.files,
             recursive=input.recursive,
         )
-        await self._processors.vfolder_file.delete_files_v2.wait_for_complete(action)
-        return DeleteFilesPayload()
+        result = await self._processors.vfolder_file.delete_files_v2.wait_for_complete(action)
+        return DeleteFilesPayload(bgtask_id=result.bgtask_id)
 
     async def create_download_session(
         self, vfolder_id: UUID, input: CreateDownloadSessionInput
@@ -408,8 +408,8 @@ class VFolderAdapter(BaseAdapter):
         action = CloneVFolderV2Action(
             user_id=me.user_id,
             vfolder_id=vfolder_id,
-            target_name=input.target_name,
-            target_host=input.target_host,
+            target_name=input.name,
+            target_host=input.host,
         )
         result = await self._processors.vfolder.clone_v2.wait_for_complete(action)
         # Fetch the newly created vfolder for the response

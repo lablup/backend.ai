@@ -12,6 +12,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 from .types import (
+    FileEntryType,
     VFolderAccessControlInfo,
     VFolderInvitationState,
     VFolderMetadataInfo,
@@ -95,11 +96,11 @@ class FileEntryNode(BaseResponseModel):
     """Node model representing a file entry inside a virtual folder."""
 
     name: str = Field(description="File or directory name")
-    type: str = Field(description="Entry type (file or directory)")
+    type: FileEntryType = Field(description="Entry type")
     size: int = Field(description="File size in bytes")
-    mode: str = Field(description="File permission mode string")
-    created: str = Field(description="Creation timestamp string")
-    modified: str = Field(description="Last modification timestamp string")
+    mode: int = Field(description="POSIX file permission mode (e.g., 33188 for 0o100644)")
+    created_at: str = Field(description="Creation timestamp")
+    updated_at: str = Field(description="Last modification timestamp")
 
 
 # ============================================================
@@ -172,15 +173,14 @@ class CreateUploadSessionPayload(BaseResponseModel):
 class MoveFilePayload(BaseResponseModel):
     """Payload for file move mutation result."""
 
-    success: bool = Field(default=True, description="Whether the file move succeeded")
+    src: str = Field(description="Source path that was moved")
+    dst: str = Field(description="Destination path")
 
 
 class DeleteFilesPayload(BaseResponseModel):
-    """Payload for file deletion mutation result."""
+    """Payload for async file deletion. Always runs as a background task."""
 
-    bgtask_id: str | None = Field(
-        default=None, description="Background task ID if deletion is async"
-    )
+    bgtask_id: str = Field(description="Background task ID for the deletion operation")
 
 
 class ListFilesPayload(BaseResponseModel):
