@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator, Generator
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from aiohttp import web
@@ -48,11 +48,15 @@ class TestGraphQLTransportWSHandler:
         return conn
 
     @pytest.fixture
-    def mock_subs(self) -> AsyncMock:
-        return AsyncMock()
+    def mock_subs(self) -> MagicMock:
+        subs = MagicMock()
+        subs.start = AsyncMock()
+        subs.cancel = Mock()
+        subs.cancel_all = AsyncMock()
+        return subs
 
     @pytest.fixture(autouse=True)
-    def _patch_handler(self, mock_conn: AsyncMock, mock_subs: AsyncMock) -> Generator[None]:
+    def _patch_handler(self, mock_conn: AsyncMock, mock_subs: MagicMock) -> Generator[None]:
         with (
             patch(
                 "ai.backend.manager.api.gql.graphql_ws.handler.GraphQLWSConnection.open",
@@ -84,7 +88,7 @@ class TestGraphQLTransportWSHandler:
         handler: GraphQLTransportWSHandler,
         request_ctx: MagicMock,
         mock_conn: AsyncMock,
-        mock_subs: AsyncMock,
+        mock_subs: MagicMock,
     ) -> None:
         msg = SubscribeMessage(
             type=GQLWSMessageType.SUBSCRIBE,
@@ -103,7 +107,7 @@ class TestGraphQLTransportWSHandler:
         handler: GraphQLTransportWSHandler,
         request_ctx: MagicMock,
         mock_conn: AsyncMock,
-        mock_subs: AsyncMock,
+        mock_subs: MagicMock,
     ) -> None:
         msg = ClientCompleteMessage(type=GQLWSMessageType.COMPLETE, id="1")
         mock_conn.receiver.__aiter__ = lambda self: _async_iter_from([msg])
@@ -130,7 +134,7 @@ class TestGraphQLTransportWSHandler:
         handler: GraphQLTransportWSHandler,
         request_ctx: MagicMock,
         mock_conn: AsyncMock,
-        mock_subs: AsyncMock,
+        mock_subs: MagicMock,
     ) -> None:
         async def _exploding_iter(_err: bool = True) -> AsyncIterator[Any]:
             if _err:
