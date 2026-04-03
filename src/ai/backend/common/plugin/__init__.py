@@ -46,6 +46,13 @@ class AbstractPlugin(metaclass=ABCMeta):
     the etcd's plugin configuration changes via the ``update_plugin_config()`` method.
     """
 
+    require_explicit_allow: ClassVar[bool] = False
+    """
+    If set True, this plugin will only be loaded when explicitly listed in the
+    ``allowed_plugins`` configuration. When the allowlist is None (load all discovered
+    plugins), plugins with this flag set will be skipped.
+    """
+
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         """
         Instantiate the plugin with the given initial configuration.
