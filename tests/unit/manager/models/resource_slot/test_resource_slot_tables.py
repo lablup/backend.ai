@@ -13,7 +13,9 @@ from decimal import Decimal
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.orm import selectinload
 
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     NumberFormat,
@@ -473,3 +475,117 @@ class TestResourceAllocationRow:
             assert row is not None
             assert row.requested == one_tib
             assert row.used == one_tib
+
+
+class TestActualOccupiedSlotsOrdering:
+    """Tests that actual_occupied_slots() returns slots sorted by resource_slot_types.rank."""
+
+    async def test_occupied_slots_sorted_by_rank(
+        self,
+        database_with_resource_slot_tables: ExtendedAsyncSAEngine,
+        agent_id: str,
+    ) -> None:
+        """Slots with lower rank appear first in the returned ResourceSlot."""
+        async with database_with_resource_slot_tables.begin_session() as db_sess:
+            db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=10))
+            db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=20))
+            db_sess.add(ResourceSlotTypeRow(slot_name="cuda.shares", slot_type="count", rank=30))
+            await db_sess.flush()
+
+        async with database_with_resource_slot_tables.begin_session() as db_sess:
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=agent_id,
+                    slot_name="cuda.shares",
+                    capacity=Decimal("8"),
+                    used=Decimal("4"),
+                )
+            )
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=agent_id,
+                    slot_name="mem",
+                    capacity=Decimal("2199023255552"),
+                    used=Decimal("1031310745600"),
+                )
+            )
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=agent_id,
+                    slot_name="cpu",
+                    capacity=Decimal("222"),
+                    used=Decimal("49"),
+                )
+            )
+            await db_sess.flush()
+
+        async with database_with_resource_slot_tables.begin_readonly_session() as db_sess:
+            agent_row = await db_sess.scalar(
+                sa.select(AgentRow)
+                .where(AgentRow.id == agent_id)
+                .options(
+                    selectinload(AgentRow.agent_resource_rows).joinedload(
+                        AgentResourceRow.slot_type_row
+                    )
+                )
+            )
+            assert agent_row is not None
+            occupied = agent_row.actual_occupied_slots()
+
+        slot_keys = list(occupied.keys())
+        assert slot_keys == ["cpu", "mem", "cuda.shares"]
+
+    async def test_occupied_slots_sorted_by_rank_reversed(
+        self,
+        database_with_resource_slot_tables: ExtendedAsyncSAEngine,
+        agent_id: str,
+    ) -> None:
+        """When rank order differs from alphabetical, rank wins."""
+        async with database_with_resource_slot_tables.begin_session() as db_sess:
+            db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=1))
+            db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=2))
+            db_sess.add(ResourceSlotTypeRow(slot_name="cuda.shares", slot_type="count", rank=3))
+            await db_sess.flush()
+
+        async with database_with_resource_slot_tables.begin_session() as db_sess:
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=agent_id,
+                    slot_name="cpu",
+                    capacity=Decimal("4"),
+                    used=Decimal("2"),
+                )
+            )
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=agent_id,
+                    slot_name="cuda.shares",
+                    capacity=Decimal("8"),
+                    used=Decimal("0"),
+                )
+            )
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=agent_id,
+                    slot_name="mem",
+                    capacity=Decimal("4294967296"),
+                    used=Decimal("1073741824"),
+                )
+            )
+            await db_sess.flush()
+
+        async with database_with_resource_slot_tables.begin_readonly_session() as db_sess:
+            agent_row = await db_sess.scalar(
+                sa.select(AgentRow)
+                .where(AgentRow.id == agent_id)
+                .options(
+                    selectinload(AgentRow.agent_resource_rows).joinedload(
+                        AgentResourceRow.slot_type_row
+                    )
+                )
+            )
+            assert agent_row is not None
+            occupied = agent_row.actual_occupied_slots()
+
+        slot_keys = list(occupied.keys())
+        assert slot_keys == ["mem", "cpu", "cuda.shares"]
