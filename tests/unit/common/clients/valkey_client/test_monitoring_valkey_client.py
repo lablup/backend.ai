@@ -308,7 +308,7 @@ class TestMonitoringValkeyClientAcquire:
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         """Test that failures below threshold do NOT trigger reconnection."""
-        threshold = monitoring_client._consecutive_failure_threshold
+        threshold = monitoring_client._spec.consecutive_failure_threshold
 
         # Simulate failures up to threshold - 1
         for i in range(threshold - 1):
@@ -326,7 +326,7 @@ class TestMonitoringValkeyClientAcquire:
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         """Test that reaching the failure threshold resets counter and triggers reconnection."""
-        threshold = monitoring_client._consecutive_failure_threshold
+        threshold = monitoring_client._spec.consecutive_failure_threshold
 
         # Set failure count just below threshold
         monitoring_client._operation_failure_count = threshold - 1
@@ -346,7 +346,7 @@ class TestMonitoringValkeyClientAcquire:
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         """Test that after threshold-triggered reconnection, the client is operational."""
-        threshold = monitoring_client._consecutive_failure_threshold
+        threshold = monitoring_client._spec.consecutive_failure_threshold
 
         # Force disconnect the operation client to cause real connection errors
         await monitoring_client._operation_client.disconnect()

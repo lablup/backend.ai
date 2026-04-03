@@ -2,7 +2,7 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterable
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Final, Self
 
@@ -140,17 +140,16 @@ class AbstractValkeyClient(ABC):
         """
         raise NotImplementedError
 
-    @asynccontextmanager
-    async def acquire(self) -> AsyncIterator[GlideClient]:
+    @abstractmethod
+    def acquire(self) -> AbstractAsyncContextManager[GlideClient]:
         """
         Acquire the client for an operation.
 
-        This context manager wraps client operations and tracks consecutive
-        connection failures. The base implementation simply yields the client.
+        This context manager wraps client operations.
         MonitoringValkeyClient overrides this to add failure tracking and
         automatic reconnection when the failure threshold is exceeded.
         """
-        yield self.client
+        raise NotImplementedError
 
 
 class ValkeyStandaloneClient(AbstractValkeyClient):
@@ -244,6 +243,10 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
 
     async def need_reconnect(self) -> bool:
         return self._valkey_client is None
+
+    @asynccontextmanager
+    async def acquire(self) -> AsyncIterator[GlideClient]:
+        yield self.client
 
 
 class ValkeySentinelClient(AbstractValkeyClient):
@@ -387,6 +390,10 @@ class ValkeySentinelClient(AbstractValkeyClient):
 
         return current_master != self._master_address
 
+    @asynccontextmanager
+    async def acquire(self) -> AsyncIterator[GlideClient]:
+        yield self.client
+
 
 def _create_valkey_client_internal(
     valkey_target: ValkeyTarget,
@@ -439,6 +446,23 @@ def create_valkey_client(
     return MonitoringValkeyClient(operation_client, monitor_client)
 
 
+@dataclass(frozen=True)
+class MonitoringValkeyClientSpec:
+    """Configuration for MonitoringValkeyClient."""
+
+    reconnectable_exceptions: tuple[type[Exception], ...] = (
+        ClosingError,
+        ClientNotConnectedError,
+    )
+    """Exception types that indicate a broken connection requiring immediate reconnection."""
+
+    consecutive_failure_threshold: int = _DEFAULT_CONSECUTIVE_FAILURE_THRESHOLD
+    """Number of consecutive failures before triggering reconnection."""
+
+    monitor_interval: float = _DEFAULT_MONITOR_INTERVAL
+    """Interval in seconds between health check pings."""
+
+
 class MonitoringValkeyClient(AbstractValkeyClient):
     """
     Valkey client wrapper with separated monitor client for health checks.
@@ -453,9 +477,8 @@ class MonitoringValkeyClient(AbstractValkeyClient):
 
     _operation_client: AbstractValkeyClient
     _monitor_client: AbstractValkeyClient
+    _spec: MonitoringValkeyClientSpec
     _monitor_task: asyncio.Task[None] | None
-    _reconnectable_exceptions: tuple[type[Exception], ...]
-    _consecutive_failure_threshold: int
     _consecutive_failure_count: int
     _operation_failure_count: int
 
@@ -463,17 +486,12 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self,
         operation_client: AbstractValkeyClient,
         monitor_client: AbstractValkeyClient,
-        reconnectable_exceptions: tuple[type[Exception], ...] = (
-            ClosingError,
-            ClientNotConnectedError,
-        ),
-        consecutive_failure_threshold: int = _DEFAULT_CONSECUTIVE_FAILURE_THRESHOLD,
+        spec: MonitoringValkeyClientSpec | None = None,
     ) -> None:
         self._operation_client = operation_client
         self._monitor_client = monitor_client
+        self._spec = spec or MonitoringValkeyClientSpec()
         self._monitor_task = None
-        self._reconnectable_exceptions = reconnectable_exceptions
-        self._consecutive_failure_threshold = consecutive_failure_threshold
         self._consecutive_failure_count = 0
         self._operation_failure_count = 0
         self._closed = False
@@ -529,12 +547,12 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             log.warning(
                 "Operation connection error (consecutive failures: {}/{})",
                 self._operation_failure_count,
-                self._consecutive_failure_threshold,
+                self._spec.consecutive_failure_threshold,
             )
-            if self._operation_failure_count >= self._consecutive_failure_threshold:
+            if self._operation_failure_count >= self._spec.consecutive_failure_threshold:
                 log.warning(
                     "Operation failure threshold reached ({}), triggering reconnection...",
-                    self._consecutive_failure_threshold,
+                    self._spec.consecutive_failure_threshold,
                 )
                 self._operation_failure_count = 0
                 await self._reconnect()
@@ -549,7 +567,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         Returns:
             True if reconnection is needed, False otherwise.
         """
-        reconnectable_exceptions = self._reconnectable_exceptions
+        reconnectable_exceptions = self._spec.reconnectable_exceptions
         try:
             await self._monitor_client.ping()
             self._consecutive_failure_count = 0
@@ -563,13 +581,13 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             log.warning(
                 "Error in connection monitoring (consecutive failures: {}/{}): {}",
                 self._consecutive_failure_count,
-                self._consecutive_failure_threshold,
+                self._spec.consecutive_failure_threshold,
                 e,
             )
-            if self._consecutive_failure_count >= self._consecutive_failure_threshold:
+            if self._consecutive_failure_count >= self._spec.consecutive_failure_threshold:
                 log.warning(
                     "Consecutive failure threshold reached ({}), reconnecting...",
-                    self._consecutive_failure_threshold,
+                    self._spec.consecutive_failure_threshold,
                 )
                 self._consecutive_failure_count = 0
                 return True
@@ -596,7 +614,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         try:
             while True:
                 try:
-                    await asyncio.sleep(_DEFAULT_MONITOR_INTERVAL)
+                    await asyncio.sleep(self._spec.monitor_interval)
                     if await self._check_connection():
                         log.info("Reconnecting Valkey clients...")
                         await self._reconnect()
