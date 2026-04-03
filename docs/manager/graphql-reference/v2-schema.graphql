@@ -1384,6 +1384,21 @@ input CheckPresetAvailabilityV2Input {
   resourceGroupName: String!
 }
 
+"""Added in UNRELEASED. Choice item."""
+type ChoiceItem {
+  """Option value."""
+  value: String!
+
+  """Display label."""
+  label: String!
+}
+
+"""Added in UNRELEASED. Select/radio UI config."""
+type ChoiceOption {
+  """List of choices."""
+  items: [ChoiceItem!]!
+}
+
 """
 Added in 24.09.0. Input for cleaning up stored artifact revision data.
 
@@ -6262,6 +6277,15 @@ type NumberFormat {
   roundLength: Int!
 }
 
+"""Added in UNRELEASED. Number input UI config."""
+type NumberOption {
+  """Minimum value."""
+  min: Float
+
+  """Maximum value."""
+  max: Float
+}
+
 """Added in 25.14.0. Object storage node."""
 type ObjectStorage implements Node {
   """The Globally Unique ID of this object"""
@@ -9287,6 +9311,9 @@ type RuntimeVariantPreset implements Node {
   """Human-readable display label for the UI."""
   displayName: String
 
+  """UI rendering options."""
+  uiOption: UIOption
+
   """Timestamp when this preset was created."""
   createdAt: DateTime!
 
@@ -9952,6 +9979,18 @@ enum SessionV2Type {
   SYSTEM
 }
 
+"""Added in UNRELEASED. Slider UI config."""
+type SliderOption {
+  """Minimum value."""
+  min: Float!
+
+  """Maximum value."""
+  max: Float!
+
+  """Increment step."""
+  step: Float!
+}
+
 """
 Added in 25.14.0. Information about the source or registry of an artifact. Contains the name and URL of the registry where the artifact is stored or originates from.
 """
@@ -10117,6 +10156,12 @@ type TerminateSessionsPayload {
   skipped: [ID!]!
 }
 
+"""Added in UNRELEASED. Text input UI config."""
+type TextOption {
+  """Placeholder text."""
+  placeholder: String
+}
+
 """
 Added in 25.19.0. This enum represents the traffic status of a replica.
 """
@@ -10130,6 +10175,24 @@ input TrafficStatusFilter {
   """The in  field."""
   in: [TrafficStatus!] = null
   equals: TrafficStatus = null
+}
+
+"""Added in UNRELEASED. UI rendering options."""
+type UIOption {
+  """UI render type."""
+  uiType: String!
+
+  """Slider config."""
+  slider: SliderOption
+
+  """Number input config."""
+  number: NumberOption
+
+  """Select/radio config."""
+  choices: ChoiceOption
+
+  """Text input config."""
+  text: TextOption
 }
 
 scalar UUID

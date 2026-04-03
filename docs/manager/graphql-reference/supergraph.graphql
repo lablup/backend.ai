@@ -2028,6 +2028,25 @@ input CheckPresetAvailabilityV2Input
   resourceGroupName: String!
 }
 
+"""Added in UNRELEASED. Choice item."""
+type ChoiceItem
+  @join__type(graph: STRAWBERRY)
+{
+  """Option value."""
+  value: String!
+
+  """Display label."""
+  label: String!
+}
+
+"""Added in UNRELEASED. Select/radio UI config."""
+type ChoiceOption
+  @join__type(graph: STRAWBERRY)
+{
+  """List of choices."""
+  items: [ChoiceItem!]!
+}
+
 """
 Added in 24.09.0. Input for cleaning up stored artifact revision data.
 
@@ -10271,6 +10290,17 @@ type NumberFormat
   roundLength: Int!
 }
 
+"""Added in UNRELEASED. Number input UI config."""
+type NumberOption
+  @join__type(graph: STRAWBERRY)
+{
+  """Minimum value."""
+  min: Float
+
+  """Maximum value."""
+  max: Float
+}
+
 """Added in 25.14.0. Object storage node."""
 type ObjectStorage implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -14332,6 +14362,9 @@ type RuntimeVariantPreset implements Node
   """Human-readable display label for the UI."""
   displayName: String
 
+  """UI rendering options."""
+  uiOption: UIOption
+
   """Timestamp when this preset was created."""
   createdAt: DateTime!
 
@@ -15269,6 +15302,20 @@ type SetQuotaScope
   quota_scope: QuotaScope
 }
 
+"""Added in UNRELEASED. Slider UI config."""
+type SliderOption
+  @join__type(graph: STRAWBERRY)
+{
+  """Minimum value."""
+  min: Float!
+
+  """Maximum value."""
+  max: Float!
+
+  """Increment step."""
+  step: Float!
+}
+
 """Added in 24.09.0. Input for SMTP authentication credentials"""
 input SMTPAuthInput
   @join__type(graph: STRAWBERRY)
@@ -15505,6 +15552,14 @@ type TerminateSessionsPayload
   skipped: [ID!]!
 }
 
+"""Added in UNRELEASED. Text input UI config."""
+type TextOption
+  @join__type(graph: STRAWBERRY)
+{
+  """Placeholder text."""
+  placeholder: String
+}
+
 """Added in 25.5.0."""
 type TotalResourceSlot implements Item
   @join__implements(graph: GRAPHENE, interface: "Item")
@@ -15532,6 +15587,26 @@ input TrafficStatusFilter
   """The in  field."""
   in: [TrafficStatus!] = null
   equals: TrafficStatus = null
+}
+
+"""Added in UNRELEASED. UI rendering options."""
+type UIOption
+  @join__type(graph: STRAWBERRY)
+{
+  """UI render type."""
+  uiType: String!
+
+  """Slider config."""
+  slider: SliderOption
+
+  """Number input config."""
+  number: NumberOption
+
+  """Select/radio config."""
+  choices: ChoiceOption
+
+  """Text input config."""
+  text: TextOption
 }
 
 """
