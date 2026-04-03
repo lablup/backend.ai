@@ -39,7 +39,6 @@ from ai.backend.manager.repositories.permission_controller.role_manager import (
     UserSystemRoleSpec,
 )
 
-from . import __version__
 from .config import OIDCWebAppConfig
 from .valkey_client import ValkeyOpenIDClient
 
@@ -53,7 +52,7 @@ class OpenIDError(Exception):
 
 
 async def ping(_request: web.Request) -> web.Response:
-    return web.Response(status=200, body=f"Backend.AI OpenID Connect SSO plugin ({__version__}).")
+    return web.Response(status=200, body="Backend.AI OpenID Connect SSO plugin.")
 
 
 def generate_random_string(length: int = 10) -> str:
