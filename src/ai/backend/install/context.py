@@ -462,7 +462,11 @@ class Context(metaclass=ABCMeta):
         self.os_info = await detect_os()
         text = Text()
         text.append("Detetced OS info: ")
-        text.append(str(self.os_info.__rich__()))
+        os_info_text = self.os_info.__rich__()
+        if isinstance(os_info_text, Text):
+            text.append_text(os_info_text)
+        else:
+            text.append(str(os_info_text))
         self.log.write(text)
         if "LiveCD" in self.os_info.distro_variants:
             self.log.write(
