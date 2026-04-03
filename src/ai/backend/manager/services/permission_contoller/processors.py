@@ -34,6 +34,10 @@ from .actions.get_entity_types import (
     GetEntityTypesAction,
     GetEntityTypesActionResult,
 )
+from .actions.get_permission_matrix import (
+    GetPermissionMatrixAction,
+    GetPermissionMatrixActionResult,
+)
 from .actions.get_scope_types import (
     GetScopeTypesAction,
     GetScopeTypesActionResult,
@@ -88,6 +92,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     search_scopes: ActionProcessor[SearchScopesAction, SearchScopesActionResult]
     get_scope_types: ActionProcessor[GetScopeTypesAction, GetScopeTypesActionResult]
     get_entity_types: ActionProcessor[GetEntityTypesAction, GetEntityTypesActionResult]
+    get_permission_matrix: ActionProcessor[
+        GetPermissionMatrixAction, GetPermissionMatrixActionResult
+    ]
     search_entities: ActionProcessor[SearchEntitiesAction, SearchEntitiesActionResult]
     search_element_associations: ActionProcessor[
         SearchElementAssociationsAction, SearchElementAssociationsActionResult
@@ -122,6 +129,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.search_scopes = ActionProcessor(service.search_scopes, action_monitors)
         self.get_scope_types = ActionProcessor(service.get_scope_types, action_monitors)
         self.get_entity_types = ActionProcessor(service.get_entity_types, action_monitors)
+        self.get_permission_matrix = ActionProcessor(service.get_permission_matrix, action_monitors)
         self.search_entities = ActionProcessor(service.search_entities, action_monitors)
         self.search_element_associations = ActionProcessor(
             service.search_element_associations, action_monitors
@@ -149,6 +157,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             SearchScopesAction.spec(),
             GetScopeTypesAction.spec(),
             GetEntityTypesAction.spec(),
+            GetPermissionMatrixAction.spec(),
             SearchEntitiesAction.spec(),
             SearchElementAssociationsAction.spec(),
             SearchPermissionsAction.spec(),

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, cast, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
@@ -90,6 +91,10 @@ from ai.backend.manager.services.deployment.actions.search_deployments import (
     SearchDeploymentsAction,
     SearchDeploymentsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.search_deployments_in_project import (
+    SearchDeploymentsInProjectAction,
+    SearchDeploymentsInProjectActionResult,
+)
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
     SearchReplicasActionResult,
@@ -118,6 +123,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
     update_deployment: ActionProcessor[UpdateDeploymentAction, UpdateDeploymentActionResult]
     destroy_deployment: ActionProcessor[DestroyDeploymentAction, DestroyDeploymentActionResult]
     search_deployments: ActionProcessor[SearchDeploymentsAction, SearchDeploymentsActionResult]
+    search_deployments_in_project: ActionProcessor[
+        SearchDeploymentsInProjectAction, SearchDeploymentsInProjectActionResult
+    ]
     get_deployment_by_id: ActionProcessor[GetDeploymentByIdAction, GetDeploymentByIdActionResult]
     get_deployment_policy: ActionProcessor[
         GetDeploymentPolicyAction, GetDeploymentPolicyActionResult
@@ -179,6 +187,11 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.update_deployment = ActionProcessor(service.update_deployment, action_monitors)
         self.destroy_deployment = ActionProcessor(service.destroy_deployment, action_monitors)
         self.search_deployments = ActionProcessor(service.search_deployments, action_monitors)
+        self.search_deployments_in_project = ActionProcessor(
+            service.search_deployments_in_project,
+            action_monitors,
+            validators=[cast(ActionValidator, validators.rbac.scope)],
+        )
         self.get_deployment_by_id = ActionProcessor(service.get_deployment_by_id, action_monitors)
         self.get_deployment_policy = ActionProcessor(service.get_deployment_policy, action_monitors)
         self.search_deployment_policies = ActionProcessor(
@@ -233,6 +246,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             UpdateDeploymentAction.spec(),
             DestroyDeploymentAction.spec(),
             SearchDeploymentsAction.spec(),
+            SearchDeploymentsInProjectAction.spec(),
             GetDeploymentByIdAction.spec(),
             GetDeploymentPolicyAction.spec(),
             SearchDeploymentPoliciesAction.spec(),

@@ -13,6 +13,7 @@ from .permission import (
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
+    EntityActionInfoGQL,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
     OperationTypeGQL,
@@ -25,6 +26,7 @@ from .permission import (
     PermissionOrderField,
     RBACElementTypeGQL,
     ScopeEntityCombinationGQL,
+    ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
 )
 from .role import (
@@ -129,4 +131,7 @@ __all__ = [
     # Entity-operation combination
     "EntityOperationCombinationGQL",
     "OperationInfoGQL",
+    # Scope-entity-operation combination (permission matrix)
+    "EntityActionInfoGQL",
+    "ScopeEntityOperationCombinationGQL",
 ]

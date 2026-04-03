@@ -1,13 +1,23 @@
 """Endpoint and route data types for deployment repository."""
 
+from __future__ import annotations
+
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
+from uuid import UUID
+
+import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.repositories.base.types import ExistenceCheck, QueryCondition, SearchScope
 
 
 @dataclass
@@ -76,3 +86,31 @@ class RouteServiceDiscoveryInfo:
     kernel_port: int
     session_owner: uuid.UUID
     project: uuid.UUID
+
+
+@dataclass(frozen=True)
+class ProjectDeploymentSearchScope(SearchScope):
+    """Required scope for searching endpoints within a project.
+
+    Used for project-scoped deployment search (project admin).
+    """
+
+    project_id: UUID
+
+    def to_condition(self) -> QueryCondition:
+        project_id = self.project_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.project == project_id
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        return [
+            ExistenceCheck(
+                column=GroupRow.id,
+                value=self.project_id,
+                error=ProjectNotFound(str(self.project_id)),
+            ),
+        ]
