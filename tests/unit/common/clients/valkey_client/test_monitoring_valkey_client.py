@@ -370,24 +370,17 @@ class TestMonitoringValkeyClientAcquire:
         test_errors: list[type[Exception]] = [
             ConnectionError,
             OSError,
+            ClientNotConnectedError,
         ]
 
-        for i, error_type in enumerate(test_errors):
+        for error_type in test_errors:
+            monitoring_client._operation_failure_count = 0
+
             with pytest.raises(error_type):
                 async with monitoring_client.acquire() as _conn:
                     raise error_type(f"test {error_type.__name__}")
 
-            assert monitoring_client._operation_failure_count == i + 1
-
-    async def test_acquire_client_not_connected_error_tracked(
-        self, monitoring_client: MonitoringValkeyClient
-    ) -> None:
-        """Test that ClientNotConnectedError is tracked as a connection error."""
-        with pytest.raises(ClientNotConnectedError):
-            async with monitoring_client.acquire() as _conn:
-                raise ClientNotConnectedError("not connected")
-
-        assert monitoring_client._operation_failure_count == 1
+            assert monitoring_client._operation_failure_count == 1
 
     async def test_acquire_mixed_success_and_failure(
         self, monitoring_client: MonitoringValkeyClient
