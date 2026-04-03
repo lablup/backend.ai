@@ -5,7 +5,7 @@ from uuid import UUID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.user.types import UserDetail
 from ai.backend.manager.services.user.actions.base import (
     UserSingleEntityAction,
     UserSingleEntityActionResult,
@@ -36,12 +36,12 @@ class GetUserAction(UserSingleEntityAction):
 class GetUserActionResult(UserSingleEntityActionResult):
     """Result of GetUserAction containing user data."""
 
-    user: UserData
+    user: UserDetail
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.user.uuid)
+        return str(self.user.user.uuid)
 
     @override
     def target_entity_id(self) -> str:
-        return str(self.user.uuid)
+        return str(self.user.user.uuid)

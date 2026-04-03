@@ -12,7 +12,7 @@ from dateutil.tz import tzutc
 from sqlalchemy import Row
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, noload
+from sqlalchemy.orm import joinedload, load_only, noload, selectinload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -31,6 +31,8 @@ from ai.backend.manager.data.user.types import (
     BulkUserUpdateResultData,
     UserCreateResultData,
     UserData,
+    UserDetail,
+    UserGroupMembership,
     UserSearchResult,
 )
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
@@ -136,6 +138,31 @@ class UserDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_session:
             user_row = await self._get_user_by_uuid(db_session, user_uuid)
             return user_row.to_data()
+
+    async def get_user_detail_by_uuid(self, user_uuid: UUID) -> UserDetail:
+        """
+        Get user with group memberships by UUID.
+        Used for user detail view.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            query = (
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_uuid)
+                .options(
+                    selectinload(UserRow.groups)
+                    .joinedload(AssocGroupUserRow.group)
+                    .load_only(GroupRow.id, GroupRow.name),
+                )
+            )
+            user_row = await db_session.scalar(query)
+            if user_row is None:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
+            group_memberships = [
+                UserGroupMembership(id=assoc.group.id, name=assoc.group.name)
+                for assoc in user_row.groups
+                if assoc.group is not None
+            ]
+            return UserDetail(user=user_row.to_data(), groups=group_memberships)
 
     async def get_by_email_validated(
         self,
@@ -817,9 +844,14 @@ class UserDBSource:
             raise UserNotFound(f"User with email {email} not found.")
         return res
 
-    async def _get_user_by_uuid(self, session: SASession, user_uuid: UUID) -> UserRow:
+    async def _get_user_by_uuid(
+        self,
+        session: SASession,
+        user_uuid: UUID,
+    ) -> UserRow:
         """Private method to get user by UUID."""
-        res = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
+        query = sa.select(UserRow).where(UserRow.uuid == user_uuid)
+        res = await session.scalar(query)
         if res is None:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return res

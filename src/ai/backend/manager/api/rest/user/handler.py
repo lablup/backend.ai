@@ -125,7 +125,7 @@ class UserHandler:
             GetUserAction(user_uuid=path.parsed.user_id)
         )
 
-        resp = GetUserResponse(user=self._adapter.convert_to_dto(action_result.user))
+        resp = GetUserResponse(user=self._adapter.convert_to_dto(action_result.user.user))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # ------------------------------------------------------------------
@@ -170,7 +170,7 @@ class UserHandler:
         get_result = await self._user.get_user.wait_for_complete(
             GetUserAction(user_uuid=path.parsed.user_id)
         )
-        email = get_result.user.email
+        email = get_result.user.user.email
 
         # Build password info if password is being updated
         password_info: PasswordInfo | None = None
@@ -208,7 +208,7 @@ class UserHandler:
         )
 
         await self._user.delete_user.wait_for_complete(
-            DeleteUserAction(email=get_result.user.email)
+            DeleteUserAction(email=get_result.user.user.email)
         )
 
         resp = DeleteUserResponse(success=True)
@@ -236,9 +236,9 @@ class UserHandler:
         )
 
         user_info_ctx = UserInfoContext(
-            uuid=caller_result.user.uuid,
-            email=caller_result.user.email,
-            main_access_key=AccessKey(caller_result.user.main_access_key or ""),
+            uuid=caller_result.user.user.uuid,
+            email=caller_result.user.user.email,
+            main_access_key=AccessKey(caller_result.user.user.main_access_key or ""),
         )
 
         purge_shared = OptionalState[bool].nop()
@@ -252,7 +252,7 @@ class UserHandler:
             PurgeUserAction(
                 user_uuid=body.parsed.user_id,
                 user_info_ctx=user_info_ctx,
-                email=get_result.user.email,
+                email=get_result.user.user.email,
                 purge_shared_vfolders=purge_shared,
                 delegate_endpoint_ownership=delegate_endpoint,
             )

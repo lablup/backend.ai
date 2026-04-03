@@ -62,6 +62,7 @@ from ai.backend.common.dto.manager.v2.user.response import (
     UpdateUserPayload,
     UserBasicInfo,
     UserContainerSettings,
+    UserGroupMembershipInfo,
     UserNode,
     UserOrganizationInfo,
     UserPayload,
@@ -85,7 +86,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
-from ai.backend.manager.data.user.types import UserData, UserStatus
+from ai.backend.manager.data.user.types import UserData, UserGroupMembership, UserStatus
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
@@ -382,7 +383,8 @@ class UserAdapter(BaseAdapter):
         action_result = await self._processors.user.get_user.wait_for_complete(
             GetUserAction(user_uuid=user_id)
         )
-        return UserPayload(user=self._user_data_to_node(action_result.user))
+        detail = action_result.user
+        return UserPayload(user=self._user_data_to_node(detail.user, groups=detail.groups))
 
     # ------------------------------------------------------------------ single CRUD
 
@@ -1231,7 +1233,11 @@ class UserAdapter(BaseAdapter):
         raise ValueError(f"Unknown order field: {order.field}")
 
     @staticmethod
-    def _user_data_to_node(data: UserData) -> UserNode:
+    def _user_data_to_node(
+        data: UserData,
+        *,
+        groups: list[UserGroupMembership] | None = None,
+    ) -> UserNode:
         """Convert UserData to UserNode DTO."""
         return UserNode(
             id=data.id,
@@ -1268,4 +1274,5 @@ class UserAdapter(BaseAdapter):
                 created_at=data.created_at,
                 modified_at=data.modified_at,
             ),
+            groups=[UserGroupMembershipInfo(id=m.id, name=m.name) for m in (groups or [])],
         )
