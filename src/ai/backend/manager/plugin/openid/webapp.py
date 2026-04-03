@@ -227,7 +227,11 @@ async def update_jwks(app: web.Application, _interval: float) -> None:
 
 class OIDCWebAppPlugin(WebappPlugin):
     async def init(self, context: Any = None) -> None:
-        pass
+        if "openid" not in self.plugin_config:
+            raise OpenIDError(
+                "OpenID plugin is not configured. "
+                "Provide the 'openid' section in the plugin configuration via etcd."
+            )
 
     async def cleanup(self) -> None:
         pass

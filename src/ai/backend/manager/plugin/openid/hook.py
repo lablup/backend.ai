@@ -29,7 +29,11 @@ class OIDCHookPlugin(HookPlugin):
         self.plugin_config = plugin_config
 
     async def init(self, context: Any = None) -> None:
-        pass
+        if "secret" not in self.plugin_config:
+            raise RuntimeError(
+                "OpenID hook plugin is not configured. "
+                "Provide the 'secret' key in the plugin configuration via etcd."
+            )
 
     async def cleanup(self) -> None:
         pass
