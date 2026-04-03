@@ -157,3 +157,47 @@ def deploy(
             await registry.close()
 
     _run_async(_run)
+
+
+@model_card.command(name="available-presets")
+@click.argument("card_id", type=click.UUID)
+@click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
+@click.option("--offset", type=int, default=0, help="Number of items to skip.")
+@click.option("--runtime-variant-id", default=None, type=click.UUID, help="Filter by variant ID.")
+@click.option("--name-contains", default=None, type=str, help="Filter by name substring.")
+def available_presets(
+    card_id: uuid.UUID,
+    limit: int,
+    offset: int,
+    runtime_variant_id: uuid.UUID | None,
+    name_contains: str | None,
+) -> None:
+    """Search available revision presets for a model card."""
+    from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+        DeploymentRevisionPresetFilter,
+        SearchDeploymentRevisionPresetsInput,
+    )
+
+    filter_dto: DeploymentRevisionPresetFilter | None = None
+    if runtime_variant_id is not None or name_contains is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = DeploymentRevisionPresetFilter(
+            runtime_variant_id=runtime_variant_id,
+            name=StringFilter(contains=name_contains) if name_contains is not None else None,
+        )
+    search_input = SearchDeploymentRevisionPresetsInput(
+        filter=filter_dto,
+        limit=limit,
+        offset=offset,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.model_card.available_presets(card_id, search_input)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    _run_async(_run)

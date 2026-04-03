@@ -6,6 +6,9 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, PathParam
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    SearchDeploymentRevisionPresetsInput,
+)
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
     DeployModelCardInput,
@@ -83,3 +86,11 @@ class V2ModelCardHandler:
     ) -> APIResponse:
         result = await self._adapter.deploy(path.parsed.card_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
+
+    async def available_presets(
+        self,
+        path: PathParam[CardIdPathParam],
+        body: BodyParam[SearchDeploymentRevisionPresetsInput],
+    ) -> APIResponse:
+        result = await self._adapter.available_presets(path.parsed.card_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

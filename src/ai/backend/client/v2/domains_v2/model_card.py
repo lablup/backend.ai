@@ -3,6 +3,12 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    SearchDeploymentRevisionPresetsInput,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
+    SearchDeploymentRevisionPresetsPayload,
+)
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
     DeployModelCardInput,
@@ -84,4 +90,14 @@ class V2ModelCardClient(BaseDomainClient):
             f"{_PATH}/{card_id}/deploy",
             request=request,
             response_model=DeployModelCardPayload,
+        )
+
+    async def available_presets(
+        self, card_id: UUID, request: SearchDeploymentRevisionPresetsInput
+    ) -> SearchDeploymentRevisionPresetsPayload:
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{card_id}/available-presets/search",
+            request=request,
+            response_model=SearchDeploymentRevisionPresetsPayload,
         )

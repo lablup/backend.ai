@@ -42,5 +42,11 @@ def register_v2_model_card_routes(
         handler.deploy,
         middlewares=[auth_required],
     )
+    registry.add(
+        "POST",
+        "/{card_id}/available-presets/search",
+        handler.available_presets,
+        middlewares=[auth_required],
+    )
 
     return registry
