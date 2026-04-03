@@ -1847,6 +1847,9 @@ input CreateModelCardV2Input {
 
   """README content."""
   readme: String = null
+
+  """Access level (public or internal)."""
+  accessLevel: ModelCardV2AccessLevel = null
 }
 
 """Added in 24.09.0. Input for creating a notification channel"""
@@ -4855,11 +4858,20 @@ type ModelCardV2 implements Node {
   """
   readme: String
 
+  """Access level of the model card (public or internal)."""
+  accessLevel: ModelCardV2AccessLevel!
+
   """Timestamp when this model card was registered."""
   createdAt: DateTime!
 
   """Timestamp of the last modification to this model card."""
   updatedAt: DateTime
+}
+
+"""Added in UNRELEASED. Access level for model cards."""
+enum ModelCardV2AccessLevel {
+  PUBLIC
+  INTERNAL
 }
 
 """Added in UNRELEASED. Paginated list of model cards."""
@@ -10600,6 +10612,9 @@ input UpdateModelCardV2Input {
 
   """README content."""
   readme: String = null
+
+  """Access level (public or internal)."""
+  accessLevel: ModelCardV2AccessLevel = null
 }
 
 """
