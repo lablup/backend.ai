@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock
 
 import pytest
@@ -18,6 +20,12 @@ async def mock_valkey_client() -> AsyncMock:
     """Create a mock Valkey client."""
     client_mock = AsyncMock()
     client_mock.client = AsyncMock()
+
+    @asynccontextmanager
+    async def mock_acquire() -> AsyncIterator[AsyncMock]:
+        yield client_mock.client
+
+    client_mock.acquire = mock_acquire
     return client_mock
 
 
