@@ -2076,6 +2076,31 @@ type ClearImages
   msg: String
 }
 
+"""Added in UNRELEASED. Input for cloning a virtual folder."""
+input CloneVFolderV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """Name for the cloned vfolder."""
+  name: String!
+
+  """Project ID for the cloned vfolder. If omitted, cloned as user-owned."""
+  projectId: UUID = null
+
+  """Target storage host for the clone."""
+  host: String = null
+}
+
+"""Added in UNRELEASED. Payload returned after cloning a virtual folder."""
+type CloneVFolderV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Cloned virtual folder"""
+  vfolder: VFolder!
+
+  """Background task ID for the clone operation"""
+  bgtaskId: String!
+}
+
 """
 Added in 25.19.0. Cluster configuration for model deployment replicas. Defines the clustering mode and number of replicas.
 """
@@ -2864,6 +2889,30 @@ input CreateDomainNodeInput
   scaling_groups: [String]
 }
 
+"""Added in UNRELEASED. Input for creating a file download session."""
+input CreateDownloadSessionV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """File path to download."""
+  path: String!
+
+  """Whether to archive the file for download."""
+  archive: Boolean! = false
+}
+
+"""
+Added in UNRELEASED. Payload returned after creating a download session.
+"""
+type CreateDownloadSessionV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Download session token"""
+  token: String!
+
+  """Download URL"""
+  url: String!
+}
+
 """Added in 25.1.0."""
 type CreateEndpointAutoScalingRuleNode
   @join__type(graph: GRAPHENE)
@@ -3006,7 +3055,7 @@ input CreateModelCardV2Input
   projectId: UUID!
 
   """Domain name."""
-  domainName: String!
+  domainName: String = null
 }
 
 """Added in 24.12.0."""
@@ -3395,6 +3444,30 @@ input CreateScalingGroupInput
   use_host_network: Boolean = false
 }
 
+"""Added in UNRELEASED. Input for creating a file upload session."""
+input CreateUploadSessionV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """File path to upload to."""
+  path: String!
+
+  """File size in bytes."""
+  size: Int!
+}
+
+"""
+Added in UNRELEASED. Payload returned after creating an upload session.
+"""
+type CreateUploadSessionV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Upload session token"""
+  token: String!
+
+  """Upload URL"""
+  url: String!
+}
+
 type CreateUser
   @join__type(graph: GRAPHENE)
 {
@@ -3533,6 +3606,37 @@ type CreateUserV2Payload
 {
   """The newly created user."""
   user: UserV2!
+}
+
+"""Added in UNRELEASED. Input for creating a new virtual folder."""
+input CreateVFolderV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """VFolder name."""
+  name: String!
+
+  """Project ID for project-owned vfolder."""
+  projectId: UUID = null
+
+  """Storage host for the vfolder."""
+  host: String = null
+
+  """Usage mode of the vfolder (general, model, data)."""
+  usageMode: String! = "general"
+
+  """Default permission of the vfolder (ro, rw, wd)."""
+  permission: String! = "rw"
+
+  """Whether the vfolder is cloneable."""
+  cloneable: Boolean! = false
+}
+
+"""Added in UNRELEASED. Payload returned after creating a virtual folder."""
+type CreateVFolderV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Created virtual folder"""
+  vfolder: VFolder!
 }
 
 """Added in 25.16.0. Input for creating VFS storage"""
@@ -3817,6 +3921,27 @@ type DeleteEndpointAutoScalingRuleNode
 {
   ok: Boolean
   msg: String
+}
+
+"""Added in UNRELEASED. Input for deleting files inside a virtual folder."""
+input DeleteFilesV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """List of file paths to delete."""
+  files: [String!]!
+
+  """Whether to delete directories recursively."""
+  recursive: Boolean! = false
+}
+
+"""
+Added in UNRELEASED. Payload returned after deleting files in a virtual folder.
+"""
+type DeleteFilesV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Background task ID for the deletion operation"""
+  bgtaskId: String!
 }
 
 """Instead of deleting the group, just mark it as inactive."""
@@ -4118,6 +4243,16 @@ type DeleteUserV2Payload
 {
   """Whether the deletion was successful."""
   success: Boolean!
+}
+
+"""
+Added in UNRELEASED. Payload returned after soft-deleting a virtual folder.
+"""
+type DeleteVFolderV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted virtual folder"""
+  id: UUID!
 }
 
 """Added in 25.16.0. Input for deleting VFS storage"""
@@ -4459,6 +4594,36 @@ enum DeploymentStrategyType
 {
   ROLLING @join__enumValue(graph: STRAWBERRY)
   BLUE_GREEN @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. Input for deploying a model card as a new deployment.
+"""
+input DeployModelCardV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """Target project UUID for the deployment."""
+  projectId: UUID!
+
+  """Deployment revision preset UUID."""
+  revisionPresetId: UUID!
+
+  """Resource group name."""
+  resourceGroup: String!
+
+  """Number of replicas."""
+  desiredReplicaCount: Int! = 1
+}
+
+"""Added in UNRELEASED. Result of deploying a model card."""
+type DeployModelCardV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the created deployment."""
+  deploymentId: UUID!
+
+  """Name of the created deployment."""
+  deploymentName: String!
 }
 
 type DisassociateAllScalingGroupsWithDomain
@@ -7240,6 +7405,24 @@ enum link__Purpose {
   EXECUTION
 }
 
+"""Added in UNRELEASED. Input for listing files in a virtual folder."""
+input ListFilesV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """Directory path to list files from."""
+  path: String!
+}
+
+"""
+Added in UNRELEASED. Payload returned after listing files in a virtual folder.
+"""
+type ListFilesV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """List of file entries"""
+  items: [VFolderFileEntryV2!]!
+}
+
 """
 Added in 25.19.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
 """
@@ -7492,6 +7675,32 @@ type MetricResultValue
 {
   timestamp: Float
   value: String
+}
+
+"""
+Added in UNRELEASED. Input for creating directories inside a virtual folder.
+"""
+input MkdirV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """Directory path(s) to create."""
+  path: [String!]!
+
+  """Create parent directories if needed."""
+  parents: Boolean! = true
+
+  """Do not raise error if directory exists."""
+  existOk: Boolean! = false
+}
+
+"""
+Added in UNRELEASED. Payload returned after creating directories in a virtual folder.
+"""
+type MkdirV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """List of created directory paths"""
+  results: [String!]!
 }
 
 type ModelCard implements Node
@@ -8779,6 +8988,30 @@ input ModifyUserResourcePolicyInput
   max_customized_image_count: Int
 }
 
+"""Added in UNRELEASED. Input for moving a file inside a virtual folder."""
+input MoveFileV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """Source file path."""
+  src: String!
+
+  """Destination file path."""
+  dst: String!
+}
+
+"""
+Added in UNRELEASED. Payload returned after moving a file in a virtual folder.
+"""
+type MoveFileV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Source path that was moved"""
+  src: String!
+
+  """Destination path"""
+  dst: String!
+}
+
 """
 All available GraphQL mutations.
 Type name changed from 'Mutations' to 'Mutation' in 25.13.0
@@ -9715,6 +9948,41 @@ type Mutation
   """
   scanProjectModelCardsV2(projectId: UUID!): ScanProjectModelCardsV2Payload! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in UNRELEASED. Deploy a model card by creating a deployment with a revision preset.
+  """
+  deployModelCardV2(cardId: UUID!, input: DeployModelCardV2Input!): DeployModelCardV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Create a new virtual folder."""
+  createVfolderV2(input: CreateVFolderV2Input!): CreateVFolderV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Soft-delete a virtual folder (move to trash)."""
+  deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Permanently purge a virtual folder."""
+  purgeVfolderV2(vfolderId: UUID!): PurgeVFolderV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Clone a virtual folder."""
+  cloneVfolderV2(vfolderId: UUID!, input: CloneVFolderV2Input!): CloneVFolderV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. List files in a virtual folder."""
+  vfolderListFilesV2(vfolderId: UUID!, input: ListFilesV2Input!): ListFilesV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Create directories inside a virtual folder."""
+  vfolderMkdirV2(vfolderId: UUID!, input: MkdirV2Input!): MkdirV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Move a file within a virtual folder."""
+  vfolderMoveFileV2(vfolderId: UUID!, input: MoveFileV2Input!): MoveFileV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete files inside a virtual folder."""
+  vfolderDeleteFilesV2(vfolderId: UUID!, input: DeleteFilesV2Input!): DeleteFilesV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Create an upload session for a virtual folder."""
+  vfolderCreateUploadSessionV2(vfolderId: UUID!, input: CreateUploadSessionV2Input!): CreateUploadSessionV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Create a download session for a virtual folder."""
+  vfolderCreateDownloadSessionV2(vfolderId: UUID!, input: CreateDownloadSessionV2Input!): CreateDownloadSessionV2Payload! @join__field(graph: STRAWBERRY)
+
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload! @join__field(graph: STRAWBERRY)
 }
@@ -10308,7 +10576,9 @@ Added in UNRELEASED. Container execution configuration for the deployment, inclu
 type PresetExecutionSpec
   @join__type(graph: STRAWBERRY)
 {
-  """Container image reference."""
+  """
+  Container image to run the inference server (e.g., 'cr.backend.ai/stable/vllm:latest').
+  """
   image: String
 
   """Startup command."""
@@ -11295,6 +11565,16 @@ type PurgeUserV2Payload
   success: Boolean!
 }
 
+"""
+Added in UNRELEASED. Payload returned after permanently purging a virtual folder.
+"""
+type PurgeVFolderV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the purged virtual folder"""
+  id: UUID!
+}
+
 type Query
   @join__type(graph: GRAPHENE)
   @join__type(graph: STRAWBERRY)
@@ -12272,6 +12552,12 @@ type Query
   Added in UNRELEASED. Check which resource presets are available for session creation.
   """
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Search all virtual folders (superadmin only)."""
+  adminVfoldersV2(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Get a single virtual folder by ID."""
+  vfolderV2(vfolderId: UUID!): VFolder @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. List virtual folders within a specific project."""
   projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection! @join__field(graph: STRAWBERRY)
@@ -14039,6 +14325,12 @@ type RuntimeVariantPreset implements Node
   Specification defining how the user-provided value is applied to the inference container.
   """
   targetSpec: PresetTargetSpec!
+
+  """UI category group for organizing parameters."""
+  category: String
+
+  """Human-readable display label for the UI."""
+  displayName: String
 
   """Timestamp when this preset was created."""
   createdAt: DateTime!
@@ -17448,6 +17740,31 @@ type VFolderEdge
 
   """The item at the end of the edge"""
   node: VFolder!
+}
+
+"""
+Added in UNRELEASED. A file or directory entry inside a virtual folder.
+"""
+type VFolderFileEntryV2
+  @join__type(graph: STRAWBERRY)
+{
+  """File or directory name"""
+  name: String!
+
+  """Entry type"""
+  type: String!
+
+  """File size in bytes"""
+  size: Int!
+
+  """POSIX file permission mode (e.g., 33188 for 0o100644)"""
+  mode: Int!
+
+  """Creation timestamp"""
+  createdAt: String!
+
+  """Last modification timestamp"""
+  updatedAt: String!
 }
 
 """

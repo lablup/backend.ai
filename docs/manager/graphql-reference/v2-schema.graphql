@@ -1402,6 +1402,27 @@ type CleanupArtifactRevisionsPayload {
   artifactRevisions: ArtifactRevisionConnection!
 }
 
+"""Added in UNRELEASED. Input for cloning a virtual folder."""
+input CloneVFolderV2Input {
+  """Name for the cloned vfolder."""
+  name: String!
+
+  """Project ID for the cloned vfolder. If omitted, cloned as user-owned."""
+  projectId: UUID = null
+
+  """Target storage host for the clone."""
+  host: String = null
+}
+
+"""Added in UNRELEASED. Payload returned after cloning a virtual folder."""
+type CloneVFolderV2Payload {
+  """Cloned virtual folder"""
+  vfolder: VFolder!
+
+  """Background task ID for the clone operation"""
+  bgtaskId: String!
+}
+
 """
 Added in 25.19.0. Cluster configuration for model deployment replicas. Defines the clustering mode and number of replicas.
 """
@@ -1682,6 +1703,26 @@ input CreateDomainInputGQL {
   integrationId: String = null
 }
 
+"""Added in UNRELEASED. Input for creating a file download session."""
+input CreateDownloadSessionV2Input {
+  """File path to download."""
+  path: String!
+
+  """Whether to archive the file for download."""
+  archive: Boolean! = false
+}
+
+"""
+Added in UNRELEASED. Payload returned after creating a download session.
+"""
+type CreateDownloadSessionV2Payload {
+  """Download session token"""
+  token: String!
+
+  """Download URL"""
+  url: String!
+}
+
 """Added in 25.14.0. """
 input CreateHuggingFaceRegistryInput {
   name: String!
@@ -1757,7 +1798,7 @@ input CreateModelCardV2Input {
   projectId: UUID!
 
   """Domain name."""
-  domainName: String!
+  domainName: String = null
 }
 
 """Added in 24.09.0. Input for creating a notification channel"""
@@ -2018,6 +2059,26 @@ type CreateRuntimeVariantPresetPayloadGQL {
   preset: RuntimeVariantPreset!
 }
 
+"""Added in UNRELEASED. Input for creating a file upload session."""
+input CreateUploadSessionV2Input {
+  """File path to upload to."""
+  path: String!
+
+  """File size in bytes."""
+  size: Int!
+}
+
+"""
+Added in UNRELEASED. Payload returned after creating an upload session.
+"""
+type CreateUploadSessionV2Payload {
+  """Upload session token"""
+  token: String!
+
+  """Upload URL"""
+  url: String!
+}
+
 """Added in UNRELEASED. Input for creating a user resource policy."""
 input CreateUserResourcePolicyInputGQL {
   """Policy name. Must be unique."""
@@ -2117,6 +2178,33 @@ input CreateVFSStorageInput {
 type CreateVFSStoragePayload {
   """Created VFS storage"""
   vfsStorage: VFSStorage!
+}
+
+"""Added in UNRELEASED. Input for creating a new virtual folder."""
+input CreateVFolderV2Input {
+  """VFolder name."""
+  name: String!
+
+  """Project ID for project-owned vfolder."""
+  projectId: UUID = null
+
+  """Storage host for the vfolder."""
+  host: String = null
+
+  """Usage mode of the vfolder (general, model, data)."""
+  usageMode: String! = "general"
+
+  """Default permission of the vfolder (ro, rw, wd)."""
+  permission: String! = "rw"
+
+  """Whether the vfolder is cloneable."""
+  cloneable: Boolean! = false
+}
+
+"""Added in UNRELEASED. Payload returned after creating a virtual folder."""
+type CreateVFolderV2Payload {
+  """Created virtual folder"""
+  vfolder: VFolder!
 }
 
 """Date (isoformat)"""
@@ -2288,6 +2376,23 @@ type DeleteDomainConfigPayload {
 type DeleteDomainPayloadGQL {
   """Whether the deletion was successful."""
   deleted: Boolean!
+}
+
+"""Added in UNRELEASED. Input for deleting files inside a virtual folder."""
+input DeleteFilesV2Input {
+  """List of file paths to delete."""
+  files: [String!]!
+
+  """Whether to delete directories recursively."""
+  recursive: Boolean! = false
+}
+
+"""
+Added in UNRELEASED. Payload returned after deleting files in a virtual folder.
+"""
+type DeleteFilesV2Payload {
+  """Background task ID for the deletion operation"""
+  bgtaskId: String!
 }
 
 """Added in 25.14.0. """
@@ -2472,6 +2577,40 @@ input DeleteVFSStorageInput {
 type DeleteVFSStoragePayload {
   """ID of the deleted VFS storage"""
   id: UUID!
+}
+
+"""
+Added in UNRELEASED. Payload returned after soft-deleting a virtual folder.
+"""
+type DeleteVFolderV2Payload {
+  """ID of the deleted virtual folder"""
+  id: UUID!
+}
+
+"""
+Added in UNRELEASED. Input for deploying a model card as a new deployment.
+"""
+input DeployModelCardV2Input {
+  """Target project UUID for the deployment."""
+  projectId: UUID!
+
+  """Deployment revision preset UUID."""
+  revisionPresetId: UUID!
+
+  """Resource group name."""
+  resourceGroup: String!
+
+  """Number of replicas."""
+  desiredReplicaCount: Int! = 1
+}
+
+"""Added in UNRELEASED. Result of deploying a model card."""
+type DeployModelCardV2Payload {
+  """ID of the created deployment."""
+  deploymentId: UUID!
+
+  """Name of the created deployment."""
+  deploymentName: String!
 }
 
 """Added in 25.19.0. """
@@ -4385,6 +4524,20 @@ enum KeypairResourcePolicyV2OrderField {
   MAX_PENDING_SESSION_COUNT
 }
 
+"""Added in UNRELEASED. Input for listing files in a virtual folder."""
+input ListFilesV2Input {
+  """Directory path to list files from."""
+  path: String!
+}
+
+"""
+Added in UNRELEASED. Payload returned after listing files in a virtual folder.
+"""
+type ListFilesV2Payload {
+  """List of file entries"""
+  items: [VFolderFileEntryV2!]!
+}
+
 """
 Added in 25.19.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
 """
@@ -4589,6 +4742,28 @@ input MetricLabelEntryInput {
 
   """Label value."""
   value: String!
+}
+
+"""
+Added in UNRELEASED. Input for creating directories inside a virtual folder.
+"""
+input MkdirV2Input {
+  """Directory path(s) to create."""
+  path: [String!]!
+
+  """Create parent directories if needed."""
+  parents: Boolean! = true
+
+  """Do not raise error if directory exists."""
+  existOk: Boolean! = false
+}
+
+"""
+Added in UNRELEASED. Payload returned after creating directories in a virtual folder.
+"""
+type MkdirV2Payload {
+  """List of created directory paths"""
+  results: [String!]!
 }
 
 """
@@ -5225,6 +5400,26 @@ type ModifyQueryDefinitionPayload {
   preset: QueryDefinition!
 }
 
+"""Added in UNRELEASED. Input for moving a file inside a virtual folder."""
+input MoveFileV2Input {
+  """Source file path."""
+  src: String!
+
+  """Destination file path."""
+  dst: String!
+}
+
+"""
+Added in UNRELEASED. Payload returned after moving a file in a virtual folder.
+"""
+type MoveFileV2Payload {
+  """Source path that was moved"""
+  src: String!
+
+  """Destination path"""
+  dst: String!
+}
+
 type Mutation {
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
@@ -5835,6 +6030,41 @@ type Mutation {
   """
   scanProjectModelCardsV2(projectId: UUID!): ScanProjectModelCardsV2Payload!
 
+  """
+  Added in UNRELEASED. Deploy a model card by creating a deployment with a revision preset.
+  """
+  deployModelCardV2(cardId: UUID!, input: DeployModelCardV2Input!): DeployModelCardV2Payload!
+
+  """Added in UNRELEASED. Create a new virtual folder."""
+  createVfolderV2(input: CreateVFolderV2Input!): CreateVFolderV2Payload!
+
+  """Added in UNRELEASED. Soft-delete a virtual folder (move to trash)."""
+  deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload!
+
+  """Added in UNRELEASED. Permanently purge a virtual folder."""
+  purgeVfolderV2(vfolderId: UUID!): PurgeVFolderV2Payload!
+
+  """Added in UNRELEASED. Clone a virtual folder."""
+  cloneVfolderV2(vfolderId: UUID!, input: CloneVFolderV2Input!): CloneVFolderV2Payload!
+
+  """Added in UNRELEASED. List files in a virtual folder."""
+  vfolderListFilesV2(vfolderId: UUID!, input: ListFilesV2Input!): ListFilesV2Payload!
+
+  """Added in UNRELEASED. Create directories inside a virtual folder."""
+  vfolderMkdirV2(vfolderId: UUID!, input: MkdirV2Input!): MkdirV2Payload!
+
+  """Added in UNRELEASED. Move a file within a virtual folder."""
+  vfolderMoveFileV2(vfolderId: UUID!, input: MoveFileV2Input!): MoveFileV2Payload!
+
+  """Added in UNRELEASED. Delete files inside a virtual folder."""
+  vfolderDeleteFilesV2(vfolderId: UUID!, input: DeleteFilesV2Input!): DeleteFilesV2Payload!
+
+  """Added in UNRELEASED. Create an upload session for a virtual folder."""
+  vfolderCreateUploadSessionV2(vfolderId: UUID!, input: CreateUploadSessionV2Input!): CreateUploadSessionV2Payload!
+
+  """Added in UNRELEASED. Create a download session for a virtual folder."""
+  vfolderCreateDownloadSessionV2(vfolderId: UUID!, input: CreateDownloadSessionV2Input!): CreateDownloadSessionV2Payload!
+
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload!
 }
@@ -6291,7 +6521,9 @@ type PresetClusterSpec {
 Added in UNRELEASED. Container execution configuration for the deployment, including the inference server image, startup commands, and environment variables.
 """
 type PresetExecutionSpec {
-  """Container image reference."""
+  """
+  Container image to run the inference server (e.g., 'cr.backend.ai/stable/vllm:latest').
+  """
   image: String
 
   """Startup command."""
@@ -7018,6 +7250,14 @@ type PurgeUserV2Payload {
   success: Boolean!
 }
 
+"""
+Added in UNRELEASED. Payload returned after permanently purging a virtual folder.
+"""
+type PurgeVFolderV2Payload {
+  """ID of the purged virtual folder"""
+  id: UUID!
+}
+
 type Query {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
@@ -7625,6 +7865,12 @@ type Query {
   Added in UNRELEASED. Check which resource presets are available for session creation.
   """
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2!
+
+  """Added in UNRELEASED. Search all virtual folders (superadmin only)."""
+  adminVfoldersV2(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
+
+  """Added in UNRELEASED. Get a single virtual folder by ID."""
+  vfolderV2(vfolderId: UUID!): VFolder
 
   """Added in UNRELEASED. List virtual folders within a specific project."""
   projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
@@ -9034,6 +9280,12 @@ type RuntimeVariantPreset implements Node {
   Specification defining how the user-provided value is applied to the inference container.
   """
   targetSpec: PresetTargetSpec!
+
+  """UI category group for organizing parameters."""
+  category: String
+
+  """Human-readable display label for the UI."""
+  displayName: String
 
   """Timestamp when this preset was created."""
   createdAt: DateTime!
@@ -11557,6 +11809,29 @@ type VFolderEdge {
 
   """The item at the end of the edge"""
   node: VFolder!
+}
+
+"""
+Added in UNRELEASED. A file or directory entry inside a virtual folder.
+"""
+type VFolderFileEntryV2 {
+  """File or directory name"""
+  name: String!
+
+  """Entry type"""
+  type: String!
+
+  """File size in bytes"""
+  size: Int!
+
+  """POSIX file permission mode (e.g., 33188 for 0o100644)"""
+  mode: Int!
+
+  """Creation timestamp"""
+  createdAt: String!
+
+  """Last modification timestamp"""
+  updatedAt: String!
 }
 
 """
