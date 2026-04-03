@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
@@ -16,6 +17,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     VFolderNode,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
+    HostPermissionCondition,
     VFolderAccessControlInfo,
     VFolderMetadataInfo,
     VFolderOwnershipInfo,
@@ -24,7 +26,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.types import BinarySize, VFolderUsageMode
+from ai.backend.common.types import BinarySize, VFolderHostPermission, VFolderUsageMode
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -162,6 +164,7 @@ class VFolderAdapter(BaseAdapter):
             raise UnreachableError("User context is not available")
         scope = UserVFolderSearchScope(user_id=me.user_id)
         conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
+        conditions.extend(self._build_host_permission_conditions(me, input.host_permission))
         orders = self._convert_vfolder_orders(input.order) if input.order else []
         querier = self._build_querier(
             conditions=conditions,
@@ -193,8 +196,12 @@ class VFolderAdapter(BaseAdapter):
 
         Used for the project admin page.
         """
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         scope = ProjectVFolderSearchScope(project_id=project_id)
         conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
+        conditions.extend(self._build_host_permission_conditions(me, input.host_permission))
         orders = self._convert_vfolder_orders(input.order) if input.order else []
         querier = self._build_querier(
             conditions=conditions,
@@ -221,7 +228,35 @@ class VFolderAdapter(BaseAdapter):
     # Filter / Order conversion
     # -------------------------------------------------------------------------
 
-    def _convert_vfolder_filter(self, f: VFolderFilter) -> list[QueryCondition]:
+    @staticmethod
+    def _build_host_permission_conditions(
+        requester: UserData,
+        host_permission: HostPermissionCondition | None,
+    ) -> list[QueryCondition]:
+        """Build query conditions for host permission filtering.
+
+        This is separate from _convert_vfolder_filter because it requires
+        the requesting user's context, whereas column-based filters are pure.
+        """
+        if host_permission is None:
+            return []
+        conditions: list[QueryCondition] = []
+        if host_permission.in_ is not None:
+            perms = [VFolderHostPermission(p) for p in host_permission.in_]
+            conditions.append(
+                VFolderConditions.by_host_permission(requester, permissions=perms, negate=False)
+            )
+        if host_permission.not_in is not None:
+            perms = [VFolderHostPermission(p) for p in host_permission.not_in]
+            conditions.append(
+                VFolderConditions.by_host_permission(requester, permissions=perms, negate=True)
+            )
+        return conditions
+
+    def _convert_vfolder_filter(
+        self,
+        f: VFolderFilter,
+    ) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.name is not None:
             c = self.convert_string_filter(

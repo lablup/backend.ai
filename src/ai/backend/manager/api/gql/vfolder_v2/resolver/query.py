@@ -21,6 +21,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types import (
     VFolderGQL,
     VFolderOrderByGQL,
 )
+from ai.backend.manager.api.gql.vfolder_v2.types.filters import HostPermissionConditionGQL
 from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderEdge
 
 
@@ -34,6 +35,7 @@ async def project_vfolders(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
     filter: VFolderFilterGQL | None = None,
+    host_permission: HostPermissionConditionGQL | None = None,
     order_by: list[VFolderOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
@@ -47,6 +49,7 @@ async def project_vfolders(
         project_id,
         SearchVFoldersInput(
             filter=filter.to_pydantic() if filter else None,
+            host_permission=host_permission.to_pydantic() if host_permission else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
             after=after,
@@ -79,6 +82,7 @@ async def project_vfolders(
 async def my_vfolders(
     info: Info[StrawberryGQLContext],
     filter: VFolderFilterGQL | None = None,
+    host_permission: HostPermissionConditionGQL | None = None,
     order_by: list[VFolderOrderByGQL] | None = None,
     before: str | None = None,
     after: str | None = None,
@@ -91,6 +95,7 @@ async def my_vfolders(
     result = await info.context.adapters.vfolder.my_search(
         SearchVFoldersInput(
             filter=filter.to_pydantic() if filter else None,
+            host_permission=host_permission.to_pydantic() if host_permission else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
             after=after,

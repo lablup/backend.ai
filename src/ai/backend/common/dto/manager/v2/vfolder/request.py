@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
+    HostPermissionCondition,
     OrderDirection,
     VFolderOrderField,
     VFolderPermissionField,
@@ -279,6 +280,10 @@ class SearchVFoldersInput(BaseRequestModel):
     """Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches)."""
 
     filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")
+    host_permission: HostPermissionCondition | None = Field(
+        default=None,
+        description="Filter by host permission accessibility. Evaluated against the requesting user's permissions.",
+    )
     order: list[VFolderOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")
     after: str | None = Field(default=None, description="Cursor pagination: after cursor.")

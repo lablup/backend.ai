@@ -18,7 +18,9 @@ from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, OrderDirecti
 from ai.backend.common.types import VFolderUsageMode
 
 __all__ = (
+    "HostPermissionCondition",
     "OrderDirection",
+    "VFolderHostPermissionField",
     "VFolderInvitationState",
     "VFolderMetadataInfo",
     "VFolderOperationStatusField",
@@ -65,6 +67,31 @@ class VFolderUsageModeFilter(BaseRequestModel):
 
     in_: list[VFolderUsageMode] | None = None
     not_in: list[VFolderUsageMode] | None = None
+
+
+class VFolderHostPermissionField(StrEnum):
+    """DTO-facing enum for VFolderHostPermission."""
+
+    CREATE = "create-vfolder"
+    MODIFY = "modify-vfolder"
+    DELETE = "delete-vfolder"
+    MOUNT_IN_SESSION = "mount-in-session"
+    UPLOAD_FILE = "upload-file"
+    DOWNLOAD_FILE = "download-file"
+    INVITE_OTHERS = "invite-others"
+    SET_USER_PERM = "set-user-specific-permission"
+
+
+class HostPermissionCondition(BaseRequestModel):
+    """Filter by host permission accessibility.
+
+    ``in_`` returns vfolders on hosts where the user has **all** listed permissions.
+    ``not_in`` returns vfolders on hosts where the user **lacks any** listed permission.
+    Both fields can be set simultaneously (conditions are ANDed).
+    """
+
+    in_: list[VFolderHostPermissionField] | None = None
+    not_in: list[VFolderHostPermissionField] | None = None
 
 
 class VFolderMetadataInfo(BaseResponseModel):

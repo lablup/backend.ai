@@ -3510,6 +3510,21 @@ extend type GroupNode @key(fields: "id") {
   id: ID! @external
 }
 
+"""
+Added in UNRELEASED. Filter by storage host permission accessibility. Returns vfolders on hosts where the requesting user has (or lacks) the specified permissions.
+"""
+input HostPermissionCondition {
+  """
+  Include only vfolders on hosts where the user has ALL listed permissions.
+  """
+  in: [VFolderHostPermission!] = null
+
+  """
+  Include only vfolders on hosts where the user does NOT have all of the listed permissions (i.e., lacks at least one of them).
+  """
+  notIn: [VFolderHostPermission!] = null
+}
+
 """Added in 25.14.0. HuggingFace registry node."""
 type HuggingFaceRegistry implements Node {
   """The Globally Unique ID of this object"""
@@ -7625,12 +7640,12 @@ type Query {
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2!
 
   """Added in UNRELEASED. List virtual folders within a specific project."""
-  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
+  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, hostPermission: HostPermissionCondition = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
 
   """
   Added in UNRELEASED. Search virtual folders accessible to the current user with pagination and filtering.
   """
-  myVfolders(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
+  myVfolders(filter: VFolderFilter = null, hostPermission: HostPermissionCondition = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
 }
 
 """
@@ -11555,7 +11570,7 @@ type VFolderEdge {
 }
 
 """
-Added in UNRELEASED. Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
+Added in UNRELEASED. Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, host permission, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input VFolderFilter {
   name: StringFilter = null
@@ -11567,6 +11582,20 @@ input VFolderFilter {
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null
+}
+
+"""
+Added in UNRELEASED. Host-level permission for virtual folder storage hosts. CREATE: Create new vfolders on the host. MODIFY: Rename or update vfolder options. DELETE: Delete vfolders from the host. MOUNT_IN_SESSION: Mount vfolders in compute sessions. UPLOAD_FILE: Upload files to vfolders. DOWNLOAD_FILE: Download files from vfolders. INVITE_OTHERS: Invite other users to user-type vfolders. SET_USER_PERM: Override permission of group-type vfolders.
+"""
+enum VFolderHostPermission {
+  CREATE
+  MODIFY
+  DELETE
+  MOUNT_IN_SESSION
+  UPLOAD_FILE
+  DOWNLOAD_FILE
+  INVITE_OTHERS
+  SET_USER_PERM
 }
 
 """

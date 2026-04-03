@@ -7,6 +7,7 @@ from typing import Self
 
 from ai.backend.common.dto.manager.v2.vfolder.request import VFolderFilter, VFolderOrder
 from ai.backend.common.dto.manager.v2.vfolder.types import (
+    HostPermissionCondition,
     VFolderStatusFilter,
     VFolderUsageModeFilter,
 )
@@ -24,7 +25,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
-from .enum import VFolderOperationStatusGQL, VFolderUsageModeGQL
+from .enum import VFolderHostPermissionGQL, VFolderOperationStatusGQL, VFolderUsageModeGQL
 
 
 @gql_pydantic_input(
@@ -65,7 +66,31 @@ class VFolderUsageModeFilterGQL(PydanticInputMixin[VFolderUsageModeFilter]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        description="Filter by storage host permission accessibility. Returns vfolders on hosts where the requesting user has (or lacks) the specified permissions.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="HostPermissionCondition",
+)
+class HostPermissionConditionGQL(PydanticInputMixin[HostPermissionCondition]):
+    """Filter by host permission accessibility."""
+
+    in_: list[VFolderHostPermissionGQL] | None = gql_field(
+        description="Include only vfolders on hosts where the user has ALL listed permissions.",
+        name="in",
+        default=None,
+    )
+    not_in: list[VFolderHostPermissionGQL] | None = gql_field(
+        description=(
+            "Include only vfolders on hosts where the user does NOT have all of the listed "
+            "permissions (i.e., lacks at least one of them)."
+        ),
+        default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, host permission, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.",
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="VFolderFilter",

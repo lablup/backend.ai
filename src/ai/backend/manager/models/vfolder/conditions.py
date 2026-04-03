@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 
 if TYPE_CHECKING:
     from ai.backend.common.data.filter_specs import StringMatchSpec
 
-from ai.backend.common.types import VFolderUsageMode
+from ai.backend.common.data.user.types import UserData
+from ai.backend.common.types import VFolderHostPermission, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.repositories.base import QueryCondition
 
@@ -188,6 +190,117 @@ class VFolderConditions:
     def by_created_at_equals(dt: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return VFolderRow.created_at == dt
+
+        return inner
+
+    # ── host permission filter factory ──
+
+    @staticmethod
+    def by_host_permission(
+        requester: UserData,
+        *,
+        permissions: Collection[VFolderHostPermission],
+        negate: bool = False,
+    ) -> QueryCondition:
+        """Filter vfolders by storage host accessibility.
+
+        Builds a SQL subquery that extracts host names from
+        ``allowed_vfolder_hosts`` JSONB columns in domains, groups, and
+        keypair_resource_policies, filtering to hosts that contain **all**
+        requested *permissions*.
+
+        Args:
+            requester: The user whose host permissions are evaluated.
+            permissions: Host permissions to check.  A host must have
+                **all** listed permissions to match.
+            negate: When ``True``, returns vfolders on hosts that
+                **lack** the requested permissions (``NOT IN``).
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            from ai.backend.manager.models.domain.row import DomainRow
+            from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
+            from ai.backend.manager.models.keypair.row import KeyPairRow
+            from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+
+            perm_values = [p.value for p in permissions]
+
+            def _build_source_query(
+                table_col: Any,
+                from_clause: sa.FromClause,
+                where_clause: sa.ColumnElement[bool],
+            ) -> sa.Select[tuple[str, str]]:
+                """Extract (host_key, permission) pairs from a JSONB column."""
+                j = sa.func.jsonb_each(table_col).table_valued("key", "value")
+                # jsonb_array_elements_text returns a single-column set-returning
+                # function.  Use render_derived=True so PostgreSQL names the column.
+                elem = sa.func.jsonb_array_elements_text(
+                    sa.type_coerce(j.c.value, JSONB)
+                ).table_valued(sa.column("value", sa.Text), with_ordinality=False)
+                return (
+                    sa.select(j.c.key, elem.c.value)
+                    .select_from(from_clause.join(j, sa.true()).join(elem, sa.true()))
+                    .where(where_clause)
+                )
+
+            # 1. Domain hosts
+            domain_pairs = _build_source_query(
+                DomainRow.allowed_vfolder_hosts,
+                DomainRow.__table__,
+                (DomainRow.name == requester.domain_name) & (DomainRow.is_active.is_(True)),
+            )
+
+            # 2. User's group hosts
+            group_from = GroupRow.__table__.join(
+                AssocGroupUserRow.__table__,
+                GroupRow.id == AssocGroupUserRow.group_id,
+            )
+            group_pairs = _build_source_query(
+                GroupRow.allowed_vfolder_hosts,
+                group_from,
+                (AssocGroupUserRow.user_id == requester.user_id)
+                & (GroupRow.domain_name == requester.domain_name)
+                & (GroupRow.is_active.is_(True)),
+            )
+
+            # 3. Keypair resource policy hosts
+            krp_from = KeyPairResourcePolicyRow.__table__.join(
+                KeyPairRow.__table__,
+                KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
+            )
+            keypair_pairs = _build_source_query(
+                KeyPairResourcePolicyRow.allowed_vfolder_hosts,
+                krp_from,
+                (KeyPairRow.user == requester.user_id) & (KeyPairRow.is_active.is_(True)),
+            )
+
+            # UNION ALL (host, perm) from all sources, then GROUP BY host
+            # and check the merged permission set contains all requested perms.
+            # This matches the Python-side union semantics of
+            # get_allowed_vfolder_hosts_by_user() where permissions from
+            # different sources are merged per host.
+            all_pairs = sa.union_all(domain_pairs, group_pairs, keypair_pairs).subquery()
+            # Use literal_column to embed the array directly in SQL, avoiding
+            # asyncpg parameter binding issues with array/JSONB type coercion.
+            perm_array_literal: sa.ColumnElement[list[str]] = sa.literal_column(
+                "ARRAY[" + ",".join(f"'{v}'" for v in perm_values) + "]::text[]"
+            )
+            hosts_with_perms = (
+                sa.select(all_pairs.c[0].label("host_key"))
+                .group_by(all_pairs.c[0])
+                .having(
+                    sa.type_coerce(
+                        sa.func.array_agg(sa.distinct(all_pairs.c[1])),
+                        ARRAY(sa.Text),
+                    ).contains(perm_array_literal)
+                )
+            )
+
+            host_in_allowed = VFolderRow.host.in_(hosts_with_perms)
+
+            if negate:
+                return ~host_in_allowed
+            return host_in_allowed
 
         return inner
 
