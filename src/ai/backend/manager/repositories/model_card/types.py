@@ -60,7 +60,7 @@ class ProjectModelCardSearchScope(SearchScope):
         ]
 
     @property
-    def membership_check_query(self) -> sa.Select:
+    def membership_check_query(self) -> sa.Select[tuple[bool]]:
         """Query to validate user is a member of this project."""
         return sa.select(sa.literal(True)).where(
             sa.and_(

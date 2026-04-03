@@ -193,6 +193,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.DEPLOYMENT_POLICY
                 | RBACElementType.DEPLOYMENT_REVISION
                 | RBACElementType.IMAGE_ALIAS
+                | RBACElementType.MODEL_CARD
                 | RBACElementType.PROJECT_ADMIN_PAGE
                 | RBACElementType.DOMAIN_ADMIN_PAGE
             ):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
@@ -216,6 +217,12 @@ class VFolderAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    async def create(self, input: Any) -> Any:
+        raise NotImplementedError("VFolder create not yet implemented in v2 adapter")
+
+    async def create_upload_session(self, vfolder_id: UUID, input: Any) -> Any:
+        raise NotImplementedError("VFolder create_upload_session not yet implemented in v2 adapter")
 
     # -------------------------------------------------------------------------
     # Filter / Order conversion
