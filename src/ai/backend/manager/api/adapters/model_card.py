@@ -166,14 +166,17 @@ class ModelCardAdapter(BaseAdapter):
         self,
         input: CreateModelCardInput,
     ) -> CreateModelCardPayload:
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         min_resource = _entries_to_min_resource(input.min_resource) if input.min_resource else None
         creator: RBACEntityCreator[ModelCardRow] = RBACEntityCreator(
             spec=ModelCardCreatorSpec(
                 name=input.name,
                 vfolder_id=input.vfolder_id,
-                domain=input.domain_name,
+                domain=input.domain_name or me.domain_name,
                 project_id=input.project_id,
-                creator_id=input.creator_id,
+                creator_id=me.user_id,
                 author=input.author,
                 title=input.title,
                 model_version=input.model_version,

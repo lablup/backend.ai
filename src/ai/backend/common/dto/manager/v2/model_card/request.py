@@ -19,8 +19,11 @@ class CreateModelCardInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=512, description="Model card name.")
     vfolder_id: UUID = Field(description="VFolder ID containing the model.")
     project_id: UUID = Field(description="Project ID (must be MODEL_STORE type).")
-    domain_name: str = Field(max_length=64, description="Domain name.")
-    creator_id: UUID = Field(description="Creator user UUID.")
+    domain_name: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Domain name. If omitted, uses the requester's domain.",
+    )
     author: str | None = Field(default=None, max_length=256)
     title: str | None = Field(default=None, max_length=512)
     model_version: str | None = Field(default=None, max_length=64)

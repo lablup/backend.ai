@@ -199,7 +199,7 @@ class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
     name: str = gql_field(description="Model card name.")
     vfolder_id: UUID = gql_field(description="VFolder ID.")
     project_id: UUID = gql_field(description="Project ID.")
-    domain_name: str = gql_field(description="Domain name.")
+    domain_name: str | None = gql_field(default=None, description="Domain name.")
 
 
 @gql_pydantic_input(
