@@ -479,6 +479,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
     _monitor_client: AbstractValkeyClient
     _spec: MonitoringValkeyClientSpec
     _monitor_task: asyncio.Task[None] | None
+    _reconnect_lock: asyncio.Lock
     _consecutive_failure_count: int
     _operation_failure_count: int
 
@@ -492,6 +493,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._monitor_client = monitor_client
         self._spec = spec or MonitoringValkeyClientSpec()
         self._monitor_task = None
+        self._reconnect_lock = asyncio.Lock()
         self._consecutive_failure_count = 0
         self._operation_failure_count = 0
         self._closed = False
@@ -630,17 +632,18 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             log.info("Valkey connection monitor task stopped. Client closed: {}", self._closed)
 
     async def _reconnect(self) -> None:
-        # Disconnect both clients
-        try:
-            await self._monitor_client.disconnect()
-        except Exception as e:
-            log.warning("Error disconnecting monitor client: {}", e)
+        async with self._reconnect_lock:
+            # Disconnect both clients
+            try:
+                await self._monitor_client.disconnect()
+            except Exception as e:
+                log.warning("Error disconnecting monitor client: {}", e)
 
-        try:
-            await self._operation_client.disconnect()
-        except Exception as e:
-            log.warning("Error disconnecting operation client: {}", e)
+            try:
+                await self._operation_client.disconnect()
+            except Exception as e:
+                log.warning("Error disconnecting operation client: {}", e)
 
-        # Reconnect both clients
-        await self._operation_client.connect()
-        await self._monitor_client.connect()
+            # Reconnect both clients
+            await self._operation_client.connect()
+            await self._monitor_client.connect()
