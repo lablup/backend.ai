@@ -33,7 +33,6 @@ from ai.backend.common.types import (
     AccessKey,
     ImageAlias,
     KernelEnqueueingConfig,
-    RuntimeVariant,
     SessionTypes,
     VFolderID,
 )
@@ -938,7 +937,7 @@ class ModelServingService:
             storage_manager=self._storage_manager,
         )
 
-        if action.runtime_variant == RuntimeVariant.CUSTOM:
+        if action.runtime_variant == "custom":
             vfid = VFolderID(ctx.model_folder_quota_scope_id, ctx.model_id)
             yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self._storage_manager,
@@ -954,7 +953,7 @@ class ModelServingService:
             )
         else:
             if (
-                action.runtime_variant != RuntimeVariant.CMD
+                action.runtime_variant != "cmd"
                 and action.config.model_mount_destination != "/models"
             ):
                 raise InvalidAPIParameters(

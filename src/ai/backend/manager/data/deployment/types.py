@@ -345,7 +345,7 @@ class ExecutionSpec(ConfiguredModel):
     startup_command: str | None = None
     bootstrap_script: str | None = None
     environ: dict[str, str] | None = None
-    runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
+    runtime_variant: RuntimeVariant
     callback_url: yarl.URL | None = None
     inference_runtime_config: Mapping[str, Any] | None = None
 

@@ -177,7 +177,7 @@ def _serve_info_from_deployment_info(deployment_info: DeploymentInfo) -> ServeIn
         is_public=deployment_info.network.open_to_public,
         runtime_variant=model_revision.execution.runtime_variant
         if model_revision
-        else RuntimeVariant.CUSTOM,
+        else RuntimeVariant("custom"),
     )
 
 
@@ -358,10 +358,10 @@ class ServiceHandler:
         resp = RuntimeInfoModel(
             runtimes=[
                 RuntimeInfo(
-                    name=v.value,
-                    human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[v].name,
+                    name=k,
+                    human_readable_name=profile.name,
                 )
-                for v in RuntimeVariant
+                for k, profile in MODEL_SERVICE_RUNTIME_PROFILES.items()
             ]
         )
         return APIResponse.build(HTTPStatus.OK, resp)

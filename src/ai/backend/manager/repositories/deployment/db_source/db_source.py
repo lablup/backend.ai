@@ -24,7 +24,6 @@ from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     KernelId,
-    RuntimeVariant,
     SessionId,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -1316,7 +1315,7 @@ class DeploymentDBSource:
                         route_id=row.route_id,
                         endpoint_id=row.endpoint_id,
                         endpoint_name=row.endpoint_name,
-                        runtime_variant=row.runtime_variant.value,
+                        runtime_variant=row.runtime_variant,
                         kernel_host=row.kernel_host,
                         kernel_port=inference_port,
                         session_owner=row.session_owner,
@@ -1928,7 +1927,7 @@ class DeploymentDBSource:
                 profile = MODEL_SERVICE_RUNTIME_PROFILES[row.runtime_variant]
                 if profile.health_check_endpoint:
                     configs[row.id] = ModelHealthCheck(path=profile.health_check_endpoint)
-                elif row.runtime_variant == RuntimeVariant.CUSTOM and row.model_definition:
+                elif row.runtime_variant == "custom" and row.model_definition:
                     md = ModelDefinition.model_validate(row.model_definition)
                     configs[row.id] = md.health_check_config()
                 else:
@@ -2168,7 +2167,7 @@ class DeploymentDBSource:
                 endpoint_data.runtime_variant
             ].health_check_endpoint:
                 _info = ModelHealthCheck(path=_path)
-            elif endpoint_data.runtime_variant == RuntimeVariant.CUSTOM:
+            elif endpoint_data.runtime_variant == "custom":
                 # For custom runtime, check model definition file
                 model_definition_path = (
                     await ModelServiceHelper.validate_model_definition_file_exists(

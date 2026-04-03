@@ -97,7 +97,7 @@ class DeploymentExecutionFields:
     Corresponds to ExecutionSpec in data layer.
     """
 
-    runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
+    runtime_variant: RuntimeVariant
     startup_command: str | None = None
     bootstrap_script: str | None = None
     environ: Mapping[str, str] | None = None

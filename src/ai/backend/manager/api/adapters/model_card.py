@@ -28,7 +28,7 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
 )
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
@@ -357,7 +357,7 @@ class ModelCardAdapter(BaseAdapter):
                 mounts=VFolderMountsCreator(
                     model_vfolder_id=model_card.vfolder_id,
                 ),
-                execution=ExecutionSpec(),
+                execution=ExecutionSpec(runtime_variant=RuntimeVariant("custom")),
                 model_definition=None,
                 revision_preset_id=input.revision_preset_id,
                 auto_activate=True,

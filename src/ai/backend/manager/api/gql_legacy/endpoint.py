@@ -560,7 +560,7 @@ class RuntimeVariantInfo(graphene.ObjectType):  # type: ignore[misc]
 
     @classmethod
     def from_enum(cls, enum: RuntimeVariant) -> Self:
-        return cls(name=enum.value, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
+        return cls(name=enum, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
 
 
 class Endpoint(graphene.ObjectType):  # type: ignore[misc]

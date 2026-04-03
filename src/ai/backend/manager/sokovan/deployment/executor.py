@@ -528,7 +528,7 @@ class DeploymentExecutor:
                 ),
                 endpoint=EndpointTagsModel(
                     id=str(endpoint_id),
-                    runtime_variant=runtime_variant.value,
+                    runtime_variant=runtime_variant,
                     existing_url=str(existing_url) if existing_url else None,
                 ),
             ),

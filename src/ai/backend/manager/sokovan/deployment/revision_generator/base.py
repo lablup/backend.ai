@@ -6,7 +6,7 @@ from dataclasses import asdict
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.types import RuntimeVariant
+from ai.backend.common.types import MODEL_SERVICE_RUNTIME_PROFILES
 from ai.backend.manager.data.deployment.types import (
     DeploymentConfig,
     ModelRevisionSpec,
@@ -39,7 +39,7 @@ class BaseRevisionGenerator(RevisionGenerator):
         """
         deployment_config = await self.load_deployment_config(
             vfolder_id=vfolder_id,
-            runtime_variant=draft_revision.execution.runtime_variant.value,
+            runtime_variant=draft_revision.execution.runtime_variant,
         )
         revision = self.merge_revision(draft_revision, deployment_config, default_architecture)
         await self.validate_revision(revision)
@@ -101,7 +101,7 @@ class BaseRevisionGenerator(RevisionGenerator):
         if deployment_config_dict is None:
             return None
 
-        all_variant_keys = {variant.value for variant in RuntimeVariant}
+        all_variant_keys = set(MODEL_SERVICE_RUNTIME_PROFILES.keys())
         root_level_dict = {
             k: v for k, v in deployment_config_dict.items() if k not in all_variant_keys
         }

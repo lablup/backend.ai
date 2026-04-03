@@ -92,7 +92,6 @@ from ai.backend.common.types import (
     KernelEnqueueingConfig,
     KernelId,
     ResourceSlot,
-    RuntimeVariant,
     SessionEnqueueingConfig,
     SessionId,
     SessionTypes,
@@ -2390,7 +2389,7 @@ class AgentRegistry:
         if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
             _info = ModelHealthCheck(path=_path)
 
-        if endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+        if endpoint.runtime_variant == "custom":
             # CUSTOM: full validation required
             model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self.storage_manager,
@@ -2498,7 +2497,7 @@ class AgentRegistry:
                 ),
                 endpoint=EndpointTagsModel(
                     id=str(endpoint.id),
-                    runtime_variant=endpoint.runtime_variant.value,
+                    runtime_variant=endpoint.runtime_variant,
                     existing_url=str(endpoint.url) if endpoint.url else None,
                 ),
             ),

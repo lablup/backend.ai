@@ -1976,34 +1976,24 @@ class ModelServiceProfile:
     port: int | None = dataclasses.field(default=None)
 
 
-class RuntimeVariant(enum.StrEnum):
-    VLLM = "vllm"
-    NIM = "nim"
-    CMD = "cmd"
-    HUGGINGFACE_TGI = "huggingface-tgi"
-    SGLANG = "sglang"
-    MODULAR_MAX = "modular-max"
-    CUSTOM = "custom"
+RuntimeVariant = NewType("RuntimeVariant", str)
 
-
-MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
-    RuntimeVariant.CUSTOM: ModelServiceProfile(name="Custom (Default)"),
-    RuntimeVariant.VLLM: ModelServiceProfile(
-        name="vLLM", health_check_endpoint="/health", port=8000
-    ),
-    RuntimeVariant.NIM: ModelServiceProfile(
+# Default runtime variant profiles keyed by runtime_variants.name from DB.
+# Used as fallback for health check endpoints and ports when not specified.
+MODEL_SERVICE_RUNTIME_PROFILES: Mapping[str, ModelServiceProfile] = {
+    "custom": ModelServiceProfile(name="Custom (Default)"),
+    "vllm": ModelServiceProfile(name="vLLM", health_check_endpoint="/health", port=8000),
+    "nim": ModelServiceProfile(
         name="NVIDIA NIM", health_check_endpoint="/v1/health/ready", port=8000
     ),
-    RuntimeVariant.HUGGINGFACE_TGI: ModelServiceProfile(
+    "huggingface-tgi": ModelServiceProfile(
         name="Huggingface TGI", health_check_endpoint="/info", port=3000
     ),
-    RuntimeVariant.SGLANG: ModelServiceProfile(
-        name="SGLang", health_check_endpoint="/health", port=9001
-    ),
-    RuntimeVariant.MODULAR_MAX: ModelServiceProfile(
+    "sglang": ModelServiceProfile(name="SGLang", health_check_endpoint="/health", port=9001),
+    "modular-max": ModelServiceProfile(
         name="Modular MAX", health_check_endpoint="/health", port=8000
     ),
-    RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
+    "cmd": ModelServiceProfile(name="Predefined Image Command"),
 }
 
 

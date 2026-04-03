@@ -334,7 +334,7 @@ class RevisionInput(BaseRequestModel):
         default=None, description="Optional resource options"
     )
     runtime_variant: RuntimeVariant = Field(
-        default=RuntimeVariant.CUSTOM, description="Runtime variant"
+        default=RuntimeVariant("custom"), description="Runtime variant"
     )
     inference_runtime_config: dict[str, Any] | None = Field(
         default=None, description="Framework-specific inference runtime configuration"

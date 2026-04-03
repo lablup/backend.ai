@@ -37,7 +37,6 @@ from ai.backend.manager.models.base import (
     Base,
     PydanticListColumn,
     ResourceSlotColumn,
-    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
 )
@@ -150,11 +149,11 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     callback_url: Mapped[str | None] = mapped_column(
         "callback_url", URLColumn, nullable=True, default=sa.null()
     )
-    runtime_variant: Mapped[RuntimeVariant] = mapped_column(
+    runtime_variant: Mapped[str] = mapped_column(
         "runtime_variant",
-        StrEnumType(RuntimeVariant),
+        sa.String(length=64),
         nullable=False,
-        default=RuntimeVariant.CUSTOM,
+        default="custom",
     )
 
     # Mount configuration
@@ -228,7 +227,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 startup_command=self.startup_command,
                 bootstrap_script=self.bootstrap_script,
                 environ=self.environ,
-                runtime_variant=self.runtime_variant,
+                runtime_variant=RuntimeVariant(self.runtime_variant),
                 callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
             ),
             model_definition=(
@@ -257,7 +256,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 resource_opts=self.resource_opts or {},
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=self.runtime_variant,
+                runtime_variant=RuntimeVariant(self.runtime_variant),
                 environ=self.environ,
             ),
             model_mount_config=ModelMountConfigData(

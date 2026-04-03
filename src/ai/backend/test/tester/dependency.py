@@ -149,7 +149,7 @@ class ModelServiceDep(BaseDependencyModel):
         examples=[1, 2, 3],
     )
     runtime_variant: RuntimeVariant = Field(
-        default=RuntimeVariant.CUSTOM,
+        default="custom",
         description="The runtime variant for the model service.",
         examples=[v.name for v in RuntimeVariant],
     )

@@ -665,7 +665,7 @@ class DeploymentService:
         try:
             deployment_config = await generator.load_deployment_config(
                 vfolder_id=revision_creator.mounts.model_vfolder_id,
-                runtime_variant=revision_creator.execution.runtime_variant.value,
+                runtime_variant=revision_creator.execution.runtime_variant,
             )
         except Exception:
             log.warning(

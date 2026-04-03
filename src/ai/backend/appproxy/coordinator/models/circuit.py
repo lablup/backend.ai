@@ -32,7 +32,6 @@ from .base import (
     Base,
     BaseMixin,
     EnumType,
-    StrEnumType,
     StructuredJSONObjectListColumn,
 )
 
@@ -79,8 +78,8 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
     )  # null if `app_mode` is set to `INFERENCE`
     endpoint_id: Mapped[UUID | None] = mapped_column(GUID, nullable=True)
     # null if `app_mode` is set to `INTERACTIVE`
-    runtime_variant: Mapped[RuntimeVariant | None] = mapped_column(
-        StrEnumType(RuntimeVariant), nullable=True
+    runtime_variant: Mapped[str | None] = mapped_column(
+        sa.String(length=64), nullable=True
     )  # null if `app_mode` is set to `INTERACTIVE`
 
     session_ids: Mapped[list[UUID]] = mapped_column(

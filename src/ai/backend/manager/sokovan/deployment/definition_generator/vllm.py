@@ -6,7 +6,7 @@ from ai.backend.common.config import (
     ModelHealthCheck,
     ModelServiceConfig,
 )
-from ai.backend.common.types import MODEL_SERVICE_RUNTIME_PROFILES, RuntimeVariant
+from ai.backend.common.types import MODEL_SERVICE_RUNTIME_PROFILES
 from ai.backend.manager.sokovan.deployment.definition_generator.base import (
     ModelDefinitionContext,
     ModelDefinitionGenerator,
@@ -18,7 +18,7 @@ class VLLMModelDefinitionGenerator(ModelDefinitionGenerator):
 
     @override
     async def generate_model_definition(self, context: ModelDefinitionContext) -> ModelDefinition:
-        runtime_profile = MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.VLLM]
+        runtime_profile = MODEL_SERVICE_RUNTIME_PROFILES["vllm"]
 
         health_check: ModelHealthCheck | None = None
         if runtime_profile.health_check_endpoint:

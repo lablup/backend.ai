@@ -667,7 +667,11 @@ class EndpointRow(Base):  # type: ignore[misc]
             destroyed_at=self.destroyed_at,
             retries=self.retries,
             lifecycle_stage=self.lifecycle_stage,
-            runtime_variant=(current_rev.runtime_variant if current_rev else RuntimeVariant.CUSTOM),
+            runtime_variant=(
+                RuntimeVariant(current_rev.runtime_variant)
+                if current_rev
+                else RuntimeVariant("custom")
+            ),
             extra_mounts=current_rev.extra_mounts if current_rev else [],
             routings=[routing.to_data() for routing in self.routings] if self.routings else None,
         )
