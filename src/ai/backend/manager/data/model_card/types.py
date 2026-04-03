@@ -27,6 +27,7 @@ class ModelCardData:
     license: str | None
     min_resource: dict[str, str] | None
     readme: str | None
+    access_level: str
     created_at: datetime
     updated_at: datetime | None
 

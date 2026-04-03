@@ -7,7 +7,10 @@ from pydantic import Field
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
+from ai.backend.common.dto.manager.v2.model_card.types import (
+    ModelCardAccessLevel,
+    ModelCardOrderField,
+)
 
 
 class ResourceSlotEntryInput(BaseRequestModel):
@@ -36,6 +39,9 @@ class CreateModelCardInput(BaseRequestModel):
     license: str | None = Field(default=None, max_length=128)
     min_resource: list[ResourceSlotEntryInput] | None = Field(default=None)
     readme: str | None = Field(default=None)
+    access_level: ModelCardAccessLevel = Field(
+        default=ModelCardAccessLevel.INTERNAL, description="Access level."
+    )
 
 
 class UpdateModelCardInput(BaseRequestModel):
@@ -53,6 +59,7 @@ class UpdateModelCardInput(BaseRequestModel):
     license: str | Sentinel | None = Field(default=SENTINEL)
     min_resource: list[ResourceSlotEntryInput] | Sentinel | None = Field(default=SENTINEL)
     readme: str | Sentinel | None = Field(default=SENTINEL)
+    access_level: ModelCardAccessLevel | Sentinel | None = Field(default=SENTINEL)
 
 
 class ModelCardFilter(BaseRequestModel):

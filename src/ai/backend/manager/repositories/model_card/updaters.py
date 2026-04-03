@@ -24,6 +24,7 @@ class ModelCardUpdaterSpec(UpdaterSpec[ModelCardRow]):
     license: TriState[str] = field(default_factory=TriState[str].nop)
     min_resource: TriState[MinResourceSpec] = field(default_factory=TriState[MinResourceSpec].nop)
     readme: TriState[str] = field(default_factory=TriState[str].nop)
+    access_level: OptionalState[str] = field(default_factory=OptionalState[str].nop)
 
     @property
     @override
@@ -46,4 +47,5 @@ class ModelCardUpdaterSpec(UpdaterSpec[ModelCardRow]):
         self.license.update_dict(to_update, "license")
         self.min_resource.update_dict(to_update, "min_resource")
         self.readme.update_dict(to_update, "readme")
+        self.access_level.update_dict(to_update, "access_level")
         return to_update

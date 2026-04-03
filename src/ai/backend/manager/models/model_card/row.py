@@ -72,6 +72,9 @@ class ModelCardRow(Base):  # type: ignore[misc]
         "min_resource", PydanticColumn(MinResourceSpec), nullable=True
     )
     readme: Mapped[str | None] = mapped_column("readme", sa.Text, nullable=True)
+    access_level: Mapped[str] = mapped_column(
+        "access_level", sa.String(length=32), nullable=False, default="internal"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -106,6 +109,7 @@ class ModelCardRow(Base):  # type: ignore[misc]
             license=self.license,
             min_resource=self.min_resource.slots if self.min_resource else None,
             readme=self.readme,
+            access_level=self.access_level,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

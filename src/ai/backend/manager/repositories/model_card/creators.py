@@ -32,6 +32,7 @@ class ModelCardCreatorSpec(CreatorSpec[ModelCardRow]):
     license: str | None
     min_resource: MinResourceSpec | None
     readme: str | None
+    access_level: str
 
     @property
     @override
@@ -63,4 +64,5 @@ class ModelCardCreatorSpec(CreatorSpec[ModelCardRow]):
         row.license = self.license
         row.min_resource = self.min_resource
         row.readme = self.readme
+        row.access_level = self.access_level
         return row

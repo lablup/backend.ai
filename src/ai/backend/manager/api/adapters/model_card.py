@@ -26,7 +26,10 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
     SearchModelCardsPayload,
     UpdateModelCardPayload,
 )
-from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
+from ai.backend.common.dto.manager.v2.model_card.types import (
+    ModelCardAccessLevel,
+    ModelCardOrderField,
+)
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
@@ -189,6 +192,7 @@ class ModelCardAdapter(BaseAdapter):
                 license=input.license,
                 min_resource=min_resource,
                 readme=input.readme,
+                access_level=input.access_level.value,
             ),
             element_type=RBACElementType.MODEL_CARD,
             scope_ref=RBACElementRef(
@@ -289,6 +293,13 @@ class ModelCardAdapter(BaseAdapter):
                 else TriState.nullify()
                 if input.readme is None
                 else TriState.update(input.readme)
+            ),
+            access_level=(
+                OptionalState.nop()
+                if input.access_level is SENTINEL
+                else OptionalState.update(input.access_level.value)
+                if input.access_level is not None
+                else OptionalState.nop()
             ),
         )
         updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=input.id)
@@ -455,6 +466,7 @@ class ModelCardAdapter(BaseAdapter):
                 _min_resource_to_entries(data.min_resource) if data.min_resource else None
             ),
             readme=data.readme,
+            access_level=ModelCardAccessLevel(data.access_level),
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

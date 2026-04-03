@@ -211,4 +211,5 @@ class ModelCardService:
             license=metadata.license if metadata else None,
             min_resource=min_resource,
             readme=readme,
+            access_level="internal",
         )

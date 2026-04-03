@@ -8,6 +8,11 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 
 
+class ModelCardAccessLevel(StrEnum):
+    PUBLIC = "public"
+    INTERNAL = "internal"
+
+
 class ModelCardOrderField(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"

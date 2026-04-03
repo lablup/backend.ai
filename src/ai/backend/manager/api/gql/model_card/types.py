@@ -72,6 +72,18 @@ class ModelCardOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
 
 
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Access level for model cards.",
+    ),
+    name="ModelCardV2AccessLevel",
+)
+class ModelCardAccessLevelGQL(StrEnum):
+    PUBLIC = "public"
+    INTERNAL = "internal"
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
@@ -137,6 +149,9 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     )
     readme: str | None = gql_field(
         description="README content from the model VFolder, typically containing usage instructions and model documentation."
+    )
+    access_level: ModelCardAccessLevelGQL = gql_field(
+        description="Access level of the model card (public or internal)."
     )
     created_at: datetime = gql_field(description="Timestamp when this model card was registered.")
     updated_at: datetime | None = gql_field(
@@ -211,6 +226,9 @@ class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
     label: list[str] | None = gql_field(default=None, description="Labels.")
     license: str | None = gql_field(default=None, description="License.")
     readme: str | None = gql_field(default=None, description="README content.")
+    access_level: ModelCardAccessLevelGQL | None = gql_field(
+        default=None, description="Access level (public or internal)."
+    )
 
 
 @gql_pydantic_input(
@@ -231,6 +249,9 @@ class UpdateModelCardInputGQL(PydanticInputMixin[UpdateInputDTO]):
     label: list[str] | None = gql_field(default=None, description="Labels.")
     license: str | None = gql_field(default=None, description="License.")
     readme: str | None = gql_field(default=None, description="README content.")
+    access_level: ModelCardAccessLevelGQL | None = gql_field(
+        default=None, description="Access level (public or internal)."
+    )
 
 
 @gql_pydantic_type(

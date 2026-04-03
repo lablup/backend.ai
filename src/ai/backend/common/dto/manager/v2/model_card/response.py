@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.model_card.types import ModelCardAccessLevel
 
 
 class ResourceSlotEntryInfo(BaseResponseModel):
@@ -36,6 +37,7 @@ class ModelCardNode(BaseResponseModel):
     metadata: ModelCardMetadata = Field(description="Model metadata.")
     min_resource: list[ResourceSlotEntryInfo] | None = Field(default=None)
     readme: str | None = Field(default=None)
+    access_level: ModelCardAccessLevel = Field(description="Access level of the model card.")
     created_at: datetime = Field(description="Creation timestamp.")
     updated_at: datetime | None = Field(default=None)
 
