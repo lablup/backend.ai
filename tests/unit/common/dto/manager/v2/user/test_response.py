@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.user.response import (
     SearchUsersPayload,
     UserBasicInfo,
     UserContainerSettings,
+    UserDetailNode,
     UserGroupMembershipInfo,
     UserNode,
     UserOrganizationInfo,
@@ -417,18 +418,37 @@ class TestUserGroupMembershipInfo:
         assert restored.name == "researchers"
 
 
-class TestUserNodeGroups:
-    """Tests for the groups field on UserNode."""
+class TestUserNodeDoesNotHaveGroups:
+    """Tests that UserNode does not carry groups (groups live on UserDetailNode)."""
+
+    def test_user_node_has_no_groups_field(self) -> None:
+        node = make_user_node()
+        assert "groups" not in node.model_fields
+
+    def test_serialized_json_excludes_groups_key(self) -> None:
+        node = make_user_node()
+        data = json.loads(node.model_dump_json())
+        assert "groups" not in data
+
+
+def make_user_detail_node(user_id: uuid.UUID | None = None) -> UserDetailNode:
+    """Helper to create a valid UserDetailNode for testing."""
+    base = make_user_node(user_id)
+    return UserDetailNode(**base.model_dump())
+
+
+class TestUserDetailNodeGroups:
+    """Tests for the groups field on UserDetailNode."""
 
     def test_groups_defaults_to_empty_list(self) -> None:
-        node = make_user_node()
+        node = make_user_detail_node()
         assert node.groups == []
 
     def test_groups_with_populated_list(self) -> None:
-        node = make_user_node()
         g1, g2 = uuid.uuid4(), uuid.uuid4()
         group1 = UserGroupMembershipInfo(id=g1, name="group-one")
         group2 = UserGroupMembershipInfo(id=g2, name="group-two")
+        node = make_user_detail_node()
         node_with_groups = node.model_copy(update={"groups": [group1, group2]})
         assert len(node_with_groups.groups) == 2
         assert node_with_groups.groups[0].id == g1
@@ -440,17 +460,21 @@ class TestUserNodeGroups:
         user_id = uuid.uuid4()
         gid = uuid.uuid4()
         group = UserGroupMembershipInfo(id=gid, name="test-group")
-        node = make_user_node(user_id)
+        node = make_user_detail_node(user_id)
         node_with_groups = node.model_copy(update={"groups": [group]})
         json_str = node_with_groups.model_dump_json()
-        restored = UserNode.model_validate_json(json_str)
+        restored = UserDetailNode.model_validate_json(json_str)
         assert restored.id == user_id
         assert len(restored.groups) == 1
         assert restored.groups[0].id == gid
         assert restored.groups[0].name == "test-group"
 
     def test_serialized_json_includes_groups_key(self) -> None:
-        node = make_user_node()
+        node = make_user_detail_node()
         data = json.loads(node.model_dump_json())
         assert "groups" in data
         assert data["groups"] == []
+
+    def test_is_subclass_of_user_node(self) -> None:
+        node = make_user_detail_node()
+        assert isinstance(node, UserNode)

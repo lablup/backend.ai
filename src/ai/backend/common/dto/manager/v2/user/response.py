@@ -33,6 +33,8 @@ __all__ = (
     "UpdateUserPayload",
     "UserBasicInfo",
     "UserContainerSettings",
+    "UserDetailNode",
+    "UserDetailPayload",
     "UserGroupMembershipInfo",
     "UserNode",
     "UserOrganizationInfo",
@@ -194,10 +196,37 @@ class UserNode(BaseResponseModel):
     timestamps: EntityTimestamps = Field(
         description="Creation and modification timestamps.",
     )
+
+
+class UserDetailNode(UserNode):
+    """Extended user entity with group membership info.
+
+    Used by REST v2 detail endpoints. The GQL layer uses UserNode
+    with the ``projects`` connection resolver instead.
+    """
+
     groups: list[UserGroupMembershipInfo] = Field(
         default_factory=list,
         description="List of groups the user belongs to.",
     )
+
+    @classmethod
+    def from_user_node(
+        cls,
+        node: UserNode,
+        *,
+        groups: list[UserGroupMembershipInfo],
+    ) -> UserDetailNode:
+        return cls(
+            id=node.id,
+            basic_info=node.basic_info,
+            status=node.status,
+            organization=node.organization,
+            security=node.security,
+            container=node.container,
+            timestamps=node.timestamps,
+            groups=groups,
+        )
 
 
 class UserPayload(BaseResponseModel):
@@ -205,6 +234,14 @@ class UserPayload(BaseResponseModel):
 
     user: UserNode = Field(
         description="The user entity.",
+    )
+
+
+class UserDetailPayload(BaseResponseModel):
+    """Payload for single user detail responses (includes group memberships)."""
+
+    user: UserDetailNode = Field(
+        description="The user entity with group membership details.",
     )
 
 

@@ -62,10 +62,11 @@ from ai.backend.common.dto.manager.v2.user.response import (
     UpdateUserPayload,
     UserBasicInfo,
     UserContainerSettings,
+    UserDetailNode,
+    UserDetailPayload,
     UserGroupMembershipInfo,
     UserNode,
     UserOrganizationInfo,
-    UserPayload,
     UserSecurityInfo,
     UserStatusInfo,
 )
@@ -378,13 +379,15 @@ class UserAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ get
 
-    async def get(self, user_id: UUID) -> UserPayload:
+    async def get(self, user_id: UUID) -> UserDetailPayload:
         """Get a user by UUID."""
         action_result = await self._processors.user.get_user.wait_for_complete(
             GetUserAction(user_uuid=user_id)
         )
         detail = action_result.user
-        return UserPayload(user=self._user_data_to_node(detail.user, groups=detail.groups))
+        return UserDetailPayload(
+            user=self._user_data_to_detail_node(detail.user, groups=detail.groups)
+        )
 
     # ------------------------------------------------------------------ single CRUD
 
@@ -1235,8 +1238,6 @@ class UserAdapter(BaseAdapter):
     @staticmethod
     def _user_data_to_node(
         data: UserData,
-        *,
-        groups: list[UserGroupMembership] | None = None,
     ) -> UserNode:
         """Convert UserData to UserNode DTO."""
         return UserNode(
@@ -1274,5 +1275,18 @@ class UserAdapter(BaseAdapter):
                 created_at=data.created_at,
                 modified_at=data.modified_at,
             ),
+        )
+
+    @classmethod
+    def _user_data_to_detail_node(
+        cls,
+        data: UserData,
+        *,
+        groups: list[UserGroupMembership] | None = None,
+    ) -> UserDetailNode:
+        """Convert UserData to UserDetailNode DTO (includes group memberships)."""
+        node = cls._user_data_to_node(data)
+        return UserDetailNode.from_user_node(
+            node,
             groups=[UserGroupMembershipInfo(id=m.id, name=m.name) for m in (groups or [])],
         )
