@@ -183,9 +183,6 @@ class DummyExplicitAllowPlugin(AbstractPlugin):
     require_explicit_allow = True
     _entrypoint_name = "explicit-only"
 
-    def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
-        super().__init__(plugin_config, local_config)
-
     async def init(self, context: Any | None = None) -> None:
         pass
 
