@@ -11,6 +11,8 @@ import sqlalchemy as sa
 if TYPE_CHECKING:
     from ai.backend.common.data.filter_specs import StringMatchSpec
 
+from uuid import UUID
+
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.repositories.base import QueryCondition
@@ -20,6 +22,13 @@ from .row import VFolderRow
 
 class VFolderConditions:
     """Query conditions for vfolders."""
+
+    @staticmethod
+    def by_id(vfolder_id: UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.id == vfolder_id
+
+        return inner
 
     # ── name string filter factories ──
 

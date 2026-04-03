@@ -32,6 +32,7 @@ __all__ = (
     "InviteVFolderPayload",
     "ListFilesPayload",
     "MkdirPayload",
+    "MoveFilePayload",
     "PurgeVFolderPayload",
     "RestoreVFolderPayload",
     "ShareVFolderPayload",
@@ -166,6 +167,12 @@ class CreateUploadSessionPayload(BaseResponseModel):
 
     token: str = Field(description="Upload session token")
     url: str = Field(description="Upload URL")
+
+
+class MoveFilePayload(BaseResponseModel):
+    """Payload for file move mutation result."""
+
+    success: bool = Field(default=True, description="Whether the file move succeeded")
 
 
 class DeleteFilesPayload(BaseResponseModel):

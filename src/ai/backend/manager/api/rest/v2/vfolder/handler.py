@@ -7,8 +7,14 @@ from typing import TYPE_CHECKING
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    CloneVFolderInput,
+    CreateDownloadSessionInput,
     CreateUploadSessionInput,
     CreateVFolderInput,
+    DeleteFilesInput,
+    ListFilesInput,
+    MkdirInput,
+    MoveFileInput,
     SearchVFoldersInput,
 )
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, VFolderIdPathParam
@@ -48,3 +54,89 @@ class V2VFolderHandler:
         """Create an upload session for a vfolder."""
         result = await self._adapter.create_upload_session(path.parsed.vfolder_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_search(
+        self,
+        body: BodyParam[SearchVFoldersInput],
+    ) -> APIResponse:
+        """Search all vfolders (superadmin only)."""
+        result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def get(
+        self,
+        path: PathParam[VFolderIdPathParam],
+    ) -> APIResponse:
+        """Get a vfolder by ID."""
+        result = await self._adapter.get(path.parsed.vfolder_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def delete(
+        self,
+        path: PathParam[VFolderIdPathParam],
+    ) -> APIResponse:
+        """Soft-delete a vfolder."""
+        result = await self._adapter.delete(path.parsed.vfolder_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def purge(
+        self,
+        path: PathParam[VFolderIdPathParam],
+    ) -> APIResponse:
+        """Permanently delete a vfolder."""
+        result = await self._adapter.purge(path.parsed.vfolder_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def list_files(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[ListFilesInput],
+    ) -> APIResponse:
+        """List files in a vfolder."""
+        result = await self._adapter.list_files(path.parsed.vfolder_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def mkdir(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[MkdirInput],
+    ) -> APIResponse:
+        """Create a directory in a vfolder."""
+        result = await self._adapter.mkdir(path.parsed.vfolder_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def move_file(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[MoveFileInput],
+    ) -> APIResponse:
+        """Move a file within a vfolder."""
+        result = await self._adapter.move_file(path.parsed.vfolder_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def delete_files(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[DeleteFilesInput],
+    ) -> APIResponse:
+        """Delete files in a vfolder."""
+        result = await self._adapter.delete_files(path.parsed.vfolder_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def create_download_session(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[CreateDownloadSessionInput],
+    ) -> APIResponse:
+        """Create a download session for a vfolder."""
+        result = await self._adapter.create_download_session(path.parsed.vfolder_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def clone(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[CloneVFolderInput],
+    ) -> APIResponse:
+        """Clone a vfolder."""
+        result = await self._adapter.clone(path.parsed.vfolder_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)

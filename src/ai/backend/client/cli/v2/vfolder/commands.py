@@ -105,3 +105,201 @@ def upload(vfolder_id: UUID, filenames: tuple[str, ...]) -> None:
             await registry.close()
 
     asyncio.run(_run())
+
+
+@vfolder.command(name="admin-search")
+@click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
+@click.option("--offset", type=int, default=0, help="Number of items to skip.")
+def admin_search(limit: int, offset: int) -> None:
+    """Search all vfolders (admin)."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            request = SearchVFoldersInput(limit=limit, offset=offset)
+            result = await registry.vfolder.admin_search(request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
+def get(vfolder_id: UUID) -> None:
+    """Get a vfolder by ID."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.get(vfolder_id)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
+def delete(vfolder_id: UUID) -> None:
+    """Delete a vfolder (move to trash)."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.delete(vfolder_id)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
+def purge(vfolder_id: UUID) -> None:
+    """Permanently delete a vfolder."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.purge(vfolder_id)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
+@click.option("--path", default=".", help="Directory path to list.")
+def ls(vfolder_id: UUID, path: str) -> None:
+    """List files in a vfolder."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import ListFilesInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            request = ListFilesInput(path=path)
+            result = await registry.vfolder.list_files(vfolder_id, request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
+@click.argument("path", type=str)
+@click.option("--parents/--no-parents", default=True, help="Create parent directories if needed.")
+@click.option("--exist-ok", is_flag=True, default=False, help="Do not error if directory exists.")
+def mkdir(vfolder_id: UUID, path: str, parents: bool, exist_ok: bool) -> None:
+    """Create a directory in a vfolder."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import MkdirInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            request = MkdirInput(path=path, parents=parents, exist_ok=exist_ok)
+            result = await registry.vfolder.mkdir(vfolder_id, request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
+@click.argument("src", type=str)
+@click.argument("dst", type=str)
+def mv(vfolder_id: UUID, src: str, dst: str) -> None:
+    """Move a file within a vfolder."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import MoveFileInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            request = MoveFileInput(src=src, dst=dst)
+            result = await registry.vfolder.move_file(vfolder_id, request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
+@click.argument("files", nargs=-1, required=True)
+@click.option("--recursive", is_flag=True, default=False, help="Delete directories recursively.")
+def rm(vfolder_id: UUID, files: tuple[str, ...], recursive: bool) -> None:
+    """Delete files in a vfolder."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import DeleteFilesInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            request = DeleteFilesInput(files=list(files), recursive=recursive)
+            result = await registry.vfolder.delete_files(vfolder_id, request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
+@click.argument("path", type=str)
+@click.option("--archive", is_flag=True, default=False, help="Archive the file for download.")
+def download(vfolder_id: UUID, path: str, archive: bool) -> None:
+    """Create a download session for a file in a vfolder."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import CreateDownloadSessionInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            request = CreateDownloadSessionInput(path=path, archive=archive)
+            result = await registry.vfolder.create_download_session(vfolder_id, request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
+@click.option("--target-name", required=True, help="Name for the cloned vfolder.")
+@click.option("--target-host", default=None, help="Target storage host.")
+def clone(vfolder_id: UUID, target_name: str, target_host: str | None) -> None:
+    """Clone a vfolder."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import CloneVFolderInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            request = CloneVFolderInput(
+                source_id=vfolder_id,
+                target_name=target_name,
+                target_host=target_host,
+            )
+            result = await registry.vfolder.clone(vfolder_id, request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())

@@ -7,15 +7,30 @@ from uuid import UUID
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    CloneVFolderInput,
+    CreateDownloadSessionInput,
     CreateUploadSessionInput,
     CreateVFolderInput,
+    DeleteFilesInput,
+    ListFilesInput,
+    MkdirInput,
+    MoveFileInput,
     SearchVFoldersInput,
     VFolderFilter,
     VFolderOrder,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
+    CloneVFolderPayload,
+    CreateDownloadSessionPayload,
     CreateUploadSessionPayload,
     CreateVFolderPayload,
+    DeleteFilesPayload,
+    DeleteVFolderPayload,
+    FileEntryNode,
+    ListFilesPayload,
+    MkdirPayload,
+    MoveFilePayload,
+    PurgeVFolderPayload,
     SearchVFoldersPayload,
     VFolderNode,
 )
@@ -34,6 +49,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderOperationStatus,
 )
+from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.orders import (
@@ -62,6 +78,14 @@ from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     AdminSearchVFoldersAction,
 )
 from ai.backend.manager.services.vfolder.actions.create_v2 import CreateVFolderV2Action
+from ai.backend.manager.services.vfolder.actions.file_v2 import (
+    CloneVFolderV2Action,
+    CreateDownloadSessionV2Action,
+    DeleteFilesV2Action,
+    ListFilesV2Action,
+    MkdirV2Action,
+    MoveFileV2Action,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
 )
@@ -70,6 +94,10 @@ from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
 )
 from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
+)
+from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
+    DeleteVFolderV2Action,
+    PurgeVFolderV2Action,
 )
 
 from .base import BaseAdapter
@@ -259,6 +287,137 @@ class VFolderAdapter(BaseAdapter):
         )
         result = await self._processors.vfolder.create_upload_session_v2.wait_for_complete(action)
         return CreateUploadSessionPayload(token=result.token, url=result.url)
+
+    async def get(self, vfolder_id: UUID) -> VFolderNode:
+        """Get a single vfolder by ID."""
+        conditions: list[QueryCondition] = [VFolderConditions.by_id(vfolder_id)]
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=[],
+            pagination_spec=_VFOLDER_PAGINATION_SPEC,
+            limit=1,
+        )
+        result = await self._processors.vfolder_admin.admin_search_vfolders.wait_for_complete(
+            AdminSearchVFoldersAction(querier=querier)
+        )
+        if not result.data:
+            raise VFolderNotFound()
+        return self._vfolder_data_to_node(result.data[0])
+
+    async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
+        """Soft-delete a vfolder (move to trash)."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action = DeleteVFolderV2Action(user_id=me.user_id, vfolder_id=vfolder_id)
+        await self._processors.vfolder.delete_v2.wait_for_complete(action)
+        return DeleteVFolderPayload(id=vfolder_id)
+
+    async def purge(self, vfolder_id: UUID) -> PurgeVFolderPayload:
+        """Permanently delete a vfolder."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action = PurgeVFolderV2Action(user_id=me.user_id, vfolder_id=vfolder_id)
+        await self._processors.vfolder.purge_v2.wait_for_complete(action)
+        return PurgeVFolderPayload(id=vfolder_id)
+
+    async def list_files(self, vfolder_id: UUID, input: ListFilesInput) -> ListFilesPayload:
+        """List files in a vfolder."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action = ListFilesV2Action(user_id=me.user_id, vfolder_id=vfolder_id, path=input.path)
+        result = await self._processors.vfolder_file.list_files_v2.wait_for_complete(action)
+        return ListFilesPayload(
+            items=[
+                FileEntryNode(
+                    name=f.name,
+                    type=f.type,
+                    size=f.size,
+                    mode=str(f.mode),
+                    created=str(f.created),
+                    modified=str(f.modified),
+                )
+                for f in result.files
+            ]
+        )
+
+    async def mkdir(self, vfolder_id: UUID, input: MkdirInput) -> MkdirPayload:
+        """Create directories in a vfolder."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action = MkdirV2Action(
+            user_id=me.user_id,
+            vfolder_id=vfolder_id,
+            path=input.path,
+            parents=input.parents,
+            exist_ok=input.exist_ok,
+        )
+        await self._processors.vfolder_file.mkdir_v2.wait_for_complete(action)
+        paths = [input.path] if isinstance(input.path, str) else input.path
+        return MkdirPayload(results=paths)
+
+    async def move_file(self, vfolder_id: UUID, input: MoveFileInput) -> MoveFilePayload:
+        """Move a file within a vfolder."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action = MoveFileV2Action(
+            user_id=me.user_id, vfolder_id=vfolder_id, src=input.src, dst=input.dst
+        )
+        await self._processors.vfolder_file.move_file_v2.wait_for_complete(action)
+        return MoveFilePayload()
+
+    async def delete_files(self, vfolder_id: UUID, input: DeleteFilesInput) -> DeleteFilesPayload:
+        """Delete files in a vfolder."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action = DeleteFilesV2Action(
+            user_id=me.user_id,
+            vfolder_id=vfolder_id,
+            files=input.files,
+            recursive=input.recursive,
+        )
+        await self._processors.vfolder_file.delete_files_v2.wait_for_complete(action)
+        return DeleteFilesPayload()
+
+    async def create_download_session(
+        self, vfolder_id: UUID, input: CreateDownloadSessionInput
+    ) -> CreateDownloadSessionPayload:
+        """Create a download session."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action = CreateDownloadSessionV2Action(
+            user_id=me.user_id,
+            vfolder_id=vfolder_id,
+            path=input.path,
+            archive=input.archive,
+        )
+        result = await self._processors.vfolder_file.download_file_v2.wait_for_complete(action)
+        return CreateDownloadSessionPayload(token=result.token, url=result.url)
+
+    async def clone(self, vfolder_id: UUID, input: CloneVFolderInput) -> CloneVFolderPayload:
+        """Clone a vfolder."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        action = CloneVFolderV2Action(
+            user_id=me.user_id,
+            vfolder_id=vfolder_id,
+            target_name=input.target_name,
+            target_host=input.target_host,
+        )
+        result = await self._processors.vfolder.clone_v2.wait_for_complete(action)
+        # Fetch the newly created vfolder for the response
+        cloned_vfolder = await self.get(result.new_vfolder_id)
+        return CloneVFolderPayload(
+            vfolder=cloned_vfolder,
+            bgtask_id=result.bgtask_id or "",
+        )
 
     # -------------------------------------------------------------------------
     # Filter / Order conversion

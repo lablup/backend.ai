@@ -98,6 +98,10 @@ from ai.backend.manager.services.vfolder.actions.create_v2 import (
     CreateVFolderV2Action,
     CreateVFolderV2ActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.file_v2 import (
+    CloneVFolderV2Action,
+    CloneVFolderV2ActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
@@ -138,6 +142,12 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
 from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
     CreateUploadSessionV2ActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
+    DeleteVFolderV2Action,
+    DeleteVFolderV2ActionResult,
+    PurgeVFolderV2Action,
+    PurgeVFolderV2ActionResult,
 )
 from ai.backend.manager.services.vfolder.types import (
     VFolderBaseInfo,
@@ -1554,4 +1564,172 @@ class VFolderService:
         return CreateUploadSessionV2ActionResult(
             token=storage_reply["token"],
             url=str(client_api_url / "upload"),
+        )
+
+    async def delete_v2(self, action: DeleteVFolderV2Action) -> DeleteVFolderV2ActionResult:
+        """Delete (trash) a vfolder (v2). Resolves policy internally from user_id."""
+        user = await self._user_repository.get_user_by_uuid(action.user_id)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_id, user.id, user.domain_name
+        )
+
+        # Host permission check — resolved from user_id
+        await self._vfolder_repository.ensure_host_permission_allowed_by_user(
+            vfolder_data.host,
+            permission=VFolderHostPermission.DELETE,
+            user_uuid=action.user_id,
+        )
+
+        await self._vfolder_repository.move_vfolders_to_trash([vfolder_data.id])
+        return DeleteVFolderV2ActionResult(vfolder_id=action.vfolder_id)
+
+    async def purge_v2(self, action: PurgeVFolderV2Action) -> PurgeVFolderV2ActionResult:
+        """Purge a vfolder permanently (v2). Resolves policy internally from user_id."""
+        user = await self._user_repository.get_user_by_uuid(action.user_id)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_id, user.id, user.domain_name
+        )
+
+        # Host permission check — resolved from user_id
+        await self._vfolder_repository.ensure_host_permission_allowed_by_user(
+            vfolder_data.host,
+            permission=VFolderHostPermission.DELETE,
+            user_uuid=action.user_id,
+        )
+
+        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_id])
+        await self._remove_vfolder_from_storage(vfolder_data)
+        return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_id)
+
+    async def clone_v2(self, action: CloneVFolderV2Action) -> CloneVFolderV2ActionResult:
+        """Clone a vfolder (v2). Resolves policy internally from user_id."""
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        if "user" not in allowed_vfolder_types:
+            raise VFolderInvalidParameter("user vfolder cannot be created in this host")
+
+        # Get requester user info
+        user_info = await self._vfolder_repository.get_user_info(action.user_id)
+        if not user_info:
+            raise VFolderInvalidParameter("No such user.")
+        user_role, user_domain_name = user_info
+
+        # Get accessible vfolders to find the source folder
+        vfolder_list_result = await self._vfolder_repository.list_accessible_vfolders(
+            user_id=action.user_id,
+            user_role=user_role,
+            domain_name=user_domain_name,
+            allowed_vfolder_types=list(allowed_vfolder_types),
+            extra_conditions=(VFolderRow.id == action.vfolder_id),
+        )
+
+        if not vfolder_list_result.vfolders:
+            raise VFolderInvalidParameter("No such vfolder.")
+
+        source_vfolder_access_info = vfolder_list_result.vfolders[0]
+        source_vfolder_data = source_vfolder_access_info.vfolder_data
+
+        # Check if the source vfolder is allowed to be cloned
+        if not source_vfolder_data.cloneable:
+            raise Forbidden("The source vfolder is not permitted to be cloned.")
+
+        if action.target_name.startswith("."):
+            for entry in vfolder_list_result.vfolders:
+                if entry.vfolder_data.name == action.target_name:
+                    raise VFolderAlreadyExists
+
+        # Get target host
+        target_folder_host = (
+            action.target_host
+            or source_vfolder_data.host
+            or self._config_provider.config.volumes.default_host
+        )
+        if not target_folder_host:
+            raise VFolderInvalidParameter(
+                "You must specify the vfolder host because the default host is not configured."
+            )
+
+        # Verify target vfolder name
+        if not verify_vfolder_name(action.target_name):
+            raise VFolderInvalidParameter(
+                f"{action.target_name} is reserved for internal operations."
+            )
+
+        # Check for duplicate vfolder names
+        duplication_exists = await self._vfolder_repository.check_vfolder_name_exists(
+            action.target_name,
+            action.user_id,
+            user_role,
+            user_domain_name,
+            list(allowed_vfolder_types),
+        )
+
+        if duplication_exists:
+            raise VFolderAlreadyExists(
+                f"VFolder with the given name already exists. ({action.target_name})"
+            )
+
+        # Host permission check — resolved from user_id, not passed resource_policy
+        await self._vfolder_repository.ensure_host_permission_allowed_by_user(
+            target_folder_host,
+            permission=VFolderHostPermission.CREATE,
+            user_uuid=action.user_id,
+        )
+
+        max_vfolder_count = await self._vfolder_repository.get_max_vfolder_count(
+            action.user_id, source_vfolder_data.group
+        )
+
+        # Check resource policy's max_vfolder_count
+        if max_vfolder_count > 0:
+            current_count = await self._vfolder_repository.count_vfolders_by_user(action.user_id)
+            if current_count >= max_vfolder_count:
+                raise VFolderInvalidParameter("You cannot create more vfolders.")
+
+        # Get user email for creator field
+        requester_email = await self._vfolder_repository.get_user_email_by_id(action.user_id)
+        if not requester_email:
+            raise VFolderInvalidParameter("No such user.")
+
+        # Create source VFolderID
+        source_folder_id = VFolderID(source_vfolder_data.quota_scope_id, source_vfolder_data.id)
+
+        # Target quota scope: default to requester's user scope
+        target_quota_scope_id = QuotaScopeID(QuotaScopeType.USER, action.user_id)
+
+        # Parse usage_mode and permission from action strings
+        usage_mode = VFolderUsageMode(action.usage_mode)
+        mount_permission = VFolderPermission(action.permission)
+
+        # Create VFolderCloneInfo for the cloning operation
+        vfolder_clone_info = VFolderCloneInfo(
+            source_vfolder_id=source_folder_id,
+            source_host=source_vfolder_data.host,
+            unmanaged_path=source_vfolder_data.unmanaged_path,
+            domain_name=user_domain_name,
+            target_quota_scope_id=target_quota_scope_id,
+            target_vfolder_name=action.target_name,
+            target_host=target_folder_host,
+            usage_mode=usage_mode,
+            permission=mount_permission,
+            email=requester_email,
+            user_id=action.user_id,
+            cloneable=action.cloneable,
+        )
+
+        # Initiate the actual vfolder cloning process using repository
+        _task_id, target_folder_id = await self._vfolder_repository.initiate_vfolder_clone(
+            vfolder_clone_info,
+            self._storage_manager,
+            self._background_task_manager,
+        )
+
+        return CloneVFolderV2ActionResult(
+            new_vfolder_id=target_folder_id,
+            bgtask_id=str(_task_id) if _task_id else None,
         )
