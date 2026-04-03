@@ -113,6 +113,11 @@ class KeypairAuthHookPlugin(HookPlugin):
         plugin_config = nmget(shared_config, "plugins.webapp.keypair_auth")
         auth_token_name = self.plugin_config["auth_token_name"]
 
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
         stoken = params[auth_token_name]
         if stoken:
             secret = plugin_config["secret"]
@@ -140,16 +145,16 @@ class KeypairAuthHookPlugin(HookPlugin):
                         keypair = result.fetchone()
 
                     sign_params = {
-                        "date": params["date"],
-                        "endpoint": params["endpoint"],
-                        "api_version": params["api_version"],
+                        "date": body.get("date"),
+                        "endpoint": body.get("endpoint"),
+                        "api_version": body.get("api_version"),
                     }
                     generated_token = await self.sign_token(
-                        sign_method, keypair["secret_key"], sign_params
+                        sign_method, keypair.secret_key, sign_params
                     )
                     if generated_token != signature:
                         raise Reject("Invalid auth token")
-                    user_id = keypair["user"]
+                    user_id = keypair.user
 
                 except Exception as e:
                     log.error("AUTHORIZE_KEYPAIR_HOOK: invalid auth token {}", stoken)
@@ -157,18 +162,14 @@ class KeypairAuthHookPlugin(HookPlugin):
                     raise Reject("Invalid auth token") from None
 
         else:
-            return None
+            return None  # no-op for normal login
 
         async with db.begin() as conn:
-            query = (
-                sa.select(users.c.uuid, users.c.status)
-                .select_from(users)
-                .where(users.c.uuid == user_id)
-            )
+            query = sa.select(users).select_from(users).where(users.c.uuid == user_id)
             result = await conn.execute(query)
             user = result.fetchone()
             if not user:
                 raise Reject("No such user with access key")
-            if user["status"] != UserStatus.ACTIVE:
+            if user.status != UserStatus.ACTIVE:
                 raise Reject("user is inactivated with access key")
             return user
