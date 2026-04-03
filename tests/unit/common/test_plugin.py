@@ -193,10 +193,37 @@ class DummyExplicitAllowPlugin(AbstractPlugin):
         pass
 
 
-class TestDiscoverPluginsRequireExplicitAllow:
-    """Tests for require_explicit_allow flag in discover_plugins()."""
+class TestDiscoverPlugins:
+    """Tests for BasePluginContext.discover_plugins()."""
 
-    def test_require_explicit_allow_skipped_when_no_allowlist(self, mocker: MockerFixture) -> None:
+    def test_discovers_single_plugin(self, mocker: MockerFixture) -> None:
+        """A single normal plugin is discovered and returned."""
+        mocked_entrypoints = functools.partial(mock_entrypoints_with_class, plugin_cls=DummyPlugin)
+        mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
+        results = list(
+            BasePluginContext.discover_plugins("backendai_XXX_v10", allowlist=None, blocklist=None)
+        )
+        assert len(results) == 1
+        assert results[0][0] == "dummy"
+        assert results[0][1] is DummyPlugin
+
+    def test_discovers_multiple_plugins(self, mocker: MockerFixture) -> None:
+        """Multiple normal plugins are all discovered."""
+        mocked_entrypoints = functools.partial(
+            mock_entrypoints_with_class,
+            plugin_cls=[DummyPlugin, DummyExplicitAllowPlugin],
+        )
+        mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
+        results = list(
+            BasePluginContext.discover_plugins(
+                "backendai_XXX_v10",
+                allowlist={"dummy", "explicit-only"},
+                blocklist=None,
+            )
+        )
+        assert len(results) == 2
+
+    def test_explicit_allow_plugin_skipped_when_no_allowlist(self, mocker: MockerFixture) -> None:
         """Plugins with require_explicit_allow=True are skipped when allowlist is None."""
         mocked_entrypoints = functools.partial(
             mock_entrypoints_with_class, plugin_cls=DummyExplicitAllowPlugin
@@ -207,7 +234,7 @@ class TestDiscoverPluginsRequireExplicitAllow:
         )
         assert len(results) == 0
 
-    def test_require_explicit_allow_loaded_when_in_allowlist(self, mocker: MockerFixture) -> None:
+    def test_explicit_allow_plugin_loaded_when_in_allowlist(self, mocker: MockerFixture) -> None:
         """Plugins with require_explicit_allow=True load when explicitly in allowlist."""
         mocked_entrypoints = functools.partial(
             mock_entrypoints_with_class, plugin_cls=[DummyExplicitAllowPlugin]
@@ -222,21 +249,10 @@ class TestDiscoverPluginsRequireExplicitAllow:
         assert results[0][0] == "explicit-only"
         assert results[0][1] is DummyExplicitAllowPlugin
 
-    def test_normal_plugin_unaffected_when_no_allowlist(self, mocker: MockerFixture) -> None:
-        """Plugins with require_explicit_allow=False (default) still load when allowlist is None."""
-        mocked_entrypoints = functools.partial(mock_entrypoints_with_class, plugin_cls=DummyPlugin)
-        mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
-        results = list(
-            BasePluginContext.discover_plugins("backendai_XXX_v10", allowlist=None, blocklist=None)
-        )
-        assert len(results) == 1
-        assert results[0][0] == "dummy"
-        assert results[0][1] is DummyPlugin
-
-    def test_mixed_plugins_only_normal_loaded_when_no_allowlist(
+    def test_mixed_plugins_without_allowlist_skips_explicit_only(
         self, mocker: MockerFixture
     ) -> None:
-        """When allowlist is None, only normal plugins load; explicit-allow plugins are skipped."""
+        """When allowlist is None, normal plugins load but explicit-allow plugins are skipped."""
         mocked_entrypoints = functools.partial(
             mock_entrypoints_with_class,
             plugin_cls=[DummyPlugin, DummyExplicitAllowPlugin],
