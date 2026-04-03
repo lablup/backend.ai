@@ -480,6 +480,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
     _spec: MonitoringValkeyClientSpec
     _monitor_task: asyncio.Task[None] | None
     _needs_reconnect: bool
+    _reconnect_event: asyncio.Event
     _consecutive_failure_count: int
     _operation_failure_count: int
 
@@ -494,6 +495,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._spec = spec or MonitoringValkeyClientSpec()
         self._monitor_task = None
         self._needs_reconnect = False
+        self._reconnect_event = asyncio.Event()
         self._consecutive_failure_count = 0
         self._operation_failure_count = 0
         self._closed = False
@@ -557,6 +559,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
                 )
                 self._operation_failure_count = 0
                 self._needs_reconnect = True
+                self._reconnect_event.set()
             raise
         else:
             self._operation_failure_count = 0
@@ -615,7 +618,15 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         try:
             while True:
                 try:
-                    await asyncio.sleep(self._spec.monitor_interval)
+                    # Wait for either the monitor interval or an explicit reconnect request
+                    try:
+                        await asyncio.wait_for(
+                            self._reconnect_event.wait(),
+                            timeout=self._spec.monitor_interval,
+                        )
+                    except TimeoutError:
+                        pass
+                    self._reconnect_event.clear()
                     if self._needs_reconnect or await self._check_connection():
                         self._needs_reconnect = False
                         log.info("Reconnecting Valkey clients...")
