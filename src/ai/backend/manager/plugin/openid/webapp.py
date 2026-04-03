@@ -229,8 +229,12 @@ async def update_jwks(app: web.Application, _interval: float) -> None:
 class OIDCWebAppPlugin(WebappPlugin):
     _config: OIDCPluginConfig
 
+    def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
+        super().__init__(plugin_config, local_config)
+        self._config = OIDCPluginConfig(**plugin_config)
+
     async def init(self, context: Any = None) -> None:
-        self._config = OIDCPluginConfig(**self.plugin_config)
+        pass
 
     async def cleanup(self) -> None:
         pass
