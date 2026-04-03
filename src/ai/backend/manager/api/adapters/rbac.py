@@ -33,11 +33,14 @@ from ai.backend.common.dto.manager.v2.rbac import (
     CreateRoleInput,
     CreateRolePayload,
     DeleteRolePayload,
+    EntityActionInfo,
     EntityNode,
+    OperationInfo,
     PermissionNode,
     PurgeRolePayload,
     RoleAssignmentNode,
     RoleNode,
+    ScopeEntityOperationCombinationInfo,
     UpdateRoleInput,
     UpdateRolePayload,
 )
@@ -107,6 +110,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
 )
+from ai.backend.manager.actions.action import build_operation_description
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.association_scopes_entities import (
@@ -179,6 +183,9 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role i
 )
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
+from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
+    GetPermissionMatrixAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
@@ -469,6 +476,45 @@ class RBACAdapter(BaseAdapter):
             for item in action_result.result.items
         }
         return [result_map.get(pair) for pair in pairs]
+
+    # ------------------------------------------------------------------ permission matrix
+
+    async def get_permission_matrix(self) -> list[ScopeEntityOperationCombinationInfo]:
+        """Return the complete RBAC scope-entity-operation permission matrix."""
+        action_result = (
+            await self._processors.permission_controller.get_permission_matrix.wait_for_complete(
+                GetPermissionMatrixAction()
+            )
+        )
+        matrix = action_result.matrix
+        return [
+            ScopeEntityOperationCombinationInfo(
+                scope_type=RBACElementTypeDTO(scope.value),
+                entities=sorted(
+                    [
+                        EntityActionInfo(
+                            entity_type=RBACElementTypeDTO(entity.value),
+                            actions=sorted(
+                                [
+                                    OperationInfo(
+                                        operation=action_name.value,
+                                        description=build_operation_description(
+                                            action_name, perm.element_type
+                                        ),
+                                        required_permission=OperationTypeDTO(perm.operation.value),
+                                    )
+                                    for action_name, perm in actions.items()
+                                ],
+                                key=lambda o: o.operation,
+                            ),
+                        )
+                        for entity, actions in entity_map.items()
+                    ],
+                    key=lambda e: e.entity_type,
+                ),
+            )
+            for scope, entity_map in sorted(matrix.items(), key=lambda e: e[0].value)
+        ]
 
     # ------------------------------------------------------------------ create
 

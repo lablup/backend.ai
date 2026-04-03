@@ -53,6 +53,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSummarySearchResult,
     DeploymentWithHistory,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -94,7 +95,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import Dep
 
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
-from .types import RouteData, RouteServiceDiscoveryInfo
+from .types import ProjectDeploymentSearchScope, RouteData, RouteServiceDiscoveryInfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -1404,6 +1405,15 @@ class DeploymentRepository:
             DeploymentInfoSearchResult with items, total_count, and pagination info
         """
         return await self._db_source.search_endpoints(querier)
+
+    @deployment_repository_resilience.apply()
+    async def search_deployments_in_project(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectDeploymentSearchScope,
+    ) -> DeploymentSummarySearchResult:
+        """Search endpoints within a project scope with pagination and filtering."""
+        return await self._db_source.search_deployments_in_project(querier, scope)
 
     # ========== Access Token Operations ==========
 

@@ -19,6 +19,11 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
+from ai.backend.manager.actions.validators.rbac.single_entity import (
+    SingleEntityActionRBACValidator,
+)
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
     VFolderMountsCreator,
@@ -107,7 +112,16 @@ class DeploymentServiceBaseFixtures:
     @pytest.fixture
     def processors(self, deployment_service: DeploymentService) -> DeploymentProcessors:
         """Create DeploymentProcessors with mock DeploymentService."""
-        return DeploymentProcessors(deployment_service, [], MagicMock(spec=ActionValidators))
+        return DeploymentProcessors(
+            deployment_service,
+            [],
+            ActionValidators(
+                rbac=RBACValidators(
+                    scope=MagicMock(spec=ScopeActionRBACValidator),
+                    single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                ),
+            ),
+        )
 
     @pytest.fixture
     def deployment_policy_data(self) -> DeploymentPolicyData:

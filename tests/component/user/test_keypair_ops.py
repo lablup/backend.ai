@@ -139,6 +139,7 @@ def server_module_registries(
             ),
             route_deps,
             sub_registries=[user_registry],
+            gql_ws_handler=MagicMock(),
         ),
     ]
 
