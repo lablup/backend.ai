@@ -27,6 +27,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
     ModelRuntimeConfigData,
     MountMetadata,
+    PresetValueSpec,
     ResourceConfigData,
     ResourceSpec,
 )
@@ -34,11 +35,13 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    PydanticListColumn,
     ResourceSlotColumn,
     StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
 )
+from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint import EndpointRow
@@ -163,6 +166,15 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         server_default="[]",
     )
 
+    # Runtime variant preset values (resolved at session creation time)
+    preset_values: Mapped[list[PresetValueEntry]] = mapped_column(
+        "preset_values",
+        PydanticListColumn(PresetValueEntry),
+        nullable=False,
+        default=[],
+        server_default="[]",
+    )
+
     # Metadata
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -224,6 +236,10 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 if self.model_definition is not None
                 else None
             ),
+            preset_values=[
+                PresetValueSpec(preset_id=pv.preset_id, value=pv.value)
+                for pv in (self.preset_values or [])
+            ],
         )
 
     def to_data(self) -> ModelRevisionData:

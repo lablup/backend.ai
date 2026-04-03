@@ -350,6 +350,13 @@ class ExecutionSpec(ConfiguredModel):
     inference_runtime_config: Mapping[str, Any] | None = None
 
 
+class PresetValueSpec(ConfiguredModel):
+    """A runtime variant preset value binding stored in a deployment revision."""
+
+    preset_id: UUID
+    value: str
+
+
 class ModelRevisionSpec(ConfiguredModel):
     revision_id: UUID | None = None
     image_id: UUID | None = None
@@ -358,6 +365,7 @@ class ModelRevisionSpec(ConfiguredModel):
     mounts: MountMetadata
     execution: ExecutionSpec
     model_definition: ModelDefinition | None = None
+    preset_values: list[PresetValueSpec] = Field(default_factory=list)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

@@ -97,6 +97,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, scaling_groups
 from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
@@ -148,6 +149,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
     DeploymentContext,
     ImageContext,
+    ResolvedPresetValues,
     UserContext,
 )
 from ai.backend.manager.utils import query_userinfo_from_session
@@ -2032,6 +2034,29 @@ class DeploymentDBSource:
             )
             image_row = await ImageRow.resolve(db_sess, [image_identifier])
 
+            # Resolve preset_values from revision
+            resolved_presets: ResolvedPresetValues | None = None
+            if revision_row.preset_values:
+                preset_ids = [pv.preset_id for pv in revision_row.preset_values]
+                vp_stmt = sa.select(RuntimeVariantPresetRow).where(
+                    RuntimeVariantPresetRow.id.in_(preset_ids)
+                )
+                vp_rows = (await db_sess.execute(vp_stmt)).scalars().all()
+                vp_map = {row.id: row for row in vp_rows}
+                resolved_environ: dict[str, str] = {}
+                resolved_args: list[str] = []
+                for pv in revision_row.preset_values:
+                    vp = vp_map.get(pv.preset_id)
+                    if vp is None:
+                        continue
+                    if vp.preset_target == "env":
+                        resolved_environ[vp.key] = pv.value
+                    elif vp.preset_target == "args":
+                        resolved_args.append(f"{vp.key} {pv.value}")
+                resolved_presets = ResolvedPresetValues(
+                    environ=resolved_environ, args=resolved_args
+                )
+
             # Build DeploymentContext
             return DeploymentContext(
                 created_user=UserContext(
@@ -2057,6 +2082,7 @@ class DeploymentDBSource:
                     ref=image_row.image_ref,
                     labels=image_row.labels or {},
                 ),
+                resolved_presets=resolved_presets,
             )
 
     async def fetch_session_statuses_by_route_ids(

@@ -42,9 +42,11 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
     merge_revision_drafts,
 )
+from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.upserter import Upserter
@@ -619,27 +621,6 @@ class DeploymentService:
 
         merged = merge_revision_drafts(preset_draft, request_draft)
 
-        # Resolve preset_values into environ and startup_command args
-        resolved_environ = dict(merged.environ) if merged.environ else {}
-        resolved_startup_command = merged.startup_command
-        if preset_data.preset_values and self._runtime_variant_preset_repository:
-            preset_ids = [pv.preset_id for pv in preset_data.preset_values]
-            variant_presets = await self._runtime_variant_preset_repository.get_by_ids(preset_ids)
-            variant_preset_map = {vp.id: vp for vp in variant_presets}
-            args_parts: list[str] = []
-            for pv in preset_data.preset_values:
-                vp = variant_preset_map.get(pv.preset_id)
-                if vp is None:
-                    continue
-                if vp.preset_target == "env":
-                    resolved_environ[vp.key] = pv.value
-                elif vp.preset_target == "args":
-                    args_parts.append(f"{vp.key} {pv.value}")
-            if args_parts and resolved_startup_command:
-                resolved_startup_command = f"{resolved_startup_command} {' '.join(args_parts)}"
-            elif args_parts:
-                resolved_startup_command = " ".join(args_parts)
-
         return ModelRevisionCreator(
             image_id=merged.image_id or creator.image_id,
             resource_spec=ResourceSpec(
@@ -650,15 +631,19 @@ class DeploymentService:
             ),
             mounts=creator.mounts,
             execution=ExecutionSpec(
-                startup_command=resolved_startup_command,
+                startup_command=merged.startup_command,
                 bootstrap_script=merged.bootstrap_script,
-                environ=resolved_environ or None,
+                environ=merged.environ,
                 runtime_variant=merged.runtime_variant or creator.execution.runtime_variant,
                 callback_url=creator.execution.callback_url,
                 inference_runtime_config=creator.execution.inference_runtime_config,
             ),
             model_definition=merged.model_definition,
             revision_preset_id=creator.revision_preset_id,
+            preset_values=[
+                PresetValueData(preset_id=pv.preset_id, value=pv.value)
+                for pv in preset_data.preset_values
+            ],
         )
 
     async def _merge_deployment_config(
@@ -784,6 +769,10 @@ class DeploymentService:
             runtime_variant=merged_creator.execution.runtime_variant,
             # TODO: Convert merged_creator.mounts.extra_mounts (list[MountInfo]) to Sequence[VFolderMount] instead of discarding.
             extra_mounts=(),
+            preset_values=[
+                PresetValueEntry(preset_id=pv.preset_id, value=pv.value)
+                for pv in merged_creator.preset_values
+            ],
         )
         creator = RBACEntityCreator(
             spec=spec,

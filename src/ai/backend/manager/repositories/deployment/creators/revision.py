@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any, override
 
 from ai.backend.common.config import ModelDefinition
@@ -15,6 +15,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.repositories.base import CreatorSpec
 
 
@@ -44,6 +45,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     callback_url: str | None
     runtime_variant: RuntimeVariant
     extra_mounts: Sequence[VFolderMount]
+    preset_values: Sequence[PresetValueEntry] = field(default_factory=list)
     revision_number: int | None = None
 
     def with_revision_number(self, revision_number: int) -> DeploymentRevisionCreatorSpec:
@@ -75,4 +77,5 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             callback_url=self.callback_url,
             runtime_variant=self.runtime_variant,
             extra_mounts=list(self.extra_mounts),
+            preset_values=list(self.preset_values),
         )
