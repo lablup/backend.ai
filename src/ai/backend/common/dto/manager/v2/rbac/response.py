@@ -31,6 +31,7 @@ __all__ = (
     "CreateRolePayload",
     "DeletePermissionPayload",
     "DeleteRolePayload",
+    "EntityActionInfo",
     "EntityNode",
     "EntityOperationCombinationInfo",
     "OperationInfo",
@@ -39,6 +40,7 @@ __all__ = (
     "RoleAssignmentNode",
     "RoleNode",
     "ScopeEntityCombinationInfo",
+    "ScopeEntityOperationCombinationInfo",
     "UpdateRolePayload",
 )
 
@@ -221,3 +223,21 @@ class EntityOperationCombinationInfo(BaseResponseModel):
 
     entity_type: RBACElementTypeDTO = Field(description="Entity element type")
     operations: list[OperationInfo] = Field(description="Valid operations for this entity")
+
+
+class EntityActionInfo(BaseResponseModel):
+    """Entity type with its allowed actions within a specific scope."""
+
+    entity_type: RBACElementTypeDTO = Field(description="Entity element type")
+    actions: list[OperationInfo] = Field(
+        description="Valid operations for this entity in the given scope"
+    )
+
+
+class ScopeEntityOperationCombinationInfo(BaseResponseModel):
+    """Complete scope-entity-operation combination for RBAC permission matrix."""
+
+    scope_type: RBACElementTypeDTO = Field(description="Scope element type")
+    entities: list[EntityActionInfo] = Field(
+        description="Entities and their valid operations within this scope"
+    )

@@ -35,9 +35,11 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     DeletePermissionPayload as DeletePermissionPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
+    EntityActionInfo,
     EntityOperationCombinationInfo,
     OperationInfo,
     ScopeEntityCombinationInfo,
+    ScopeEntityOperationCombinationInfo,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     PermissionNode as PermissionNodeDTO,
@@ -332,6 +334,34 @@ class OperationInfoGQL(PydanticOutputMixin[OperationInfo]):
 class EntityOperationCombinationGQL(PydanticOutputMixin[EntityOperationCombinationInfo]):
     entity_type: RBACElementTypeGQL
     operations: list[OperationInfoGQL]
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Entity with its allowed actions within a scope.",
+    ),
+    model=EntityActionInfo,
+    name="EntityActionInfo",
+)
+class EntityActionInfoGQL(PydanticOutputMixin[EntityActionInfo]):
+    entity_type: RBACElementTypeGQL
+    actions: list[OperationInfoGQL]
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Scope-entity-operation combination for RBAC permission matrix.",
+    ),
+    model=ScopeEntityOperationCombinationInfo,
+    name="ScopeEntityOperationCombination",
+)
+class ScopeEntityOperationCombinationGQL(
+    PydanticOutputMixin[ScopeEntityOperationCombinationInfo],
+):
+    scope_type: RBACElementTypeGQL
+    entities: list[EntityActionInfoGQL]
 
 
 PermissionEdge = Edge[PermissionGQL]

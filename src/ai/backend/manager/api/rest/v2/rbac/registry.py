@@ -116,6 +116,14 @@ def register_v2_rbac_routes(
         middlewares=[superadmin_required],
     )
 
+    # Permission Matrix
+    registry.add(
+        "GET",
+        "/permission-matrix",
+        handler.get_permission_matrix,
+        middlewares=[superadmin_required],
+    )
+
     # Entities
     registry.add(
         "POST",

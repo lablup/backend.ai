@@ -3257,6 +3257,15 @@ input EmailSpecInput {
   auth: SMTPAuthInput = null
 }
 
+"""Added in UNRELEASED. Entity with its allowed actions within a scope."""
+type EntityActionInfo {
+  """Entity element type"""
+  entityType: RBACElementType!
+
+  """Valid operations for this entity in the given scope"""
+  actions: [OperationInfo!]!
+}
+
 """Added in 26.3.0. Entity connection."""
 type EntityConnection {
   """Pagination data for this connection"""
@@ -7318,6 +7327,11 @@ type Query {
   """Added in UNRELEASED. List valid RBAC entity-operation combinations."""
   rbacEntityOperationCombinations: [EntityOperationCombination!]!
 
+  """
+  Added in UNRELEASED. List complete RBAC scope-entity-operation combinations (permission matrix).
+  """
+  rbacPermissionMatrix: [ScopeEntityOperationCombination!]!
+
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
 
@@ -9205,6 +9219,17 @@ type ScopeEntityCombination {
 
   """Valid entity types for this scope type"""
   validEntityTypes: [RBACElementType!]!
+}
+
+"""
+Added in UNRELEASED. Scope-entity-operation combination for RBAC permission matrix.
+"""
+type ScopeEntityOperationCombination {
+  """Scope element type"""
+  scopeType: RBACElementType!
+
+  """Entities and their valid operations within this scope"""
+  entities: [EntityActionInfo!]!
 }
 
 """

@@ -696,6 +696,36 @@ class ModelDeploymentData:
     sub_step: DeploymentLifecycleSubStep | None = None
 
 
+@dataclass(frozen=True)
+class DeploymentSummaryData:
+    id: UUID
+    name: str
+    created_user: UUID
+    session_owner: UUID
+    domain: str
+    project: UUID
+    resource_group: str
+    lifecycle_stage: EndpointLifecycle
+    tag: str | None
+    open_to_public: bool
+    url: str | None
+    current_revision: UUID | None
+    deploying_revision: UUID | None
+    replicas: int
+    desired_replicas: int | None
+    created_at: datetime | None
+    destroyed_at: datetime | None
+    sub_step: DeploymentLifecycleSubStep | None
+
+
+@dataclass
+class DeploymentSummarySearchResult:
+    items: list[DeploymentSummaryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
 class DeploymentOrderField(enum.StrEnum):
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"
