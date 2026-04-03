@@ -31,6 +31,9 @@ class RuntimeVariantPresetRepository:
     async def get_by_id(self, preset_id: UUID) -> RuntimeVariantPresetData:
         return await self._db_source.get_by_id(preset_id)
 
+    async def get_by_ids(self, preset_ids: list[UUID]) -> list[RuntimeVariantPresetData]:
+        return await self._db_source.get_by_ids(preset_ids)
+
     async def update(self, updater: Updater[RuntimeVariantPresetRow]) -> RuntimeVariantPresetData:
         return await self._db_source.update(updater)
 

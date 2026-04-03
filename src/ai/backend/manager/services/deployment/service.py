@@ -65,6 +65,9 @@ from ai.backend.manager.repositories.deployment.upserters import DeploymentPolic
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentRevisionPresetRepository,
 )
+from ai.backend.manager.repositories.runtime_variant_preset.repository import (
+    RuntimeVariantPresetRepository,
+)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
@@ -295,6 +298,7 @@ class DeploymentService:
     _revision_generator_registry: RevisionGeneratorRegistry
     _model_definition_generator_registry: ModelDefinitionGeneratorRegistry
     _deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
+    _runtime_variant_preset_repository: RuntimeVariantPresetRepository | None
 
     def __init__(
         self,
@@ -303,6 +307,7 @@ class DeploymentService:
         revision_generator_registry: RevisionGeneratorRegistry,
         model_definition_generator_registry: ModelDefinitionGeneratorRegistry,
         deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None = None,
+        runtime_variant_preset_repository: RuntimeVariantPresetRepository | None = None,
     ) -> None:
         """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
@@ -310,6 +315,7 @@ class DeploymentService:
         self._revision_generator_registry = revision_generator_registry
         self._model_definition_generator_registry = model_definition_generator_registry
         self._deployment_revision_preset_repository = deployment_revision_preset_repository
+        self._runtime_variant_preset_repository = runtime_variant_preset_repository
 
     # ========== Deployment CRUD ==========
 
@@ -613,6 +619,27 @@ class DeploymentService:
 
         merged = merge_revision_drafts(preset_draft, request_draft)
 
+        # Resolve preset_values into environ and startup_command args
+        resolved_environ = dict(merged.environ) if merged.environ else {}
+        resolved_startup_command = merged.startup_command
+        if preset_data.preset_values and self._runtime_variant_preset_repository:
+            preset_ids = [pv.preset_id for pv in preset_data.preset_values]
+            variant_presets = await self._runtime_variant_preset_repository.get_by_ids(preset_ids)
+            variant_preset_map = {vp.id: vp for vp in variant_presets}
+            args_parts: list[str] = []
+            for pv in preset_data.preset_values:
+                vp = variant_preset_map.get(pv.preset_id)
+                if vp is None:
+                    continue
+                if vp.preset_target == "env":
+                    resolved_environ[vp.key] = pv.value
+                elif vp.preset_target == "args":
+                    args_parts.append(f"{vp.key} {pv.value}")
+            if args_parts and resolved_startup_command:
+                resolved_startup_command = f"{resolved_startup_command} {' '.join(args_parts)}"
+            elif args_parts:
+                resolved_startup_command = " ".join(args_parts)
+
         return ModelRevisionCreator(
             image_id=merged.image_id or creator.image_id,
             resource_spec=ResourceSpec(
@@ -623,9 +650,9 @@ class DeploymentService:
             ),
             mounts=creator.mounts,
             execution=ExecutionSpec(
-                startup_command=merged.startup_command,
+                startup_command=resolved_startup_command,
                 bootstrap_script=merged.bootstrap_script,
-                environ=merged.environ,
+                environ=resolved_environ or None,
                 runtime_variant=merged.runtime_variant or creator.execution.runtime_variant,
                 callback_url=creator.execution.callback_url,
                 inference_runtime_config=creator.execution.inference_runtime_config,
