@@ -42,6 +42,7 @@ from .config_gen.appproxy import (
     apply_coordinator_config,
     apply_worker_config,
 )
+from .config_gen.webserver import WebserverParams, apply_webserver_config
 from .dev import (
     bootstrap_pants,
     install_editable_webui,
@@ -688,7 +689,6 @@ class Context(metaclass=ABCMeta):
             tomlkit.dump(data, fp)
 
     async def configure_webserver(self) -> None:
-        conf_path = self.copy_config("webserver.conf")
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         endpoint_protocol = self.install_variable.endpoint_protocol
@@ -698,57 +698,48 @@ class Context(metaclass=ABCMeta):
         if halfstack.redis_addr is None:
             raise RuntimeError("redis_addr must be configured")
 
-        # use FQDN if provided, otherwise use public_facing_address
+        # Determine wsproxy URL based on FQDN
         if fqdn_prefix is not None:
-            # With FQDN prefix, use public storage address with https
             wsproxy_url = f"https://{storage_public_address}:5050"
         else:
-            # Without FQDN prefix, use public_facing_address with http
             wsproxy_url = f"http://{public_facing_address}:5050"
-        # Use sed_in_place for dotted key wsproxy.url
+
+        # Determine Redis config
+        redis_addr: str | None = None
+        redis_sentinel: str | None = None
+        if halfstack.ha_setup:
+            if not halfstack.redis_sentinel_addrs:
+                raise ValueError("Redis sentinel addresses must be configured for HA setup")
+            redis_sentinel = ",".join(
+                f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
+            )
+        else:
+            redis_addr = f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
+
+        params = WebserverParams(
+            manager_host=service.manager_addr.face.host,
+            manager_port=service.manager_addr.face.port,
+            wsproxy_url=wsproxy_url,
+            force_endpoint_protocol=endpoint_protocol.value if endpoint_protocol else None,
+            redis_addr=redis_addr,
+            redis_sentinel=redis_sentinel,
+            redis_password=halfstack.redis_password,
+            menu_blocklist=service.webui_menu_blocklist,
+            menu_inactivelist=service.webui_menu_inactivelist,
+        )
+
+        conf_path = self.copy_config("webserver.conf")
+        # Use sed for dotted key wsproxy.url (tomlkit treats it as nested table)
         self.sed_in_place(
             conf_path,
             re.compile(r'^wsproxy\.url\s*=\s*".*"', flags=re.MULTILINE),
             f'wsproxy.url = "{wsproxy_url}"',
         )
-
         with conf_path.open("r") as fp:
-            data = tomlkit.load(fp)
-            if endpoint_protocol is not None:
-                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value
-            data["api"]["endpoint"] = (
-                f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
-            )
-            helper_table = tomlkit.table()
-            helper_table["socket_timeout"] = 5.0
-            helper_table["socket_connect_timeout"] = 2.0
-            helper_table["reconnect_poll_timeout"] = 0.3
-            if halfstack.ha_setup:
-                if not halfstack.redis_sentinel_addrs:
-                    raise ValueError("Redis sentinel addresses must be configured for HA setup")
-                redis_table = tomlkit.table()
-                redis_table["sentinel"] = ",".join(
-                    f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
-                )
-                redis_table["service_name"] = "mymaster"
-                redis_table["redis_helper_config"] = helper_table
-                if halfstack.redis_password:
-                    redis_table["password"] = halfstack.redis_password
-            else:
-                if not halfstack.redis_addr:
-                    raise RuntimeError("redis_addr must be configured")
-                redis_table = tomlkit.table()
-                redis_table["addr"] = (
-                    f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
-                )
-                redis_table["redis_helper_config"] = helper_table
-                if halfstack.redis_password:
-                    redis_table["password"] = halfstack.redis_password
-            data["session"]["redis"] = redis_table
-            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)
-            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)
+            doc = tomlkit.load(fp)
+        apply_webserver_config(doc, params)
         with conf_path.open("w") as fp:
-            tomlkit.dump(data, fp)
+            tomlkit.dump(doc, fp)
 
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
