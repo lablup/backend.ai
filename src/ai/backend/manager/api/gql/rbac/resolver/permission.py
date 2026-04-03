@@ -31,6 +31,7 @@ from ai.backend.manager.api.gql.rbac.types import (
     PermissionOrderBy,
     RBACElementTypeGQL,
     ScopeEntityCombinationGQL,
+    ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
 )
 from ai.backend.manager.api.gql.rbac.types.permission import PermissionEdge
@@ -137,6 +138,19 @@ async def rbac_entity_operation_combinations(
         )
         for entity, ops in sorted(entity_ops.items(), key=lambda e: e[0].value)
     ]
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="List complete RBAC scope-entity-operation combinations (permission matrix).",
+    )
+)  # type: ignore[misc]
+async def rbac_permission_matrix(
+    info: Info[StrawberryGQLContext],
+) -> list[ScopeEntityOperationCombinationGQL]:
+    dto_items = await info.context.adapters.rbac.get_permission_matrix()
+    return [ScopeEntityOperationCombinationGQL.from_pydantic(item) for item in dto_items]
 
 
 # ==================== Mutation Resolvers ====================

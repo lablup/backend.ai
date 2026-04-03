@@ -48,6 +48,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
+    DeploymentSummarySearchResult,
     DeploymentWithHistory,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
@@ -141,6 +142,7 @@ from ai.backend.manager.repositories.deployment.creators import (
 )
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.types import (
+    ProjectDeploymentSearchScope,
     RouteData,
     RouteServiceDiscoveryInfo,
 )
@@ -1218,6 +1220,36 @@ class DeploymentDBSource:
             items = [row.EndpointRow.to_deployment_info() for row in result.rows]
 
             return DeploymentInfoSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_deployments_in_project(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectDeploymentSearchScope,
+    ) -> DeploymentSummarySearchResult:
+        """Search endpoints within a project scope with pagination and filtering.
+
+        Returns lightweight DeploymentSummaryData built from EndpointRow scalar
+        columns only (no eager-loaded relationships). Revision and policy
+        details are not included.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+                scope=scope,
+            )
+
+            items = [row.EndpointRow.to_summary_data() for row in result.rows]
+
+            return DeploymentSummarySearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

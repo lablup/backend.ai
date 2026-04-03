@@ -6,7 +6,7 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.api_handlers import APIResponse, BaseRootResponseModel, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     AdminSearchPermissionsPayload,
     AdminSearchRoleAssignmentsPayload,
     AdminSearchRolesPayload,
+    ScopeEntityOperationCombinationInfo,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import RoleIdPathParam
@@ -37,6 +38,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.rbac import RBACAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class PermissionMatrixPayload(
+    BaseRootResponseModel[list[ScopeEntityOperationCombinationInfo]],
+):
+    """Root response model wrapping the RBAC permission matrix."""
 
 
 class V2RBACHandler:
@@ -189,6 +196,15 @@ class V2RBACHandler:
         """Bulk-revoke a role from multiple users."""
         result = await self._adapter.bulk_revoke_role(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    # ------------------------------------------------------------------ Permission Matrix
+
+    async def get_permission_matrix(self) -> APIResponse:
+        """Return the complete RBAC permission matrix."""
+        result = await self._adapter.get_permission_matrix()
+        return APIResponse.build(
+            status_code=HTTPStatus.OK, response_model=PermissionMatrixPayload(result)
+        )
 
     # ------------------------------------------------------------------ Entities
 
