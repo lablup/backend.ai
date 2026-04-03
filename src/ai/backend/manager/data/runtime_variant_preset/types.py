@@ -36,6 +36,7 @@ class TextOptionData:
 
 @dataclass(frozen=True)
 class UIOptionData:
+    ui_type: str
     slider: SliderOptionData | None
     number: NumberOptionData | None
     choices: ChoiceOptionData | None

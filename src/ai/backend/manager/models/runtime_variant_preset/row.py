@@ -90,6 +90,7 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
         if opt is None:
             return None
         return UIOptionData(
+            ui_type=opt.ui_type.value,
             slider=SliderOptionData(min=opt.slider.min, max=opt.slider.max, step=opt.slider.step)
             if opt.slider
             else None,

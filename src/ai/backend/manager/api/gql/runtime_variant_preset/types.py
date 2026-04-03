@@ -107,6 +107,8 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     target_spec: PresetTargetSpecGQL = gql_field(
         description="Specification defining how the user-provided value is applied to the inference container."
     )
+    category: str | None = gql_field(description="UI category group for organizing parameters.")
+    display_name: str | None = gql_field(description="Human-readable display label for the UI.")
     created_at: datetime = gql_field(description="Timestamp when this preset was created.")
     updated_at: datetime | None = gql_field(
         description="Timestamp of the last modification to this preset."

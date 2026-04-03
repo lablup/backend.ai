@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
@@ -20,17 +19,26 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     UpdateRuntimeVariantPresetPayload,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    ChoiceItem,
+    ChoiceOption,
+    NumberOption,
     RuntimeVariantPresetOrderField,
+    SliderOption,
+    TextOption,
+    UIOption,
+    UIType,
 )
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
-from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
+from ai.backend.manager.data.runtime_variant_preset.types import (
+    RuntimeVariantPresetData,
+    UIOptionData,
+)
 from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
 from ai.backend.manager.models.runtime_variant_preset.conditions import (
     RuntimeVariantPresetConditions,
 )
 from ai.backend.manager.models.runtime_variant_preset.orders import RuntimeVariantPresetOrders
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.models.runtime_variant_preset.types import UIOption
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder, combine_conditions_or
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -64,6 +72,24 @@ def _preset_pagination_spec() -> PaginationSpec:
         forward_condition_factory=RuntimeVariantPresetConditions.by_cursor_forward,
         backward_condition_factory=RuntimeVariantPresetConditions.by_cursor_backward,
         tiebreaker_order=RuntimeVariantPresetRow.id.asc(),
+    )
+
+
+def _convert_ui_option_data(opt: UIOptionData | None) -> UIOption | None:
+    if opt is None:
+        return None
+    return UIOption(
+        ui_type=UIType(opt.ui_type) if opt.ui_type else UIType.TEXT_INPUT,
+        slider=SliderOption(min=opt.slider.min, max=opt.slider.max, step=opt.slider.step)
+        if opt.slider
+        else None,
+        number=NumberOption(min=opt.number.min, max=opt.number.max) if opt.number else None,
+        choices=ChoiceOption(
+            items=[ChoiceItem(value=c.value, label=c.label) for c in opt.choices.items]
+        )
+        if opt.choices
+        else None,
+        text=TextOption(placeholder=opt.text.placeholder) if opt.text else None,
     )
 
 
@@ -125,9 +151,9 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 default_value=input.default_value,
                 key=input.key,
                 category=input.category,
-                ui_type=input.ui_type,
+                ui_type=input.ui_option.ui_type.value if input.ui_option else None,
                 display_name=input.display_name,
-                ui_option=UIOption(**input.ui_option) if input.ui_option else None,
+                ui_option=input.ui_option,
             )
         )
         result = await self._processors.runtime_variant_preset.create.wait_for_complete(
@@ -180,10 +206,10 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             ),
             ui_type=(
                 TriState.nop()
-                if input.ui_type is SENTINEL
+                if input.ui_option is SENTINEL
                 else TriState.nullify()
-                if input.ui_type is None
-                else TriState.update(input.ui_type)
+                if input.ui_option is None
+                else TriState.update(input.ui_option.ui_type.value)
             ),
             display_name=(
                 TriState.nop()
@@ -197,7 +223,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 if input.ui_option is SENTINEL
                 else TriState.nullify()
                 if input.ui_option is None
-                else TriState.update(UIOption(**input.ui_option))
+                else TriState.update(input.ui_option)
             ),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=input.id)
@@ -269,7 +295,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             category=data.category,
             ui_type=data.ui_type,
             display_name=data.display_name,
-            ui_option=dataclasses.asdict(data.ui_option) if data.ui_option else None,
+            ui_option=_convert_ui_option_data(data.ui_option),
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

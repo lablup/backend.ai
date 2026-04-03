@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+
+from .types import UIOption
 
 
 class PresetTargetSpec(BaseResponseModel):
@@ -24,9 +25,8 @@ class RuntimeVariantPresetNode(BaseResponseModel):
     rank: int = Field(description="Display order rank.")
     target_spec: PresetTargetSpec = Field(description="Preset target specification.")
     category: str | None = Field(default=None, description="UI category group.")
-    ui_type: str | None = Field(default=None, description="UI render type.")
     display_name: str | None = Field(default=None, description="UI display name.")
-    ui_option: dict[str, Any] | None = Field(default=None, description="UI rendering config.")
+    ui_option: UIOption | None = Field(default=None, description="UI rendering config.")
     created_at: datetime = Field(description="Creation timestamp.")
     updated_at: datetime | None = Field(default=None, description="Last update timestamp.")
 

@@ -134,7 +134,7 @@ class ListFilesInputGQL(PydanticInputMixin[ListFilesInputDTO]):
     name="MkdirV2Input",
 )
 class MkdirInputGQL(PydanticInputMixin[MkdirInputDTO]):
-    path: str | list[str] = gql_field(description="Directory path(s) to create.")
+    path: list[str] = gql_field(description="Directory path(s) to create.")
     parents: bool = gql_field(default=True, description="Create parent directories if needed.")
     exist_ok: bool = gql_field(default=False, description="Do not raise error if directory exists.")
 
