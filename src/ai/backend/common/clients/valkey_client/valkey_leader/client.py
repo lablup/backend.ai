@@ -150,7 +150,7 @@ class ValkeyLeaderClient:
             Exception: Any exception from the underlying Redis operation
         """
         # Execute the Lua script
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.invoke_script(
                 script=self._leader_script,
                 keys=[leader_key],
@@ -181,7 +181,7 @@ class ValkeyLeaderClient:
             Exception: Any exception from the underlying Redis operation
         """
         # Execute the Lua script for atomic release
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.invoke_script(
                 script=self._release_script,
                 keys=[leader_key],

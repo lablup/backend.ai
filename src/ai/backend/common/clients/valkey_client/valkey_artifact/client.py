@@ -209,7 +209,7 @@ class ValkeyArtifactDownloadTrackingClient:
                 ),
             )
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
         log.debug(
             "Initialized artifact download tracking: model_id={}, revision={}, total_files={}, total_bytes={}",
@@ -244,7 +244,7 @@ class ValkeyArtifactDownloadTrackingClient:
         file_key = self._get_file_key(model_id, revision, file_path)
         artifact_key = self._get_artifact_key(model_id, revision)
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             # Get previous file data to calculate delta for artifact aggregation
             previous_data_bytes = await conn.get(file_key)
             previous_current_bytes = 0
@@ -315,7 +315,7 @@ class ValkeyArtifactDownloadTrackingClient:
         :return: Artifact progress data or None if not found
         """
         artifact_key = self._get_artifact_key(model_id, revision)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             hash_data = await conn.hgetall(artifact_key)
 
         if not hash_data:
@@ -353,7 +353,7 @@ class ValkeyArtifactDownloadTrackingClient:
         :return: File progress data or None if not found
         """
         file_key = self._get_file_key(model_id, revision, file_path)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             data_bytes = await conn.get(file_key)
 
         if not data_bytes:
@@ -382,7 +382,7 @@ class ValkeyArtifactDownloadTrackingClient:
         file_progress_list: list[FileDownloadProgressData] = []
 
         cursor = b"0"
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             while cursor:
                 result = await conn.scan(cursor, match=file_pattern, count=100)
                 cursor = cast(bytes, result[0])
@@ -446,7 +446,7 @@ class ValkeyArtifactDownloadTrackingClient:
         artifact_key = self._get_artifact_key(model_id, revision)
         file_pattern = self._get_file_pattern(model_id, revision)
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             # Delete artifact key
             await conn.delete([artifact_key])
 

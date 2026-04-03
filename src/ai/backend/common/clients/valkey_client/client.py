@@ -109,7 +109,7 @@ class ValkeySentinelTarget:
 class AbstractValkeyClient(ABC):
     @property
     @abstractmethod
-    def client(self) -> GlideClient:
+    def _raw_client(self) -> GlideClient:
         pass
 
     @abstractmethod
@@ -141,7 +141,7 @@ class AbstractValkeyClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def acquire(self) -> AbstractAsyncContextManager[GlideClient]:
+    def client(self) -> AbstractAsyncContextManager[GlideClient]:
         """
         Acquire the client for an operation.
 
@@ -173,7 +173,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         self._pubsub_channels = pubsub_channels
 
     @property
-    def client(self) -> GlideClient:
+    def _raw_client(self) -> GlideClient:
         if self._valkey_client is None:
             raise ClientNotConnectedError("ValkeyStandaloneClient is not connected")
         return self._valkey_client
@@ -245,8 +245,8 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         return self._valkey_client is None
 
     @asynccontextmanager
-    async def acquire(self) -> AsyncIterator[GlideClient]:
-        yield self.client
+    async def client(self) -> AsyncIterator[GlideClient]:
+        yield self._raw_client
 
 
 class ValkeySentinelClient(AbstractValkeyClient):
@@ -292,7 +292,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
         self._master_address = None
 
     @property
-    def client(self) -> GlideClient:
+    def _raw_client(self) -> GlideClient:
         if self._valkey_client is None:
             raise ClientNotConnectedError("ValkeySentinelClient is not connected")
         return self._valkey_client
@@ -391,8 +391,8 @@ class ValkeySentinelClient(AbstractValkeyClient):
         return current_master != self._master_address
 
     @asynccontextmanager
-    async def acquire(self) -> AsyncIterator[GlideClient]:
-        yield self.client
+    async def client(self) -> AsyncIterator[GlideClient]:
+        yield self._raw_client
 
 
 def _create_valkey_client_internal(
@@ -479,7 +479,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
     _monitor_client: AbstractValkeyClient
     _spec: MonitoringValkeyClientSpec
     _monitor_task: asyncio.Task[None] | None
-    _reconnect_lock: asyncio.Lock
+    _needs_reconnect: bool
     _consecutive_failure_count: int
     _operation_failure_count: int
 
@@ -493,14 +493,14 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._monitor_client = monitor_client
         self._spec = spec or MonitoringValkeyClientSpec()
         self._monitor_task = None
-        self._reconnect_lock = asyncio.Lock()
+        self._needs_reconnect = False
         self._consecutive_failure_count = 0
         self._operation_failure_count = 0
         self._closed = False
 
     @property
-    def client(self) -> GlideClient:
-        return self._operation_client.client
+    def _raw_client(self) -> GlideClient:
+        return self._operation_client._raw_client
 
     async def connect(self) -> None:
         await self._operation_client.connect()
@@ -531,19 +531,18 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         return await self._monitor_client.need_reconnect()
 
     @asynccontextmanager
-    async def acquire(self) -> AsyncIterator[GlideClient]:
+    async def client(self) -> AsyncIterator[GlideClient]:
         """
         Acquire the operation client for use, tracking consecutive failures.
 
         On connection errors, increments the failure counter. When the
-        consecutive failure threshold is exceeded, tears down the connection
-        and triggers reconnection rather than continuing to retry on a
-        broken connection.
+        consecutive failure threshold is exceeded, marks the client for
+        reconnection by the monitor loop rather than reconnecting directly.
 
         On successful operations, resets the failure counter.
         """
         try:
-            yield self._operation_client.client
+            yield self._operation_client._raw_client
         except _VALKEY_CONNECTION_ERRORS:
             self._operation_failure_count += 1
             log.warning(
@@ -553,11 +552,11 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             )
             if self._operation_failure_count >= self._spec.consecutive_failure_threshold:
                 log.warning(
-                    "Operation failure threshold reached ({}), triggering reconnection...",
+                    "Operation failure threshold reached ({}), requesting reconnection...",
                     self._spec.consecutive_failure_threshold,
                 )
                 self._operation_failure_count = 0
-                await self._reconnect()
+                self._needs_reconnect = True
             raise
         else:
             self._operation_failure_count = 0
@@ -617,7 +616,8 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             while True:
                 try:
                     await asyncio.sleep(self._spec.monitor_interval)
-                    if await self._check_connection():
+                    if self._needs_reconnect or await self._check_connection():
+                        self._needs_reconnect = False
                         log.info("Reconnecting Valkey clients...")
                         await self._reconnect()
                 except asyncio.CancelledError:
@@ -632,18 +632,17 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             log.info("Valkey connection monitor task stopped. Client closed: {}", self._closed)
 
     async def _reconnect(self) -> None:
-        async with self._reconnect_lock:
-            # Disconnect both clients
-            try:
-                await self._monitor_client.disconnect()
-            except Exception as e:
-                log.warning("Error disconnecting monitor client: {}", e)
+        # Disconnect both clients
+        try:
+            await self._monitor_client.disconnect()
+        except Exception as e:
+            log.warning("Error disconnecting monitor client: {}", e)
 
-            try:
-                await self._operation_client.disconnect()
-            except Exception as e:
-                log.warning("Error disconnecting operation client: {}", e)
+        try:
+            await self._operation_client.disconnect()
+        except Exception as e:
+            log.warning("Error disconnecting operation client: {}", e)
 
-            # Reconnect both clients
-            await self._operation_client.connect()
-            await self._monitor_client.connect()
+        # Reconnect both clients
+        await self._operation_client.connect()
+        await self._monitor_client.connect()

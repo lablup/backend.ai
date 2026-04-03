@@ -133,13 +133,13 @@ class ValkeyLiveClient:
         :param batch: The batch to execute.
         :return: List of command results.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.exec(batch, raise_on_error=True)
 
     @valkey_live_resilience.apply()
     async def get_live_data(self, key: str) -> bytes | None:
         """Get live data value by key."""
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.get(key)
 
     @valkey_live_resilience.apply()
@@ -152,7 +152,7 @@ class ValkeyLiveClient:
         """
         if not keys:
             return []
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.mget(cast(list[str | bytes], keys))
 
     @valkey_live_resilience.apply()
@@ -167,7 +167,7 @@ class ValkeyLiveClient:
         """Store live data value for key with optional expiration."""
         expiry = ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION if ex is None else ex)
         conditional_set = ConditionalChange.ONLY_IF_EXISTS if xx else None
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(key, value, conditional_set=conditional_set, expiry=expiry)
 
     @valkey_live_resilience.apply()
@@ -192,7 +192,7 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def delete_live_data(self, key: str) -> int:
         """Delete live data keys."""
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.delete([key])
 
     @valkey_live_resilience.apply()
@@ -231,7 +231,7 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def get_server_time(self) -> float:
         """Get server time as timestamp."""
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.time()
         if len(result) != 2:
             raise ValueError(
@@ -245,7 +245,7 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def count_active_connections(self, session_id: str) -> int:
         """Count active connections for a session."""
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.zcount(
                 self._active_app_connection_key(session_id),
                 InfBound.NEG_INF,
@@ -259,7 +259,7 @@ class ValkeyLiveClient:
         mapping: Mapping[str, str | bytes],
     ) -> int:
         """Store scheduler metadata in hash fields."""
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.hset(key, cast(Mapping[str | bytes, str | bytes], mapping))
 
     @valkey_live_resilience.apply()
@@ -270,7 +270,7 @@ class ValkeyLiveClient:
         :param name: The hash key name.
         :return: Dictionary of field names to values.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.hgetall(name)
         # Convert bytes keys and values to strings
         metadata: dict[str, str] = {}
@@ -302,7 +302,7 @@ class ValkeyLiveClient:
             stream_id=stream_id,
         )
         tracker_key = self._active_app_connection_key(session_id)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.zadd(tracker_key, {connection_id: current_time})
 
     @valkey_live_resilience.apply()
@@ -326,7 +326,7 @@ class ValkeyLiveClient:
             stream_id=stream_id,
         )
         current_time = await self.get_server_time()
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.zadd(tracker_key, {tracker_val: current_time})
 
     @valkey_live_resilience.apply()
@@ -350,7 +350,7 @@ class ValkeyLiveClient:
             service=service,
             stream_id=stream_id,
         )
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.zrem(tracker_key, [connection_id])
 
     @valkey_live_resilience.apply()
@@ -367,7 +367,7 @@ class ValkeyLiveClient:
         :return: Number of connections removed.
         """
         tracker_key = self._active_app_connection_key(session_id)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.zremrangebyscore(
                 tracker_key, InfBound.NEG_INF, ScoreBoundary(max_timestamp)
             )
@@ -380,7 +380,7 @@ class ValkeyLiveClient:
         :param agent_id: The agent ID to update.
         :param timestamp: The timestamp when the agent was last seen.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.hset(_AGENT_LAST_SEEN_HASH, {agent_id: str(timestamp)})
 
     @valkey_live_resilience.apply()
@@ -390,7 +390,7 @@ class ValkeyLiveClient:
 
         :param agent_id: The agent ID to remove.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.hdel(_AGENT_LAST_SEEN_HASH, [agent_id])
 
     def _get_session_requests_key(self, session_id: str) -> str:
@@ -460,7 +460,7 @@ class ValkeyLiveClient:
 
         :return: List of (agent_id, last_seen_timestamp) tuples.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             results = []
             cursor = b"0"
             while True:
@@ -491,7 +491,7 @@ class ValkeyLiveClient:
         :param pattern: The pattern to match keys against.
         :return: List of matching keys.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             results = []
             cursor = b"0"
             while True:
@@ -534,7 +534,7 @@ class ValkeyLiveClient:
         :param key: The hash key.
         :return: Dictionary of field names to values.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.hgetall(key)
         # Convert bytes keys and values to strings
         str_result: dict[str, str] = {}
@@ -570,7 +570,7 @@ class ValkeyLiveClient:
                 health_check_config.model_dump_json(),
                 expiry=ExpirySet(ExpiryType.SEC, 3600),
             )
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(pipe, raise_on_error=True)
 
     @valkey_live_resilience.apply()
@@ -581,7 +581,7 @@ class ValkeyLiveClient:
         :param key: The key to delete.
         :return: Number of keys deleted.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.delete([key])
 
     def _active_app_connection_key(self, session_id: str) -> str:
@@ -616,5 +616,5 @@ class ValkeyLiveClient:
         :param keys: List of keys to check.
         :return: Number of keys that exist.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.exists(cast(list[str | bytes], list(keys)))

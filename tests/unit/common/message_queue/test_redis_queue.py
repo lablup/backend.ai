@@ -74,10 +74,10 @@ async def redis_queue(
     )
     queue = await RedisQueue.create(redis_target, queue_args)
     yield queue
-    await queue._anycaster._client._client.client.flushdb()  # type: ignore[attr-defined]
-    await queue._broadcaster._client._client.client.flushdb()  # type: ignore[attr-defined]
-    await queue._consumer._client._client.client.flushdb()  # type: ignore[attr-defined]
-    await queue._subscriber._client._client.client.flushdb()  # type: ignore[attr-defined]
+    await queue._anycaster._client._client._raw_client.flushdb()  # type: ignore[attr-defined]
+    await queue._broadcaster._client._client._raw_client.flushdb()  # type: ignore[attr-defined]
+    await queue._consumer._client._client._raw_client.flushdb()  # type: ignore[attr-defined]
+    await queue._subscriber._client._client._raw_client.flushdb()  # type: ignore[attr-defined]
     await queue.close()
 
 

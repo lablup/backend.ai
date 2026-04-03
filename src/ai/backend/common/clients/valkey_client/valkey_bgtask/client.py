@@ -175,7 +175,7 @@ class ValkeyBgtaskClient:
             batch.hset(subtask_key, subkey_info.to_valkey_hash_fields())
             batch.expire(subtask_key, TASK_METADATA_TTL)
         batch = await self._build_claim_task(batch, task_info.task_id, task_set_key)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_bgtask_resilience.apply()
@@ -185,7 +185,7 @@ class ValkeyBgtaskClient:
         """
         batch = self._create_batch()
         batch = await self._build_claim_task(batch, task_id, task_set_key)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     async def _build_claim_task(
@@ -235,7 +235,7 @@ class ValkeyBgtaskClient:
         batch = self._create_batch()
         for key in keys:
             batch.expire(key, TASK_METADATA_TTL)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_bgtask_resilience.apply()
@@ -272,7 +272,7 @@ class ValkeyBgtaskClient:
         # Decrement ongoing_count last to get its final value
         batch.hincrby(task_key, b"ongoing_count", -1)
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             results = await conn.exec(batch, raise_on_error=True)
         if results is None:
             raise RuntimeError("Failed to execute finish_subtask batch")
@@ -290,7 +290,7 @@ class ValkeyBgtaskClient:
         """
         # First, get subtask keys before modifying anything
         task_subkey_set_key = self._get_task_subkey_set_key(task_id)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             subkeys_result = await conn.smembers(task_subkey_set_key)
 
             batch = self._create_batch()
@@ -336,7 +336,7 @@ class ValkeyBgtaskClient:
         batch = self._create_batch()
         for key in keys:
             batch.smembers(key)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             raw_results = await conn.exec(batch, raise_on_error=True)
         if raw_results is None:
             raise RuntimeError("Failed to retrieve members from keys")
@@ -372,7 +372,7 @@ class ValkeyBgtaskClient:
         """
         task_key = self._get_task_key(task_id)
         script = self._conditional_ttl_refresh_script()
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             raw_result = await conn.invoke_script(
                 script,
                 keys=[task_key],
@@ -407,7 +407,7 @@ class ValkeyBgtaskClient:
         """
         # Fetch task metadata
         task_key = self._get_task_key(task_id)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             raw_task_metadata_dict = await conn.hgetall(task_key)
             if not raw_task_metadata_dict:
                 log.warning("Task metadata not found (id: {})", task_id)

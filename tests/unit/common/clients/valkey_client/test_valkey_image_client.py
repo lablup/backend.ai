@@ -39,13 +39,13 @@ class TestValkeyImageClient:
             try:
                 cursor = b"0"
                 while cursor:
-                    result = await client._client.client.scan(
+                    result = await client._client._raw_client.scan(
                         cursor, match="installed_image:*", count=100
                     )
                     cursor = cast(bytes, result[0])
                     keys = cast(list[bytes], result[1])
                     if keys:
-                        await client._client.client.delete(cast(list[str | bytes], keys))
+                        await client._client._raw_client.delete(cast(list[str | bytes], keys))
                     if cursor == b"0":
                         break
             except ClientNotConnectedError:

@@ -86,15 +86,17 @@ class ValkeyOpenIDClient:
         :param verifier: The verifier string.
         """
         key = self._openid_key(session_key)
-        await self._client.client.set(
-            key,
-            verifier,
-            expiry=ExpirySet(ExpiryType.SEC, _SESSION_KEY_EXPIRATION),
-        )
+        async with self._client.client() as conn:
+            await conn.set(
+                key,
+                verifier,
+                expiry=ExpirySet(ExpiryType.SEC, _SESSION_KEY_EXPIRATION),
+            )
 
     async def get_openid_key(self, session_key: str) -> str:
         key = self._openid_key(session_key)
-        result = await self._client.client.get(key)
+        async with self._client.client() as conn:
+            result = await conn.get(key)
         if result is None:
             raise InvalidSession(reason=f"OpenID key not found for session {session_key}")
         return result.decode()

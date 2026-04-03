@@ -113,7 +113,7 @@ class ValkeyVolumeStatsClient:
         :return: The cached JSON data as bytes, or None if not found.
         """
         key = self._make_cache_key(volume_name)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.get(key)
 
     @valkey_volume_stats_resilience.apply()
@@ -131,7 +131,7 @@ class ValkeyVolumeStatsClient:
         :param ttl_seconds: TTL in seconds.
         """
         key = self._make_cache_key(volume_name)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(
                 key,
                 data,

@@ -101,7 +101,7 @@ class ValkeySessionClient:
         :param session_key: The session key to retrieve.
         :return: The session data as bytes, or None if not found.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.get(session_key)
 
     @valkey_session_resilience.apply()
@@ -115,7 +115,7 @@ class ValkeySessionClient:
         :param session_data: The session data to store.
         :param ttl_seconds: Time to live in seconds.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(
                 session_key,
                 session_data,
@@ -129,7 +129,7 @@ class ValkeySessionClient:
 
         :param session_key: The session key to delete.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.delete([session_key])
 
     @valkey_session_resilience.apply()
@@ -140,7 +140,7 @@ class ValkeySessionClient:
         :param session_token: The session token (prefix is added internally).
         :return: The session data as bytes, or None if not found.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.get(f"{SESSION_KEY_PREFIX}{session_token}")
 
     @valkey_session_resilience.apply()
@@ -154,7 +154,7 @@ class ValkeySessionClient:
         :param session_data: The session data to store.
         :param ttl_seconds: Time to live in seconds.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(
                 f"{SESSION_KEY_PREFIX}{session_token}",
                 session_data,
@@ -168,7 +168,7 @@ class ValkeySessionClient:
 
         :param session_token: The session token (prefix is added internally).
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.delete([f"{SESSION_KEY_PREFIX}{session_token}"])
 
     @valkey_session_resilience.apply()
@@ -180,7 +180,7 @@ class ValkeySessionClient:
         :return: The login history data as bytes, or None if not found.
         """
         key = f"{LOGIN_HISTORY_KEY_PREFIX}{username}"
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.get(key)
 
     @valkey_session_resilience.apply()
@@ -195,7 +195,7 @@ class ValkeySessionClient:
         :param block_duration_seconds: How long to block in seconds.
         """
         key = f"{LOGIN_HISTORY_KEY_PREFIX}{username}"
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(
                 key,
                 block_data,
@@ -207,7 +207,7 @@ class ValkeySessionClient:
         """
         Flush all data in the current database (typically used for session cleanup).
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.flushdb()
 
     @valkey_session_resilience.apply()
@@ -217,7 +217,7 @@ class ValkeySessionClient:
 
         :return: Server time as (seconds, microseconds).
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.time()
         seconds_bytes, _ = result
         return int(seconds_bytes)
@@ -228,5 +228,5 @@ class ValkeySessionClient:
 
         :raises: Exception if ping fails
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.ping()

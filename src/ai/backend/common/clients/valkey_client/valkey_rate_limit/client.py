@@ -124,7 +124,7 @@ class ValkeyRateLimitClient:
         now = Decimal(time.time()).quantize(_TIME_PRECISION)
         now_float = float(now)
         # Increment request ID counter
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.invoke_script(
                 Script(_RATE_LIMIT_SCRIPT),
                 keys=[access_key],
@@ -142,7 +142,7 @@ class ValkeyRateLimitClient:
         :param access_key: The access key to get the count for.
         :return: The current count.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.zcard(access_key)
 
     @valkey_rate_limit_resilience.apply()
@@ -159,7 +159,7 @@ class ValkeyRateLimitClient:
         :param value: The configuration value to set.
         :param expiration: The expiration time in seconds.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(
                 key=key,
                 value=value,
@@ -182,7 +182,7 @@ class ValkeyRateLimitClient:
         tx = self._create_batch()
         tx.incr(key)
         tx.expire(key, expiration)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             results = await conn.exec(tx, raise_on_error=True)
         # Handle the result properly by extracting the first result
         if results and len(results) > 0:
@@ -197,7 +197,7 @@ class ValkeyRateLimitClient:
         :param key: The key to get.
         :return: The rate limit data or None if not found.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.get(key)
         return result.decode("utf-8") if result else None
 
@@ -209,7 +209,7 @@ class ValkeyRateLimitClient:
         :param key: The key to get.
         :return: The value or None if not found.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.get(key)
         return result.decode("utf-8") if result else None
 
@@ -221,7 +221,7 @@ class ValkeyRateLimitClient:
         :param key: The key to delete.
         :return: True if the key was deleted, False otherwise.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.delete([key])
         return result > 0
 
@@ -230,7 +230,7 @@ class ValkeyRateLimitClient:
         """
         Flush all keys in the current database.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.flushdb()
 
     @valkey_rate_limit_resilience.apply()
@@ -248,7 +248,7 @@ class ValkeyRateLimitClient:
         :param window: The time window in seconds.
         """
         cutoff_time = now - window
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.zremrangebyscore(key, ScoreBoundary(0), ScoreBoundary(cutoff_time))
 
     @valkey_rate_limit_resilience.apply()
@@ -270,7 +270,7 @@ class ValkeyRateLimitClient:
         tx = self._create_batch()
         tx.zadd(key, {member: score})
         tx.expire(key, expiration)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(tx, raise_on_error=True)
 
     def _create_batch(self, is_atomic: bool = False) -> Batch:

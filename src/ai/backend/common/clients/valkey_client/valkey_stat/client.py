@@ -137,7 +137,7 @@ class ValkeyStatClient:
         :param access_key: The keypair access key.
         :return: The query count, or 0 if not found.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.get(self._get_keypair_query_count_key(access_key))
         if result is None:
             return 0
@@ -158,7 +158,7 @@ class ValkeyStatClient:
         :return: The concurrency usage count, or None if not found in cache.
         """
         key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.get(key)
         if result is None:
             return None
@@ -175,7 +175,7 @@ class ValkeyStatClient:
         :param access_key: The keypair access key.
         :return: The timestamp as float, or None if not found.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.get(self._get_keypair_last_call_time_key(access_key))
         if result is None:
             return None
@@ -192,7 +192,7 @@ class ValkeyStatClient:
         :param agent_id: The agent ID.
         :return: GPU allocation map as dict, or None if not found.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.get(f"gpu_alloc_map.{agent_id}")
         if result is None:
             return None
@@ -218,7 +218,7 @@ class ValkeyStatClient:
         key = f"gpu_alloc_map.{agent_id}"
         value = dump_json_str(alloc_map)
         ttl = 3600 * 24  # 24 hours
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(key, value, expiry=ExpirySet(ExpiryType.SEC, ttl))
 
     @valkey_stat_resilience.apply()
@@ -229,7 +229,7 @@ class ValkeyStatClient:
         :param kernel_id: The kernel ID.
         :return: Kernel statistics as dict, or None if not found.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.get(str(kernel_id))
         if result is None:
             return None
@@ -283,7 +283,7 @@ class ValkeyStatClient:
         :param kernel_id: The kernel ID to get abuse report for.
         :return: The abuse report string for the kernel, or None if not found.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.hget(_ABUSE_REPORT_HASH, kernel_id)
         if result is None:
             return None
@@ -302,7 +302,7 @@ class ValkeyStatClient:
         """
         # TODO: If Agent ID is changed, a leak may occur. (expire is needed)
         key = self._get_container_count_key(agent_id)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(
                 key, str(container_count), expiry=ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION)
             )
@@ -433,7 +433,7 @@ class ValkeyStatClient:
         :param lifetime: The expiration time in seconds.
         """
         key = self._get_manager_status_key(node_id, pid)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(
                 key=key,
                 value=status_data,
@@ -546,7 +546,7 @@ class ValkeyStatClient:
         key = f"image:{image_id}:distro"
         batch.get(key)
         batch.expire(key, _DEFAULT_EXPIRATION)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             results = await conn.exec(batch, raise_on_error=True)
         if not results:
             return None
@@ -566,7 +566,7 @@ class ValkeyStatClient:
         :param image_id: The Docker image ID.
         :param distro: The Linux distribution name.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(
                 f"image:{image_id}:distro",
                 distro,
@@ -582,7 +582,7 @@ class ValkeyStatClient:
         :param volume_name: The volume name.
         :return: Volume usage data as dict, or None if not found.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.get(f"volume.usage.{proxy_name}.{volume_name}")
 
     @valkey_stat_resilience.apply()
@@ -602,7 +602,7 @@ class ValkeyStatClient:
         :param expiry_seconds: The expiration time in seconds.
         """
         expiry = ExpirySet(ExpiryType.SEC, expiry_seconds)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(f"volume.usage.{proxy_name}.{volume_name}", usage_data, expiry=expiry)
 
     @valkey_stat_resilience.apply()
@@ -616,7 +616,7 @@ class ValkeyStatClient:
         :param metadata: Dictionary of metadata to store.
         """
         # TODO: Changed to allow setting expiration using the `set` method instead of the `hset` method.
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.hset(
                 _COMPUTER_METADATA_KEY, cast(Mapping[str | bytes, str | bytes], metadata)
             )
@@ -628,7 +628,7 @@ class ValkeyStatClient:
 
         :return: Dictionary of slot name to metadata JSON string.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.hgetall(_COMPUTER_METADATA_KEY)
         # Convert bytes keys and values to strings
         metadata: dict[str, bytes] = {}
@@ -645,7 +645,7 @@ class ValkeyStatClient:
         :param key: The key to retrieve.
         :return: The value, or None if the key doesn't exist.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.get(key)
 
     # Resource preset cache methods
@@ -676,7 +676,7 @@ class ValkeyStatClient:
         :return: The cached data, or None if not found.
         """
         key = self._get_resource_preset_id_key(preset_id)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.get(key)
 
     @valkey_stat_resilience.apply()
@@ -688,7 +688,7 @@ class ValkeyStatClient:
         :return: The cached data, or None if not found.
         """
         key = self._get_resource_preset_name_key(name)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.get(key)
 
     @valkey_stat_resilience.apply()
@@ -700,7 +700,7 @@ class ValkeyStatClient:
         :return: The cached data, or None if not found.
         """
         key = self._get_resource_preset_list_key(scaling_group)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.get(key)
 
     @valkey_stat_resilience.apply()
@@ -717,7 +717,7 @@ class ValkeyStatClient:
         :return: The cached data, or None if not found.
         """
         key = self._get_resource_preset_check_key(access_key, group, domain, scaling_group)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.get(key)
 
     @valkey_stat_resilience.apply()
@@ -742,7 +742,7 @@ class ValkeyStatClient:
         name_key = self._get_resource_preset_name_key(name)
         batch.set(name_key, value, expiry=ExpirySet(ExpiryType.SEC, expire_sec))
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
@@ -757,7 +757,7 @@ class ValkeyStatClient:
         :param expire_sec: Expiration time in seconds (default 60).
         """
         key = self._get_resource_preset_list_key(scaling_group)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(
                 key=key,
                 value=value,
@@ -793,7 +793,7 @@ class ValkeyStatClient:
         )
         batch.sadd(_RESOURCE_PRESET_CHECK_INDEX_KEY, [key])
         batch.expire(_RESOURCE_PRESET_CHECK_INDEX_KEY, expire_sec)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
@@ -815,7 +815,7 @@ class ValkeyStatClient:
 
         if not keys_to_delete:
             return 0
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.delete(keys_to_delete)
 
     @valkey_stat_resilience.apply()
@@ -842,7 +842,7 @@ class ValkeyStatClient:
             batch = self._create_batch()
             batch = self._invalidate_resource_presets(batch, all_keys)
             batch.delete([_RESOURCE_PRESET_CHECK_INDEX_KEY])
-            async with self._client.acquire() as conn:
+            async with self._client.client() as conn:
                 await conn.exec(batch, raise_on_error=True)
 
     # TODO: Remove this too generalized methods
@@ -861,7 +861,7 @@ class ValkeyStatClient:
         :param expire_sec: Expiration time in seconds. If None, uses default expiration.
         """
         expiration = expire_sec if expire_sec is not None else _DEFAULT_EXPIRATION
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(
                 key=key,
                 value=value,
@@ -876,7 +876,7 @@ class ValkeyStatClient:
         :param keys: List of keys to delete.
         :return: Number of keys that were deleted.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.delete(list(keys))
 
     async def _time(self) -> float:
@@ -885,7 +885,7 @@ class ValkeyStatClient:
 
         :return: Server time as [seconds, microseconds].
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.time()
         if len(result) != 2:
             raise ValueError(
@@ -906,7 +906,7 @@ class ValkeyStatClient:
         :param value: Value to set.
         :param time: Expiration time in seconds.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(name, value, expiry=ExpirySet(ExpiryType.SEC, time))
 
     @valkey_stat_resilience.apply()
@@ -917,7 +917,7 @@ class ValkeyStatClient:
         :param key: The key to increment.
         :return: The new value after increment.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.incr(key)
 
     def _get_keypair_concurrency_key(self, access_key: str, is_private: bool) -> str:
@@ -944,7 +944,7 @@ class ValkeyStatClient:
         last_call_time_key = self._get_keypair_last_call_time_key(access_key)
         batch.set(last_call_time_key, str(now).encode())
         batch.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     # DEPRECATED: These methods are being phased out in favor of cache mirroring approach
@@ -980,7 +980,7 @@ class ValkeyStatClient:
             key = self._get_keypair_concurrency_key(access_key, is_private=True)
             batch.incrby(key, delta)
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
@@ -1015,7 +1015,7 @@ class ValkeyStatClient:
             key = self._get_keypair_concurrency_key(access_key, is_private=True)
             batch.decrby(key, delta)
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
@@ -1028,7 +1028,7 @@ class ValkeyStatClient:
         :return: The new value after decrement.
         """
         key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.incrby(key, -1)
 
     @valkey_stat_resilience.apply()
@@ -1041,7 +1041,7 @@ class ValkeyStatClient:
         :return: True if the key was deleted, False if it didn't exist.
         """
         key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.delete([key])
         return result > 0
 
@@ -1057,7 +1057,7 @@ class ValkeyStatClient:
         :param is_private: Whether this is for SFTP concurrency (True) or regular concurrency (False).
         """
         key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(key, str(concurrency_used))
 
     @valkey_stat_resilience.apply()
@@ -1079,7 +1079,7 @@ class ValkeyStatClient:
         batch.set(regular_key, str(regular_concurrency))
         batch.set(sftp_key, str(sftp_concurrency))
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
@@ -1092,7 +1092,7 @@ class ValkeyStatClient:
         """
         if not keys:
             return []
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.mget(cast(list[str | bytes], keys))
 
     @valkey_stat_resilience.apply()
@@ -1120,7 +1120,7 @@ class ValkeyStatClient:
                 expiry=ExpirySet(ExpiryType.SEC, expiration),
             )
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
@@ -1149,7 +1149,7 @@ class ValkeyStatClient:
                 expiry=ExpirySet(ExpiryType.SEC, expire_sec),
             )
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
@@ -1168,7 +1168,7 @@ class ValkeyStatClient:
             return
 
         # Use SADD to add session IDs to the set
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             for session_id in session_ids:
                 await conn.sadd(status_set_key, [session_id])
 
@@ -1183,7 +1183,7 @@ class ValkeyStatClient:
         :param status_set_key: The key for the status set.
         :return: List of encoded session IDs.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             count = await conn.scard(status_set_key)
             if count == 0:
                 return []
@@ -1209,7 +1209,7 @@ class ValkeyStatClient:
 
         # Use SREM to remove session IDs from the set
         removed_count = 0
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             for session_id in session_ids:
                 removed_count += await conn.srem(status_set_key, [session_id])
         return removed_count
@@ -1224,7 +1224,7 @@ class ValkeyStatClient:
         """
         cursor = b"0"
         keys: list[bytes] = []
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             while True:
                 result = await conn.hscan(hash_name, cursor)
                 cursor = cast(bytes, result[0])
@@ -1243,7 +1243,7 @@ class ValkeyStatClient:
         """
         cursor = b"0"
         matched_keys: list[bytes] = []
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             while True:
                 result = await conn.scan(cursor, match=pattern)
                 cursor = cast(bytes, result[0])
@@ -1270,7 +1270,7 @@ class ValkeyStatClient:
         for kern_id, report_val in new_report.items():
             batch.hset(_ABUSE_REPORT_HASH, {kern_id: report_val})
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
@@ -1286,7 +1286,7 @@ class ValkeyStatClient:
         :param limit: The maximum allowed concurrent sessions.
         :return: Tuple of (ok, concurrency_used) where ok is 1 if allowed, 0 if limit exceeded.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             # Set default value if key doesn't exist
             current_value = await conn.get(redis_key)
             if current_value is None:
@@ -1325,7 +1325,7 @@ class ValkeyStatClient:
         cursor = b"0"
         matched_keys: list[bytes] = []
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             while True:
                 result = await conn.scan(cursor, match=pattern)
                 cursor = cast(bytes, result[0])
@@ -1463,7 +1463,7 @@ class ValkeyStatClient:
             value = msgpack.packb(replica_measures)
             batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, cache_lifespan))
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
     async def get_total_resource_slots(self) -> TotalResourceData | None:
@@ -1472,7 +1472,7 @@ class ValkeyStatClient:
 
         :return: TotalResourceData if cached, None if not in cache
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.get(_TOTAL_RESOURCE_SLOTS_KEY)
         if result is None:
             return None
@@ -1496,7 +1496,7 @@ class ValkeyStatClient:
         try:
             total_slots_obj = total_slots.to_json()
             serialized = dump_json_str(total_slots_obj)
-            async with self._client.acquire() as conn:
+            async with self._client.client() as conn:
                 await conn.set(
                     _TOTAL_RESOURCE_SLOTS_KEY,
                     serialized,
@@ -1550,7 +1550,7 @@ class ValkeyStatClient:
         and keypair concurrencies for the given access keys.
         """
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             # Use the index SET to look up tracked keys instead of SCAN over the entire keyspace.
             resource_preset_keys = list(await conn.smembers(_RESOURCE_PRESET_CHECK_INDEX_KEY))
 
@@ -1571,7 +1571,7 @@ class ValkeyStatClient:
         :param parameters: List of configuration parameter names to retrieve.
         :return: Dictionary mapping parameter names to their values.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.config_get(cast(list[str | bytes], list(parameters)))
 
     @valkey_stat_resilience.apply()
@@ -1582,5 +1582,5 @@ class ValkeyStatClient:
         :param args: Command arguments (first element is the command name).
         :return: Command result.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             return await conn.custom_command(cast(list[str | bytes], list(args)))

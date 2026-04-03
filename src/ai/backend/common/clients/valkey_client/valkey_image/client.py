@@ -113,7 +113,7 @@ class ValkeyImageClient:
         tx = self._create_batch()
         for image_id in image_ids:
             tx.sadd(str(image_id), [agent_id])
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(tx, raise_on_error=True)
 
     @valkey_image_resilience.apply()
@@ -132,7 +132,7 @@ class ValkeyImageClient:
             return
 
         value = dump_json_str([img.model_dump() for img in installed_image_info])
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.set(key=f"installed_image:{agent_id}", value=value)
 
     @valkey_image_resilience.apply()
@@ -146,7 +146,7 @@ class ValkeyImageClient:
         :param agent_id: The agent ID to get.
         :return: list of installed image information
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             value = await conn.get(key=f"installed_image:{agent_id}")
         if value is None:
             return []
@@ -175,7 +175,7 @@ class ValkeyImageClient:
         tx = self._create_batch()
         for image_canonical in image_canonicals:
             tx.srem(str(image_canonical), [agent_id])
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(tx, raise_on_error=True)
 
     @valkey_image_resilience.apply()
@@ -196,7 +196,7 @@ class ValkeyImageClient:
         tx = self._create_batch()
         for image_id in image_ids:
             tx.srem(str(image_id), [agent_id])
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             await conn.exec(tx, raise_on_error=True)
 
     @valkey_image_resilience.apply()
@@ -211,7 +211,7 @@ class ValkeyImageClient:
         """
         cursor = b"0"
         keys_to_remove: list[bytes] = []
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             while True:
                 result = await conn.scan(cursor)
                 if len(result) != 2:
@@ -240,7 +240,7 @@ class ValkeyImageClient:
         :param image_id: The image identifier.
         :return: Set of agent IDs.
         """
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             result = await conn.smembers(str(image_id))
         return {AgentId(member.decode()) for member in result}
 
@@ -262,7 +262,7 @@ class ValkeyImageClient:
         for image_id in image_ids:
             tx.smembers(str(image_id))
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             results = await conn.exec(tx, raise_on_error=True)
         final_results: dict[ImageID, set[AgentId]] = {}
         if not results:
@@ -290,7 +290,7 @@ class ValkeyImageClient:
         for image_id in image_ids:
             tx.scard(str(image_id))
 
-        async with self._client.acquire() as conn:
+        async with self._client.client() as conn:
             results = await conn.exec(tx, raise_on_error=True)
         if not results:
             return []
