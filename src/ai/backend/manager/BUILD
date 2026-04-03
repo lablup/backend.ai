@@ -60,10 +60,12 @@ python_distribution(
         "backendai_hook_v20": {
             "totp": "ai.backend.manager.plugin.totp.hook:TOTPHook",
             "openid": "ai.backend.manager.plugin.openid.hook:OIDCHookPlugin",
+            "auth_keypair": "ai.backend.manager.plugin.keypair.hook:KeypairAuthHookPlugin",
         },
         "backendai_webapp_v20": {
             "totp": "ai.backend.manager.plugin.totp.webapp:TOTPWebapp",
             "openid": "ai.backend.manager.plugin.openid.webapp:OIDCWebAppPlugin",
+            "auth_keypair": "ai.backend.manager.plugin.keypair.webapp:KeypairAuthWebAppPlugin",
         },
         "backendai_network_manager_v1": {
             "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
