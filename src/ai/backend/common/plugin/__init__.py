@@ -138,8 +138,16 @@ class BasePluginContext[P: AbstractPlugin]:
             allowlist=cls_allowlist | arg_allowlist if allowlist_enabled else None,
             blocklist=cls_blocklist | arg_blocklist,
         ):
+            plugin_cls = entrypoint.load()
+            if not allowlist_enabled and getattr(plugin_cls, "require_explicit_allow", False):
+                log.info(
+                    "skipping plugin (group:{}): {} (requires explicit allow)",
+                    plugin_group,
+                    entrypoint.name,
+                )
+                continue
             log.info("loading plugin (group:{}): {}", plugin_group, entrypoint.name)
-            yield entrypoint.name, entrypoint.load()
+            yield entrypoint.name, plugin_cls
 
     async def init(
         self,
