@@ -42,6 +42,7 @@ from .config_gen.appproxy import (
     apply_coordinator_config,
     apply_worker_config,
 )
+from .config_gen.manager import ManagerParams, apply_manager_config
 from .config_gen.storage_proxy import StorageProxyParams, apply_storage_proxy_config
 from .config_gen.webserver import WebserverParams, apply_webserver_config
 from .dev import (
@@ -507,26 +508,28 @@ class Context(metaclass=ABCMeta):
         base_path = self.install_info.base_path
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
-        toml_path = self.copy_config("manager.toml")
-        alembic_path = self.copy_config("alembic.ini")
+
+        # Generate RPC keypair (stays in context.py)
         (base_path / "fixtures" / "manager").mkdir(parents=True, exist_ok=True)
         await self.run_manager_cli(["mgr", "generate-rpc-keypair", "fixtures/manager", "manager"])
-        self.sed_in_place_multi(
-            toml_path,
-            [
-                (re.compile("^num-proc = .*", flags=re.MULTILINE), "num-proc = 1"),
-                ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
-                ("port = 8100", f"port = {halfstack.postgres_addr.face.port}"),
-                (
-                    "port = 8081",
-                    f"port = {self.install_info.service_config.manager_addr.bind.port}",
-                ),
-                (
-                    re.compile("^(# )?ipc-base-path =.*", flags=re.MULTILINE),
-                    f'ipc-base-path = "{self.install_info.service_config.manager_ipc_base_path}"',
-                ),
-            ],
+
+        # Apply manager TOML config using shared module
+        params = ManagerParams(
+            etcd_port=halfstack.etcd_addr[0].face.port,
+            db_port=halfstack.postgres_addr.face.port,
+            manager_port=service.manager_addr.bind.port,
+            num_proc=1,
+            ipc_base_path=service.manager_ipc_base_path,
         )
+        toml_path = self.copy_config("manager.toml")
+        with toml_path.open("r") as fp:
+            doc = tomlkit.load(fp)
+        apply_manager_config(doc, params)
+        with toml_path.open("w") as fp:
+            tomlkit.dump(doc, fp)
+
+        # Alembic config
+        alembic_path = self.copy_config("alembic.ini")
         self.sed_in_place(
             alembic_path,
             "localhost:8100",
