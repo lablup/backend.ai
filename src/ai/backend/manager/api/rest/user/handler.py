@@ -125,7 +125,7 @@ class UserHandler:
             GetUserAction(user_uuid=path.parsed.user_id)
         )
 
-        resp = GetUserResponse(user=self._adapter.convert_to_dto(action_result.user.user))
+        resp = GetUserResponse(user=self._adapter.convert_to_dto(action_result.user))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # ------------------------------------------------------------------
