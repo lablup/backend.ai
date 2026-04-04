@@ -1337,12 +1337,9 @@ class VFolderMount(JSONSerializableMixin):
             "usage_mode": self.usage_mode.value,
         }
 
-    _REMOVED_KEYS = frozenset({"overlay_target", "mount_mode"})
-
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
-        cleaned = {k: v for k, v in obj.items() if k not in cls._REMOVED_KEYS}
-        base = cls.as_trafaret().check(cleaned)
+        base = cls.as_trafaret().check(obj)
         return cls(**base)
 
     @classmethod
