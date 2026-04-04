@@ -1231,9 +1231,7 @@ class UserAdapter(BaseAdapter):
         raise ValueError(f"Unknown order field: {order.field}")
 
     @staticmethod
-    def _user_data_to_node(
-        data: UserData,
-    ) -> UserNode:
+    def _user_data_to_node(data: UserData) -> UserNode:
         """Convert UserData to UserNode DTO."""
         return UserNode(
             id=data.id,
