@@ -23,6 +23,8 @@ from .types import (
 )
 
 __all__ = (
+    "BulkDeleteVFoldersPayload",
+    "BulkPurgeVFoldersPayload",
     "CloneVFolderPayload",
     "CreateDownloadSessionPayload",
     "CreateUploadSessionPayload",
@@ -130,6 +132,18 @@ class PurgeVFolderPayload(BaseResponseModel):
     """Payload for virtual folder purge mutation result."""
 
     id: UUID = Field(description="ID of the purged virtual folder")
+
+
+class BulkDeleteVFoldersPayload(BaseResponseModel):
+    """Payload for bulk virtual folder soft-deletion."""
+
+    deleted_count: int = Field(description="Number of virtual folders successfully soft-deleted.")
+
+
+class BulkPurgeVFoldersPayload(BaseResponseModel):
+    """Payload for bulk virtual folder purge."""
+
+    purged_count: int = Field(description="Number of virtual folders successfully purged.")
 
 
 class RestoreVFolderPayload(BaseResponseModel):

@@ -16,6 +16,26 @@ def vfolder() -> None:
     """VFolder management commands."""
 
 
+@vfolder.command(name="my-search")
+@click.option("--limit", type=int, default=20)
+@click.option("--offset", type=int, default=0)
+def my_search(limit: int, offset: int) -> None:
+    """Search vfolders owned by the current user."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import SearchVFoldersInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            request = SearchVFoldersInput(limit=limit, offset=offset)
+            result = await registry.vfolder.my_search(request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 @vfolder.command(name="project-search")
 @click.argument("project_id", type=str)
 @click.option("--limit", type=int, default=20)
@@ -301,6 +321,46 @@ def clone(vfolder_id: UUID, name: str, host: str | None, project_id: UUID | None
                 project_id=project_id,
             )
             result = await registry.vfolder.clone(vfolder_id, request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command(name="bulk-delete")
+@click.argument("ids", nargs=-1, required=True, type=click.UUID)
+def bulk_delete(ids: tuple[UUID, ...]) -> None:
+    """Soft-delete multiple vfolders."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import BulkDeleteVFoldersInput
+
+    input_dto = BulkDeleteVFoldersInput(ids=list(ids))
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.bulk_delete(input_dto)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command(name="bulk-purge")
+@click.argument("ids", nargs=-1, required=True, type=click.UUID)
+def bulk_purge(ids: tuple[UUID, ...]) -> None:
+    """Permanently purge multiple vfolders."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import BulkPurgeVFoldersInput
+
+    input_dto = BulkPurgeVFoldersInput(ids=list(ids))
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.bulk_purge(input_dto)
             print_result(result)
         finally:
             await registry.close()

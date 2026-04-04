@@ -6,6 +6,8 @@ from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    BulkDeleteVFoldersInput,
+    BulkPurgeVFoldersInput,
     CloneVFolderInput,
     CreateDownloadSessionInput,
     CreateUploadSessionInput,
@@ -17,6 +19,8 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
+    BulkDeleteVFoldersPayload,
+    BulkPurgeVFoldersPayload,
     CloneVFolderPayload,
     CreateDownloadSessionPayload,
     CreateUploadSessionPayload,
@@ -36,6 +40,18 @@ _PATH = "/v2/vfolders"
 
 class V2VFolderClient(BaseDomainClient):
     """SDK client for ``/v2/vfolders`` endpoints."""
+
+    async def my_search(
+        self,
+        request: SearchVFoldersInput,
+    ) -> SearchVFoldersPayload:
+        """Search vfolders owned by the current user."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/my/search",
+            request=request,
+            response_model=SearchVFoldersPayload,
+        )
 
     async def project_search(
         self,
@@ -184,4 +200,28 @@ class V2VFolderClient(BaseDomainClient):
             f"{_PATH}/{vfolder_id}/clone",
             request=request,
             response_model=CloneVFolderPayload,
+        )
+
+    async def bulk_delete(
+        self,
+        request: BulkDeleteVFoldersInput,
+    ) -> BulkDeleteVFoldersPayload:
+        """Soft-delete multiple vfolders."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/delete",
+            request=request,
+            response_model=BulkDeleteVFoldersPayload,
+        )
+
+    async def bulk_purge(
+        self,
+        request: BulkPurgeVFoldersInput,
+    ) -> BulkPurgeVFoldersPayload:
+        """Permanently purge multiple vfolders."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/purge",
+            request=request,
+            response_model=BulkPurgeVFoldersPayload,
         )

@@ -10,6 +10,10 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
+    BulkDeleteVFoldersInputGQL,
+    BulkDeleteVFoldersPayloadGQL,
+    BulkPurgeVFoldersInputGQL,
+    BulkPurgeVFoldersPayloadGQL,
     CloneVFolderInputGQL,
     CloneVFolderPayloadGQL,
     CreateVFolderInputGQL,
@@ -180,3 +184,53 @@ async def vfolder_create_download_session_v2(
         vfolder_id, input.to_pydantic()
     )
     return DownloadSessionPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Soft-delete multiple virtual folders.",
+    )
+)  # type: ignore[misc]
+async def bulk_delete_vfolders_v2(
+    info: Info[StrawberryGQLContext],
+    input: BulkDeleteVFoldersInputGQL,
+) -> BulkDeleteVFoldersPayloadGQL:
+    """Soft-delete multiple virtual folders.
+
+    Args:
+        info: Strawberry GraphQL context.
+        input: Input containing list of VFolder UUIDs to delete.
+
+    Returns:
+        BulkDeleteVFoldersPayloadGQL with count of deleted vfolders.
+    """
+    ctx = info.context
+    dto = input.to_pydantic()
+    payload = await ctx.adapters.vfolder.bulk_delete(dto)
+    return BulkDeleteVFoldersPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently purge multiple virtual folders.",
+    )
+)  # type: ignore[misc]
+async def bulk_purge_vfolders_v2(
+    info: Info[StrawberryGQLContext],
+    input: BulkPurgeVFoldersInputGQL,
+) -> BulkPurgeVFoldersPayloadGQL:
+    """Permanently purge multiple virtual folders.
+
+    Args:
+        info: Strawberry GraphQL context.
+        input: Input containing list of VFolder UUIDs to purge.
+
+    Returns:
+        BulkPurgeVFoldersPayloadGQL with count of purged vfolders.
+    """
+    ctx = info.context
+    dto = input.to_pydantic()
+    payload = await ctx.adapters.vfolder.bulk_purge(dto)
+    return BulkPurgeVFoldersPayloadGQL.from_pydantic(payload)

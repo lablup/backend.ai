@@ -23,6 +23,8 @@ from .types import (
 
 __all__ = (
     "AcceptInvitationInput",
+    "BulkDeleteVFoldersInput",
+    "BulkPurgeVFoldersInput",
     "SearchVFoldersInput",
     "CloneVFolderInput",
     "CreateDownloadSessionInput",
@@ -113,6 +115,18 @@ class PurgeVFolderInput(BaseRequestModel):
     """Input for purging a virtual folder."""
 
     id: UUID = Field(description="VFolder ID to purge")
+
+
+class BulkDeleteVFoldersInput(BaseRequestModel):
+    """Input for soft-deleting multiple virtual folders."""
+
+    ids: list[UUID] = Field(description="List of VFolder UUIDs to soft-delete.")
+
+
+class BulkPurgeVFoldersInput(BaseRequestModel):
+    """Input for permanently purging multiple virtual folders."""
+
+    ids: list[UUID] = Field(description="List of VFolder UUIDs to purge.")
 
 
 class RestoreVFolderInput(BaseRequestModel):

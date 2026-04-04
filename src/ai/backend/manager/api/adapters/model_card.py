@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
+    DeleteModelCardsInput,
     DeployModelCardInput,
     ModelCardFilter,
     ModelCardOrder,
@@ -24,6 +25,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
 from ai.backend.common.dto.manager.v2.model_card.response import (
     CreateModelCardPayload,
     DeleteModelCardPayload,
+    DeleteModelCardsPayload,
     DeployModelCardPayload,
     ModelCardMetadata,
     ModelCardNode,
@@ -331,6 +333,14 @@ class ModelCardAdapter(BaseAdapter):
             DeleteModelCardAction(id=card_id)
         )
         return DeleteModelCardPayload(id=result.model_card.id)
+
+    async def bulk_delete(self, input: DeleteModelCardsInput) -> DeleteModelCardsPayload:
+        """Delete multiple model cards by ID."""
+        for card_id in input.ids:
+            await self._processors.model_card.delete.wait_for_complete(
+                DeleteModelCardAction(id=card_id)
+            )
+        return DeleteModelCardsPayload(deleted_count=len(input.ids))
 
     async def scan_project(self, project_id: UUID) -> ScanProjectModelCardsPayload:
         me = current_user()

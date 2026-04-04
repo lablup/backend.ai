@@ -10,6 +10,9 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput as CreateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    DeleteModelCardsInput as DeleteCardsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
     DeployModelCardInput as DeployInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
@@ -26,6 +29,9 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
     DeleteModelCardPayload as DeletePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.response import (
+    DeleteModelCardsPayload as DeleteCardsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
     DeployModelCardPayload as DeployPayloadDTO,
@@ -333,3 +339,26 @@ class DeployModelCardInputGQL(PydanticInputMixin[DeployInputDTO]):
 class DeployModelCardPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
     deployment_id: UUID = gql_field(description="ID of the created deployment.")
     deployment_name: str = gql_field(description="Name of the created deployment.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for deleting multiple model cards.",
+    ),
+    name="DeleteModelCardsV2Input",
+)
+class DeleteModelCardsInputGQL(PydanticInputMixin[DeleteCardsInputDTO]):
+    ids: list[UUID] = gql_field(description="List of model card UUIDs to delete.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for bulk model card deletion.",
+    ),
+    model=DeleteCardsPayloadDTO,
+    name="DeleteModelCardsV2Payload",
+)
+class DeleteModelCardsPayloadGQL(PydanticOutputMixin[DeleteCardsPayloadDTO]):
+    deleted_count: int = gql_field(description="Number of model cards successfully deleted.")

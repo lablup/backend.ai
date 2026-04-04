@@ -5,6 +5,12 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    BulkDeleteVFoldersInput as BulkDeleteInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    BulkPurgeVFoldersInput as BulkPurgeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
     CloneVFolderInput as CloneInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -27,6 +33,12 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     MoveFileInput as MoveFileInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.response import (
+    BulkDeleteVFoldersPayload as BulkDeletePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.response import (
+    BulkPurgeVFoldersPayload as BulkPurgePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     CloneVFolderPayload as ClonePayloadDTO,
@@ -340,3 +352,56 @@ class UploadSessionPayloadGQL(PydanticOutputMixin[UploadPayloadDTO]):
 class DownloadSessionPayloadGQL(PydanticOutputMixin[DownloadPayloadDTO]):
     token: str = gql_field(description="Download session token.")
     url: str = gql_field(description="Download URL.")
+
+
+# ============================================================
+# Bulk operation types
+# ============================================================
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for soft-deleting multiple virtual folders.",
+    ),
+    name="BulkDeleteVFoldersV2Input",
+)
+class BulkDeleteVFoldersInputGQL(PydanticInputMixin[BulkDeleteInputDTO]):
+    ids: list[UUID] = gql_field(description="List of VFolder UUIDs to soft-delete.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for bulk virtual folder soft-deletion.",
+    ),
+    model=BulkDeletePayloadDTO,
+    name="BulkDeleteVFoldersV2Payload",
+)
+class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
+    deleted_count: int = gql_field(
+        description="Number of virtual folders successfully soft-deleted."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for permanently purging multiple virtual folders.",
+    ),
+    name="BulkPurgeVFoldersV2Input",
+)
+class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
+    ids: list[UUID] = gql_field(description="List of VFolder UUIDs to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for bulk virtual folder purge.",
+    ),
+    model=BulkPurgePayloadDTO,
+    name="BulkPurgeVFoldersV2Payload",
+)
+class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
+    purged_count: int = gql_field(description="Number of virtual folders successfully purged.")

@@ -10,6 +10,9 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput as CreateRuntimeVariantInputDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
+    DeleteRuntimeVariantsInput as DeleteRuntimeVariantsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     RuntimeVariantFilter as RuntimeVariantFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
@@ -23,6 +26,9 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     DeleteRuntimeVariantPayload as DeleteRuntimeVariantPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.response import (
+    DeleteRuntimeVariantsPayload as DeleteRuntimeVariantsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     RuntimeVariantNode as RuntimeVariantNodeDTO,
@@ -170,3 +176,25 @@ class UpdateRuntimeVariantPayloadGQL(PydanticOutputMixin[UpdateRuntimeVariantPay
 )
 class DeleteRuntimeVariantPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantPayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted runtime variant.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for deleting multiple runtime variants.",
+    ),
+    name="DeleteRuntimeVariantsInput",
+)
+class DeleteRuntimeVariantsInputGQL(PydanticInputMixin[DeleteRuntimeVariantsInputDTO]):
+    ids: list[UUID] = gql_field(description="List of runtime variant UUIDs to delete.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for bulk runtime variant deletion.",
+    ),
+    model=DeleteRuntimeVariantsPayloadDTO,
+)
+class DeleteRuntimeVariantsPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantsPayloadDTO]):
+    deleted_count: int = gql_field(description="Number of runtime variants successfully deleted.")

@@ -22,6 +22,12 @@ def register_v2_vfolder_routes(
 
     registry.add(
         "POST",
+        "/my/search",
+        handler.my_search,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/projects/{project_id}/search",
         handler.project_search,
         middlewares=[auth_required],
@@ -96,6 +102,18 @@ def register_v2_vfolder_routes(
         "POST",
         "/{vfolder_id}/clone",
         handler.clone,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/delete",
+        handler.bulk_delete,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/purge",
+        handler.bulk_purge,
         middlewares=[auth_required],
     )
 

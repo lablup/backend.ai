@@ -37,6 +37,8 @@ from ai.backend.manager.api.gql.model_card.types import (
     CreateModelCardInputGQL,
     CreateModelCardPayloadGQL,
     DeleteModelCardPayloadGQL,
+    DeleteModelCardsInputGQL,
+    DeleteModelCardsPayloadGQL,
     DeployModelCardInputGQL,
     DeployModelCardPayloadGQL,
     ModelCardAvailablePresetsScopeGQL,
@@ -159,6 +161,32 @@ async def admin_delete_model_card_v2(
     check_admin_only()
     payload = await info.context.adapters.model_card.delete(id)
     return DeleteModelCardPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Delete multiple model cards (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_delete_model_cards_v2(
+    info: Info[StrawberryGQLContext],
+    input: DeleteModelCardsInputGQL,
+) -> DeleteModelCardsPayloadGQL:
+    """Delete multiple model cards.
+
+    Args:
+        info: Strawberry GraphQL context.
+        input: Input containing list of model card UUIDs to delete.
+
+    Returns:
+        DeleteModelCardsPayloadGQL with count of deleted model cards.
+    """
+    check_admin_only()
+    ctx = info.context
+    dto = input.to_pydantic()
+    payload = await ctx.adapters.model_card.bulk_delete(dto)
+    return DeleteModelCardsPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(

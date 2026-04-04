@@ -7,6 +7,8 @@ from uuid import UUID
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    BulkDeleteVFoldersInput,
+    BulkPurgeVFoldersInput,
     CloneVFolderInput,
     CreateDownloadSessionInput,
     CreateUploadSessionInput,
@@ -20,6 +22,8 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     VFolderOrder,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
+    BulkDeleteVFoldersPayload,
+    BulkPurgeVFoldersPayload,
     CloneVFolderPayload,
     CreateDownloadSessionPayload,
     CreateUploadSessionPayload,
@@ -322,6 +326,26 @@ class VFolderAdapter(BaseAdapter):
         action = PurgeVFolderV2Action(user_id=me.user_id, vfolder_id=vfolder_id)
         await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return PurgeVFolderPayload(id=vfolder_id)
+
+    async def bulk_delete(self, input: BulkDeleteVFoldersInput) -> BulkDeleteVFoldersPayload:
+        """Soft-delete multiple vfolders."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        for vfolder_id in input.ids:
+            action = DeleteVFolderV2Action(user_id=me.user_id, vfolder_id=vfolder_id)
+            await self._processors.vfolder.delete_v2.wait_for_complete(action)
+        return BulkDeleteVFoldersPayload(deleted_count=len(input.ids))
+
+    async def bulk_purge(self, input: BulkPurgeVFoldersInput) -> BulkPurgeVFoldersPayload:
+        """Permanently purge multiple vfolders."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        for vfolder_id in input.ids:
+            action = PurgeVFolderV2Action(user_id=me.user_id, vfolder_id=vfolder_id)
+            await self._processors.vfolder.purge_v2.wait_for_complete(action)
+        return BulkPurgeVFoldersPayload(purged_count=len(input.ids))
 
     async def list_files(self, vfolder_id: UUID, input: ListFilesInput) -> ListFilesPayload:
         """List files in a vfolder."""

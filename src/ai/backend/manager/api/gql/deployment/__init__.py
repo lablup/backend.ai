@@ -16,16 +16,17 @@ from .resolver import (
     # Revision
     activate_deployment_revision,
     add_model_revision,
+    # Revision Preset
+    admin_create_deployment_revision_preset,
+    admin_delete_deployment_revision_preset,
+    admin_update_deployment_revision_preset,
     # Access Token
     create_access_token,
     # Auto Scaling
     create_auto_scaling_rule,
-    # Revision Preset
-    create_deployment_revision_preset,
     # Deployment
     create_model_deployment,
     delete_auto_scaling_rule,
-    delete_deployment_revision_preset,
     delete_model_deployment,
     deployment,
     deployment_revision_preset,
@@ -47,7 +48,6 @@ from .resolver import (
     update_auto_scaling_rule,
     # Policy
     update_deployment_policy,
-    update_deployment_revision_preset,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -296,9 +296,9 @@ __all__ = [
     "routes",
     "update_route_traffic_status",
     # Resolvers - Revision Preset
-    "create_deployment_revision_preset",
-    "delete_deployment_revision_preset",
+    "admin_create_deployment_revision_preset",
+    "admin_delete_deployment_revision_preset",
+    "admin_update_deployment_revision_preset",
     "deployment_revision_preset",
     "deployment_revision_presets",
-    "update_deployment_revision_preset",
 ]

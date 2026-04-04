@@ -173,6 +173,7 @@ from .login_session import (
 from .model_card import (
     admin_create_model_card_v2,
     admin_delete_model_card_v2,
+    admin_delete_model_cards_v2,
     admin_model_cards_v2,
     admin_update_model_card_v2,
     deploy_model_card_v2,
@@ -332,6 +333,7 @@ from .resource_usage import (
 from .runtime_variant import (
     admin_create_runtime_variant,
     admin_delete_runtime_variant,
+    admin_delete_runtime_variants,
     admin_update_runtime_variant,
     runtime_variant,
     runtime_variants,
@@ -389,6 +391,8 @@ from .user import (
 )
 from .vfolder_v2 import (
     admin_vfolders_v2,
+    bulk_delete_vfolders_v2,
+    bulk_purge_vfolders_v2,
     clone_vfolder_v2,
     create_vfolder_v2,
     delete_vfolder_v2,
@@ -773,6 +777,7 @@ class Mutation:
     admin_create_runtime_variant = admin_create_runtime_variant
     admin_update_runtime_variant = admin_update_runtime_variant
     admin_delete_runtime_variant = admin_delete_runtime_variant
+    admin_delete_runtime_variants = admin_delete_runtime_variants
     # Runtime Variant Preset mutations
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
@@ -785,12 +790,15 @@ class Mutation:
     admin_create_model_card_v2 = admin_create_model_card_v2
     admin_update_model_card_v2 = admin_update_model_card_v2
     admin_delete_model_card_v2 = admin_delete_model_card_v2
+    admin_delete_model_cards_v2 = admin_delete_model_cards_v2
     scan_project_model_cards_v2 = scan_project_model_cards_v2
     deploy_model_card_v2 = deploy_model_card_v2
     # VFolder V2 mutations
     create_vfolder_v2 = create_vfolder_v2
     delete_vfolder_v2 = delete_vfolder_v2
     purge_vfolder_v2 = purge_vfolder_v2
+    bulk_delete_vfolders_v2 = bulk_delete_vfolders_v2
+    bulk_purge_vfolders_v2 = bulk_purge_vfolders_v2
     clone_vfolder_v2 = clone_vfolder_v2
     vfolder_list_files_v2 = vfolder_list_files_v2
     vfolder_mkdir_v2 = vfolder_mkdir_v2

@@ -61,6 +61,12 @@ class SearchModelCardsPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there are more items before.")
 
 
+class DeleteModelCardsPayload(BaseResponseModel):
+    """Payload for bulk model card deletion."""
+
+    deleted_count: int = Field(description="Number of model cards successfully deleted.")
+
+
 class ScanProjectModelCardsPayload(BaseResponseModel):
     created_count: int = Field(description="Number of newly created model cards.")
     updated_count: int = Field(description="Number of updated existing model cards.")

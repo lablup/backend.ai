@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
+    DeleteModelCardsInput,
     DeployModelCardInput,
     SearchModelCardsInput,
     UpdateModelCardInput,
@@ -18,6 +19,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
 from ai.backend.common.dto.manager.v2.model_card.response import (
     CreateModelCardPayload,
     DeleteModelCardPayload,
+    DeleteModelCardsPayload,
     DeployModelCardPayload,
     ModelCardNode,
     ScanProjectModelCardsPayload,
@@ -75,6 +77,14 @@ class V2ModelCardClient(BaseDomainClient):
             "DELETE",
             f"{_PATH}/{card_id}",
             response_model=DeleteModelCardPayload,
+        )
+
+    async def bulk_delete(self, request: DeleteModelCardsInput) -> DeleteModelCardsPayload:
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/delete",
+            request=request,
+            response_model=DeleteModelCardsPayload,
         )
 
     async def scan_project(self, project_id: UUID) -> ScanProjectModelCardsPayload:

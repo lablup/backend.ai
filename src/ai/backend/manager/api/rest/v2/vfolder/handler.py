@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    BulkDeleteVFoldersInput,
+    BulkPurgeVFoldersInput,
     CloneVFolderInput,
     CreateDownloadSessionInput,
     CreateUploadSessionInput,
@@ -28,6 +30,14 @@ class V2VFolderHandler:
 
     def __init__(self, *, adapter: VFolderAdapter) -> None:
         self._adapter = adapter
+
+    async def my_search(
+        self,
+        body: BodyParam[SearchVFoldersInput],
+    ) -> APIResponse:
+        """Search vfolders owned by the current user."""
+        result = await self._adapter.my_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_search(
         self,
@@ -140,3 +150,19 @@ class V2VFolderHandler:
         """Clone a vfolder."""
         result = await self._adapter.clone(path.parsed.vfolder_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
+
+    async def bulk_delete(
+        self,
+        body: BodyParam[BulkDeleteVFoldersInput],
+    ) -> APIResponse:
+        """Soft-delete multiple vfolders."""
+        result = await self._adapter.bulk_delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def bulk_purge(
+        self,
+        body: BodyParam[BulkPurgeVFoldersInput],
+    ) -> APIResponse:
+        """Permanently purge multiple vfolders."""
+        result = await self._adapter.bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

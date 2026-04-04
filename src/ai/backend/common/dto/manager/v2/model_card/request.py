@@ -90,6 +90,12 @@ class SearchModelCardsInput(BaseRequestModel):
     offset: int | None = Field(default=None, ge=0)
 
 
+class DeleteModelCardsInput(BaseRequestModel):
+    """Input for deleting multiple model cards."""
+
+    ids: list[UUID] = Field(description="List of model card UUIDs to delete.")
+
+
 class DeployModelCardInput(BaseRequestModel):
     """Input for creating a deployment from a model card."""
 
