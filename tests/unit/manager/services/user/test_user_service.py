@@ -24,7 +24,6 @@ from ai.backend.manager.data.user.types import (
     BulkUserUpdateResultData,
     UserCreateResultData,
     UserData,
-    UserDetail,
     UserInfoContext,
     UserSearchResult,
     UserStatus,
@@ -348,23 +347,22 @@ class TestGetUser:
     def service(self, mock_user_repository: MagicMock) -> UserService:
         return _make_service(mock_user_repository)
 
-    async def test_get_existing_user_returns_user_detail(
+    async def test_get_existing_user_returns_user_data(
         self,
         service: UserService,
         mock_user_repository: MagicMock,
     ) -> None:
-        """Existing UUID returns UserDetail."""
+        """Existing UUID returns UserData."""
         user_uuid = uuid.uuid4()
         user = _make_user_data(user_uuid=user_uuid, email="found@example.com")
-        detail = UserDetail(user=user)
-        mock_user_repository.get_user_detail_by_uuid = AsyncMock(return_value=detail)
+        mock_user_repository.get_user_by_uuid = AsyncMock(return_value=user)
 
         action = GetUserAction(user_uuid=user_uuid)
         result = await service.get_user(action)
 
-        assert result.user.user.uuid == user_uuid
-        assert result.user.user.email == "found@example.com"
-        mock_user_repository.get_user_detail_by_uuid.assert_called_once_with(user_uuid)
+        assert result.user.uuid == user_uuid
+        assert result.user.email == "found@example.com"
+        mock_user_repository.get_user_by_uuid.assert_called_once_with(user_uuid)
 
     async def test_get_nonexistent_user_raises_not_found(
         self,
@@ -372,7 +370,7 @@ class TestGetUser:
         mock_user_repository: MagicMock,
     ) -> None:
         """Non-existent UUID raises UserNotFound."""
-        mock_user_repository.get_user_detail_by_uuid = AsyncMock(
+        mock_user_repository.get_user_by_uuid = AsyncMock(
             side_effect=UserNotFound("User not found")
         )
 

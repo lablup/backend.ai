@@ -195,8 +195,8 @@ class UserService:
         Raises:
             UserNotFound: If the user with the given UUID does not exist.
         """
-        user_detail = await self._user_repository.get_user_detail_by_uuid(action.user_uuid)
-        return GetUserActionResult(user=user_detail)
+        user_data = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        return GetUserActionResult(user=user_data)
 
     async def purge_user(self, action: PurgeUserAction) -> PurgeUserActionResult:
         email = action.email

@@ -27,6 +27,18 @@ def register_v2_project_routes(
     reg.add("POST", "/purge", handler.admin_purge, middlewares=[superadmin_required])
     reg.add(
         "POST",
+        "/domains/{domain_name}/search",
+        handler.domain_search,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "POST",
+        "/users/{user_id}/search",
+        handler.user_search,
+        middlewares=[auth_required],
+    )
+    reg.add(
+        "POST",
         "/{project_id}/users/assign",
         handler.assign_users,
         middlewares=[auth_required],

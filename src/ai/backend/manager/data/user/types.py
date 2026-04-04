@@ -57,12 +57,6 @@ class UserStatus(enum.StrEnum):
 
 
 @dataclass
-class UserGroupMembership:
-    id: UUID
-    name: str
-
-
-@dataclass
 class UserInfoContext:
     uuid: UUID
     email: str
@@ -146,14 +140,6 @@ class UserData:
             container_gids=row.container_gids,
             integration_name=row.integration_id,  # DB column is integration_id
         )
-
-
-@dataclass
-class UserDetail:
-    """Combined view of user data with group memberships."""
-
-    user: UserData
-    groups: list[UserGroupMembership] = field(default_factory=list)
 
 
 @dataclass

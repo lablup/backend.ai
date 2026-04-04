@@ -6,9 +6,8 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from ai.backend.common.data.user.types import UserRole as DataUserRole
-from ai.backend.common.dto.manager.v2.user.response import UserGroupMembershipInfo
 from ai.backend.manager.api.adapters.user import UserAdapter
-from ai.backend.manager.data.user.types import UserData, UserGroupMembership
+from ai.backend.manager.data.user.types import UserData
 
 
 def _create_user_data(
@@ -44,41 +43,28 @@ def _create_user_data(
     )
 
 
-class TestUserDataToNodeGroups:
-    """Tests for _user_data_to_node group membership mapping."""
+class TestUserDataToNode:
+    """Tests for _user_data_to_node conversion."""
 
-    def test_no_groups_produces_empty_list(self) -> None:
-        """UserData without groups kwarg should produce UserNode.groups == []."""
+    def test_basic_fields_mapped_correctly(self) -> None:
+        """UserData fields should map to UserNode sub-models."""
+        user_id = uuid4()
+        data = _create_user_data(user_id=user_id)
+        node = UserAdapter._user_data_to_node(data)
+
+        assert node.id == user_id
+        assert node.basic_info.username == "testuser"
+        assert node.basic_info.email == "test@example.com"
+        assert node.basic_info.full_name == "Test User"
+        assert node.basic_info.description == "A test user"
+        assert node.organization.domain_name == "default"
+        assert node.organization.resource_policy == "default"
+        assert node.status.need_password_change is False
+        assert node.security.totp_activated is False
+        assert node.container.container_uid is None
+
+    def test_node_has_no_groups_field(self) -> None:
+        """UserNode should not have a groups field."""
         data = _create_user_data()
         node = UserAdapter._user_data_to_node(data)
-        assert node.groups == []
-
-    def test_populated_groups_mapped_correctly(self) -> None:
-        """Groups passed to _user_data_to_node should produce correctly mapped UserNode.groups."""
-        group_id_1 = uuid4()
-        group_id_2 = uuid4()
-        groups = [
-            UserGroupMembership(id=group_id_1, name="researchers"),
-            UserGroupMembership(id=group_id_2, name="developers"),
-        ]
-        data = _create_user_data()
-        node = UserAdapter._user_data_to_node(data, groups=groups)
-
-        assert len(node.groups) == 2
-        assert isinstance(node.groups[0], UserGroupMembershipInfo)
-        assert isinstance(node.groups[1], UserGroupMembershipInfo)
-        assert node.groups[0].id == group_id_1
-        assert node.groups[0].name == "researchers"
-        assert node.groups[1].id == group_id_2
-        assert node.groups[1].name == "developers"
-
-    def test_single_group_mapped_correctly(self) -> None:
-        """Single group passed to _user_data_to_node maps to a single-element list."""
-        group_id = uuid4()
-        groups = [UserGroupMembership(id=group_id, name="admins")]
-        data = _create_user_data()
-        node = UserAdapter._user_data_to_node(data, groups=groups)
-
-        assert len(node.groups) == 1
-        assert node.groups[0].id == group_id
-        assert node.groups[0].name == "admins"
+        assert not hasattr(node, "groups")

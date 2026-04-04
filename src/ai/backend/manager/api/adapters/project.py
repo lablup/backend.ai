@@ -7,6 +7,7 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchGroupsInput,
@@ -16,6 +17,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     GroupFilter,
     GroupOrder,
     PurgeGroupInput,
+    SearchGroupsRequest,
     UnassignUsersFromProjectInput,
     UpdateGroupInput,
 )
@@ -30,6 +32,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
     ProjectPayload,
     ProjectStorageInfo,
     PurgeProjectPayload,
+    SearchProjectsPayload,
     UnassignUserError,
     UnassignUsersFromProjectPayload,
     VFolderHostPermissionEntry,
@@ -52,6 +55,7 @@ from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
+    OffsetPagination,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
@@ -314,6 +318,55 @@ class ProjectAdapter(BaseAdapter):
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
+        )
+
+    # --------------------------------------------------------- REST scoped search
+
+    def _build_search_querier(self, input: SearchGroupsRequest) -> BatchQuerier:
+        """Build a BatchQuerier from the offset-based search request DTO."""
+        conditions = self._convert_group_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        pagination = OffsetPagination(limit=input.limit, offset=input.offset)
+        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+
+    async def domain_search(
+        self,
+        domain_name: str,
+        input: SearchGroupsRequest,
+    ) -> SearchProjectsPayload:
+        """Search projects within a domain (REST v2 scoped search)."""
+        querier = self._build_search_querier(input)
+        scope = DomainProjectSearchScope(domain_name=domain_name)
+        action_result = await self._processors.group.search_projects_by_domain.wait_for_complete(
+            SearchProjectsByDomainAction(scope=scope, querier=querier)
+        )
+        return SearchProjectsPayload(
+            items=[self._group_data_to_node(item) for item in action_result.items],
+            pagination=PaginationInfo(
+                total=action_result.total_count,
+                offset=input.offset,
+                limit=input.limit,
+            ),
+        )
+
+    async def user_search(
+        self,
+        user_id: UUID,
+        input: SearchGroupsRequest,
+    ) -> SearchProjectsPayload:
+        """Search projects a user is a member of (REST v2 scoped search)."""
+        querier = self._build_search_querier(input)
+        scope = UserProjectSearchScope(user_uuid=user_id)
+        action_result = await self._processors.group.search_projects_by_user.wait_for_complete(
+            SearchProjectsByUserAction(scope=scope, querier=querier)
+        )
+        return SearchProjectsPayload(
+            items=[self._group_data_to_node(item) for item in action_result.items],
+            pagination=PaginationInfo(
+                total=action_result.total_count,
+                offset=input.offset,
+                limit=input.limit,
+            ),
         )
 
     async def assign_users(

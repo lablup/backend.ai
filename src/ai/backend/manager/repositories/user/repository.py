@@ -26,7 +26,6 @@ from ai.backend.manager.data.user.types import (
     BulkUserUpdateResultData,
     UserCreateResultData,
     UserData,
-    UserDetail,
     UserSearchResult,
 )
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -77,14 +76,6 @@ class UserRepository:
         Admin-only operation.
         """
         return await self._db_source.get_user_by_uuid(user_uuid)
-
-    @user_repository_resilience.apply()
-    async def get_user_detail_by_uuid(self, user_uuid: UUID) -> UserDetail:
-        """
-        Get user with group memberships by UUID.
-        Used for user detail view.
-        """
-        return await self._db_source.get_user_detail_by_uuid(user_uuid)
 
     @user_repository_resilience.apply()
     async def get_by_email_validated(
