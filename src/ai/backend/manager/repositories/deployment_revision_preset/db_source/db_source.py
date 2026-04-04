@@ -42,6 +42,7 @@ class DeploymentRevisionPresetDBSource:
     ) -> DeploymentRevisionPresetData:
         async with self._db.begin_session() as session:
             result = await execute_creator(session, creator)
+            await session.refresh(result.row, ["resource_slot_rows"])
             return result.row.to_data()
 
     async def get_by_id(self, preset_id: UUID) -> DeploymentRevisionPresetData:
@@ -63,6 +64,7 @@ class DeploymentRevisionPresetDBSource:
                 raise DeploymentRevisionPresetNotFound(
                     f"Deployment revision preset with ID {updater.pk_value} not found."
                 )
+            await session.refresh(result.row, ["resource_slot_rows"])
             return result.row.to_data()
 
     async def delete(self, preset_id: UUID) -> DeploymentRevisionPresetData:
@@ -73,6 +75,7 @@ class DeploymentRevisionPresetDBSource:
             row = (await session.execute(stmt)).scalar_one_or_none()
             if row is None:
                 raise DeploymentRevisionPresetNotFound()
+            await session.refresh(row, ["resource_slot_rows"])
             data = row.to_data()
             await session.delete(row)
         return data
