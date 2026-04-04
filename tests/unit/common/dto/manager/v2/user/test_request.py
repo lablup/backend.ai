@@ -234,6 +234,26 @@ class TestUpdateUserInput:
         req = UpdateUserInput(container_uid=1000)
         assert req.container_uid == 1000
 
+    def test_integration_name_sentinel_default(self) -> None:
+        req = UpdateUserInput()
+        assert req.integration_name is SENTINEL
+
+    def test_integration_name_none_clears(self) -> None:
+        req = UpdateUserInput(integration_name=None)
+        assert req.integration_name is None
+
+    def test_integration_name_with_value(self) -> None:
+        req = UpdateUserInput(integration_name="ext-system")
+        assert req.integration_name == "ext-system"
+
+    def test_integration_name_max_length_rejects_over_512(self) -> None:
+        with pytest.raises(ValidationError, match="integration_name"):
+            UpdateUserInput(integration_name="x" * 513)
+
+    def test_integration_name_max_length_accepts_exactly_512(self) -> None:
+        req = UpdateUserInput(integration_name="x" * 512)
+        assert req.integration_name == "x" * 512
+
     def test_round_trip_with_none_fields(self) -> None:
         req = UpdateUserInput(
             username="newname",
