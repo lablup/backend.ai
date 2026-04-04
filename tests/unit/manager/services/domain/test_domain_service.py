@@ -56,7 +56,7 @@ def _make_domain_data(
         allowed_vfolder_hosts=VFolderHostPermissionMap(),
         allowed_docker_registries=[],
         dotfiles=b"\x90",
-        integration_id=None,
+        integration_name=None,
     )
 
 

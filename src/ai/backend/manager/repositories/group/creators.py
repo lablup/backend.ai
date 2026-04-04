@@ -23,7 +23,7 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
     is_active: bool | None = None
     total_resource_slots: ResourceSlot | None = None
     allowed_vfolder_hosts: VFolderHostPermissionMap | None = None
-    integration_id: str | None = None
+    integration_name: str | None = None
     resource_policy: str | None = None
     container_registry: dict[str, str] | None = None
     dotfiles: bytes | None = None
@@ -38,7 +38,7 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
             is_active=self.is_active if self.is_active is not None else True,
             total_resource_slots=self.total_resource_slots or ResourceSlot(),
             allowed_vfolder_hosts=self.allowed_vfolder_hosts or VFolderHostPermissionMap(),
-            integration_id=self.integration_id,
+            integration_id=self.integration_name,  # DB column is integration_id
             resource_policy=self.resource_policy,
             dotfiles=self.dotfiles,
             container_registry=self.container_registry,

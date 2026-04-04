@@ -47,7 +47,7 @@ class GroupData:
     is_active: bool | None
     created_at: datetime | None = field(compare=False)
     modified_at: datetime | None = field(compare=False)
-    integration_id: str | None
+    integration_name: str | None
     domain_name: str
     total_resource_slots: ResourceSlot
     allowed_vfolder_hosts: VFolderHostPermissionMap
@@ -88,7 +88,7 @@ class GroupModifier(PartialModifier):
     allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
         default_factory=OptionalState[dict[str, str]].nop
     )
-    integration_id: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    integration_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     container_registry: TriState[dict[str, str]] = field(
         default_factory=TriState[dict[str, str]].nop
@@ -103,7 +103,8 @@ class GroupModifier(PartialModifier):
         self.domain_name.update_dict(to_update, "domain_name")
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
-        self.integration_id.update_dict(to_update, "integration_id")
+        # Field is named integration_name above model layer; DB column remains integration_id.
+        self.integration_name.update_dict(to_update, "integration_id")
         self.resource_policy.update_dict(to_update, "resource_policy")
         self.container_registry.update_dict(to_update, "container_registry")
         return to_update

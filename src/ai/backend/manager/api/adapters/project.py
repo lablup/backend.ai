@@ -168,7 +168,7 @@ class ProjectAdapter(BaseAdapter):
             domain_name=input.domain_name,
             type=DataProjectType(input.type.value) if input.type else None,
             description=input.description,
-            integration_id=input.integration_id,
+            integration_name=input.integration_name,
             resource_policy=input.resource_policy,
         )
         result = await self._processors.group.create_group.wait_for_complete(
@@ -196,12 +196,12 @@ class ProjectAdapter(BaseAdapter):
                 if input.is_active is not None
                 else OptionalState.nop()
             ),
-            integration_id=(
-                OptionalState.nop()
-                if isinstance(input.integration_id, Sentinel)
-                else OptionalState.nop()
-                if input.integration_id is None
-                else OptionalState.update(input.integration_id)
+            integration_name=(
+                TriState.nop()
+                if isinstance(input.integration_name, Sentinel)
+                else TriState.nullify()
+                if input.integration_name is None
+                else TriState.update(input.integration_name)
             ),
             resource_policy=(
                 OptionalState.update(input.resource_policy)
@@ -529,7 +529,7 @@ class ProjectAdapter(BaseAdapter):
                 name=data.name,
                 description=data.description,
                 type=ProjectType(data.type.value),
-                integration_id=data.integration_id,
+                integration_name=data.integration_name,
             ),
             organization=ProjectOrganizationInfo(
                 domain_name=data.domain_name,

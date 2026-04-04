@@ -264,7 +264,7 @@ class AuthDBSource:
             password_changed_at=row.password_changed_at,
             domain_name=row.domain_name or "",
             role=row.role or UserRole.USER,
-            integration_id=row.integration_id,
+            integration_name=row.integration_id,  # DB column is integration_id
             resource_policy=row.resource_policy,
             sudo_session_enabled=row.sudo_session_enabled,
         )

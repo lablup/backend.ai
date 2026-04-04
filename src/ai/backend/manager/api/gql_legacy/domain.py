@@ -176,7 +176,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             ),
             allowed_docker_registries=obj.allowed_docker_registries,
             dotfiles=obj.dotfiles,
-            integration_id=obj.integration_id,
+            integration_id=obj.integration_name,  # RBACModel uses integration_name
         )
 
     @classmethod
@@ -214,7 +214,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=dto.allowed_docker_registries,
             dotfiles=dto.dotfiles,
-            integration_id=dto.integration_id,
+            integration_id=dto.integration_name,  # DomainData uses integration_name
         )
 
     async def resolve_scaling_groups(
@@ -394,7 +394,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
                     else None,
                     allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
                     allowed_docker_registries=value_or_none(self.allowed_docker_registries),
-                    integration_id=value_or_none(self.integration_id),
+                    integration_name=value_or_none(self.integration_id),
                     dotfiles=value_or_none(self.dotfiles),
                 )
             ),
@@ -483,7 +483,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
             allowed_docker_registries=OptionalState[list[str]].from_graphql(
                 self.allowed_vfolder_hosts,
             ),
-            integration_id=TriState[str].from_graphql(
+            integration_name=TriState[str].from_graphql(
                 self.integration_id,
             ),
             dotfiles=OptionalState[bytes].from_graphql(
@@ -590,7 +590,7 @@ class Domain(graphene.ObjectType):  # type: ignore[misc]
             else {},
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=dto.allowed_docker_registries,
-            integration_id=dto.integration_id,
+            integration_id=dto.integration_name,  # DomainData uses integration_name
         )
 
     @classmethod
@@ -655,7 +655,7 @@ class DomainInput(graphene.InputObjectType):  # type: ignore[misc]
                     total_resource_slots=value_or_none(self.total_resource_slots),
                     allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
                     allowed_docker_registries=value_or_none(self.allowed_docker_registries),
-                    integration_id=value_or_none(self.integration_id),
+                    integration_name=value_or_none(self.integration_id),
                 )
             ),
             user_info=user_info,
@@ -700,7 +700,7 @@ class ModifyDomainInput(graphene.InputObjectType):  # type: ignore[misc]
             allowed_docker_registries=OptionalState[list[str]].from_graphql(
                 self.allowed_docker_registries,
             ),
-            integration_id=TriState[str].from_graphql(self.integration_id),
+            integration_name=TriState[str].from_graphql(self.integration_id),
         )
         return ModifyDomainAction(
             user_info=user_info,
