@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserRoleFilter,
     UserStatusFilter,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -20,6 +21,7 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_pydantic_input,
@@ -95,7 +97,7 @@ class UserProjectNestedFilterGQL(PydanticInputMixin[UserProjectFilter]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        description="Filter input for querying users. Supports filtering by UUID, username, email, status, domain, integration_name, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
         added_version="26.2.0",
     ),
     name="UserV2Filter",
@@ -108,6 +110,13 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     email: StringFilter | None = None
     status: UserStatusEnumFilterGQL | None = None
     domain_name: StringFilter | None = None
+    integration_name: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by external integration identifier.",
+        ),
+        default=None,
+    )
     role: UserRoleEnumFilterGQL | None = None
     created_at: DateTimeFilter | None = None
     domain: UserDomainNestedFilterGQL | None = None
