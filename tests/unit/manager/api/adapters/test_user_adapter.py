@@ -1,4 +1,4 @@
-"""Tests for v2 UserAdapter._user_data_to_node and _user_data_to_detail_node conversion."""
+"""Tests for v2 UserAdapter._user_data_to_node conversion."""
 
 from __future__ import annotations
 
@@ -6,11 +6,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from ai.backend.common.data.user.types import UserRole as DataUserRole
-from ai.backend.common.dto.manager.v2.user.response import (
-    UserDetailNode,
-    UserGroupMembershipInfo,
-    UserNode,
-)
+from ai.backend.common.dto.manager.v2.user.response import UserGroupMembershipInfo
 from ai.backend.manager.api.adapters.user import UserAdapter
 from ai.backend.manager.data.user.types import UserData, UserGroupMembership
 
@@ -48,31 +44,17 @@ def _create_user_data(
     )
 
 
-class TestUserDataToNode:
-    """Tests for _user_data_to_node conversion."""
-
-    def test_returns_user_node(self) -> None:
-        data = _create_user_data()
-        node = UserAdapter._user_data_to_node(data)
-        assert isinstance(node, UserNode)
-        assert not isinstance(node, UserDetailNode)
-
-    def test_does_not_have_groups(self) -> None:
-        data = _create_user_data()
-        node = UserAdapter._user_data_to_node(data)
-        assert not hasattr(node, "groups") or "groups" not in node.model_fields
-
-
-class TestUserDataToDetailNodeGroups:
-    """Tests for _user_data_to_detail_node group membership mapping."""
+class TestUserDataToNodeGroups:
+    """Tests for _user_data_to_node group membership mapping."""
 
     def test_no_groups_produces_empty_list(self) -> None:
+        """UserData without groups kwarg should produce UserNode.groups == []."""
         data = _create_user_data()
-        node = UserAdapter._user_data_to_detail_node(data)
-        assert isinstance(node, UserDetailNode)
+        node = UserAdapter._user_data_to_node(data)
         assert node.groups == []
 
     def test_populated_groups_mapped_correctly(self) -> None:
+        """Groups passed to _user_data_to_node should produce correctly mapped UserNode.groups."""
         group_id_1 = uuid4()
         group_id_2 = uuid4()
         groups = [
@@ -80,7 +62,7 @@ class TestUserDataToDetailNodeGroups:
             UserGroupMembership(id=group_id_2, name="developers"),
         ]
         data = _create_user_data()
-        node = UserAdapter._user_data_to_detail_node(data, groups=groups)
+        node = UserAdapter._user_data_to_node(data, groups=groups)
 
         assert len(node.groups) == 2
         assert isinstance(node.groups[0], UserGroupMembershipInfo)
@@ -91,16 +73,12 @@ class TestUserDataToDetailNodeGroups:
         assert node.groups[1].name == "developers"
 
     def test_single_group_mapped_correctly(self) -> None:
+        """Single group passed to _user_data_to_node maps to a single-element list."""
         group_id = uuid4()
         groups = [UserGroupMembership(id=group_id, name="admins")]
         data = _create_user_data()
-        node = UserAdapter._user_data_to_detail_node(data, groups=groups)
+        node = UserAdapter._user_data_to_node(data, groups=groups)
 
         assert len(node.groups) == 1
         assert node.groups[0].id == group_id
         assert node.groups[0].name == "admins"
-
-    def test_detail_node_is_subclass_of_user_node(self) -> None:
-        data = _create_user_data()
-        node = UserAdapter._user_data_to_detail_node(data)
-        assert isinstance(node, UserNode)
