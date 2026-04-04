@@ -1767,6 +1767,22 @@ input BulkCreateUserV2Input
   users: [CreateUserV2Input!]!
 }
 
+"""Added in UNRELEASED. Input for soft-deleting multiple virtual folders."""
+input BulkDeleteVFoldersV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """List of VFolder UUIDs to soft-delete."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk virtual folder soft-deletion."""
+type BulkDeleteVFoldersV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Number of virtual folders successfully soft-deleted."""
+  deletedCount: Int!
+}
+
 """
 Added in 26.3.0. Input for permanently deleting multiple users. This action is irreversible.
 """
@@ -1813,6 +1829,24 @@ type BulkPurgeUserV2Error
 
   """Error message describing the failure."""
   message: String!
+}
+
+"""
+Added in UNRELEASED. Input for permanently purging multiple virtual folders.
+"""
+input BulkPurgeVFoldersV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """List of VFolder UUIDs to purge."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk virtual folder purge."""
+type BulkPurgeVFoldersV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Number of virtual folders successfully purged."""
+  purgedCount: Int!
 }
 
 """
@@ -4052,6 +4086,22 @@ type DeleteModelCardPayloadGQL
   id: UUID!
 }
 
+"""Added in UNRELEASED. Input for deleting multiple model cards."""
+input DeleteModelCardsV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """List of model card UUIDs to delete."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk model card deletion."""
+type DeleteModelCardsV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """Number of model cards successfully deleted."""
+  deletedCount: Int!
+}
+
 """Added in 24.12.0."""
 type DeleteNetwork
   @join__type(graph: GRAPHENE)
@@ -4218,6 +4268,22 @@ type DeleteRuntimeVariantPresetPayloadGQL
 {
   """ID of the deleted preset."""
   id: UUID!
+}
+
+"""Added in UNRELEASED. Input for deleting multiple runtime variants."""
+input DeleteRuntimeVariantsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """List of runtime variant UUIDs to delete."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk runtime variant deletion."""
+type DeleteRuntimeVariantsPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Number of runtime variants successfully deleted."""
+  deletedCount: Int!
 }
 
 type DeleteScalingGroup
@@ -9988,6 +10054,11 @@ type Mutation
   adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL! @join__field(graph: STRAWBERRY)
 
   """
+  Added in UNRELEASED. Delete multiple runtime variants (superadmin only).
+  """
+  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
   Added in UNRELEASED. Create a runtime variant preset (superadmin only).
   """
   adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayloadGQL! @join__field(graph: STRAWBERRY)
@@ -10002,14 +10073,14 @@ type Mutation
   """
   adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL! @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Create a deployment revision preset."""
-  createDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+  """Added in UNRELEASED. Create a deployment revision preset (admin only)."""
+  adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Update a deployment revision preset."""
-  updateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+  """Added in UNRELEASED. Update a deployment revision preset (admin only)."""
+  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Delete a deployment revision preset."""
-  deleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
+  """Added in UNRELEASED. Delete a deployment revision preset (admin only)."""
+  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL! @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. Create a model card (admin only)."""
   adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
@@ -10019,6 +10090,9 @@ type Mutation
 
   """Added in UNRELEASED. Delete a model card (admin only)."""
   adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Delete multiple model cards (admin only)."""
+  adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload! @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.
@@ -10038,6 +10112,12 @@ type Mutation
 
   """Added in UNRELEASED. Permanently purge a virtual folder."""
   purgeVfolderV2(vfolderId: UUID!): PurgeVFolderV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Soft-delete multiple virtual folders."""
+  bulkDeleteVfoldersV2(input: BulkDeleteVFoldersV2Input!): BulkDeleteVFoldersV2Payload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Permanently purge multiple virtual folders."""
+  bulkPurgeVfoldersV2(input: BulkPurgeVFoldersV2Input!): BulkPurgeVFoldersV2Payload! @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. Clone a virtual folder."""
   cloneVfolderV2(vfolderId: UUID!, input: CloneVFolderV2Input!): CloneVFolderV2Payload! @join__field(graph: STRAWBERRY)

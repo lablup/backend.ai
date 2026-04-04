@@ -1186,6 +1186,18 @@ type BulkCreateUsersV2Payload {
   failed: [BulkCreateUserV2Error!]!
 }
 
+"""Added in UNRELEASED. Input for soft-deleting multiple virtual folders."""
+input BulkDeleteVFoldersV2Input {
+  """List of VFolder UUIDs to soft-delete."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk virtual folder soft-deletion."""
+type BulkDeleteVFoldersV2Payload {
+  """Number of virtual folders successfully soft-deleted."""
+  deletedCount: Int!
+}
+
 """Added in 26.3.0. Error information for a failed user in bulk purge."""
 type BulkPurgeUserV2Error {
   """UUID of the user that failed to purge."""
@@ -1224,6 +1236,20 @@ type BulkPurgeUsersV2Payload {
 
   """List of errors for users that failed to purge."""
   failed: [BulkPurgeUserV2Error!]!
+}
+
+"""
+Added in UNRELEASED. Input for permanently purging multiple virtual folders.
+"""
+input BulkPurgeVFoldersV2Input {
+  """List of VFolder UUIDs to purge."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk virtual folder purge."""
+type BulkPurgeVFoldersV2Payload {
+  """Number of virtual folders successfully purged."""
+  purgedCount: Int!
 }
 
 """
@@ -2469,6 +2495,18 @@ type DeleteModelCardPayloadGQL {
   id: UUID!
 }
 
+"""Added in UNRELEASED. Input for deleting multiple model cards."""
+input DeleteModelCardsV2Input {
+  """List of model card UUIDs to delete."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk model card deletion."""
+type DeleteModelCardsV2Payload {
+  """Number of model cards successfully deleted."""
+  deletedCount: Int!
+}
+
 """Added in 24.09.0. Input for deleting a notification channel"""
 input DeleteNotificationChannelInput {
   id: ID!
@@ -2575,6 +2613,18 @@ type DeleteRuntimeVariantPayloadGQL {
 type DeleteRuntimeVariantPresetPayloadGQL {
   """ID of the deleted preset."""
   id: UUID!
+}
+
+"""Added in UNRELEASED. Input for deleting multiple runtime variants."""
+input DeleteRuntimeVariantsInput {
+  """List of runtime variant UUIDs to delete."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk runtime variant deletion."""
+type DeleteRuntimeVariantsPayloadGQL {
+  """Number of runtime variants successfully deleted."""
+  deletedCount: Int!
 }
 
 """
@@ -6062,6 +6112,11 @@ type Mutation {
   adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL!
 
   """
+  Added in UNRELEASED. Delete multiple runtime variants (superadmin only).
+  """
+  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayloadGQL!
+
+  """
   Added in UNRELEASED. Create a runtime variant preset (superadmin only).
   """
   adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayloadGQL!
@@ -6076,14 +6131,14 @@ type Mutation {
   """
   adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL!
 
-  """Added in UNRELEASED. Create a deployment revision preset."""
-  createDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL!
+  """Added in UNRELEASED. Create a deployment revision preset (admin only)."""
+  adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL!
 
-  """Added in UNRELEASED. Update a deployment revision preset."""
-  updateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL!
+  """Added in UNRELEASED. Update a deployment revision preset (admin only)."""
+  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL!
 
-  """Added in UNRELEASED. Delete a deployment revision preset."""
-  deleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL!
+  """Added in UNRELEASED. Delete a deployment revision preset (admin only)."""
+  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL!
 
   """Added in UNRELEASED. Create a model card (admin only)."""
   adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL!
@@ -6093,6 +6148,9 @@ type Mutation {
 
   """Added in UNRELEASED. Delete a model card (admin only)."""
   adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL!
+
+  """Added in UNRELEASED. Delete multiple model cards (admin only)."""
+  adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload!
 
   """
   Added in UNRELEASED. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.
@@ -6112,6 +6170,12 @@ type Mutation {
 
   """Added in UNRELEASED. Permanently purge a virtual folder."""
   purgeVfolderV2(vfolderId: UUID!): PurgeVFolderV2Payload!
+
+  """Added in UNRELEASED. Soft-delete multiple virtual folders."""
+  bulkDeleteVfoldersV2(input: BulkDeleteVFoldersV2Input!): BulkDeleteVFoldersV2Payload!
+
+  """Added in UNRELEASED. Permanently purge multiple virtual folders."""
+  bulkPurgeVfoldersV2(input: BulkPurgeVFoldersV2Input!): BulkPurgeVFoldersV2Payload!
 
   """Added in UNRELEASED. Clone a virtual folder."""
   cloneVfolderV2(vfolderId: UUID!, input: CloneVFolderV2Input!): CloneVFolderV2Payload!
