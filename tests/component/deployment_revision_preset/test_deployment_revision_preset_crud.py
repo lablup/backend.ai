@@ -67,7 +67,7 @@ class TestDeploymentRevisionPresetCRUD:
                 runtime_variant_id=runtime_variant_id,
                 name="test-preset",
                 description="Test preset",
-                image="test-image:latest",
+                image_id=uuid.uuid4(),
                 resource_slots=[
                     ResourceSlotEntryInput(resource_type="cpu", quantity="4"),
                     ResourceSlotEntryInput(resource_type="mem", quantity="8g"),
@@ -98,6 +98,7 @@ class TestDeploymentRevisionPresetCRUD:
             CreateDeploymentRevisionPresetInput(
                 runtime_variant_id=runtime_variant_id,
                 name="search-test-preset",
+                image_id=uuid.uuid4(),
             )
         )
         preset_id = create_result.preset.id
@@ -126,6 +127,7 @@ class TestDeploymentRevisionPresetCRUD:
                 runtime_variant_id=runtime_variant_id,
                 name="update-test-preset",
                 description="Before",
+                image_id=uuid.uuid4(),
             )
         )
         preset_id = create_result.preset.id
@@ -152,6 +154,7 @@ class TestDeploymentRevisionPresetCRUD:
             CreateDeploymentRevisionPresetInput(
                 runtime_variant_id=runtime_variant_id,
                 name="delete-test-preset",
+                image_id=uuid.uuid4(),
             )
         )
         preset_id = create_result.preset.id
@@ -168,6 +171,7 @@ class TestDeploymentRevisionPresetCRUD:
             CreateDeploymentRevisionPresetInput(
                 runtime_variant_id=runtime_variant_id,
                 name="dup-test-preset",
+                image_id=uuid.uuid4(),
             )
         )
         preset_id = create_result.preset.id
@@ -178,6 +182,7 @@ class TestDeploymentRevisionPresetCRUD:
                     CreateDeploymentRevisionPresetInput(
                         runtime_variant_id=runtime_variant_id,
                         name="dup-test-preset",
+                        image_id=uuid.uuid4(),
                     )
                 )
             assert exc_info.value.args[0] == 409
@@ -193,12 +198,14 @@ class TestDeploymentRevisionPresetCRUD:
             CreateDeploymentRevisionPresetInput(
                 runtime_variant_id=runtime_variant_id,
                 name="rank-test-1",
+                image_id=uuid.uuid4(),
             )
         )
         r2 = await admin_v2_registry.deployment_revision_preset.create(
             CreateDeploymentRevisionPresetInput(
                 runtime_variant_id=runtime_variant_id,
                 name="rank-test-2",
+                image_id=uuid.uuid4(),
             )
         )
         assert r1.preset.rank == 100

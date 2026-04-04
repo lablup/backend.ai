@@ -63,7 +63,7 @@ def create(
     input_dto = CreateVFolderInput(
         name=name,
         usage_mode=VFolderUsageMode(usage_mode),
-        group_id=group_id,
+        project_id=group_id,
         host=host,
         cloneable=cloneable,
     )
