@@ -102,14 +102,6 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AllocatedResourceSlotNode,
     SearchAllocatedResourceSlotsPayload,
 )
-from ai.backend.common.dto.manager.v2.resource_slot.request import (
-    AllocatedResourceSlotFilter,
-    SearchAllocatedResourceSlotsInput,
-)
-from ai.backend.common.dto.manager.v2.resource_slot.response import (
-    AllocatedResourceSlotNode,
-    SearchAllocatedResourceSlotsPayload,
-)
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsEntryInfoDTO,
     ResourceOptsInfoDTO,
