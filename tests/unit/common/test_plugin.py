@@ -200,7 +200,7 @@ class TestDiscoverPlugins:
         """A single normal plugin is discovered and returned."""
         mocked_entrypoints = functools.partial(mock_entrypoints_with_class, plugin_cls=DummyPlugin)
         mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
-        results = list(
+        results: list[tuple[str, type[AbstractPlugin]]] = list(
             BasePluginContext.discover_plugins("backendai_XXX_v10", allowlist=None, blocklist=None)
         )
         assert len(results) == 1
@@ -214,7 +214,7 @@ class TestDiscoverPlugins:
             plugin_cls=[DummyPlugin, DummyExplicitAllowPlugin],
         )
         mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
-        results = list(
+        results: list[tuple[str, type[AbstractPlugin]]] = list(
             BasePluginContext.discover_plugins(
                 "backendai_XXX_v10",
                 allowlist={"dummy", "explicit-only"},
@@ -229,7 +229,7 @@ class TestDiscoverPlugins:
             mock_entrypoints_with_class, plugin_cls=DummyExplicitAllowPlugin
         )
         mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
-        results = list(
+        results: list[tuple[str, type[AbstractPlugin]]] = list(
             BasePluginContext.discover_plugins("backendai_XXX_v10", allowlist=None, blocklist=None)
         )
         assert len(results) == 0
@@ -240,7 +240,7 @@ class TestDiscoverPlugins:
             mock_entrypoints_with_class, plugin_cls=[DummyExplicitAllowPlugin]
         )
         mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
-        results = list(
+        results: list[tuple[str, type[AbstractPlugin]]] = list(
             BasePluginContext.discover_plugins(
                 "backendai_XXX_v10", allowlist={"explicit-only"}, blocklist=None
             )
@@ -258,7 +258,7 @@ class TestDiscoverPlugins:
             plugin_cls=[DummyPlugin, DummyExplicitAllowPlugin],
         )
         mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
-        results = list(
+        results: list[tuple[str, type[AbstractPlugin]]] = list(
             BasePluginContext.discover_plugins("backendai_XXX_v10", allowlist=None, blocklist=None)
         )
         assert len(results) == 1
