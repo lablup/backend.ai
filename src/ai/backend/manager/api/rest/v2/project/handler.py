@@ -13,11 +13,16 @@ from ai.backend.common.dto.manager.v2.group.request import (
     CreateProjectInput,
     DeleteProjectInput,
     PurgeProjectInput,
+    SearchProjectsRequest,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam
+from ai.backend.manager.api.rest.v2.path_params import (
+    DomainNamePathParam,
+    ProjectIdPathParam,
+    UserIdPathParam,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.project import ProjectAdapter
@@ -78,6 +83,24 @@ class V2ProjectHandler:
     ) -> APIResponse:
         """Permanently purge a project (superadmin only)."""
         result = await self._adapter.admin_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def domain_search(
+        self,
+        path: PathParam[DomainNamePathParam],
+        body: BodyParam[SearchProjectsRequest],
+    ) -> APIResponse:
+        """Search projects scoped to a domain."""
+        result = await self._adapter.domain_search(path.parsed.domain_name, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def user_search(
+        self,
+        path: PathParam[UserIdPathParam],
+        body: BodyParam[SearchProjectsRequest],
+    ) -> APIResponse:
+        """Search projects scoped to a user's memberships."""
+        result = await self._adapter.user_search(path.parsed.user_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def assign_users(
