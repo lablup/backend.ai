@@ -402,7 +402,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 startup_command="python serve.py",
                 bootstrap_script="pip install -r requirements.txt",
                 environ={"CUDA_VISIBLE_DEVICES": "0"},
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant=RuntimeVariant("vllm"),
                 callback_url=None,
             ),
             model_definition=ModelDefinition(),
@@ -422,7 +422,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 resource_slot=ResourceSlot({"cpu": "4", "mem": "8g"}),
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant=RuntimeVariant("vllm"),
             ),
             model_mount_config=ModelMountConfigData(
                 vfolder_id=model_vfolder_id,
@@ -450,7 +450,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 model_vfolder_id=model_vfolder_id,
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant=RuntimeVariant("vllm"),
                 environ=None,
             ),
             model_definition=ModelDefinition(),
@@ -485,7 +485,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
         assert spec.image_id == revision_creator.image_id
         assert spec.resource_group == endpoint_info.metadata.resource_group
         assert spec.model_id == revision_creator.mounts.model_vfolder_id
-        assert spec.runtime_variant == RuntimeVariant.VLLM
+        assert spec.runtime_variant == RuntimeVariant("vllm")
 
     async def test_add_model_revision_maps_resource_fields(
         self,
@@ -558,7 +558,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
                 resource_slots={"cpu": "4"},
             ),
             mounts=VFolderMountsCreator(model_vfolder_id=model_vfolder_id),
-            execution=ExecutionSpec(runtime_variant=RuntimeVariant.VLLM),
+            execution=ExecutionSpec(runtime_variant=RuntimeVariant("vllm")),
             model_definition=sample_model_definition,
         )
 

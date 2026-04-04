@@ -84,10 +84,10 @@ class TestReExportedEnums:
         assert ExportedEndpointLifecycle.READY.value == "ready"
 
     def test_runtime_variant_custom_value(self) -> None:
-        assert ExportedRuntimeVariant.CUSTOM.value == "custom"
+        assert ExportedRuntimeVariant("custom") == "custom"
 
     def test_runtime_variant_vllm_value(self) -> None:
-        assert ExportedRuntimeVariant.VLLM.value == "vllm"
+        assert ExportedRuntimeVariant("vllm") == "vllm"
 
 
 class TestRouteInfoSummary:

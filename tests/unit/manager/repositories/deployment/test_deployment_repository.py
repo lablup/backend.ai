@@ -626,7 +626,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant=RuntimeVariant("vllm"),
                 environ={},
                 extra_mounts=[],
             )
@@ -843,7 +843,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     resource_opts={},
                     cluster_mode=ClusterMode.SINGLE_NODE.name,
                     cluster_size=1,
-                    runtime_variant=RuntimeVariant.VLLM,
+                    runtime_variant=RuntimeVariant("vllm"),
                     environ={},
                     extra_mounts=[],
                 )
@@ -944,7 +944,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             assert info.endpoint_id in endpoint_ids
             assert info.kernel_host.startswith("10.0.1.")
             assert 8080 <= info.kernel_port <= 8082
-            assert info.runtime_variant == RuntimeVariant.VLLM.value
+            assert info.runtime_variant == RuntimeVariant("vllm")
             assert info.endpoint_name.startswith("endpoint-")
 
 
@@ -1557,7 +1557,7 @@ class TestDeploymentRevisionOperations:
             bootstrap_script=None,
             environ={},
             callback_url=None,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
             extra_mounts=[],
         )
         return await deployment_repository.create_revision(
@@ -1599,7 +1599,7 @@ class TestDeploymentRevisionOperations:
                 bootstrap_script=None,
                 environ={},
                 callback_url=None,
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 extra_mounts=[],
             )
             revision = await deployment_repository.create_revision(
@@ -1643,7 +1643,7 @@ class TestDeploymentRevisionOperations:
                 bootstrap_script=None,
                 environ={},
                 callback_url=None,
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 extra_mounts=[],
             )
             revision = await deployment_repository.create_revision(
@@ -1684,7 +1684,7 @@ class TestDeploymentRevisionOperations:
             bootstrap_script=None,
             environ={},
             callback_url=None,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
             extra_mounts=[],
         )
         creator = RBACEntityCreator(
@@ -1702,7 +1702,7 @@ class TestDeploymentRevisionOperations:
         assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
         assert result.cluster_config.size == 1
         assert result.resource_config.resource_group_name == test_scaling_group_name
-        assert result.model_runtime_config.runtime_variant == RuntimeVariant.CUSTOM
+        assert result.model_runtime_config.runtime_variant == RuntimeVariant("custom")
         assert result.name == "revision-1"
 
     async def test_get_revision(
@@ -3615,7 +3615,7 @@ class TestDeploymentRepositoryDuplicateName:
             model_mount_destination="/models",
             model_definition_path=None,
             extra_mounts=[],
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
             startup_command=None,
             bootstrap_script=None,
             environ=None,

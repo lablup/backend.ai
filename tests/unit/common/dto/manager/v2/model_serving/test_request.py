@@ -144,7 +144,7 @@ class TestCreateServiceInput:
 
     def test_default_runtime_variant_is_custom(self) -> None:
         inp = _make_create_input()
-        assert inp.runtime_variant == RuntimeVariant.CUSTOM
+        assert inp.runtime_variant == RuntimeVariant("custom")
 
     def test_default_cluster_size_is_one(self) -> None:
         inp = _make_create_input()
@@ -167,8 +167,8 @@ class TestCreateServiceInput:
         assert inp.architecture is None
 
     def test_with_vllm_runtime(self) -> None:
-        inp = _make_create_input(runtime_variant=RuntimeVariant.VLLM)
-        assert inp.runtime_variant == RuntimeVariant.VLLM
+        inp = _make_create_input(runtime_variant=RuntimeVariant("vllm"))
+        assert inp.runtime_variant == RuntimeVariant("vllm")
 
     def test_nested_config_accessible(self) -> None:
         config = _make_service_config(model="bert-model")

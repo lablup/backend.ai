@@ -561,7 +561,7 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
                 resource_slot=ResourceSlot({"cpu": "4", "mem": "8g"}),
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant=RuntimeVariant("vllm"),
             ),
             model_mount_config=ModelMountConfigData(
                 vfolder_id=uuid.uuid4(),

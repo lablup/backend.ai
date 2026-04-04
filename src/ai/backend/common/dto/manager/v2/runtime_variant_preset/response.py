@@ -25,6 +25,9 @@ class RuntimeVariantPresetNode(BaseResponseModel):
     rank: int = Field(description="Display order rank.")
     target_spec: PresetTargetSpec = Field(description="Preset target specification.")
     category: str | None = Field(default=None, description="UI category group.")
+    ui_type: str | None = Field(
+        default=None, description="UI type for rendering (slider, number, choice, text)."
+    )
     display_name: str | None = Field(default=None, description="UI display name.")
     ui_option: UIOption | None = Field(default=None, description="UI rendering config.")
     created_at: datetime = Field(description="Creation timestamp.")

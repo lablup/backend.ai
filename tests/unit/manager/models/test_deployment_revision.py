@@ -302,7 +302,7 @@ class TestDeploymentRevisionRow:
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 environ={},
                 extra_mounts=[],
             )
@@ -336,7 +336,7 @@ class TestDeploymentRevisionRow:
                 cluster_size=1,
                 startup_command="python serve.py",
                 bootstrap_script="#!/bin/bash\necho hello",
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 environ={"DEBUG": "true"},
                 extra_mounts=[],
             )
@@ -356,7 +356,7 @@ class TestDeploymentRevisionRow:
             assert data.model_mount_config.vfolder_id == model_id
             assert data.model_mount_config.mount_destination == "/models"
             assert data.model_mount_config.definition_path == "model.yaml"
-            assert data.model_runtime_config.runtime_variant == RuntimeVariant.CUSTOM
+            assert data.model_runtime_config.runtime_variant == RuntimeVariant("custom")
             assert data.model_runtime_config.environ == {"DEBUG": "true"}
             assert data.image_id == test_image.id
 
@@ -379,7 +379,7 @@ class TestDeploymentRevisionRow:
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 environ={},
                 extra_mounts=[],
             )
@@ -398,7 +398,7 @@ class TestDeploymentRevisionRow:
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 environ={},
                 extra_mounts=[],
             )

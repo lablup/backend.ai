@@ -35,6 +35,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     VFolderNode,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
+    FileEntryType,
     VFolderAccessControlInfo,
     VFolderMetadataInfo,
     VFolderOwnershipInfo,
@@ -333,9 +334,9 @@ class VFolderAdapter(BaseAdapter):
             items=[
                 FileEntryNode(
                     name=f.name,
-                    type=f.type,
+                    type=FileEntryType(f.type),
                     size=f.size,
-                    mode=f.mode,
+                    mode=int(f.mode),
                     created_at=str(f.created),
                     updated_at=str(f.modified),
                 )

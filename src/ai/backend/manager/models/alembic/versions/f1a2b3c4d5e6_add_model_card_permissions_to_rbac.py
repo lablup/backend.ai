@@ -1,7 +1,7 @@
 """add_model_card_permissions_to_rbac
 
 Revision ID: f1a2b3c4d5e6
-Revises: e3111d960208
+Revises: bbcc151ec870
 Create Date: 2026-04-02 13:30:00.000000
 
 """
@@ -16,7 +16,7 @@ from ai.backend.manager.models.rbac_models.migration.enums import (
 
 # revision identifiers, used by Alembic.
 revision = "f1a2b3c4d5e6"
-down_revision = "e3111d960208"
+down_revision = "bbcc151ec870"
 branch_labels = None
 depends_on = None
 

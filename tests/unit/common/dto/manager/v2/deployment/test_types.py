@@ -313,7 +313,7 @@ class TestDeploymentRevisionInfo:
             resource_group="default",
             resource_slots={"cpu": "2", "mem": "4g"},
             image_id=image_id,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
             model_vfolder_id=model_vfolder_id,
             model_mount_destination="/models",
             model_definition_path="/models/model.yaml",
@@ -322,7 +322,7 @@ class TestDeploymentRevisionInfo:
         assert info.cluster_size == 1
         assert info.resource_group == "default"
         assert info.image_id == image_id
-        assert info.runtime_variant == RuntimeVariant.CUSTOM
+        assert info.runtime_variant == RuntimeVariant("custom")
         assert info.model_vfolder_id == model_vfolder_id
         assert info.model_mount_destination == "/models"
         assert info.model_definition_path == "/models/model.yaml"
@@ -334,7 +334,7 @@ class TestDeploymentRevisionInfo:
             resource_group="default",
             resource_slots={},
             image_id=uuid.uuid4(),
-            runtime_variant=RuntimeVariant.VLLM,
+            runtime_variant=RuntimeVariant("vllm"),
             model_vfolder_id=None,
             model_mount_destination=None,
             model_definition_path=None,
@@ -352,7 +352,7 @@ class TestDeploymentRevisionInfo:
             resource_group="gpu-group",
             resource_slots={"cpu": "4", "cuda.shares": "1"},
             image_id=image_id,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
             model_vfolder_id=model_id,
             model_mount_destination="/models",
             model_definition_path="/models/def.yaml",
