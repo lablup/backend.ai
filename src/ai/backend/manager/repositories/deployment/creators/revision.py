@@ -16,6 +16,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
 
@@ -56,7 +57,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     def build_row(self) -> DeploymentRevisionRow:
         if self.revision_number is None:
             raise InternalServerError("revision_number must be set before building a row")
-        return DeploymentRevisionRow(
+        row = DeploymentRevisionRow(
             endpoint=self.endpoint_id,
             revision_number=self.revision_number,
             image=self.image_id,
@@ -67,7 +68,6 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             if self.model_definition
             else None,
             resource_group=self.resource_group,
-            resource_slots=self.resource_slots,
             resource_opts=self.resource_opts,
             cluster_mode=self.cluster_mode,
             cluster_size=self.cluster_size,
@@ -79,3 +79,11 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             extra_mounts=list(self.extra_mounts),
             preset_values=list(self.preset_values),
         )
+        row.resource_slot_rows = [
+            DeploymentRevisionResourceSlotRow(
+                slot_name=str(slot_name),
+                quantity=quantity,
+            )
+            for slot_name, quantity in self.resource_slots.items()
+        ]
+        return row

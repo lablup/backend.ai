@@ -96,6 +96,7 @@ from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, scaling_groups
@@ -329,7 +330,6 @@ class DeploymentDBSource:
                 model_mount_destination=spec.model_mount_destination,
                 model_definition_path=spec.model_definition_path,
                 resource_group=spec.resource_group,
-                resource_slots=spec.resource_slots,
                 resource_opts=dict(spec.resource_opts) if spec.resource_opts else {},
                 cluster_mode=spec.cluster_mode.value,
                 cluster_size=spec.cluster_size,
@@ -340,6 +340,13 @@ class DeploymentDBSource:
                 runtime_variant=spec.runtime_variant,
                 extra_mounts=list(spec.extra_mounts),
             )
+            initial_revision.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(
+                    slot_name=str(slot_name),
+                    quantity=quantity,
+                )
+                for slot_name, quantity in spec.resource_slots.items()
+            ]
             db_sess.add(initial_revision)
             await db_sess.flush()
             endpoint.current_revision = initial_revision.id

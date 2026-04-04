@@ -72,6 +72,10 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_slot.row import (
+    DeploymentRevisionResourceSlotRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import (
@@ -150,13 +154,25 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 VFolderRow,
                 ContainerRegistryRow,
                 ImageRow,
+                ResourceSlotTypeRow,
                 SessionRow,
                 KernelRow,
                 EndpointRow,
                 DeploymentRevisionRow,
+                DeploymentRevisionResourceSlotRow,
                 RoutingRow,
             ],
         ):
+            async with database_connection.begin_session() as sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    await sess.execute(
+                        sa.text(
+                            "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                            " VALUES (:slot_name, :slot_type, 0)"
+                            " ON CONFLICT DO NOTHING"
+                        ),
+                        {"slot_name": slot_name, "slot_type": slot_type},
+                    )
             yield database_connection
 
     @pytest.fixture
@@ -622,7 +638,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 model=None,
                 model_mount_destination="/models",
                 resource_group=test_scaling_group_name,
-                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
@@ -630,6 +645,10 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 environ={},
                 extra_mounts=[],
             )
+            revision.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("4")),
+                DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("8192")),
+            ]
             db_sess.add(revision)
             await db_sess.commit()
 
@@ -839,7 +858,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     model=None,
                     model_mount_destination="/models",
                     resource_group=test_scaling_group_name,
-                    resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                     resource_opts={},
                     cluster_mode=ClusterMode.SINGLE_NODE.name,
                     cluster_size=1,
@@ -847,6 +865,10 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     environ={},
                     extra_mounts=[],
                 )
+                revision.resource_slot_rows = [
+                    DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("2")),
+                    DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("4096")),
+                ]
                 db_sess.add(revision)
                 endpoint_ids.append(endpoint_id)
 
@@ -1309,13 +1331,25 @@ class TestDeploymentRevisionOperations:
                 GroupRow,
                 VFolderRow,
                 ImageRow,
+                ResourceSlotTypeRow,
                 EndpointRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
                 AssociationScopesEntitiesRow,  # RBACEntityCreator dependency
                 DeploymentRevisionRow,
+                DeploymentRevisionResourceSlotRow,
                 DeploymentPolicyRow,
             ],
         ):
+            async with database_connection.begin_session() as sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    await sess.execute(
+                        sa.text(
+                            "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                            " VALUES (:slot_name, :slot_type, 0)"
+                            " ON CONFLICT DO NOTHING"
+                        ),
+                        {"slot_name": slot_name, "slot_type": slot_type},
+                    )
             yield database_connection
 
     @pytest.fixture
@@ -3433,12 +3467,24 @@ class TestDeploymentRepositoryDuplicateName:
                 GroupRow,
                 VFolderRow,
                 ImageRow,
+                ResourceSlotTypeRow,
                 EndpointRow,
                 DeploymentRevisionRow,
+                DeploymentRevisionResourceSlotRow,
                 AssociationScopesEntitiesRow,
                 DeploymentPolicyRow,
             ],
         ):
+            async with database_connection.begin_session() as sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    await sess.execute(
+                        sa.text(
+                            "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                            " VALUES (:slot_name, :slot_type, 0)"
+                            " ON CONFLICT DO NOTHING"
+                        ),
+                        {"slot_name": slot_name, "slot_type": slot_type},
+                    )
             yield database_connection
 
     @pytest.fixture

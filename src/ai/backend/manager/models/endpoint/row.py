@@ -661,7 +661,11 @@ class EndpointRow(Base):  # type: ignore[misc]
             domain=self.domain,
             project=self.project,
             resource_group=self.resource_group,
-            resource_slots=current_rev.resource_slots if current_rev else ResourceSlot({}),
+            resource_slots=ResourceSlot({
+                r.slot_name: r.quantity for r in current_rev.resource_slot_rows
+            })
+            if current_rev
+            else ResourceSlot({}),
             url=self.url or "",
             model=current_rev.model or uuid.UUID(int=0) if current_rev else uuid.UUID(int=0),
             model_definition_path=current_rev.model_definition_path if current_rev else None,

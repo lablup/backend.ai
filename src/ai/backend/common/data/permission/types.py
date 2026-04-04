@@ -252,6 +252,7 @@ class EntityType(enum.StrEnum):
             cls.NOTIFICATION_CHANNEL,
             cls.NOTIFICATION_RULE,
             cls.MODEL_DEPLOYMENT,
+            cls.MODEL_CARD,
         }
 
     @classmethod

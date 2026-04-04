@@ -67,6 +67,19 @@ ImageFactoryFunc = Callable[[], Coroutine[Any, Any, uuid.UUID]]
 VFolderFactoryFunc = Callable[[], Coroutine[Any, Any, uuid.UUID]]
 
 
+@pytest.fixture(autouse=True)
+async def _seed_resource_slot_types(db_engine: SAEngine) -> None:
+    """Ensure resource_slot_types has seed data for FK constraints."""
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.text(
+                "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                " VALUES ('cpu', 'count', 40), ('mem', 'bytes', 50)"
+                " ON CONFLICT DO NOTHING"
+            )
+        )
+
+
 @pytest.fixture()
 def deployment_processors(
     database_engine: ExtendedAsyncSAEngine,

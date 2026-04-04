@@ -92,6 +92,7 @@ class RBACElementTypeDTO(StrEnum):
     ARTIFACT_REGISTRY = "artifact_registry"
     SESSION_TEMPLATE = "session_template"
     APP_CONFIG = "app_config"
+    MODEL_CARD = "model_card"
 
     # Root-query-enabled entities (superadmin-only)
     RESOURCE_PRESET = "resource_preset"
