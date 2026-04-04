@@ -817,14 +817,9 @@ class UserDBSource:
             raise UserNotFound(f"User with email {email} not found.")
         return res
 
-    async def _get_user_by_uuid(
-        self,
-        session: SASession,
-        user_uuid: UUID,
-    ) -> UserRow:
+    async def _get_user_by_uuid(self, session: SASession, user_uuid: UUID) -> UserRow:
         """Private method to get user by UUID."""
-        query = sa.select(UserRow).where(UserRow.uuid == user_uuid)
-        res = await session.scalar(query)
+        res = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
         if res is None:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return res

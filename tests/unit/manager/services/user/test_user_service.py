@@ -352,7 +352,7 @@ class TestGetUser:
         service: UserService,
         mock_user_repository: MagicMock,
     ) -> None:
-        """Existing UUID returns UserData."""
+        """Existing UUID returns full UserData."""
         user_uuid = uuid.uuid4()
         user = _make_user_data(user_uuid=user_uuid, email="found@example.com")
         mock_user_repository.get_user_by_uuid = AsyncMock(return_value=user)
