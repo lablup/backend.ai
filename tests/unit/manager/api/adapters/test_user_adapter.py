@@ -40,6 +40,7 @@ def _create_user_data(
         container_uid=None,
         container_main_gid=None,
         container_gids=None,
+        integration_name="ext-test-system",
     )
 
 
@@ -57,6 +58,7 @@ class TestUserDataToNode:
         assert node.basic_info.email == "test@example.com"
         assert node.basic_info.full_name == "Test User"
         assert node.basic_info.description == "A test user"
+        assert node.basic_info.integration_name == "ext-test-system"
         assert node.organization.domain_name == "default"
         assert node.organization.resource_policy == "default"
         assert node.status.need_password_change is False

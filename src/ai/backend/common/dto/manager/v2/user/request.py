@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
@@ -175,6 +175,15 @@ class UpdateUserInput(BaseRequestModel):
         default=SENTINEL,
         description="New external integration identifier. Set to null to clear.",
     )
+
+    @field_validator("integration_name")
+    @classmethod
+    def _validate_integration_name_max_length(
+        cls, v: str | Sentinel | None
+    ) -> str | Sentinel | None:
+        if isinstance(v, str) and len(v) > 512:
+            raise ValueError("integration_name must be at most 512 characters")
+        return v
 
 
 class DeleteUserInput(BaseRequestModel):

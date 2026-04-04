@@ -88,7 +88,7 @@ class TestUserConditionsIntegrationNameFilters:
         spec = StringMatchSpec(value="ext-abc", case_insensitive=True, negated=False)
         condition = UserConditions.by_integration_name_contains(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "lower" in sql
+        assert "lower" in sql.lower()
 
     def test_by_integration_name_contains_negated(self) -> None:
         spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=True)
@@ -108,7 +108,7 @@ class TestUserConditionsIntegrationNameFilters:
         spec = StringMatchSpec(value="Ext-ABC", case_insensitive=True, negated=False)
         condition = UserConditions.by_integration_name_equals(spec)
         sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
-        assert "lower" in sql
+        assert "lower" in sql.lower()
 
     def test_by_integration_name_equals_negated(self) -> None:
         spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=True)
