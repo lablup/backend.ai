@@ -38,11 +38,11 @@ from .revision import (
     revisions,
 )
 from .revision_preset import (
-    create_deployment_revision_preset,
-    delete_deployment_revision_preset,
+    admin_create_deployment_revision_preset,
+    admin_delete_deployment_revision_preset,
+    admin_update_deployment_revision_preset,
     deployment_revision_preset,
     deployment_revision_presets,
-    update_deployment_revision_preset,
 )
 from .route import (
     route,
@@ -83,9 +83,9 @@ __all__ = [
     "route",
     "update_route_traffic_status",
     # Revision Preset
-    "create_deployment_revision_preset",
-    "delete_deployment_revision_preset",
+    "admin_create_deployment_revision_preset",
+    "admin_delete_deployment_revision_preset",
+    "admin_update_deployment_revision_preset",
     "deployment_revision_preset",
     "deployment_revision_presets",
-    "update_deployment_revision_preset",
 ]
