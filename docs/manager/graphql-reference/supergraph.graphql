@@ -1559,6 +1559,18 @@ type AuditLogV2Edge
   node: AuditLogV2!
 }
 
+"""
+The comparator used to compare the metric value with the threshold. Added in 25.1.0.
+"""
+enum AutoScalingMetricComparator
+  @join__type(graph: GRAPHENE)
+{
+  LESS_THAN @join__enumValue(graph: GRAPHENE)
+  LESS_THAN_OR_EQUAL @join__enumValue(graph: GRAPHENE)
+  GREATER_THAN @join__enumValue(graph: GRAPHENE)
+  GREATER_THAN_OR_EQUAL @join__enumValue(graph: GRAPHENE)
+}
+
 """The source type to fetch metrics. Added in 25.1.0."""
 enum AutoScalingMetricSource
   @join__type(graph: GRAPHENE)
@@ -5631,8 +5643,8 @@ input EndpointAutoScalingRuleInput
 {
   metric_source: AutoScalingMetricSource!
   metric_name: String!
-  min_threshold: String
-  max_threshold: String
+  threshold: String!
+  comparator: AutoScalingMetricComparator!
   step_size: Int!
   cooldown_seconds: Int!
   min_replicas: Int
@@ -5649,8 +5661,8 @@ type EndpointAutoScalingRuleNode implements Node
   row_id: UUID!
   metric_source: AutoScalingMetricSource!
   metric_name: String!
-  min_threshold: String
-  max_threshold: String
+  threshold: String!
+  comparator: AutoScalingMetricComparator!
   step_size: Int!
   cooldown_seconds: Int!
   min_replicas: Int
@@ -8825,8 +8837,8 @@ input ModifyEndpointAutoScalingRuleInput
 {
   metric_source: AutoScalingMetricSource
   metric_name: String
-  min_threshold: String
-  max_threshold: String
+  threshold: String
+  comparator: AutoScalingMetricComparator
   step_size: Int
   cooldown_seconds: Int
   min_replicas: Int
