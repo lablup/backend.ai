@@ -18,7 +18,7 @@ type AccessToken implements Node {
   createdAt: DateTime!
 
   """The expiration timestamp of the access token."""
-  validUntil: DateTime!
+  expiresAt: DateTime
 }
 
 """Added in 25.16.0. Connection for access tokens."""
@@ -43,7 +43,7 @@ type AccessTokenEdge {
 """Added in 25.16.0. """
 input AccessTokenFilter {
   token: StringFilter = null
-  validUntil: DateTimeFilter = null
+  expiresAt: DateTimeFilter = null
   createdAt: DateTimeFilter = null
   AND: [AccessTokenFilter!] = null
   OR: [AccessTokenFilter!] = null
@@ -1692,7 +1692,7 @@ input CreateAccessTokenInput {
   modelDeploymentId: ID!
 
   """The expiration timestamp of the access token."""
-  validUntil: DateTime!
+  expiresAt: DateTime
 }
 
 """Added in 25.16.0. Payload for creating an access token."""
@@ -5349,7 +5349,7 @@ input ModelMountConfigInput {
 }
 
 """
-Added in 25.19.0. A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness) and traffic weight for load balancing.
+Added in 25.19.0. A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness).
 """
 type ModelReplica implements Node {
   """The Globally Unique ID of this object"""
@@ -5363,11 +5363,8 @@ type ModelReplica implements Node {
   """Whether the replica is currently running and able to serve requests."""
   livenessStatus: LivenessStatus!
 
-  """Whether the replica is currently active and able to serve requests."""
+  """Whether the replica is actively receiving traffic."""
   activenessStatus: ActivenessStatus!
-
-  """Traffic weight for load balancing between replicas."""
-  weight: Int!
 
   """Timestamp when the replica was created."""
   createdAt: DateTime!
@@ -6788,6 +6785,12 @@ type ProjectBasicInfo {
   integrationId: String
 }
 
+"""Added in 25.19.0. Scope for project-level deployment operations."""
+input ProjectDeploymentScope {
+  """Project UUID to scope the deployment operation."""
+  projectId: UUID!
+}
+
 """
 Added in 26.2.0. Nested filter for the domain a project belongs to. Filters projects whose domain matches all specified conditions.
 """
@@ -7505,11 +7508,6 @@ type Query {
   """
   mergedAppConfig: AppConfig!
 
-  """
-  Added in 25.16.0. List deployments with optional filtering and pagination (admin, all deployments).
-  """
-  deployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
-
   """Added in 25.16.0. Get a specific deployment by ID."""
   deployment(id: ID!): ModelDeployment
 
@@ -7601,6 +7599,9 @@ type Query {
   """Added in UNRELEASED. List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
 
+  """Added in 25.16.0. List all deployments (superadmin only)."""
+  adminDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
+
   """Added in UNRELEASED. List deployment history (admin only)"""
   adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection
 
@@ -7690,6 +7691,9 @@ type Query {
   Added in UNRELEASED. List sessions within a specific project. Requires project membership or higher privileges.
   """
   projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
+
+  """Added in 25.19.0. List deployments within a specific project."""
+  projectDeployments(scope: ProjectDeploymentScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
 
   """
   Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
