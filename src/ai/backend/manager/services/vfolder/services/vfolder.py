@@ -743,7 +743,7 @@ class VFolderService:
         )
 
         max_vfolder_count = await self._vfolder_repository.get_max_vfolder_count(
-            action.requester_user_uuid, source_vfolder_data.group
+            action.requester_user_uuid, None
         )
 
         # Check resource policy's max_vfolder_count
