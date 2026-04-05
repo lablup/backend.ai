@@ -301,7 +301,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
         mock_deployment_repository: MagicMock,
         route_info: RouteInfo,
     ) -> None:
-        """Existing replica_id returns ModelReplicaData with readiness/liveness/activeness/weight."""
+        """Existing replica_id returns ModelReplicaData with readiness/liveness/activeness."""
         mock_deployment_repository.get_route = AsyncMock(return_value=route_info)
 
         action = GetReplicaByIdAction(replica_id=route_info.route_id)
@@ -312,7 +312,6 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
         assert result.data.readiness_status == ReadinessStatus.HEALTHY
         assert result.data.liveness_status == LivenessStatus.HEALTHY
         assert result.data.activeness_status == ActivenessStatus.ACTIVE
-        assert result.data.weight == 50  # 0.5 * 100
 
     async def test_non_existent_replica_returns_none(
         self,
@@ -351,7 +350,6 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
         result = await processors.get_replica_by_id.wait_for_complete(action)
 
         assert result.data is not None
-        assert result.data.weight == 0
         assert result.data.activeness_status == ActivenessStatus.INACTIVE
 
 
@@ -455,7 +453,7 @@ class TestSearchAccessTokens(DeploymentCRUDBaseFixtures):
         return ModelDeploymentAccessTokenData(
             id=uuid.uuid4(),
             token="test-token-abc123",
-            valid_until=datetime(2025, 12, 31, tzinfo=UTC),
+            expires_at=datetime(2025, 12, 31, tzinfo=UTC),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
