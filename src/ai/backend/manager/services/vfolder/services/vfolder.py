@@ -739,7 +739,7 @@ class VFolderService:
             user_uuid=action.requester_user_uuid,
             resource_policy={"allowed_vfolder_hosts": allowed_vfolder_hosts},
             domain_name=user_domain_name,
-            group_id=source_vfolder_data.group,
+            group_id=None,
         )
 
         max_vfolder_count = await self._vfolder_repository.get_max_vfolder_count(
