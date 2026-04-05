@@ -332,7 +332,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
         mock_deployment_repository: MagicMock,
         endpoint_id: uuid.UUID,
     ) -> None:
-        """weight=0 (traffic inactive) returned correctly."""
+        """traffic_status=INACTIVE returned correctly."""
         inactive_route = RouteInfo(
             route_id=uuid.uuid4(),
             endpoint_id=endpoint_id,
@@ -342,7 +342,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
             traffic_ratio=0.0,
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
-            traffic_status=RouteTrafficStatus.ACTIVE,
+            traffic_status=RouteTrafficStatus.INACTIVE,
         )
         mock_deployment_repository.get_route = AsyncMock(return_value=inactive_route)
 
