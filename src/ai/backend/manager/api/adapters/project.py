@@ -481,11 +481,11 @@ class ProjectAdapter(BaseAdapter):
             return []
         return [GroupConditions.exists_domain_combined(raw_conditions)]
 
-    def _convert_user_nested_filter(self, user_filter: ProjectUserFilter) -> list[QueryCondition]:
+    @staticmethod
+    def _convert_user_nested_filter(user_filter: ProjectUserFilter) -> list[QueryCondition]:
         raw_conditions: list[QueryCondition] = []
         if user_filter.id is not None:
-            condition = self.convert_uuid_filter(
-                user_filter.id,
+            condition = user_filter.id.build_query_condition(
                 equals_factory=GroupConditions.by_user_id_equals,
                 in_factory=GroupConditions.by_user_id_in,
             )
