@@ -11488,6 +11488,7 @@ Added in 26.2.0. Nested filter for users belonging to a project. Filters project
 input ProjectUserNestedFilter
   @join__type(graph: STRAWBERRY)
 {
+  id: UUIDFilter = null
   username: StringFilter = null
   email: StringFilter = null
   isActive: Boolean = null

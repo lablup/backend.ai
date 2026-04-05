@@ -7269,6 +7269,7 @@ input ProjectUsageScope {
 Added in 26.2.0. Nested filter for users belonging to a project. Filters projects that have at least one user matching all specified conditions.
 """
 input ProjectUserNestedFilter {
+  id: UUIDFilter = null
   username: StringFilter = null
   email: StringFilter = null
   isActive: Boolean = null
