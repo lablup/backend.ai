@@ -7,6 +7,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BaseRootResponseModel, BodyParam, PathParam
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
@@ -32,7 +33,8 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     ScopeEntityOperationCombinationInfo,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.rest.v2.path_params import RoleIdPathParam
+from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, RoleIdPathParam
+from ai.backend.manager.models.rbac_models.conditions import RoleConditions
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.rbac import RBACAdapter
@@ -68,6 +70,29 @@ class V2RBACHandler:
     ) -> APIResponse:
         """Search roles with filters, orders, and pagination."""
         result = await self._adapter.admin_search_roles_gql(body.parsed)
+        payload = AdminSearchRolesPayload(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def project_search_roles(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[AdminSearchRolesGQLInput],
+    ) -> APIResponse:
+        """Search roles registered in a project scope."""
+        result = await self._adapter.admin_search_roles_gql(
+            body.parsed,
+            base_conditions=[
+                RoleConditions.by_registered_in_scope(
+                    RBACElementType.PROJECT.to_scope_type(),
+                    str(path.parsed.project_id),
+                ),
+            ],
+        )
         payload = AdminSearchRolesPayload(
             items=result.items,
             total_count=result.total_count,

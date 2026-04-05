@@ -195,6 +195,20 @@ class RoleConditions:
 
         return inner
 
+    @staticmethod
+    def by_registered_in_scope(scope_type: ScopeType, scope_id: str) -> QueryCondition:
+        """Filter roles that are registered in the given scope via association_scopes_entities."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                AssociationScopesEntitiesRow.scope_type == scope_type,
+                AssociationScopesEntitiesRow.scope_id == scope_id,
+                AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+            )
+            return sa.cast(RoleRow.id, sa.String).in_(subq)
+
+        return inner
+
 
 class PermissionConditions:
     """Query conditions for permissions."""

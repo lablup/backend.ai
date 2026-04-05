@@ -65,6 +65,17 @@ class V2RBACClient(BaseDomainClient):
             response_model=AdminSearchRolesPayload,
         )
 
+    async def project_search_roles(
+        self, project_id: UUID, request: AdminSearchRolesGQLInput
+    ) -> AdminSearchRolesPayload:
+        """Search roles registered in a project scope."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/roles/projects/{project_id}/search",
+            request=request,
+            response_model=AdminSearchRolesPayload,
+        )
+
     async def get_role(self, role_id: UUID) -> RoleNode:
         """Retrieve a single role by UUID."""
         return await self._client.typed_request(

@@ -258,6 +258,7 @@ from .rbac import (
     admin_update_permission,
     admin_update_role,
     my_roles,
+    project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
@@ -508,6 +509,8 @@ class Query:
     my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
+    # RBAC Scoped APIs
+    project_roles = project_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
     rbac_entity_operation_combinations = rbac_entity_operation_combinations
     rbac_permission_matrix = rbac_permission_matrix
