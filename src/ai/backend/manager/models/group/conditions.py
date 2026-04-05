@@ -367,6 +367,26 @@ class GroupConditions:
         return sa.exists(subq)
 
     @staticmethod
+    def by_user_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserRow.uuid == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return GroupConditions._exists_user(condition)
+
+        return inner
+
+    @staticmethod
+    def by_user_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserRow.uuid.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return GroupConditions._exists_user(condition)
+
+        return inner
+
+    @staticmethod
     def by_user_username_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:
