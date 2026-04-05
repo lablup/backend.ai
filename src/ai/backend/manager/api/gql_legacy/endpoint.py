@@ -183,13 +183,22 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
 
     @classmethod
     def from_row(cls, graph_ctx: GraphQueryContext, row: EndpointAutoScalingRuleRow) -> Self:
+        if row.max_threshold is not None:
+            threshold_str = str(row.max_threshold)
+            comparator_val = AutoScalingMetricComparator.GREATER_THAN
+        elif row.min_threshold is not None:
+            threshold_str = str(row.min_threshold)
+            comparator_val = AutoScalingMetricComparator.LESS_THAN
+        else:
+            threshold_str = "0"
+            comparator_val = AutoScalingMetricComparator.GREATER_THAN
         return cls(
             id=row.id,
             row_id=row.id,
             metric_source=row.metric_source,
             metric_name=row.metric_name,
-            threshold=row.threshold,
-            comparator=row.comparator,
+            threshold=threshold_str,
+            comparator=comparator_val,
             step_size=row.step_size,
             cooldown_seconds=row.cooldown_seconds,
             min_replicas=row.min_replicas,
