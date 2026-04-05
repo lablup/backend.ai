@@ -2086,8 +2086,8 @@ type EndpointAutoScalingRuleNode implements Node @key(fields: "id") {
   row_id: UUID!
   metric_source: AutoScalingMetricSource!
   metric_name: String!
-  min_threshold: String
-  max_threshold: String
+  threshold: String!
+  comparator: AutoScalingMetricComparator!
   step_size: Int!
   cooldown_seconds: Int!
   min_replicas: Int
@@ -2101,6 +2101,16 @@ type EndpointAutoScalingRuleNode implements Node @key(fields: "id") {
 enum AutoScalingMetricSource {
   KERNEL
   INFERENCE_FRAMEWORK
+}
+
+"""
+The comparator used to compare the metric value with the threshold. Added in 25.1.0.
+"""
+enum AutoScalingMetricComparator {
+  LESS_THAN
+  LESS_THAN_OR_EQUAL
+  GREATER_THAN
+  GREATER_THAN_OR_EQUAL
 }
 
 """Added in 25.1.0."""
@@ -3536,8 +3546,8 @@ type CreateEndpointAutoScalingRuleNode {
 input EndpointAutoScalingRuleInput {
   metric_source: AutoScalingMetricSource!
   metric_name: String!
-  min_threshold: String
-  max_threshold: String
+  threshold: String!
+  comparator: AutoScalingMetricComparator!
   step_size: Int!
   cooldown_seconds: Int!
   min_replicas: Int
@@ -3555,8 +3565,8 @@ type ModifyEndpointAutoScalingRuleNode {
 input ModifyEndpointAutoScalingRuleInput {
   metric_source: AutoScalingMetricSource
   metric_name: String
-  min_threshold: String
-  max_threshold: String
+  threshold: String
+  comparator: AutoScalingMetricComparator
   step_size: Int
   cooldown_seconds: Int
   min_replicas: Int

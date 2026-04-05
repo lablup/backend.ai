@@ -991,12 +991,21 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         await session.delete(self)
 
     def to_data(self) -> EndpointAutoScalingRuleData:
+        if self.max_threshold is not None:
+            threshold_str = str(self.max_threshold)
+            comparator = AutoScalingMetricComparator.GREATER_THAN
+        elif self.min_threshold is not None:
+            threshold_str = str(self.min_threshold)
+            comparator = AutoScalingMetricComparator.LESS_THAN
+        else:
+            threshold_str = "0"
+            comparator = AutoScalingMetricComparator.GREATER_THAN
         return EndpointAutoScalingRuleData(
             id=self.id,
             metric_source=self.metric_source,
             metric_name=self.metric_name,
-            min_threshold=str(self.min_threshold) if self.min_threshold is not None else None,
-            max_threshold=str(self.max_threshold) if self.max_threshold is not None else None,
+            threshold=threshold_str,
+            comparator=comparator,
             step_size=self.step_size,
             cooldown_seconds=self.cooldown_seconds,
             min_replicas=self.min_replicas or 0,

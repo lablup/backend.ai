@@ -46,6 +46,7 @@ from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
+    AutoScalingMetricComparator,
     AutoScalingMetricSource,
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
@@ -619,8 +620,8 @@ class ModelServingRepository:
         endpoint_id: uuid.UUID,
         metric_source: AutoScalingMetricSource,
         metric_name: str,
-        min_threshold: Decimal | None,
-        max_threshold: Decimal | None,
+        threshold: Any,
+        comparator: AutoScalingMetricComparator,
         step_size: int,
         cooldown_seconds: int,
         min_replicas: int | None = None,
@@ -638,12 +639,22 @@ class ModelServingRepository:
             if endpoint.lifecycle_stage in EndpointLifecycle.inactive_states():
                 return None
 
+            # Convert legacy threshold+comparator to min/max_threshold
+            min_threshold_val: Decimal | None = None
+            max_threshold_val: Decimal | None = None
+            if comparator in (
+                AutoScalingMetricComparator.GREATER_THAN,
+                AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL,
+            ):
+                max_threshold_val = Decimal(str(threshold))
+            else:
+                min_threshold_val = Decimal(str(threshold))
             rule = await endpoint.create_auto_scaling_rule(
                 session,
                 metric_source,
                 metric_name,
-                min_threshold,
-                max_threshold,
+                min_threshold_val,
+                max_threshold_val,
                 step_size,
                 cooldown_seconds=cooldown_seconds,
                 min_replicas=min_replicas,

@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any, override
 
 from ai.backend.common.types import (
+    AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
     ResourceSlot,
@@ -85,8 +86,10 @@ class EndpointAutoScalingRuleUpdaterSpec(UpdaterSpec[EndpointAutoScalingRuleRow]
 
     metric_source: OptionalState[AutoScalingMetricSource] = field(default_factory=OptionalState.nop)
     metric_name: OptionalState[str] = field(default_factory=OptionalState.nop)
-    min_threshold: TriState[Decimal] = field(default_factory=TriState.nop)
-    max_threshold: TriState[Decimal] = field(default_factory=TriState.nop)
+    threshold: OptionalState[Decimal] = field(default_factory=OptionalState.nop)
+    comparator: OptionalState[AutoScalingMetricComparator] = field(
+        default_factory=OptionalState.nop
+    )
     step_size: OptionalState[int] = field(default_factory=OptionalState.nop)
     cooldown_seconds: OptionalState[int] = field(default_factory=OptionalState.nop)
     min_replicas: TriState[int] = field(default_factory=TriState.nop)
@@ -102,8 +105,19 @@ class EndpointAutoScalingRuleUpdaterSpec(UpdaterSpec[EndpointAutoScalingRuleRow]
         to_update: dict[str, Any] = {}
         self.metric_source.update_dict(to_update, "metric_source")
         self.metric_name.update_dict(to_update, "metric_name")
-        self.min_threshold.update_dict(to_update, "min_threshold")
-        self.max_threshold.update_dict(to_update, "max_threshold")
+        # Convert legacy threshold+comparator to DB min/max_threshold columns
+        threshold_val = self.threshold.optional_value()
+        comparator_val = self.comparator.optional_value()
+        if threshold_val is not None and comparator_val is not None:
+            if comparator_val in (
+                AutoScalingMetricComparator.GREATER_THAN,
+                AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL,
+            ):
+                to_update["max_threshold"] = threshold_val
+            else:
+                to_update["min_threshold"] = threshold_val
+        elif threshold_val is not None:
+            to_update["max_threshold"] = threshold_val
         self.step_size.update_dict(to_update, "step_size")
         self.cooldown_seconds.update_dict(to_update, "cooldown_seconds")
         self.min_replicas.update_dict(to_update, "min_replicas")

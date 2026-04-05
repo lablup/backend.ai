@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from pydantic import AnyUrl
 
 from ai.backend.common.types import (
+    AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
     RuntimeVariant,
@@ -77,8 +78,8 @@ class EndpointAutoScalingRuleCreator:
 
     metric_source: AutoScalingMetricSource
     metric_name: str
-    min_threshold: str | None
-    max_threshold: str | None
+    threshold: str
+    comparator: AutoScalingMetricComparator
     step_size: int
     cooldown_seconds: int
     min_replicas: int | None = None

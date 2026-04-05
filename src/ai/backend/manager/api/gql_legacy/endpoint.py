@@ -22,6 +22,7 @@ from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
+    AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
     EndpointId,
@@ -101,6 +102,10 @@ AutoScalingMetricSourceGQLEnum = graphene.Enum.from_enum(
     AutoScalingMetricSource,
     description="The source type to fetch metrics. Added in 25.1.0.",
 )
+AutoScalingMetricComparatorGQLEnum = graphene.Enum.from_enum(
+    AutoScalingMetricComparator,
+    description="The comparator used to compare the metric value with the threshold. Added in 25.1.0.",
+)
 
 
 @graphene_federation.key("id")
@@ -116,8 +121,11 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
         required=True,
     )
     metric_name = graphene.String(required=True)
-    min_threshold = graphene.String()
-    max_threshold = graphene.String()
+    threshold = graphene.String(required=True)
+    comparator = graphene.Field(
+        AutoScalingMetricComparatorGQLEnum,
+        required=True,
+    )
     step_size = graphene.Int(required=True)
     cooldown_seconds = graphene.Int(required=True)
 
@@ -133,8 +141,8 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
         "id": ("id", None),
         "metric_source": ("metric_source", None),
         "metric_name": ("metric_name", None),
-        "min_threshold": ("min_threshold", None),
-        "max_threshold": ("max_threshold", None),
+        "threshold": ("threshold", None),
+        "comparator": ("comparator", None),
         "step_size": ("step_size", None),
         "cooldown_seconds": ("cooldown_seconds", None),
         "created_at": ("created_at", dtparse),
@@ -146,8 +154,8 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
         "id": ("id", None),
         "metric_source": ("metric_source", None),
         "metric_name": ("metric_name", None),
-        "min_threshold": ("min_threshold", None),
-        "max_threshold": ("max_threshold", None),
+        "threshold": ("threshold", None),
+        "comparator": ("comparator", None),
         "step_size": ("step_size", None),
         "cooldown_seconds": ("cooldown_seconds", None),
         "created_at": ("created_at", None),
@@ -162,8 +170,8 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
             row_id=dto.id,
             metric_source=dto.metric_source,
             metric_name=dto.metric_name,
-            min_threshold=dto.min_threshold,
-            max_threshold=dto.max_threshold,
+            threshold=dto.threshold,
+            comparator=dto.comparator,
             step_size=dto.step_size,
             cooldown_seconds=dto.cooldown_seconds,
             min_replicas=dto.min_replicas,
@@ -180,8 +188,8 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
             row_id=row.id,
             metric_source=row.metric_source,
             metric_name=row.metric_name,
-            min_threshold=str(row.min_threshold) if row.min_threshold is not None else None,
-            max_threshold=str(row.max_threshold) if row.max_threshold is not None else None,
+            threshold=row.threshold,
+            comparator=row.comparator,
             step_size=row.step_size,
             cooldown_seconds=row.cooldown_seconds,
             min_replicas=row.min_replicas,
@@ -310,8 +318,11 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ignore[mi
         required=True,
     )
     metric_name = graphene.String(required=True)
-    min_threshold = graphene.String()
-    max_threshold = graphene.String()
+    threshold = graphene.String(required=True)
+    comparator = graphene.Field(
+        AutoScalingMetricComparatorGQLEnum,
+        required=True,
+    )
     step_size = graphene.Int(required=True)
     cooldown_seconds = graphene.Int(required=True)
     min_replicas = graphene.Int()
@@ -323,8 +334,8 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ignore[mi
             creator=EndpointAutoScalingRuleCreator(
                 metric_source=AutoScalingMetricSource(self.metric_source),
                 metric_name=self.metric_name,
-                min_threshold=self.min_threshold if self.min_threshold is not Undefined else None,
-                max_threshold=self.max_threshold if self.max_threshold is not Undefined else None,
+                threshold=self.threshold,
+                comparator=AutoScalingMetricComparator(self.comparator),
                 step_size=self.step_size,
                 cooldown_seconds=self.cooldown_seconds,
                 min_replicas=self.min_replicas if self.min_replicas is not Undefined else None,
@@ -342,21 +353,24 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ign
         default_value=Undefined,
     )
     metric_name = graphene.String()
-    min_threshold = graphene.String()
-    max_threshold = graphene.String()
+    threshold = graphene.String()
+    comparator = graphene.Field(
+        AutoScalingMetricComparatorGQLEnum,
+        default_value=Undefined,
+    )
     step_size = graphene.Int()
     cooldown_seconds = graphene.Int()
     min_replicas = graphene.Int()
     max_replicas = graphene.Int()
 
     def to_action(self, id: RuleId) -> ModifyEndpointAutoScalingRuleAction:
-        def convert_to_nullable_decimal(
+        def convert_to_decimal(
             value: str | None | UndefinedType,
-        ) -> decimal.Decimal | None | UndefinedType:
+        ) -> decimal.Decimal | UndefinedType:
             if isinstance(value, UndefinedType):
                 return value
             if value is None:
-                return None
+                raise InvalidAPIParameters("Threshold cannot be None")
 
             try:
                 return decimal.Decimal(value)
@@ -372,11 +386,13 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ign
             metric_name=OptionalState.from_graphql(
                 self.metric_name,
             ),
-            min_threshold=TriState.from_graphql(
-                convert_to_nullable_decimal(self.min_threshold),
+            threshold=OptionalState.from_graphql(
+                convert_to_decimal(self.threshold),
             ),
-            max_threshold=TriState.from_graphql(
-                convert_to_nullable_decimal(self.max_threshold),
+            comparator=OptionalState.from_graphql(
+                AutoScalingMetricComparator(self.comparator)
+                if self.comparator is not Undefined
+                else Undefined,
             ),
             step_size=OptionalState.from_graphql(
                 self.step_size,
