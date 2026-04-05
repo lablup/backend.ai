@@ -19,6 +19,7 @@ from .resolver import (
     # Revision Preset
     admin_create_deployment_revision_preset,
     admin_delete_deployment_revision_preset,
+    admin_deployments,
     admin_update_deployment_revision_preset,
     # Access Token
     create_access_token,
@@ -26,15 +27,16 @@ from .resolver import (
     create_auto_scaling_rule,
     # Deployment
     create_model_deployment,
+    delete_access_token,
     delete_auto_scaling_rule,
     delete_model_deployment,
     deployment,
     deployment_revision_preset,
     deployment_revision_presets,
     deployment_status_changed,
-    deployments,
     inference_runtime_config,
     inference_runtime_configs,
+    project_deployments,
     # Replica
     replica,
     replica_status_changed,
@@ -122,6 +124,7 @@ from .types import (
     ModelRuntimeConfig,
     ModelRuntimeConfigInput,
     MountPermission,
+    ProjectDeploymentScopeGQL,
     ReadinessStatus,
     ReplicaFilter,
     ReplicaOrderBy,
@@ -249,6 +252,7 @@ __all__ = [
     "ModelRuntimeConfig",
     "ModelRuntimeConfigInput",
     "MountPermission",
+    "ProjectDeploymentScopeGQL",
     "ResourceConfig",
     "ResourceConfigInput",
     "ResourceGroupInput",
@@ -266,6 +270,7 @@ __all__ = [
     "get_route_pagination_spec",
     # Resolvers - Access Token
     "create_access_token",
+    "delete_access_token",
     # Resolvers - Auto Scaling
     "create_auto_scaling_rule",
     "delete_auto_scaling_rule",
@@ -275,7 +280,8 @@ __all__ = [
     "delete_model_deployment",
     "deployment",
     "deployment_status_changed",
-    "deployments",
+    "admin_deployments",
+    "project_deployments",
     "sync_replicas",
     "update_model_deployment",
     # Resolvers - Policy

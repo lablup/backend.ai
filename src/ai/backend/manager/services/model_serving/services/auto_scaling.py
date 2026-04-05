@@ -86,11 +86,16 @@ class AutoScalingService:
     async def create_endpoint_auto_scaling_rule(
         self, action: CreateEndpointAutoScalingRuleAction
     ) -> CreateEndpointAutoScalingRuleActionResult:
+        _min_threshold: decimal.Decimal | None = None
+        _max_threshold: decimal.Decimal | None = None
         try:
-            _threshold = decimal.Decimal(action.creator.threshold)
+            if action.creator.min_threshold is not None:
+                _min_threshold = decimal.Decimal(action.creator.min_threshold)
+            if action.creator.max_threshold is not None:
+                _max_threshold = decimal.Decimal(action.creator.max_threshold)
         except decimal.InvalidOperation as e:
             raise InvalidAPIParameters(
-                f"Cannot convert {action.creator.threshold} to Decimal"
+                "Cannot convert min_threshold/max_threshold to Decimal"
             ) from e
 
         # Validate access to the endpoint first
@@ -107,8 +112,8 @@ class AutoScalingService:
             endpoint_id=action.endpoint_id,
             metric_source=action.creator.metric_source,
             metric_name=action.creator.metric_name,
-            threshold=_threshold,
-            comparator=action.creator.comparator,
+            min_threshold=_min_threshold,
+            max_threshold=_max_threshold,
             step_size=action.creator.step_size,
             cooldown_seconds=action.creator.cooldown_seconds,
             min_replicas=action.creator.min_replicas,

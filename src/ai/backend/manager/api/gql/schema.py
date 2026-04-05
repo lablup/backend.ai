@@ -63,6 +63,7 @@ from .deployment import (
     # Revision Preset
     admin_create_deployment_revision_preset,
     admin_delete_deployment_revision_preset,
+    admin_deployments,
     admin_update_deployment_revision_preset,
     # Access Token
     create_access_token,
@@ -76,9 +77,9 @@ from .deployment import (
     deployment_revision_preset,
     deployment_revision_presets,
     deployment_status_changed,
-    deployments,
     inference_runtime_config,
     inference_runtime_configs,
+    project_deployments,
     # Replica
     replica,
     replica_status_changed,
@@ -426,7 +427,6 @@ class Query:
     artifact_revisions = artifact_revisions
     user_app_config = user_app_config
     merged_app_config = merged_app_config
-    deployments = deployments
     deployment = deployment
     revisions = revisions
     revision = revision
@@ -453,6 +453,7 @@ class Query:
     admin_allowed_projects_for_resource_group_v2 = admin_allowed_projects_for_resource_group_v2
     admin_service_catalogs = admin_service_catalogs
     admin_session_scheduling_histories = admin_session_scheduling_histories
+    admin_deployments = admin_deployments
     admin_deployment_histories = admin_deployment_histories
     admin_route_histories = admin_route_histories
     admin_notification_channel = admin_notification_channel
@@ -477,6 +478,7 @@ class Query:
     admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
     project_sessions_v2 = project_sessions_v2
+    project_deployments = project_deployments
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases

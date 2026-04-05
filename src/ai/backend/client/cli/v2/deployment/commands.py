@@ -16,6 +16,87 @@ def deployment() -> None:
     """Deployment management commands."""
 
 
+@deployment.command(name="project-search")
+@click.argument("project_id", type=str)
+@click.option("--limit", type=int, default=20, help="Maximum items to return.")
+@click.option("--offset", type=int, default=0, help="Number of items to skip.")
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., name:asc, created_at:desc).",
+)
+@click.option("--name-contains", default=None, type=str, help="Filter by name (contains).")
+@click.option(
+    "--status",
+    multiple=True,
+    help="Filter by status (repeatable, e.g., --status ACTIVE --status DEGRADED).",
+)
+@click.option(
+    "--open-to-public",
+    default=None,
+    type=bool,
+    help="Filter by public access (true/false).",
+)
+def project_search(
+    project_id: str,
+    limit: int,
+    offset: int,
+    order_by: tuple[str, ...],
+    name_contains: str | None,
+    status: tuple[str, ...],
+    open_to_public: bool | None,
+) -> None:
+    """Search deployments within a project."""
+
+    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.v2.deployment.request import (
+        AdminSearchDeploymentsInput,
+        DeploymentFilter,
+        DeploymentOrder,
+        DeploymentStatusFilter,
+    )
+    from ai.backend.common.dto.manager.v2.deployment.types import DeploymentOrderField
+
+    filter_dto: DeploymentFilter | None = None
+    if name_contains or status or open_to_public is not None:
+        filter_dto = DeploymentFilter(
+            name=StringFilter(contains=name_contains) if name_contains else None,
+            status=DeploymentStatusFilter(in_=list(status)) if status else None,
+            open_to_public=open_to_public,
+        )
+
+    orders: list[DeploymentOrder] | None = None
+    if order_by:
+        from ai.backend.common.dto.manager.v2.common import OrderDirection
+
+        parsed: list[DeploymentOrder] = []
+        for spec in order_by:
+            parts = spec.split(":")
+            field_name = parts[0]
+            direction = OrderDirection(parts[1].lower()) if len(parts) > 1 else OrderDirection.DESC
+            parsed.append(
+                DeploymentOrder(field=DeploymentOrderField(field_name), direction=direction)
+            )
+        orders = parsed
+
+    body = AdminSearchDeploymentsInput(
+        filter=filter_dto,
+        order=orders,
+        limit=limit,
+        offset=offset,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.deployment.project_search(UUID(project_id), body)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 @deployment.command()
 @click.argument("deployment_id", type=str)
 def get(deployment_id: str) -> None:

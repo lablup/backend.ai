@@ -607,7 +607,7 @@ class ModelDeploymentAutoScalingRuleData:
 class ModelDeploymentAccessTokenData:
     id: UUID
     token: str
-    valid_until: datetime
+    expires_at: datetime | None
     created_at: datetime
 
 
@@ -619,7 +619,6 @@ class ModelReplicaData:
     readiness_status: ReadinessStatus
     liveness_status: LivenessStatus
     activeness_status: ActivenessStatus
-    weight: int
     detail: dict[str, Any]
     created_at: datetime
 

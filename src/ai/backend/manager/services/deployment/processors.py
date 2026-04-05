@@ -9,13 +9,29 @@ from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
+    BulkDeleteAccessTokensAction,
+    BulkDeleteAccessTokensActionResult,
+)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
 )
+from ai.backend.manager.services.deployment.actions.access_token.delete_access_token import (
+    DeleteAccessTokenAction,
+    DeleteAccessTokenActionResult,
+)
+from ai.backend.manager.services.deployment.actions.access_token.get_access_token import (
+    GetAccessTokenAction,
+    GetAccessTokenActionResult,
+)
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
     SearchAccessTokensActionResult,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
+    BulkDeleteAutoScalingRulesAction,
+    BulkDeleteAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -172,12 +188,20 @@ class DeploymentProcessors(AbstractProcessorPackage):
     delete_auto_scaling_rule: ActionProcessor[
         DeleteAutoScalingRuleAction, DeleteAutoScalingRuleActionResult
     ]
+    bulk_delete_auto_scaling_rules: ActionProcessor[
+        BulkDeleteAutoScalingRulesAction, BulkDeleteAutoScalingRulesActionResult
+    ]
     search_auto_scaling_rules: ActionProcessor[
         SearchAutoScalingRulesAction, SearchAutoScalingRulesActionResult
     ]
 
     # Access token
     create_access_token: ActionProcessor[CreateAccessTokenAction, CreateAccessTokenActionResult]
+    get_access_token: ActionProcessor[GetAccessTokenAction, GetAccessTokenActionResult]
+    delete_access_token: ActionProcessor[DeleteAccessTokenAction, DeleteAccessTokenActionResult]
+    bulk_delete_access_tokens: ActionProcessor[
+        BulkDeleteAccessTokensAction, BulkDeleteAccessTokensActionResult
+    ]
     search_access_tokens: ActionProcessor[SearchAccessTokensAction, SearchAccessTokensActionResult]
 
     def __init__(
@@ -239,12 +263,20 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.delete_auto_scaling_rule = ActionProcessor(
             service.delete_auto_scaling_rule, action_monitors
         )
+        self.bulk_delete_auto_scaling_rules = ActionProcessor(
+            service.bulk_delete_auto_scaling_rules, action_monitors
+        )
         self.search_auto_scaling_rules = ActionProcessor(
             service.search_auto_scaling_rules, action_monitors
         )
 
         # Access token
         self.create_access_token = ActionProcessor(service.create_access_token, action_monitors)
+        self.get_access_token = ActionProcessor(service.get_access_token, action_monitors)
+        self.delete_access_token = ActionProcessor(service.delete_access_token, action_monitors)
+        self.bulk_delete_access_tokens = ActionProcessor(
+            service.bulk_delete_access_tokens, action_monitors
+        )
         self.search_access_tokens = ActionProcessor(service.search_access_tokens, action_monitors)
 
     @override
@@ -279,8 +311,12 @@ class DeploymentProcessors(AbstractProcessorPackage):
             GetAutoScalingRuleAction.spec(),
             UpdateAutoScalingRuleAction.spec(),
             DeleteAutoScalingRuleAction.spec(),
+            BulkDeleteAutoScalingRulesAction.spec(),
             SearchAutoScalingRulesAction.spec(),
             # Access token
             CreateAccessTokenAction.spec(),
+            GetAccessTokenAction.spec(),
+            DeleteAccessTokenAction.spec(),
+            BulkDeleteAccessTokensAction.spec(),
             SearchAccessTokensAction.spec(),
         ]

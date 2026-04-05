@@ -6,4 +6,4 @@ from uuid import UUID
 @dataclass
 class ModelDeploymentAccessTokenCreator:
     model_deployment_id: UUID
-    valid_until: datetime
+    expires_at: datetime | None

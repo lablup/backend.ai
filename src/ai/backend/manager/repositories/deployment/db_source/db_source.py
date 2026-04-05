@@ -6,7 +6,7 @@ from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, cast
 
@@ -77,6 +77,7 @@ from ai.backend.manager.errors.service import (
     AutoScalingRuleNotFound,
     DeploymentPolicyNotFound,
     EndpointNotFound,
+    EndpointTokenNotFound,
     NoUpdatesToApply,
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
@@ -974,6 +975,22 @@ class DeploymentDBSource:
             )
             result = await db_sess.execute(query)
             return cast(CursorResult[Any], result).rowcount > 0
+
+    async def bulk_delete_autoscaling_rules(
+        self,
+        rule_ids: list[uuid.UUID],
+    ) -> list[uuid.UUID]:
+        """Delete multiple autoscaling rules and return the IDs that were actually deleted."""
+        if not rule_ids:
+            return []
+        async with self._begin_session_read_committed() as db_sess:
+            query = (
+                sa.delete(EndpointAutoScalingRuleRow)
+                .where(EndpointAutoScalingRuleRow.id.in_(rule_ids))
+                .returning(EndpointAutoScalingRuleRow.id)
+            )
+            result = await db_sess.execute(query)
+            return [row[0] for row in result.fetchall()]
 
     # New Model Deployment Auto-scaling Rule methods (using new types)
 
@@ -2690,6 +2707,50 @@ class DeploymentDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    async def get_access_token(
+        self,
+        token_id: uuid.UUID,
+    ) -> ModelDeploymentAccessTokenData:
+        """Get a single access token by ID."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointTokenRow).where(EndpointTokenRow.id == token_id)
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            if not row:
+                raise EndpointTokenNotFound(f"Access token {token_id} not found")
+            return ModelDeploymentAccessTokenData(
+                id=row.id,
+                token=row.token,
+                expires_at=row.expires_at,
+                created_at=row.created_at or datetime.now(UTC),
+            )
+
+    async def delete_access_token(
+        self,
+        token_id: uuid.UUID,
+    ) -> bool:
+        """Delete an access token."""
+        async with self._begin_session_read_committed() as db_sess:
+            query = sa.delete(EndpointTokenRow).where(EndpointTokenRow.id == token_id)
+            result = await db_sess.execute(query)
+            return cast(CursorResult[Any], result).rowcount > 0
+
+    async def bulk_delete_access_tokens(
+        self,
+        token_ids: list[uuid.UUID],
+    ) -> list[uuid.UUID]:
+        """Delete multiple access tokens and return the IDs that were actually deleted."""
+        if not token_ids:
+            return []
+        async with self._begin_session_read_committed() as db_sess:
+            query = (
+                sa.delete(EndpointTokenRow)
+                .where(EndpointTokenRow.id.in_(token_ids))
+                .returning(EndpointTokenRow.id)
+            )
+            result = await db_sess.execute(query)
+            return [row[0] for row in result.fetchall()]
+
     async def search_access_tokens(
         self,
         querier: BatchQuerier,
@@ -2714,10 +2775,10 @@ class DeploymentDBSource:
             return AccessTokenSearchResult(
                 items=[
                     ModelDeploymentAccessTokenData(
-                        id=row.id,
-                        token=row.token,
-                        valid_until=row.valid_until,
-                        created_at=row.created_at,
+                        id=row.EndpointTokenRow.id,
+                        token=row.EndpointTokenRow.token,
+                        expires_at=row.EndpointTokenRow.expires_at,
+                        created_at=row.EndpointTokenRow.created_at,
                     )
                     for row in result.rows
                 ],

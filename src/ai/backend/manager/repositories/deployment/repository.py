@@ -56,6 +56,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyUpsertResult,
     DeploymentSummarySearchResult,
     DeploymentWithHistory,
+    ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -405,6 +406,14 @@ class DeploymentRepository:
     ) -> bool:
         """Delete an autoscaling rule."""
         return await self._db_source.delete_autoscaling_rule(rule_id)
+
+    @deployment_repository_resilience.apply()
+    async def bulk_delete_autoscaling_rules(
+        self,
+        rule_ids: list[uuid.UUID],
+    ) -> list[uuid.UUID]:
+        """Delete multiple autoscaling rules."""
+        return await self._db_source.bulk_delete_autoscaling_rules(rule_ids)
 
     # Model Deployment Auto-scaling Rule operations (new types)
 
@@ -1447,6 +1456,30 @@ class DeploymentRepository:
             Created EndpointTokenRow.
         """
         return await self._db_source.create_access_token(creator)
+
+    @deployment_repository_resilience.apply()
+    async def get_access_token(
+        self,
+        token_id: uuid.UUID,
+    ) -> ModelDeploymentAccessTokenData:
+        """Get a single access token by ID."""
+        return await self._db_source.get_access_token(token_id)
+
+    @deployment_repository_resilience.apply()
+    async def delete_access_token(
+        self,
+        token_id: uuid.UUID,
+    ) -> bool:
+        """Delete an access token."""
+        return await self._db_source.delete_access_token(token_id)
+
+    @deployment_repository_resilience.apply()
+    async def bulk_delete_access_tokens(
+        self,
+        token_ids: list[uuid.UUID],
+    ) -> list[uuid.UUID]:
+        """Delete multiple access tokens."""
+        return await self._db_source.bulk_delete_access_tokens(token_ids)
 
     # ========== Additional Search Operations ==========
 

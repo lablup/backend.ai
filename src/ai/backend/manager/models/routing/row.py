@@ -24,7 +24,6 @@ from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    EnumValueType,
     StrEnumType,
 )
 
@@ -78,7 +77,7 @@ class RoutingRow(Base):  # type: ignore[misc]
     )
     status: Mapped[RouteStatus] = mapped_column(
         "status",
-        EnumValueType(RouteStatus),
+        StrEnumType(RouteStatus, use_name=False),
         nullable=False,
         default=RouteStatus.PROVISIONING,
     )
@@ -112,7 +111,7 @@ class RoutingRow(Base):  # type: ignore[misc]
     revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
     traffic_status: Mapped[RouteTrafficStatus] = mapped_column(
         "traffic_status",
-        EnumValueType(RouteTrafficStatus),
+        StrEnumType(RouteTrafficStatus, use_name=False),
         nullable=False,
         server_default=sa.text("'active'"),
         default=RouteTrafficStatus.ACTIVE,

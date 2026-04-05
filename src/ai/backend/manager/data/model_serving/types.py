@@ -13,7 +13,6 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import (
     AccessKey,
-    AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
     MountPermission,
@@ -114,8 +113,8 @@ class EndpointAutoScalingRuleData:
     id: uuid.UUID
     metric_source: AutoScalingMetricSource
     metric_name: str
-    threshold: str
-    comparator: AutoScalingMetricComparator
+    min_threshold: str | None
+    max_threshold: str | None
     step_size: int
     cooldown_seconds: int
     min_replicas: int

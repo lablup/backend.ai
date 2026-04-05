@@ -540,7 +540,7 @@ class AccessTokenFilter(BaseRequestModel):
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
     token: StringFilter | None = Field(default=None, description="Token value filter")
-    valid_until: DateTimeFilter | None = Field(
+    expires_at: DateTimeFilter | None = Field(
         default=None, description="Expiration datetime filter"
     )
     created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
@@ -737,7 +737,19 @@ class CreateAccessTokenInput(BaseRequestModel):
     """Input for creating an access token."""
 
     deployment_id: UUID = Field(description="Deployment ID")
-    valid_until: datetime = Field(description="Token expiration timestamp")
+    expires_at: datetime | None = Field(default=None, description="Token expiration timestamp")
+
+
+class DeleteAccessTokenInput(BaseRequestModel):
+    """Input for deleting an access token."""
+
+    id: UUID = Field(description="Access token ID")
+
+
+class BulkDeleteAccessTokensInput(BaseRequestModel):
+    """Input for bulk deleting access tokens."""
+
+    ids: list[UUID] = Field(description="List of access token UUIDs to delete.")
 
 
 class CreateAutoScalingRuleInput(BaseRequestModel):
@@ -785,6 +797,12 @@ class DeleteAutoScalingRuleInput(BaseRequestModel):
     """Input for deleting an auto-scaling rule."""
 
     id: UUID = Field(description="Auto-scaling rule ID")
+
+
+class BulkDeleteAutoScalingRulesInput(BaseRequestModel):
+    """Input for bulk deleting auto-scaling rules."""
+
+    ids: list[UUID] = Field(description="List of auto-scaling rule UUIDs to delete.")
 
 
 class UpsertDeploymentPolicyInput(BaseRequestModel):

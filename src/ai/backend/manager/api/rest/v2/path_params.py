@@ -89,5 +89,9 @@ class VFolderIdPathParam(BaseRequestModel):
     vfolder_id: UUID = Field(description="VFolder UUID")
 
 
+class TokenIdPathParam(BaseRequestModel):
+    token_id: UUID = Field(description="Token UUID")
+
+
 class AccessKeyPathParam(BaseRequestModel):
     access_key: str = Field(description="Access key string")

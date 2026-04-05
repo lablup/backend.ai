@@ -8,6 +8,8 @@ from .access_token import (
     AccessTokenOrderBy,
     CreateAccessTokenInput,
     CreateAccessTokenPayload,
+    DeleteAccessTokenInput,
+    DeleteAccessTokenPayload,
 )
 from .auto_scaling import (
     AutoScalingMetricSource,
@@ -42,6 +44,7 @@ from .deployment import (
     ModelDeploymentMetadataInput,
     ModelDeploymentNetworkAccess,
     ModelDeploymentNetworkAccessInput,
+    ProjectDeploymentScopeGQL,
     ReplicaState,
     SyncReplicaInput,
     SyncReplicaPayload,
@@ -142,6 +145,8 @@ __all__ = [
     "AccessTokenOrderBy",
     "CreateAccessTokenInput",
     "CreateAccessTokenPayload",
+    "DeleteAccessTokenInput",
+    "DeleteAccessTokenPayload",
     # Auto Scaling
     "AutoScalingMetricSource",
     "AutoScalingRule",
@@ -172,6 +177,7 @@ __all__ = [
     "ModelDeploymentEdge",
     "ModelDeploymentMetadata",
     "ModelDeploymentMetadataInput",
+    "ProjectDeploymentScopeGQL",
     "ModelDeploymentNetworkAccess",
     "ModelDeploymentNetworkAccessInput",
     "ReplicaState",

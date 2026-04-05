@@ -6,6 +6,7 @@ for the deployment module.
 
 from .access_token import (
     create_access_token,
+    delete_access_token,
 )
 from .auto_scaling import (
     create_auto_scaling_rule,
@@ -13,11 +14,12 @@ from .auto_scaling import (
     update_auto_scaling_rule,
 )
 from .deployment import (
+    admin_deployments,
     create_model_deployment,
     delete_model_deployment,
     deployment,
     deployment_status_changed,
-    deployments,
+    project_deployments,
     sync_replicas,
     update_model_deployment,
 )
@@ -53,12 +55,14 @@ from .route import (
 __all__ = [
     # Access Token
     "create_access_token",
+    "delete_access_token",
     # Auto Scaling
     "create_auto_scaling_rule",
     "update_auto_scaling_rule",
     "delete_auto_scaling_rule",
     # Deployment
-    "deployments",
+    "admin_deployments",
+    "project_deployments",
     "deployment",
     "create_model_deployment",
     "update_model_deployment",

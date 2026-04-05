@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from decimal import Decimal
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -45,7 +46,6 @@ from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
-    AutoScalingMetricComparator,
     AutoScalingMetricSource,
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
@@ -619,8 +619,8 @@ class ModelServingRepository:
         endpoint_id: uuid.UUID,
         metric_source: AutoScalingMetricSource,
         metric_name: str,
-        threshold: Any,
-        comparator: AutoScalingMetricComparator,
+        min_threshold: Decimal | None,
+        max_threshold: Decimal | None,
         step_size: int,
         cooldown_seconds: int,
         min_replicas: int | None = None,
@@ -642,8 +642,8 @@ class ModelServingRepository:
                 session,
                 metric_source,
                 metric_name,
-                threshold,
-                comparator,
+                min_threshold,
+                max_threshold,
                 step_size,
                 cooldown_seconds=cooldown_seconds,
                 min_replicas=min_replicas,
