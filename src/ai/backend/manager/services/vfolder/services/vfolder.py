@@ -1681,8 +1681,9 @@ class VFolderService:
             user_uuid=action.user_id,
         )
 
+        # clone_v2 always creates user-owned vfolders, so check user resource policy (group_uuid=None)
         max_vfolder_count = await self._vfolder_repository.get_max_vfolder_count(
-            action.user_id, source_vfolder_data.group
+            action.user_id, None
         )
 
         # Check resource policy's max_vfolder_count
