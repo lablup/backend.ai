@@ -79,6 +79,7 @@ from .deployment import (
     deployment_status_changed,
     inference_runtime_config,
     inference_runtime_configs,
+    my_deployments,
     project_deployments,
     # Replica
     replica,
@@ -479,6 +480,7 @@ class Query:
     admin_sessions_v2 = admin_sessions_v2
     project_sessions_v2 = project_sessions_v2
     project_deployments = project_deployments
+    my_deployments = my_deployments
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases

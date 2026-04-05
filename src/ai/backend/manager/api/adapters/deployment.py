@@ -11,6 +11,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     RouteHealthStatus,
@@ -496,6 +497,58 @@ class DeploymentAdapter(BaseAdapter):
     ) -> AdminSearchDeploymentsPayload:
         """Search deployments (admin, no scope)."""
         querier = self._build_deployment_querier(input)
+        action_result = await self._processors.deployment.search_deployments.wait_for_complete(
+            SearchDeploymentsAction(querier=querier)
+        )
+        return AdminSearchDeploymentsPayload(
+            items=[self._deployment_data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def my_search(
+        self,
+        input: AdminSearchDeploymentsInput,
+    ) -> AdminSearchDeploymentsPayload:
+        """Search deployments owned by the current user."""
+        user = current_user()
+        if user is None:
+            raise RuntimeError("No authenticated user in context")
+        conditions: list[QueryCondition] = []
+        if input.filter:
+            f = input.filter
+            if f.name is not None:
+                condition = self.convert_string_filter(
+                    f.name,
+                    contains_factory=DeploymentConditions.by_name_contains,
+                    equals_factory=DeploymentConditions.by_name_equals,
+                    starts_with_factory=DeploymentConditions.by_name_starts_with,
+                    ends_with_factory=DeploymentConditions.by_name_ends_with,
+                )
+                if condition is not None:
+                    conditions.append(condition)
+            if f.open_to_public is not None:
+                conditions.append(DeploymentConditions.by_open_to_public(f.open_to_public))
+        orders: list[QueryOrder] = (
+            self._convert_deployment_orders(input.order) if input.order else []
+        )
+
+        def _by_created_user() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.created_user == user.user_id
+
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_deployment_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[_by_created_user],
+        )
         action_result = await self._processors.deployment.search_deployments.wait_for_complete(
             SearchDeploymentsAction(querier=querier)
         )

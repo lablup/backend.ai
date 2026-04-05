@@ -96,6 +96,18 @@ class V2DeploymentClient(BaseDomainClient):
             response_model=AdminSearchDeploymentsPayload,
         )
 
+    async def my_search(
+        self,
+        body: AdminSearchDeploymentsInput,
+    ) -> AdminSearchDeploymentsPayload:
+        """Search deployments owned by the current user."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/my/search",
+            request=body,
+            response_model=AdminSearchDeploymentsPayload,
+        )
+
     async def project_search(
         self,
         project_id: UUID,

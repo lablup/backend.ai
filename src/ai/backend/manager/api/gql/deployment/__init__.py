@@ -36,6 +36,7 @@ from .resolver import (
     deployment_status_changed,
     inference_runtime_config,
     inference_runtime_configs,
+    my_deployments,
     project_deployments,
     # Replica
     replica,
@@ -281,6 +282,7 @@ __all__ = [
     "deployment",
     "deployment_status_changed",
     "admin_deployments",
+    "my_deployments",
     "project_deployments",
     "sync_replicas",
     "update_model_deployment",

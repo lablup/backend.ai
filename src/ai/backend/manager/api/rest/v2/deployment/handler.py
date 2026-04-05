@@ -101,6 +101,14 @@ class V2DeploymentHandler:
         result = await self._adapter.project_search(path.parsed.project_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def my_search(
+        self,
+        body: BodyParam[AdminSearchDeploymentsInput],
+    ) -> APIResponse:
+        """Search deployments owned by the current user."""
+        result = await self._adapter.my_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def get(
         self,
         path: PathParam[DeploymentIdPathParam],

@@ -19,6 +19,7 @@ from .deployment import (
     delete_model_deployment,
     deployment,
     deployment_status_changed,
+    my_deployments,
     project_deployments,
     sync_replicas,
     update_model_deployment,
@@ -62,6 +63,7 @@ __all__ = [
     "delete_auto_scaling_rule",
     # Deployment
     "admin_deployments",
+    "my_deployments",
     "project_deployments",
     "deployment",
     "create_model_deployment",

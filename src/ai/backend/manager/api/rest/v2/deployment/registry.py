@@ -42,6 +42,12 @@ def register_v2_deployment_routes(
         middlewares=[auth_required],
     )
     registry.add(
+        "POST",
+        "/my/search",
+        handler.my_search,
+        middlewares=[auth_required],
+    )
+    registry.add(
         "GET",
         "/{deployment_id}",
         handler.get,
