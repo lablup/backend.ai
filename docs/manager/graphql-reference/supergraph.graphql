@@ -12411,6 +12411,9 @@ type Query
   """Added in 25.19.0. List deployments within a specific project."""
   projectDeployments(scope: ProjectDeploymentScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
 
+  """Added in 25.19.0. List deployments owned by the current user."""
+  myDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
+
   """
   Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
   """
