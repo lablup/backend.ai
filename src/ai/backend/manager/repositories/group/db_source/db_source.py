@@ -23,7 +23,7 @@ from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupData, UnassignUserFailure, UnassignUsersResult
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.permission.types import EntityType, RBACElementRef, ScopeType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
     ProjectHasActiveEndpointsError,
@@ -45,7 +45,11 @@ from ai.backend.manager.models.kernel import (
     KernelRow,
     kernels,
 )
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import project_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
@@ -694,6 +698,22 @@ class GroupDBSource:
 
             # Delete business N:N rows and RBAC scope associations
             await execute_rbac_scope_entity_unbinder(session, unbinder)
+
+            # Delete user-role mappings for project-scoped roles
+            if assigned_rows:
+                project_role_ids_subq = sa.select(
+                    AssociationScopesEntitiesRow.entity_id,
+                ).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(unbinder.project_id),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+                )
+                await session.execute(
+                    sa.delete(UserRoleRow).where(
+                        UserRoleRow.user_id.in_([row.uuid for row in assigned_rows]),
+                        sa.cast(UserRoleRow.role_id, sa.String).in_(project_role_ids_subq),
+                    )
+                )
 
             # Compute failures
             failures: list[UnassignUserFailure] = []
