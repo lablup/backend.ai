@@ -52,9 +52,9 @@ def search(
     """Search roles."""
     from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.rbac.request import (
-        AdminSearchRolesGQLInput,
         RoleFilter,
         RoleOrderBy,
+        SearchRolesInput,
     )
     from ai.backend.common.dto.manager.v2.rbac.types import (
         RoleOrderField,
@@ -78,7 +78,7 @@ def search(
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.search_roles(
-                AdminSearchRolesGQLInput(
+                SearchRolesInput(
                     filter=filter_dto,
                     order=orders,
                     limit=limit,
@@ -126,9 +126,9 @@ def project_search(
     """Search roles registered in a project scope."""
     from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.rbac.request import (
-        AdminSearchRolesGQLInput,
         RoleFilter,
         RoleOrderBy,
+        SearchRolesInput,
     )
     from ai.backend.common.dto.manager.v2.rbac.types import (
         RoleOrderField,
@@ -151,7 +151,7 @@ def project_search(
         try:
             result = await registry.rbac.project_search_roles(
                 UUID(project_id),
-                AdminSearchRolesGQLInput(
+                SearchRolesInput(
                     filter=filter_dto,
                     order=orders,
                     limit=limit,

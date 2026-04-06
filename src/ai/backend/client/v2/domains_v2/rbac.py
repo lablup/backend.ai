@@ -9,7 +9,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     AdminSearchRoleAssignmentsGQLInput,
-    AdminSearchRolesGQLInput,
     AssignRoleInput,
     BulkAssignRoleInput,
     BulkRevokeRoleInput,
@@ -19,6 +18,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     DeleteRoleInput,
     PurgeRoleInput,
     RevokeRoleInput,
+    SearchRolesInput,
     UpdatePermissionInput,
     UpdateRoleInput,
 )
@@ -56,7 +56,7 @@ class V2RBACClient(BaseDomainClient):
             response_model=CreateRolePayload,
         )
 
-    async def search_roles(self, request: AdminSearchRolesGQLInput) -> AdminSearchRolesPayload:
+    async def search_roles(self, request: SearchRolesInput) -> AdminSearchRolesPayload:
         """Search roles with filters, orders, and pagination."""
         return await self._client.typed_request(
             "POST",
@@ -66,7 +66,7 @@ class V2RBACClient(BaseDomainClient):
         )
 
     async def project_search_roles(
-        self, project_id: UUID, request: AdminSearchRolesGQLInput
+        self, project_id: UUID, request: SearchRolesInput
     ) -> AdminSearchRolesPayload:
         """Search roles registered in a project scope."""
         return await self._client.typed_request(

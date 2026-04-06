@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchRolesGQLInput
+from ai.backend.common.dto.manager.v2.rbac.request import SearchRolesInput
 from ai.backend.common.dto.manager.v2.rbac.response import AdminSearchRolesPayload
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.adapters.rbac import RBACAdapter
@@ -137,7 +137,7 @@ class TestProjectRolesSearch:
 
         result = await admin_v2_registry.rbac.project_search_roles(
             group_fixture,
-            AdminSearchRolesGQLInput(),
+            SearchRolesInput(),
         )
         assert isinstance(result, AdminSearchRolesPayload)
         role_ids = [r.id for r in result.items]
@@ -178,7 +178,7 @@ class TestProjectRolesSearch:
 
         result = await admin_v2_registry.rbac.project_search_roles(
             group_fixture,
-            AdminSearchRolesGQLInput(),
+            SearchRolesInput(),
         )
         role_ids = [r.id for r in result.items]
         assert in_project.role.id in role_ids
@@ -200,7 +200,7 @@ class TestProjectRolesSearch:
         """A project with no registered roles should return an empty list."""
         result = await admin_v2_registry.rbac.project_search_roles(
             group_fixture,
-            AdminSearchRolesGQLInput(),
+            SearchRolesInput(),
         )
         assert isinstance(result, AdminSearchRolesPayload)
         assert result.items == []

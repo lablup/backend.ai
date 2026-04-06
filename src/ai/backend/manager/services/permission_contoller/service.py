@@ -84,6 +84,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_roles impor
     SearchRolesAction,
     SearchRolesActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
+    SearchRolesInScopeAction,
+    SearchRolesInScopeActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
     SearchScopesAction,
     SearchScopesActionResult,
@@ -247,6 +251,13 @@ class PermissionControllerService:
         """Search roles with pagination and filtering."""
         result = await self._repository.search_roles(action.querier)
         return SearchRolesActionResult(result=result)
+
+    async def search_roles_in_scope(
+        self, action: SearchRolesInScopeAction
+    ) -> SearchRolesInScopeActionResult:
+        """Search roles registered in a project scope."""
+        result = await self._repository.search_roles_in_scope(action.querier, action.scope)
+        return SearchRolesInScopeActionResult(result=result)
 
     async def search_permissions(
         self, action: SearchPermissionsAction

@@ -23,6 +23,8 @@ from .actions import (
     RevokeRoleActionResult,
     SearchRolesAction,
     SearchRolesActionResult,
+    SearchRolesInScopeAction,
+    SearchRolesInScopeActionResult,
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
     UpdateRoleAction,
@@ -83,6 +85,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     bulk_revoke_role: ActionProcessor[BulkRevokeRoleAction, BulkRevokeRoleActionResult]
     get_role_detail: ActionProcessor[GetRoleDetailAction, GetRoleDetailActionResult]
     search_roles: ActionProcessor[SearchRolesAction, SearchRolesActionResult]
+    search_roles_in_scope: ActionProcessor[SearchRolesInScopeAction, SearchRolesInScopeActionResult]
     search_users_assigned_to_role: ActionProcessor[
         SearchUsersAssignedToRoleAction, SearchUsersAssignedToRoleActionResult
     ]
@@ -120,6 +123,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.bulk_revoke_role = ActionProcessor(service.bulk_revoke_role, action_monitors)
         self.get_role_detail = ActionProcessor(service.get_role_detail, action_monitors)
         self.search_roles = ActionProcessor(service.search_roles, action_monitors)
+        self.search_roles_in_scope = ActionProcessor(service.search_roles_in_scope, action_monitors)
         self.search_users_assigned_to_role = ActionProcessor(
             service.search_users_assigned_to_role, action_monitors
         )
@@ -152,6 +156,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             BulkRevokeRoleAction.spec(),
             GetRoleDetailAction.spec(),
             SearchRolesAction.spec(),
+            SearchRolesInScopeAction.spec(),
             SearchUsersAssignedToRoleAction.spec(),
             UpdateRolePermissionsAction.spec(),
             SearchScopesAction.spec(),
