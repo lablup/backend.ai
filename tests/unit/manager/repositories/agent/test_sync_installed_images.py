@@ -85,7 +85,7 @@ class TestSyncInstalledImagesIntegration:
         )
 
         try:
-            await client._client._raw_client.flushdb()
+            await client._client.raw_client.flushdb()
             yield client
         finally:
             await client.close()
@@ -305,7 +305,7 @@ class TestSyncInstalledImagesIntegration:
 
             # Store in Redis (simulating agent's heartbeat)
             images_json = json.dumps([img.model_dump() for img in installed_images])
-            await valkey_image_client._client._raw_client.set(
+            await valkey_image_client._client.raw_client.set(
                 key=f"installed_image:{agent_id}",
                 value=images_json,
             )
@@ -394,7 +394,7 @@ class TestSyncInstalledImagesIntegration:
             ]
 
             images_json = json.dumps([img.model_dump() for img in installed_images])
-            await valkey_image_client._client._raw_client.set(
+            await valkey_image_client._client.raw_client.set(
                 key=f"installed_image:{agent_id}",
                 value=images_json,
             )
@@ -450,7 +450,7 @@ class TestSyncInstalledImagesIntegration:
             ]
 
             images_json = json.dumps([img.model_dump() for img in installed_images])
-            await valkey_image_client._client._raw_client.set(
+            await valkey_image_client._client.raw_client.set(
                 key=f"installed_image:{agent_id}",
                 value=images_json,
             )
@@ -509,7 +509,7 @@ class TestSyncInstalledImagesIntegration:
             ]
 
             images_json = json.dumps([img.model_dump() for img in installed_images])
-            await valkey_image_client._client._raw_client.set(
+            await valkey_image_client._client.raw_client.set(
                 key=f"installed_image:{agent_id}",
                 value=images_json,
             )

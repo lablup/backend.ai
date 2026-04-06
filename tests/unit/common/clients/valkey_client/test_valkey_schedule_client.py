@@ -57,7 +57,7 @@ class TestValkeyScheduleClient:
         """Helper: Manually set stale health data for testing staleness detection"""
         key = client._get_route_health_key(route_id)
         stale_timestamp = str(int(time()) - MAX_HEALTH_STALENESS_SEC - 10)
-        await client._client._raw_client.hset(
+        await client._client.raw_client.hset(
             key,
             {
                 "readiness": "1",
@@ -285,7 +285,7 @@ class TestValkeyScheduleClient:
         # Set route with old last_check timestamp
         key = valkey_schedule_client._get_route_health_key(route_id)
         old_timestamp = str(int(time()) - 60)  # 60 seconds ago
-        await valkey_schedule_client._client._raw_client.hset(
+        await valkey_schedule_client._client.raw_client.hset(
             key,
             {"readiness": "1", "last_readiness": old_timestamp, "last_check": old_timestamp},
         )
@@ -402,7 +402,7 @@ class TestKernelPresenceStatus:
         kernel_id = KernelId(uuid4())
         key = valkey_schedule_client._get_kernel_presence_key(kernel_id)
         stale_timestamp = str(int(time()) - MAX_KERNEL_HEALTH_STALENESS_SEC - 10)
-        await valkey_schedule_client._client._raw_client.hset(
+        await valkey_schedule_client._client.raw_client.hset(
             key,
             {
                 "presence": "1",
@@ -411,7 +411,7 @@ class TestKernelPresenceStatus:
                 "created_at": stale_timestamp,
             },
         )
-        await valkey_schedule_client._client._raw_client.expire(key, KERNEL_HEALTH_TTL_SEC)
+        await valkey_schedule_client._client.raw_client.expire(key, KERNEL_HEALTH_TTL_SEC)
         return kernel_id
 
     @pytest.fixture
@@ -564,7 +564,7 @@ class TestKernelPresenceStatus:
         kernel_id = KernelId(uuid4())
         key = valkey_schedule_client._get_kernel_presence_key(kernel_id)
         old_timestamp = str(int(time()) - 60)  # 60 seconds ago
-        await valkey_schedule_client._client._raw_client.hset(
+        await valkey_schedule_client._client.raw_client.hset(
             key,
             {
                 "presence": "1",
@@ -681,7 +681,7 @@ class TestAgentLastCheck:
         # Manually set agent_last_check
         key = valkey_schedule_client._get_agent_last_check_key(agent_id)
         expected_timestamp = int(time())
-        await valkey_schedule_client._client._raw_client.set(
+        await valkey_schedule_client._client.raw_client.set(
             key,
             str(expected_timestamp),
             expiry=ExpirySet(ExpiryType.SEC, AGENT_LAST_CHECK_TTL_SEC),

@@ -109,7 +109,7 @@ class ValkeySentinelTarget:
 class AbstractValkeyClient(ABC):
     @property
     @abstractmethod
-    def _raw_client(self) -> GlideClient:
+    def raw_client(self) -> GlideClient:
         pass
 
     @abstractmethod
@@ -173,7 +173,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         self._pubsub_channels = pubsub_channels
 
     @property
-    def _raw_client(self) -> GlideClient:
+    def raw_client(self) -> GlideClient:
         if self._valkey_client is None:
             raise ClientNotConnectedError("ValkeyStandaloneClient is not connected")
         return self._valkey_client
@@ -246,7 +246,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
 
     @asynccontextmanager
     async def client(self) -> AsyncIterator[GlideClient]:
-        yield self._raw_client
+        yield self.raw_client
 
 
 class ValkeySentinelClient(AbstractValkeyClient):
@@ -292,7 +292,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
         self._master_address = None
 
     @property
-    def _raw_client(self) -> GlideClient:
+    def raw_client(self) -> GlideClient:
         if self._valkey_client is None:
             raise ClientNotConnectedError("ValkeySentinelClient is not connected")
         return self._valkey_client
@@ -392,7 +392,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
 
     @asynccontextmanager
     async def client(self) -> AsyncIterator[GlideClient]:
-        yield self._raw_client
+        yield self.raw_client
 
 
 def _create_valkey_client_internal(
@@ -501,8 +501,8 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._closed = False
 
     @property
-    def _raw_client(self) -> GlideClient:
-        return self._operation_client._raw_client
+    def raw_client(self) -> GlideClient:
+        return self._operation_client.raw_client
 
     async def connect(self) -> None:
         await self._operation_client.connect()
@@ -544,7 +544,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         On successful operations, resets the failure counter.
         """
         try:
-            yield self._operation_client._raw_client
+            yield self._operation_client.raw_client
         except _VALKEY_CONNECTION_ERRORS:
             self._operation_failure_count += 1
             log.warning(

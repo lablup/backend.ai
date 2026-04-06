@@ -110,7 +110,7 @@ class TestMonitoringValkeyClient:
 
         # Should raise error when not connected
         with pytest.raises(ClientNotConnectedError):
-            _ = client._raw_client
+            _ = client.raw_client
 
         # Connect and verify it works
         await client.connect()
