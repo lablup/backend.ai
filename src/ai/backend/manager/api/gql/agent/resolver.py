@@ -22,6 +22,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 
 
 @gql_root_field(
@@ -53,6 +54,7 @@ async def agents_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> AgentV2Connection | None:
+    check_admin_only()
     result = await info.context.adapters.agent.admin_search(
         AdminSearchAgentsInput(
             filter=filter.to_pydantic() if filter else None,

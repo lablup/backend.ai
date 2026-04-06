@@ -253,6 +253,8 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         last: int | None = None,
     ) -> ConnectionResolverResult[AgentNode]:
         graph_ctx: GraphQueryContext = info.context
+        if graph_ctx.user["role"] != UserRole.SUPERADMIN:
+            return ConnectionResolverResult([], None, None, None, 0)
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
             if filter_expr is not None
