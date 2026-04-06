@@ -2210,6 +2210,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         raise InvalidAPIParameters("Unknown client role")
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_resource_preset(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2220,6 +2221,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         return cast(ResourcePreset, await loader.load(name))
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_resource_preset_by_id(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2230,6 +2232,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         return cast(ResourcePreset, await loader.load(id))
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_resource_presets(
         root: Any,
         info: graphene.ResolveInfo,
