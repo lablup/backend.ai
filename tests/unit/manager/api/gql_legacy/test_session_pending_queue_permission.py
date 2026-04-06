@@ -19,7 +19,7 @@ class ExpectedResult(Enum):
 
 class TestSessionPendingQueuePermission:
     @pytest.fixture
-    def make_info(self) -> Callable:
+    def make_info(self) -> Callable[[UserRole], graphene.ResolveInfo]:
         def _make(role: UserRole) -> graphene.ResolveInfo:
             ctx = MagicMock()
             ctx.user = {"role": role}
@@ -54,16 +54,14 @@ class TestSessionPendingQueuePermission:
     )
     async def test_only_superadmin_can_access(
         self,
-        make_info: Callable,
+        make_info: Callable[[UserRole], graphene.ResolveInfo],
         role: UserRole,
         expected_result: ExpectedResult,
     ) -> None:
         info = make_info(role)
         if expected_result == ExpectedResult.FORBIDDEN:
             with pytest.raises(GenericForbidden):
-                await Query.resolve_session_pending_queue(
-                    None, info, resource_group_id="default"
-                )
+                await Query.resolve_session_pending_queue(None, info, resource_group_id="default")
         else:
             result = await Query.resolve_session_pending_queue(
                 None, info, resource_group_id="default"
