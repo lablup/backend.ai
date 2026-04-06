@@ -42,6 +42,7 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import PermissionStatus, RoleStatus
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
@@ -202,6 +203,43 @@ class TestCreateRole:
         assert result.data.created_at is not None
         assert result.data.updated_at is not None
         assert result.data.created_at <= now or result.data.created_at >= now
+
+    async def test_create_role_forwards_scope_refs(
+        self,
+        service: PermissionControllerService,
+        mock_repository: MagicMock,
+    ) -> None:
+        role_data = _make_role_data()
+        mock_repository.create_role.return_value = role_data
+
+        scope_refs = [
+            RBACElementRef(element_type=RBACElementType.DOMAIN, element_id="domain-1"),
+            RBACElementRef(element_type=RBACElementType.PROJECT, element_id="project-1"),
+        ]
+        creator = MagicMock()
+        action = CreateRoleAction(creator=creator, scope_refs=scope_refs)
+
+        await service.create_role(action)
+
+        call_args = mock_repository.create_role.call_args[0][0]
+        assert len(call_args.scope_refs) == 2
+        assert call_args.scope_refs[0] == scope_refs[0]
+        assert call_args.scope_refs[1] == scope_refs[1]
+
+    async def test_create_role_without_scope_refs_defaults_to_empty(
+        self,
+        service: PermissionControllerService,
+        mock_repository: MagicMock,
+    ) -> None:
+        role_data = _make_role_data()
+        mock_repository.create_role.return_value = role_data
+
+        action = CreateRoleAction(creator=MagicMock())
+
+        await service.create_role(action)
+
+        call_args = mock_repository.create_role.call_args[0][0]
+        assert len(call_args.scope_refs) == 0
 
 
 class TestGetRoleDetail:
