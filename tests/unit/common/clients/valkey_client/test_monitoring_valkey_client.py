@@ -308,7 +308,7 @@ class TestMonitoringValkeyClientAcquire:
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         """Test that failures below threshold do NOT trigger reconnection."""
-        threshold = monitoring_client._consecutive_failure_threshold
+        threshold = monitoring_client._operation_failure_threshold
 
         # Simulate failures up to threshold - 1
         for i in range(threshold - 1):
@@ -332,7 +332,7 @@ class TestMonitoringValkeyClientAcquire:
         The client() failure tracking sets _reconnect_event, and the monitor loop
         performs the actual reconnection.
         """
-        threshold = monitoring_client._consecutive_failure_threshold
+        threshold = monitoring_client._operation_failure_threshold
 
         # 1. Verify both clients are initially healthy
         await monitoring_client.ping()  # monitor client ping

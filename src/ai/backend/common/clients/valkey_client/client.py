@@ -30,8 +30,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_REQUEST_TIMEOUT: Final[int] = 1_000  # Default request timeout in milliseconds
 _MONITOR_REQUEST_TIMEOUT: Final[int] = 3_000  # Fixed timeout for monitor client in milliseconds
-_DEFAULT_CONSECUTIVE_FAILURE_THRESHOLD: Final[int] = (
-    3  # Number of consecutive failures before reconnection
+_DEFAULT_MONITOR_FAILURE_THRESHOLD: Final[int] = (
+    3  # Number of consecutive monitor ping failures before reconnection
+)
+_DEFAULT_OPERATION_FAILURE_THRESHOLD: Final[int] = (
+    10  # Number of consecutive operation failures before reconnection
 )
 _DEFAULT_MONITOR_INTERVAL: Final[float] = 10.0  # Interval between ping attempts in seconds
 
@@ -456,8 +459,11 @@ class MonitoringValkeyClientSpec:
     )
     """Exception types that indicate a broken connection requiring immediate reconnection."""
 
-    consecutive_failure_threshold: int = _DEFAULT_CONSECUTIVE_FAILURE_THRESHOLD
-    """Number of consecutive failures before triggering reconnection."""
+    monitor_failure_threshold: int = _DEFAULT_MONITOR_FAILURE_THRESHOLD
+    """Number of consecutive monitor ping failures before triggering reconnection."""
+
+    operation_failure_threshold: int = _DEFAULT_OPERATION_FAILURE_THRESHOLD
+    """Number of consecutive operation failures before triggering reconnection."""
 
     monitor_interval: float = _DEFAULT_MONITOR_INTERVAL
     """Interval in seconds between health check pings."""
@@ -478,7 +484,8 @@ class MonitoringValkeyClient(AbstractValkeyClient):
     _operation_client: AbstractValkeyClient
     _monitor_client: AbstractValkeyClient
     _reconnectable_exceptions: tuple[type[Exception], ...]
-    _consecutive_failure_threshold: int
+    _monitor_failure_threshold: int
+    _operation_failure_threshold: int
     _monitor_interval: float
     _monitor_task: asyncio.Task[None] | None
     _reconnect_event: asyncio.Event
@@ -495,7 +502,8 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._operation_client = operation_client
         self._monitor_client = monitor_client
         self._reconnectable_exceptions = resolved_spec.reconnectable_exceptions
-        self._consecutive_failure_threshold = resolved_spec.consecutive_failure_threshold
+        self._monitor_failure_threshold = resolved_spec.monitor_failure_threshold
+        self._operation_failure_threshold = resolved_spec.operation_failure_threshold
         self._monitor_interval = resolved_spec.monitor_interval
         self._monitor_task = None
         self._reconnect_event = asyncio.Event()
@@ -553,12 +561,12 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             log.warning(
                 "Operation connection error (consecutive failures: {}/{})",
                 self._operation_failure_count,
-                self._consecutive_failure_threshold,
+                self._operation_failure_threshold,
             )
-            if self._operation_failure_count >= self._consecutive_failure_threshold:
+            if self._operation_failure_count >= self._operation_failure_threshold:
                 log.warning(
                     "Operation failure threshold reached ({}), requesting reconnection...",
-                    self._consecutive_failure_threshold,
+                    self._operation_failure_threshold,
                 )
                 self._operation_failure_count = 0
                 self._reconnect_event.set()
@@ -587,13 +595,13 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             log.warning(
                 "Error in connection monitoring (consecutive failures: {}/{}): {}",
                 self._monitor_consecutive_failure_count,
-                self._consecutive_failure_threshold,
+                self._monitor_failure_threshold,
                 e,
             )
-            if self._monitor_consecutive_failure_count >= self._consecutive_failure_threshold:
+            if self._monitor_consecutive_failure_count >= self._monitor_failure_threshold:
                 log.warning(
-                    "Consecutive failure threshold reached ({}), reconnecting...",
-                    self._consecutive_failure_threshold,
+                    "Monitor failure threshold reached ({}), reconnecting...",
+                    self._monitor_failure_threshold,
                 )
                 self._monitor_consecutive_failure_count = 0
                 return True
