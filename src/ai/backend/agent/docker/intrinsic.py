@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
-import multiprocessing
 import os
 import platform
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
@@ -72,6 +71,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # checking /proc/filesystems so we don't have to put all the details virtual filesystems like
 # "sockfs", "debugfs", etc.
 _CONTAINER_STAT_TIMEOUT: float = 2.0
+_INVALID_PID: int = 0
 
 # The list of pruned fstype when checking the filesystem usage statistics.
 pruned_disk_types = frozenset([
@@ -83,37 +83,52 @@ pruned_disk_types = frozenset([
 ])
 
 
-def netstat_ns_work(ns_path: Path) -> dict[str, Any]:
+@dataclasses.dataclass(frozen=True)
+class ContainerNetStat:
+    rx_bytes: int
+    tx_bytes: int
+
+
+def _parse_proc_net_dev(content: str) -> ContainerNetStat:
+    """Parse /proc/net/dev content and return stats for non-lo interfaces."""
+    rx_bytes = 0
+    tx_bytes = 0
+    for line in content.splitlines():
+        if ":" not in line:
+            continue
+        iface, _, stats_str = line.partition(":")
+        iface = iface.strip()
+        if iface == "lo":
+            continue
+        fields = stats_str.split()
+        # fields[0] = rx_bytes, fields[8] = tx_bytes
+        rx_bytes += int(fields[0])
+        tx_bytes += int(fields[8])
+    return ContainerNetStat(rx_bytes=rx_bytes, tx_bytes=tx_bytes)
+
+
+def read_proc_net_dev(container_pid: int) -> ContainerNetStat:
+    """Read network stats from /proc/[pid]/net/dev for the given container PID.
+
+    Parses the kernel's net/dev format directly from the container's proc entry,
+    avoiding the need for namespace switching (setns) which is unreliable in
+    threaded Python processes.
+    """
+    content = Path(f"/proc/{container_pid}/net/dev").read_text()
+    return _parse_proc_net_dev(content)
+
+
+def read_netns_net_dev(ns_path: Path) -> ContainerNetStat:
+    """Read network stats by switching into the given network namespace.
+
+    Uses setns() to enter the namespace, then reads /proc/thread-self/net/dev
+    which reflects the calling thread's namespace (not the process-level one).
+
+    This is the fallback for when the container PID is unavailable (PID=0).
+    """
     with nsenter(ns_path):
-        return psutil.net_io_counters(pernic=True)
-
-
-async def netstat_ns(ns_path: Path) -> dict[str, Any]:
-    loop = asyncio.get_running_loop()
-    # Linux namespace is per-thread state. Therefore we need to ensure
-    # IO is executed in the same thread where we switched the namespace.
-    # Go provides runtime.LockOSThread() to do this.
-    #
-    # Unfortunately, CPython drops GIL while running IO and does not
-    # provide any similar functionality. Therefore we execute namespace
-    # dependent operation in the new process.
-
-    # Check if we're already in a daemon process
-    current_process = multiprocessing.current_process()
-    try:
-        is_daemon = current_process.daemon
-    except AttributeError:
-        is_daemon = False
-
-    if is_daemon:
-        return await loop.run_in_executor(None, netstat_ns_work, ns_path)
-    try:
-        with ProcessPoolExecutor(max_workers=1) as executor:
-            result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
-    except AssertionError:
-        # We're in a daemon process, run directly in thread pool
-        result = await loop.run_in_executor(None, netstat_ns_work, ns_path)
-    return result
+        content = Path("/proc/thread-self/net/dev").read_text()
+    return _parse_proc_net_dev(content)
 
 
 async def fetch_api_stats(container: DockerContainer) -> dict[str, Any] | None:
@@ -716,52 +731,45 @@ class MemoryPlugin(AbstractComputePlugin):
             try:
                 async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
                     data = await container.show()
-                    sandbox_key = data["NetworkSettings"]["SandboxKey"]
+                    container_pid: int = data.get("State", {}).get("Pid", _INVALID_PID)
             except TimeoutError:
                 log.warning(
                     "MemoryPlugin: timeout reading container info for container {0}",
                     container_id[:7],
                 )
                 return None
-            net_rx_bytes = 0
-            net_tx_bytes = 0
-            if not sandbox_key:
-                log.warning(
-                    "MemoryPlugin: empty SandboxKey for container {0},"
-                    " skipping net stat collection",
-                    container_id[:7],
-                )
-            else:
-                ns_path = Path(sandbox_key)
-                if not ns_path.exists():
+            net_stat = ContainerNetStat(rx_bytes=0, tx_bytes=0)
+            loop = current_loop()
+            if container_pid > 0:
+                try:
+                    net_stat = await loop.run_in_executor(None, read_proc_net_dev, container_pid)
+                except OSError as e:
                     log.warning(
-                        "MemoryPlugin: network namespace path does not exist for container"
-                        " {0} (sandbox_key={1!r}), skipping net stat collection",
+                        "MemoryPlugin: cannot read net stats for container {0} (pid={1}): {2!r}",
                         container_id[:7],
-                        sandbox_key,
+                        container_pid,
+                        e,
                     )
-                else:
+            else:
+                sandbox_key = data.get("NetworkSettings", {}).get("SandboxKey", "")
+                ns_path = Path(sandbox_key) if sandbox_key else None
+                if ns_path and ns_path.exists():
                     try:
-                        async with asyncio.timeout(_CONTAINER_STAT_TIMEOUT):
-                            nstat = await netstat_ns(ns_path)
-                    except TimeoutError:
-                        log.warning(
-                            "MemoryPlugin: timeout reading net stats for container {0}",
-                            container_id[:7],
-                        )
-                        return None
+                        net_stat = await loop.run_in_executor(None, read_netns_net_dev, ns_path)
                     except OSError as e:
                         log.warning(
-                            "MemoryPlugin: cannot read net stats for container {0}: {1!r}",
+                            "MemoryPlugin: cannot read net stats via netns for"
+                            " container {0} (sandbox_key={1!r}): {2!r}",
                             container_id[:7],
+                            sandbox_key,
                             e,
                         )
-                        return None
-                    for name, net_stat in nstat.items():
-                        if name == "lo":
-                            continue
-                        net_rx_bytes += net_stat.bytes_recv
-                        net_tx_bytes += net_stat.bytes_sent
+                else:
+                    log.warning(
+                        "MemoryPlugin: container {0} has no PID and no valid SandboxKey,"
+                        " skipping net stat collection",
+                        container_id[:7],
+                    )
             loop = current_loop()
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
             return (
@@ -769,8 +777,8 @@ class MemoryPlugin(AbstractComputePlugin):
                 mem_max_bytes,
                 io_read_bytes,
                 io_write_bytes,
-                net_rx_bytes,
-                net_tx_bytes,
+                net_stat.rx_bytes,
+                net_stat.tx_bytes,
                 scratch_sz,
             )
 
