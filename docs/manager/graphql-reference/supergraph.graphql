@@ -3524,7 +3524,7 @@ input CreateRoleInput
   name: String!
   description: String = null
   source: RoleSource! = CUSTOM
-  scope: ScopeInput = null
+  scopes: [ScopeInput!] = null
 }
 
 """Added in UNRELEASED. Input for creating a runtime variant."""
