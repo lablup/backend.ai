@@ -6,7 +6,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -18,7 +18,6 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.v2.rbac.request import SearchRolesInput
 from ai.backend.common.dto.manager.v2.rbac.response import AdminSearchRolesPayload
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.adapters.rbac import RBACAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -55,8 +54,10 @@ def permission_controller_processors(
 ) -> PermissionControllerProcessors:
     repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(repo, rbac_action_registry=[])
+    validators = MagicMock()
+    validators.rbac.scope.validate = AsyncMock()
     return PermissionControllerProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service, action_monitors=[], validators=validators
     )
 
 
