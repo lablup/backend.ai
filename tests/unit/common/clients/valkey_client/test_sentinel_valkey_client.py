@@ -10,8 +10,11 @@ from ai.backend.common.clients.valkey_client.client import (
     MonitoringValkeyClient,
     ValkeySentinelClient,
     ValkeySentinelTarget,
+    ValkeyStandaloneClient,
+    create_valkey_client,
 )
 from ai.backend.common.exception import ClientNotConnectedError, ValkeySentinelMasterNotFound
+from ai.backend.common.types import ValkeyTarget
 
 
 @pytest.fixture
@@ -393,3 +396,153 @@ class TestMonitoringValkeyClientWithSentinel:
                 pass
 
             mock_reconnect.assert_called()
+
+    async def test_monitor_loop_survives_reconnect_failure(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        mock_sentinel_monitor_client: AsyncMock,
+    ) -> None:
+        """Monitor loop must not die when _reconnect() raises; it should log and retry."""
+        check_count = 0
+
+        async def fake_need_reconnect() -> bool:
+            nonlocal check_count
+            check_count += 1
+            if check_count <= 2:
+                # First two cycles: master changed → trigger reconnect
+                return True
+            # Third cycle: cancel to end test
+            raise asyncio.CancelledError
+
+        mock_sentinel_monitor_client.need_reconnect = fake_need_reconnect
+
+        reconnect_call_count = 0
+
+        async def failing_then_succeeding_reconnect() -> None:
+            nonlocal reconnect_call_count
+            reconnect_call_count += 1
+            if reconnect_call_count == 1:
+                raise ConnectionError("Sentinel temporarily unavailable")
+            # Second call succeeds
+
+        with (
+            patch.object(
+                monitoring_client,
+                "_reconnect",
+                side_effect=failing_then_succeeding_reconnect,
+            ),
+            patch(
+                "ai.backend.common.clients.valkey_client.client._DEFAULT_MONITOR_INTERVAL",
+                0.01,
+            ),
+        ):
+            task = asyncio.create_task(monitoring_client._monitor_connection())
+            await asyncio.sleep(0.2)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        # The loop survived the first reconnect failure and retried successfully
+        assert reconnect_call_count == 2
+
+    async def test_failover_reconnects_to_new_master(
+        self,
+        sentinel_target: ValkeySentinelTarget,
+        mock_sentinel: MagicMock,
+    ) -> None:
+        """Full failover flow: connected to master A → detect change → reconnect → master B."""
+        old_master_client = AsyncMock()
+        old_master_client.ping = AsyncMock(return_value=b"PONG")
+        old_master_client.close = AsyncMock()
+
+        new_master_client = AsyncMock()
+        new_master_client.ping = AsyncMock(return_value=b"PONG")
+        new_master_client.close = AsyncMock()
+
+        # Phase 1: initial connect to master A
+        mock_sentinel.discover_master.return_value = ("master-a", 6379)
+
+        operation_client = ValkeySentinelClient(
+            target=sentinel_target,
+            db_id=0,
+            human_readable_name="test.op",
+        )
+        operation_client._sentinel = mock_sentinel
+
+        with patch(
+            "ai.backend.common.clients.valkey_client.client.GlideClient.create",
+            new_callable=AsyncMock,
+            return_value=old_master_client,
+        ):
+            await operation_client.connect()
+
+        assert operation_client._master_address == ("master-a", 6379)
+        assert operation_client._valkey_client is old_master_client
+
+        # Phase 2: failover happens — sentinel now reports master B
+        mock_sentinel.discover_master.return_value = ("master-b", 6379)
+        assert await operation_client.need_reconnect() is True
+
+        # Phase 3: reconnect — disconnect old, connect to new master
+        await operation_client.disconnect()
+        old_master_client.close.assert_called_once()
+
+        with patch(
+            "ai.backend.common.clients.valkey_client.client.GlideClient.create",
+            new_callable=AsyncMock,
+            return_value=new_master_client,
+        ):
+            await operation_client.connect()
+
+        assert operation_client._master_address == ("master-b", 6379)
+        assert operation_client._valkey_client is new_master_client
+
+
+class TestCreateValkeyClientFactory:
+    """Tests for create_valkey_client() factory function producing correct client types."""
+
+    def test_creates_sentinel_clients_when_sentinel_config_provided(self) -> None:
+        target = ValkeyTarget(
+            sentinel=["127.0.0.1:26379", "127.0.0.1:26380"],
+            service_name="mymaster",
+            password="secret",
+            request_timeout=2000,
+        )
+
+        client = create_valkey_client(target, db_id=0, human_readable_name="test")
+
+        assert isinstance(client, MonitoringValkeyClient)
+        assert isinstance(client._operation_client, ValkeySentinelClient)
+        assert isinstance(client._monitor_client, ValkeySentinelClient)
+
+    def test_creates_standalone_clients_when_no_sentinel_config(self) -> None:
+        target = ValkeyTarget(addr="127.0.0.1:6379")
+
+        client = create_valkey_client(target, db_id=0, human_readable_name="test")
+
+        assert isinstance(client, MonitoringValkeyClient)
+        assert isinstance(client._operation_client, ValkeyStandaloneClient)
+        assert isinstance(client._monitor_client, ValkeyStandaloneClient)
+
+    def test_monitor_client_uses_fixed_timeout(self) -> None:
+        target = ValkeyTarget(
+            sentinel=["127.0.0.1:26379"],
+            service_name="mymaster",
+            request_timeout=30000,
+        )
+
+        client = create_valkey_client(target, db_id=0, human_readable_name="test")
+
+        assert isinstance(client, MonitoringValkeyClient)
+        operation_client = client._operation_client
+        monitor_client = client._monitor_client
+        assert isinstance(operation_client, ValkeySentinelClient)
+        assert isinstance(monitor_client, ValkeySentinelClient)
+
+        # Operation client keeps user-specified timeout
+        assert operation_client._target.request_timeout == 30000
+
+        # Monitor client uses fixed 3-second timeout regardless of user config
+        assert monitor_client._target.request_timeout == 3000
