@@ -34,30 +34,51 @@ def mock_glide_client() -> AsyncMock:
     return client
 
 
+@pytest.fixture
+def mock_sentinel() -> MagicMock:
+    sentinel = MagicMock()
+    sentinel.discover_master = AsyncMock(return_value=("127.0.0.1", 6379))
+    return sentinel
+
+
+@pytest.fixture
+def sentinel_client(
+    sentinel_target: ValkeySentinelTarget,
+    mock_sentinel: MagicMock,
+) -> ValkeySentinelClient:
+    client = ValkeySentinelClient(
+        target=sentinel_target,
+        db_id=0,
+        human_readable_name="test.sentinel",
+    )
+    client._sentinel = mock_sentinel
+    return client
+
+
+@pytest.fixture
+def connected_sentinel_client(
+    sentinel_client: ValkeySentinelClient,
+    mock_glide_client: AsyncMock,
+) -> ValkeySentinelClient:
+    sentinel_client._valkey_client = mock_glide_client
+    sentinel_client._master_address = ("127.0.0.1", 6379)
+    return sentinel_client
+
+
 class TestValkeySentinelClientNeedReconnect:
     """Tests for ValkeySentinelClient.need_reconnect() detecting master address changes."""
 
     async def test_returns_true_when_client_is_none(
-        self, sentinel_target: ValkeySentinelTarget
+        self, sentinel_client: ValkeySentinelClient
     ) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
         # _valkey_client is None by default (not connected)
         assert await sentinel_client.need_reconnect() is True
 
     async def test_returns_true_when_master_address_is_none(
         self,
-        sentinel_target: ValkeySentinelTarget,
+        sentinel_client: ValkeySentinelClient,
         mock_glide_client: AsyncMock,
     ) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
         # Simulate a state where client exists but master_address was never set
         sentinel_client._valkey_client = mock_glide_client
         sentinel_client._master_address = None
@@ -66,97 +87,51 @@ class TestValkeySentinelClientNeedReconnect:
 
     async def test_returns_true_when_master_address_changed(
         self,
-        sentinel_target: ValkeySentinelTarget,
-        mock_glide_client: AsyncMock,
+        connected_sentinel_client: ValkeySentinelClient,
+        mock_sentinel: MagicMock,
     ) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
-        sentinel_client._valkey_client = mock_glide_client
-        sentinel_client._master_address = ("old-host", 6379)
-
         # Sentinel now reports a different master (failover happened)
-        sentinel_client._sentinel = MagicMock()
-        sentinel_client._sentinel.discover_master = AsyncMock(
-            return_value=("new-host", 6379),
-        )
+        mock_sentinel.discover_master.return_value = ("new-host", 6379)
 
-        assert await sentinel_client.need_reconnect() is True
+        assert await connected_sentinel_client.need_reconnect() is True
 
     async def test_returns_false_when_master_address_unchanged(
-        self,
-        sentinel_target: ValkeySentinelTarget,
-        mock_glide_client: AsyncMock,
+        self, connected_sentinel_client: ValkeySentinelClient
     ) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
-        sentinel_client._valkey_client = mock_glide_client
-        sentinel_client._master_address = ("same-host", 6379)
-
-        sentinel_client._sentinel = MagicMock()
-        sentinel_client._sentinel.discover_master = AsyncMock(
-            return_value=("same-host", 6379),
-        )
-
-        assert await sentinel_client.need_reconnect() is False
+        # mock_sentinel already returns ("127.0.0.1", 6379) which matches _master_address
+        assert await connected_sentinel_client.need_reconnect() is False
 
     async def test_returns_false_when_discovery_fails(
         self,
-        sentinel_target: ValkeySentinelTarget,
-        mock_glide_client: AsyncMock,
+        connected_sentinel_client: ValkeySentinelClient,
+        mock_sentinel: MagicMock,
     ) -> None:
         """When Sentinel discovery fails, keep the current connection (conservative strategy)."""
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
-        sentinel_client._valkey_client = mock_glide_client
-        sentinel_client._master_address = ("current-host", 6379)
-
-        sentinel_client._sentinel = MagicMock()
-        sentinel_client._sentinel.discover_master = AsyncMock(
-            side_effect=ConnectionError("Sentinel unreachable"),
-        )
+        mock_sentinel.discover_master.side_effect = ConnectionError("Sentinel unreachable")
 
         # _get_master_address returns None on failure → need_reconnect returns False
-        assert await sentinel_client.need_reconnect() is False
+        assert await connected_sentinel_client.need_reconnect() is False
 
 
 class TestValkeySentinelClientGetMasterAddress:
     """Tests for ValkeySentinelClient._get_master_address() Sentinel discovery."""
 
-    async def test_returns_address_on_success(self, sentinel_target: ValkeySentinelTarget) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
-        sentinel_client._sentinel = MagicMock()
-        sentinel_client._sentinel.discover_master = AsyncMock(
-            return_value=("10.0.0.1", 6379),
-        )
+    async def test_returns_address_on_success(
+        self,
+        sentinel_client: ValkeySentinelClient,
+        mock_sentinel: MagicMock,
+    ) -> None:
+        mock_sentinel.discover_master.return_value = ("10.0.0.1", 6379)
 
         result = await sentinel_client._get_master_address()
         assert result == ("10.0.0.1", 6379)
 
     async def test_returns_none_on_discovery_failure(
-        self, sentinel_target: ValkeySentinelTarget
+        self,
+        sentinel_client: ValkeySentinelClient,
+        mock_sentinel: MagicMock,
     ) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
-        sentinel_client._sentinel = MagicMock()
-        sentinel_client._sentinel.discover_master = AsyncMock(
-            side_effect=ConnectionError("All sentinels down"),
-        )
+        mock_sentinel.discover_master.side_effect = ConnectionError("All sentinels down")
 
         result = await sentinel_client._get_master_address()
         assert result is None
@@ -166,36 +141,20 @@ class TestValkeySentinelClientConnect:
     """Tests for ValkeySentinelClient.connect() lifecycle."""
 
     async def test_raises_master_not_found_when_discovery_fails(
-        self, sentinel_target: ValkeySentinelTarget
+        self,
+        sentinel_client: ValkeySentinelClient,
+        mock_sentinel: MagicMock,
     ) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
-        sentinel_client._sentinel = MagicMock()
-        sentinel_client._sentinel.discover_master = AsyncMock(
-            side_effect=ConnectionError("Sentinel unreachable"),
-        )
+        mock_sentinel.discover_master.side_effect = ConnectionError("Sentinel unreachable")
 
         with pytest.raises(ValkeySentinelMasterNotFound):
             await sentinel_client.connect()
 
     async def test_creates_client_on_successful_discovery(
         self,
-        sentinel_target: ValkeySentinelTarget,
+        sentinel_client: ValkeySentinelClient,
         mock_glide_client: AsyncMock,
     ) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
-        sentinel_client._sentinel = MagicMock()
-        sentinel_client._sentinel.discover_master = AsyncMock(
-            return_value=("10.0.0.1", 6379),
-        )
-
         with patch(
             "ai.backend.common.clients.valkey_client.client.GlideClient.create",
             new_callable=AsyncMock,
@@ -204,72 +163,53 @@ class TestValkeySentinelClientConnect:
             await sentinel_client.connect()
 
         assert sentinel_client._valkey_client is mock_glide_client
-        assert sentinel_client._master_address == ("10.0.0.1", 6379)
+        assert sentinel_client._master_address == ("127.0.0.1", 6379)
 
     async def test_skips_if_already_connected(
         self,
-        sentinel_target: ValkeySentinelTarget,
-        mock_glide_client: AsyncMock,
+        connected_sentinel_client: ValkeySentinelClient,
+        mock_sentinel: MagicMock,
     ) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
-        sentinel_client._valkey_client = mock_glide_client
-
-        sentinel_client._sentinel = MagicMock()
-        sentinel_client._sentinel.discover_master = AsyncMock()
-
         # connect() should return early without calling discover_master
-        await sentinel_client.connect()
-        sentinel_client._sentinel.discover_master.assert_not_called()
+        mock_sentinel.discover_master.reset_mock()
+        await connected_sentinel_client.connect()
+        mock_sentinel.discover_master.assert_not_called()
 
     async def test_disconnect_closes_client(
         self,
-        sentinel_target: ValkeySentinelTarget,
+        connected_sentinel_client: ValkeySentinelClient,
         mock_glide_client: AsyncMock,
     ) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
-        sentinel_client._valkey_client = mock_glide_client
-
-        await sentinel_client.disconnect()
+        await connected_sentinel_client.disconnect()
 
         mock_glide_client.close.assert_called_once()
-        assert sentinel_client._valkey_client is None
+        assert connected_sentinel_client._valkey_client is None
 
 
 class TestValkeySentinelClientPing:
     """Tests for ValkeySentinelClient.ping()."""
 
-    async def test_raises_when_not_connected(self, sentinel_target: ValkeySentinelTarget) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
-
+    async def test_raises_when_not_connected(self, sentinel_client: ValkeySentinelClient) -> None:
         with pytest.raises(ClientNotConnectedError):
             await sentinel_client.ping()
 
     async def test_pings_successfully_when_connected(
         self,
-        sentinel_target: ValkeySentinelTarget,
+        connected_sentinel_client: ValkeySentinelClient,
         mock_glide_client: AsyncMock,
     ) -> None:
-        sentinel_client = ValkeySentinelClient(
-            target=sentinel_target,
-            db_id=0,
-            human_readable_name="test.sentinel",
-        )
-        sentinel_client._valkey_client = mock_glide_client
-
-        await sentinel_client.ping()
+        await connected_sentinel_client.ping()
         mock_glide_client.ping.assert_called_once()
+
+
+def _create_mock_sentinel_client() -> AsyncMock:
+    client = AsyncMock(spec=ValkeySentinelClient)
+    client.need_reconnect = AsyncMock(return_value=False)
+    client.ping = AsyncMock()
+    client.connect = AsyncMock()
+    client.disconnect = AsyncMock()
+    client.client = MagicMock()
+    return client
 
 
 class TestMonitoringValkeyClientWithSentinel:
@@ -277,23 +217,11 @@ class TestMonitoringValkeyClientWithSentinel:
 
     @pytest.fixture
     def mock_sentinel_operation_client(self) -> AsyncMock:
-        client = AsyncMock(spec=ValkeySentinelClient)
-        client.need_reconnect = AsyncMock(return_value=False)
-        client.ping = AsyncMock()
-        client.connect = AsyncMock()
-        client.disconnect = AsyncMock()
-        client.client = MagicMock()
-        return client
+        return _create_mock_sentinel_client()
 
     @pytest.fixture
     def mock_sentinel_monitor_client(self) -> AsyncMock:
-        client = AsyncMock(spec=ValkeySentinelClient)
-        client.need_reconnect = AsyncMock(return_value=False)
-        client.ping = AsyncMock()
-        client.connect = AsyncMock()
-        client.disconnect = AsyncMock()
-        client.client = MagicMock()
-        return client
+        return _create_mock_sentinel_client()
 
     @pytest.fixture
     def monitoring_client(
