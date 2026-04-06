@@ -255,9 +255,13 @@ class PermissionControllerService:
     async def search_roles_in_scope(
         self, action: SearchRolesInScopeAction
     ) -> SearchRolesInScopeActionResult:
-        """Search roles registered in a project scope."""
+        """Search roles registered in a given scope."""
         result = await self._repository.search_roles_in_scope(action.querier, action.scope)
-        return SearchRolesInScopeActionResult(result=result)
+        return SearchRolesInScopeActionResult(
+            result=result,
+            _scope_type=action.scope.scope_type,
+            _scope_id=action.scope.scope_id,
+        )
 
     async def search_permissions(
         self, action: SearchPermissionsAction
