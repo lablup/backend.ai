@@ -630,16 +630,9 @@ class PermissionDBSource:
         querier: BatchQuerier,
         scope: ScopedRoleSearchScope,
     ) -> RoleListResult:
-        """Search roles registered in a project scope."""
+        """Search roles registered in a given scope via association_scopes_entities."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = (
-                sa.select(RoleRow)
-                .outerjoin(
-                    ObjectPermissionRow,
-                    RoleRow.id == ObjectPermissionRow.role_id,
-                )
-                .distinct()
-            )
+            query = sa.select(RoleRow)
 
             result = await execute_batch_querier(
                 db_sess,
