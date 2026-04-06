@@ -1878,9 +1878,9 @@ class RedisProfileTarget:
 
 def safe_print_redis_config(config: RedisConfig) -> str:
     safe_config = copy.deepcopy(config)
-    if config.password:
+    if config.password is not None:
         safe_config.password = "********"
-    if config.sentinel_password:
+    if config.sentinel_password is not None:
         safe_config.sentinel_password = "********"
     return str(safe_config)
 

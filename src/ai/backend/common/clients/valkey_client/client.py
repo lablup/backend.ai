@@ -246,10 +246,11 @@ class ValkeySentinelClient(AbstractValkeyClient):
             host, port = addr_to_hostport_pair(addr)
             sentinel_addrs.append((host, port))
 
+        sentinel_auth = (
+            target.sentinel_password if target.sentinel_password is not None else target.password
+        )
         sentinel_kwargs: dict[str, Any] = {
-            "password": target.sentinel_password
-            if target.sentinel_password is not None
-            else target.password,
+            "password": sentinel_auth,
             "ssl": target.use_tls,
             "ssl_cert_reqs": SSL_CERT_NONE if target.tls_skip_verify else SSL_CERT_REQUIRED,
         }
