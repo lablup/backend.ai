@@ -274,7 +274,7 @@ class TestMonitoringValkeyClientWithSentinel:
     # -- _check_connection --
 
     @pytest.fixture
-    def monitoring_client_with_master_change(
+    def monitoring_client_needing_reconnect(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
@@ -283,9 +283,9 @@ class TestMonitoringValkeyClientWithSentinel:
         return monitoring_client
 
     async def test_check_connection_triggers_reconnect_on_master_change(
-        self, monitoring_client_with_master_change: MonitoringValkeyClient
+        self, monitoring_client_needing_reconnect: MonitoringValkeyClient
     ) -> None:
-        assert await monitoring_client_with_master_change._check_connection() is True
+        assert await monitoring_client_needing_reconnect._check_connection() is True
 
     async def test_check_connection_no_reconnect_when_stable(
         self, monitoring_client: MonitoringValkeyClient
@@ -315,7 +315,7 @@ class TestMonitoringValkeyClientWithSentinel:
         assert monitoring_client._consecutive_failure_count == 0
 
     @pytest.fixture
-    def monitoring_client_with_ping_timeout(
+    def monitoring_client_with_failing_ping(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
@@ -324,10 +324,10 @@ class TestMonitoringValkeyClientWithSentinel:
         return monitoring_client
 
     async def test_check_ping_accumulates_failures_until_threshold(
-        self, monitoring_client_with_ping_timeout: MonitoringValkeyClient
+        self, monitoring_client_with_failing_ping: MonitoringValkeyClient
     ) -> None:
         """General exceptions accumulate; reconnect triggers at threshold (3)."""
-        client = monitoring_client_with_ping_timeout
+        client = monitoring_client_with_failing_ping
 
         assert await client._check_ping() is False
         assert client._consecutive_failure_count == 1
@@ -341,11 +341,11 @@ class TestMonitoringValkeyClientWithSentinel:
 
     async def test_check_ping_resets_failure_count_on_success(
         self,
-        monitoring_client_with_ping_timeout: MonitoringValkeyClient,
+        monitoring_client_with_failing_ping: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
     ) -> None:
         """Successful ping resets the consecutive failure counter."""
-        client = monitoring_client_with_ping_timeout
+        client = monitoring_client_with_failing_ping
 
         await client._check_ping()
         await client._check_ping()
