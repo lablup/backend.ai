@@ -4,6 +4,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from glide import GlideClient
 from glide.exceptions import ClosingError  # type: ignore[import-not-found]
 
 import ai.backend.common.clients.valkey_client.client as client_module
@@ -169,9 +170,7 @@ class TestValkeySentinelClientConnect:
         mock_glide_client: AsyncMock,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(
-            client_module.GlideClient, "create", AsyncMock(return_value=mock_glide_client)
-        )
+        monkeypatch.setattr(GlideClient, "create", AsyncMock(return_value=mock_glide_client))
         await sentinel_client.connect()
 
         assert sentinel_client._valkey_client is mock_glide_client
