@@ -4,7 +4,12 @@ from typing import Annotated, Any
 
 from pydantic import AliasChoices, BaseModel, Field, field_serializer, field_validator
 
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import RedisHelperConfig as RedisHelperConfigDict
 from ai.backend.common.types import RedisProfileTarget, ValkeyProfileTarget, ValkeyTarget
@@ -165,7 +170,7 @@ class SingleRedisConfig(BaseModel):
                 "If None, falls back to the master password. "
                 "Set explicitly when Sentinel nodes use a different password than the master."
             ),
-            added_version="25.13.0",
+            added_version=NEXT_RELEASE_VERSION,
             secret=True,
             example=ConfigExample(local="", prod="REDIS_SENTINEL_PASSWORD"),
         ),
