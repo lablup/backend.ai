@@ -14,28 +14,46 @@ from ai.backend.common.configs.redis import SingleRedisConfig
 from ai.backend.common.types import RedisTarget, ValkeyTarget
 
 
-class TestSentinelPasswordSeparation:
-    """Verify sentinel_password is used for Sentinel auth, falling back to master password."""
+class TestValkeySentinelTargetPasswordResolution:
+    """Verify from_valkey_target() resolves sentinel password with fallback at construction time."""
+
+    def test_sentinel_password_takes_precedence(self) -> None:
+        valkey_target = ValkeyTarget(
+            sentinel=["127.0.0.1:26379"],
+            service_name="mymaster",
+            password="master-pw",
+            sentinel_password="sentinel-pw",
+        )
+        sentinel_target = ValkeySentinelTarget.from_valkey_target(valkey_target)
+
+        assert sentinel_target.password == "sentinel-pw"
+        assert sentinel_target.master_password == "master-pw"
+
+    def test_falls_back_to_master_password_when_sentinel_password_is_none(self) -> None:
+        valkey_target = ValkeyTarget(
+            sentinel=["127.0.0.1:26379"],
+            service_name="mymaster",
+            password="master-pw",
+        )
+        sentinel_target = ValkeySentinelTarget.from_valkey_target(valkey_target)
+
+        assert sentinel_target.password == "master-pw"
+        assert sentinel_target.master_password == "master-pw"
+
+
+class TestValkeySentinelClientUsesResolvedPasswords:
+    """Verify ValkeySentinelClient uses password for sentinel, master_password for GlideClient."""
 
     @pytest.fixture
     def target_with_separate_passwords(self) -> ValkeySentinelTarget:
         return ValkeySentinelTarget(
             sentinel_addresses=["127.0.0.1:26379"],
             service_name="mymaster",
-            password="master-secret",
-            sentinel_password="sentinel-secret",
+            password="sentinel-secret",
+            master_password="master-secret",
         )
 
-    @pytest.fixture
-    def target_without_sentinel_password(self) -> ValkeySentinelTarget:
-        return ValkeySentinelTarget(
-            sentinel_addresses=["127.0.0.1:26379"],
-            service_name="mymaster",
-            password="master-secret",
-            sentinel_password=None,
-        )
-
-    def test_uses_sentinel_password_when_set(
+    def test_sentinel_kwargs_uses_password(
         self, target_with_separate_passwords: ValkeySentinelTarget
     ) -> None:
         with patch("ai.backend.common.clients.valkey_client.client.Sentinel") as mock_sentinel_cls:
@@ -47,19 +65,6 @@ class TestSentinelPasswordSeparation:
 
             sentinel_kwargs = mock_sentinel_cls.call_args.kwargs["sentinel_kwargs"]
             assert sentinel_kwargs["password"] == "sentinel-secret"
-
-    def test_falls_back_to_master_password_when_sentinel_password_is_none(
-        self, target_without_sentinel_password: ValkeySentinelTarget
-    ) -> None:
-        with patch("ai.backend.common.clients.valkey_client.client.Sentinel") as mock_sentinel_cls:
-            ValkeySentinelClient(
-                target=target_without_sentinel_password,
-                db_id=0,
-                human_readable_name="test",
-            )
-
-            sentinel_kwargs = mock_sentinel_cls.call_args.kwargs["sentinel_kwargs"]
-            assert sentinel_kwargs["password"] == "master-secret"
 
 
 class TestSentinelPasswordPropagation:
@@ -117,7 +122,7 @@ class TestSentinelPasswordPropagation:
         assert redis_target.sentinel_password == "sentinel-pw"
         assert redis_target.password == "master-pw"
 
-    def test_create_valkey_client_propagates_sentinel_password(self) -> None:
+    def test_create_valkey_client_resolves_passwords(self) -> None:
         target = ValkeyTarget(
             sentinel=["127.0.0.1:26379"],
             service_name="mymaster",
@@ -131,8 +136,13 @@ class TestSentinelPasswordPropagation:
         monitor_client = client._monitor_client
         assert isinstance(operation_client, ValkeySentinelClient)
         assert isinstance(monitor_client, ValkeySentinelClient)
-        assert operation_client._target.sentinel_password == "sentinel-pw"
-        assert monitor_client._target.sentinel_password == "sentinel-pw"
+
+        # password = sentinel password (resolved via from_valkey_target)
+        assert operation_client._target.password == "sentinel-pw"
+        assert monitor_client._target.password == "sentinel-pw"
+        # master_password preserved for GlideClient credentials
+        assert operation_client._target.master_password == "master-pw"
+        assert monitor_client._target.master_password == "master-pw"
 
     def test_valkey_target_sentinel_password_defaults_to_none(self) -> None:
         target = ValkeyTarget(

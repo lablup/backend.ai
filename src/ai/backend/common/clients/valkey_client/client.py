@@ -70,7 +70,7 @@ class ValkeySentinelTarget:
     sentinel_addresses: Iterable[str]
     service_name: str
     password: str | None = None
-    sentinel_password: str | None = None
+    master_password: str | None = None
     request_timeout: int | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
@@ -79,6 +79,10 @@ class ValkeySentinelTarget:
     def from_valkey_target(cls, valkey_target: ValkeyTarget) -> Self:
         """
         Create a ValkeySentinelTarget from a ValkeyTarget.
+
+        password is resolved here: sentinel_password takes precedence,
+        falling back to the master password for backward compatibility.
+        master_password is always the master password for GlideClient credentials.
         """
         if not valkey_target.service_name:
             raise ValueError("RedisTarget must have service_name when using sentinel")
@@ -86,11 +90,16 @@ class ValkeySentinelTarget:
         if not valkey_target.sentinel:
             raise ValueError("RedisTarget sentinel configuration is invalid or empty")
 
+        sentinel_password = (
+            valkey_target.sentinel_password
+            if valkey_target.sentinel_password is not None
+            else valkey_target.password
+        )
         return cls(
             sentinel_addresses=valkey_target.sentinel,
             service_name=valkey_target.service_name,
-            password=valkey_target.password,
-            sentinel_password=valkey_target.sentinel_password,
+            password=sentinel_password,
+            master_password=valkey_target.password,
             request_timeout=valkey_target.request_timeout,
             use_tls=valkey_target.use_tls,
             tls_skip_verify=valkey_target.tls_skip_verify,
@@ -246,11 +255,8 @@ class ValkeySentinelClient(AbstractValkeyClient):
             host, port = addr_to_hostport_pair(addr)
             sentinel_addrs.append((host, port))
 
-        sentinel_auth = (
-            target.sentinel_password if target.sentinel_password is not None else target.password
-        )
         sentinel_kwargs: dict[str, Any] = {
-            "password": sentinel_auth,
+            "password": target.password,
             "ssl": target.use_tls,
             "ssl_cert_reqs": SSL_CERT_NONE if target.tls_skip_verify else SSL_CERT_REQUIRED,
         }
@@ -293,7 +299,9 @@ class ValkeySentinelClient(AbstractValkeyClient):
 
         addresses = [NodeAddress(host=master_address[0], port=master_address[1])]
         credentials = (
-            ServerCredentials(password=self._target.password) if self._target.password else None
+            ServerCredentials(password=self._target.master_password)
+            if self._target.master_password
+            else None
         )
 
         config = GlideClientConfiguration(
