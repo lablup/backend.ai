@@ -88,6 +88,8 @@ class ValkeySentinelTarget:
         if not valkey_target.sentinel:
             raise ValueError("RedisTarget sentinel configuration is invalid or empty")
 
+        # Fall back to master password for backward compatibility when
+        # sentinel_password is not explicitly configured.
         sentinel_password = (
             valkey_target.sentinel_password
             if valkey_target.sentinel_password is not None
