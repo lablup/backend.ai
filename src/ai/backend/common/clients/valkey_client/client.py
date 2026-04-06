@@ -477,10 +477,12 @@ class MonitoringValkeyClient(AbstractValkeyClient):
 
     _operation_client: AbstractValkeyClient
     _monitor_client: AbstractValkeyClient
-    _spec: MonitoringValkeyClientSpec
+    _reconnectable_exceptions: tuple[type[Exception], ...]
+    _consecutive_failure_threshold: int
+    _monitor_interval: float
     _monitor_task: asyncio.Task[None] | None
     _reconnect_event: asyncio.Event
-    _consecutive_failure_count: int
+    _monitor_consecutive_failure_count: int
     _operation_failure_count: int
 
     def __init__(
@@ -489,12 +491,15 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         monitor_client: AbstractValkeyClient,
         spec: MonitoringValkeyClientSpec | None = None,
     ) -> None:
+        resolved_spec = spec or MonitoringValkeyClientSpec()
         self._operation_client = operation_client
         self._monitor_client = monitor_client
-        self._spec = spec or MonitoringValkeyClientSpec()
+        self._reconnectable_exceptions = resolved_spec.reconnectable_exceptions
+        self._consecutive_failure_threshold = resolved_spec.consecutive_failure_threshold
+        self._monitor_interval = resolved_spec.monitor_interval
         self._monitor_task = None
         self._reconnect_event = asyncio.Event()
-        self._consecutive_failure_count = 0
+        self._monitor_consecutive_failure_count = 0
         self._operation_failure_count = 0
         self._closed = False
 
@@ -548,12 +553,12 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             log.warning(
                 "Operation connection error (consecutive failures: {}/{})",
                 self._operation_failure_count,
-                self._spec.consecutive_failure_threshold,
+                self._consecutive_failure_threshold,
             )
-            if self._operation_failure_count >= self._spec.consecutive_failure_threshold:
+            if self._operation_failure_count >= self._consecutive_failure_threshold:
                 log.warning(
                     "Operation failure threshold reached ({}), requesting reconnection...",
-                    self._spec.consecutive_failure_threshold,
+                    self._consecutive_failure_threshold,
                 )
                 self._operation_failure_count = 0
                 self._reconnect_event.set()
@@ -568,29 +573,29 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         Returns:
             True if reconnection is needed, False otherwise.
         """
-        reconnectable_exceptions = self._spec.reconnectable_exceptions
+        reconnectable_exceptions = self._reconnectable_exceptions
         try:
             await self._monitor_client.ping()
-            self._consecutive_failure_count = 0
+            self._monitor_consecutive_failure_count = 0
             return False
         except reconnectable_exceptions as e:
             log.warning("Connection error: {}, reconnecting immediately...", e)
-            self._consecutive_failure_count = 0
+            self._monitor_consecutive_failure_count = 0
             return True
         except Exception as e:
-            self._consecutive_failure_count += 1
+            self._monitor_consecutive_failure_count += 1
             log.warning(
                 "Error in connection monitoring (consecutive failures: {}/{}): {}",
-                self._consecutive_failure_count,
-                self._spec.consecutive_failure_threshold,
+                self._monitor_consecutive_failure_count,
+                self._consecutive_failure_threshold,
                 e,
             )
-            if self._consecutive_failure_count >= self._spec.consecutive_failure_threshold:
+            if self._monitor_consecutive_failure_count >= self._consecutive_failure_threshold:
                 log.warning(
                     "Consecutive failure threshold reached ({}), reconnecting...",
-                    self._spec.consecutive_failure_threshold,
+                    self._consecutive_failure_threshold,
                 )
-                self._consecutive_failure_count = 0
+                self._monitor_consecutive_failure_count = 0
                 return True
             return False
 
@@ -619,7 +624,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
                     try:
                         await asyncio.wait_for(
                             self._reconnect_event.wait(),
-                            timeout=self._spec.monitor_interval,
+                            timeout=self._monitor_interval,
                         )
                     except TimeoutError:
                         pass
