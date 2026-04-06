@@ -55,12 +55,16 @@ def mock_entrypoints_with_instance(
     *,
     mocked_plugin: AbstractPlugin,
 ) -> Iterator[DummyEntrypoint]:
-    # Since mocked_plugin is already an instance constructed via AsyncMock,
-    # we emulate the original constructor using a lambda fucntion.
+    # Create a proper AbstractPlugin subclass whose instantiation returns the mock,
+    # so that the type check in discover_plugins() passes.
+    class MockedPluginClass(DummyPlugin):
+        def __new__(cls, plugin_config: Any, local_config: Any) -> Any:
+            return mocked_plugin
+
     yield DummyEntrypoint(
         name="dummy",
         group=plugin_group_name,
-        load_result=lambda plugin_config, local_config: mocked_plugin,
+        load_result=MockedPluginClass,
     )
 
 

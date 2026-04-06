@@ -5,7 +5,7 @@ import logging
 import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterator, Mapping
-from typing import Any, ClassVar, TypeVar
+from typing import Any, ClassVar, TypeVar, cast
 from weakref import WeakSet
 
 from ai.backend.common.asyncio import cancel_tasks
@@ -139,7 +139,15 @@ class BasePluginContext[P: AbstractPlugin]:
             blocklist=cls_blocklist | arg_blocklist,
         ):
             plugin_cls = entrypoint.load()
-            if not allowlist_enabled and getattr(plugin_cls, "require_explicit_allow", False):
+            if not (isinstance(plugin_cls, type) and issubclass(plugin_cls, AbstractPlugin)):
+                log.warning(
+                    "skipping plugin (group:{}): {} (not a valid AbstractPlugin subclass, got {})",
+                    plugin_group,
+                    entrypoint.name,
+                    type(plugin_cls),
+                )
+                continue
+            if not allowlist_enabled and plugin_cls.require_explicit_allow:
                 log.info(
                     "skipping plugin (group:{}): {} (requires explicit allow)",
                     plugin_group,
@@ -147,7 +155,7 @@ class BasePluginContext[P: AbstractPlugin]:
                 )
                 continue
             log.info("loading plugin (group:{}): {}", plugin_group, entrypoint.name)
-            yield entrypoint.name, plugin_cls
+            yield entrypoint.name, cast(type[P], plugin_cls)
 
     async def init(
         self,
