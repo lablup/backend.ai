@@ -46,4 +46,4 @@ download_github_release "lablup/bssh" "bssh" "${BSSH_VERSION:-}"
 download_github_release "lablup/all-smi" "all-smi" "${ALL_SMI_VERSION:-}"
 
 echo "=== All external tools updated ==="
-git add "${TARGET_DIR}"/*.bin "${TARGET_DIR}"/*.1
+git add "${TARGET_DIR}"/*.bin "${TARGET_DIR}"/*.1 2>/dev/null || true
