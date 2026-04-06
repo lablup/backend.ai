@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import Enum, auto
 from unittest.mock import AsyncMock, MagicMock
 
 import graphene
 import pytest
 
-from ai.backend.manager.api.gql_legacy.base import GenericForbidden
 from ai.backend.manager.api.gql_legacy.schema import Query
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user import UserRole
 
 
@@ -18,7 +19,7 @@ class ExpectedResult(Enum):
 
 class TestSessionPendingQueuePermission:
     @pytest.fixture
-    def make_info(self) -> callable:
+    def make_info(self) -> Callable:
         def _make(role: UserRole) -> graphene.ResolveInfo:
             ctx = MagicMock()
             ctx.user = {"role": role}
@@ -53,7 +54,7 @@ class TestSessionPendingQueuePermission:
     )
     async def test_only_superadmin_can_access(
         self,
-        make_info: callable,
+        make_info: Callable,
         role: UserRole,
         expected_result: ExpectedResult,
     ) -> None:
