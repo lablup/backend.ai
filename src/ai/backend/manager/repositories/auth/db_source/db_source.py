@@ -28,7 +28,7 @@ from ai.backend.manager.errors.auth import (
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.login_session.enums import (
     LoginAttemptResult,
     LoginClientType,
@@ -522,8 +522,8 @@ class AuthDBSource:
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)
                 .options(
-                    joinedload(UserRow.main_keypair).joinedload(KeyPairRow.resource_policy_row),
-                    selectinload(UserRow.keypairs).joinedload(KeyPairRow.resource_policy_row),
+                    joinedload(UserRow.main_keypair),
+                    selectinload(UserRow.keypairs),
                 )
             )
             user_row = await db_session.scalar(user_query)

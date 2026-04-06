@@ -118,14 +118,12 @@ def _make_mock_keypair_row(
     *,
     access_key: str = "test_access_key",
     secret_key: str = "test_secret_key",
-    max_concurrent_sessions: int = 1,
 ) -> MagicMock:
     """Create a mock keypair row with access_key, secret_key, and mapping."""
     mock_keypair = MagicMock()
     mock_keypair.access_key = access_key
     mock_keypair.secret_key = secret_key
     mock_keypair.mapping = {"access_key": access_key}
-    mock_keypair.resource_policy_row.max_concurrent_sessions = max_concurrent_sessions
     return mock_keypair
 
 
