@@ -70,6 +70,7 @@ class ValkeySentinelTarget:
     sentinel_addresses: Iterable[str]
     service_name: str
     password: str | None = None
+    sentinel_password: str | None = None
     request_timeout: int | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
@@ -89,6 +90,7 @@ class ValkeySentinelTarget:
             sentinel_addresses=valkey_target.sentinel,
             service_name=valkey_target.service_name,
             password=valkey_target.password,
+            sentinel_password=valkey_target.sentinel_password,
             request_timeout=valkey_target.request_timeout,
             use_tls=valkey_target.use_tls,
             tls_skip_verify=valkey_target.tls_skip_verify,
@@ -245,7 +247,9 @@ class ValkeySentinelClient(AbstractValkeyClient):
             sentinel_addrs.append((host, port))
 
         sentinel_kwargs: dict[str, Any] = {
-            "password": target.password,
+            "password": target.sentinel_password
+            if target.sentinel_password is not None
+            else target.password,
             "ssl": target.use_tls,
             "ssl_cert_reqs": SSL_CERT_NONE if target.tls_skip_verify else SSL_CERT_REQUIRED,
         }
@@ -399,6 +403,7 @@ def create_valkey_client(
         sentinel=valkey_target.sentinel,
         service_name=valkey_target.service_name,
         password=valkey_target.password,
+        sentinel_password=valkey_target.sentinel_password,
         request_timeout=_MONITOR_REQUEST_TIMEOUT,
         use_tls=valkey_target.use_tls,
         tls_skip_verify=valkey_target.tls_skip_verify,
