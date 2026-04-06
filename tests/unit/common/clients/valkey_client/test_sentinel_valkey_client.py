@@ -253,27 +253,22 @@ class TestMonitoringValkeyClientWithSentinel:
         result = await monitoring_client._check_connection()
         assert result is False
 
-    async def test_check_ping_returns_true_on_closing_error(
+    @pytest.mark.parametrize(
+        "exception",
+        [
+            ClosingError("Connection closed"),
+            ClientNotConnectedError("Not connected"),
+        ],
+        ids=["ClosingError", "ClientNotConnectedError"],
+    )
+    async def test_check_ping_returns_true_on_reconnectable_exception(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
+        exception: Exception,
     ) -> None:
-        """ClosingError triggers immediate reconnection."""
-        mock_sentinel_monitor_client.ping.side_effect = ClosingError("Connection closed")
-
-        result = await monitoring_client._check_ping()
-        assert result is True
-        assert monitoring_client._consecutive_failure_count == 0
-
-    async def test_check_ping_returns_true_on_client_not_connected_error(
-        self,
-        monitoring_client: MonitoringValkeyClient,
-        mock_sentinel_monitor_client: AsyncMock,
-    ) -> None:
-        """ClientNotConnectedError triggers immediate reconnection."""
-        mock_sentinel_monitor_client.ping.side_effect = ClientNotConnectedError(
-            "Not connected",
-        )
+        """Reconnectable exceptions trigger immediate reconnection."""
+        mock_sentinel_monitor_client.ping.side_effect = exception
 
         result = await monitoring_client._check_ping()
         assert result is True
