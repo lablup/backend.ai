@@ -6,7 +6,7 @@ set -euo pipefail
 BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
 TARGET_DIR="${BASE_PATH}/src/ai/backend/runner"
 WORK_DIR=$(mktemp -d)
-trap "rm -rf ${WORK_DIR}" EXIT
+trap 'rm -rf "${WORK_DIR}"' EXIT
 
 download_github_release() {
     local repo=$1

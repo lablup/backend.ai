@@ -23,7 +23,12 @@ fi
 # Update external tool binaries (bssh, all-smi, etc.)
 echo "Updating external tool binaries..."
 ./scripts/download-external-tools.sh
-git commit -m "chore: update external tool binaries"
+# Only commit if there are staged changes (download-external-tools.sh may be a no-op)
+if ! git diff --cached --quiet; then
+    git commit -m "chore: update external tool binaries"
+else
+    echo "No external tool binary updates to commit."
+fi
 
 # Check dependencies
 pants tailor --check update-build-files --check '::'
