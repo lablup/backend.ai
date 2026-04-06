@@ -32,8 +32,8 @@ monkey.patch_all()
 import pyinfra.connectors.util as _pyinfra_util  # noqa: E402
 from gevent.subprocess import PIPE, Popen  # noqa: E402
 
-_pyinfra_util.Popen = Popen  # type: ignore[attr-defined]
-_pyinfra_util.PIPE = PIPE  # type: ignore[attr-defined]
+_pyinfra_util.Popen = Popen
+_pyinfra_util.PIPE = PIPE
 
 # Now run pyinfra CLI
 from pyinfra_cli.cli import cli  # noqa: E402
