@@ -227,6 +227,8 @@ async def update_jwks(app: web.Application, _interval: float) -> None:
 
 
 class OIDCWebAppPlugin(WebappPlugin):
+    require_explicit_allow = True
+
     _config: OIDCPluginConfig
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
