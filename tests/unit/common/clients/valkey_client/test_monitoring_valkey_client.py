@@ -212,8 +212,8 @@ class TestMonitoringValkeyClient:
 
 
 @pytest.mark.redis
-class TestMonitoringValkeyClientAcquire:
-    """Tests for the acquire() context manager and retry-based disconnection logic."""
+class TestMonitoringValkeyClientContextManager:
+    """Tests for the client() context manager and retry-based disconnection logic."""
 
     @pytest.fixture
     async def monitoring_client(
@@ -226,7 +226,7 @@ class TestMonitoringValkeyClientAcquire:
             create_valkey_client(
                 valkey_target,
                 db_id=REDIS_STREAM_DB,
-                human_readable_name="test.acquire",
+                human_readable_name="test.client",
             ),
         )
         await client.connect()
@@ -235,15 +235,15 @@ class TestMonitoringValkeyClientAcquire:
         finally:
             await client.disconnect()
 
-    async def test_acquire_yields_glide_client(
+    async def test_client_yields_glide_client(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
-        """Test that acquire() yields the operation GlideClient."""
+        """Test that client() yields the operation GlideClient."""
         async with monitoring_client.client() as conn:
             result = await conn.ping()
             assert result == b"PONG"
 
-    async def test_acquire_resets_failure_count_on_success(
+    async def test_client_resets_failure_count_on_success(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         """Test that successful operations reset the failure counter."""
@@ -256,7 +256,7 @@ class TestMonitoringValkeyClientAcquire:
         # Success should reset the counter
         assert monitoring_client._operation_failure_count == 0
 
-    async def test_acquire_increments_failure_count_on_connection_error(
+    async def test_client_increments_failure_count_on_connection_error(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         """Test that connection errors increment the failure counter."""
@@ -268,7 +268,7 @@ class TestMonitoringValkeyClientAcquire:
 
         assert monitoring_client._operation_failure_count == 1
 
-    async def test_acquire_does_not_increment_on_non_connection_error(
+    async def test_client_does_not_increment_on_non_connection_error(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         """Test that non-connection errors do NOT increment the failure counter."""
@@ -281,7 +281,7 @@ class TestMonitoringValkeyClientAcquire:
         # Non-connection errors should not affect the counter
         assert monitoring_client._operation_failure_count == 0
 
-    async def test_acquire_does_not_reconnect_below_threshold(
+    async def test_client_does_not_reconnect_below_threshold(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         """Test that failures below threshold do NOT trigger reconnection."""
@@ -344,7 +344,7 @@ class TestMonitoringValkeyClientAcquire:
         # 8. Monitor client should also still be healthy after reconnect
         await monitoring_client._monitor_client.ping()
 
-    async def test_acquire_tracks_each_connection_error_type(
+    async def test_client_tracks_each_connection_error_type(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         """Test that all defined connection error types are tracked."""
@@ -363,7 +363,7 @@ class TestMonitoringValkeyClientAcquire:
 
             assert monitoring_client._operation_failure_count == 1
 
-    async def test_acquire_mixed_success_and_failure(
+    async def test_client_mixed_success_and_failure(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         """Test that a successful operation between failures resets the counter."""
