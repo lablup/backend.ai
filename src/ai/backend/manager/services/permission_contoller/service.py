@@ -259,7 +259,7 @@ class PermissionControllerService:
         result = await self._repository.search_roles_in_scope(action.querier, action.scope)
         return SearchRolesInScopeActionResult(
             result=result,
-            _scope_type=action.scope.scope_type,
+            _scope_type=action.scope.element_type.to_scope_type(),
             _scope_id=action.scope.scope_id,
         )
 

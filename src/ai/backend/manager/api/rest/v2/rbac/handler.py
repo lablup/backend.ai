@@ -7,7 +7,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BaseRootResponseModel, BodyParam, PathParam
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
@@ -86,7 +86,7 @@ class V2RBACHandler:
         """Search roles registered in a project scope."""
         result = await self._adapter.search_roles_in_scope(
             ScopedRoleSearchScope(
-                scope_type=ScopeType.PROJECT, scope_id=str(path.parsed.project_id)
+                element_type=RBACElementType.PROJECT, scope_id=str(path.parsed.project_id)
             ),
             body.parsed,
         )

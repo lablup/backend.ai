@@ -8,7 +8,7 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchRoleAssignmentsGQLInput,
     SearchRolesInput,
@@ -230,7 +230,7 @@ async def project_roles(
     offset: int | None = None,
 ) -> RoleConnection:
     result = await info.context.adapters.rbac.search_roles_in_scope(
-        ScopedRoleSearchScope(scope_type=ScopeType.PROJECT, scope_id=str(project_id)),
+        ScopedRoleSearchScope(element_type=RBACElementType.PROJECT, scope_id=str(project_id)),
         SearchRolesInput(
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,

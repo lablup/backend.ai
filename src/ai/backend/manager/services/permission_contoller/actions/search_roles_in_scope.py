@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import RoleData
@@ -30,7 +30,7 @@ class SearchRolesInScopeAction(RoleScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return self.scope.scope_type
+        return self.scope.element_type.to_scope_type()
 
     @override
     def scope_id(self) -> str:
@@ -39,7 +39,7 @@ class SearchRolesInScopeAction(RoleScopeAction):
     @override
     def target_element(self) -> RBACElementRef:
         return RBACElementRef(
-            element_type=RBACElementType(self.scope.scope_type.value),
+            element_type=self.scope.element_type,
             element_id=self.scope.scope_id,
         )
 

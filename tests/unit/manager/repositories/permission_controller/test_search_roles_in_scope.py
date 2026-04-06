@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -94,7 +95,7 @@ class TestSearchRolesInScope:
     ) -> None:
         """Only roles registered in the given scope should be returned."""
         scope = ScopedRoleSearchScope(
-            scope_type=ScopeType.PROJECT,
+            element_type=RBACElementType.PROJECT,
             scope_id=str(scoped_roles.project_id),
         )
         querier = BatchQuerier(
@@ -116,7 +117,7 @@ class TestSearchRolesInScope:
     ) -> None:
         """Total count should reflect only roles in scope."""
         scope = ScopedRoleSearchScope(
-            scope_type=ScopeType.PROJECT,
+            element_type=RBACElementType.PROJECT,
             scope_id=str(scoped_roles.project_id),
         )
         querier = BatchQuerier(
@@ -137,7 +138,7 @@ class TestSearchRolesInScope:
         """A scope with no registered roles should return empty results."""
         empty_project_id = uuid.uuid4()
         scope = ScopedRoleSearchScope(
-            scope_type=ScopeType.PROJECT,
+            element_type=RBACElementType.PROJECT,
             scope_id=str(empty_project_id),
         )
         querier = BatchQuerier(
@@ -181,7 +182,7 @@ class TestSearchRolesInScope:
 
         # Search with DOMAIN scope using the same scope_id
         domain_scope = ScopedRoleSearchScope(
-            scope_type=ScopeType.DOMAIN,
+            element_type=RBACElementType.DOMAIN,
             scope_id=scope_id,
         )
         result = await db_source.search_roles_in_scope(querier, domain_scope)
@@ -189,7 +190,7 @@ class TestSearchRolesInScope:
 
         # Search with PROJECT scope should find it
         project_scope = ScopedRoleSearchScope(
-            scope_type=ScopeType.PROJECT,
+            element_type=RBACElementType.PROJECT,
             scope_id=scope_id,
         )
         result = await db_source.search_roles_in_scope(querier, project_scope)
