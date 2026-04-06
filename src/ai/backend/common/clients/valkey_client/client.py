@@ -70,7 +70,6 @@ class ValkeySentinelTarget:
     sentinel_addresses: Iterable[str]
     service_name: str
     password: str | None = None
-    master_password: str | None = None
     request_timeout: int | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
@@ -82,7 +81,6 @@ class ValkeySentinelTarget:
 
         password is resolved here: sentinel_password takes precedence,
         falling back to the master password for backward compatibility.
-        master_password is always the master password for GlideClient credentials.
         """
         if not valkey_target.service_name:
             raise ValueError("RedisTarget must have service_name when using sentinel")
@@ -99,7 +97,6 @@ class ValkeySentinelTarget:
             sentinel_addresses=valkey_target.sentinel,
             service_name=valkey_target.service_name,
             password=sentinel_password,
-            master_password=valkey_target.password,
             request_timeout=valkey_target.request_timeout,
             use_tls=valkey_target.use_tls,
             tls_skip_verify=valkey_target.tls_skip_verify,
@@ -249,6 +246,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
         db_id: int,
         human_readable_name: str,
         pubsub_channels: set[str] | None = None,
+        master_password: str | None = None,
     ) -> None:
         sentinel_addrs = []
         for addr in target.sentinel_addresses:
@@ -267,6 +265,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
         self._db_id = db_id
         self._human_readable_name = human_readable_name
         self._target = target
+        self._master_password = master_password
         self._pubsub_channels = pubsub_channels
         self._valkey_client = None
         self._master_address = None
@@ -299,9 +298,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
 
         addresses = [NodeAddress(host=master_address[0], port=master_address[1])]
         credentials = (
-            ServerCredentials(password=self._target.master_password)
-            if self._target.master_password
-            else None
+            ServerCredentials(password=self._master_password) if self._master_password else None
         )
 
         config = GlideClientConfiguration(
@@ -384,7 +381,13 @@ def _create_valkey_client_internal(
     """
     if valkey_target.sentinel:
         sentinel_target = ValkeySentinelTarget.from_valkey_target(valkey_target)
-        return ValkeySentinelClient(sentinel_target, db_id, human_readable_name, pubsub_channels)
+        return ValkeySentinelClient(
+            sentinel_target,
+            db_id,
+            human_readable_name,
+            pubsub_channels,
+            master_password=valkey_target.password,
+        )
     standalone_target = ValkeyStandaloneTarget.from_valkey_target(valkey_target)
     return ValkeyStandaloneClient(standalone_target, db_id, human_readable_name, pubsub_channels)
 
