@@ -70,6 +70,7 @@ class ValkeySentinelTarget:
     sentinel_addresses: Iterable[str]
     service_name: str
     password: str | None = None
+    sentinel_password: str | None = None
     request_timeout: int | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
@@ -78,9 +79,6 @@ class ValkeySentinelTarget:
     def from_valkey_target(cls, valkey_target: ValkeyTarget) -> Self:
         """
         Create a ValkeySentinelTarget from a ValkeyTarget.
-
-        password is resolved here: sentinel_password takes precedence,
-        falling back to the master password for backward compatibility.
         """
         if not valkey_target.service_name:
             raise ValueError("RedisTarget must have service_name when using sentinel")
@@ -88,17 +86,11 @@ class ValkeySentinelTarget:
         if not valkey_target.sentinel:
             raise ValueError("RedisTarget sentinel configuration is invalid or empty")
 
-        # Fall back to master password for backward compatibility when
-        # sentinel_password is not explicitly configured.
-        sentinel_password = (
-            valkey_target.sentinel_password
-            if valkey_target.sentinel_password is not None
-            else valkey_target.password
-        )
         return cls(
             sentinel_addresses=valkey_target.sentinel,
             service_name=valkey_target.service_name,
-            password=sentinel_password,
+            password=valkey_target.password,
+            sentinel_password=valkey_target.sentinel_password,
             request_timeout=valkey_target.request_timeout,
             use_tls=valkey_target.use_tls,
             tls_skip_verify=valkey_target.tls_skip_verify,
@@ -248,15 +240,19 @@ class ValkeySentinelClient(AbstractValkeyClient):
         db_id: int,
         human_readable_name: str,
         pubsub_channels: set[str] | None = None,
-        master_password: str | None = None,
     ) -> None:
         sentinel_addrs = []
         for addr in target.sentinel_addresses:
             host, port = addr_to_hostport_pair(addr)
             sentinel_addrs.append((host, port))
 
+        # Fall back to master password for backward compatibility when
+        # sentinel_password is not explicitly configured.
+        sentinel_auth = (
+            target.sentinel_password if target.sentinel_password is not None else target.password
+        )
         sentinel_kwargs: dict[str, Any] = {
-            "password": target.password,
+            "password": sentinel_auth,
             "ssl": target.use_tls,
             "ssl_cert_reqs": SSL_CERT_NONE if target.tls_skip_verify else SSL_CERT_REQUIRED,
         }
@@ -267,7 +263,6 @@ class ValkeySentinelClient(AbstractValkeyClient):
         self._db_id = db_id
         self._human_readable_name = human_readable_name
         self._target = target
-        self._master_password = master_password
         self._pubsub_channels = pubsub_channels
         self._valkey_client = None
         self._master_address = None
@@ -300,7 +295,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
 
         addresses = [NodeAddress(host=master_address[0], port=master_address[1])]
         credentials = (
-            ServerCredentials(password=self._master_password) if self._master_password else None
+            ServerCredentials(password=self._target.password) if self._target.password else None
         )
 
         config = GlideClientConfiguration(
@@ -383,13 +378,7 @@ def _create_valkey_client_internal(
     """
     if valkey_target.sentinel:
         sentinel_target = ValkeySentinelTarget.from_valkey_target(valkey_target)
-        return ValkeySentinelClient(
-            sentinel_target,
-            db_id,
-            human_readable_name,
-            pubsub_channels,
-            master_password=valkey_target.password,
-        )
+        return ValkeySentinelClient(sentinel_target, db_id, human_readable_name, pubsub_channels)
     standalone_target = ValkeyStandaloneTarget.from_valkey_target(valkey_target)
     return ValkeyStandaloneClient(standalone_target, db_id, human_readable_name, pubsub_channels)
 
