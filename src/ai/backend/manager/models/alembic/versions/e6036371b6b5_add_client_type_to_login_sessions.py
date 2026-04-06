@@ -1,7 +1,7 @@
 """add client_type to login_sessions
 
-Revision ID: a1b2c3d4e5f6
-Revises: d0e1f2a3b4c5
+Revision ID: e6036371b6b5
+Revises: 04e150fdefa0
 Create Date: 2026-04-06
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "a1b2c3d4e5f6"
-down_revision = "d0e1f2a3b4c5"
+revision = "e6036371b6b5"
+down_revision = "04e150fdefa0"
 branch_labels = None
 depends_on = None
 
