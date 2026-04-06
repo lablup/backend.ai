@@ -12,7 +12,11 @@ from ai.backend.manager.models.base import (
     Base,
     StrEnumType,
 )
-from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
+from ai.backend.manager.models.login_session.enums import (
+    LoginAttemptResult,
+    LoginClientType,
+    LoginSessionStatus,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
@@ -37,6 +41,13 @@ class LoginSessionRow(Base):  # type: ignore[misc]
         index=True,
     )
     access_key: Mapped[str] = mapped_column("access_key", sa.String(20), nullable=False)
+    client_type: Mapped[LoginClientType] = mapped_column(
+        "client_type",
+        StrEnumType(LoginClientType),
+        nullable=False,
+        default=LoginClientType.DEFAULT,
+        server_default=LoginClientType.DEFAULT.value,
+    )
     status: Mapped[LoginSessionStatus] = mapped_column(
         "status",
         StrEnumType(LoginSessionStatus),
@@ -58,7 +69,12 @@ class LoginSessionRow(Base):  # type: ignore[misc]
         "invalidated_at", sa.DateTime(timezone=True), nullable=True
     )
 
-    __table_args__ = (sa.Index("ix_login_sessions_user_id_status", "user_id", "status"),)
+    __table_args__ = (
+        sa.Index("ix_login_sessions_user_id_status", "user_id", "status"),
+        sa.Index(
+            "ix_login_sessions_user_id_client_type_status", "user_id", "client_type", "status"
+        ),
+    )
 
     def to_data(self) -> LoginSessionData:
         from ai.backend.manager.data.auth.login_session_types import (
@@ -70,6 +86,7 @@ class LoginSessionRow(Base):  # type: ignore[misc]
             session_token=self.session_token,
             user_id=self.user_id,
             access_key=self.access_key,
+            client_type=self.client_type,
             status=self.status,
             created_at=self.created_at,
             last_accessed_at=self.last_accessed_at,

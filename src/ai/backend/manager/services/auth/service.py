@@ -44,7 +44,7 @@ from ai.backend.manager.models.keypair import (
     generate_ssh_keypair,
     validate_ssh_keypair,
 )
-from ai.backend.manager.models.login_session.enums import LoginAttemptResult
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginClientType
 from ai.backend.manager.models.user import (
     INACTIVE_USER_STATUSES,
     UserRole,
@@ -215,9 +215,12 @@ class AuthService:
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
+        client_type = LoginClientType(action.client_type)
         if hook_result.result:
             user = hook_result.result
-            active_sessions = await self._auth_repository.get_active_session_tokens(user.uuid)
+            active_sessions = await self._auth_repository.get_active_session_tokens(
+                user.uuid, client_type=client_type
+            )
             return user, active_sessions
 
         target_password_info = PasswordInfo(
@@ -230,6 +233,7 @@ class AuthService:
             action.domain_name,
             action.email,
             target_password_info=target_password_info,
+            client_type=client_type,
         )
         return cred_result.user, cred_result.active_sessions
 
@@ -331,6 +335,7 @@ class AuthService:
         ``live_sessions`` is already the authoritative active set (cross-checked against
         Valkey by the caller), so no additional repository count query is needed.
         """
+        client_type = LoginClientType(action.client_type)
         try:
             user_resource_policy = await self._user_resource_policy_repository.get_by_name(
                 user.resource_policy
@@ -351,6 +356,7 @@ class AuthService:
             user_id=user.uuid,
             access_key=keypair_row.access_key,
             domain_name=action.domain_name,
+            client_type=client_type,
         )
 
         if tokens_to_invalidate:
@@ -361,6 +367,7 @@ class AuthService:
         session_data = LoginSessionData(
             created=int(time.time()),
             expiration_dt=int(time.time()) + auth_config.login_session_max_age,
+            client_type=client_type.value,
             session=LoginSessionInner(
                 authenticated=True,
                 token=LoginSessionTokenData(

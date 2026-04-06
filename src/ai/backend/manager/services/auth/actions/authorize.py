@@ -20,6 +20,7 @@ class AuthorizeAction(AuthAction):
     stoken: str | None
     otp: str | None
     force: bool = False
+    client_type: str = "default"
 
     @override
     def entity_id(self) -> str | None:

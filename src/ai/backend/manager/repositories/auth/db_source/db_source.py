@@ -29,7 +29,11 @@ from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
-from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
+from ai.backend.manager.models.login_session.enums import (
+    LoginAttemptResult,
+    LoginClientType,
+    LoginSessionStatus,
+)
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.user import (
     UserRole,
@@ -389,6 +393,7 @@ class AuthDBSource:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
+        client_type: LoginClientType = LoginClientType.DEFAULT,
     ) -> CredentialVerificationResult:
         """Verify credentials, migrate password hash, and fetch active sessions.
 
@@ -417,6 +422,7 @@ class AuthDBSource:
                 )
                 .where(
                     (LoginSessionRow.__table__.c.user_id == row.uuid)
+                    & (LoginSessionRow.__table__.c.client_type == client_type)
                     & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
                 )
                 .order_by(LoginSessionRow.__table__.c.created_at.asc())
@@ -463,6 +469,8 @@ class AuthDBSource:
         user_id: UUID,
         access_key: str,
         domain_name: str,
+        *,
+        client_type: LoginClientType = LoginClientType.DEFAULT,
     ) -> LoginSessionCreationResult:
         """Create a new active login session and record a successful login history entry.
 
@@ -478,6 +486,7 @@ class AuthDBSource:
                     user_id=user_id,
                     access_key=access_key,
                     session_token=session_token,
+                    client_type=client_type,
                     status=LoginSessionStatus.ACTIVE,
                 )
             )
@@ -534,8 +543,12 @@ class AuthDBSource:
     # --- Login Session ---
 
     @auth_db_source_resilience.apply()
-    async def fetch_active_session_tokens(self, user_id: UUID) -> list[ActiveSessionInfo]:
-        """Fetch active session tokens for a user, ordered by created_at ASC (oldest first)."""
+    async def fetch_active_session_tokens(
+        self,
+        user_id: UUID,
+        client_type: LoginClientType = LoginClientType.DEFAULT,
+    ) -> list[ActiveSessionInfo]:
+        """Fetch active session tokens for a user and client_type, ordered by created_at ASC (oldest first)."""
         async with self._db.begin_readonly_session() as db_session:
             query = (
                 sa.select(
@@ -544,6 +557,7 @@ class AuthDBSource:
                 )
                 .where(
                     (LoginSessionRow.user_id == user_id)
+                    & (LoginSessionRow.client_type == client_type)
                     & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
                 )
                 .order_by(LoginSessionRow.created_at.asc())

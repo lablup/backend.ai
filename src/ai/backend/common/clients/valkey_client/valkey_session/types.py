@@ -17,4 +17,5 @@ class LoginSessionInner(BaseModel):
 class LoginSessionData(BaseModel):
     created: int
     expiration_dt: int
+    client_type: str = "default"
     session: LoginSessionInner

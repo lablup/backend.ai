@@ -55,6 +55,11 @@ class AuthorizeRequest(BaseRequestModel):
         default=False,
         description="If true, invalidate existing active sessions and proceed with login",
     )
+    client_type: str = Field(
+        default="default",
+        description="Client type identifier (e.g., 'core', 'webui', 'fasttrack'). "
+        "Concurrent session limits are enforced per client type.",
+    )
 
 
 class GetRoleRequest(BaseRequestModel):

@@ -511,15 +511,15 @@ async def test_authorize_force_invalidates_existing_sessions(
     assert result.authorization_result.session_token == "forced_new_token"
 
 
-async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_repo(
+async def test_create_login_session_passes_client_type_without_enforcement_knobs(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
 ) -> None:
-    """create_login_session must not pass any enforcement knobs to the repository.
+    """Regression: client_type must be passed, but no enforcement knobs.
 
-    Enforcement now lives entirely in the service layer; the repository only receives
-    the identity fields needed to create the row. Eviction, when needed, is performed
-    via a separate ``invalidate_login_sessions_by_tokens`` call.
+    Enforcement lives entirely in the service layer; the repository only receives
+    the identity fields and client_type. Eviction, when needed, is performed via a
+    separate ``invalidate_login_sessions_by_tokens`` call.
     """
     mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
         session_token="new_token",
@@ -534,6 +534,7 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
             request=MagicMock(),
             stoken=None,
             otp=None,
+            client_type="webui",
         ),
         user=_make_mock_user(),
         keypair_row=_make_mock_keypair_row(),
@@ -550,4 +551,5 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
     call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
     assert "max_concurrent_sessions" not in call_kwargs
     assert "tokens_to_invalidate" not in call_kwargs
+    assert call_kwargs["client_type"].value == "webui"
     mock_auth_repository.invalidate_login_sessions_by_tokens.assert_not_called()

@@ -9,6 +9,13 @@ class LoginSessionStatus(enum.StrEnum):
     REVOKED = "revoked"
 
 
+class LoginClientType(enum.StrEnum):
+    CORE = "core"
+    WEBUI = "webui"
+    FASTTRACK = "fasttrack"
+    DEFAULT = "default"
+
+
 class LoginAttemptResult(enum.StrEnum):
     SUCCESS = "success"
     FAILED_INVALID_CREDENTIALS = "failed_invalid_credentials"
