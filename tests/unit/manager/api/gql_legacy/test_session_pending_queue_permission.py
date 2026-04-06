@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum, auto
 from unittest.mock import AsyncMock, MagicMock
 
 import graphene
@@ -10,32 +11,21 @@ from ai.backend.manager.api.gql_legacy.schema import Query
 from ai.backend.manager.models.user import UserRole
 
 
-def _make_info(role: UserRole) -> graphene.ResolveInfo:
-    ctx = MagicMock()
-    ctx.user = {"role": role}
-    info = MagicMock(spec=graphene.ResolveInfo)
-    info.context = ctx
-    return info
+class ExpectedResult(Enum):
+    ALLOWED = auto()
+    FORBIDDEN = auto()
 
 
 class TestSessionPendingQueuePermission:
-    @pytest.mark.parametrize(
-        ("role", "should_raise"),
-        [
-            (UserRole.USER, True),
-            (UserRole.ADMIN, True),
-            (UserRole.SUPERADMIN, False),
-        ],
-    )
-    async def test_only_superadmin_can_access(
-        self, role: UserRole, should_raise: bool
-    ) -> None:
-        info = _make_info(role)
-        if not should_raise:
-            info.context.valkey_schedule = AsyncMock()
-            info.context.valkey_schedule.get_pending_queue = AsyncMock(return_value=[])
-            info.context.db = MagicMock()
-            info.context.db.begin_readonly_session = MagicMock(
+    @pytest.fixture
+    def make_info(self) -> callable:
+        def _make(role: UserRole) -> graphene.ResolveInfo:
+            ctx = MagicMock()
+            ctx.user = {"role": role}
+            ctx.valkey_schedule = AsyncMock()
+            ctx.valkey_schedule.get_pending_queue = AsyncMock(return_value=[])
+            ctx.db = MagicMock()
+            ctx.db.begin_readonly_session = MagicMock(
                 return_value=AsyncMock(
                     __aenter__=AsyncMock(
                         return_value=MagicMock(
@@ -47,7 +37,28 @@ class TestSessionPendingQueuePermission:
                     __aexit__=AsyncMock(return_value=None),
                 )
             )
-        if should_raise:
+            info = MagicMock(spec=graphene.ResolveInfo)
+            info.context = ctx
+            return info
+
+        return _make
+
+    @pytest.mark.parametrize(
+        ("role", "expected_result"),
+        [
+            (UserRole.USER, ExpectedResult.FORBIDDEN),
+            (UserRole.ADMIN, ExpectedResult.FORBIDDEN),
+            (UserRole.SUPERADMIN, ExpectedResult.ALLOWED),
+        ],
+    )
+    async def test_only_superadmin_can_access(
+        self,
+        make_info: callable,
+        role: UserRole,
+        expected_result: ExpectedResult,
+    ) -> None:
+        info = make_info(role)
+        if expected_result == ExpectedResult.FORBIDDEN:
             with pytest.raises(GenericForbidden):
                 await Query.resolve_session_pending_queue(
                     None, info, resource_group_id="default"
