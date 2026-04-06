@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from glide.exceptions import ClosingError  # type: ignore[import-not-found]
 
+import ai.backend.common.clients.valkey_client.client as client_module
 from ai.backend.common.clients.valkey_client.client import (
     MonitoringValkeyClient,
     ValkeySentinelClient,
@@ -166,13 +167,12 @@ class TestValkeySentinelClientConnect:
         self,
         sentinel_client: ValkeySentinelClient,
         mock_glide_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        with patch(
-            "ai.backend.common.clients.valkey_client.client.GlideClient.create",
-            new_callable=AsyncMock,
-            return_value=mock_glide_client,
-        ):
-            await sentinel_client.connect()
+        monkeypatch.setattr(
+            client_module.GlideClient, "create", AsyncMock(return_value=mock_glide_client)
+        )
+        await sentinel_client.connect()
 
         assert sentinel_client._valkey_client is mock_glide_client
         assert sentinel_client._master_address == INITIAL_MASTER
@@ -363,6 +363,7 @@ class TestMonitoringValkeyClientWithSentinel:
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """The monitor loop triggers _reconnect when _check_connection returns True."""
         call_count = 0
@@ -376,31 +377,25 @@ class TestMonitoringValkeyClientWithSentinel:
 
         mock_sentinel_monitor_client.need_reconnect = fake_need_reconnect
 
-        with (
-            patch.object(
-                monitoring_client,
-                "_reconnect",
-                new_callable=AsyncMock,
-            ) as mock_reconnect,
-            patch(
-                "ai.backend.common.clients.valkey_client.client._DEFAULT_MONITOR_INTERVAL",
-                0.01,
-            ),
-        ):
-            task = asyncio.create_task(monitoring_client._monitor_connection())
-            await asyncio.sleep(0.1)
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+        mock_reconnect = AsyncMock()
+        monkeypatch.setattr(monitoring_client, "_reconnect", mock_reconnect)
+        monkeypatch.setattr(client_module, "_DEFAULT_MONITOR_INTERVAL", 0.01)
 
-            mock_reconnect.assert_called()
+        task = asyncio.create_task(monitoring_client._monitor_connection())
+        await asyncio.sleep(0.1)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        mock_reconnect.assert_called()
 
     async def test_monitor_loop_survives_reconnect_failure(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Monitor loop must not die when _reconnect() raises; it should log and retry."""
         check_count = 0
@@ -422,24 +417,16 @@ class TestMonitoringValkeyClientWithSentinel:
             if reconnect_call_count == 1:
                 raise ConnectionError("Sentinel temporarily unavailable")
 
-        with (
-            patch.object(
-                monitoring_client,
-                "_reconnect",
-                side_effect=failing_then_succeeding_reconnect,
-            ),
-            patch(
-                "ai.backend.common.clients.valkey_client.client._DEFAULT_MONITOR_INTERVAL",
-                0.01,
-            ),
-        ):
-            task = asyncio.create_task(monitoring_client._monitor_connection())
-            await asyncio.sleep(0.2)
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+        monkeypatch.setattr(monitoring_client, "_reconnect", failing_then_succeeding_reconnect)
+        monkeypatch.setattr(client_module, "_DEFAULT_MONITOR_INTERVAL", 0.01)
+
+        task = asyncio.create_task(monitoring_client._monitor_connection())
+        await asyncio.sleep(0.2)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
         assert reconnect_call_count == 2
 
@@ -470,6 +457,7 @@ class TestValkeySentinelClientFailover:
         sentinel_target: ValkeySentinelTarget,
         mock_sentinel: MagicMock,
         old_master_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> ValkeySentinelClient:
         mock_sentinel.discover_master.return_value = ("master-a", 6379)
         client = ValkeySentinelClient(
@@ -478,12 +466,10 @@ class TestValkeySentinelClientFailover:
             human_readable_name="test.failover",
         )
         client._sentinel = mock_sentinel
-        with patch(
-            "ai.backend.common.clients.valkey_client.client.GlideClient.create",
-            new_callable=AsyncMock,
-            return_value=old_master_client,
-        ):
-            await client.connect()
+        monkeypatch.setattr(
+            client_module.GlideClient, "create", AsyncMock(return_value=old_master_client)
+        )
+        await client.connect()
         return client
 
     async def test_detects_failover_and_reconnects_to_new_master(
@@ -492,6 +478,7 @@ class TestValkeySentinelClientFailover:
         mock_sentinel: MagicMock,
         old_master_client: AsyncMock,
         new_master_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         client = sentinel_client_connected_to_old_master
         assert client._master_address == ("master-a", 6379)
@@ -505,12 +492,10 @@ class TestValkeySentinelClientFailover:
         await client.disconnect()
         old_master_client.close.assert_called_once()
 
-        with patch(
-            "ai.backend.common.clients.valkey_client.client.GlideClient.create",
-            new_callable=AsyncMock,
-            return_value=new_master_client,
-        ):
-            await client.connect()
+        monkeypatch.setattr(
+            client_module.GlideClient, "create", AsyncMock(return_value=new_master_client)
+        )
+        await client.connect()
 
         assert client._master_address == ("master-b", 6379)
         assert client._valkey_client is new_master_client
