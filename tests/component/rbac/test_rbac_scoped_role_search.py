@@ -1,8 +1,7 @@
-"""Component tests for project-scoped role search via v2 REST API."""
+"""Component tests for scoped role search via v2 REST API."""
 
 from __future__ import annotations
 
-import secrets
 import uuid
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
@@ -67,7 +66,6 @@ def server_module_registries(
     permission_controller_processors: PermissionControllerProcessors,
 ) -> list[RouteRegistry]:
     """Register both v1 RBAC (for role creation) and v2 RBAC (for project search) routes."""
-    # v1 routes for role CRUD
     rbac_registry = register_rbac_routes(
         RBACHandler(permission_controller=permission_controller_processors), route_deps
     )
@@ -78,7 +76,6 @@ def server_module_registries(
         gql_ws_handler=MagicMock(),
     )
 
-    # v2 routes for project search
     processors = MagicMock()
     processors.permission_controller = permission_controller_processors
     adapter = RBACAdapter(processors)
@@ -108,49 +105,55 @@ async def admin_v2_registry(
         await registry.close()
 
 
-class TestProjectRolesSearch:
-    """Search roles registered in a specific project scope."""
+@pytest.fixture()
+async def role_registered_in_project(
+    role_factory: RoleFactory,
+    group_fixture: uuid.UUID,
+    db_engine: SAEngine,
+) -> AsyncIterator[uuid.UUID]:
+    """Create a role and register it in the project scope. Yields the role ID."""
+    created = await role_factory(name=f"proj-role-{uuid.uuid4().hex[:8]}")
+    role_id = created.role.id
+
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(AssociationScopesEntitiesRow.__table__).values(
+                id=uuid.uuid4(),
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(group_fixture),
+                entity_type=EntityType.ROLE,
+                entity_id=str(role_id),
+            )
+        )
+
+    yield role_id
+
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            AssociationScopesEntitiesRow.__table__.delete().where(
+                AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id),
+            )
+        )
+
+
+class TestScopedRoleSearch:
+    """Search roles registered in a specific scope."""
 
     async def test_returns_roles_registered_in_project(
         self,
         admin_registry: BackendAIClientRegistry,
         admin_v2_registry: V2ClientRegistry,
-        role_factory: RoleFactory,
         group_fixture: uuid.UUID,
-        db_engine: SAEngine,
+        role_registered_in_project: uuid.UUID,
     ) -> None:
         """Roles registered in project scope should appear in project search."""
-        unique = secrets.token_hex(4)
-        created = await role_factory(name=f"proj-role-{unique}")
-        role_id = created.role.id
-
-        # Register role in the project scope via association_scopes_entities
-        async with db_engine.begin() as conn:
-            await conn.execute(
-                sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                    id=uuid.uuid4(),
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(group_fixture),
-                    entity_type=EntityType.ROLE,
-                    entity_id=str(role_id),
-                )
-            )
-
         result = await admin_v2_registry.rbac.project_search_roles(
             group_fixture,
             SearchRolesInput(),
         )
         assert isinstance(result, AdminSearchRolesPayload)
         role_ids = [r.id for r in result.items]
-        assert role_id in role_ids
-
-        # Cleanup
-        async with db_engine.begin() as conn:
-            await conn.execute(
-                AssociationScopesEntitiesRow.__table__.delete().where(
-                    AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id),
-                )
-            )
+        assert role_registered_in_project in role_ids
 
     async def test_excludes_roles_not_in_project(
         self,
@@ -158,40 +161,18 @@ class TestProjectRolesSearch:
         admin_v2_registry: V2ClientRegistry,
         role_factory: RoleFactory,
         group_fixture: uuid.UUID,
-        db_engine: SAEngine,
+        role_registered_in_project: uuid.UUID,
     ) -> None:
         """Roles NOT registered in project scope should NOT appear in project search."""
-        unique = secrets.token_hex(4)
-        in_project = await role_factory(name=f"in-proj-{unique}")
-        not_in_project = await role_factory(name=f"not-in-proj-{unique}")
-
-        # Register only one role in the project scope
-        async with db_engine.begin() as conn:
-            await conn.execute(
-                sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                    id=uuid.uuid4(),
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(group_fixture),
-                    entity_type=EntityType.ROLE,
-                    entity_id=str(in_project.role.id),
-                )
-            )
+        not_in_project = await role_factory(name=f"not-in-proj-{uuid.uuid4().hex[:8]}")
 
         result = await admin_v2_registry.rbac.project_search_roles(
             group_fixture,
             SearchRolesInput(),
         )
         role_ids = [r.id for r in result.items]
-        assert in_project.role.id in role_ids
+        assert role_registered_in_project in role_ids
         assert not_in_project.role.id not in role_ids
-
-        # Cleanup
-        async with db_engine.begin() as conn:
-            await conn.execute(
-                AssociationScopesEntitiesRow.__table__.delete().where(
-                    AssociationScopesEntitiesRow.__table__.c.entity_id == str(in_project.role.id),
-                )
-            )
 
     async def test_empty_project_returns_no_roles(
         self,
