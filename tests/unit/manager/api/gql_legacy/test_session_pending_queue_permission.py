@@ -19,30 +19,41 @@ def _make_info(role: UserRole) -> graphene.ResolveInfo:
 
 
 class TestSessionPendingQueuePermission:
-    async def test_regular_user_is_rejected(self) -> None:
-        info = _make_info(UserRole.USER)
-        with pytest.raises(GenericForbidden):
-            await Query.resolve_session_pending_queue(None, info, resource_group_id="default")
-
-    async def test_domain_admin_is_rejected(self) -> None:
-        info = _make_info(UserRole.ADMIN)
-        with pytest.raises(GenericForbidden):
-            await Query.resolve_session_pending_queue(None, info, resource_group_id="default")
-
-    async def test_superadmin_is_allowed(self) -> None:
-        info = _make_info(UserRole.SUPERADMIN)
-        info.context.valkey_schedule = AsyncMock()
-        info.context.valkey_schedule.get_pending_queue = AsyncMock(return_value=[])
-        info.context.db = MagicMock()
-        info.context.db.begin_readonly_session = MagicMock(
-            return_value=AsyncMock(
-                __aenter__=AsyncMock(
-                    return_value=MagicMock(
-                        scalars=AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[])))
-                    )
-                ),
-                __aexit__=AsyncMock(return_value=None),
+    @pytest.mark.parametrize(
+        ("role", "should_raise"),
+        [
+            (UserRole.USER, True),
+            (UserRole.ADMIN, True),
+            (UserRole.SUPERADMIN, False),
+        ],
+    )
+    async def test_only_superadmin_can_access(
+        self, role: UserRole, should_raise: bool
+    ) -> None:
+        info = _make_info(role)
+        if not should_raise:
+            info.context.valkey_schedule = AsyncMock()
+            info.context.valkey_schedule.get_pending_queue = AsyncMock(return_value=[])
+            info.context.db = MagicMock()
+            info.context.db.begin_readonly_session = MagicMock(
+                return_value=AsyncMock(
+                    __aenter__=AsyncMock(
+                        return_value=MagicMock(
+                            scalars=AsyncMock(
+                                return_value=MagicMock(all=MagicMock(return_value=[]))
+                            )
+                        )
+                    ),
+                    __aexit__=AsyncMock(return_value=None),
+                )
             )
-        )
-        result = await Query.resolve_session_pending_queue(None, info, resource_group_id="default")
-        assert result is not None
+        if should_raise:
+            with pytest.raises(GenericForbidden):
+                await Query.resolve_session_pending_queue(
+                    None, info, resource_group_id="default"
+                )
+        else:
+            result = await Query.resolve_session_pending_queue(
+                None, info, resource_group_id="default"
+            )
+            assert result is not None
