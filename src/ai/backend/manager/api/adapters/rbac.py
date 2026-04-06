@@ -798,7 +798,11 @@ class RBACAdapter(BaseAdapter):
         """Assign a role to a user."""
         action_result = await self._processors.permission_controller.assign_role.wait_for_complete(
             AssignRoleAction(
-                input=UserRoleAssignmentInput(user_id=input.user_id, role_id=input.role_id)
+                input=UserRoleAssignmentInput(
+                    user_id=input.user_id,
+                    role_id=input.role_id,
+                    project_id=input.project_id,
+                )
             )
         )
         data: UserRoleAssignmentData = action_result.data
@@ -833,7 +837,10 @@ class RBACAdapter(BaseAdapter):
         specs = [UserRoleCreatorSpec(user_id=uid, role_id=input.role_id) for uid in input.user_ids]
         action_result = (
             await self._processors.permission_controller.bulk_assign_role.wait_for_complete(
-                BulkAssignRoleAction(bulk_creator=BulkCreator(specs=specs))
+                BulkAssignRoleAction(
+                    bulk_creator=BulkCreator(specs=specs),
+                    project_id=input.project_id,
+                )
             )
         )
         result: BulkRoleAssignmentResultData = action_result.data

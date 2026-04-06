@@ -729,6 +729,47 @@ class GroupDBSource:
                 failures=failures,
             )
 
+    async def bind_user_to_project(self, user_id: UUID, project_id: UUID) -> None:
+        """Add a user to a project (business association + RBAC scope binding).
+
+        Skips if the user is already a member of the project.
+        """
+        async with self._db.begin_session() as session:
+            already_bound = await session.scalar(
+                sa.select(AssocGroupUserRow.user_id).where(
+                    AssocGroupUserRow.user_id == user_id,
+                    AssocGroupUserRow.group_id == project_id,
+                )
+            )
+            if already_bound is not None:
+                return
+
+            project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
+            pair = RBACScopeBindingPair(
+                spec=AssocGroupUserCreatorSpec(user_id=user_id, group_id=project_id),
+                entity_ref=RBACElementRef(RBACElementType.USER, str(user_id)),
+                scope_ref=project_scope_ref,
+            )
+            await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=[pair]))
+
+    async def unbind_user_from_project(self, user_id: UUID, project_id: UUID) -> None:
+        """Remove a user from a project (business association + RBAC scope binding)."""
+        async with self._db.begin_session() as session:
+            await session.execute(
+                sa.delete(AssocGroupUserRow).where(
+                    AssocGroupUserRow.user_id == user_id,
+                    AssocGroupUserRow.group_id == project_id,
+                )
+            )
+            await session.execute(
+                sa.delete(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(project_id),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(user_id),
+                )
+            )
+
     async def get_project(self, project_id: UUID) -> GroupData:
         """Get a single project by UUID.
 

@@ -131,6 +131,10 @@ class AssignRoleInput(BaseRequestModel):
 
     user_id: UUID = Field(description="User ID to assign the role to")
     role_id: UUID = Field(description="Role ID to assign")
+    project_id: UUID | None = Field(
+        default=None,
+        description="When provided, also add the user to this project",
+    )
 
 
 class RevokeRoleInput(BaseRequestModel):
@@ -145,6 +149,10 @@ class BulkAssignRoleInput(BaseRequestModel):
 
     role_id: UUID = Field(description="Role ID to assign")
     user_ids: list[UUID] = Field(description="List of user IDs to assign the role to")
+    project_id: UUID | None = Field(
+        default=None,
+        description="When provided, also add the users to this project",
+    )
 
 
 class BulkRevokeRoleInput(BaseRequestModel):

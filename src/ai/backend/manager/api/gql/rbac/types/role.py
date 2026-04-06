@@ -511,6 +511,7 @@ class UpdateRoleInput(PydanticInputMixin[UpdateRoleInputDTO]):
 class AssignRoleInput(PydanticInputMixin[AssignRoleInputDTO]):
     user_id: uuid.UUID
     role_id: uuid.UUID
+    project_id: uuid.UUID | None = strawberry.UNSET
 
 
 @gql_pydantic_input(
@@ -530,6 +531,7 @@ class RevokeRoleInput(PydanticInputMixin[RevokeRoleInputDTO]):
 class BulkAssignRoleInputGQL(PydanticInputMixin[BulkAssignRoleInputDTO]):
     role_id: uuid.UUID
     user_ids: list[uuid.UUID]
+    project_id: uuid.UUID | None = strawberry.UNSET
 
 
 @gql_pydantic_input(
