@@ -96,29 +96,6 @@ class TestMonitoringValkeyClient:
         # Verify ping uses monitor client
         await monitoring_client.ping()
 
-    async def test_client_not_connected_error(
-        self, redis_container: tuple[str, HostPortPairModel]
-    ) -> None:
-        """Test that ClientNotConnectedError is raised when accessing disconnected client"""
-        hostport_pair: HostPortPairModel = redis_container[1]
-        valkey_target = ValkeyTarget(addr=hostport_pair.address)
-        client = create_valkey_client(
-            valkey_target,
-            db_id=REDIS_STREAM_DB,
-            human_readable_name="test.not_connected",
-        )
-
-        # Should raise error when not connected
-        with pytest.raises(ClientNotConnectedError):
-            _ = client.raw_client
-
-        # Connect and verify it works
-        await client.connect()
-        try:
-            await client.ping()
-        finally:
-            await client.disconnect()
-
     async def test_monitor_task_lifecycle(self, monitoring_client: MonitoringValkeyClient) -> None:
         """Test that monitor task is created and cancelled properly"""
         # Monitor task should be running after connect

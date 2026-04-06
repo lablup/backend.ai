@@ -110,11 +110,6 @@ class ValkeySentinelTarget:
 
 
 class AbstractValkeyClient(ABC):
-    @property
-    @abstractmethod
-    def raw_client(self) -> GlideClient:
-        pass
-
     @abstractmethod
     async def connect(self) -> None:
         pass
@@ -174,12 +169,6 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         self._db_id = db_id
         self._human_readable_name = human_readable_name
         self._pubsub_channels = pubsub_channels
-
-    @property
-    def raw_client(self) -> GlideClient:
-        if self._valkey_client is None:
-            raise ClientNotConnectedError("ValkeyStandaloneClient is not connected")
-        return self._valkey_client
 
     async def connect(self) -> None:
         if self._valkey_client is not None:
@@ -249,7 +238,9 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
 
     @asynccontextmanager
     async def client(self) -> AsyncIterator[GlideClient]:
-        yield self.raw_client
+        if self._valkey_client is None:
+            raise ClientNotConnectedError("ValkeyStandaloneClient is not connected")
+        yield self._valkey_client
 
 
 class ValkeySentinelClient(AbstractValkeyClient):
@@ -293,12 +284,6 @@ class ValkeySentinelClient(AbstractValkeyClient):
         self._pubsub_channels = pubsub_channels
         self._valkey_client = None
         self._master_address = None
-
-    @property
-    def raw_client(self) -> GlideClient:
-        if self._valkey_client is None:
-            raise ClientNotConnectedError("ValkeySentinelClient is not connected")
-        return self._valkey_client
 
     async def connect(self) -> None:
         if self._valkey_client is not None:
@@ -395,7 +380,9 @@ class ValkeySentinelClient(AbstractValkeyClient):
 
     @asynccontextmanager
     async def client(self) -> AsyncIterator[GlideClient]:
-        yield self.raw_client
+        if self._valkey_client is None:
+            raise ClientNotConnectedError("ValkeySentinelClient is not connected")
+        yield self._valkey_client
 
 
 def _create_valkey_client_internal(
@@ -511,10 +498,6 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._operation_failure_count = 0
         self._closed = False
 
-    @property
-    def raw_client(self) -> GlideClient:
-        return self._operation_client.raw_client
-
     async def connect(self) -> None:
         await self._operation_client.connect()
         await self._monitor_client.connect()
@@ -555,7 +538,8 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         On successful operations, resets the failure counter.
         """
         try:
-            yield self._operation_client.raw_client
+            async with self._operation_client.client() as conn:
+                yield conn
         except _VALKEY_CONNECTION_ERRORS:
             self._operation_failure_count += 1
             log.warning(
