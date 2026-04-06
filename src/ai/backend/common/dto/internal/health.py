@@ -14,6 +14,21 @@ class HealthStatus(StrEnum):
     ERROR = "error"
 
 
+class SubComponentConnectivityStatus(BaseModel):
+    """
+    Connectivity status of a sub-component (e.g., operation or monitor client).
+
+    Used when a component has internal sub-components with independent health,
+    such as Valkey's operation and monitor clients.
+    """
+
+    is_healthy: bool = Field(description="Whether the sub-component is currently healthy")
+    last_checked_at: datetime = Field(description="Timestamp when the health check was performed")
+    error_message: str | None = Field(
+        default=None, description="Error message if the health check failed"
+    )
+
+
 class ComponentConnectivityStatus(BaseModel):
     """
     Connectivity status of a single component (for API response).
@@ -29,6 +44,10 @@ class ComponentConnectivityStatus(BaseModel):
     last_checked_at: datetime = Field(description="Timestamp when the health check was performed")
     error_message: str | None = Field(
         default=None, description="Error message if the health check failed"
+    )
+    sub_components: dict[str, SubComponentConnectivityStatus] | None = Field(
+        default=None,
+        description="Health status of internal sub-components (e.g., operation and monitor clients)",
     )
 
 

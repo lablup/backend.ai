@@ -11,6 +11,7 @@ from aiotools import cancel_and_wait
 from ai.backend.common.dto.internal.health import (
     ComponentConnectivityStatus,
     ConnectivityCheckResponse,
+    SubComponentConnectivityStatus,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -309,6 +310,16 @@ class HealthProbe:
 
             # Flatten component statuses from the result
             for component_id, status in reg.result.results.items():
+                sub_components_dto: dict[str, SubComponentConnectivityStatus] | None = None
+                if status.sub_components:
+                    sub_components_dto = {
+                        name: SubComponentConnectivityStatus(
+                            is_healthy=sub.is_healthy,
+                            last_checked_at=sub.last_checked_at,
+                            error_message=sub.error_message,
+                        )
+                        for name, sub in status.sub_components.items()
+                    }
                 components.append(
                     ComponentConnectivityStatus(
                         service_group=service_group,
@@ -316,6 +327,7 @@ class HealthProbe:
                         is_healthy=status.is_healthy,
                         last_checked_at=status.last_checked_at,
                         error_message=status.error_message,
+                        sub_components=sub_components_dto,
                     )
                 )
 
