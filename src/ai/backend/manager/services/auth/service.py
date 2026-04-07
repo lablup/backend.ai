@@ -280,31 +280,31 @@ class AuthService:
 
     def _enforce_max_concurrent_logins(
         self,
-        limit: int | None,
+        max_concurrent_logins: int | None,
         live_sessions: list[ActiveSessionInfo],
         force: bool,
     ) -> list[str] | None:
         """Apply the per-user ``max_concurrent_logins`` cap and return tokens to evict.
 
         Behavior:
-        - ``limit is None`` (unlimited or no policy): no cap, returns ``None``.
+        - ``max_concurrent_logins is None`` (unlimited or no policy): no cap, returns ``None``.
         - Below the cap: no eviction, returns ``None``.
         - At or over the cap with ``force=True``: returns the oldest session tokens
-          (``count - limit + 1`` of them) so the caller can invalidate them before
-          creating the new login session.
+          (``count - max_concurrent_logins + 1`` of them) so the caller can invalidate
+          them before creating the new login session.
         - At or over the cap with ``force=False``: raises ``TooManyConcurrentLoginSessions``.
 
         ``live_sessions`` must already be the authoritative active set (cross-checked
         against Valkey by the caller) and ordered oldest-first.
         """
-        if limit is None:
+        if max_concurrent_logins is None:
             return None
         count = len(live_sessions)
-        if count < limit:
+        if count < max_concurrent_logins:
             return None
         if not force:
             raise TooManyConcurrentLoginSessions()
-        sessions_to_invalidate = count - limit + 1
+        sessions_to_invalidate = count - max_concurrent_logins + 1
         return [s.session_token for s in live_sessions[:sessions_to_invalidate]]
 
     async def _create_login_session(
@@ -329,13 +329,13 @@ class AuthService:
             user_resource_policy = await self._user_resource_policy_repository.get_by_name(
                 user.resource_policy
             )
-            limit: int | None = user_resource_policy.max_concurrent_logins
+            max_concurrent_logins: int | None = user_resource_policy.max_concurrent_logins
         except UserResourcePolicyNotFound:
             # If no matching resource policy is found, skip login-session limit enforcement.
-            limit = None
+            max_concurrent_logins = None
 
         tokens_to_invalidate = self._enforce_max_concurrent_logins(
-            limit=limit,
+            max_concurrent_logins=max_concurrent_logins,
             live_sessions=live_sessions,
             force=action.force,
         )
