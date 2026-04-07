@@ -175,7 +175,6 @@ class UpdateVFSStoragePayload:
         description="Payload for deleting VFS storage.",
     ),
     model=DeleteVFSStoragePayloadDTO,
-    fields=["id"],
     name="DeleteVFSStoragePayload",
 )
 class DeleteVFSStoragePayload(PydanticOutputMixin[DeleteVFSStoragePayloadDTO]):
