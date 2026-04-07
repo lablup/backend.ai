@@ -65,7 +65,7 @@ class UserInfoContext:
 
 @dataclass(frozen=True)
 class SessionOwnerContext:
-    """Resolved owner context for session creation, returned by query_userinfo()."""
+    """Resolved owner context for session creation."""
 
     owner_uuid: UUID
     group_id: UUID

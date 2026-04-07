@@ -137,9 +137,7 @@ async def query_userinfo(
         if row is None:
             raise ValueError("Unknown owner access key")
         if row.role is None:
-            raise InternalServerError(
-                f"Owner user has no role assigned (access_key={owner_access_key})"
-            )
+            raise InternalServerError(f"Owner user has no role assigned (owner_uuid={row.user})")
         owner_domain = row.domain_name
         owner_uuid = row.user
         actual_owner_role: UserRole = row.role
@@ -291,9 +289,7 @@ async def query_userinfo_from_session(
         if row is None:
             raise ValueError("Unknown owner access key")
         if row.role is None:
-            raise InternalServerError(
-                f"Owner user has no role assigned (access_key={owner_access_key})"
-            )
+            raise InternalServerError(f"Owner user has no role assigned (owner_uuid={row.user})")
         owner_domain = row.domain_name
         owner_uuid = row.user
         actual_owner_role: UserRole = row.role

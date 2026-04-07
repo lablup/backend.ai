@@ -5,6 +5,7 @@ Tests the service layer with mocked repositories.
 
 from __future__ import annotations
 
+import inspect
 import uuid
 from datetime import datetime
 from typing import Any
@@ -41,6 +42,7 @@ from ai.backend.manager.errors.kernel import (
 from ai.backend.manager.errors.resource import AppNotFound, TaskTemplateNotFound
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusBatchAction,
@@ -1068,17 +1070,18 @@ class TestCreateFromParams:
 
         mock_agent_registry.create_session.assert_called_once()
         call_args = mock_agent_registry.create_session.call_args
-        # UserScope is the 3rd positional argument
-        passed_user_scope: UserScope = call_args[0][2]
+        bound = inspect.signature(AgentRegistry.create_session).bind(
+            None, *call_args.args, **call_args.kwargs
+        )
+        passed_user_scope: UserScope = bound.arguments["user_scope"]
         assert passed_user_scope.user_uuid == delegated_owner_id, (
             "UserScope.user_uuid must be the owner's UUID, not the requester's"
         )
         assert passed_user_scope.user_uuid != sample_user_id
-        assert passed_user_scope.user_role == str(UserRole.USER), (
+        assert passed_user_scope.user_role == UserRole.USER.value, (
             "UserScope.user_role must be the owner's role, not the requester's"
         )
-        # The 4th positional argument is owner_access_key — must be the owner's
-        assert call_args[0][3] == delegated_owner_access_key
+        assert bound.arguments["owner_access_key"] == delegated_owner_access_key
 
 
 # ==================== CreateFromTemplate Tests ====================
