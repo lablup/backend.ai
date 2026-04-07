@@ -304,8 +304,8 @@ class AuthService:
             return None
         if not force:
             raise TooManyConcurrentLoginSessions()
-        sessions_to_remove = count - limit + 1
-        return [s.session_token for s in live_sessions[:sessions_to_remove]]
+        sessions_to_invalidate = count - limit + 1
+        return [s.session_token for s in live_sessions[:sessions_to_invalidate]]
 
     async def _create_login_session(
         self,
