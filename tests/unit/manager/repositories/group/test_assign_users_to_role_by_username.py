@@ -9,6 +9,7 @@ import pytest
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.user.types import ResolveUsersByUsernameResult
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -34,6 +35,8 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.repositories.base import NoPagination
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.testutils.db import with_tables
 
@@ -205,6 +208,18 @@ class TestResolveUsersByUsername:
     ) -> GroupDBSource:
         return GroupDBSource(db=db_with_cleanup)
 
+    # --- Helpers ---
+
+    async def _resolve(
+        self, db_source: GroupDBSource, names: list[str]
+    ) -> ResolveUsersByUsernameResult:
+        unique = list(set(names))
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[lambda: UserRow.email.in_(unique) | UserRow.username.in_(unique)],
+        )
+        return await db_source.resolve_users_by_username(names, querier)
+
     # --- Test cases ---
 
     async def test_resolve_by_email(
@@ -214,10 +229,10 @@ class TestResolveUsersByUsername:
     ) -> None:
         """Resolve a user by email address."""
         uid, email, _ = user_alice
-        name_to_uid, failed = await group_db_source.resolve_users_by_username([email])
+        result = await self._resolve(group_db_source, [email])
 
-        assert name_to_uid == {email: uid}
-        assert failed == []
+        assert result.name_to_uid == {email: uid}
+        assert result.failed_names == []
 
     async def test_resolve_by_username(
         self,
@@ -226,10 +241,10 @@ class TestResolveUsersByUsername:
     ) -> None:
         """Resolve a user by username."""
         uid, _, username = user_alice
-        name_to_uid, failed = await group_db_source.resolve_users_by_username([username])
+        result = await self._resolve(group_db_source, [username])
 
-        assert name_to_uid == {username: uid}
-        assert failed == []
+        assert result.name_to_uid == {username: uid}
+        assert result.failed_names == []
 
     async def test_resolve_mixed_email_and_username(
         self,
@@ -240,22 +255,20 @@ class TestResolveUsersByUsername:
         """Resolve users using a mix of emails and usernames."""
         uid1, email1, _ = user_alice
         uid2, _, username2 = user_bob
-        name_to_uid, failed = await group_db_source.resolve_users_by_username([email1, username2])
+        result = await self._resolve(group_db_source, [email1, username2])
 
-        assert name_to_uid == {email1: uid1, username2: uid2}
-        assert failed == []
+        assert result.name_to_uid == {email1: uid1, username2: uid2}
+        assert result.failed_names == []
 
     async def test_nonexistent_name_in_failed(
         self,
         group_db_source: GroupDBSource,
     ) -> None:
         """Non-existent email/username appears in failed_names."""
-        name_to_uid, failed = await group_db_source.resolve_users_by_username([
-            "nobody@example.com"
-        ])
+        result = await self._resolve(group_db_source, ["nobody@example.com"])
 
-        assert name_to_uid == {}
-        assert failed == ["nobody@example.com"]
+        assert result.name_to_uid == {}
+        assert result.failed_names == ["nobody@example.com"]
 
     async def test_inactive_user_resolves_successfully(
         self,
@@ -275,10 +288,10 @@ class TestResolveUsersByUsername:
             email="dave@example.com",
             status=UserStatus.INACTIVE,
         )
-        name_to_uid, failed = await group_db_source.resolve_users_by_username([email])
+        result = await self._resolve(group_db_source, [email])
 
-        assert name_to_uid == {email: uid}
-        assert failed == []
+        assert result.name_to_uid == {email: uid}
+        assert result.failed_names == []
 
     async def test_mixed_valid_and_invalid_names(
         self,
@@ -287,23 +300,26 @@ class TestResolveUsersByUsername:
     ) -> None:
         """Valid names resolve; invalid names appear in failed_names."""
         uid, email, _ = user_alice
-        name_to_uid, failed = await group_db_source.resolve_users_by_username([
-            email,
-            "ghost@nowhere.com",
-        ])
+        result = await self._resolve(
+            group_db_source,
+            [
+                email,
+                "ghost@nowhere.com",
+            ],
+        )
 
-        assert name_to_uid == {email: uid}
-        assert failed == ["ghost@nowhere.com"]
+        assert result.name_to_uid == {email: uid}
+        assert result.failed_names == ["ghost@nowhere.com"]
 
     async def test_empty_names_returns_empty(
         self,
         group_db_source: GroupDBSource,
     ) -> None:
         """Empty names list returns ({}, [])."""
-        name_to_uid, failed = await group_db_source.resolve_users_by_username([])
+        result = await self._resolve(group_db_source, [])
 
-        assert name_to_uid == {}
-        assert failed == []
+        assert result.name_to_uid == {}
+        assert result.failed_names == []
 
     async def test_duplicate_names_deduplicated(
         self,
@@ -312,10 +328,10 @@ class TestResolveUsersByUsername:
     ) -> None:
         """Duplicate names in input resolve to a single entry."""
         uid, email, _ = user_alice
-        name_to_uid, failed = await group_db_source.resolve_users_by_username([email, email])
+        result = await self._resolve(group_db_source, [email, email])
 
-        assert name_to_uid == {email: uid}
-        assert failed == []
+        assert result.name_to_uid == {email: uid}
+        assert result.failed_names == []
 
     async def test_collision_email_vs_username_treated_as_failed(
         self,
@@ -344,12 +360,10 @@ class TestResolveUsersByUsername:
             email="user_b@example.com",
         )
 
-        name_to_uid, failed = await group_db_source.resolve_users_by_username([
-            "shared@example.com"
-        ])
+        result = await self._resolve(group_db_source, ["shared@example.com"])
 
-        assert name_to_uid == {}
-        assert failed == ["shared@example.com"]
+        assert result.name_to_uid == {}
+        assert result.failed_names == ["shared@example.com"]
 
     async def test_same_user_email_and_username_both_match(
         self,
@@ -358,7 +372,7 @@ class TestResolveUsersByUsername:
     ) -> None:
         """When email and username both match the SAME user, both resolve correctly."""
         uid, email, username = user_alice
-        name_to_uid, failed = await group_db_source.resolve_users_by_username([email, username])
+        result = await self._resolve(group_db_source, [email, username])
 
-        assert name_to_uid == {email: uid, username: uid}
-        assert failed == []
+        assert result.name_to_uid == {email: uid, username: uid}
+        assert result.failed_names == []

@@ -237,11 +237,11 @@ class PermissionControllerService:
         to prevent user enumeration.
         """
         # 1. Resolve names → user UUIDs (system-wide)
-        name_to_uid, resolve_failed = await self._group_repository.resolve_users_by_username(
-            action.names
+        resolve_result = await self._group_repository.resolve_users_by_username(
+            action.names, action.querier
         )
         # 2. Assign resolved users (domain filter + dedup handled internally)
-        user_ids = list(dict.fromkeys(name_to_uid.values()))
+        user_ids = list(dict.fromkeys(resolve_result.name_to_uid.values()))
         assigned_users = []
         if user_ids:
             assigned_users = await self._group_repository.assign_users_to_project(
@@ -249,8 +249,8 @@ class PermissionControllerService:
             )
         # 3. Merge failures: resolve failures + names whose UUIDs weren't assigned
         assigned_uuids = {u.uuid for u in assigned_users}
-        all_failed = list(resolve_failed)
-        for name, uid in name_to_uid.items():
+        all_failed = list(resolve_result.failed_names)
+        for name, uid in resolve_result.name_to_uid.items():
             if uid not in assigned_uuids:
                 all_failed.append(name)
         return AssignUsersToRoleByUsernameActionResult(

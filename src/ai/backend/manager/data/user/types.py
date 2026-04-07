@@ -143,6 +143,14 @@ class UserData:
 
 
 @dataclass
+class ResolveUsersByUsernameResult:
+    """Result of resolving email/username to user UUIDs."""
+
+    name_to_uid: dict[str, UUID]
+    failed_names: list[str]
+
+
+@dataclass
 class UserCreateResultData:
     user: UserData
     keypair: KeyPairData

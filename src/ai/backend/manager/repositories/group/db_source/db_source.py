@@ -24,7 +24,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupData, UnassignUserFailure, UnassignUsersResult
 from ai.backend.manager.data.permission.types import EntityType, RBACElementRef, ScopeType
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.user.types import ResolveUsersByUsernameResult, UserData
 from ai.backend.manager.errors.resource import (
     ProjectHasActiveEndpointsError,
     ProjectHasActiveKernelsError,
@@ -663,48 +663,41 @@ class GroupDBSource:
             return [row.to_data() for row in new_user_rows]
 
     async def resolve_users_by_username(
-        self, names: list[str]
-    ) -> tuple[dict[str, UUID], list[str]]:
+        self, names: list[str], querier: BatchQuerier
+    ) -> ResolveUsersByUsernameResult:
         """Resolve email/username to user UUIDs.
 
-        Matches ``UserRow.email`` or ``UserRow.username`` against the given
-        names. If a single name matches multiple distinct users (e.g. one
-        user's email equals another user's username), the name is treated
-        as ambiguous and returned in ``failed_names``.
-
-        Returns (name_to_user_id mapping, failed_names).
+        Uses the given ``querier`` to fetch matching users. If a single name
+        matches multiple distinct users (e.g. one user's email equals another
+        user's username), the name is treated as ambiguous and returned in
+        ``failed_names``.
         """
         if not names:
-            return ({}, [])
+            return ResolveUsersByUsernameResult(name_to_uid={}, failed_names=[])
 
         async with self._db.begin_readonly_session() as session:
             unique_names = set(names)
-            rows = (
-                await session.scalars(
-                    sa.select(UserRow).where(
-                        UserRow.email.in_(unique_names) | UserRow.username.in_(unique_names)
-                    )
-                )
-            ).all()
+            result = await execute_batch_querier(session, sa.select(UserRow), querier)
 
             # Build per-name → user mappings.
             # A name that resolves to multiple distinct users is ambiguous.
             name_to_user: dict[str, UUID] = {}
             ambiguous_names: set[str] = set()
-            for row in rows:
-                for name in (row.email, row.username):
+            for row in result.rows:
+                user_row = row._mapping[UserRow]
+                for name in (user_row.email, user_row.username):
                     if name is None or name not in unique_names:
                         continue
                     if name in ambiguous_names:
                         continue
-                    if name in name_to_user and name_to_user[name] != row.uuid:
+                    if name in name_to_user and name_to_user[name] != user_row.uuid:
                         ambiguous_names.add(name)
                         del name_to_user[name]
                     else:
-                        name_to_user[name] = row.uuid
+                        name_to_user[name] = user_row.uuid
 
             failed_names = [n for n in names if n not in name_to_user]
-            return (name_to_user, failed_names)
+            return ResolveUsersByUsernameResult(name_to_uid=name_to_user, failed_names=failed_names)
 
     async def unassign_users_from_project(
         self, unbinder: UserProjectEntityUnbinder

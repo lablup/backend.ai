@@ -16,7 +16,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupData, UnassignUsersResult
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.user.types import ResolveUsersByUsernameResult, UserData
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -134,13 +134,10 @@ class GroupRepository:
 
     @group_repository_resilience.apply()
     async def resolve_users_by_username(
-        self, names: list[str]
-    ) -> tuple[dict[str, UUID], list[str]]:
-        """Resolve email/username to user UUIDs.
-
-        Returns (name_to_user_id mapping, failed_names).
-        """
-        return await self._db_source.resolve_users_by_username(names)
+        self, names: list[str], querier: BatchQuerier
+    ) -> ResolveUsersByUsernameResult:
+        """Resolve email/username to user UUIDs."""
+        return await self._db_source.resolve_users_by_username(names, querier)
 
     @group_repository_resilience.apply()
     async def unassign_users_from_project(

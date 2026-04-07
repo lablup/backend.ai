@@ -157,6 +157,7 @@ from ai.backend.manager.models.rbac_models.orders import (
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
@@ -908,9 +909,17 @@ class RBACAdapter(BaseAdapter):
         self, input: AssignUsersToRoleByUsernameInputDTO
     ) -> AssignUsersToRoleByUsernamePayload:
         """Assign a role to users identified by email or username, with project binding."""
+        unique_names = list(set(input.names))
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[
+                lambda: UserRow.email.in_(unique_names) | UserRow.username.in_(unique_names)
+            ],
+        )
         result = await self._processors.permission_controller.assign_users_to_role_by_username.wait_for_complete(
             AssignUsersToRoleByUsernameAction(
                 project_id=input.project_id,
+                querier=querier,
                 names=input.names,
                 role_id=input.role_id,
             )
