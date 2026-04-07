@@ -675,7 +675,7 @@ class GroupDBSource:
         if not names:
             return ResolveUsersByUsernameResult(name_to_uid={}, failed_names=[])
 
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_session_read_committed() as session:
             unique_names = set(names)
             result = await execute_batch_querier(session, sa.select(UserRow), querier)
 
