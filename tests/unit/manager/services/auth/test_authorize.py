@@ -12,6 +12,7 @@ from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookRes
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -20,6 +21,9 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     LoginSessionCreationResult,
 )
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
 )
@@ -58,17 +62,34 @@ def mock_valkey_session_client() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_user_resource_policy_repository() -> AsyncMock:
+    mock_repo = AsyncMock(spec=UserResourcePolicyRepository)
+    # Default: policy with no concurrent login limit (unlimited)
+    mock_repo.get_by_name.return_value = UserResourcePolicyData(
+        name="default",
+        max_vfolder_count=10,
+        max_quota_scope_size=0,
+        max_session_count_per_model_session=5,
+        max_customized_image_count=3,
+        max_concurrent_logins=None,
+    )
+    return mock_repo
+
+
+@pytest.fixture
 def auth_service(
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
     mock_config_provider: MagicMock,
     mock_valkey_session_client: AsyncMock,
+    mock_user_resource_policy_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
         valkey_session_client=mock_valkey_session_client,
+        user_resource_policy_repository=mock_user_resource_policy_repository,
     )
 
 
@@ -79,6 +100,7 @@ def _make_mock_user(
     role: UserRole = UserRole.USER,
     status: UserStatus = UserStatus.ACTIVE,
     password_changed_at: datetime | None = None,
+    resource_policy: str = "default",
 ) -> MagicMock:
     """Create a mock user RowMapping with attribute and item access."""
     mock_user = MagicMock()
@@ -87,6 +109,7 @@ def _make_mock_user(
     mock_user.role = role
     mock_user.status = status
     mock_user.password_changed_at = password_changed_at
+    mock_user.resource_policy = resource_policy
     mock_user.__getitem__ = lambda self, key: getattr(self, key)
     return mock_user
 

@@ -16,7 +16,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionTokenData,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -287,15 +287,19 @@ class AuthService:
         auth_config: AuthConfig,
     ) -> AuthorizeActionResult:
         """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed."""
-        user_resource_policy = await self._user_resource_policy_repository.get_by_name(
-            user.resource_policy
-        )
-        if user_resource_policy.max_concurrent_logins is not None:
-            active_login_count = await self._auth_repository.count_active_login_sessions(
-                user_id=user.uuid
+        try:
+            user_resource_policy = await self._user_resource_policy_repository.get_by_name(
+                user.resource_policy
             )
-            if active_login_count >= user_resource_policy.max_concurrent_logins:
-                raise TooManyConcurrentLoginSessions()
+            if user_resource_policy.max_concurrent_logins is not None:
+                active_login_count = await self._auth_repository.count_active_login_sessions(
+                    user_id=user.uuid
+                )
+                if active_login_count >= user_resource_policy.max_concurrent_logins:
+                    raise TooManyConcurrentLoginSessions()
+        except UserResourcePolicyNotFound:
+            # If no matching resource policy is found, skip login-session limit enforcement.
+            pass
 
         max_concurrent_sessions = keypair_row.resource_policy_row.max_concurrent_sessions
         tokens_to_invalidate: list[str] | None = None
