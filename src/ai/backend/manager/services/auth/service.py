@@ -44,7 +44,7 @@ from ai.backend.manager.models.keypair import (
     generate_ssh_keypair,
     validate_ssh_keypair,
 )
-from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginClientType
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import (
     INACTIVE_USER_STATUSES,
     UserRole,
@@ -215,7 +215,7 @@ class AuthService:
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
-        client_type = LoginClientType(action.client_type)
+        client_type = action.client_type
         if hook_result.result:
             user = hook_result.result
             active_sessions = await self._auth_repository.get_active_session_tokens(
@@ -335,7 +335,7 @@ class AuthService:
         ``live_sessions`` is already the authoritative active set (cross-checked against
         Valkey by the caller), so no additional repository count query is needed.
         """
-        client_type = LoginClientType(action.client_type)
+        client_type = action.client_type
         try:
             user_resource_policy = await self._user_resource_policy_repository.get_by_name(
                 user.resource_policy

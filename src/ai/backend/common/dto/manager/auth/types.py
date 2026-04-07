@@ -12,6 +12,7 @@ from pydantic import BaseModel
 __all__ = (
     "AuthTokenType",
     "AuthResponseType",
+    "LoginClientType",
     "TwoFactorType",
     "AuthResponse",
     "AuthSuccessResponse",
@@ -30,6 +31,13 @@ class AuthResponseType(StrEnum):
     SUCCESS = "success"
     REQUIRE_TWO_FACTOR_REGISTRATION = "REQUIRE_TWO_FACTOR_REGISTRATION"
     REQUIRE_TWO_FACTOR_AUTH = "REQUIRE_TWO_FACTOR_AUTH"
+
+
+class LoginClientType(StrEnum):
+    CORE = "core"
+    WEBUI = "webui"
+    FASTTRACK = "fasttrack"
+    DEFAULT = "default"
 
 
 class TwoFactorType(StrEnum):

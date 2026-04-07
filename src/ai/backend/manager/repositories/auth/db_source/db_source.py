@@ -546,20 +546,25 @@ class AuthDBSource:
     async def fetch_active_session_tokens(
         self,
         user_id: UUID,
-        client_type: LoginClientType = LoginClientType.DEFAULT,
+        client_type: LoginClientType | None = None,
     ) -> list[ActiveSessionInfo]:
-        """Fetch active session tokens for a user and client_type, ordered by created_at ASC (oldest first)."""
+        """Fetch active session tokens for a user, ordered by created_at ASC (oldest first).
+
+        If ``client_type`` is None, all client types are returned; otherwise results are
+        filtered to the given client type.
+        """
         async with self._db.begin_readonly_session() as db_session:
+            where_clause = (LoginSessionRow.user_id == user_id) & (
+                LoginSessionRow.status == LoginSessionStatus.ACTIVE
+            )
+            if client_type is not None:
+                where_clause = where_clause & (LoginSessionRow.client_type == client_type)
             query = (
                 sa.select(
                     LoginSessionRow.session_token,
                     LoginSessionRow.created_at,
                 )
-                .where(
-                    (LoginSessionRow.user_id == user_id)
-                    & (LoginSessionRow.client_type == client_type)
-                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
-                )
+                .where(where_clause)
                 .order_by(LoginSessionRow.created_at.asc())
             )
             result = await db_session.execute(query)

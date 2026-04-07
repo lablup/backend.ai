@@ -2,18 +2,19 @@ from __future__ import annotations
 
 import enum
 
+from ai.backend.common.dto.manager.auth.types import LoginClientType
+
+__all__ = (
+    "LoginAttemptResult",
+    "LoginClientType",
+    "LoginSessionStatus",
+)
+
 
 class LoginSessionStatus(enum.StrEnum):
     ACTIVE = "active"
     INVALIDATED = "invalidated"
     REVOKED = "revoked"
-
-
-class LoginClientType(enum.StrEnum):
-    CORE = "core"
-    WEBUI = "webui"
-    FASTTRACK = "fasttrack"
-    DEFAULT = "default"
 
 
 class LoginAttemptResult(enum.StrEnum):

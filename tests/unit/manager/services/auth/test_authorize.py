@@ -6,7 +6,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.dto.manager.auth.types import AuthTokenType
+from ai.backend.common.dto.manager.auth.types import AuthTokenType, LoginClientType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -532,7 +532,7 @@ async def test_create_login_session_passes_client_type_without_enforcement_knobs
             request=MagicMock(),
             stoken=None,
             otp=None,
-            client_type="webui",
+            client_type=LoginClientType.WEBUI,
         ),
         user=_make_mock_user(),
         keypair_row=_make_mock_keypair_row(),

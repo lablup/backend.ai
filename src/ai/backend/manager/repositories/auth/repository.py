@@ -155,7 +155,7 @@ class AuthRepository:
     async def get_active_session_tokens(
         self,
         user_id: UUID,
-        client_type: LoginClientType = LoginClientType.DEFAULT,
+        client_type: LoginClientType | None = None,
     ) -> list[ActiveSessionInfo]:
         return await self._db_source.fetch_active_session_tokens(user_id, client_type=client_type)
 

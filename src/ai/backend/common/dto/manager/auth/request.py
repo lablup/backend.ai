@@ -11,7 +11,7 @@ from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 
-from .types import AuthTokenType
+from .types import AuthTokenType, LoginClientType
 
 __all__ = (
     "AuthorizeRequest",
@@ -55,8 +55,8 @@ class AuthorizeRequest(BaseRequestModel):
         default=False,
         description="If true, invalidate existing active sessions and proceed with login",
     )
-    client_type: str = Field(
-        default="default",
+    client_type: LoginClientType = Field(
+        default=LoginClientType.DEFAULT,
         description="Client type identifier (e.g., 'core', 'webui', 'fasttrack'). "
         "Concurrent session limits are enforced per client type.",
     )
