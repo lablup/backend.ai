@@ -197,7 +197,6 @@ class UpdateHuggingFaceRegistryPayload(PydanticOutputMixin[UpdateHuggingFaceRegi
         description="Payload for deleting a HuggingFace registry.",
     ),
     model=DeleteHuggingFaceRegistryPayloadDTO,
-    fields=["id"],
 )
 class DeleteHuggingFaceRegistryPayload(PydanticOutputMixin[DeleteHuggingFaceRegistryPayloadDTO]):
     id: ID
