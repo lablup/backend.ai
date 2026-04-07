@@ -663,49 +663,31 @@ class GroupDBSource:
             return [row.to_data() for row in new_user_rows]
 
     async def resolve_users_by_username(
-        self, project_id: UUID, names: list[str]
-    ) -> tuple[list[UUID], list[str]]:
-        """Resolve email/username to user UUIDs within the project's domain.
+        self, names: list[str]
+    ) -> tuple[dict[str, UUID], list[str]]:
+        """Resolve email/username to user UUIDs.
 
         Matches ``UserRow.email`` or ``UserRow.username`` against the given
-        names, filtered to the same domain as the project and not already
-        assigned. Email takes precedence over username when both match.
-        If a single name matches multiple users (e.g. one user's email equals
-        another user's username), the name is treated as failed to avoid
-        ambiguous assignment.
+        names. If a single name matches multiple distinct users (e.g. one
+        user's email equals another user's username), the name is treated
+        as ambiguous and returned in ``failed_names``.
 
-        Unresolvable names (not found, wrong domain, already assigned, or
-        ambiguous) are returned in ``failed_names`` without distinguishing
-        the reason, to prevent user enumeration.
-
-        Returns (resolved_user_ids, failed_names).
+        Returns (name_to_user_id mapping, failed_names).
         """
         if not names:
-            return ([], [])
+            return ({}, [])
 
         async with self._db.begin_readonly_session() as session:
-            project_domain_subq = (
-                sa.select(GroupRow.domain_name).where(GroupRow.id == project_id).scalar_subquery()
-            )
-
             unique_names = set(names)
             rows = (
                 await session.scalars(
-                    sa.select(UserRow)
-                    .outerjoin(
-                        AssocGroupUserRow,
-                        (UserRow.uuid == AssocGroupUserRow.user_id)
-                        & (AssocGroupUserRow.group_id == project_id),
-                    )
-                    .where(
-                        (UserRow.email.in_(unique_names) | UserRow.username.in_(unique_names))
-                        & (UserRow.domain_name == project_domain_subq)
-                        & AssocGroupUserRow.user_id.is_(None)
+                    sa.select(UserRow).where(
+                        UserRow.email.in_(unique_names) | UserRow.username.in_(unique_names)
                     )
                 )
             ).all()
 
-            # Build per-name → user mappings with email precedence.
+            # Build per-name → user mappings.
             # A name that resolves to multiple distinct users is ambiguous.
             name_to_user: dict[str, UUID] = {}
             ambiguous_names: set[str] = set()
@@ -721,11 +703,8 @@ class GroupDBSource:
                     else:
                         name_to_user[name] = row.uuid
 
-            # Deduplicate: multiple input names may resolve to the same user
-            resolved_ids = list(dict.fromkeys(name_to_user.values()))
-            resolved_names = set(name_to_user.keys())
-            failed_names = [n for n in names if n not in resolved_names]
-            return (resolved_ids, failed_names)
+            failed_names = [n for n in names if n not in name_to_user]
+            return (name_to_user, failed_names)
 
     async def unassign_users_from_project(
         self, unbinder: UserProjectEntityUnbinder

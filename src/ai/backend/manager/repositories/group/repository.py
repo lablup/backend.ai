@@ -134,13 +134,13 @@ class GroupRepository:
 
     @group_repository_resilience.apply()
     async def resolve_users_by_username(
-        self, project_id: UUID, names: list[str]
-    ) -> tuple[list[UUID], list[str]]:
-        """Resolve email/username to user UUIDs within the project's domain.
+        self, names: list[str]
+    ) -> tuple[dict[str, UUID], list[str]]:
+        """Resolve email/username to user UUIDs.
 
-        Returns (resolved_user_ids, failed_names).
+        Returns (name_to_user_id mapping, failed_names).
         """
-        return await self._db_source.resolve_users_by_username(project_id, names)
+        return await self._db_source.resolve_users_by_username(names)
 
     @group_repository_resilience.apply()
     async def unassign_users_from_project(

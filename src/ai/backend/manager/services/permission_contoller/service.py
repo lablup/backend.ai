@@ -230,19 +230,33 @@ class PermissionControllerService:
     async def assign_users_to_role_by_username(
         self, action: AssignUsersToRoleByUsernameAction
     ) -> AssignUsersToRoleByUsernameActionResult:
-        """Resolve users by email/username and assign a role with project binding."""
-        user_ids, failed_names = await self._group_repository.resolve_users_by_username(
-            action.project_id, action.names
+        """Resolve users by email/username and assign a role with project binding.
+
+        Combines resolve failures (not found, ambiguous) and assign failures
+        (wrong domain, already assigned) into a single ``failed_names`` list
+        to prevent user enumeration.
+        """
+        # 1. Resolve names → user UUIDs (system-wide)
+        name_to_uid, resolve_failed = await self._group_repository.resolve_users_by_username(
+            action.names
         )
+        # 2. Assign resolved users (domain filter + dedup handled internally)
+        user_ids = list(dict.fromkeys(name_to_uid.values()))
         assigned_users = []
         if user_ids:
             assigned_users = await self._group_repository.assign_users_to_project(
                 action.project_id, user_ids, action.role_id
             )
+        # 3. Merge failures: resolve failures + names whose UUIDs weren't assigned
+        assigned_uuids = {u.uuid for u in assigned_users}
+        all_failed = list(resolve_failed)
+        for name, uid in name_to_uid.items():
+            if uid not in assigned_uuids:
+                all_failed.append(name)
         return AssignUsersToRoleByUsernameActionResult(
             project_id=action.project_id,
             assigned_count=len(assigned_users),
-            failed_names=failed_names,
+            failed_names=all_failed,
         )
 
     async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
