@@ -110,12 +110,22 @@ def terminate(session_ids: tuple[str, ...], forced: bool) -> None:
 @click.argument("session_id", type=str)
 @click.argument("service", type=str)
 @click.option("--port", type=int, default=None, help="Specific container port.")
-def start_service(session_id: str, service: str, port: int | None) -> None:
+@click.option(
+    "--owner-id",
+    type=str,
+    default=None,
+    help="Delegated owner user UUID. Defaults to the caller when omitted.",
+)
+def start_service(session_id: str, service: str, port: int | None, owner_id: str | None) -> None:
     """Start a service (e.g., jupyter, vscode) in a session."""
 
     from ai.backend.common.dto.manager.v2.session.request import StartSessionServiceInput
 
-    body = StartSessionServiceInput(service=service, port=port)
+    body = StartSessionServiceInput(
+        service=service,
+        port=port,
+        owner_id=UUID(owner_id) if owner_id else None,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -131,12 +141,21 @@ def start_service(session_id: str, service: str, port: int | None) -> None:
 @session.command(name="shutdown-service")
 @click.argument("session_id", type=str)
 @click.argument("service", type=str)
-def shutdown_service(session_id: str, service: str) -> None:
+@click.option(
+    "--owner-id",
+    type=str,
+    default=None,
+    help="Delegated owner user UUID. Defaults to the caller when omitted.",
+)
+def shutdown_service(session_id: str, service: str, owner_id: str | None) -> None:
     """Shut down a service in a session."""
 
     from ai.backend.common.dto.manager.v2.session.request import ShutdownSessionServiceInput
 
-    body = ShutdownSessionServiceInput(service=service)
+    body = ShutdownSessionServiceInput(
+        service=service,
+        owner_id=UUID(owner_id) if owner_id else None,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -236,12 +255,18 @@ def logs(session_id: str, kernel_id: str | None, owner_id: str | None) -> None:
 @click.argument("session_id", type=str)
 @click.option("--name", type=str, default=None, help="New session name.")
 @click.option("--tag", type=str, default=None, help="Updated tag.")
-def update(session_id: str, name: str | None, tag: str | None) -> None:
+@click.option(
+    "--owner-id",
+    type=str,
+    default=None,
+    help="Delegated owner user UUID. Defaults to the caller when omitted.",
+)
+def update(session_id: str, name: str | None, tag: str | None, owner_id: str | None) -> None:
     """Update a session."""
 
     from ai.backend.common.dto.manager.v2.session.request import UpdateSessionInput
 
-    body = UpdateSessionInput(name=name, tag=tag)
+    body = UpdateSessionInput(name=name, tag=tag, owner_id=UUID(owner_id) if owner_id else None)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
