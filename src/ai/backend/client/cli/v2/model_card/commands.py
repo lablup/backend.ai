@@ -131,21 +131,59 @@ def get(card_id: uuid.UUID) -> None:
 @click.option("--revision-preset-id", required=True, type=click.UUID, help="Revision preset UUID.")
 @click.option("--resource-group", required=True, type=str, help="Resource group name.")
 @click.option("--replicas", default=1, type=int, help="Number of replicas.")
+@click.option(
+    "--open-to-public/--no-open-to-public",
+    "open_to_public",
+    default=None,
+    help="Override open_to_public. Defaults to the preset value, then False.",
+)
+@click.option(
+    "--replica-count",
+    default=None,
+    type=int,
+    help="Override replica_count. Defaults to the preset value, then the --replicas value.",
+)
+@click.option(
+    "--revision-history-limit",
+    default=None,
+    type=int,
+    help="Override revision_history_limit. Defaults to the preset value, then 10.",
+)
+@click.option(
+    "--strategy",
+    default=None,
+    type=click.Choice(["ROLLING", "BLUE_GREEN"], case_sensitive=False),
+    help="Override deployment strategy type (ROLLING or BLUE_GREEN).",
+)
 def deploy(
     card_id: uuid.UUID,
     project_id: uuid.UUID,
     revision_preset_id: uuid.UUID,
     resource_group: str,
     replicas: int,
+    open_to_public: bool | None,
+    replica_count: int | None,
+    revision_history_limit: int | None,
+    strategy: str | None,
 ) -> None:
     """Deploy a model card as a new deployment."""
+    from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+    from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
     from ai.backend.common.dto.manager.v2.model_card.request import DeployModelCardInput
+
+    strategy_input: DeploymentStrategyInput | None = None
+    if strategy is not None:
+        strategy_input = DeploymentStrategyInput(type=DeploymentStrategy(strategy.upper()))
 
     deploy_input = DeployModelCardInput(
         project_id=project_id,
         revision_preset_id=revision_preset_id,
         resource_group=resource_group,
         desired_replica_count=replicas,
+        open_to_public=open_to_public,
+        replica_count=replica_count,
+        revision_history_limit=revision_history_limit,
+        deployment_strategy=strategy_input,
     )
 
     async def _run() -> None:

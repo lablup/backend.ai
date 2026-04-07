@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+
 
 @dataclass(frozen=True)
 class PresetValueData:
@@ -46,5 +48,12 @@ class DeploymentRevisionPresetData:
     bootstrap_script: str | None
     environ: list[EnvironEntryData]
     preset_values: list[PresetValueData] = field(default_factory=list)
+    # Deployment-level preset fields. `None` means the preset does not specify
+    # this value and callers should fall back to user input or system default.
+    open_to_public: bool | None = None
+    replica_count: int | None = None
+    revision_history_limit: int | None = None
+    deployment_strategy: DeploymentStrategy | None = None
+    deployment_strategy_spec: dict[str, Any] | None = None
     created_at: datetime = field(default=None)  # type: ignore[assignment]
     updated_at: datetime | None = None

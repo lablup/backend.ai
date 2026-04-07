@@ -3,10 +3,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.config import ModelDefinition
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
@@ -35,6 +36,11 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
     bootstrap_script: str | None
     environ: dict[str, str]
     preset_values: list[PresetValueEntry]
+    open_to_public: bool | None = None
+    replica_count: int | None = None
+    revision_history_limit: int | None = None
+    deployment_strategy: DeploymentStrategy | None = None
+    deployment_strategy_spec: dict[str, Any] | None = None
 
     @property
     @override
@@ -64,6 +70,11 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
         row.bootstrap_script = self.bootstrap_script
         row.environ = self.environ
         row.preset_values = self.preset_values
+        row.open_to_public = self.open_to_public
+        row.replica_count = self.replica_count
+        row.revision_history_limit = self.revision_history_limit
+        row.deployment_strategy = self.deployment_strategy
+        row.deployment_strategy_spec = self.deployment_strategy_spec
         row.resource_slot_rows = [
             PresetResourceSlotRow(
                 slot_name=entry.resource_type,

@@ -137,7 +137,10 @@ class DeploymentPolicyCreator:
 @dataclass
 class NewDeploymentCreator:
     metadata: DeploymentMetadata
-    replica_spec: ReplicaSpec
-    network: DeploymentNetworkSpec
+    # `None` means the caller did not specify these deployment-level settings;
+    # the service resolves them against the revision preset (if any) and then
+    # falls back to the system default.
+    replica_spec: ReplicaSpec | None = None
+    network: DeploymentNetworkSpec | None = None
     model_revision: ModelRevisionCreator | None = None
     policy: DeploymentPolicyConfig | None = None

@@ -9,6 +9,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.common.config import ModelDefinition
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
     EnvironEntryData,
@@ -21,6 +22,7 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
     PydanticListColumn,
     ResourceOptsEntry,
+    StrEnumType,
 )
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 
@@ -70,6 +72,26 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
         "preset_values", PydanticListColumn(PresetValueEntry), nullable=False, server_default="[]"
     )
 
+    # Deployment-level preset fields (nullable: None means "preset does not specify,
+    # fall back to user input or system default").
+    open_to_public: Mapped[bool | None] = mapped_column(
+        "open_to_public", sa.Boolean(), nullable=True
+    )
+    replica_count: Mapped[int | None] = mapped_column("replica_count", sa.Integer(), nullable=True)
+    revision_history_limit: Mapped[int | None] = mapped_column(
+        "revision_history_limit", sa.Integer(), nullable=True
+    )
+    deployment_strategy: Mapped[DeploymentStrategy | None] = mapped_column(
+        "deployment_strategy",
+        StrEnumType(DeploymentStrategy, use_name=False),
+        nullable=True,
+    )
+    deployment_strategy_spec: Mapped[dict[str, object] | None] = mapped_column(
+        "deployment_strategy_spec",
+        pgsql.JSONB(),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -115,6 +137,11 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
                 PresetValueData(preset_id=pv.preset_id, value=pv.value)
                 for pv in (self.preset_values or [])
             ],
+            open_to_public=self.open_to_public,
+            replica_count=self.replica_count,
+            revision_history_limit=self.revision_history_limit,
+            deployment_strategy=self.deployment_strategy,
+            deployment_strategy_spec=self.deployment_strategy_spec,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

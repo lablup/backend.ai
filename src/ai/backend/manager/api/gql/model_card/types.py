@@ -85,6 +85,7 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
     DeploymentRevisionPresetFilterGQL,
     DeploymentRevisionPresetOrderByGQL,
+    PresetDeploymentStrategyInputGQL,
 )
 from ai.backend.manager.api.gql.model_card._preset_helpers import build_preset_connection
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
@@ -425,6 +426,22 @@ class DeployModelCardInputGQL(PydanticInputMixin[DeployInputDTO]):
     revision_preset_id: UUID = gql_field(description="Deployment revision preset UUID.")
     resource_group: str = gql_field(description="Resource group name.")
     desired_replica_count: int = gql_field(default=1, description="Number of replicas.")
+    open_to_public: bool | None = gql_field(
+        default=None,
+        description="Override open_to_public. Defaults to the preset value, then False.",
+    )
+    replica_count: int | None = gql_field(
+        default=None,
+        description="Override replica_count. Defaults to the preset value, then desired_replica_count.",
+    )
+    revision_history_limit: int | None = gql_field(
+        default=None,
+        description="Override revision_history_limit. Defaults to the preset value, then 10.",
+    )
+    deployment_strategy: PresetDeploymentStrategyInputGQL | None = gql_field(
+        default=None,
+        description="Override deployment strategy. Defaults to the preset value, then none.",
+    )
 
 
 @gql_pydantic_type(

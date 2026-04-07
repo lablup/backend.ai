@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.config import ModelDefinition
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
@@ -38,6 +39,15 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     preset_values: OptionalState[list[PresetValueEntry]] = field(
         default_factory=OptionalState[list[PresetValueEntry]].nop
     )
+    open_to_public: TriState[bool] = field(default_factory=TriState[bool].nop)
+    replica_count: TriState[int] = field(default_factory=TriState[int].nop)
+    revision_history_limit: TriState[int] = field(default_factory=TriState[int].nop)
+    deployment_strategy: TriState[DeploymentStrategy] = field(
+        default_factory=TriState[DeploymentStrategy].nop
+    )
+    deployment_strategy_spec: TriState[dict[str, Any]] = field(
+        default_factory=TriState[dict[str, Any]].nop
+    )
 
     @property
     @override
@@ -59,4 +69,9 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
         self.bootstrap_script.update_dict(to_update, "bootstrap_script")
         self.environ.update_dict(to_update, "environ")
         self.preset_values.update_dict(to_update, "preset_values")
+        self.open_to_public.update_dict(to_update, "open_to_public")
+        self.replica_count.update_dict(to_update, "replica_count")
+        self.revision_history_limit.update_dict(to_update, "revision_history_limit")
+        self.deployment_strategy.update_dict(to_update, "deployment_strategy")
+        self.deployment_strategy_spec.update_dict(to_update, "deployment_strategy_spec")
         return to_update

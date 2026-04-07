@@ -8,6 +8,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
@@ -54,6 +55,25 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     preset_values: list[PresetValueInput] | None = Field(
         default=None, description="Preset values from runtime variant presets."
     )
+    open_to_public: bool | None = Field(
+        default=None,
+        description="Default open_to_public for deployments created from this preset.",
+    )
+    replica_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Default replica count for deployments created from this preset.",
+    )
+    revision_history_limit: int | None = Field(
+        default=None,
+        ge=0,
+        description="Default revision history limit for deployments created from this preset.",
+    )
+    deployment_strategy: DeploymentStrategyInput | None = Field(
+        default=None,
+        description="Default deployment strategy (rolling or blue-green) for "
+        "deployments created from this preset.",
+    )
 
 
 class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
@@ -71,6 +91,10 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     bootstrap_script: str | Sentinel | None = Field(default=SENTINEL)
     environ: list[EnvironEntryInput] | None = Field(default=None)
     preset_values: list[PresetValueInput] | None = Field(default=None)
+    open_to_public: bool | Sentinel | None = Field(default=SENTINEL)
+    replica_count: int | Sentinel | None = Field(default=SENTINEL, ge=0)
+    revision_history_limit: int | Sentinel | None = Field(default=SENTINEL, ge=0)
+    deployment_strategy: DeploymentStrategyInput | Sentinel | None = Field(default=SENTINEL)
 
 
 class DeploymentRevisionPresetFilter(BaseRequestModel):

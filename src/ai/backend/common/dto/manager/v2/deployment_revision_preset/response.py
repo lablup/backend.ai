@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 
 
 class EnvironEntryInfo(BaseResponseModel):
@@ -49,6 +50,33 @@ class PresetClusterSpec(BaseResponseModel):
     cluster_size: int = Field(description="Cluster size.")
 
 
+class PresetDeploymentDefaults(BaseResponseModel):
+    """Deployment-level default values provided by the preset.
+
+    Any field that is ``None`` means the preset does not specify a default;
+    callers should fall back to user input or the system default.
+    """
+
+    open_to_public: bool | None = Field(
+        default=None, description="Default open_to_public for deployments from this preset."
+    )
+    replica_count: int | None = Field(
+        default=None, description="Default replica count for deployments from this preset."
+    )
+    revision_history_limit: int | None = Field(
+        default=None,
+        description="Default revision history limit for deployments from this preset.",
+    )
+    deployment_strategy: DeploymentStrategy | None = Field(
+        default=None,
+        description="Default deployment strategy type (ROLLING or BLUE_GREEN).",
+    )
+    deployment_strategy_spec: dict[str, Any] | None = Field(
+        default=None,
+        description="Strategy-specific configuration (rolling or blue-green).",
+    )
+
+
 class DeploymentRevisionPresetNode(BaseResponseModel):
     id: UUID = Field(description="Preset ID.")
     runtime_variant_id: UUID = Field(description="Runtime variant ID.")
@@ -58,6 +86,10 @@ class DeploymentRevisionPresetNode(BaseResponseModel):
     cluster: PresetClusterSpec = Field(description="Cluster configuration.")
     resource: PresetResourceAllocation = Field(description="Resource allocation.")
     execution: PresetExecutionSpec = Field(description="Execution configuration.")
+    deployment_defaults: PresetDeploymentDefaults = Field(
+        default_factory=PresetDeploymentDefaults,
+        description="Deployment-level default values provided by this preset.",
+    )
     model_definition: dict[str, Any] | None = Field(
         default=None, description="Model definition configuration."
     )

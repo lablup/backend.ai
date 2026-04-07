@@ -276,7 +276,9 @@ class DeploymentMetadata:
     created_user: UUID
     session_owner: UUID
     created_at: datetime | None
-    revision_history_limit: int
+    # `None` means "caller did not specify"; the service resolves it against
+    # the revision preset default (if any) and ultimately the system default.
+    revision_history_limit: int | None = None
     tag: str | None = None
 
 
