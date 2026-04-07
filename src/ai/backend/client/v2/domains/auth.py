@@ -34,9 +34,6 @@ class AuthClient(BaseDomainClient):
         self._anon_client = anon_client
 
     async def authorize(self, request: AuthorizeRequest) -> AuthorizeResponse:
-        # SDK clients always identify as "core" so their concurrent-login quota
-        # is tracked separately from the webui bucket, regardless of what the
-        # caller passed.
         request = request.model_copy(update={"client_type": LoginClientType.CORE})
         return await self._anon_client.typed_request(
             "POST",
