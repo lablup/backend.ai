@@ -50,14 +50,14 @@ def enqueue(payload: str) -> None:
 
 
 @session.command()
-@click.argument("session_id", type=str)
-def get(session_id: str) -> None:
+@click.argument("session_id", type=click.UUID)
+def get(session_id: UUID) -> None:
     """Get a session by ID."""
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.session.get(UUID(session_id))
+            result = await registry.session.get(session_id)
             print_result(result)
         finally:
             await registry.close()
@@ -66,10 +66,10 @@ def get(session_id: str) -> None:
 
 
 @session.command(name="project-search")
-@click.argument("project_id", type=str)
+@click.argument("project_id", type=click.UUID)
 @click.option("--limit", type=int, default=20)
 @click.option("--offset", type=int, default=0)
-def project_search(project_id: str, limit: int, offset: int) -> None:
+def project_search(project_id: UUID, limit: int, offset: int) -> None:
     """Search sessions within a project."""
 
     from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
@@ -78,7 +78,7 @@ def project_search(project_id: str, limit: int, offset: int) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             request = AdminSearchSessionsInput(limit=limit, offset=offset)
-            result = await registry.session.project_search(UUID(project_id), request)
+            result = await registry.session.project_search(project_id, request)
             print_result(result)
         finally:
             await registry.close()
@@ -87,15 +87,15 @@ def project_search(project_id: str, limit: int, offset: int) -> None:
 
 
 @session.command()
-@click.argument("session_ids", nargs=-1, required=True)
+@click.argument("session_ids", nargs=-1, required=True, type=click.UUID)
 @click.option("--forced", is_flag=True, default=False, help="Force-terminate without cleanup.")
-def terminate(session_ids: tuple[str, ...], forced: bool) -> None:
+def terminate(session_ids: tuple[UUID, ...], forced: bool) -> None:
     """Terminate one or more sessions by ID."""
 
     from ai.backend.common.dto.manager.v2.session.request import TerminateSessionsInput
 
     body = TerminateSessionsInput(
-        session_ids=[UUID(sid) for sid in session_ids],
+        session_ids=list(session_ids),
         forced=forced,
     )
 
@@ -111,30 +111,26 @@ def terminate(session_ids: tuple[str, ...], forced: bool) -> None:
 
 
 @session.command(name="start-service")
-@click.argument("session_id", type=str)
+@click.argument("session_id", type=click.UUID)
 @click.argument("service", type=str)
 @click.option("--port", type=int, default=None, help="Specific container port.")
 @click.option(
     "--owner-id",
-    type=str,
+    type=click.UUID,
     default=None,
     help="Delegated owner user UUID. Defaults to the caller when omitted.",
 )
-def start_service(session_id: str, service: str, port: int | None, owner_id: str | None) -> None:
+def start_service(session_id: UUID, service: str, port: int | None, owner_id: UUID | None) -> None:
     """Start a service (e.g., jupyter, vscode) in a session."""
 
     from ai.backend.common.dto.manager.v2.session.request import StartSessionServiceInput
 
-    body = StartSessionServiceInput(
-        service=service,
-        port=port,
-        owner_id=UUID(owner_id) if owner_id else None,
-    )
+    body = StartSessionServiceInput(service=service, port=port, owner_id=owner_id)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.session.start_service(UUID(session_id), body)
+            result = await registry.session.start_service(session_id, body)
             print_result(result)
         finally:
             await registry.close()
@@ -143,28 +139,25 @@ def start_service(session_id: str, service: str, port: int | None, owner_id: str
 
 
 @session.command(name="shutdown-service")
-@click.argument("session_id", type=str)
+@click.argument("session_id", type=click.UUID)
 @click.argument("service", type=str)
 @click.option(
     "--owner-id",
-    type=str,
+    type=click.UUID,
     default=None,
     help="Delegated owner user UUID. Defaults to the caller when omitted.",
 )
-def shutdown_service(session_id: str, service: str, owner_id: str | None) -> None:
+def shutdown_service(session_id: UUID, service: str, owner_id: UUID | None) -> None:
     """Shut down a service in a session."""
 
     from ai.backend.common.dto.manager.v2.session.request import ShutdownSessionServiceInput
 
-    body = ShutdownSessionServiceInput(
-        service=service,
-        owner_id=UUID(owner_id) if owner_id else None,
-    )
+    body = ShutdownSessionServiceInput(service=service, owner_id=owner_id)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            await registry.session.shutdown_service(UUID(session_id), body)
+            await registry.session.shutdown_service(session_id, body)
             click.echo("Service shut down successfully.")
         finally:
             await registry.close()
@@ -173,24 +166,24 @@ def shutdown_service(session_id: str, service: str, owner_id: str | None) -> Non
 
 
 @session.command()
-@click.argument("session_id", type=str)
+@click.argument("session_id", type=click.UUID)
 @click.option(
     "--owner-id",
-    type=str,
+    type=click.UUID,
     default=None,
     help="Delegated owner user UUID. Defaults to the caller when omitted.",
 )
-def restart(session_id: str, owner_id: str | None) -> None:
+def restart(session_id: UUID, owner_id: UUID | None) -> None:
     """Restart a session."""
 
     from ai.backend.common.dto.manager.v2.session.request import RestartSessionInput
 
-    body = RestartSessionInput(owner_id=UUID(owner_id) if owner_id else None)
+    body = RestartSessionInput(owner_id=owner_id)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.session.restart(UUID(session_id), body)
+            result = await registry.session.restart(session_id, body)
             print_result(result)
         finally:
             await registry.close()
@@ -199,30 +192,26 @@ def restart(session_id: str, owner_id: str | None) -> None:
 
 
 @session.command()
-@click.argument("session_id", type=str)
+@click.argument("session_id", type=click.UUID)
 @click.option("--forced", is_flag=True, default=False, help="Force-destroy without cleanup.")
 @click.option("--recursive", is_flag=True, default=False, help="Destroy dependent sessions too.")
 @click.option(
     "--owner-id",
-    type=str,
+    type=click.UUID,
     default=None,
     help="Delegated owner user UUID. Defaults to the caller when omitted.",
 )
-def destroy(session_id: str, forced: bool, recursive: bool, owner_id: str | None) -> None:
+def destroy(session_id: UUID, forced: bool, recursive: bool, owner_id: UUID | None) -> None:
     """Destroy a session."""
 
     from ai.backend.common.dto.manager.v2.session.request import DestroySessionInput
 
-    body = DestroySessionInput(
-        forced=forced,
-        recursive=recursive,
-        owner_id=UUID(owner_id) if owner_id else None,
-    )
+    body = DestroySessionInput(forced=forced, recursive=recursive, owner_id=owner_id)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.session.destroy(UUID(session_id), body)
+            result = await registry.session.destroy(session_id, body)
             print_result(result)
         finally:
             await registry.close()
@@ -231,23 +220,21 @@ def destroy(session_id: str, forced: bool, recursive: bool, owner_id: str | None
 
 
 @session.command()
-@click.argument("session_id", type=str)
-@click.option("--kernel-id", type=str, default=None, help="Specific kernel UUID.")
+@click.argument("session_id", type=click.UUID)
+@click.option("--kernel-id", type=click.UUID, default=None, help="Specific kernel UUID.")
 @click.option(
     "--owner-id",
-    type=str,
+    type=click.UUID,
     default=None,
     help="Delegated owner user UUID. Defaults to the caller when omitted.",
 )
-def logs(session_id: str, kernel_id: str | None, owner_id: str | None) -> None:
+def logs(session_id: UUID, kernel_id: UUID | None, owner_id: UUID | None) -> None:
     """Get container logs for a session."""
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            kid = UUID(kernel_id) if kernel_id else None
-            oid = UUID(owner_id) if owner_id else None
-            result = await registry.session.get_logs(UUID(session_id), kid, oid)
+            result = await registry.session.get_logs(session_id, kernel_id, owner_id)
             click.echo(result.logs)
         finally:
             await registry.close()
@@ -256,26 +243,26 @@ def logs(session_id: str, kernel_id: str | None, owner_id: str | None) -> None:
 
 
 @session.command()
-@click.argument("session_id", type=str)
+@click.argument("session_id", type=click.UUID)
 @click.option("--name", type=str, default=None, help="New session name.")
 @click.option("--tag", type=str, default=None, help="Updated tag.")
 @click.option(
     "--owner-id",
-    type=str,
+    type=click.UUID,
     default=None,
     help="Delegated owner user UUID. Defaults to the caller when omitted.",
 )
-def update(session_id: str, name: str | None, tag: str | None, owner_id: str | None) -> None:
+def update(session_id: UUID, name: str | None, tag: str | None, owner_id: UUID | None) -> None:
     """Update a session."""
 
     from ai.backend.common.dto.manager.v2.session.request import UpdateSessionInput
 
-    body = UpdateSessionInput(name=name, tag=tag, owner_id=UUID(owner_id) if owner_id else None)
+    body = UpdateSessionInput(name=name, tag=tag, owner_id=owner_id)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.session.update(UUID(session_id), body)
+            result = await registry.session.update(session_id, body)
             print_result(result)
         finally:
             await registry.close()
