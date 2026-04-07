@@ -14,7 +14,7 @@ from collections import UserDict, UserString, defaultdict, namedtuple
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from ipaddress import ip_address, ip_network
 from pathlib import Path, PurePosixPath
@@ -769,6 +769,19 @@ class BinarySize(int):
             return Decimal("Infinity")
         orig_expr = expr
         expr = expr.strip().replace("_", "")
+        # Numeric DB columns and Decimal arithmetic frequently produce
+        # integer-equivalent strings with trailing zeros (e.g.,
+        # "536870912.000000"). BinarySize fundamentally expects whole bytes,
+        # so collapse such representations to the integer form before the
+        # main parse path. True fractional values like "1.5" still fall
+        # through to the existing rejection path below.
+        if "." in expr:
+            try:
+                _normalized = Decimal(expr)
+            except InvalidOperation:
+                _normalized = None
+            if _normalized is not None and _normalized == _normalized.to_integral_value():
+                expr = str(int(_normalized))
         try:
             return cls(expr)
         except ValueError:
