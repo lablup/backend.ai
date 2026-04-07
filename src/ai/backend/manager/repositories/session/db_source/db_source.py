@@ -15,7 +15,7 @@ from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.session.types import SessionData, SessionListResult
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
@@ -350,7 +350,7 @@ class SessionDBSource:
         query_domain_name: str,
         group_name: str | None,
         query_on_behalf_of: AccessKey | None = None,
-    ) -> tuple[uuid.UUID, uuid.UUID, dict[str, Any]]:
+    ) -> SessionOwnerContext:
         if group_name is None:
             raise GenericBadRequest("group_name cannot be None")
         async with self._db.begin_readonly() as conn:

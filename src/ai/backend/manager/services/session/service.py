@@ -417,7 +417,7 @@ class SessionService:
             raise TaskTemplateNotFound
 
         try:
-            _, group_id, resource_policy = await self._session_repository.query_userinfo(
+            user_info = await self._session_repository.query_userinfo(
                 user_id,
                 requester_access_key,
                 user_role,
@@ -436,12 +436,12 @@ class SessionService:
                 session_name,
                 UserScope(
                     domain_name=domain_name,
-                    group_id=group_id,
-                    user_uuid=user_id,
-                    user_role=user_role,
+                    group_id=user_info.group_id,
+                    user_uuid=user_info.owner_uuid,
+                    user_role=str(user_info.owner_role),
                 ),
                 owner_access_key,
-                resource_policy,
+                user_info.resource_policy,
                 scaling_group_name,
                 session_type,
                 tag,
@@ -493,7 +493,7 @@ class SessionService:
         callback_url = action.params.callback_url
         reuse_if_exists = action.params.reuse_if_exists
 
-        owner_uuid, group_id, resource_policy = await self._session_repository.query_userinfo(
+        user_info = await self._session_repository.query_userinfo(
             user_id,
             requester_access_key,
             user_role,
@@ -518,12 +518,12 @@ class SessionService:
                 image_row.image_ref,
                 UserScope(
                     domain_name=domain_name,
-                    group_id=group_id,
-                    user_uuid=user_id,
-                    user_role=user_role,
+                    group_id=user_info.group_id,
+                    user_uuid=user_info.owner_uuid,
+                    user_role=str(user_info.owner_role),
                 ),
                 owner_access_key,
-                resource_policy,
+                user_info.resource_policy,
                 session_type,
                 config,
                 cluster_mode,
@@ -553,7 +553,7 @@ class SessionService:
         except BackendAIError:
             raise
         except Exception as e:
-            await self._error_monitor.capture_exception(context={"user": owner_uuid})
+            await self._error_monitor.capture_exception(context={"user": user_info.owner_uuid})
             log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError from e
 
@@ -697,7 +697,7 @@ class SessionService:
         reuse_if_exists = params["reuse_if_exists"]
         domain_name = params["domain_name"]
 
-        owner_uuid, group_id, resource_policy = await self._session_repository.query_userinfo(
+        user_info = await self._session_repository.query_userinfo(
             user_id,
             requester_access_key,
             user_role,
@@ -722,12 +722,12 @@ class SessionService:
                 image_row.image_ref,
                 UserScope(
                     domain_name=domain_name,
-                    group_id=group_id,
-                    user_uuid=user_id,
-                    user_role=user_role,
+                    group_id=user_info.group_id,
+                    user_uuid=user_info.owner_uuid,
+                    user_role=str(user_info.owner_role),
                 ),
                 owner_access_key,
-                resource_policy,
+                user_info.resource_policy,
                 session_type,
                 config,
                 cluster_mode,
@@ -752,7 +752,7 @@ class SessionService:
         except BackendAIError:
             raise
         except Exception as e:
-            await self._error_monitor.capture_exception(context={"user": owner_uuid})
+            await self._error_monitor.capture_exception(context={"user": user_info.owner_uuid})
             log.exception("GET_OR_CREATE: unexpected error!", e)
             raise InternalServerError from e
 

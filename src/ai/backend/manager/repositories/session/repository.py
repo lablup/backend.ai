@@ -17,7 +17,7 @@ from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.session.types import SessionData, SessionListResult
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
@@ -194,7 +194,7 @@ class SessionRepository:
         query_domain_name: str,
         group_name: str | None,
         query_on_behalf_of: AccessKey | None = None,
-    ) -> tuple[uuid.UUID, uuid.UUID, dict[str, Any]]:
+    ) -> SessionOwnerContext:
         return await self._db_source.query_userinfo(
             user_id,
             requester_access_key,

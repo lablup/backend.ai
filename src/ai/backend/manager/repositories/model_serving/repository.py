@@ -40,7 +40,6 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
-from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -1065,7 +1064,7 @@ class ModelServingRepository:
             )
 
             try:
-                owner_uuid, group_id, resource_policy = await query_userinfo(
+                user_info = await query_userinfo(
                     conn,
                     requester_uuid,
                     requester_access_key,
@@ -1078,11 +1077,10 @@ class ModelServingRepository:
                 )
             except ValueError as e:
                 raise InvalidAPIParameters(str(e)) from e
-
-            owner_role_query = sa.select(UserRow.role).where(UserRow.uuid == owner_uuid)
-            owner_role = (await conn.execute(owner_role_query)).scalar()
-            if not owner_role:
-                raise InvalidAuthParameters("Owner role is required to create a model service")
+            owner_uuid = user_info.owner_uuid
+            group_id = user_info.group_id
+            resource_policy = user_info.resource_policy
+            owner_role = user_info.owner_role
 
             allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
             try:

@@ -2062,7 +2062,7 @@ class DeploymentDBSource:
 
             # Use query_userinfo_from_session to get group_id and resource_policy
             # This also validates domain, group access permissions
-            owner_uuid, group_id, resource_policy = await query_userinfo_from_session(
+            user_info = await query_userinfo_from_session(
                 db_sess,
                 created_user_row.UserRow.uuid,
                 AccessKey(created_user_row.access_key),
@@ -2075,6 +2075,8 @@ class DeploymentDBSource:
                 if session_owner_row != created_user_row
                 else None,
             )
+            group_id = user_info.group_id
+            resource_policy = user_info.resource_policy
 
             revision_query = (
                 sa.select(DeploymentRevisionRow)

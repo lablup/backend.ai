@@ -112,7 +112,7 @@ class ModelServingEventHandler:
                 else:
                     session_owner = created_user
 
-                _, group_id, resource_policy = await query_userinfo_from_session(
+                user_info = await query_userinfo_from_session(
                     db_sess,
                     created_user.uuid,
                     created_user.access_key,
@@ -123,6 +123,8 @@ class ModelServingEventHandler:
                     endpoint.project,
                     query_on_behalf_of=session_owner.access_key,
                 )
+                group_id = user_info.group_id
+                resource_policy = user_info.resource_policy
 
                 if current_rev.image_row is None:
                     raise ValueError(f"Image not found for endpoint {endpoint.id}")
