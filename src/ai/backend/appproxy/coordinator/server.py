@@ -618,6 +618,53 @@ async def on_route_update_event(
         await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
 
 
+async def _reconcile_worker_occupied_slots(
+    context: RootContext,
+    circuits: Sequence[Circuit],
+    workers: Sequence[Worker],
+) -> None:
+    """Recompute Worker.occupied_slots from the live circuit set and write back
+    any drifts.
+
+    ``Worker.occupied_slots`` is currently maintained as an incremental counter
+    (``+= 1`` on add_circuit, ``-= 1`` on unload), which can drift out of sync
+    with the actual ``circuits`` table whenever an unload event is missed, a
+    transaction rolls back partially, or external schema manipulation removes
+    rows. Once drifted, ``pick_worker`` filters every worker out and the
+    coordinator returns ``WorkerNotAvailable`` even though there are free
+    slots. This helper rebuilds the counter from the rows actually present in
+    the DB and writes back any worker whose stored value disagrees.
+    """
+    actual_counts: dict[UUID, int] = {}
+    for circuit in circuits:
+        actual_counts[circuit.worker] = actual_counts.get(circuit.worker, 0) + 1
+
+    drifted: list[tuple[Worker, int]] = []
+    for worker in workers:
+        expected = actual_counts.get(worker.id, 0)
+        if worker.occupied_slots != expected:
+            drifted.append((worker, expected))
+    if not drifted:
+        return
+
+    async def _fix(sess: SASession) -> None:
+        for worker, expected in drifted:
+            fresh = await Worker.get(sess, worker.id)
+            log.info(
+                "occupied_slots reconcile: worker={} {} -> {}",
+                fresh.authority,
+                fresh.occupied_slots,
+                expected,
+            )
+            fresh.occupied_slots = expected
+
+    try:
+        async with context.db.connect() as db_conn:
+            await execute_with_txn_retry(_fix, context.db.begin_session, db_conn)
+    except Exception:
+        log.exception("Failed to reconcile worker occupied_slots")
+
+
 async def on_reconcile_traefik_routes(
     context: RootContext,
     _source: AgentId,
@@ -627,7 +674,7 @@ async def on_reconcile_traefik_routes(
     etcd routing config from the PG source of truth, then drops any stale
     circuit keys that were left behind in etcd by missed unloads.
 
-    Two phases:
+    Three phases:
 
     1. **Put reconcile** — iterate every circuit in the coordinator DB
        (both inference and interactive) and re-invoke ``update_circuit_routes``.
@@ -636,8 +683,11 @@ async def on_reconcile_traefik_routes(
        ``reconcile_traefik_etcd_state`` and remove any orphan
        ``bai_service_*`` / ``bai_router_*`` / ``bai_appproxy_plugin_*``
        prefixes so etcd cannot accumulate dead entries across crashes.
+    3. **Worker counter reconcile** — recompute ``Worker.occupied_slots``
+       from the actual circuit count and fix drifts. Without this the
+       counter can wedge a worker permanently after a missed unload.
 
-    Both phases swallow per-item errors so a single bad circuit or worker
+    Each phase swallows its own errors so a single bad circuit or worker
     cannot short-circuit the entire reconcile cycle.
     """
     if not context.local_config.proxy_coordinator.enable_traefik:
@@ -658,6 +708,7 @@ async def on_reconcile_traefik_routes(
         await context.circuit_manager.reconcile_traefik_etcd_state(circuits, workers)
     except Exception:
         log.exception("Failed to reconcile stale traefik etcd state")
+    await _reconcile_worker_occupied_slots(context, circuits, workers)
     log.debug("reconcile_traefik_routes cycle completed: {} circuits reconciled", reconciled)
 
 

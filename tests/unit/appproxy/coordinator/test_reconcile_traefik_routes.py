@@ -14,7 +14,10 @@ import pytest
 from ai.backend.appproxy.common.events import DoReconcileTraefikRoutesEvent
 from ai.backend.appproxy.common.types import AppMode, ProxyProtocol
 from ai.backend.appproxy.coordinator.models import Circuit, Worker
-from ai.backend.appproxy.coordinator.server import on_reconcile_traefik_routes
+from ai.backend.appproxy.coordinator.server import (
+    _reconcile_worker_occupied_slots,
+    on_reconcile_traefik_routes,
+)
 from ai.backend.appproxy.coordinator.types import CircuitManager
 from ai.backend.common.types import AgentId
 
@@ -51,19 +54,30 @@ async def _noop_lock(_circuit_id: object) -> AsyncIterator[None]:
     yield
 
 
-def _make_circuit(app_mode: AppMode, worker_authority: str = "worker-1") -> Circuit:
+def _make_circuit(
+    app_mode: AppMode,
+    worker_authority: str = "worker-1",
+    worker_id: UUID | None = None,
+) -> Circuit:
     circuit: Any = MagicMock(spec=Circuit)
     circuit.id = uuid4()
     circuit.app_mode = app_mode
     circuit.route_info = []
     circuit.protocol = ProxyProtocol.HTTP
+    circuit.worker = worker_id if worker_id is not None else uuid4()
     circuit.worker_row = SimpleNamespace(authority=worker_authority)
     return cast(Circuit, circuit)
 
 
-def _make_worker(authority: str = "worker-1") -> Worker:
+def _make_worker(
+    authority: str = "worker-1",
+    occupied_slots: int = 0,
+    worker_id: UUID | None = None,
+) -> Worker:
     worker: Any = MagicMock(spec=Worker)
     worker.authority = authority
+    worker.id = worker_id if worker_id is not None else uuid4()
+    worker.occupied_slots = occupied_slots
     return cast(Worker, worker)
 
 
@@ -346,6 +360,149 @@ class TestReconcileTraefikEtcdState:
             assert "middlewares" not in prefix
 
 
-def _unused_uuid() -> UUID:
-    # Keep UUID imported for type checkers even if unused elsewhere.
-    return uuid4()
+class TestReconcileWorkerOccupiedSlots:
+    """Unit tests for the inline worker.occupied_slots reconcile helper.
+
+    Verifies that ``Worker.occupied_slots`` is rebuilt from the actual circuit
+    count and written back via a real DB session whenever the stored counter
+    drifts. This is the safety net for missed `+= 1`/`-= 1` updates that
+    otherwise wedge a worker permanently.
+    """
+
+    @asynccontextmanager
+    async def _writable_session(self, worker_store: dict[UUID, int]) -> AsyncIterator[Any]:
+        # Stand-in for a writable AsyncSession; the helper only calls
+        # ``Worker.get(sess, worker.id)`` and assigns ``occupied_slots``.
+        sess: Any = MagicMock()
+        sess._worker_store = worker_store
+        yield sess
+
+    @asynccontextmanager
+    async def _connect_ctx(self) -> AsyncIterator[Any]:
+        yield None
+
+    def _make_context(self, worker_store: dict[UUID, int]) -> Any:
+        ctx_self = self
+
+        @asynccontextmanager
+        async def begin_session() -> AsyncIterator[Any]:
+            async with ctx_self._writable_session(worker_store) as sess:
+                yield sess
+
+        db = SimpleNamespace(
+            connect=ctx_self._connect_ctx,
+            begin_session=begin_session,
+        )
+        return SimpleNamespace(db=db)
+
+    async def test_writes_back_drifted_counter(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        worker_id = uuid4()
+        worker = _make_worker(occupied_slots=96, worker_id=worker_id)
+        # Two live circuits actually point at this worker → expected = 2
+        circuits = [
+            _make_circuit(AppMode.INTERACTIVE, worker_id=worker_id),
+            _make_circuit(AppMode.INTERACTIVE, worker_id=worker_id),
+        ]
+
+        worker_store: dict[UUID, int] = {worker_id: 96}
+
+        async def fake_get(sess: Any, wid: UUID, **_kwargs: Any) -> Any:
+            fresh: Any = MagicMock()
+            fresh.id = wid
+            fresh.authority = "worker-1"
+            fresh.occupied_slots = sess._worker_store[wid]
+            # Property setter mimics SQLAlchemy ORM column write-back.
+            type(fresh).occupied_slots = property(
+                fget=lambda self: self.__dict__["_oc"],
+                fset=lambda self, value: (
+                    self.__dict__.__setitem__("_oc", value),
+                    sess._worker_store.__setitem__(wid, value),
+                )[0],
+            )
+            fresh.__dict__["_oc"] = sess._worker_store[wid]
+            return fresh
+
+        async def fake_execute_with_txn_retry(txn_func: Any, _begin: Any, _conn: Any) -> Any:
+            async with _begin() as sess:
+                return await txn_func(sess)
+
+        monkeypatch.setattr(Worker, "get", fake_get)
+        monkeypatch.setattr(
+            "ai.backend.appproxy.coordinator.server.execute_with_txn_retry",
+            fake_execute_with_txn_retry,
+        )
+
+        context = self._make_context(worker_store)
+        await _reconcile_worker_occupied_slots(context, circuits, [worker])
+
+        assert worker_store[worker_id] == 2
+
+    async def test_noop_when_counter_already_matches(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        worker_id = uuid4()
+        worker = _make_worker(occupied_slots=2, worker_id=worker_id)
+        circuits = [
+            _make_circuit(AppMode.INTERACTIVE, worker_id=worker_id),
+            _make_circuit(AppMode.INTERACTIVE, worker_id=worker_id),
+        ]
+
+        # Should not even open a writable session — no drift.
+        get_called = MagicMock()
+        monkeypatch.setattr(Worker, "get", get_called)
+
+        context = self._make_context({worker_id: 2})
+        await _reconcile_worker_occupied_slots(context, circuits, [worker])
+
+        assert get_called.call_count == 0
+
+    async def test_zero_circuits_resets_counter(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        worker_id = uuid4()
+        worker = _make_worker(occupied_slots=5, worker_id=worker_id)
+        circuits: list[Circuit] = []  # no live circuits at all → expected = 0
+
+        worker_store: dict[UUID, int] = {worker_id: 5}
+
+        async def fake_get(sess: Any, wid: UUID, **_kwargs: Any) -> Any:
+            fresh: Any = MagicMock()
+            fresh.id = wid
+            fresh.authority = "worker-1"
+            type(fresh).occupied_slots = property(
+                fget=lambda self: self.__dict__["_oc"],
+                fset=lambda self, value: (
+                    self.__dict__.__setitem__("_oc", value),
+                    sess._worker_store.__setitem__(wid, value),
+                )[0],
+            )
+            fresh.__dict__["_oc"] = sess._worker_store[wid]
+            return fresh
+
+        async def fake_execute_with_txn_retry(txn_func: Any, _begin: Any, _conn: Any) -> Any:
+            async with _begin() as sess:
+                return await txn_func(sess)
+
+        monkeypatch.setattr(Worker, "get", fake_get)
+        monkeypatch.setattr(
+            "ai.backend.appproxy.coordinator.server.execute_with_txn_retry",
+            fake_execute_with_txn_retry,
+        )
+
+        context = self._make_context(worker_store)
+        await _reconcile_worker_occupied_slots(context, circuits, [worker])
+
+        assert worker_store[worker_id] == 0
+
+    async def test_swallows_db_errors(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        worker_id = uuid4()
+        worker = _make_worker(occupied_slots=10, worker_id=worker_id)
+        circuits: list[Circuit] = []
+
+        async def fake_execute_with_txn_retry(*_args: Any, **_kwargs: Any) -> Any:
+            raise RuntimeError("postgres exploded")
+
+        monkeypatch.setattr(
+            "ai.backend.appproxy.coordinator.server.execute_with_txn_retry",
+            fake_execute_with_txn_retry,
+        )
+
+        context = self._make_context({worker_id: 10})
+        # Must not raise — handler swallows reconcile failures.
+        await _reconcile_worker_occupied_slots(context, circuits, [worker])
