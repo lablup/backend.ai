@@ -968,7 +968,13 @@ class ModelServingService:
                 raise InvalidAPIParameters(
                     "Model mount destination must be /models for non-custom runtimes"
                 )
-            yaml_path = "model-definition.yaml"
+            vfid = VFolderID(ctx.model_folder_quota_scope_id, ctx.model_id)
+            yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
+                self._storage_manager,
+                ctx.model_folder_host,
+                vfid,
+                None,
+            )
 
         return ValidateModelServiceActionResult(
             model_id=ctx.model_id,
