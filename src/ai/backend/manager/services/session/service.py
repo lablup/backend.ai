@@ -795,6 +795,7 @@ class SessionService:
             session_name,
             owner_access_key,
             recursive=recursive,
+            owner_user_uuid=action.owner_id,
         )
 
         # Determine termination reason based on forced flag
@@ -1071,6 +1072,7 @@ class SessionService:
                 if kernel_id is None
                 else KernelLoadingStrategy.ALL_KERNELS
             ),
+            owner_user_uuid=action.owner_id,
         )
 
         if compute_session.status in DEAD_SESSION_STATUSES:
@@ -1301,7 +1303,7 @@ class SessionService:
 
         try:
             compute_session = await self._session_repository.update_session_name(
-                session_name, new_name, owner_access_key
+                session_name, new_name, owner_access_key, owner_user_uuid=action.owner_id
             )
             if compute_session.status != SessionStatus.RUNNING:
                 raise InvalidAPIParameters("Can't change name of not running session")
@@ -1322,6 +1324,7 @@ class SessionService:
             session_name,
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+            owner_user_uuid=action.owner_id,
         )
         await self._agent_registry.increment_session_usage(session)
         await self._agent_registry.restart_session(session)
@@ -1338,6 +1341,7 @@ class SessionService:
             session_name,
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            owner_user_uuid=action.owner_id,
         )
         await self._agent_registry.shutdown_service(session, service_name)
         return ShutdownServiceActionResult(result=None, session_data=session.to_dataclass())
@@ -1357,6 +1361,7 @@ class SessionService:
                 self._session_repository.get_session_with_routing_minimal(
                     session_name,
                     access_key,
+                    owner_user_uuid=action.owner_id,
                 )
             )
         )
