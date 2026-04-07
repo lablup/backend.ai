@@ -38,12 +38,25 @@ def upgrade() -> None:
             "login_sessions",
             ["user_id", "client_type", "status"],
         )
+    # The new composite index covers (user_id, status) lookups via prefix match,
+    # so the old 2-column index is redundant.
+    if "ix_login_sessions_user_id_status" in existing_indexes:
+        op.drop_index(
+            "ix_login_sessions_user_id_status",
+            table_name="login_sessions",
+        )
 
 
 def downgrade() -> None:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
     existing_indexes = {idx["name"] for idx in inspector.get_indexes("login_sessions")}
+    if "ix_login_sessions_user_id_status" not in existing_indexes:
+        op.create_index(
+            "ix_login_sessions_user_id_status",
+            "login_sessions",
+            ["user_id", "status"],
+        )
     if "ix_login_sessions_user_id_client_type_status" in existing_indexes:
         op.drop_index(
             "ix_login_sessions_user_id_client_type_status",
