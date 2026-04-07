@@ -1,6 +1,6 @@
 directive @oneOf on INPUT_OBJECT
 
-schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key", "@shareable"]) {
+schema @link(url: "https://specs.apollo.dev/federation/v2.11", import: ["@external", "@key", "@shareable"]) {
   query: Query
   mutation: Mutation
   subscription: Subscription
@@ -154,9 +154,6 @@ Added in UNRELEASED. Payload returned after admin creates a keypair. The secret_
 type AdminCreateKeypairPayload {
   """The newly created keypair."""
   keypair: KeyPairGQL!
-
-  """The secret key. Only returned at creation time."""
-  secretKey: String!
 }
 
 """Added in UNRELEASED. Payload returned after admin deletes a keypair."""
@@ -2558,7 +2555,7 @@ input DeleteHuggingFaceRegistryInput {
 """Added in 25.14.0. Payload for deleting a HuggingFace registry."""
 type DeleteHuggingFaceRegistryPayload {
   """ID of the deleted HuggingFace registry"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in UNRELEASED. Payload for keypair resource policy deletion."""
@@ -2593,7 +2590,7 @@ input DeleteNotificationChannelInput {
 """Added in 26.3.0. Payload for delete notification channel mutation."""
 type DeleteNotificationChannelPayload {
   """ID of the deleted notification channel"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 24.09.0. Input for deleting a notification rule"""
@@ -2604,7 +2601,7 @@ input DeleteNotificationRuleInput {
 """Added in 26.3.0. Payload for delete notification rule mutation."""
 type DeleteNotificationRulePayload {
   """ID of the deleted notification rule"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 25.14.0. """
@@ -2615,7 +2612,7 @@ input DeleteObjectStorageInput {
 """Added in 25.14.0. Payload for deleting an object storage."""
 type DeleteObjectStoragePayload {
   """ID of the deleted object storage"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 26.3.0. Input for deleting a scoped permission"""
@@ -2626,7 +2623,7 @@ input DeletePermissionInput {
 """Added in 26.3.0. Payload for delete permission mutation."""
 type DeletePermissionPayload {
   """ID of the deleted permission"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in UNRELEASED. Payload for project deletion mutation."""
@@ -2644,7 +2641,7 @@ type DeleteProjectResourcePolicyPayloadGQL {
 """Added in 26.3.0. Payload returned after deleting a query definition."""
 type DeleteQueryDefinitionPayload {
   """Deleted query definition ID"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 25.14.0. """
@@ -2655,7 +2652,7 @@ input DeleteReservoirRegistryInput {
 """Added in 25.14.0. Payload for deleting a reservoir registry."""
 type DeleteReservoirRegistryPayload {
   """ID of the deleted Reservoir registry"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in UNRELEASED. Payload for resource group deletion."""
@@ -2678,7 +2675,7 @@ input DeleteRoleInput {
 """Added in 26.3.0. Payload for delete role mutation."""
 type DeleteRolePayload {
   """ID of the deleted role"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in UNRELEASED. Payload for runtime variant deletion."""
@@ -2755,7 +2752,7 @@ input DeleteVFSStorageInput {
 """Added in 25.16.0. Payload for deleting VFS storage."""
 type DeleteVFSStoragePayload {
   """ID of the deleted VFS storage"""
-  id: UUID!
+  id: ID!
 }
 
 """
@@ -4291,11 +4288,6 @@ Added in 26.2.0. Payload returned after issuing a new keypair. The secret_key is
 type IssueMyKeypairPayload {
   """The newly created keypair."""
   keypair: KeyPairGQL!
-
-  """
-  The newly generated secret key. This value is only returned at creation time.
-  """
-  secretKey: String!
 }
 
 """
@@ -7555,7 +7547,7 @@ input PurgeRoleInput {
 """Added in 26.3.0. Payload for purge role mutation."""
 type PurgeRolePayload {
   """ID of the purged role"""
-  id: UUID!
+  id: ID!
 }
 
 """
@@ -12509,7 +12501,7 @@ input ValidateNotificationChannelInput {
 """Added in 26.3.0. Payload for validate notification channel mutation."""
 type ValidateNotificationChannelPayload {
   """ID of the validated notification channel"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 24.09.0. Input for validate notification rule mutation"""

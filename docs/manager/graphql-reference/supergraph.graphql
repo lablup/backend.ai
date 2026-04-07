@@ -1,6 +1,6 @@
 schema
   @link(url: "https://specs.apollo.dev/link/v1.0")
-  @link(url: "https://specs.apollo.dev/join/v0.4", for: EXECUTION)
+  @link(url: "https://specs.apollo.dev/join/v0.5", for: EXECUTION)
 {
   query: Query
   mutation: Mutation
@@ -11,7 +11,7 @@ directive @join__directive(graphs: [join__Graph!], name: String!, args: join__Di
 
 directive @join__enumValue(graph: join__Graph!) repeatable on ENUM_VALUE
 
-directive @join__field(graph: join__Graph, requires: join__FieldSet, provides: join__FieldSet, type: String, external: Boolean, override: String, usedOverridden: Boolean, overrideLabel: String) repeatable on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+directive @join__field(graph: join__Graph, requires: join__FieldSet, provides: join__FieldSet, type: String, external: Boolean, override: String, usedOverridden: Boolean, overrideLabel: String, contextArguments: [join__ContextArgument!]) repeatable on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 
 directive @join__graph(name: String!, url: String!) on ENUM_VALUE
 
@@ -200,9 +200,6 @@ type AdminCreateKeypairPayload
 {
   """The newly created keypair."""
   keypair: KeyPairGQL!
-
-  """The secret key. Only returned at creation time."""
-  secretKey: String!
 }
 
 """Added in UNRELEASED. Payload returned after admin deletes a keypair."""
@@ -4146,7 +4143,7 @@ type DeleteHuggingFaceRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted HuggingFace registry"""
-  id: UUID!
+  id: ID!
 }
 
 type DeleteKeyPair
@@ -4215,7 +4212,7 @@ type DeleteNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted notification channel"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 24.09.0. Input for deleting a notification rule"""
@@ -4230,7 +4227,7 @@ type DeleteNotificationRulePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted notification rule"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 25.14.0. """
@@ -4245,7 +4242,7 @@ type DeleteObjectStoragePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted object storage"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 26.3.0. Input for deleting a scoped permission"""
@@ -4260,7 +4257,7 @@ type DeletePermissionPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted permission"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in UNRELEASED. Payload for project deletion mutation."""
@@ -4291,7 +4288,7 @@ type DeleteQueryDefinitionPayload
   @join__type(graph: STRAWBERRY)
 {
   """Deleted query definition ID"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 25.14.0. """
@@ -4306,7 +4303,7 @@ type DeleteReservoirRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted Reservoir registry"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in UNRELEASED. Payload for resource group deletion."""
@@ -4344,7 +4341,7 @@ type DeleteRolePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted role"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in UNRELEASED. Payload for runtime variant deletion."""
@@ -4481,7 +4478,7 @@ type DeleteVFSStoragePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted VFS storage"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 25.19.0. """
@@ -6887,11 +6884,6 @@ type IssueMyKeypairPayload
 {
   """The newly created keypair."""
   keypair: KeyPairGQL!
-
-  """
-  The newly generated secret key. This value is only returned at creation time.
-  """
-  secretKey: String!
 }
 
 interface Item
@@ -6900,9 +6892,18 @@ interface Item
   id: ID
 }
 
+input join__ContextArgument {
+  name: String!
+  type: String!
+  context: String!
+  selection: join__FieldValue!
+}
+
 scalar join__DirectiveArguments
 
 scalar join__FieldSet
+
+scalar join__FieldValue
 
 enum join__Graph {
   GRAPHENE @join__graph(name: "graphene", url: "http://host.docker.internal:8091/admin/gql")
@@ -11883,7 +11884,7 @@ type PurgeRolePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the purged role"""
-  id: UUID!
+  id: ID!
 }
 
 """
@@ -18233,7 +18234,7 @@ type ValidateNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the validated notification channel"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 24.09.0. Input for validate notification rule mutation"""
