@@ -2,10 +2,22 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    DeploymentRevisionPresetFilter,
+    DeploymentRevisionPresetOrder,
+    SearchDeploymentRevisionPresetsInput,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
+    DeploymentRevisionPresetOrderField,
+)
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput as CreateInputDTO,
 )
@@ -43,6 +55,9 @@ from ai.backend.common.dto.manager.v2.model_card.response import (
     ModelCardNode as NodeDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
+    ResourceSlotEntryInfo as ResourceSlotEntryDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.response import (
     ScanProjectModelCardsPayload as ScanPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
@@ -66,7 +81,17 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.deployment.types.revision_preset import (
+    DeploymentRevisionPresetConnection,
+    DeploymentRevisionPresetFilterGQL,
+    DeploymentRevisionPresetOrderByGQL,
+)
+from ai.backend.manager.api.gql.model_card._preset_helpers import build_preset_connection
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderGQL
 
 
 @gql_enum(
@@ -91,6 +116,23 @@ class ModelCardOrderFieldGQL(StrEnum):
 class ModelCardAccessLevelGQL(StrEnum):
     PUBLIC = "public"
     INTERNAL = "internal"
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A single resource requirement entry for a model card. The quantity is represented as a string because model card requirements are descriptive (display/matching) rather than arithmetic.",
+    ),
+    model=ResourceSlotEntryDTO,
+    name="ModelCardV2ResourceSlotEntry",
+)
+class ModelCardResourceSlotEntryGQL(PydanticOutputMixin[ResourceSlotEntryDTO]):
+    resource_type: str = gql_field(
+        description="Resource type identifier (e.g., 'cpu', 'mem', 'cuda.shares')."
+    )
+    quantity: str = gql_field(
+        description="Minimum required quantity for this resource as a decimal string."
+    )
 
 
 @gql_pydantic_type(
@@ -156,6 +198,10 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     metadata: ModelCardMetadataGQL = gql_field(
         description="Model metadata including authorship, classification, framework info, and licensing extracted from model-definition.yaml."
     )
+    min_resource: list[ModelCardResourceSlotEntryGQL] | None = gql_field(
+        description="Minimum resource requirements for serving this model. Each entry maps a resource slot (e.g. 'cpu', 'cuda.shares') to its minimum required quantity. Used to filter compatible deployment revision presets via `available_presets`.",
+        default=None,
+    )
     readme: str | None = gql_field(
         description="README content from the model VFolder, typically containing usage instructions and model documentation."
     )
@@ -166,6 +212,59 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     updated_at: datetime | None = gql_field(
         description="Timestamp of the last modification to this model card."
     )
+
+    @gql_field(  # type: ignore[misc]
+        description="The VFolder that stores this model card's files. Resolved through a DataLoader so that listing many model cards does not trigger N+1 fetches."
+    )
+    async def vfolder(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            VFolderGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.vfolder_v2.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.vfolder_loader.load(self.vfolder_id)
+
+    @gql_field(  # type: ignore[misc]
+        description="Deployment revision presets that satisfy this model card's minimum resource requirements. Equivalent to the root `model_card_available_presets` query but scoped to this card."
+    )
+    async def available_presets(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: DeploymentRevisionPresetFilterGQL | None = None,
+        order_by: list[DeploymentRevisionPresetOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> DeploymentRevisionPresetConnection | None:
+        filter_dto: DeploymentRevisionPresetFilter | None = filter.to_pydantic() if filter else None
+        orders_dto: list[DeploymentRevisionPresetOrder] | None = None
+        if order_by:
+            orders_dto = [
+                DeploymentRevisionPresetOrder(
+                    field=DeploymentRevisionPresetOrderField(o.field.value),
+                    direction=OrderDirection(o.direction),
+                )
+                for o in order_by
+            ]
+        search_input = SearchDeploymentRevisionPresetsInput(
+            filter=filter_dto,
+            order=orders_dto,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+        result = await info.context.adapters.model_card.available_presets(self.row_id, search_input)
+        return build_preset_connection(result)
 
 
 ModelCardV2Edge = Edge[ModelCardGQL]
@@ -201,7 +300,7 @@ class ProjectModelCardScopeGQL(PydanticInputMixin[ProjectModelCardScopeDTO]):
         added_version=NEXT_RELEASE_VERSION,
         description="Scope for querying available presets that satisfy a model card's resource requirements.",
     ),
-    name="ModelCardAvailablePresetsV2Scope",
+    name="ModelCardAvailablePresetsScope",
 )
 class ModelCardAvailablePresetsScopeGQL(PydanticInputMixin[AvailablePresetsScopeDTO]):
     model_card_id: UUID = gql_field(

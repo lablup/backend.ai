@@ -106,6 +106,7 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
+from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
@@ -199,6 +200,24 @@ class VfolderRepository:
             if not vfolder_row:
                 raise VFolderNotFound()
             return self._vfolder_row_to_data(vfolder_row)
+
+    @vfolder_repository_resilience.apply()
+    async def batch_load_by_ids(self, ids: Sequence[uuid.UUID]) -> list[VFolderData | None]:
+        """
+        Batch fetch vfolders by IDs without permission validation.
+
+        Returns a list with the same length and order as the input ids;
+        entries that are not found are ``None``. Intended for GraphQL
+        DataLoader use where the caller has already authorized access to a
+        parent entity that references these vfolder IDs.
+        """
+        if not ids:
+            return []
+        async with self._db.begin_readonly_session() as session:
+            query = sa.select(VFolderRow).where(VFolderConditions.by_ids(ids)())
+            result = await session.execute(query)
+            rows_by_id = {row.id: self._vfolder_row_to_data(row) for row in result.scalars().all()}
+            return [rows_by_id.get(vfolder_id) for vfolder_id in ids]
 
     @vfolder_repository_resilience.apply()
     async def get_allowed_vfolder_hosts(

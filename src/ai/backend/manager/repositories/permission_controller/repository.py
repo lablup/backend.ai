@@ -27,12 +27,12 @@ from ai.backend.manager.data.permission.role import (
     RoleDetailData,
     RoleListResult,
     RolePermissionsUpdateInput,
+    RoleRevocationResult,
     ScopeChainPermissionCheckInput,
     ScopePermissionCheckInput,
     SingleEntityPermissionCheckInput,
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
-    UserRoleRevocationData,
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
@@ -160,11 +160,8 @@ class PermissionControllerRepository:
         return result.to_data()
 
     @permission_controller_repository_resilience.apply()
-    async def revoke_role(self, data: UserRoleRevocationInput) -> UserRoleRevocationData:
-        user_role_id = await self._db_source.revoke_role(data)
-        return UserRoleRevocationData(
-            user_role_id=user_role_id, user_id=data.user_id, role_id=data.role_id
-        )
+    async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
+        return await self._db_source.revoke_role(data)
 
     @permission_controller_repository_resilience.apply()
     async def bulk_assign_role(

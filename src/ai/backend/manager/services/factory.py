@@ -311,6 +311,7 @@ def create_services(args: ServiceArgs) -> Services:
             auth_repository=repositories.auth.repository,
             config_provider=args.config_provider,
             valkey_session_client=args.valkey_session_client,
+            user_resource_policy_repository=repositories.user_resource_policy.repository,
         ),
         notification=NotificationService(
             repository=repositories.notification.repository,
@@ -325,6 +326,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
+            group_repository=repositories.group.repository,
             rbac_action_registry=RBAC_ACTION_REGISTRY,
         ),
         vfs_storage=VFSStorageService(

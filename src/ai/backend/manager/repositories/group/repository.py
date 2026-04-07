@@ -140,6 +140,19 @@ class GroupRepository:
         return await self._db_source.unassign_users_from_project(unbinder)
 
     @group_repository_resilience.apply()
+    async def bind_user_to_project(self, user_id: UUID, project_id: UUID) -> None:
+        """Add a user to a project (business association + RBAC scope binding).
+
+        Skips if the user is already a member of the project.
+        """
+        await self._db_source.bind_user_to_project(user_id, project_id)
+
+    @group_repository_resilience.apply()
+    async def unbind_user_from_project(self, user_id: UUID, project_id: UUID) -> None:
+        """Remove a user from a project (business association + RBAC scope binding)."""
+        await self._db_source.unbind_user_from_project(user_id, project_id)
+
+    @group_repository_resilience.apply()
     async def get_project(self, project_id: UUID) -> GroupData:
         """Get a single project by UUID.
 

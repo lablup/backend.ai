@@ -20,7 +20,6 @@ from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, L
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.errors.auth import (
-    ActiveLoginSessionExistsError,
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
@@ -434,65 +433,56 @@ class AuthDBSource:
             )
 
     @auth_db_source_resilience.apply()
+    async def invalidate_sessions_by_tokens(self, session_tokens: list[str]) -> None:
+        """Invalidate the given active login sessions in bulk.
+
+        Rows whose status is not ACTIVE are left untouched. This method only
+        invalidates the specified sessions; the caller decides whether to invoke it
+        before or after ``create_login_session`` as appropriate for the surrounding
+        workflow.
+        """
+        if not session_tokens:
+            return
+        async with self._db.begin_session() as db_session:
+            query = (
+                sa.update(LoginSessionRow)
+                .where(
+                    LoginSessionRow.session_token.in_(session_tokens)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .values(
+                    status=LoginSessionStatus.INVALIDATED,
+                    invalidated_at=sa.func.now(),
+                )
+            )
+            await db_session.execute(query)
+
+    @auth_db_source_resilience.apply()
     async def create_login_session(
         self,
         user_id: UUID,
         access_key: str,
         domain_name: str,
-        *,
-        max_concurrent_sessions: int = 1,
-        tokens_to_invalidate: list[str] | None = None,
     ) -> LoginSessionCreationResult:
-        """Atomically invalidate old sessions (if force), check limit, create session, and record success history.
+        """Create a new active login session and record a successful login history entry.
 
-        Raises ActiveLoginSessionExistsError if the active session count would exceed
-        max_concurrent_sessions after invalidation.
+        All enforcement (cap check and force-eviction decision) is performed by the
+        service layer before this method is called. Eviction of old sessions, when
+        needed, must also be performed by the service layer via
+        ``invalidate_login_sessions_by_tokens`` prior to this call.
         """
         session_token = uuid_mod.uuid4().hex
         async with self._db.connect() as conn:
-            # Force: invalidate specified sessions
-            if tokens_to_invalidate:
-                await conn.execute(
-                    sa.update(LoginSessionRow.__table__)
-                    .where(
-                        LoginSessionRow.__table__.c.session_token.in_(tokens_to_invalidate)
-                        & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
-                    )
-                    .values(
-                        status=LoginSessionStatus.INVALIDATED,
-                        invalidated_at=sa.func.now(),
-                    )
+            await conn.execute(
+                sa.insert(LoginSessionRow.__table__).values(
+                    user_id=user_id,
+                    access_key=access_key,
+                    session_token=session_token,
+                    status=LoginSessionStatus.ACTIVE,
                 )
-
-            # Conditional INSERT: only if active count < max
-            insert_query = sa.insert(LoginSessionRow.__table__).from_select(
-                ["user_id", "access_key", "session_token", "status"],
-                sa.select(
-                    sa.literal(user_id).label("user_id"),
-                    sa.literal(access_key).label("access_key"),
-                    sa.literal(session_token).label("session_token"),
-                    sa.literal(LoginSessionStatus.ACTIVE.value).label("status"),
-                ).where(
-                    sa.select(sa.func.count())
-                    .select_from(LoginSessionRow.__table__)
-                    .where(
-                        (LoginSessionRow.__table__.c.user_id == user_id)
-                        & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
-                    )
-                    .correlate(None)
-                    .scalar_subquery()
-                    < max_concurrent_sessions
-                ),
             )
-            result = await conn.execute(insert_query)
 
-            if result.rowcount == 0:
-                await conn.rollback()
-                raise ActiveLoginSessionExistsError(
-                    extra_msg="An active login session already exists. Use force=true to override."
-                )
-
-            # Record successful login in the same transaction
+            # Record successful login in the same transaction.
             await self._record_login_history(
                 conn, user_id, domain_name, LoginAttemptResult.SUCCESS, fail_reason=None
             )

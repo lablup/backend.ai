@@ -150,11 +150,12 @@ class ValkeyLeaderClient:
             Exception: Any exception from the underlying Redis operation
         """
         # Execute the Lua script
-        result = await self._client.client.invoke_script(
-            script=self._leader_script,
-            keys=[leader_key],
-            args=[server_id, str(lease_duration)],
-        )
+        async with self._client.client() as conn:
+            result = await conn.invoke_script(
+                script=self._leader_script,
+                keys=[leader_key],
+                args=[server_id, str(lease_duration)],
+            )
         return bool(result == 1)
 
     @valkey_leader_resilience.apply()
@@ -180,11 +181,12 @@ class ValkeyLeaderClient:
             Exception: Any exception from the underlying Redis operation
         """
         # Execute the Lua script for atomic release
-        result = await self._client.client.invoke_script(
-            script=self._release_script,
-            keys=[leader_key],
-            args=[server_id],
-        )
+        async with self._client.client() as conn:
+            result = await conn.invoke_script(
+                script=self._release_script,
+                keys=[leader_key],
+                args=[server_id],
+            )
         released = bool(result == 1)
         if released:
             log.info(f"Server {server_id} released leadership for {leader_key}")

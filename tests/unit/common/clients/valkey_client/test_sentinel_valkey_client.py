@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from glide import GlideClient
 from glide.exceptions import ClosingError  # type: ignore[import-not-found]
 
-import ai.backend.common.clients.valkey_client.client as client_module
 from ai.backend.common.clients.valkey_client.client import (
     MonitoringValkeyClient,
+    MonitoringValkeyClientSpec,
     ValkeySentinelClient,
     ValkeySentinelTarget,
     ValkeyStandaloneClient,
@@ -77,12 +79,21 @@ def connected_sentinel_client(
 
 
 def _create_mock_sentinel_client() -> AsyncMock:
+    mock_glide = AsyncMock()
+    mock_glide.ping = AsyncMock(return_value=b"PONG")
+
     client = AsyncMock(spec=ValkeySentinelClient)
     client.need_reconnect = AsyncMock(return_value=False)
     client.ping = AsyncMock()
     client.connect = AsyncMock()
     client.disconnect = AsyncMock()
-    client.client = MagicMock()
+
+    @asynccontextmanager
+    async def mock_client_cm() -> AsyncIterator[AsyncMock]:
+        yield mock_glide
+
+    client.client = mock_client_cm
+    client._mock_glide = mock_glide
     return client
 
 
@@ -235,9 +246,11 @@ class TestMonitoringValkeyClientWithSentinel:
         mock_sentinel_operation_client: AsyncMock,
         mock_sentinel_monitor_client: AsyncMock,
     ) -> MonitoringValkeyClient:
+        spec = MonitoringValkeyClientSpec(monitor_interval=0.01)
         return MonitoringValkeyClient(
             operation_client=mock_sentinel_operation_client,
             monitor_client=mock_sentinel_monitor_client,
+            spec=spec,
         )
 
     # -- _check_connection --
@@ -275,7 +288,7 @@ class TestMonitoringValkeyClientWithSentinel:
         mock_sentinel_monitor_client.ping.side_effect = exception
 
         assert await monitoring_client._check_ping() is True
-        assert monitoring_client._consecutive_failure_count == 0
+        assert monitoring_client._monitor_consecutive_failure_count == 0
 
     async def test_check_ping_accumulates_failures_until_threshold(
         self,
@@ -286,14 +299,14 @@ class TestMonitoringValkeyClientWithSentinel:
         mock_sentinel_monitor_client.ping.side_effect = TimeoutError("Timed out")
 
         assert await monitoring_client._check_ping() is False
-        assert monitoring_client._consecutive_failure_count == 1
+        assert monitoring_client._monitor_consecutive_failure_count == 1
 
         assert await monitoring_client._check_ping() is False
-        assert monitoring_client._consecutive_failure_count == 2
+        assert monitoring_client._monitor_consecutive_failure_count == 2
 
         # Third failure: threshold reached → reconnect
         assert await monitoring_client._check_ping() is True
-        assert monitoring_client._consecutive_failure_count == 0
+        assert monitoring_client._monitor_consecutive_failure_count == 0
 
     async def test_check_ping_resets_failure_count_on_success(
         self,
@@ -305,14 +318,14 @@ class TestMonitoringValkeyClientWithSentinel:
 
         await monitoring_client._check_ping()
         await monitoring_client._check_ping()
-        assert monitoring_client._consecutive_failure_count == 2
+        assert monitoring_client._monitor_consecutive_failure_count == 2
 
         # Recovery: ping succeeds
         mock_sentinel_monitor_client.ping.side_effect = None
         mock_sentinel_monitor_client.ping.return_value = None
 
         assert await monitoring_client._check_ping() is False
-        assert monitoring_client._consecutive_failure_count == 0
+        assert monitoring_client._monitor_consecutive_failure_count == 0
 
     # -- _reconnect --
 
@@ -378,7 +391,6 @@ class TestMonitoringValkeyClientWithSentinel:
 
         mock_reconnect = AsyncMock()
         monkeypatch.setattr(monitoring_client, "_reconnect", mock_reconnect)
-        monkeypatch.setattr(client_module, "_DEFAULT_MONITOR_INTERVAL", 0.01)
 
         task = asyncio.create_task(monitoring_client._monitor_connection())
         await asyncio.sleep(0.1)
@@ -417,7 +429,6 @@ class TestMonitoringValkeyClientWithSentinel:
                 raise ConnectionError("Sentinel temporarily unavailable")
 
         monkeypatch.setattr(monitoring_client, "_reconnect", failing_then_succeeding_reconnect)
-        monkeypatch.setattr(client_module, "_DEFAULT_MONITOR_INTERVAL", 0.01)
 
         task = asyncio.create_task(monitoring_client._monitor_connection())
         await asyncio.sleep(0.2)
@@ -428,6 +439,139 @@ class TestMonitoringValkeyClientWithSentinel:
             pass
 
         assert reconnect_call_count == 2
+
+
+# ---- MonitoringValkeyClient.client() context manager with Sentinel ----
+
+
+class TestMonitoringValkeyClientContextManagerWithSentinel:
+    """Tests for the client() context manager with Sentinel-backed operation client."""
+
+    @pytest.fixture
+    def mock_sentinel_operation_client(self) -> AsyncMock:
+        return _create_mock_sentinel_client()
+
+    @pytest.fixture
+    def mock_sentinel_monitor_client(self) -> AsyncMock:
+        return _create_mock_sentinel_client()
+
+    @pytest.fixture
+    def monitoring_client(
+        self,
+        mock_sentinel_operation_client: AsyncMock,
+        mock_sentinel_monitor_client: AsyncMock,
+    ) -> MonitoringValkeyClient:
+        spec = MonitoringValkeyClientSpec(
+            operation_failure_threshold=3,
+            monitor_interval=0.01,
+        )
+        return MonitoringValkeyClient(
+            operation_client=mock_sentinel_operation_client,
+            monitor_client=mock_sentinel_monitor_client,
+            spec=spec,
+        )
+
+    async def test_client_yields_glide_client(
+        self, monitoring_client: MonitoringValkeyClient
+    ) -> None:
+        """client() yields the operation GlideClient from sentinel client."""
+        async with monitoring_client.client() as conn:
+            result = await conn.ping()
+            assert result == b"PONG"
+
+    async def test_client_resets_failure_count_on_success(
+        self, monitoring_client: MonitoringValkeyClient
+    ) -> None:
+        monitoring_client._operation_failure_count = 2
+        async with monitoring_client.client() as conn:
+            await conn.ping()
+        assert monitoring_client._operation_failure_count == 0
+
+    async def test_client_increments_failure_count_on_connection_error(
+        self, monitoring_client: MonitoringValkeyClient
+    ) -> None:
+        with pytest.raises(ConnectionError):
+            async with monitoring_client.client() as _conn:
+                raise ConnectionError("simulated sentinel connection failure")
+        assert monitoring_client._operation_failure_count == 1
+
+    async def test_client_does_not_increment_on_non_connection_error(
+        self, monitoring_client: MonitoringValkeyClient
+    ) -> None:
+        with pytest.raises(ValueError):
+            async with monitoring_client.client() as _conn:
+                raise ValueError("business logic error")
+        assert monitoring_client._operation_failure_count == 0
+
+    async def test_client_sets_reconnect_event_at_threshold(
+        self, monitoring_client: MonitoringValkeyClient
+    ) -> None:
+        """When operation failure threshold is reached, reconnect event is set."""
+        threshold = monitoring_client._operation_failure_threshold
+
+        for _ in range(threshold):
+            with pytest.raises(ConnectionError):
+                async with monitoring_client.client() as _conn:
+                    raise ConnectionError("failure")
+
+        assert monitoring_client._operation_failure_count == 0
+        assert monitoring_client._reconnect_event.is_set()
+
+    async def test_client_does_not_set_reconnect_event_below_threshold(
+        self, monitoring_client: MonitoringValkeyClient
+    ) -> None:
+        threshold = monitoring_client._operation_failure_threshold
+
+        for _ in range(threshold - 1):
+            with pytest.raises(ConnectionError):
+                async with monitoring_client.client() as _conn:
+                    raise ConnectionError("failure")
+
+        assert monitoring_client._operation_failure_count == threshold - 1
+        assert not monitoring_client._reconnect_event.is_set()
+
+    async def test_reconnect_event_wakes_monitor_loop(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """When client() sets _reconnect_event, the monitor loop wakes up and reconnects."""
+        reconnect_called = asyncio.Event()
+        original_reconnect = monitoring_client._reconnect
+
+        async def tracking_reconnect() -> None:
+            await original_reconnect()
+            reconnect_called.set()
+
+        monkeypatch.setattr(monitoring_client, "_reconnect", tracking_reconnect)
+
+        task = asyncio.create_task(monitoring_client._monitor_connection())
+        try:
+            # Trigger operation failures to reach threshold
+            threshold = monitoring_client._operation_failure_threshold
+            for _ in range(threshold):
+                with pytest.raises(ConnectionError):
+                    async with monitoring_client.client() as _conn:
+                        raise ConnectionError("failure")
+
+            # Wait for monitor loop to pick up the reconnect event
+            await asyncio.wait_for(reconnect_called.wait(), timeout=1.0)
+            assert reconnect_called.is_set()
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    async def test_client_tracks_not_connected_error_from_sentinel(
+        self, monitoring_client: MonitoringValkeyClient
+    ) -> None:
+        """ClientNotConnectedError from sentinel operation client is tracked as connection error."""
+        with pytest.raises(ClientNotConnectedError):
+            async with monitoring_client.client() as _conn:
+                raise ClientNotConnectedError("ValkeySentinelClient is not connected")
+        assert monitoring_client._operation_failure_count == 1
 
 
 # ---- create_valkey_client() factory ----

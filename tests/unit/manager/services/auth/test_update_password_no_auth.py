@@ -13,6 +13,9 @@ from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import GenericBadRequest, RejectedByHook
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.actions.update_password_no_auth import (
     UpdatePasswordNoAuthAction,
 )
@@ -49,6 +52,7 @@ def auth_service(
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
         valkey_session_client=AsyncMock(),
+        user_resource_policy_repository=AsyncMock(spec=UserResourcePolicyRepository),
     )
 
 

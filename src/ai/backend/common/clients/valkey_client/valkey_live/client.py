@@ -133,12 +133,14 @@ class ValkeyLiveClient:
         :param batch: The batch to execute.
         :return: List of command results.
         """
-        return await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            return await conn.exec(batch, raise_on_error=True)
 
     @valkey_live_resilience.apply()
     async def get_live_data(self, key: str) -> bytes | None:
         """Get live data value by key."""
-        return await self._client.client.get(key)
+        async with self._client.client() as conn:
+            return await conn.get(key)
 
     @valkey_live_resilience.apply()
     async def get_multiple_live_data(self, keys: list[str]) -> list[bytes | None]:
@@ -150,7 +152,8 @@ class ValkeyLiveClient:
         """
         if not keys:
             return []
-        return await self._client.client.mget(cast(list[str | bytes], keys))
+        async with self._client.client() as conn:
+            return await conn.mget(cast(list[str | bytes], keys))
 
     @valkey_live_resilience.apply()
     async def store_live_data(
@@ -164,7 +167,8 @@ class ValkeyLiveClient:
         """Store live data value for key with optional expiration."""
         expiry = ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION if ex is None else ex)
         conditional_set = ConditionalChange.ONLY_IF_EXISTS if xx else None
-        await self._client.client.set(key, value, conditional_set=conditional_set, expiry=expiry)
+        async with self._client.client() as conn:
+            await conn.set(key, value, conditional_set=conditional_set, expiry=expiry)
 
     @valkey_live_resilience.apply()
     async def store_multiple_live_data(
@@ -188,7 +192,8 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def delete_live_data(self, key: str) -> int:
         """Delete live data keys."""
-        return await self._client.client.delete([key])
+        async with self._client.client() as conn:
+            return await conn.delete([key])
 
     @valkey_live_resilience.apply()
     async def incr_live_data(
@@ -226,7 +231,8 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def get_server_time(self) -> float:
         """Get server time as timestamp."""
-        result = await self._client.client.time()
+        async with self._client.client() as conn:
+            result = await conn.time()
         if len(result) != 2:
             raise ValueError(
                 f"Unexpected result from time command: {result}. Expected a tuple of (seconds, microseconds)."
@@ -239,11 +245,12 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def count_active_connections(self, session_id: str) -> int:
         """Count active connections for a session."""
-        return await self._client.client.zcount(
-            self._active_app_connection_key(session_id),
-            InfBound.NEG_INF,
-            InfBound.POS_INF,
-        )
+        async with self._client.client() as conn:
+            return await conn.zcount(
+                self._active_app_connection_key(session_id),
+                InfBound.NEG_INF,
+                InfBound.POS_INF,
+            )
 
     @valkey_live_resilience.apply()
     async def add_scheduler_metadata(
@@ -252,7 +259,8 @@ class ValkeyLiveClient:
         mapping: Mapping[str, str | bytes],
     ) -> int:
         """Store scheduler metadata in hash fields."""
-        return await self._client.client.hset(key, cast(Mapping[str | bytes, str | bytes], mapping))
+        async with self._client.client() as conn:
+            return await conn.hset(key, cast(Mapping[str | bytes, str | bytes], mapping))
 
     @valkey_live_resilience.apply()
     async def get_scheduler_metadata(self, name: str) -> Mapping[str, str]:
@@ -262,7 +270,8 @@ class ValkeyLiveClient:
         :param name: The hash key name.
         :return: Dictionary of field names to values.
         """
-        result = await self._client.client.hgetall(name)
+        async with self._client.client() as conn:
+            result = await conn.hgetall(name)
         # Convert bytes keys and values to strings
         metadata: dict[str, str] = {}
         for key, value in result.items():
@@ -293,7 +302,8 @@ class ValkeyLiveClient:
             stream_id=stream_id,
         )
         tracker_key = self._active_app_connection_key(session_id)
-        await self._client.client.zadd(tracker_key, {connection_id: current_time})
+        async with self._client.client() as conn:
+            await conn.zadd(tracker_key, {connection_id: current_time})
 
     @valkey_live_resilience.apply()
     async def update_app_connection_tracker(
@@ -316,7 +326,8 @@ class ValkeyLiveClient:
             stream_id=stream_id,
         )
         current_time = await self.get_server_time()
-        await self._client.client.zadd(tracker_key, {tracker_val: current_time})
+        async with self._client.client() as conn:
+            await conn.zadd(tracker_key, {tracker_val: current_time})
 
     @valkey_live_resilience.apply()
     async def remove_connection_tracker(
@@ -339,7 +350,8 @@ class ValkeyLiveClient:
             service=service,
             stream_id=stream_id,
         )
-        return await self._client.client.zrem(tracker_key, [connection_id])
+        async with self._client.client() as conn:
+            return await conn.zrem(tracker_key, [connection_id])
 
     @valkey_live_resilience.apply()
     async def remove_stale_connections(
@@ -355,9 +367,10 @@ class ValkeyLiveClient:
         :return: Number of connections removed.
         """
         tracker_key = self._active_app_connection_key(session_id)
-        return await self._client.client.zremrangebyscore(
-            tracker_key, InfBound.NEG_INF, ScoreBoundary(max_timestamp)
-        )
+        async with self._client.client() as conn:
+            return await conn.zremrangebyscore(
+                tracker_key, InfBound.NEG_INF, ScoreBoundary(max_timestamp)
+            )
 
     @valkey_live_resilience.apply()
     async def update_agent_last_seen(self, agent_id: str, timestamp: float) -> None:
@@ -367,7 +380,8 @@ class ValkeyLiveClient:
         :param agent_id: The agent ID to update.
         :param timestamp: The timestamp when the agent was last seen.
         """
-        await self._client.client.hset(_AGENT_LAST_SEEN_HASH, {agent_id: str(timestamp)})
+        async with self._client.client() as conn:
+            await conn.hset(_AGENT_LAST_SEEN_HASH, {agent_id: str(timestamp)})
 
     @valkey_live_resilience.apply()
     async def remove_agent_last_seen(self, agent_id: str) -> None:
@@ -376,7 +390,8 @@ class ValkeyLiveClient:
 
         :param agent_id: The agent ID to remove.
         """
-        await self._client.client.hdel(_AGENT_LAST_SEEN_HASH, [agent_id])
+        async with self._client.client() as conn:
+            await conn.hdel(_AGENT_LAST_SEEN_HASH, [agent_id])
 
     def _get_session_requests_key(self, session_id: str) -> str:
         """
@@ -445,25 +460,26 @@ class ValkeyLiveClient:
 
         :return: List of (agent_id, last_seen_timestamp) tuples.
         """
-        results = []
-        cursor = b"0"
-        while True:
-            scan_result = await self._client.client.hscan(_AGENT_LAST_SEEN_HASH, cursor)
-            if len(scan_result) != 2:
-                break
-            cursor = cast(bytes, scan_result[0])
-            fields = cast(list[bytes], scan_result[1])
-            for i in range(0, len(fields), 2):
-                if i + 1 >= len(fields):
-                    continue
-                try:
-                    field_name = fields[i].decode("utf-8")
-                    field_value = float(fields[i + 1].decode("utf-8"))
-                    results.append((field_name, field_value))
-                except (ValueError, UnicodeDecodeError):
-                    continue
-            if cursor == b"0":
-                break
+        async with self._client.client() as conn:
+            results = []
+            cursor = b"0"
+            while True:
+                scan_result = await conn.hscan(_AGENT_LAST_SEEN_HASH, cursor)
+                if len(scan_result) != 2:
+                    break
+                cursor = cast(bytes, scan_result[0])
+                fields = cast(list[bytes], scan_result[1])
+                for i in range(0, len(fields), 2):
+                    if i + 1 >= len(fields):
+                        continue
+                    try:
+                        field_name = fields[i].decode("utf-8")
+                        field_value = float(fields[i + 1].decode("utf-8"))
+                        results.append((field_name, field_value))
+                    except (ValueError, UnicodeDecodeError):
+                        continue
+                if cursor == b"0":
+                    break
 
         return results
 
@@ -475,19 +491,20 @@ class ValkeyLiveClient:
         :param pattern: The pattern to match keys against.
         :return: List of matching keys.
         """
-        results = []
-        cursor = b"0"
-        while True:
-            scan_result = await self._client.client.scan(cursor, match=pattern, count=100)
-            if len(scan_result) != 2:
-                break
-            cursor = cast(bytes, scan_result[0])
-            keys = cast(list[bytes], scan_result[1])
+        async with self._client.client() as conn:
+            results = []
+            cursor = b"0"
+            while True:
+                scan_result = await conn.scan(cursor, match=pattern, count=100)
+                if len(scan_result) != 2:
+                    break
+                cursor = cast(bytes, scan_result[0])
+                keys = cast(list[bytes], scan_result[1])
 
-            for key in keys:
-                results.append(key.decode("utf-8"))
-            if cursor == b"0":
-                break
+                for key in keys:
+                    results.append(key.decode("utf-8"))
+                if cursor == b"0":
+                    break
 
         return results
 
@@ -517,7 +534,8 @@ class ValkeyLiveClient:
         :param key: The hash key.
         :return: Dictionary of field names to values.
         """
-        result = await self._client.client.hgetall(key)
+        async with self._client.client() as conn:
+            result = await conn.hgetall(key)
         # Convert bytes keys and values to strings
         str_result: dict[str, str] = {}
         for k, v in result.items():
@@ -552,7 +570,8 @@ class ValkeyLiveClient:
                 health_check_config.model_dump_json(),
                 expiry=ExpirySet(ExpiryType.SEC, 3600),
             )
-        await self._client.client.exec(pipe, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(pipe, raise_on_error=True)
 
     @valkey_live_resilience.apply()
     async def delete_key(self, key: str) -> int:
@@ -562,7 +581,8 @@ class ValkeyLiveClient:
         :param key: The key to delete.
         :return: Number of keys deleted.
         """
-        return await self._client.client.delete([key])
+        async with self._client.client() as conn:
+            return await conn.delete([key])
 
     def _active_app_connection_key(self, session_id: str) -> str:
         """
@@ -596,4 +616,5 @@ class ValkeyLiveClient:
         :param keys: List of keys to check.
         :return: Number of keys that exist.
         """
-        return await self._client.client.exists(cast(list[str | bytes], list(keys)))
+        async with self._client.client() as conn:
+            return await conn.exists(cast(list[str | bytes], list(keys)))

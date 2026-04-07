@@ -30,6 +30,13 @@ class VFolderConditions:
 
         return inner
 
+    @staticmethod
+    def by_ids(vfolder_ids: Collection[UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.id.in_(vfolder_ids)
+
+        return inner
+
     # ── name string filter factories ──
 
     @staticmethod

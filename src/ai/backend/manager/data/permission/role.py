@@ -103,6 +103,7 @@ class UserRoleAssignmentInput:
     user_id: uuid.UUID
     role_id: uuid.UUID
     granted_by: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -147,6 +148,22 @@ class UserRoleRevocationInput:
 
     user_id: uuid.UUID
     role_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class ProjectRoleCount:
+    """Number of roles a user still holds in a project after revocation."""
+
+    project_id: uuid.UUID
+    remaining_count: int
+
+
+@dataclass(frozen=True)
+class RoleRevocationResult:
+    """Result of revoking a role from a user."""
+
+    user_role_id: uuid.UUID
+    project_remaining_roles: list[ProjectRoleCount] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

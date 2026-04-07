@@ -82,6 +82,9 @@ from ai.backend.manager.repositories.vfolder.types import (
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     AdminSearchVFoldersAction,
 )
+from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
+    BatchLoadVFoldersByIdsAction,
+)
 from ai.backend.manager.services.vfolder.actions.create_v2 import CreateVFolderV2Action
 from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
@@ -156,6 +159,28 @@ class VFolderAdapter(BaseAdapter):
             ),
             unmanaged_path=data.unmanaged_path,
         )
+
+    # -------------------------------------------------------------------------
+    # Batch load (DataLoader)
+    # -------------------------------------------------------------------------
+
+    async def batch_load_by_ids(self, ids: list[UUID]) -> list[VFolderNode | None]:
+        """Batch fetch vfolders by IDs for GraphQL DataLoader.
+
+        Used by field resolvers (e.g. ``ModelCardGQL.vfolder``) that surface a
+        related vfolder for an entity that is already accessible to the caller.
+        Returns nodes in the same order as the input IDs; missing entries are
+        ``None``.
+        """
+        if not ids:
+            return []
+        action_result = await self._processors.vfolder.batch_load_vfolders_by_ids.wait_for_complete(
+            BatchLoadVFoldersByIdsAction(ids=list(ids))
+        )
+        return [
+            self._vfolder_data_to_node(item) if item is not None else None
+            for item in action_result.data
+        ]
 
     # -------------------------------------------------------------------------
     # Search
