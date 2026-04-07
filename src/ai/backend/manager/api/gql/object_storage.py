@@ -257,7 +257,6 @@ class UpdateObjectStoragePayload:
         description="Payload for deleting an object storage.",
     ),
     model=DeleteObjectStoragePayloadDTO,
-    fields=["id"],
     name="DeleteObjectStoragePayload",
 )
 class DeleteObjectStoragePayload(PydanticOutputMixin[DeleteObjectStoragePayloadDTO]):
