@@ -104,6 +104,36 @@ def assign(user_id: str, role_id: str) -> None:
     asyncio.run(_run())
 
 
+@assignment.command("assign-by-name")
+@click.option("--role-id", required=True, type=click.UUID, help="Role UUID to assign.")
+@click.option("--project-id", required=True, type=click.UUID, help="Project UUID to bind users to.")
+@click.option(
+    "--names",
+    required=True,
+    type=str,
+    help="Comma-separated list of email addresses or usernames.",
+)
+def assign_by_name(role_id: UUID, project_id: UUID, names: str) -> None:
+    """Assign a role to users by email or username, with project binding."""
+    from ai.backend.common.dto.manager.v2.group.request import AssignUsersByNameToProjectInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.rbac.assign_role_by_name(
+                AssignUsersByNameToProjectInput(
+                    names=[n.strip() for n in names.split(",") if n.strip()],
+                    role_id=role_id,
+                    project_id=project_id,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 @assignment.command()
 @click.option("--user-id", required=True, help="User UUID to revoke the role from.")
 @click.option("--role-id", required=True, help="Role UUID to revoke.")

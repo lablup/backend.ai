@@ -6,6 +6,10 @@ from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.services.group.actions.assign_users_by_name_to_project import (
+    AssignUsersByNameToProjectAction,
+    AssignUsersByNameToProjectActionResult,
+)
 from ai.backend.manager.services.group.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
     AssignUsersToProjectActionResult,
@@ -68,6 +72,9 @@ class GroupProcessors(AbstractProcessorPackage):
     assign_users_to_project: SingleEntityActionProcessor[
         AssignUsersToProjectAction, AssignUsersToProjectActionResult
     ]
+    assign_users_by_name_to_project: SingleEntityActionProcessor[
+        AssignUsersByNameToProjectAction, AssignUsersByNameToProjectActionResult
+    ]
     unassign_users_from_project: SingleEntityActionProcessor[
         UnassignUsersFromProjectAction, UnassignUsersFromProjectActionResult
     ]
@@ -109,6 +116,11 @@ class GroupProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=rbac_single_entity_validators,
         )
+        self.assign_users_by_name_to_project = SingleEntityActionProcessor(
+            group_service.assign_users_by_name_to_project,
+            action_monitors,
+            validators=rbac_single_entity_validators,
+        )
         self.unassign_users_from_project = SingleEntityActionProcessor(
             group_service.unassign_users_from_project,
             action_monitors,
@@ -129,5 +141,6 @@ class GroupProcessors(AbstractProcessorPackage):
             SearchProjectsByUserAction.spec(),
             GetProjectAction.spec(),
             AssignUsersToProjectAction.spec(),
+            AssignUsersByNameToProjectAction.spec(),
             UnassignUsersFromProjectAction.spec(),
         ]

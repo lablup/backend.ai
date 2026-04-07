@@ -121,6 +121,12 @@ def register_v2_rbac_routes(
         handler.bulk_revoke_role,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "POST",
+        "/assignments/assign-by-name",
+        handler.assign_role_by_name,
+        middlewares=[auth_required],
+    )
 
     # Permission Matrix
     registry.add(

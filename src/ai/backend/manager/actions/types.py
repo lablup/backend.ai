@@ -19,6 +19,7 @@ class ActionOperationType(enum.StrEnum):
     UPDATE = "update"
     DELETE = "delete"
     PURGE = "purge"
+    GRANT_READ = "grant_read"
 
     def to_permission_operation(self) -> OperationType:
         match self:
@@ -34,6 +35,8 @@ class ActionOperationType(enum.StrEnum):
                 return OperationType.SOFT_DELETE
             case ActionOperationType.PURGE:
                 return OperationType.HARD_DELETE
+            case ActionOperationType.GRANT_READ:
+                return OperationType.GRANT_READ
 
 
 @dataclass

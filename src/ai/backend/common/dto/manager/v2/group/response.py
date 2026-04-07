@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.user.response import UserNode
 
 __all__ = (
     "AdminSearchGroupsPayload",
+    "AssignUsersByNameToProjectPayload",
     "AssignUsersToProjectPayload",
     "DeleteProjectPayload",
     "ProjectBasicInfo",
@@ -177,6 +178,23 @@ class AdminSearchGroupsPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of groups matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class AssignUsersByNameToProjectPayload(BaseResponseModel):
+    """Payload for assign-by-name response.
+
+    Intentionally returns only counts and failed names (not user details)
+    to avoid leaking information about resolved users.
+    """
+
+    assigned_count: int = Field(description="Number of users successfully assigned.")
+    failed_names: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Names that could not be assigned. The reason is intentionally ambiguous "
+            "(user not found, wrong domain, or already assigned)."
+        ),
+    )
 
 
 class UnassignUserError(BaseResponseModel):

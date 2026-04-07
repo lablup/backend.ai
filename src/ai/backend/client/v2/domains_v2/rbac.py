@@ -5,6 +5,8 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.group.request import AssignUsersByNameToProjectInput
+from ai.backend.common.dto.manager.v2.group.response import AssignUsersByNameToProjectPayload
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
@@ -189,6 +191,17 @@ class V2RBACClient(BaseDomainClient):
             f"{_PATH}/assignments/bulk-assign",
             request=request,
             response_model=BulkAssignRoleResultPayload,
+        )
+
+    async def assign_role_by_name(
+        self, request: AssignUsersByNameToProjectInput
+    ) -> AssignUsersByNameToProjectPayload:
+        """Assign a role to users identified by email or username, with project binding."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/assignments/assign-by-name",
+            request=request,
+            response_model=AssignUsersByNameToProjectPayload,
         )
 
     async def bulk_revoke_role(self, request: BulkRevokeRoleInput) -> BulkRevokeRoleResultPayload:

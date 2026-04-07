@@ -662,6 +662,56 @@ class GroupDBSource:
 
             return [row.to_data() for row in new_user_rows]
 
+    async def resolve_users_by_name(
+        self, project_id: UUID, names: list[str]
+    ) -> tuple[list[UUID], list[str]]:
+        """Resolve email/username to user UUIDs within the project's domain.
+
+        Matches ``UserRow.email`` or ``UserRow.username`` against the given
+        names, filtered to the same domain as the project and not already
+        assigned. Unresolvable names (not found, wrong domain, or already
+        assigned) are returned in ``failed_names`` without distinguishing
+        the reason, to prevent user enumeration.
+
+        Returns (resolved_user_ids, failed_names).
+        """
+        if not names:
+            return ([], [])
+
+        async with self._db.begin_readonly_session() as session:
+            project_domain_subq = (
+                sa.select(GroupRow.domain_name).where(GroupRow.id == project_id).scalar_subquery()
+            )
+
+            unique_names = list(set(names))
+            rows = (
+                await session.scalars(
+                    sa.select(UserRow)
+                    .outerjoin(
+                        AssocGroupUserRow,
+                        (UserRow.uuid == AssocGroupUserRow.user_id)
+                        & (AssocGroupUserRow.group_id == project_id),
+                    )
+                    .where(
+                        (UserRow.email.in_(unique_names) | UserRow.username.in_(unique_names))
+                        & (UserRow.domain_name == project_domain_subq)
+                        & AssocGroupUserRow.user_id.is_(None)
+                    )
+                )
+            ).all()
+
+            resolved_names: set[str] = set()
+            resolved_ids: list[UUID] = []
+            for row in rows:
+                resolved_ids.append(row.uuid)
+                if row.email in unique_names:
+                    resolved_names.add(row.email)
+                if row.username is not None and row.username in unique_names:
+                    resolved_names.add(row.username)
+
+            failed_names = [n for n in names if n not in resolved_names]
+            return (resolved_ids, failed_names)
+
     async def unassign_users_from_project(
         self, unbinder: UserProjectEntityUnbinder
     ) -> UnassignUsersResult:

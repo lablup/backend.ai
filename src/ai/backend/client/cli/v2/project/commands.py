@@ -115,3 +115,33 @@ def role_search(
             await registry.close()
 
     asyncio.run(_run())
+
+
+@project.command("assign-by-username")
+@click.argument("project_id", type=click.UUID)
+@click.option("--role-id", required=True, type=click.UUID, help="Role UUID to assign to the users.")
+@click.option(
+    "--names",
+    required=True,
+    type=str,
+    help="Comma-separated list of email addresses or usernames to assign.",
+)
+def assign_by_username(project_id: UUID, role_id: UUID, names: str) -> None:
+    """Assign a role to users by email or username, binding them to this project."""
+    from ai.backend.common.dto.manager.v2.group.request import AssignUsersToRoleByUsernameInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.rbac.assign_role_by_username(
+                AssignUsersToRoleByUsernameInput(
+                    names=[n.strip() for n in names.split(",") if n.strip()],
+                    role_id=role_id,
+                    project_id=project_id,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())

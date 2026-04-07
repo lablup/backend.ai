@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
 
 __all__ = (
     "AdminSearchProjectsInput",
+    "AssignUsersByNameToProjectInput",
     "AssignUsersToProjectInput",
     "CreateProjectInput",
     "DeleteProjectInput",
@@ -177,6 +178,17 @@ class AssignUsersToProjectInput(BaseRequestModel):
 
     user_ids: list[UUID] = Field(description="List of user UUIDs to assign to the project.")
     role_id: UUID = Field(description="UUID of the project role to assign to the users.")
+
+
+class AssignUsersByNameToProjectInput(BaseRequestModel):
+    """Input for assigning a role to users identified by email or username, with project binding."""
+
+    names: list[str] = Field(
+        description="List of email addresses or usernames to assign.",
+        min_length=1,
+    )
+    role_id: UUID = Field(description="UUID of the role to assign.")
+    project_id: UUID = Field(description="UUID of the project to bind the users to.")
 
 
 class UnassignUsersFromProjectInput(BaseRequestModel):

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BaseRootResponseModel, BodyParam, PathParam
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.v2.group.request import AssignUsersByNameToProjectInput
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
@@ -209,6 +210,14 @@ class V2RBACHandler:
     ) -> APIResponse:
         """Bulk-assign a role to multiple users."""
         result = await self._adapter.bulk_assign_role(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def assign_role_by_name(
+        self,
+        body: BodyParam[AssignUsersByNameToProjectInput],
+    ) -> APIResponse:
+        """Assign a role to users identified by email or username."""
+        result = await self._adapter.assign_role_by_name(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def bulk_revoke_role(

@@ -24,6 +24,10 @@ from ai.backend.common.dto.manager.rbac import (
     SearchRolesResponse,
 )
 from ai.backend.common.dto.manager.rbac.response import PaginationInfo
+from ai.backend.common.dto.manager.v2.group.request import (
+    AssignUsersByNameToProjectInput as AssignUsersByNameToProjectInputDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import AssignUsersByNameToProjectPayload
 from ai.backend.common.dto.manager.v2.rbac import (
     AssociationScopesEntitiesNode,
     BulkAssignRoleFailureInfo,
@@ -175,6 +179,9 @@ from ai.backend.manager.repositories.permission_controller.types import ScopedRo
 from ai.backend.manager.repositories.permission_controller.updaters import (
     PermissionUpdaterSpec,
     RoleUpdaterSpec,
+)
+from ai.backend.manager.services.group.actions.assign_users_by_name_to_project import (
+    AssignUsersByNameToProjectAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
@@ -895,6 +902,22 @@ class RBACAdapter(BaseAdapter):
                 BulkAssignRoleFailureInfo(user_id=f.user_id, message=f.message)
                 for f in result.failures
             ],
+        )
+
+    async def assign_role_by_name(
+        self, input: AssignUsersByNameToProjectInputDTO
+    ) -> AssignUsersByNameToProjectPayload:
+        """Assign a role to users identified by email or username, with project binding."""
+        result = await self._processors.group.assign_users_by_name_to_project.wait_for_complete(
+            AssignUsersByNameToProjectAction(
+                project_id=input.project_id,
+                names=input.names,
+                role_id=input.role_id,
+            )
+        )
+        return AssignUsersByNameToProjectPayload(
+            assigned_count=result.assigned_count,
+            failed_names=result.failed_names,
         )
 
     async def bulk_revoke_role(self, input: BulkRevokeRoleInputDTO) -> BulkRevokeRoleResultPayload:
