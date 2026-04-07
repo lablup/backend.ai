@@ -149,24 +149,40 @@ class AuthService:
         self._valkey_session_client = valkey_session_client
         self._user_resource_policy_repository = user_resource_policy_repository
 
+    async def _resolve_group_role(
+        self,
+        group_id: uuid.UUID,
+        user_id: uuid.UUID,
+        is_superadmin: bool,
+    ) -> str:
+        """Resolve the caller's role within the given project/group.
+
+        Superadmins always have access. For non-superadmins, verify membership via the
+        repository and raise ``ObjectNotFound`` when the user is not a member (to avoid
+        leaking whether the project exists). Per-group roles are not yet implemented, so
+        all members currently resolve to ``"user"``.
+        """
+        if is_superadmin:
+            # Superadmins have global access across all domains and groups.
+            return "user"
+        try:
+            # TODO: per-group role is not yet implemented.
+            await self._auth_repository.get_group_membership(group_id, user_id)
+        except GroupMembershipNotFoundError as e:
+            raise ObjectNotFound(
+                extra_msg="No such project or you are not the member of it.",
+                object_name="project (user group)",
+            ) from e
+        return "user"
+
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
-        group_role = None
+        group_role: str | None = None
         if action.group_id is not None:
-            if action.is_superadmin:
-                # Superadmins have global access across all domains and groups.
-                group_role = "user"
-            else:
-                try:
-                    # TODO: per-group role is not yet implemented.
-                    await self._auth_repository.get_group_membership(
-                        action.group_id, action.user_id
-                    )
-                    group_role = "user"
-                except GroupMembershipNotFoundError as e:
-                    raise ObjectNotFound(
-                        extra_msg="No such project or you are not the member of it.",
-                        object_name="project (user group)",
-                    ) from e
+            group_role = await self._resolve_group_role(
+                group_id=action.group_id,
+                user_id=action.user_id,
+                is_superadmin=action.is_superadmin,
+            )
 
         return GetRoleActionResult(
             global_role="superadmin" if action.is_superadmin else "user",
