@@ -237,6 +237,7 @@ def create_services(args: ServiceArgs) -> Services:
                 session_repository=repositories.session.repository,
                 scheduling_controller=args.scheduling_controller,
                 appproxy_client_pool=args.appproxy_client_pool,
+                user_repository=repositories.user.repository,
             )
         ),
         keypair_resource_policy=KeypairResourcePolicyService(

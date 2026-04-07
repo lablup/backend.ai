@@ -89,6 +89,7 @@ async def session_processors(
         session_repository=session_repo,
         scheduling_controller=scheduling_controller_mock,
         appproxy_client_pool=appproxy_client_pool,
+        user_repository=AsyncMock(),
     )
     service = SessionService(args)
     return SessionProcessors(

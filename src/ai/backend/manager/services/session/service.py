@@ -31,6 +31,7 @@ from ai.backend.common.exception import (
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
+    AccessKey,
     ContainerId,
     ImageAlias,
     KernelEnqueueingConfig,
@@ -75,6 +76,7 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -232,6 +234,7 @@ class SessionServiceArgs:
     session_repository: SessionRepository
     scheduling_controller: SchedulingController
     appproxy_client_pool: AppProxyClientPool
+    user_repository: UserRepository
 
 
 class SessionService:
@@ -242,6 +245,7 @@ class SessionService:
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
+    _user_repository: UserRepository
     _scheduling_controller: SchedulingController
     _appproxy_client_pool: AppProxyClientPool
     _database_ptask_group: aiotools.PersistentTaskGroup
@@ -258,11 +262,33 @@ class SessionService:
         self._error_monitor = args.error_monitor
         self._idle_checker_host = args.idle_checker_host
         self._session_repository = args.session_repository
+        self._user_repository = args.user_repository
         self._scheduling_controller = args.scheduling_controller
         self._appproxy_client_pool = args.appproxy_client_pool
         self._database_ptask_group = aiotools.PersistentTaskGroup()
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
+
+    async def _resolve_owner_access_key(
+        self,
+        owner_id: uuid.UUID | None,
+        fallback: AccessKey,
+    ) -> AccessKey:
+        """Resolve a delegated owner UUID to that user's main access key.
+
+        Returns ``fallback`` when ``owner_id`` is None. Otherwise loads the
+        target user via the user repository and returns its main access key.
+        Raises ``InternalServerError`` if the target user has no main access
+        key configured.
+        """
+        if owner_id is None:
+            return fallback
+        user_data = await self._user_repository.get_user_by_uuid(owner_id)
+        if user_data.main_access_key is None:
+            raise InternalServerError(
+                f"Delegated owner {owner_id} has no main access key configured"
+            )
+        return AccessKey(user_data.main_access_key)
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name
@@ -758,7 +784,9 @@ class SessionService:
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_access_key = await self._resolve_owner_access_key(
+            action.owner_id, action.owner_access_key
+        )
         forced = action.forced
         recursive = action.recursive
 
@@ -1029,7 +1057,9 @@ class SessionService:
     ) -> GetContainerLogsActionResult:
         resp = {"result": {"logs": ""}}
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_access_key = await self._resolve_owner_access_key(
+            action.owner_id, action.owner_access_key
+        )
         kernel_id = action.kernel_id
 
         compute_session = await self._session_repository.get_session_validated(
@@ -1264,7 +1294,9 @@ class SessionService:
 
     async def rename_session(self, action: RenameSessionAction) -> RenameSessionActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_access_key = await self._resolve_owner_access_key(
+            action.owner_id, action.owner_access_key
+        )
         new_name = action.new_name
 
         try:
@@ -1282,7 +1314,9 @@ class SessionService:
 
     async def restart_session(self, action: RestartSessionAction) -> RestartSessionActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_access_key = await self._resolve_owner_access_key(
+            action.owner_id, action.owner_access_key
+        )
 
         session = await self._session_repository.get_session_validated(
             session_name,
@@ -1295,7 +1329,9 @@ class SessionService:
 
     async def shutdown_service(self, action: ShutdownServiceAction) -> ShutdownServiceActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_access_key = await self._resolve_owner_access_key(
+            action.owner_id, action.owner_access_key
+        )
         service_name = action.service_name
 
         session = await self._session_repository.get_session_validated(
@@ -1308,7 +1344,7 @@ class SessionService:
 
     async def start_service(self, action: StartServiceAction) -> StartServiceActionResult:
         session_name = action.session_name
-        access_key = action.access_key
+        access_key = await self._resolve_owner_access_key(action.owner_id, action.access_key)
         service = action.service
         port = action.port
 
@@ -1591,17 +1627,38 @@ class SessionService:
 
         Resolves the image, builds a SessionCreationSpec, and delegates
         to the scheduling controller. Returns immediately with PENDING status.
+
+        When ``action.owner_id`` is set, the target user's main access key,
+        role, and domain are loaded from the user repository and used in place
+        of the caller's identity for delegation.
         """
+        user_id = action.user_id
+        user_role = action.user_role
+        access_key = action.access_key
+        domain_name = action.domain_name
+        if action.owner_id is not None:
+            owner = await self._user_repository.get_user_by_uuid(action.owner_id)
+            if owner.main_access_key is None:
+                raise InternalServerError(
+                    f"Delegated owner {action.owner_id} has no main access key configured"
+                )
+            user_id = owner.id
+            access_key = AccessKey(owner.main_access_key)
+            if owner.role is not None:
+                user_role = owner.role
+            if owner.domain_name is not None:
+                domain_name = owner.domain_name
+
         image_row = await self._session_repository.resolve_image_by_id(action.image_id)
         resource_policy = await self._session_repository.get_keypair_resource_policy(
-            action.access_key,
+            access_key,
         )
 
         user_scope = UserScope(
-            domain_name=action.domain_name,
+            domain_name=domain_name,
             group_id=action.group_id,
-            user_uuid=action.user_id,
-            user_role=action.user_role,
+            user_uuid=user_id,
+            user_role=user_role,
         )
 
         # Build creation_spec dict from typed action fields
@@ -1668,7 +1725,7 @@ class SessionService:
         spec = SessionCreationSpec(
             session_creation_id=session_creation_id,
             session_name=action.session_name,
-            access_key=action.access_key,
+            access_key=access_key,
             user_scope=user_scope,
             session_type=action.session_type,
             cluster_mode=action.resource.cluster_mode,
