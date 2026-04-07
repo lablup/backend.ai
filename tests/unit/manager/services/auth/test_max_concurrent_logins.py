@@ -1,6 +1,6 @@
 """Tests for max_concurrent_logins enforcement in AuthService._create_login_session."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -14,7 +14,10 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.auth import TooManyConcurrentLoginSessions
 from ai.backend.manager.models.user import UserRole, UserStatus
-from ai.backend.manager.repositories.auth.db_source.db_source import LoginSessionCreationResult
+from ai.backend.manager.repositories.auth.db_source.db_source import (
+    ActiveSessionInfo,
+    LoginSessionCreationResult,
+)
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -47,16 +50,15 @@ def _make_mock_user(resource_policy: str = _DEFAULT_RESOURCE_POLICY) -> MagicMoc
     return mock_user
 
 
-def _make_mock_keypair_row(max_concurrent_sessions: int = 5) -> MagicMock:
+def _make_mock_keypair_row() -> MagicMock:
     """Create a mock keypair row."""
     mock_keypair = MagicMock()
     mock_keypair.access_key = "AKIAIOSFODNN7EXAMPLE"
     mock_keypair.secret_key = "secret"
-    mock_keypair.resource_policy_row.max_concurrent_sessions = max_concurrent_sessions
     return mock_keypair
 
 
-def _make_action() -> AuthorizeAction:
+def _make_action(*, force: bool = False) -> AuthorizeAction:
     return AuthorizeAction(
         type=AuthTokenType.KEYPAIR,
         domain_name="default",
@@ -65,6 +67,7 @@ def _make_action() -> AuthorizeAction:
         request=MagicMock(),
         stoken=None,
         otp=None,
+        force=force,
     )
 
 
@@ -77,6 +80,18 @@ def _make_policy(max_concurrent_logins: int | None) -> UserResourcePolicyData:
         max_customized_image_count=3,
         max_concurrent_logins=max_concurrent_logins,
     )
+
+
+def _make_live_sessions(count: int) -> list[ActiveSessionInfo]:
+    """Create a list of fake live session infos, oldest first."""
+    base_time = datetime(2024, 1, 1, tzinfo=UTC)
+    return [
+        ActiveSessionInfo(
+            session_token=f"token_{i}",
+            created_at=base_time + timedelta(minutes=i),
+        )
+        for i in range(count)
+    ]
 
 
 @pytest.fixture
@@ -116,40 +131,41 @@ def auth_service(
 
 
 class TestMaxConcurrentLoginsEnforcement:
-    """Tests for the max_concurrent_logins enforcement logic in _create_login_session."""
+    """Tests for the max_concurrent_logins enforcement logic in _create_login_session.
 
-    async def test_limit_1_with_1_active_session_raises(
+    Enforcement is driven entirely by ``live_sessions`` (the already-cross-checked active
+    set) and ``user_resource_policy.max_concurrent_logins``.  No extra DB count query is
+    issued.
+    """
+
+    async def test_limit_1_with_1_live_session_no_force_raises(
         self,
         auth_service: AuthService,
-        mock_auth_repository: AsyncMock,
         mock_user_resource_policy_repository: AsyncMock,
     ) -> None:
-        """limit=1, user has 1 active login session → new login raises TooManyConcurrentLoginSessions."""
+        """limit=1, 1 live session, force=False → raises TooManyConcurrentLoginSessions."""
         mock_user_resource_policy_repository.get_by_name.return_value = _make_policy(
             max_concurrent_logins=1
         )
-        mock_auth_repository.count_active_login_sessions.return_value = 1
 
         with pytest.raises(TooManyConcurrentLoginSessions):
             await auth_service._create_login_session(
-                action=_make_action(),
+                action=_make_action(force=False),
                 user=_make_mock_user(),
                 keypair_row=_make_mock_keypair_row(),
-                live_sessions=[],
+                live_sessions=_make_live_sessions(1),
                 auth_config=_make_auth_config(),
             )
 
-    async def test_limit_1_with_0_active_sessions_succeeds(
+    async def test_limit_1_with_0_live_sessions_succeeds(
         self,
         auth_service: AuthService,
-        mock_auth_repository: AsyncMock,
         mock_user_resource_policy_repository: AsyncMock,
     ) -> None:
-        """limit=1, user has 0 active login sessions → new login succeeds."""
+        """limit=1, 0 live sessions → new login succeeds (below limit)."""
         mock_user_resource_policy_repository.get_by_name.return_value = _make_policy(
             max_concurrent_logins=1
         )
-        mock_auth_repository.count_active_login_sessions.return_value = 0
 
         result = await auth_service._create_login_session(
             action=_make_action(),
@@ -171,19 +187,19 @@ class TestMaxConcurrentLoginsEnforcement:
         mock_user_resource_policy_repository.get_by_name.return_value = _make_policy(
             max_concurrent_logins=None
         )
-        # Simulate many active sessions — should never be queried
-        mock_auth_repository.count_active_login_sessions.return_value = 9999
 
         result = await auth_service._create_login_session(
             action=_make_action(),
             user=_make_mock_user(),
             keypair_row=_make_mock_keypair_row(),
-            live_sessions=[],
+            # Many live sessions — should not be rejected.
+            live_sessions=_make_live_sessions(9999),
             auth_config=_make_auth_config(),
         )
 
-        # count_active_login_sessions must NOT be called when limit is None
-        mock_auth_repository.count_active_login_sessions.assert_not_awaited()
+        # create_login_session must be called without tokens_to_invalidate
+        call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
+        assert call_kwargs.get("tokens_to_invalidate") is None
         assert result.authorization_result is not None
 
     async def test_missing_resource_policy_does_not_raise(
@@ -197,57 +213,126 @@ class TestMaxConcurrentLoginsEnforcement:
             "Policy not found"
         )
 
-        # Should not raise — policy not found means skip enforcement
         result = await auth_service._create_login_session(
             action=_make_action(),
             user=_make_mock_user(),
             keypair_row=_make_mock_keypair_row(),
-            live_sessions=[],
+            live_sessions=_make_live_sessions(5),
             auth_config=_make_auth_config(),
         )
 
-        mock_auth_repository.count_active_login_sessions.assert_not_awaited()
+        call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
+        assert call_kwargs.get("tokens_to_invalidate") is None
         assert result.authorization_result is not None
 
-    async def test_limit_5_with_5_active_sessions_raises(
+    async def test_limit_5_with_5_live_sessions_no_force_raises(
         self,
         auth_service: AuthService,
-        mock_auth_repository: AsyncMock,
         mock_user_resource_policy_repository: AsyncMock,
     ) -> None:
-        """limit=5, user has 5 active sessions → raises TooManyConcurrentLoginSessions."""
+        """limit=5, 5 live sessions, force=False → raises TooManyConcurrentLoginSessions."""
         mock_user_resource_policy_repository.get_by_name.return_value = _make_policy(
             max_concurrent_logins=5
         )
-        mock_auth_repository.count_active_login_sessions.return_value = 5
 
         with pytest.raises(TooManyConcurrentLoginSessions):
             await auth_service._create_login_session(
-                action=_make_action(),
+                action=_make_action(force=False),
                 user=_make_mock_user(),
                 keypair_row=_make_mock_keypair_row(),
-                live_sessions=[],
+                live_sessions=_make_live_sessions(5),
                 auth_config=_make_auth_config(),
             )
 
-    async def test_limit_5_with_4_active_sessions_succeeds(
+    async def test_limit_5_with_4_live_sessions_succeeds(
         self,
         auth_service: AuthService,
-        mock_auth_repository: AsyncMock,
         mock_user_resource_policy_repository: AsyncMock,
     ) -> None:
-        """limit=5, user has 4 active sessions → succeeds (below limit)."""
+        """limit=5, 4 live sessions → succeeds (below limit)."""
         mock_user_resource_policy_repository.get_by_name.return_value = _make_policy(
             max_concurrent_logins=5
         )
-        mock_auth_repository.count_active_login_sessions.return_value = 4
 
         result = await auth_service._create_login_session(
             action=_make_action(),
             user=_make_mock_user(),
             keypair_row=_make_mock_keypair_row(),
-            live_sessions=[],
+            live_sessions=_make_live_sessions(4),
             auth_config=_make_auth_config(),
         )
 
+        assert result.authorization_result is not None
+
+    async def test_limit_1_with_2_live_sessions_force_evicts_oldest_2(
+        self,
+        auth_service: AuthService,
+        mock_auth_repository: AsyncMock,
+        mock_user_resource_policy_repository: AsyncMock,
+    ) -> None:
+        """limit=1, 2 live sessions, force=True → evicts both oldest sessions to make room for 1 new."""
+        mock_user_resource_policy_repository.get_by_name.return_value = _make_policy(
+            max_concurrent_logins=1
+        )
+        live_sessions = _make_live_sessions(2)
+
+        result = await auth_service._create_login_session(
+            action=_make_action(force=True),
+            user=_make_mock_user(),
+            keypair_row=_make_mock_keypair_row(),
+            live_sessions=live_sessions,
+            auth_config=_make_auth_config(),
+        )
+
+        # 2 sessions at limit=1 → sessions_to_remove = 2 - 1 + 1 = 2, evict both.
+        call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
+        assert call_kwargs.get("tokens_to_invalidate") == ["token_0", "token_1"]
+        assert result.authorization_result is not None
+
+    async def test_limit_5_with_5_live_sessions_force_evicts_oldest_1(
+        self,
+        auth_service: AuthService,
+        mock_auth_repository: AsyncMock,
+        mock_user_resource_policy_repository: AsyncMock,
+    ) -> None:
+        """limit=5, 5 live sessions, force=True → evicts exactly 1 oldest session."""
+        mock_user_resource_policy_repository.get_by_name.return_value = _make_policy(
+            max_concurrent_logins=5
+        )
+        live_sessions = _make_live_sessions(5)
+
+        result = await auth_service._create_login_session(
+            action=_make_action(force=True),
+            user=_make_mock_user(),
+            keypair_row=_make_mock_keypair_row(),
+            live_sessions=live_sessions,
+            auth_config=_make_auth_config(),
+        )
+
+        # 5 sessions at limit=5 → sessions_to_remove = 5 - 5 + 1 = 1, evict token_0 only.
+        call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
+        assert call_kwargs.get("tokens_to_invalidate") == ["token_0"]
+        assert result.authorization_result is not None
+
+    async def test_force_true_below_limit_does_not_evict(
+        self,
+        auth_service: AuthService,
+        mock_auth_repository: AsyncMock,
+        mock_user_resource_policy_repository: AsyncMock,
+    ) -> None:
+        """limit=5, 3 live sessions, force=True → below limit, no eviction needed."""
+        mock_user_resource_policy_repository.get_by_name.return_value = _make_policy(
+            max_concurrent_logins=5
+        )
+
+        result = await auth_service._create_login_session(
+            action=_make_action(force=True),
+            user=_make_mock_user(),
+            keypair_row=_make_mock_keypair_row(),
+            live_sessions=_make_live_sessions(3),
+            auth_config=_make_auth_config(),
+        )
+
+        call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
+        assert call_kwargs.get("tokens_to_invalidate") is None
         assert result.authorization_result is not None

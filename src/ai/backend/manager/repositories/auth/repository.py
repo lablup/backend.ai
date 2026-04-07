@@ -114,14 +114,12 @@ class AuthRepository:
         access_key: str,
         domain_name: str,
         *,
-        max_concurrent_sessions: int = 1,
         tokens_to_invalidate: list[str] | None = None,
     ) -> LoginSessionCreationResult:
         return await self._db_source.create_login_session(
             user_id,
             access_key,
             domain_name,
-            max_concurrent_sessions=max_concurrent_sessions,
             tokens_to_invalidate=tokens_to_invalidate,
         )
 
@@ -150,11 +148,6 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def get_active_session_tokens(self, user_id: UUID) -> list[ActiveSessionInfo]:
         return await self._db_source.fetch_active_session_tokens(user_id)
-
-    @auth_repository_resilience.apply()
-    async def count_active_login_sessions(self, user_id: UUID) -> int:
-        """Return the number of active (non-revoked) login sessions for a user."""
-        return await self._db_source.count_active_login_sessions(user_id)
 
     @auth_repository_resilience.apply()
     async def invalidate_login_session_by_token(self, session_token: str) -> None:

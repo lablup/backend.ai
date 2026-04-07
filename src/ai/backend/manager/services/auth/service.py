@@ -286,32 +286,41 @@ class AuthService:
         live_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
     ) -> AuthorizeActionResult:
-        """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed."""
+        """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed.
+
+        Enforcement uses ``user_resource_policy.max_concurrent_logins``:
+        - None (unlimited): always proceed.
+        - Set: if ``len(live_sessions) >= limit`` and ``action.force`` is True, evict the
+          oldest sessions to make room; otherwise raise ``TooManyConcurrentLoginSessions``.
+
+        ``live_sessions`` is already the authoritative active set (cross-checked against
+        Valkey by the caller), so no additional repository count query is needed.
+        """
         try:
             user_resource_policy = await self._user_resource_policy_repository.get_by_name(
                 user.resource_policy
             )
-            if user_resource_policy.max_concurrent_logins is not None:
-                active_login_count = await self._auth_repository.count_active_login_sessions(
-                    user_id=user.uuid
-                )
-                if active_login_count >= user_resource_policy.max_concurrent_logins:
-                    raise TooManyConcurrentLoginSessions()
+            limit: int | None = user_resource_policy.max_concurrent_logins
         except UserResourcePolicyNotFound:
             # If no matching resource policy is found, skip login-session limit enforcement.
-            pass
+            limit = None
 
-        max_concurrent_sessions = keypair_row.resource_policy_row.max_concurrent_sessions
         tokens_to_invalidate: list[str] | None = None
-        if action.force and len(live_sessions) >= max_concurrent_sessions:
-            sessions_to_remove = len(live_sessions) - max_concurrent_sessions + 1
-            tokens_to_invalidate = [s.session_token for s in live_sessions[:sessions_to_remove]]
+        if limit is not None:
+            count = len(live_sessions)
+            if count >= limit:
+                if action.force:
+                    sessions_to_remove = count - limit + 1
+                    tokens_to_invalidate = [
+                        s.session_token for s in live_sessions[:sessions_to_remove]
+                    ]
+                else:
+                    raise TooManyConcurrentLoginSessions()
 
         session_result = await self._auth_repository.create_login_session(
             user_id=user.uuid,
             access_key=keypair_row.access_key,
             domain_name=action.domain_name,
-            max_concurrent_sessions=max_concurrent_sessions,
             tokens_to_invalidate=tokens_to_invalidate,
         )
 

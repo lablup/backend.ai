@@ -439,9 +439,10 @@ async def test_authorize_force_invalidates_existing_sessions(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
+    mock_user_resource_policy_repository: AsyncMock,
     mock_valkey_session_client: AsyncMock,
 ) -> None:
-    """Test that force=True invalidates existing live sessions and creates a new one."""
+    """Test that force=True evicts the oldest live session when the user-level limit is reached."""
     action = AuthorizeAction(
         type=AuthTokenType.KEYPAIR,
         domain_name="default",
@@ -451,6 +452,16 @@ async def test_authorize_force_invalidates_existing_sessions(
         stoken=None,
         otp=None,
         force=True,
+    )
+
+    # Set limit=1 so that the one live session triggers force-eviction.
+    mock_user_resource_policy_repository.get_by_name.return_value = UserResourcePolicyData(
+        name="default",
+        max_vfolder_count=10,
+        max_quota_scope_size=0,
+        max_session_count_per_model_session=5,
+        max_customized_image_count=3,
+        max_concurrent_logins=1,
     )
 
     mock_user = _make_mock_user()
@@ -497,11 +508,15 @@ async def test_authorize_force_invalidates_existing_sessions(
     assert result.authorization_result.session_token == "forced_new_token"
 
 
-async def test_create_login_session_uses_max_concurrent_sessions_from_resource_policy(
+async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_repo(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
 ) -> None:
-    """Regression: max_concurrent_sessions must come from keypair_resource_policy, not hardcoded."""
+    """create_login_session must not pass max_concurrent_sessions to the repository.
+
+    Enforcement now lives entirely in the service layer; the repository only receives
+    tokens_to_invalidate (if any).
+    """
     mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
         session_token="new_token",
     )
@@ -517,7 +532,7 @@ async def test_create_login_session_uses_max_concurrent_sessions_from_resource_p
             otp=None,
         ),
         user=_make_mock_user(),
-        keypair_row=_make_mock_keypair_row(max_concurrent_sessions=5),
+        keypair_row=_make_mock_keypair_row(),
         live_sessions=[],
         auth_config=AuthConfig(
             max_password_age=timedelta(days=90),
@@ -529,4 +544,4 @@ async def test_create_login_session_uses_max_concurrent_sessions_from_resource_p
     )
 
     call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
-    assert call_kwargs["max_concurrent_sessions"] == 5
+    assert "max_concurrent_sessions" not in call_kwargs

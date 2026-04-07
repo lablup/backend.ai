@@ -20,7 +20,6 @@ from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, L
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.errors.auth import (
-    ActiveLoginSessionExistsError,
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
@@ -440,17 +439,17 @@ class AuthDBSource:
         access_key: str,
         domain_name: str,
         *,
-        max_concurrent_sessions: int = 1,
         tokens_to_invalidate: list[str] | None = None,
     ) -> LoginSessionCreationResult:
-        """Atomically invalidate old sessions (if force), check limit, create session, and record success history.
+        """Atomically invalidate old sessions (if provided), create a new session, and record success history.
 
-        Raises ActiveLoginSessionExistsError if the active session count would exceed
-        max_concurrent_sessions after invalidation.
+        All enforcement (cap check and force-eviction decision) is performed by the
+        service layer before this method is called. This method only executes the
+        resulting DB writes: invalidate the specified tokens and insert the new session.
         """
         session_token = uuid_mod.uuid4().hex
         async with self._db.connect() as conn:
-            # Force: invalidate specified sessions
+            # Invalidate sessions that the service layer decided to evict.
             if tokens_to_invalidate:
                 await conn.execute(
                     sa.update(LoginSessionRow.__table__)
@@ -464,35 +463,17 @@ class AuthDBSource:
                     )
                 )
 
-            # Conditional INSERT: only if active count < max
-            insert_query = sa.insert(LoginSessionRow.__table__).from_select(
-                ["user_id", "access_key", "session_token", "status"],
-                sa.select(
-                    sa.literal(user_id).label("user_id"),
-                    sa.literal(access_key).label("access_key"),
-                    sa.literal(session_token).label("session_token"),
-                    sa.literal(LoginSessionStatus.ACTIVE.value).label("status"),
-                ).where(
-                    sa.select(sa.func.count())
-                    .select_from(LoginSessionRow.__table__)
-                    .where(
-                        (LoginSessionRow.__table__.c.user_id == user_id)
-                        & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
-                    )
-                    .correlate(None)
-                    .scalar_subquery()
-                    < max_concurrent_sessions
-                ),
-            )
-            result = await conn.execute(insert_query)
-
-            if result.rowcount == 0:
-                await conn.rollback()
-                raise ActiveLoginSessionExistsError(
-                    extra_msg="An active login session already exists. Use force=true to override."
+            # Insert the new active session.
+            await conn.execute(
+                sa.insert(LoginSessionRow.__table__).values(
+                    user_id=user_id,
+                    access_key=access_key,
+                    session_token=session_token,
+                    status=LoginSessionStatus.ACTIVE,
                 )
+            )
 
-            # Record successful login in the same transaction
+            # Record successful login in the same transaction.
             await self._record_login_history(
                 conn, user_id, domain_name, LoginAttemptResult.SUCCESS, fail_reason=None
             )
@@ -563,21 +544,6 @@ class AuthDBSource:
                 ActiveSessionInfo(session_token=row.session_token, created_at=row.created_at)
                 for row in result
             ]
-
-    @auth_db_source_resilience.apply()
-    async def count_active_login_sessions(self, user_id: UUID) -> int:
-        """Return the number of active (non-revoked) login sessions for a user."""
-        async with self._db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(sa.func.count())
-                .select_from(LoginSessionRow)
-                .where(
-                    (LoginSessionRow.user_id == user_id)
-                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
-                )
-            )
-            result = await db_session.execute(query)
-            return result.scalar_one()
 
     @auth_db_source_resilience.apply()
     async def invalidate_session_by_token(self, session_token: str) -> None:
