@@ -100,7 +100,7 @@ class AuthRepository:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-        client_type: LoginClientType = LoginClientType.DEFAULT,
+        client_type: LoginClientType,
     ) -> CredentialVerificationResult:
         return await self._db_source.verify_credential(
             domain_name,
@@ -116,7 +116,7 @@ class AuthRepository:
         access_key: str,
         domain_name: str,
         *,
-        client_type: LoginClientType = LoginClientType.DEFAULT,
+        client_type: LoginClientType,
     ) -> LoginSessionCreationResult:
         return await self._db_source.create_login_session(
             user_id,

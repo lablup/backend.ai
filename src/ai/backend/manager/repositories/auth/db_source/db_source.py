@@ -393,7 +393,7 @@ class AuthDBSource:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-        client_type: LoginClientType = LoginClientType.DEFAULT,
+        client_type: LoginClientType,
     ) -> CredentialVerificationResult:
         """Verify credentials, migrate password hash, and fetch active sessions.
 
@@ -470,7 +470,7 @@ class AuthDBSource:
         access_key: str,
         domain_name: str,
         *,
-        client_type: LoginClientType = LoginClientType.DEFAULT,
+        client_type: LoginClientType,
     ) -> LoginSessionCreationResult:
         """Create a new active login session and record a successful login history entry.
 

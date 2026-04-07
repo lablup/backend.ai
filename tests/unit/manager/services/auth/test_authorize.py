@@ -179,6 +179,8 @@ async def test_authorize_success(
         request=MagicMock(),
         stoken=None,
         otp=None,
+        force=False,
+        client_type=LoginClientType.DEFAULT,
     )
 
     result = await auth_service.authorize(action)
@@ -205,6 +207,8 @@ async def test_authorize_invalid_token_type(
         request=MagicMock(),
         stoken=None,
         otp=None,
+        force=False,
+        client_type=LoginClientType.DEFAULT,
     )
 
     with pytest.raises(InvalidAPIParameters):
@@ -231,6 +235,8 @@ async def test_authorize_invalid_credentials(
         request=MagicMock(),
         stoken=None,
         otp=None,
+        force=False,
+        client_type=LoginClientType.DEFAULT,
     )
 
     with pytest.raises(AuthorizationFailed):
@@ -252,6 +258,8 @@ async def test_authorize_with_hook_authorization(
         request=MagicMock(),
         stoken=None,
         otp=None,
+        force=False,
+        client_type=LoginClientType.DEFAULT,
     )
 
     # Hook returns user data directly (bypasses verify_credential)
@@ -308,6 +316,8 @@ async def test_authorize_with_password_expiry(
         request=MagicMock(),
         stoken=None,
         otp=None,
+        force=False,
+        client_type=LoginClientType.DEFAULT,
     )
 
     # Setup expired password (changed 100 days ago, max age is 90 days)
@@ -350,6 +360,8 @@ async def test_authorize_with_post_hook_response(
         request=MagicMock(),
         stoken=None,
         otp=None,
+        force=False,
+        client_type=LoginClientType.DEFAULT,
     )
 
     # Setup successful credential verification
@@ -393,6 +405,8 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
         request=MagicMock(),
         stoken=None,
         otp=None,
+        force=False,
+        client_type=LoginClientType.DEFAULT,
     )
 
     mock_user = _make_mock_user()
@@ -450,6 +464,7 @@ async def test_authorize_force_invalidates_existing_sessions(
         stoken=None,
         otp=None,
         force=True,
+        client_type=LoginClientType.DEFAULT,
     )
 
     # Set max_concurrent_logins=1 so that the one live session triggers force-eviction.
@@ -533,6 +548,7 @@ async def test_create_login_session_passes_client_type_without_enforcement_knobs
             stoken=None,
             otp=None,
             client_type=LoginClientType.WEBUI,
+            force=False,
         ),
         user=_make_mock_user(),
         keypair_row=_make_mock_keypair_row(),

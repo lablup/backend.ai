@@ -19,8 +19,8 @@ class AuthorizeAction(AuthAction):
     password: str
     stoken: str | None
     otp: str | None
-    force: bool = False
-    client_type: LoginClientType = LoginClientType.DEFAULT
+    force: bool
+    client_type: LoginClientType
 
     @override
     def entity_id(self) -> str | None:
