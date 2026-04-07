@@ -2957,6 +2957,20 @@ input CreateDeploymentRevisionPresetInput
 
   """Preset name."""
   name: String!
+
+  """Default open_to_public for deployments created from this preset."""
+  openToPublic: Boolean = null
+
+  """Default replica count for deployments created from this preset."""
+  replicaCount: Int = null
+
+  """
+  Default revision history limit for deployments created from this preset.
+  """
+  revisionHistoryLimit: Int = null
+
+  """Default deployment strategy for deployments created from this preset."""
+  deploymentStrategy: PresetDeploymentStrategyInput = null
 }
 
 """Added in UNRELEASED. Create deployment revision preset payload."""
@@ -4645,6 +4659,11 @@ type DeploymentRevisionPreset implements Node
   execution: PresetExecutionSpec!
 
   """
+  Deployment-level default values (open_to_public, replica_count, revision_history_limit, deployment_strategy) provided by this preset.
+  """
+  deploymentDefaults: PresetDeploymentDefaults!
+
+  """
   Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.
   """
   modelDefinition: ModelDefinition
@@ -4830,6 +4849,22 @@ input DeployModelCardV2Input
 
   """Number of replicas."""
   desiredReplicaCount: Int! = 1
+
+  """Override open_to_public. Defaults to the preset value, then False."""
+  openToPublic: Boolean = null
+
+  """
+  Override replica_count. Defaults to the preset value, then desired_replica_count.
+  """
+  replicaCount: Int = null
+
+  """
+  Override revision_history_limit. Defaults to the preset value, then 10.
+  """
+  revisionHistoryLimit: Int = null
+
+  """Override deployment strategy. Defaults to the preset value, then none."""
+  deploymentStrategy: PresetDeploymentStrategyInput = null
 }
 
 """Added in UNRELEASED. Result of deploying a model card."""
@@ -10952,6 +10987,44 @@ type PresetClusterSpec
 }
 
 """
+Added in UNRELEASED. Deployment-level defaults stored on the preset. Any null field means the preset does not specify a default and callers should fall back to user input or the system default.
+"""
+type PresetDeploymentDefaults
+  @join__type(graph: STRAWBERRY)
+{
+  """Default open_to_public for deployments from this preset."""
+  openToPublic: Boolean
+
+  """Default replica count for deployments from this preset."""
+  replicaCount: Int
+
+  """Default revision history limit for deployments from this preset."""
+  revisionHistoryLimit: Int
+
+  """Default deployment strategy type (ROLLING or BLUE_GREEN)."""
+  deploymentStrategy: DeploymentStrategyType
+
+  """Strategy-specific configuration (rolling or blue-green)."""
+  deploymentStrategySpec: JSON
+}
+
+"""
+Added in UNRELEASED. Deployment strategy input for a revision preset, used to establish a default deployment strategy applied to any deployment created from this preset.
+"""
+input PresetDeploymentStrategyInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Strategy type (ROLLING or BLUE_GREEN)."""
+  type: DeploymentStrategyType!
+
+  """Rolling update configuration (required when type is ROLLING)."""
+  rollingUpdate: RollingUpdateConfigInput = null
+
+  """Blue/green configuration (required when type is BLUE_GREEN)."""
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""
 Added in UNRELEASED. Container execution configuration for the deployment, including the inference server image, startup commands, and environment variables.
 """
 type PresetExecutionSpec
@@ -16372,6 +16445,26 @@ input UpdateDeploymentRevisionPresetInput
 
   """New rank."""
   rank: Int = null
+
+  """
+  Default open_to_public for deployments created from this preset. Set to null to clear.
+  """
+  openToPublic: Boolean
+
+  """
+  Default replica count for deployments created from this preset. Set to null to clear.
+  """
+  replicaCount: Int
+
+  """
+  Default revision history limit for deployments created from this preset. Set to null to clear.
+  """
+  revisionHistoryLimit: Int
+
+  """
+  Default deployment strategy for deployments created from this preset. Set to null to clear.
+  """
+  deploymentStrategy: PresetDeploymentStrategyInput
 }
 
 """Added in UNRELEASED. Update deployment revision preset payload."""
