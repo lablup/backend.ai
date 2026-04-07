@@ -100,6 +100,11 @@ class EnqueueSessionAction(SessionScopeAction):
     access_key: AccessKey = AccessKey("")
     domain_name: str = ""
     group_id: uuid.UUID = field(default_factory=lambda: uuid.UUID(int=0))
+    owner_id: uuid.UUID | None = None
+    """Delegated owner user UUID. When set, the service resolves it and
+    overrides ``user_id``, ``user_role``, ``access_key``, and ``domain_name``
+    with the target user's values.
+    """
 
     @override
     def entity_id(self) -> str | None:

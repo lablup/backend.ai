@@ -196,6 +196,7 @@ async def session_service(
         session_repository=mock_session_repository,
         scheduling_controller=mock_scheduling_controller,
         appproxy_client_pool=mock_appproxy_client_pool,
+        user_repository=MagicMock(),
     )
     return SessionService(args)
 

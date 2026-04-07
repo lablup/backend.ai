@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, override
+from uuid import UUID
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
@@ -13,6 +14,10 @@ class ShutdownServiceAction(SessionAppServiceAction):
     session_name: str
     owner_access_key: AccessKey
     service_name: str
+    owner_id: UUID | None = None
+    """Delegated owner user UUID. When set, the service resolves it to the
+    target user's main access key and overrides ``owner_access_key``.
+    """
 
     @override
     def entity_id(self) -> str | None:
