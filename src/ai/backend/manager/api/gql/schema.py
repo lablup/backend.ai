@@ -854,7 +854,7 @@ schema = CustomizedSchema(
     mutation=Mutation,
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),
-    enable_federation_2=True,
+    federation_version="2.11",
     extensions=[
         GQLLoggingExtension,
         GQLMetricExtension,
