@@ -42,7 +42,9 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 )
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
+    DestroySessionInput,
     EnqueueSessionInput,
+    RestartSessionInput,
     SessionFilter,
     SessionOrder,
     ShutdownSessionServiceInput,
@@ -53,7 +55,9 @@ from ai.backend.common.dto.manager.v2.session.request import (
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
+    DestroySessionPayload,
     EnqueueSessionPayload,
+    RestartSessionPayload,
     SessionLifecycleInfoGQLDTO,
     SessionLogsPayload,
     SessionMetadataInfoGQLDTO,
@@ -116,6 +120,7 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.services.session.actions.destroy_session import DestroySessionAction
 from ai.backend.manager.services.session.actions.enqueue_session import (
     EnqueueSessionAction,
     ResourceSlotEntry,
@@ -129,6 +134,7 @@ from ai.backend.manager.services.session.actions.get_container_logs import (
     GetContainerLogsAction,
 )
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
+from ai.backend.manager.services.session.actions.restart_session import RestartSessionAction
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_in_project import (
     SearchSessionsInProjectAction,
@@ -873,6 +879,40 @@ class SessionAdapter(BaseAdapter):
     # -------------------------------------------------------------------------
     # Logs
     # -------------------------------------------------------------------------
+
+    async def restart(
+        self,
+        session_id: UUID,
+        input: RestartSessionInput,
+        access_key: str,
+    ) -> RestartSessionPayload:
+        """Restart a session, optionally on behalf of a delegated owner."""
+        owner_access_key = await self._resolve_owner_access_key(input.owner_id, access_key)
+        action = RestartSessionAction(
+            session_name=str(session_id),
+            owner_access_key=owner_access_key,
+        )
+        await self._processors.session.restart_session.wait_for_complete(action)
+        return RestartSessionPayload()
+
+    async def destroy(
+        self,
+        session_id: UUID,
+        input: DestroySessionInput,
+        user_role: UserRole,
+        access_key: str,
+    ) -> DestroySessionPayload:
+        """Destroy a session, optionally on behalf of a delegated owner."""
+        owner_access_key = await self._resolve_owner_access_key(input.owner_id, access_key)
+        action = DestroySessionAction(
+            user_role=user_role,
+            session_name=str(session_id),
+            forced=input.forced,
+            recursive=input.recursive,
+            owner_access_key=owner_access_key,
+        )
+        result = await self._processors.session.destroy_session.wait_for_complete(action)
+        return DestroySessionPayload(result=result.result or {})
 
     async def get_logs(
         self,
