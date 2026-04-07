@@ -45,8 +45,8 @@ class LoginSessionRow(Base):  # type: ignore[misc]
         "client_type",
         StrEnumType(LoginClientType),
         nullable=False,
-        default=LoginClientType.DEFAULT,
-        server_default=LoginClientType.DEFAULT.value,
+        default=LoginClientType.CORE,
+        server_default=LoginClientType.CORE.value,
     )
     status: Mapped[LoginSessionStatus] = mapped_column(
         "status",

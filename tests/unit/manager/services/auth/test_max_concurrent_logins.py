@@ -69,7 +69,7 @@ def _make_action(*, force: bool = False) -> AuthorizeAction:
         stoken=None,
         otp=None,
         force=force,
-        client_type=LoginClientType.DEFAULT,
+        client_type=LoginClientType.CORE,
     )
 
 

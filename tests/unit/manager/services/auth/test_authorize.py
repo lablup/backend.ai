@@ -185,7 +185,7 @@ async def test_authorize_success(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.DEFAULT,
+        client_type=LoginClientType.CORE,
     )
 
     result = await auth_service.authorize(action)
@@ -213,7 +213,7 @@ async def test_authorize_invalid_token_type(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.DEFAULT,
+        client_type=LoginClientType.CORE,
     )
 
     with pytest.raises(InvalidAPIParameters):
@@ -241,7 +241,7 @@ async def test_authorize_invalid_credentials(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.DEFAULT,
+        client_type=LoginClientType.CORE,
     )
 
     with pytest.raises(AuthorizationFailed):
@@ -264,7 +264,7 @@ async def test_authorize_with_hook_authorization(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.DEFAULT,
+        client_type=LoginClientType.CORE,
     )
 
     # Hook returns user data directly (bypasses verify_credential)
@@ -322,7 +322,7 @@ async def test_authorize_with_password_expiry(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.DEFAULT,
+        client_type=LoginClientType.CORE,
     )
 
     # Setup expired password (changed 100 days ago, max age is 90 days)
@@ -366,7 +366,7 @@ async def test_authorize_with_post_hook_response(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.DEFAULT,
+        client_type=LoginClientType.CORE,
     )
 
     # Setup successful credential verification
@@ -411,7 +411,7 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.DEFAULT,
+        client_type=LoginClientType.CORE,
     )
 
     mock_user = _make_mock_user()
@@ -469,7 +469,7 @@ async def test_authorize_force_invalidates_existing_sessions(
         stoken=None,
         otp=None,
         force=True,
-        client_type=LoginClientType.DEFAULT,
+        client_type=LoginClientType.CORE,
     )
 
     # Set max_concurrent_logins=1 so that the one live session triggers force-eviction.

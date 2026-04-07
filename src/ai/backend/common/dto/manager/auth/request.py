@@ -56,9 +56,10 @@ class AuthorizeRequest(BaseRequestModel):
         description="If true, invalidate existing active sessions and proceed with login",
     )
     client_type: LoginClientType = Field(
-        default=LoginClientType.DEFAULT,
-        description="Client type identifier (e.g., 'core', 'webui', 'fasttrack'). "
-        "Concurrent session limits are enforced per client type.",
+        default=LoginClientType.CORE,
+        description="Client type identifier ('core', 'webui', 'fasttrack'). "
+        "Defaults to 'core' when omitted. Concurrent session limits are enforced "
+        "per client type.",
     )
 
 

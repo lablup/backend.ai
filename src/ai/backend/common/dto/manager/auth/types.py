@@ -37,7 +37,6 @@ class LoginClientType(StrEnum):
     CORE = "core"
     WEBUI = "webui"
     FASTTRACK = "fasttrack"
-    DEFAULT = "default"
 
 
 class TwoFactorType(StrEnum):

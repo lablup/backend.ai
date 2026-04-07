@@ -224,7 +224,7 @@ class TestLoginSessionForce:
             domain_name=sample_user.domain_name,
             email=sample_user.email,
             target_password_info=self._make_password_info(),
-            client_type=LoginClientType.DEFAULT,
+            client_type=LoginClientType.CORE,
         )
         assert cred_result.user["uuid"] == sample_user.user_id
         assert len(cred_result.active_sessions) == 0
@@ -234,7 +234,7 @@ class TestLoginSessionForce:
             user_id=sample_user.user_id,
             access_key=sample_user.access_key,
             domain_name=sample_user.domain_name,
-            client_type=LoginClientType.DEFAULT,
+            client_type=LoginClientType.CORE,
         )
         assert session_result.session_token
 
@@ -259,7 +259,7 @@ class TestLoginSessionForce:
             domain_name=sample_user.domain_name,
             email=sample_user.email,
             target_password_info=self._make_password_info(),
-            client_type=LoginClientType.DEFAULT,
+            client_type=LoginClientType.CORE,
         )
         assert cred_result.user["uuid"] == sample_user.user_id
         assert len(cred_result.active_sessions) == 0
@@ -269,7 +269,7 @@ class TestLoginSessionForce:
             user_id=sample_user.user_id,
             access_key=sample_user.access_key,
             domain_name=sample_user.domain_name,
-            client_type=LoginClientType.DEFAULT,
+            client_type=LoginClientType.CORE,
         )
         assert session_result.session_token
 
@@ -298,7 +298,7 @@ class TestLoginSessionForce:
             domain_name=sample_user.domain_name,
             email=sample_user.email,
             target_password_info=self._make_password_info(),
-            client_type=LoginClientType.DEFAULT,
+            client_type=LoginClientType.CORE,
         )
         assert cred_result.user["uuid"] == user_id
         assert len(cred_result.active_sessions) == 1
@@ -310,7 +310,7 @@ class TestLoginSessionForce:
             user_id=user_id,
             access_key=access_key,
             domain_name=sample_user.domain_name,
-            client_type=LoginClientType.DEFAULT,
+            client_type=LoginClientType.CORE,
         )
         assert session_result.session_token
 
@@ -337,7 +337,7 @@ class TestLoginSessionForce:
                 domain_name=sample_user.domain_name,
                 email=sample_user.email,
                 target_password_info=self._make_password_info("wrong_password"),
-                client_type=LoginClientType.DEFAULT,
+                client_type=LoginClientType.CORE,
             )
 
         # verify_credential does NOT record login history
@@ -361,13 +361,13 @@ class TestLoginSessionForce:
             domain_name=sample_user.domain_name,
             email=sample_user.email,
             target_password_info=self._make_password_info(),
-            client_type=LoginClientType.DEFAULT,
+            client_type=LoginClientType.CORE,
         )
         result1 = await auth_db_source.create_login_session(
             user_id=sample_user.user_id,
             access_key=sample_user.access_key,
             domain_name=sample_user.domain_name,
-            client_type=LoginClientType.DEFAULT,
+            client_type=LoginClientType.CORE,
         )
         assert result1.session_token
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
@@ -381,7 +381,7 @@ class TestLoginSessionForce:
             domain_name=sample_user.domain_name,
             email=sample_user.email,
             target_password_info=self._make_password_info(),
-            client_type=LoginClientType.DEFAULT,
+            client_type=LoginClientType.CORE,
         )
         assert cred_result.user["uuid"] == sample_user.user_id
         assert len(cred_result.active_sessions) == 0
@@ -390,7 +390,7 @@ class TestLoginSessionForce:
             user_id=sample_user.user_id,
             access_key=sample_user.access_key,
             domain_name=sample_user.domain_name,
-            client_type=LoginClientType.DEFAULT,
+            client_type=LoginClientType.CORE,
         )
         assert result2.session_token != result1.session_token
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
