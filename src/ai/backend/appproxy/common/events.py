@@ -228,3 +228,37 @@ class DoHealthCheckEvent(AbstractAnycastEvent):
     @override
     def user_event(self) -> UserEvent | None:
         return None
+
+
+class DoReconcileTraefikRoutesEvent(AbstractAnycastEvent):
+    """Periodic trigger emitted by the coordinator leader cron to reconcile
+    every active inference circuit's routing config against the live Circuit
+    DB state. Acts as a safety net against missed propagation events so that
+    the etcd-based Traefik provider eventually converges on the DB-backed
+    source of truth.
+    """
+
+    def serialize(self) -> tuple[Any, ...]:
+        return tuple()
+
+    @classmethod
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
+        return cls()
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_reconcile_traefik_routes"
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.MODEL_ROUTE
+
+    @override
+    def domain_id(self) -> str | None:
+        return None
+
+    @override
+    def user_event(self) -> UserEvent | None:
+        return None
