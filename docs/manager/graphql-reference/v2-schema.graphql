@@ -2199,6 +2199,14 @@ type CreateRuntimeVariantPresetPayloadGQL {
   preset: RuntimeVariantPreset!
 }
 
+"""
+Added in UNRELEASED. Session types allowed for user-initiated creation.
+"""
+enum CreateSessionType {
+  INTERACTIVE
+  BATCH
+}
+
 """Added in UNRELEASED. Input for creating a file upload session."""
 input CreateUploadSessionV2Input {
   """File path to upload to."""
@@ -3561,6 +3569,78 @@ input EmailSpecInput {
   smtp: SMTPConnectionInput!
   message: EmailMessageInput!
   auth: SMTPAuthInput = null
+}
+
+"""Added in UNRELEASED. Input for creating a new compute session."""
+input EnqueueSessionInput {
+  """Session name."""
+  sessionName: String!
+
+  """Session type."""
+  sessionType: CreateSessionType!
+
+  """Image UUID."""
+  imageId: ID!
+
+  """Resource slot allocations."""
+  resourceEntries: [SessionResourceSlotEntryInput!]!
+
+  """Scaling group name."""
+  resourceGroup: String = null
+
+  """Additional resource options."""
+  resourceOpts: SessionResourceOptsInput = null
+
+  """Cluster mode."""
+  clusterMode: SessionClusterMode! = SINGLE_NODE
+
+  """Number of containers."""
+  clusterSize: Int! = 1
+
+  """Virtual folder mounts."""
+  mounts: [SessionMountItemInput!] = null
+
+  """Environment variables."""
+  environ: JSON = null
+
+  """Ports to pre-open."""
+  preopenPorts: [Int!] = null
+
+  """Bootstrap script."""
+  bootstrapScript: String = null
+
+  """Scheduling priority (0-100)."""
+  priority: Int! = 10
+
+  """Whether preemptible."""
+  isPreemptible: Boolean! = true
+
+  """Dependent session IDs."""
+  dependencies: [ID!] = null
+
+  """Designated agent IDs."""
+  agentList: [String!] = null
+
+  """Network UUID to attach."""
+  attachNetwork: ID = null
+
+  """User-defined tag."""
+  tag: String = null
+
+  """Webhook URL."""
+  callbackUrl: String = null
+
+  """Batch configuration."""
+  batch: SessionBatchConfigInput = null
+
+  """Project UUID."""
+  projectId: ID = null
+}
+
+"""Added in UNRELEASED. Payload returned after creating a session."""
+type EnqueueSessionPayload {
+  """Created session details."""
+  session: SessionV2!
 }
 
 """Added in UNRELEASED. Entity with its allowed actions within a scope."""
@@ -4943,6 +5023,14 @@ type MkdirV2Payload {
 }
 
 """
+Added in UNRELEASED. Scope for querying available presets that satisfy a model card's resource requirements.
+"""
+input ModelCardAvailablePresetsScope {
+  """Model card UUID to check resource requirements against."""
+  modelCardId: UUID!
+}
+
+"""
 Added in UNRELEASED. Represents a registered AI model with metadata extracted from model-definition.yaml. A model card links to a VFolder containing the actual model files and belongs to a MODEL_STORE type project for access control scoping.
 """
 type ModelCardV2 implements Node {
@@ -4979,6 +5067,11 @@ type ModelCardV2 implements Node {
   metadata: ModelCardV2Metadata!
 
   """
+  Minimum resource requirements for serving this model. Each entry maps a resource slot (e.g. 'cpu', 'cuda.shares') to its minimum required quantity. Used to filter compatible deployment revision presets via `available_presets`.
+  """
+  minResource: [ModelCardV2ResourceSlotEntry!]
+
+  """
   README content from the model VFolder, typically containing usage instructions and model documentation.
   """
   readme: String
@@ -4991,6 +5084,16 @@ type ModelCardV2 implements Node {
 
   """Timestamp of the last modification to this model card."""
   updatedAt: DateTime
+
+  """
+  The VFolder that stores this model card's files. Resolved through a DataLoader so that listing many model cards does not trigger N+1 fetches.
+  """
+  vfolder: VFolder
+
+  """
+  Deployment revision presets that satisfy this model card's minimum resource requirements. Equivalent to the root `model_card_available_presets` query but scoped to this card.
+  """
+  availablePresets(filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection
 }
 
 """Added in UNRELEASED. Access level for model cards."""
@@ -5059,6 +5162,17 @@ input ModelCardV2OrderBy {
 enum ModelCardV2OrderField {
   NAME
   CREATED_AT
+}
+
+"""
+Added in UNRELEASED. A single resource requirement entry for a model card. The quantity is represented as a string because model card requirements are descriptive (display/matching) rather than arithmetic.
+"""
+type ModelCardV2ResourceSlotEntry {
+  """Resource type name."""
+  resourceType: String!
+
+  """Resource quantity."""
+  quantity: String!
 }
 
 """
@@ -6263,6 +6377,9 @@ type Mutation {
 
   """Added in UNRELEASED. Create a download session for a virtual folder."""
   vfolderCreateDownloadSessionV2(vfolderId: UUID!, input: CreateDownloadSessionV2Input!): CreateDownloadSessionV2Payload!
+
+  """Added in UNRELEASED. Enqueue a new compute session."""
+  enqueueSession(input: EnqueueSessionInput!): EnqueueSessionPayload!
 
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload!
@@ -7532,6 +7649,11 @@ type Query {
   """Added in UNRELEASED. List available notification rule types"""
   notificationRuleTypes: [NotificationRuleType!]
 
+  """
+  Added in UNRELEASED. Get JSON schema for a notification rule type's message format
+  """
+  notificationRuleTypeSchema(ruleType: NotificationRuleType!): JSON!
+
   """Added in 25.14.0. Get an object storage by ID"""
   objectStorage(id: ID!): ObjectStorage
 
@@ -7715,18 +7837,20 @@ type Query {
   """
   adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
-  """Added in 26.3.0. Get a single query definition by ID (admin only)."""
-  adminPrometheusQueryPreset(id: ID!): QueryDefinition
+  """
+  Added in UNRELEASED. Get a single prometheus query preset by ID. Available to any authenticated user since presets are a shared catalog of metric query templates.
+  """
+  prometheusQueryPreset(id: ID!): QueryDefinition
 
   """
-  Added in 26.3.0. List query definitions with filtering and pagination (admin only).
+  Added in UNRELEASED. List prometheus query presets with filtering and pagination. Available to any authenticated user since presets are a shared catalog of metric query templates.
   """
-  adminPrometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, limit: Int = null, offset: Int = null): QueryDefinitionConnection
+  prometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, limit: Int = null, offset: Int = null): QueryDefinitionConnection
 
   """
-  Added in 26.3.0. Execute a query definition by ID and return the result (admin only).
+  Added in UNRELEASED. Execute a prometheus query preset by ID and return the result. Available to any authenticated user; the underlying preset query is the same regardless of who runs it.
   """
-  adminPrometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult!
+  prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult!
 
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role
@@ -8057,6 +8181,11 @@ type Query {
 
   """Added in UNRELEASED. Get a single model card by ID."""
   modelCardV2(id: UUID!): ModelCardV2
+
+  """
+  Added in UNRELEASED. Search deployment revision presets that satisfy a model card's minimum resource requirements.
+  """
+  modelCardAvailablePresets(scope: ModelCardAvailablePresetsScope!, filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection
 
   """
   Added in UNRELEASED. Get my keypair resource allocation (current user).
@@ -9887,6 +10016,51 @@ Added in 26.2.0. A collection of exposed service ports. Each entry defines a ser
 type ServicePorts {
   """List of service port entries"""
   entries: [ServicePortEntry!]!
+}
+
+"""Added in UNRELEASED. Batch session specific configuration."""
+input SessionBatchConfigInput {
+  """Shell command to execute."""
+  startupCommand: String!
+
+  """Scheduled start time (ISO 8601)."""
+  startsAt: String = null
+
+  """Execution timeout in seconds."""
+  batchTimeout: Int = null
+}
+
+"""Added in UNRELEASED. Cluster networking modes for session creation."""
+enum SessionClusterMode {
+  SINGLE_NODE
+  MULTI_NODE
+}
+
+"""Added in UNRELEASED. A virtual folder mount specification."""
+input SessionMountItemInput {
+  """Virtual folder UUID."""
+  vfolderId: ID!
+
+  """Custom mount path."""
+  mountPath: String = null
+
+  """Mount permission ('rw' or 'ro')."""
+  permission: String = null
+}
+
+"""Added in UNRELEASED. Additional resource options for session creation."""
+input SessionResourceOptsInput {
+  """Shared memory size (e.g., '1g')."""
+  shmem: BinarySizeInput = null
+}
+
+"""Added in UNRELEASED. A single resource slot allocation entry."""
+input SessionResourceSlotEntryInput {
+  """Resource type identifier."""
+  resourceType: String!
+
+  """Quantity as a decimal string."""
+  quantity: String!
 }
 
 """Added in 26.3.0. Session scheduling history record."""

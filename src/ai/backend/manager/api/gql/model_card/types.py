@@ -218,11 +218,14 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     )
     async def vfolder(
         self,
-        info: Info[StrawberryGQLContext, None],
-    ) -> Annotated[
-        VFolderGQL | None,
-        strawberry.lazy("ai.backend.manager.api.gql.vfolder_v2.types.node"),
-    ]:
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            VFolderGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.vfolder_v2.types.node"),
+        ]
+        | None
+    ):
         return await info.context.data_loaders.vfolder_loader.load(self.vfolder_id)
 
     @gql_field(  # type: ignore[misc]
@@ -230,7 +233,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     )
     async def available_presets(
         self,
-        info: Info[StrawberryGQLContext, None],
+        info: Info[StrawberryGQLContext],
         filter: DeploymentRevisionPresetFilterGQL | None = None,
         order_by: list[DeploymentRevisionPresetOrderByGQL] | None = None,
         before: str | None = None,
