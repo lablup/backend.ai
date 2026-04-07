@@ -115,13 +115,13 @@ def assign(user_id: str, role_id: str) -> None:
 )
 def assign_by_username(role_id: UUID, project_id: UUID, names: str) -> None:
     """Assign a role to users by email or username, with project binding."""
-    from ai.backend.common.dto.manager.v2.group.request import AssignUsersByUsernameToProjectInput
+    from ai.backend.common.dto.manager.v2.group.request import AssignUsersToRoleByUsernameInput
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.assign_role_by_username(
-                AssignUsersByUsernameToProjectInput(
+                AssignUsersToRoleByUsernameInput(
                     names=[n.strip() for n in names.split(",") if n.strip()],
                     role_id=role_id,
                     project_id=project_id,
