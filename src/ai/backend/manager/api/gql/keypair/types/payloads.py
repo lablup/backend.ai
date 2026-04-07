@@ -39,7 +39,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
         description="Payload returned after issuing a new keypair. The secret_key is only shown once.",
     ),
     model=IssueMyKeypairPayloadDTO,
-    fields=["secret_key"],
     name="IssueMyKeypairPayload",
 )
 class IssueMyKeypairPayloadGQL(PydanticOutputMixin[IssueMyKeypairPayloadDTO]):
@@ -78,7 +77,6 @@ class SwitchMyMainAccessKeyPayloadGQL(PydanticOutputMixin[SwitchMyMainAccessKeyP
         description="Payload returned after updating a keypair.",
     ),
     model=UpdateMyKeypairPayloadDTO,
-    fields=[],
     name="UpdateMyKeypairPayload",
 )
 class UpdateMyKeypairPayloadGQL(PydanticOutputMixin[UpdateMyKeypairPayloadDTO]):
@@ -91,7 +89,6 @@ class UpdateMyKeypairPayloadGQL(PydanticOutputMixin[UpdateMyKeypairPayloadDTO]):
         description="Payload returned after admin creates a keypair. The secret_key is only shown once.",
     ),
     model=AdminCreateKeypairPayloadDTO,
-    fields=["secret_key"],
     name="AdminCreateKeypairPayload",
 )
 class AdminCreateKeypairPayloadGQL(PydanticOutputMixin[AdminCreateKeypairPayloadDTO]):
@@ -104,7 +101,6 @@ class AdminCreateKeypairPayloadGQL(PydanticOutputMixin[AdminCreateKeypairPayload
         description="Payload returned after admin updates a keypair.",
     ),
     model=AdminUpdateKeypairPayloadDTO,
-    fields=[],
     name="AdminUpdateKeypairPayload",
 )
 class AdminUpdateKeypairPayloadGQL(PydanticOutputMixin[AdminUpdateKeypairPayloadDTO]):
