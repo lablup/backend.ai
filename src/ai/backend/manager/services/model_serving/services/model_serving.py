@@ -970,27 +970,20 @@ class ModelServingService:
                 )
             vfid = VFolderID(ctx.model_folder_quota_scope_id, ctx.model_id)
             yaml_path: str | None
-            if action.config.model_definition_path is not None:
-                # User explicitly specified a path: validate it exists.
+            try:
                 yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
                     self._storage_manager,
                     ctx.model_folder_host,
                     vfid,
                     action.config.model_definition_path,
                 )
-            else:
-                # For non-custom runtimes the model definition file is optional.
-                # Try to discover it (accepting both `.yaml` and `.yml`); if absent,
-                # leave the path as None so downstream stages skip it gracefully.
-                try:
-                    yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
-                        self._storage_manager,
-                        ctx.model_folder_host,
-                        vfid,
-                        None,
-                    )
-                except InvalidAPIParameters:
-                    yaml_path = None
+            except InvalidAPIParameters:
+                # The model definition file is optional for non-custom runtimes;
+                # only treat the missing file as an error if the user explicitly
+                # supplied a path.
+                if action.config.model_definition_path is not None:
+                    raise
+                yaml_path = None
 
         return ValidateModelServiceActionResult(
             model_id=ctx.model_id,
