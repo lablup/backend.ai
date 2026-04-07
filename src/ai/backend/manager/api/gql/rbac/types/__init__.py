@@ -59,7 +59,6 @@ from .role import (
     RoleSourceGQL,
     RoleStatusFilterGQL,
     RoleStatusGQL,
-    ScopeRefGQL,
     UpdateRoleInput,
 )
 from .scope import RBACElementTypeGQL, ScopeInputGQL
@@ -129,7 +128,6 @@ __all__ = [
     "EntityConnection",
     # Scope types
     "ScopeInputGQL",
-    "ScopeRefGQL",
     # Scope-entity combination
     "ScopeEntityCombinationGQL",
     # Entity-operation combination
