@@ -565,6 +565,21 @@ class AuthDBSource:
             ]
 
     @auth_db_source_resilience.apply()
+    async def count_active_login_sessions(self, user_id: UUID) -> int:
+        """Return the number of active (non-revoked) login sessions for a user."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = (
+                sa.select(sa.func.count())
+                .select_from(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.user_id == user_id)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+            )
+            result = await db_session.execute(query)
+            return result.scalar_one()
+
+    @auth_db_source_resilience.apply()
     async def invalidate_session_by_token(self, session_token: str) -> None:
         """Invalidate a single login session by its token."""
         async with self._db.begin_session() as db_session:

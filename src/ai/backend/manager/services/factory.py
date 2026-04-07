@@ -311,6 +311,7 @@ def create_services(args: ServiceArgs) -> Services:
             auth_repository=repositories.auth.repository,
             config_provider=args.config_provider,
             valkey_session_client=args.valkey_session_client,
+            user_resource_policy_repository=repositories.user_resource_policy.repository,
         ),
         notification=NotificationService(
             repository=repositories.notification.repository,

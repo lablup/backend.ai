@@ -152,6 +152,11 @@ class AuthRepository:
         return await self._db_source.fetch_active_session_tokens(user_id)
 
     @auth_repository_resilience.apply()
+    async def count_active_login_sessions(self, user_id: UUID) -> int:
+        """Return the number of active (non-revoked) login sessions for a user."""
+        return await self._db_source.count_active_login_sessions(user_id)
+
+    @auth_repository_resilience.apply()
     async def invalidate_login_session_by_token(self, session_token: str) -> None:
         await self._db_source.invalidate_session_by_token(session_token)
 

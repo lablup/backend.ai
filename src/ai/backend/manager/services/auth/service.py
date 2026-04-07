@@ -29,6 +29,7 @@ from ai.backend.manager.errors.auth import (
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
     PasswordExpired,
+    TooManyConcurrentLoginSessions,
     UserCreationError,
 )
 from ai.backend.manager.errors.common import (
@@ -53,6 +54,9 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
@@ -129,6 +133,7 @@ class AuthService:
     _auth_repository: AuthRepository
     _config_provider: ManagerConfigProvider
     _valkey_session_client: ValkeySessionClient
+    _user_resource_policy_repository: UserResourcePolicyRepository
 
     def __init__(
         self,
@@ -136,11 +141,13 @@ class AuthService:
         auth_repository: AuthRepository,
         config_provider: ManagerConfigProvider,
         valkey_session_client: ValkeySessionClient,
+        user_resource_policy_repository: UserResourcePolicyRepository,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
         self._config_provider = config_provider
         self._valkey_session_client = valkey_session_client
+        self._user_resource_policy_repository = user_resource_policy_repository
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
@@ -280,6 +287,16 @@ class AuthService:
         auth_config: AuthConfig,
     ) -> AuthorizeActionResult:
         """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed."""
+        user_resource_policy = await self._user_resource_policy_repository.get_by_name(
+            user.resource_policy
+        )
+        if user_resource_policy.max_concurrent_logins is not None:
+            active_login_count = await self._auth_repository.count_active_login_sessions(
+                user_id=user.uuid
+            )
+            if active_login_count >= user_resource_policy.max_concurrent_logins:
+                raise TooManyConcurrentLoginSessions()
+
         max_concurrent_sessions = keypair_row.resource_policy_row.max_concurrent_sessions
         tokens_to_invalidate: list[str] | None = None
         if action.force and len(live_sessions) >= max_concurrent_sessions:

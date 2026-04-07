@@ -181,3 +181,15 @@ class ActiveLoginSessionExistsError(BackendAIError, web.HTTPConflict):
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.CONFLICT,
         )
+
+
+class TooManyConcurrentLoginSessions(BackendAIError, web.HTTPTooManyRequests):
+    error_type = "https://api.backend.ai/probs/too-many-concurrent-logins"
+    error_title = "Too many concurrent login sessions for this user."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.CONFLICT,
+        )
