@@ -669,8 +669,13 @@ class GroupDBSource:
 
         Matches ``UserRow.email`` or ``UserRow.username`` against the given
         names, filtered to the same domain as the project and not already
-        assigned. Unresolvable names (not found, wrong domain, or already
-        assigned) are returned in ``failed_names`` without distinguishing
+        assigned. Email takes precedence over username when both match.
+        If a single name matches multiple users (e.g. one user's email equals
+        another user's username), the name is treated as failed to avoid
+        ambiguous assignment.
+
+        Unresolvable names (not found, wrong domain, already assigned, or
+        ambiguous) are returned in ``failed_names`` without distinguishing
         the reason, to prevent user enumeration.
 
         Returns (resolved_user_ids, failed_names).
@@ -683,7 +688,7 @@ class GroupDBSource:
                 sa.select(GroupRow.domain_name).where(GroupRow.id == project_id).scalar_subquery()
             )
 
-            unique_names = list(set(names))
+            unique_names = set(names)
             rows = (
                 await session.scalars(
                     sa.select(UserRow)
@@ -700,15 +705,25 @@ class GroupDBSource:
                 )
             ).all()
 
-            resolved_names: set[str] = set()
-            resolved_ids: list[UUID] = []
+            # Build per-name → user mappings with email precedence.
+            # A name that resolves to multiple distinct users is ambiguous.
+            name_to_user: dict[str, UUID] = {}
+            ambiguous_names: set[str] = set()
             for row in rows:
-                resolved_ids.append(row.uuid)
-                if row.email in unique_names:
-                    resolved_names.add(row.email)
-                if row.username is not None and row.username in unique_names:
-                    resolved_names.add(row.username)
+                for name in (row.email, row.username):
+                    if name is None or name not in unique_names:
+                        continue
+                    if name in ambiguous_names:
+                        continue
+                    if name in name_to_user and name_to_user[name] != row.uuid:
+                        ambiguous_names.add(name)
+                        del name_to_user[name]
+                    else:
+                        name_to_user[name] = row.uuid
 
+            # Deduplicate: multiple input names may resolve to the same user
+            resolved_ids = list(dict.fromkeys(name_to_user.values()))
+            resolved_names = set(name_to_user.keys())
             failed_names = [n for n in names if n not in resolved_names]
             return (resolved_ids, failed_names)
 

@@ -495,3 +495,57 @@ class TestResolveUsersByName:
 
         assert user_ids == []
         assert set(failed) == {valid_email, cross_email, "ghost@x.com"}
+
+    async def test_collision_email_vs_username_treated_as_failed(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: GroupDBSource,
+        test_project: uuid.UUID,
+        test_domain: str,
+        user_resource_policy: str,
+        test_password_info: PasswordInfo,
+    ) -> None:
+        """When a name matches one user's email and another user's username,
+        the name is treated as ambiguous and appears in failed_names."""
+        # user_a has email "shared@example.com"
+        uid_a, _, _ = await self._create_user(
+            db_with_cleanup,
+            test_domain,
+            user_resource_policy,
+            test_password_info,
+            username="user_a",
+            email="shared@example.com",
+        )
+        # user_b has username "shared@example.com"
+        uid_b, _, _ = await self._create_user(
+            db_with_cleanup,
+            test_domain,
+            user_resource_policy,
+            test_password_info,
+            username="shared@example.com",
+            email="user_b@example.com",
+        )
+
+        user_ids, failed = await group_db_source.resolve_users_by_name(
+            test_project, ["shared@example.com"]
+        )
+
+        # Ambiguous: neither user should be assigned
+        assert user_ids == []
+        assert failed == ["shared@example.com"]
+
+    async def test_same_user_email_and_username_both_match(
+        self,
+        group_db_source: GroupDBSource,
+        test_project: uuid.UUID,
+        same_domain_user_1: tuple[uuid.UUID, str, str],
+    ) -> None:
+        """When email and username both match the SAME user, it resolves correctly."""
+        uid, email, username = same_domain_user_1
+        user_ids, failed = await group_db_source.resolve_users_by_name(
+            test_project, [email, username]
+        )
+
+        # Both names resolve to the same user — deduplicated
+        assert user_ids == [uid]
+        assert failed == []

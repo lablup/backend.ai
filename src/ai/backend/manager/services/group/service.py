@@ -268,13 +268,16 @@ class GroupService:
         # 2. Assign resolved users (bind to project + role mapping)
         #    Follows PermissionControllerService.assign_role() pattern:
         #    bind_user_to_project() + role assignment in one step.
+        #    Use actual result count to handle race conditions where users
+        #    may get assigned between resolve and assign.
+        assigned_users = []
         if user_ids:
-            await self._group_repository.assign_users_to_project(
+            assigned_users = await self._group_repository.assign_users_to_project(
                 action.project_id, user_ids, action.role_id
             )
         return AssignUsersByNameToProjectActionResult(
             project_id=action.project_id,
-            assigned_count=len(user_ids),
+            assigned_count=len(assigned_users),
             failed_names=failed_names,
         )
 
