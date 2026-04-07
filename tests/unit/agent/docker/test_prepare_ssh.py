@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, cast
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -11,7 +11,12 @@ from pytest_mock import MockerFixture
 
 from ai.backend.agent.docker.agent import DockerKernelCreationContext
 from ai.backend.common.docker import KernelFeatures
-from ai.backend.common.types import ClusterInfo
+from ai.backend.common.types import (
+    ClusterInfo,
+    ClusterMode,
+    ClusterSSHKeyPair,
+    ClusterSSHPortMapping,
+)
 
 
 class PrepareSSHFixture:
@@ -60,8 +65,8 @@ class PrepareSSHFixture:
         host_key_path.parent.mkdir(parents=True, exist_ok=True)
         host_key_path.write_bytes(b"fake-host-key")
 
-    async def call(self, cluster_info: dict[str, Any]) -> None:
-        await DockerKernelCreationContext.prepare_ssh(self.ctx, cast(ClusterInfo, cluster_info))
+    async def call(self, cluster_info: ClusterInfo) -> None:
+        await DockerKernelCreationContext.prepare_ssh(self.ctx, cluster_info)
 
     @property
     def ssh_dir(self) -> Path:
@@ -74,30 +79,37 @@ def prepare_ssh(tmp_path: Path, mocker: MockerFixture) -> PrepareSSHFixture:
 
 
 @pytest.fixture()
-def cluster_info_with_keypair() -> dict[str, Any]:
-    return {
-        "ssh_keypair": {
-            "private_key": "-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----",
-            "public_key": "ssh-rsa AAAAFAKE user@host",
-        },
-        "cluster_ssh_port_mapping": None,
-    }
+def cluster_info_with_keypair() -> ClusterInfo:
+    return ClusterInfo(
+        mode=ClusterMode.SINGLE_NODE,
+        size=1,
+        replicas={},
+        network_config={},
+        ssh_keypair=ClusterSSHKeyPair(
+            private_key="-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----",
+            public_key="ssh-rsa AAAAFAKE user@host",
+        ),
+        cluster_ssh_port_mapping=None,
+    )
 
 
 @pytest.fixture()
-def cluster_info_no_keypair() -> dict[str, Any]:
-    return {
-        "ssh_keypair": None,
-        "cluster_ssh_port_mapping": None,
-    }
+def cluster_info_no_keypair() -> ClusterInfo:
+    return ClusterInfo(
+        mode=ClusterMode.SINGLE_NODE,
+        size=1,
+        replicas={},
+        network_config={},
+        ssh_keypair=None,
+        cluster_ssh_port_mapping=None,
+    )
 
 
 class TestPrepareSshHostKeyGeneration:
-    @pytest.mark.asyncio
     async def test_calls_dropbearkey_with_correct_args(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_no_keypair: dict[str, Any],
+        cluster_info_no_keypair: ClusterInfo,
     ) -> None:
         await prepare_ssh.call(cluster_info_no_keypair)
 
@@ -105,21 +117,24 @@ class TestPrepareSshHostKeyGeneration:
         call_args = prepare_ssh.mock_subprocess_run.call_args
         cmd = call_args[0][0]
         dropbearmulti = prepare_ssh.ctx.resolve_krunner_filepath.return_value
-        assert cmd[0] == str(dropbearmulti)
-        assert cmd[1] == "dropbearkey"
-        assert cmd[2:4] == ["-t", "rsa"]
-        assert cmd[4:6] == ["-s", "2048"]
-        assert cmd[6] == "-f"
         expected_key_path = str(prepare_ssh.ssh_dir / "dropbear_rsa_host_key")
-        assert cmd[7] == expected_key_path
-        assert call_args[1]["check"] is True
-        assert call_args[1]["capture_output"] is True
+        assert cmd == [
+            str(dropbearmulti),
+            "dropbearkey",
+            "-t",
+            "rsa",
+            "-s",
+            "2048",
+            "-f",
+            expected_key_path,
+        ]
+        assert call_args.kwargs["check"] is True
+        assert call_args.kwargs["capture_output"] is True
 
-    @pytest.mark.asyncio
     async def test_skips_generation_when_host_key_exists(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_no_keypair: dict[str, Any],
+        cluster_info_no_keypair: ClusterInfo,
     ) -> None:
         prepare_ssh.ssh_dir.mkdir(parents=True, exist_ok=True)
         (prepare_ssh.ssh_dir / "dropbear_rsa_host_key").write_text("existing_key")
@@ -128,11 +143,10 @@ class TestPrepareSshHostKeyGeneration:
 
         prepare_ssh.mock_subprocess_run.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_raises_file_not_found_when_binary_missing(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_no_keypair: dict[str, Any],
+        cluster_info_no_keypair: ClusterInfo,
     ) -> None:
         prepare_ssh.ctx.resolve_krunner_filepath.return_value = (
             prepare_ssh.tmp_path / "nonexistent.bin"
@@ -142,11 +156,10 @@ class TestPrepareSshHostKeyGeneration:
 
         assert not (prepare_ssh.ssh_dir / "id_cluster").exists()
 
-    @pytest.mark.asyncio
     async def test_logs_and_reraises_on_subprocess_failure(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_no_keypair: dict[str, Any],
+        cluster_info_no_keypair: ClusterInfo,
     ) -> None:
         prepare_ssh.mock_subprocess_run.side_effect = CalledProcessError(
             1, "dropbearkey", b"out", b"err"
@@ -156,11 +169,10 @@ class TestPrepareSshHostKeyGeneration:
 
         assert not (prepare_ssh.ssh_dir / "id_cluster").exists()
 
-    @pytest.mark.asyncio
     async def test_host_key_gets_chmod_0o600(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_no_keypair: dict[str, Any],
+        cluster_info_no_keypair: ClusterInfo,
     ) -> None:
         await prepare_ssh.call(cluster_info_no_keypair)
 
@@ -169,25 +181,24 @@ class TestPrepareSshHostKeyGeneration:
 
 
 class TestPrepareSshClusterKeypair:
-    @pytest.mark.asyncio
     async def test_writes_keypair_with_correct_permissions(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_with_keypair: dict[str, Any],
+        cluster_info_with_keypair: ClusterInfo,
     ) -> None:
         await prepare_ssh.call(cluster_info_with_keypair)
 
         priv_key = prepare_ssh.ssh_dir / "id_cluster"
         pub_key = prepare_ssh.ssh_dir / "id_cluster.pub"
+        assert cluster_info_with_keypair["ssh_keypair"] is not None  # for mypy
         assert priv_key.read_text() == cluster_info_with_keypair["ssh_keypair"]["private_key"]
         assert pub_key.read_text() == cluster_info_with_keypair["ssh_keypair"]["public_key"]
         assert priv_key.stat().st_mode & 0o777 == 0o600
 
-    @pytest.mark.asyncio
     async def test_skips_cluster_keypair_when_sshkey_none(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_no_keypair: dict[str, Any],
+        cluster_info_no_keypair: ClusterInfo,
     ) -> None:
         await prepare_ssh.call(cluster_info_no_keypair)
 
@@ -197,26 +208,28 @@ class TestPrepareSshClusterKeypair:
 
 
 class TestPrepareSshPortMapping:
-    @pytest.mark.asyncio
     async def test_writes_port_mapping_json(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_with_keypair: dict[str, Any],
+        cluster_info_with_keypair: ClusterInfo,
     ) -> None:
-        port_mapping = {"node1": ["10.0.0.1", 2222], "node2": ["10.0.0.2", 2223]}
+        port_mapping = ClusterSSHPortMapping({
+            "node1": ("10.0.0.1", 2222),
+            "node2": ("10.0.0.2", 2223),
+        })
         cluster_info_with_keypair["cluster_ssh_port_mapping"] = port_mapping
 
         await prepare_ssh.call(cluster_info_with_keypair)
 
         mapping_path = prepare_ssh.ssh_dir / "port-mapping.json"
         assert mapping_path.exists()
-        assert json.loads(mapping_path.read_bytes()) == port_mapping
+        written = json.loads(mapping_path.read_bytes())
+        assert written == {k: list(v) for k, v in port_mapping.items()}
 
-    @pytest.mark.asyncio
     async def test_skips_port_mapping_when_none(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_with_keypair: dict[str, Any],
+        cluster_info_with_keypair: ClusterInfo,
     ) -> None:
         await prepare_ssh.call(cluster_info_with_keypair)
 
@@ -224,11 +237,10 @@ class TestPrepareSshPortMapping:
 
 
 class TestPrepareSshChown:
-    @pytest.mark.asyncio
     async def test_chown_called_with_overriding_uid_gid(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_with_keypair: dict[str, Any],
+        cluster_info_with_keypair: ClusterInfo,
     ) -> None:
         prepare_ssh.ctx.get_overriding_uid.return_value = 5000
         prepare_ssh.ctx.get_overriding_gid.return_value = 5001
@@ -244,11 +256,10 @@ class TestPrepareSshChown:
         assert "id_cluster" in path_names
         assert "id_cluster.pub" in path_names
 
-    @pytest.mark.asyncio
     async def test_chown_called_with_uid_match_feature(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_with_keypair: dict[str, Any],
+        cluster_info_with_keypair: ClusterInfo,
     ) -> None:
         prepare_ssh.ctx.kernel_features = frozenset({KernelFeatures.UID_MATCH})
 
@@ -259,21 +270,19 @@ class TestPrepareSshChown:
         assert call_args[0][1] == prepare_ssh.ctx.local_config.container.kernel_uid
         assert call_args[0][2] == prepare_ssh.ctx.local_config.container.kernel_gid
 
-    @pytest.mark.asyncio
     async def test_chown_skipped_when_no_override_and_no_uid_match(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_with_keypair: dict[str, Any],
+        cluster_info_with_keypair: ClusterInfo,
     ) -> None:
         await prepare_ssh.call(cluster_info_with_keypair)
 
         prepare_ssh.ctx._chown_paths_if_root.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_chown_called_with_only_overriding_uid(
         self,
         prepare_ssh: PrepareSSHFixture,
-        cluster_info_with_keypair: dict[str, Any],
+        cluster_info_with_keypair: ClusterInfo,
     ) -> None:
         prepare_ssh.ctx.get_overriding_uid.return_value = 5000
 
