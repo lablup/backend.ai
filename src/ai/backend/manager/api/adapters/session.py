@@ -142,6 +142,7 @@ from ai.backend.manager.services.session.actions.terminate_sessions import (
 from ai.backend.manager.services.session.actions.terminate_sessions_in_project import (
     TerminateSessionsInProjectAction,
 )
+from ai.backend.manager.services.user.actions.get_user import GetUserAction
 
 from .base import BaseAdapter
 
@@ -195,6 +196,24 @@ _KERNEL_PAGINATION_SPEC = PaginationSpec(
 class SessionAdapter(BaseAdapter):
     """Adapter for session and kernel domain operations."""
 
+    async def _resolve_owner_access_key(
+        self,
+        owner_id: UUID | None,
+        fallback_access_key: str,
+    ) -> AccessKey:
+        """Resolve a delegated owner UUID to that user's main access key.
+
+        Returns the caller's ``fallback_access_key`` when ``owner_id`` is None.
+        Otherwise loads the target user via the user processor (which enforces
+        RBAC) and returns the target user's main access key.
+        """
+        if owner_id is None:
+            return AccessKey(fallback_access_key)
+        result = await self._processors.user.get_user.wait_for_complete(
+            GetUserAction(user_uuid=owner_id),
+        )
+        return AccessKey(result.user.main_access_key)
+
     @staticmethod
     def _require_user_id() -> UUID:
         """Return the current user's UUID from request context.
@@ -223,9 +242,24 @@ class SessionAdapter(BaseAdapter):
 
         When ``input.owner_id`` is set, the session is created on behalf of the
         target user: their main access key, role, and domain are used in place
-        of the caller's. Resolution and authorization of the delegated user
-        are handled by the downstream session service, not by this adapter.
+        of the caller's. The target user must be loadable via the user
+        processor (RBAC enforced).
         """
+        if input.owner_id is not None:
+            owner_result = await self._processors.user.get_user.wait_for_complete(
+                GetUserAction(user_uuid=input.owner_id),
+            )
+            owner = owner_result.user
+            if owner.main_access_key is None:
+                raise RuntimeError(
+                    f"Delegated owner {input.owner_id} has no main access key configured"
+                )
+            user_id = owner.id
+            access_key = owner.main_access_key
+            if owner.role is not None:
+                user_role = owner.role.value
+            if owner.domain_name is not None:
+                domain_name = owner.domain_name
         batch_spec: SessionBatchSpec | None = None
         if input.batch is not None:
             starts_at = None
@@ -868,11 +902,17 @@ class SessionAdapter(BaseAdapter):
         session_id: UUID,
         access_key: str,
         kernel_id: UUID | None = None,
+        owner_id: UUID | None = None,
     ) -> SessionLogsPayload:
-        """Get container logs for a session."""
+        """Get container logs for a session.
+
+        When ``owner_id`` is provided, the logs are fetched on behalf of the
+        delegated owner. Otherwise the caller's own access key is used.
+        """
+        owner_access_key = await self._resolve_owner_access_key(owner_id, access_key)
         action = GetContainerLogsAction(
             session_name=str(session_id),
-            owner_access_key=AccessKey(access_key),
+            owner_access_key=owner_access_key,
             kernel_id=KernelId(kernel_id) if kernel_id else None,
         )
         result = await self._processors.session.get_container_logs.wait_for_complete(action)

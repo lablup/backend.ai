@@ -175,11 +175,17 @@ class V2SessionClient(BaseDomainClient):
         self,
         session_id: UUID,
         kernel_id: UUID | None = None,
+        owner_id: UUID | None = None,
     ) -> SessionLogsPayload:
-        """Get container logs for a session."""
+        """Get container logs for a session.
+
+        ``owner_id`` selects a delegated owner; the caller is used when omitted.
+        """
         params: dict[str, str] = {}
         if kernel_id is not None:
             params["kernel_id"] = str(kernel_id)
+        if owner_id is not None:
+            params["owner_id"] = str(owner_id)
         return await self._client.typed_request(
             "GET",
             f"{_PATH}/{session_id}/logs",
