@@ -533,7 +533,6 @@ class UpdateNotificationChannelPayload(PydanticOutputMixin[UpdateNotificationCha
         added_version="26.3.0", description="Payload for delete notification channel mutation."
     ),
     model=DeleteNotificationChannelPayloadDTO,
-    fields=["id"],
 )
 class DeleteNotificationChannelPayload(PydanticOutputMixin[DeleteNotificationChannelPayloadDTO]):
     id: ID = gql_field(description="ID of the deleted notification channel.")
@@ -564,7 +563,6 @@ class UpdateNotificationRulePayload(PydanticOutputMixin[UpdateNotificationRulePa
         added_version="26.3.0", description="Payload for delete notification rule mutation."
     ),
     model=DeleteNotificationRulePayloadDTO,
-    fields=["id"],
 )
 class DeleteNotificationRulePayload(PydanticOutputMixin[DeleteNotificationRulePayloadDTO]):
     id: ID = gql_field(description="ID of the deleted notification rule.")
@@ -588,7 +586,6 @@ class ValidateNotificationChannelInput(PydanticInputMixin[ValidateNotificationCh
         added_version="26.3.0", description="Payload for validate notification channel mutation."
     ),
     model=ValidateNotificationChannelPayloadDTO,
-    fields=["id"],
 )
 class ValidateNotificationChannelPayload(
     PydanticOutputMixin[ValidateNotificationChannelPayloadDTO]
