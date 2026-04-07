@@ -340,11 +340,7 @@ class AuthService:
             force=action.force,
         )
 
-        # Create the new session first. If this fails we must NOT have already
-        # destroyed the user's existing sessions — the user would lose every
-        # session without getting a replacement. Only after the new session is
-        # persisted do we evict the old ones (Valkey first so cross-checks stop
-        # seeing them, then DB invalidation).
+        # Create-before-destroy: evict old sessions only after the new one is persisted.
         session_result = await self._auth_repository.create_login_session(
             user_id=user.uuid,
             access_key=keypair_row.access_key,
