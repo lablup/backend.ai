@@ -1647,12 +1647,18 @@ class SessionService:
                 raise InternalServerError(
                     f"Delegated owner {action.owner_id} has no main access key configured"
                 )
+            if owner.role is None:
+                raise InternalServerError(
+                    f"Delegated owner {action.owner_id} has no role configured"
+                )
+            if owner.domain_name is None:
+                raise InternalServerError(
+                    f"Delegated owner {action.owner_id} has no domain configured"
+                )
             user_id = owner.id
             access_key = AccessKey(owner.main_access_key)
-            if owner.role is not None:
-                user_role = owner.role
-            if owner.domain_name is not None:
-                domain_name = owner.domain_name
+            user_role = owner.role
+            domain_name = owner.domain_name
 
         image_row = await self._session_repository.resolve_image_by_id(action.image_id)
         resource_policy = await self._session_repository.get_keypair_resource_policy(
