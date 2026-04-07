@@ -149,40 +149,24 @@ class AuthService:
         self._valkey_session_client = valkey_session_client
         self._user_resource_policy_repository = user_resource_policy_repository
 
-    async def _resolve_group_role(
-        self,
-        group_id: uuid.UUID,
-        user_id: uuid.UUID,
-        is_superadmin: bool,
-    ) -> str:
-        """Resolve the caller's role within the given project/group.
-
-        Superadmins always have access. For non-superadmins, verify membership via the
-        repository and raise ``ObjectNotFound`` when the user is not a member (to avoid
-        leaking whether the project exists). Per-group roles are not yet implemented, so
-        all members currently resolve to ``"user"``.
-        """
-        if is_superadmin:
-            # Superadmins have global access across all domains and groups.
-            return "user"
-        try:
-            # TODO: per-group role is not yet implemented.
-            await self._auth_repository.get_group_membership(group_id, user_id)
-        except GroupMembershipNotFoundError as e:
-            raise ObjectNotFound(
-                extra_msg="No such project or you are not the member of it.",
-                object_name="project (user group)",
-            ) from e
-        return "user"
-
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
-        group_role: str | None = None
+        group_role = None
         if action.group_id is not None:
-            group_role = await self._resolve_group_role(
-                group_id=action.group_id,
-                user_id=action.user_id,
-                is_superadmin=action.is_superadmin,
-            )
+            if action.is_superadmin:
+                # Superadmins have global access across all domains and groups.
+                group_role = "user"
+            else:
+                try:
+                    # TODO: per-group role is not yet implemented.
+                    await self._auth_repository.get_group_membership(
+                        action.group_id, action.user_id
+                    )
+                    group_role = "user"
+                except GroupMembershipNotFoundError as e:
+                    raise ObjectNotFound(
+                        extra_msg="No such project or you are not the member of it.",
+                        object_name="project (user group)",
+                    ) from e
 
         return GetRoleActionResult(
             global_role="superadmin" if action.is_superadmin else "user",
@@ -294,6 +278,35 @@ class AuthService:
 
         return main_keypair_row, live_sessions
 
+    def _enforce_max_concurrent_logins(
+        self,
+        limit: int | None,
+        live_sessions: list[ActiveSessionInfo],
+        force: bool,
+    ) -> list[str] | None:
+        """Apply the per-user ``max_concurrent_logins`` cap and return tokens to evict.
+
+        Behavior:
+        - ``limit is None`` (unlimited or no policy): no cap, returns ``None``.
+        - Below the cap: no eviction, returns ``None``.
+        - At or over the cap with ``force=True``: returns the oldest session tokens
+          (``count - limit + 1`` of them) so the caller can invalidate them before
+          creating the new login session.
+        - At or over the cap with ``force=False``: raises ``TooManyConcurrentLoginSessions``.
+
+        ``live_sessions`` must already be the authoritative active set (cross-checked
+        against Valkey by the caller) and ordered oldest-first.
+        """
+        if limit is None:
+            return None
+        count = len(live_sessions)
+        if count < limit:
+            return None
+        if not force:
+            raise TooManyConcurrentLoginSessions()
+        sessions_to_remove = count - limit + 1
+        return [s.session_token for s in live_sessions[:sessions_to_remove]]
+
     async def _create_login_session(
         self,
         action: AuthorizeAction,
@@ -321,17 +334,11 @@ class AuthService:
             # If no matching resource policy is found, skip login-session limit enforcement.
             limit = None
 
-        tokens_to_invalidate: list[str] | None = None
-        if limit is not None:
-            count = len(live_sessions)
-            if count >= limit:
-                if action.force:
-                    sessions_to_remove = count - limit + 1
-                    tokens_to_invalidate = [
-                        s.session_token for s in live_sessions[:sessions_to_remove]
-                    ]
-                else:
-                    raise TooManyConcurrentLoginSessions()
+        tokens_to_invalidate = self._enforce_max_concurrent_logins(
+            limit=limit,
+            live_sessions=live_sessions,
+            force=action.force,
+        )
 
         session_result = await self._auth_repository.create_login_session(
             user_id=user.uuid,
