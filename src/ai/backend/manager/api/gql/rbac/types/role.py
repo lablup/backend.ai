@@ -57,6 +57,10 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput as UpdateRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
+    AssociationScopesEntitiesNode,
+    RoleAssignmentNode,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
     BulkAssignRoleFailureInfo as BulkAssignRoleFailureInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
@@ -74,9 +78,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     PurgeRolePayload as PurgeRolePayloadDTO,
 )
-from ai.backend.common.dto.manager.v2.rbac.response import (
-    RoleAssignmentNode,
-)
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleSourceDTO,
     RoleStatusDTO,
@@ -87,6 +88,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -100,7 +102,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import ScopeInputGQL
+from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL, ScopeInputGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -305,6 +307,21 @@ class RoleGQL(PydanticNodeMixin[Any]):
             count=result.total_count,
         )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Scopes this role is registered in.",
+        )
+    )  # type: ignore[misc]
+    async def scopes(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> list[ScopeRefGQL]:
+        result = await info.context.adapters.rbac.admin_search_role_scopes_gql(
+            role_id=uuid.UUID(self.id),
+        )
+        return [ScopeRefGQL.from_pydantic(item) for item in result.items]
+
 
 @gql_node_type(
     BackendAIGQLMeta(
@@ -350,6 +367,36 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     ):
         # DataLoader already returns UserV2GQL | None via from_pydantic conversion
         return await info.context.data_loaders.user_loader.load(self.user_id)
+
+
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Scope reference from the association_scopes_entities table.",
+    ),
+    name="ScopeRef",
+)
+class ScopeRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
+    id: NodeID[str]
+    scope_type: RBACElementTypeGQL
+    scope_id: str
+    entity_type: RBACElementTypeGQL
+    entity_id: str
+    relation_type: str
+    registered_at: datetime
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.element_association_loader.load_many([
+            uuid.UUID(nid) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
 
 
 # ==================== Filter Types ====================

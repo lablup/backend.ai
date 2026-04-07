@@ -10,6 +10,7 @@ from functools import lru_cache
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.rbac import (
@@ -711,6 +712,40 @@ class RBACAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
+            base_conditions=base_conditions,
+        )
+        action_result: SearchElementAssociationsActionResult = await self._processors.permission_controller.search_element_associations.wait_for_complete(
+            SearchElementAssociationsAction(querier=querier)
+        )
+        raw = action_result.result
+        return SearchResult(
+            items=[self._association_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
+        )
+
+    async def admin_search_role_scopes_gql(
+        self,
+        role_id: UUID,
+    ) -> SearchResult[AssociationScopesEntitiesNode]:
+        """Get all scope associations for a specific role."""
+        base_conditions: list[QueryCondition] = [
+            EntityScopeConditions.by_entity_type(RBACElementType.ROLE),
+            EntityScopeConditions.by_entity_id_equals(
+                StringMatchSpec(value=str(role_id), case_insensitive=False, negated=False)
+            ),
+        ]
+        querier = self._build_querier(
+            conditions=[],
+            orders=[],
+            pagination_spec=_entity_pagination_spec(),
+            first=None,
+            after=None,
+            last=None,
+            before=None,
+            limit=None,
+            offset=None,
             base_conditions=base_conditions,
         )
         action_result: SearchElementAssociationsActionResult = await self._processors.permission_controller.search_element_associations.wait_for_complete(
