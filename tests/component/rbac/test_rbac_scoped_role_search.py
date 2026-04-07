@@ -52,7 +52,9 @@ def permission_controller_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> PermissionControllerProcessors:
     repo = PermissionControllerRepository(database_engine)
-    service = PermissionControllerService(repo, rbac_action_registry=[])
+    service = PermissionControllerService(
+        repo, group_repository=MagicMock(), rbac_action_registry=[]
+    )
     validators = MagicMock()
     validators.rbac.scope.validate = AsyncMock()
     return PermissionControllerProcessors(
