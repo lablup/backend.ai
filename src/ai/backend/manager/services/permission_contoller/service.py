@@ -237,9 +237,7 @@ class PermissionControllerService:
         to prevent user enumeration.
         """
         # 1. Resolve names → user UUIDs (system-wide)
-        resolve_result = await self._group_repository.resolve_users_by_username(
-            action.names, action.querier
-        )
+        resolve_result = await self._group_repository.resolve_users_by_username(action.names)
         # 2. Assign resolved users (domain filter + dedup handled internally)
         user_ids = list(dict.fromkeys(resolve_result.name_to_uid.values()))
         assigned_users = []

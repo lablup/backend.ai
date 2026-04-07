@@ -12,13 +12,11 @@ from ai.backend.manager.actions.action.single_entity import (
 from ai.backend.manager.actions.action.types import FieldData
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 
 
 @dataclass
 class AssignUsersToRoleByUsernameAction(BaseSingleEntityAction):
     project_id: UUID
-    querier: BatchQuerier
     names: list[str]
     role_id: UUID
 

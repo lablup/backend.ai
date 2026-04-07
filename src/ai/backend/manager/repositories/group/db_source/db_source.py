@@ -65,6 +65,7 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator, execute_bulk_creator
+from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
@@ -662,21 +663,24 @@ class GroupDBSource:
 
             return [row.to_data() for row in new_user_rows]
 
-    async def resolve_users_by_username(
-        self, names: list[str], querier: BatchQuerier
-    ) -> ResolveUsersByUsernameResult:
+    async def resolve_users_by_username(self, names: list[str]) -> ResolveUsersByUsernameResult:
         """Resolve email/username to user UUIDs.
 
-        Uses the given ``querier`` to fetch matching users. If a single name
-        matches multiple distinct users (e.g. one user's email equals another
-        user's username), the name is treated as ambiguous and returned in
-        ``failed_names``.
+        If a single name matches multiple distinct users (e.g. one user's
+        email equals another user's username), the name is treated as
+        ambiguous and returned in ``failed_names``.
         """
         if not names:
             return ResolveUsersByUsernameResult(name_to_uid={}, failed_names=[])
 
         async with self._db.begin_session_read_committed() as session:
             unique_names = set(names)
+            querier = BatchQuerier(
+                pagination=NoPagination(),
+                conditions=[
+                    lambda: UserRow.email.in_(unique_names) | UserRow.username.in_(unique_names)
+                ],
+            )
             result = await execute_batch_querier(session, sa.select(UserRow), querier)
 
             # Build per-name → user mappings.

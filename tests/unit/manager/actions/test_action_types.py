@@ -9,6 +9,9 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
+from ai.backend.manager.services.permission_contoller.actions.assign_users_to_role_by_username import (
+    AssignUsersToRoleByUsernameAction,
+)
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.vfs_storage.actions.delete import DeleteVFSStorageAction
@@ -22,14 +25,15 @@ _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
     UpdateObjectStorageAction,
     DeleteVFSStorageAction,
     PurgeUserAction,
+    AssignUsersToRoleByUsernameAction,
 ]
 
 
 class TestActionOperationType:
-    def test_has_exactly_six_values(self) -> None:
+    def test_has_exactly_seven_values(self) -> None:
         values = list(ActionOperationType)
-        assert len(values) == 6
-        expected = {"get", "search", "create", "update", "delete", "purge"}
+        assert len(values) == 7
+        expected = {"get", "search", "create", "update", "delete", "purge", "grant_read"}
         assert {v.value for v in values} == expected
 
     def test_to_permission_operation_mapping(self) -> None:
@@ -39,6 +43,7 @@ class TestActionOperationType:
         assert ActionOperationType.UPDATE.to_permission_operation() == OperationType.UPDATE
         assert ActionOperationType.DELETE.to_permission_operation() == OperationType.SOFT_DELETE
         assert ActionOperationType.PURGE.to_permission_operation() == OperationType.HARD_DELETE
+        assert ActionOperationType.GRANT_READ.to_permission_operation() == OperationType.GRANT_READ
 
     def test_all_values_are_unique(self) -> None:
         values = [v.value for v in ActionOperationType]

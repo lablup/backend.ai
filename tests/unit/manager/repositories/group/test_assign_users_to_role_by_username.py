@@ -35,8 +35,6 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import NoPagination
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.testutils.db import with_tables
 
@@ -213,12 +211,7 @@ class TestResolveUsersByUsername:
     async def _resolve(
         self, db_source: GroupDBSource, names: list[str]
     ) -> ResolveUsersByUsernameResult:
-        unique = list(set(names))
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[lambda: UserRow.email.in_(unique) | UserRow.username.in_(unique)],
-        )
-        return await db_source.resolve_users_by_username(names, querier)
+        return await db_source.resolve_users_by_username(names)
 
     # --- Test cases ---
 
