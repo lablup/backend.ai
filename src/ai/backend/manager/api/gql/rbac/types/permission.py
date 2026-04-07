@@ -278,7 +278,6 @@ class DeletePermissionInput(PydanticInputMixin[DeletePermissionInputDTO]):
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for delete permission mutation."),
     model=DeletePermissionPayloadDTO,
-    fields=["id"],
     name="DeletePermissionPayload",
 )
 class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
