@@ -70,9 +70,6 @@ class LoginSessionRow(Base):  # type: ignore[misc]
     )
 
     __table_args__ = (
-        # Composite index covers both per-client-type lookups (authorize flow) and
-        # user-wide scans (signout) via B-tree prefix match, so a separate
-        # (user_id, status) index is redundant.
         sa.Index(
             "ix_login_sessions_user_id_client_type_status", "user_id", "client_type", "status"
         ),
