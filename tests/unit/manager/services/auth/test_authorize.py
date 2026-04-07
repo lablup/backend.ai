@@ -13,7 +13,12 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
+from ai.backend.manager.errors.auth import (
+    AuthorizationFailed,
+    PasswordExpired,
+    TooManyConcurrentLoginSessions,
+)
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -567,3 +572,138 @@ async def test_create_login_session_passes_client_type_without_enforcement_knobs
     assert "tokens_to_invalidate" not in call_kwargs
     assert call_kwargs["client_type"].value == "webui"
     mock_auth_repository.invalidate_login_sessions_by_tokens.assert_not_called()
+
+
+class TestPerClientTypeLoginCap:
+    """``max_concurrent_logins`` must be enforced independently per ``client_type``.
+
+    If ``max_concurrent_logins=1``, a user with one existing CORE session must still be
+    able to log in as WEBUI (different bucket), but attempting another CORE login without
+    force must be rejected. Repository filtering by ``client_type`` is what makes the
+    buckets independent, so these tests exercise the full ``authorize()`` flow and
+    assert that the repository is consulted with the requesting client type.
+    """
+
+    @staticmethod
+    def _make_action(client_type: LoginClientType) -> AuthorizeAction:
+        return AuthorizeAction(
+            type=AuthTokenType.KEYPAIR,
+            domain_name="default",
+            email="test@example.com",
+            password="password",
+            request=MagicMock(),
+            stoken=None,
+            otp=None,
+            force=False,
+            client_type=client_type,
+        )
+
+    @staticmethod
+    def _setup_common_mocks(
+        mock_hook_plugin_ctx: MagicMock,
+        mock_auth_repository: AsyncMock,
+        mock_user_resource_policy_repository: AsyncMock,
+        mock_valkey_session_client: AsyncMock,
+    ) -> None:
+        mock_hook_plugin_ctx.dispatch.return_value = HookResult(
+            status=HookResults.PASSED, result=None, reason=None
+        )
+        # Per-user cap of 1 login session per client_type.
+        mock_user_resource_policy_repository.get_by_name.return_value = UserResourcePolicyData(
+            name="default",
+            max_vfolder_count=10,
+            max_quota_scope_size=0,
+            max_session_count_per_model_session=5,
+            max_customized_image_count=3,
+            max_concurrent_logins=1,
+        )
+        mock_user_row = MagicMock()
+        mock_user_row.get_main_keypair_row.return_value = _make_mock_keypair_row()
+        mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
+        # Any returned active session is considered live in Valkey.
+        mock_valkey_session_client.get_login_session.return_value = b"session_data"
+        mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
+            session_token="new_token",
+        )
+
+    async def test_different_client_type_bypasses_existing_bucket(
+        self,
+        auth_service: AuthService,
+        mock_hook_plugin_ctx: MagicMock,
+        mock_auth_repository: AsyncMock,
+        mock_user_resource_policy_repository: AsyncMock,
+        mock_valkey_session_client: AsyncMock,
+    ) -> None:
+        """cap=1, existing CORE=1, incoming WEBUI → allowed (empty WEBUI bucket)."""
+        self._setup_common_mocks(
+            mock_hook_plugin_ctx,
+            mock_auth_repository,
+            mock_user_resource_policy_repository,
+            mock_valkey_session_client,
+        )
+
+        # Repository filters by client_type: return 1 session only when CORE is asked,
+        # empty for every other bucket (including the incoming WEBUI request).
+        async def fake_verify_credential(
+            domain_name: str,
+            email: str,
+            target_password_info: PasswordInfo,
+            client_type: LoginClientType,
+        ) -> CredentialVerificationResult:
+            sessions = (
+                [
+                    ActiveSessionInfo(
+                        session_token="existing_core_token",
+                        created_at=datetime.now(tz=UTC) - timedelta(hours=1),
+                    )
+                ]
+                if client_type == LoginClientType.CORE
+                else []
+            )
+            return CredentialVerificationResult(
+                user=_make_mock_user(),
+                active_sessions=sessions,
+            )
+
+        mock_auth_repository.verify_credential.side_effect = fake_verify_credential
+
+        result = await auth_service.authorize(self._make_action(LoginClientType.WEBUI))
+
+        assert result.authorization_result is not None
+        assert result.authorization_result.session_token == "new_token"
+        # Repository was consulted with the WEBUI bucket.
+        verify_kwargs = mock_auth_repository.verify_credential.call_args.kwargs
+        assert verify_kwargs["client_type"] == LoginClientType.WEBUI
+        create_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
+        assert create_kwargs["client_type"] == LoginClientType.WEBUI
+
+    async def test_same_client_type_at_cap_is_rejected(
+        self,
+        auth_service: AuthService,
+        mock_hook_plugin_ctx: MagicMock,
+        mock_auth_repository: AsyncMock,
+        mock_user_resource_policy_repository: AsyncMock,
+        mock_valkey_session_client: AsyncMock,
+    ) -> None:
+        """cap=1, existing CORE=1, incoming CORE without force → rejected."""
+        self._setup_common_mocks(
+            mock_hook_plugin_ctx,
+            mock_auth_repository,
+            mock_user_resource_policy_repository,
+            mock_valkey_session_client,
+        )
+
+        mock_auth_repository.verify_credential.return_value = CredentialVerificationResult(
+            user=_make_mock_user(),
+            active_sessions=[
+                ActiveSessionInfo(
+                    session_token="existing_core_token",
+                    created_at=datetime.now(tz=UTC) - timedelta(hours=1),
+                )
+            ],
+        )
+
+        with pytest.raises(TooManyConcurrentLoginSessions):
+            await auth_service.authorize(self._make_action(LoginClientType.CORE))
+
+        mock_auth_repository.create_login_session.assert_not_called()
