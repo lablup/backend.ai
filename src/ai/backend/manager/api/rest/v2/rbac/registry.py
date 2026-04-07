@@ -123,8 +123,8 @@ def register_v2_rbac_routes(
     )
     registry.add(
         "POST",
-        "/assignments/assign-by-name",
-        handler.assign_role_by_name,
+        "/assignments/assign-by-username",
+        handler.assign_role_by_username,
         middlewares=[auth_required],
     )
 

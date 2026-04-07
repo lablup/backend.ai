@@ -25,9 +25,9 @@ from ai.backend.common.dto.manager.rbac import (
 )
 from ai.backend.common.dto.manager.rbac.response import PaginationInfo
 from ai.backend.common.dto.manager.v2.group.request import (
-    AssignUsersByNameToProjectInput as AssignUsersByNameToProjectInputDTO,
+    AssignUsersByUsernameToProjectInput as AssignUsersByUsernameToProjectInputDTO,
 )
-from ai.backend.common.dto.manager.v2.group.response import AssignUsersByNameToProjectPayload
+from ai.backend.common.dto.manager.v2.group.response import AssignUsersByUsernameToProjectPayload
 from ai.backend.common.dto.manager.v2.rbac import (
     AssociationScopesEntitiesNode,
     BulkAssignRoleFailureInfo,
@@ -181,8 +181,8 @@ from ai.backend.manager.repositories.permission_controller.updaters import (
     RoleUpdaterSpec,
 )
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
-from ai.backend.manager.services.permission_contoller.actions.assign_users_by_name_to_project import (
-    AssignUsersByNameToProjectAction,
+from ai.backend.manager.services.permission_contoller.actions.assign_users_by_username_to_project import (
+    AssignUsersByUsernameToProjectAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
     BulkAssignRoleAction,
@@ -904,18 +904,18 @@ class RBACAdapter(BaseAdapter):
             ],
         )
 
-    async def assign_role_by_name(
-        self, input: AssignUsersByNameToProjectInputDTO
-    ) -> AssignUsersByNameToProjectPayload:
+    async def assign_role_by_username(
+        self, input: AssignUsersByUsernameToProjectInputDTO
+    ) -> AssignUsersByUsernameToProjectPayload:
         """Assign a role to users identified by email or username, with project binding."""
-        result = await self._processors.permission_controller.assign_users_by_name_to_project.wait_for_complete(
-            AssignUsersByNameToProjectAction(
+        result = await self._processors.permission_controller.assign_users_by_username_to_project.wait_for_complete(
+            AssignUsersByUsernameToProjectAction(
                 project_id=input.project_id,
                 names=input.names,
                 role_id=input.role_id,
             )
         )
-        return AssignUsersByNameToProjectPayload(
+        return AssignUsersByUsernameToProjectPayload(
             assigned_count=result.assigned_count,
             failed_names=result.failed_names,
         )

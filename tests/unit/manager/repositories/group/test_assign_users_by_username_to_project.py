@@ -1,4 +1,4 @@
-"""Tests for GroupDBSource.resolve_users_by_name()"""
+"""Tests for GroupDBSource.resolve_users_by_username()"""
 
 from __future__ import annotations
 
@@ -40,8 +40,8 @@ from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.testutils.db import with_tables
 
 
-class TestResolveUsersByName:
-    """Tests for GroupDBSource.resolve_users_by_name"""
+class TestResolveUsersByUsername:
+    """Tests for GroupDBSource.resolve_users_by_username"""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -325,7 +325,7 @@ class TestResolveUsersByName:
     ) -> None:
         """Resolve a user by email address."""
         uid, email, _ = same_domain_user_1
-        user_ids, failed = await group_db_source.resolve_users_by_name(test_project, [email])
+        user_ids, failed = await group_db_source.resolve_users_by_username(test_project, [email])
 
         assert user_ids == [uid]
         assert failed == []
@@ -338,7 +338,7 @@ class TestResolveUsersByName:
     ) -> None:
         """Resolve a user by username."""
         uid, _, username = same_domain_user_1
-        user_ids, failed = await group_db_source.resolve_users_by_name(test_project, [username])
+        user_ids, failed = await group_db_source.resolve_users_by_username(test_project, [username])
 
         assert user_ids == [uid]
         assert failed == []
@@ -353,7 +353,7 @@ class TestResolveUsersByName:
         """Resolve users using a mix of emails and usernames."""
         uid1, email1, _ = same_domain_user_1
         uid2, _, username2 = same_domain_user_2
-        user_ids, failed = await group_db_source.resolve_users_by_name(
+        user_ids, failed = await group_db_source.resolve_users_by_username(
             test_project, [email1, username2]
         )
 
@@ -366,7 +366,7 @@ class TestResolveUsersByName:
         test_project: uuid.UUID,
     ) -> None:
         """Non-existent email/username appears in failed_names."""
-        user_ids, failed = await group_db_source.resolve_users_by_name(
+        user_ids, failed = await group_db_source.resolve_users_by_username(
             test_project, ["nobody@example.com"]
         )
 
@@ -381,7 +381,7 @@ class TestResolveUsersByName:
     ) -> None:
         """User from a different domain appears in failed_names."""
         _, email, _ = cross_domain_user
-        user_ids, failed = await group_db_source.resolve_users_by_name(test_project, [email])
+        user_ids, failed = await group_db_source.resolve_users_by_username(test_project, [email])
 
         assert user_ids == []
         assert failed == [email]
@@ -397,7 +397,7 @@ class TestResolveUsersByName:
         uid, email, _ = same_domain_user_1
         await self._pre_assign_user(db_with_cleanup, uid, test_project)
 
-        user_ids, failed = await group_db_source.resolve_users_by_name(test_project, [email])
+        user_ids, failed = await group_db_source.resolve_users_by_username(test_project, [email])
 
         assert user_ids == []
         assert failed == [email]
@@ -410,7 +410,7 @@ class TestResolveUsersByName:
     ) -> None:
         """Inactive users are resolved (no status restriction)."""
         uid, email, _ = inactive_user
-        user_ids, failed = await group_db_source.resolve_users_by_name(test_project, [email])
+        user_ids, failed = await group_db_source.resolve_users_by_username(test_project, [email])
 
         assert user_ids == [uid]
         assert failed == []
@@ -426,7 +426,7 @@ class TestResolveUsersByName:
         uid, valid_email, _ = same_domain_user_1
         _, invalid_email, _ = cross_domain_user
 
-        user_ids, failed = await group_db_source.resolve_users_by_name(
+        user_ids, failed = await group_db_source.resolve_users_by_username(
             test_project, [valid_email, invalid_email, "ghost@nowhere.com"]
         )
 
@@ -441,7 +441,7 @@ class TestResolveUsersByName:
     ) -> None:
         """When all names fail, user_ids is empty."""
         _, email, _ = cross_domain_user
-        user_ids, failed = await group_db_source.resolve_users_by_name(
+        user_ids, failed = await group_db_source.resolve_users_by_username(
             test_project, [email, "fake@example.com"]
         )
 
@@ -454,7 +454,7 @@ class TestResolveUsersByName:
         test_project: uuid.UUID,
     ) -> None:
         """Empty names list returns ([], [])."""
-        user_ids, failed = await group_db_source.resolve_users_by_name(test_project, [])
+        user_ids, failed = await group_db_source.resolve_users_by_username(test_project, [])
 
         assert user_ids == []
         assert failed == []
@@ -467,7 +467,9 @@ class TestResolveUsersByName:
     ) -> None:
         """Duplicate names in input resolve to a single user."""
         uid, email, _ = same_domain_user_1
-        user_ids, failed = await group_db_source.resolve_users_by_name(test_project, [email, email])
+        user_ids, failed = await group_db_source.resolve_users_by_username(
+            test_project, [email, email]
+        )
 
         assert user_ids == [uid]
         assert failed == []
@@ -489,7 +491,7 @@ class TestResolveUsersByName:
         await self._pre_assign_user(db_with_cleanup, uid, test_project)
 
         # All three failure types: already assigned, cross-domain, non-existent
-        user_ids, failed = await group_db_source.resolve_users_by_name(
+        user_ids, failed = await group_db_source.resolve_users_by_username(
             test_project, [valid_email, cross_email, "ghost@x.com"]
         )
 
@@ -526,7 +528,7 @@ class TestResolveUsersByName:
             email="user_b@example.com",
         )
 
-        user_ids, failed = await group_db_source.resolve_users_by_name(
+        user_ids, failed = await group_db_source.resolve_users_by_username(
             test_project, ["shared@example.com"]
         )
 
@@ -542,7 +544,7 @@ class TestResolveUsersByName:
     ) -> None:
         """When email and username both match the SAME user, it resolves correctly."""
         uid, email, username = same_domain_user_1
-        user_ids, failed = await group_db_source.resolve_users_by_name(
+        user_ids, failed = await group_db_source.resolve_users_by_username(
             test_project, [email, username]
         )
 

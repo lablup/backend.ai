@@ -34,9 +34,9 @@ from .actions import (
     UpdateRolePermissionsAction,
     UpdateRolePermissionsActionResult,
 )
-from .actions.assign_users_by_name_to_project import (
-    AssignUsersByNameToProjectAction,
-    AssignUsersByNameToProjectActionResult,
+from .actions.assign_users_by_username_to_project import (
+    AssignUsersByUsernameToProjectAction,
+    AssignUsersByUsernameToProjectActionResult,
 )
 from .actions.get_entity_types import (
     GetEntityTypesAction,
@@ -114,8 +114,8 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
     update_permission: ActionProcessor[UpdatePermissionAction, UpdatePermissionActionResult]
     delete_permission: ActionProcessor[DeletePermissionAction, DeletePermissionActionResult]
-    assign_users_by_name_to_project: SingleEntityActionProcessor[
-        AssignUsersByNameToProjectAction, AssignUsersByNameToProjectActionResult
+    assign_users_by_username_to_project: SingleEntityActionProcessor[
+        AssignUsersByUsernameToProjectAction, AssignUsersByUsernameToProjectActionResult
     ]
 
     def __init__(
@@ -156,8 +156,8 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.create_permission = ActionProcessor(service.create_permission, action_monitors)
         self.update_permission = ActionProcessor(service.update_permission, action_monitors)
         self.delete_permission = ActionProcessor(service.delete_permission, action_monitors)
-        self.assign_users_by_name_to_project = SingleEntityActionProcessor(
-            service.assign_users_by_name_to_project,
+        self.assign_users_by_username_to_project = SingleEntityActionProcessor(
+            service.assign_users_by_username_to_project,
             action_monitors,
             validators=[validators.rbac.single_entity],
         )
@@ -188,5 +188,5 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             CreatePermissionAction.spec(),
             UpdatePermissionAction.spec(),
             DeletePermissionAction.spec(),
-            AssignUsersByNameToProjectAction.spec(),
+            AssignUsersByUsernameToProjectAction.spec(),
         ]

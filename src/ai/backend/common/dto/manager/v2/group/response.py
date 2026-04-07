@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.user.response import UserNode
 
 __all__ = (
     "AdminSearchGroupsPayload",
-    "AssignUsersByNameToProjectPayload",
+    "AssignUsersByUsernameToProjectPayload",
     "AssignUsersToProjectPayload",
     "DeleteProjectPayload",
     "ProjectBasicInfo",
@@ -180,8 +180,8 @@ class AdminSearchGroupsPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
-class AssignUsersByNameToProjectPayload(BaseResponseModel):
-    """Payload for assign-by-name response.
+class AssignUsersByUsernameToProjectPayload(BaseResponseModel):
+    """Payload for assign-by-username response.
 
     Intentionally returns only counts and failed names (not user details)
     to avoid leaking information about resolved users.

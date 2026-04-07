@@ -4,7 +4,7 @@ Group (Project) DTOs for Manager API v2.
 
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
-    AssignUsersByNameToProjectInput,
+    AssignUsersByUsernameToProjectInput,
     AssignUsersToProjectInput,
     CreateProjectInput,
     DeleteProjectInput,
@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     AdminSearchGroupsPayload,
-    AssignUsersByNameToProjectPayload,
+    AssignUsersByUsernameToProjectPayload,
     AssignUsersToProjectPayload,
     DeleteProjectPayload,
     ProjectBasicInfo,
@@ -53,7 +53,7 @@ __all__ = (
     "ProjectUserFilter",
     # Request DTOs
     "AdminSearchProjectsInput",
-    "AssignUsersByNameToProjectInput",
+    "AssignUsersByUsernameToProjectInput",
     "AssignUsersToProjectInput",
     "CreateProjectInput",
     "UpdateProjectInput",
@@ -65,7 +65,7 @@ __all__ = (
     "UnassignUsersFromProjectInput",
     # Response DTOs
     "AdminSearchGroupsPayload",
-    "AssignUsersByNameToProjectPayload",
+    "AssignUsersByUsernameToProjectPayload",
     "AssignUsersToProjectPayload",
     "ProjectBasicInfo",
     "ProjectOrganizationInfo",

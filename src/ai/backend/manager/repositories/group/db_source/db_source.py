@@ -662,7 +662,7 @@ class GroupDBSource:
 
             return [row.to_data() for row in new_user_rows]
 
-    async def resolve_users_by_name(
+    async def resolve_users_by_username(
         self, project_id: UUID, names: list[str]
     ) -> tuple[list[UUID], list[str]]:
         """Resolve email/username to user UUIDs within the project's domain.

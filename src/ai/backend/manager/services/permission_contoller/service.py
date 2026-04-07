@@ -22,9 +22,9 @@ from ai.backend.manager.services.permission_contoller.actions.assign_role import
     AssignRoleAction,
     AssignRoleActionResult,
 )
-from ai.backend.manager.services.permission_contoller.actions.assign_users_by_name_to_project import (
-    AssignUsersByNameToProjectAction,
-    AssignUsersByNameToProjectActionResult,
+from ai.backend.manager.services.permission_contoller.actions.assign_users_by_username_to_project import (
+    AssignUsersByUsernameToProjectAction,
+    AssignUsersByUsernameToProjectActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
     BulkAssignRoleAction,
@@ -227,11 +227,11 @@ class PermissionControllerService:
             )
         )
 
-    async def assign_users_by_name_to_project(
-        self, action: AssignUsersByNameToProjectAction
-    ) -> AssignUsersByNameToProjectActionResult:
+    async def assign_users_by_username_to_project(
+        self, action: AssignUsersByUsernameToProjectAction
+    ) -> AssignUsersByUsernameToProjectActionResult:
         """Resolve users by email/username and assign a role with project binding."""
-        user_ids, failed_names = await self._group_repository.resolve_users_by_name(
+        user_ids, failed_names = await self._group_repository.resolve_users_by_username(
             action.project_id, action.names
         )
         assigned_users = []
@@ -239,7 +239,7 @@ class PermissionControllerService:
             assigned_users = await self._group_repository.assign_users_to_project(
                 action.project_id, user_ids, action.role_id
             )
-        return AssignUsersByNameToProjectActionResult(
+        return AssignUsersByUsernameToProjectActionResult(
             project_id=action.project_id,
             assigned_count=len(assigned_users),
             failed_names=failed_names,

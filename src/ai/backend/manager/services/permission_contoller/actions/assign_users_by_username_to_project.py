@@ -15,7 +15,7 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 
 
 @dataclass
-class AssignUsersByNameToProjectAction(BaseSingleEntityAction):
+class AssignUsersByUsernameToProjectAction(BaseSingleEntityAction):
     project_id: UUID
     names: list[str]
     role_id: UUID
@@ -44,7 +44,7 @@ class AssignUsersByNameToProjectAction(BaseSingleEntityAction):
 
 
 @dataclass
-class AssignUsersByNameToProjectActionResult(BaseSingleEntityActionResult):
+class AssignUsersByUsernameToProjectActionResult(BaseSingleEntityActionResult):
     project_id: UUID
     assigned_count: int
     failed_names: list[str]
