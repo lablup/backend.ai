@@ -112,6 +112,9 @@ class User(BaseFunction):
             "domain": api_session.get().config.domain,
             "username": username,
             "password": password,
+            # CLI and SDK clients share the "core" client_type bucket so their
+            # concurrent-login quota is accounted for separately from webui.
+            "client_type": "core",
         }
         for k, v in extra_args.items():
             body[k] = v
