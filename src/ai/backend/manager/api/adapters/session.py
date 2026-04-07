@@ -850,9 +850,10 @@ class SessionAdapter(BaseAdapter):
         access_key: str,
     ) -> StartSessionServicePayload:
         """Start an app service in a session."""
+        owner_access_key = await self._resolve_owner_access_key(input.owner_id, access_key)
         action = StartServiceAction(
             session_name=str(session_id),
-            access_key=AccessKey(access_key),
+            access_key=owner_access_key,
             service=input.service,
             login_session_token=input.login_session_token,
             port=input.port,
@@ -869,9 +870,10 @@ class SessionAdapter(BaseAdapter):
         access_key: str,
     ) -> None:
         """Shut down a service in a session."""
+        owner_access_key = await self._resolve_owner_access_key(input.owner_id, access_key)
         action = ShutdownServiceAction(
             session_name=str(session_id),
-            owner_access_key=AccessKey(access_key),
+            owner_access_key=owner_access_key,
             service_name=input.service,
         )
         await self._processors.session.shutdown_service.wait_for_complete(action)
@@ -948,10 +950,11 @@ class SessionAdapter(BaseAdapter):
     ) -> UpdateSessionPayload:
         """Update session fields (currently supports rename only)."""
         if input.name is not None:
+            owner_access_key = await self._resolve_owner_access_key(input.owner_id, access_key)
             action = RenameSessionAction(
                 session_name=str(session_id),
                 new_name=input.name,
-                owner_access_key=AccessKey(access_key),
+                owner_access_key=owner_access_key,
             )
             result = await self._processors.session.rename_session.wait_for_complete(action)
             return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))
