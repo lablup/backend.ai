@@ -70,6 +70,6 @@ class ModelCardCreatorSpec(CreatorSpec[ModelCardRow]):
                 slot_name=entry.slot_name,
                 min_quantity=entry.min_quantity,
             )
-            for entry in self.min_resource
+            for entry in (self.min_resource or [])
         ]
         return row

@@ -1,10 +1,3 @@
-"""Integration tests for ModelCard creation with resource_requirement_rows.
-
-Regression test for BA-5617: ModelCardCreatorSpec.build_row() must populate
-resource_requirement_rows from min_resource, preventing MissingGreenlet
-when ModelCardDBSource.create() calls to_data().
-"""
-
 from __future__ import annotations
 
 import uuid
