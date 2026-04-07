@@ -144,9 +144,10 @@ class ValkeyStreamClient:
         :param group_name: The name of the consumer group to create.
         :raises: GlideClientError if the group already exists.
         """
-        await self._client.client.xgroup_create(
-            stream_key, group_name, "$", StreamGroupOptions(make_stream=True)
-        )
+        async with self._client.client() as conn:
+            await conn.xgroup_create(
+                stream_key, group_name, "$", StreamGroupOptions(make_stream=True)
+            )
 
     @valkey_stream_resilience.apply()
     async def read_consumer_group(
@@ -169,12 +170,13 @@ class ValkeyStreamClient:
         :raises: GlideClientError if the group does not exist or other errors occur.
         """
         try:
-            result = await self._client.client.xreadgroup(
-                {stream_key: ">"},
-                group_name,
-                consumer_name,
-                StreamReadGroupOptions(block_ms=block_ms, count=count),
-            )
+            async with self._client.client() as conn:
+                result = await conn.xreadgroup(
+                    {stream_key: ">"},
+                    group_name,
+                    consumer_name,
+                    StreamReadGroupOptions(block_ms=block_ms, count=count),
+                )
         except GlideTimeoutError:
             return None
         if not result:
@@ -202,7 +204,8 @@ class ValkeyStreamClient:
         :param message_id: The ID of the message to acknowledge.
         :raises: GlideClientError if the message cannot be acknowledged.
         """
-        await self._client.client.xack(stream_key, group_name, [message_id])
+        async with self._client.client() as conn:
+            await conn.xack(stream_key, group_name, [message_id])
 
     @valkey_stream_resilience.apply()
     async def enqueue_stream_message(
@@ -218,13 +221,14 @@ class ValkeyStreamClient:
         :raises: GlideClientError if the message cannot be added.
         """
         values = [(k, v) for k, v in payload.items()]
-        await self._client.client.xadd(
-            stream_key,
-            cast(list[tuple[str | bytes, str | bytes]], values),
-            StreamAddOptions(
-                make_stream=True, trim=TrimByMaxLen(exact=False, threshold=_MAX_STREAM_LENGTH)
-            ),
-        )
+        async with self._client.client() as conn:
+            await conn.xadd(
+                stream_key,
+                cast(list[tuple[str | bytes, str | bytes]], values),
+                StreamAddOptions(
+                    make_stream=True, trim=TrimByMaxLen(exact=False, threshold=_MAX_STREAM_LENGTH)
+                ),
+            )
 
     @valkey_stream_resilience.apply()
     async def reque_stream_message(
@@ -253,7 +257,8 @@ class ValkeyStreamClient:
                 make_stream=True, trim=TrimByMaxLen(exact=False, threshold=_MAX_STREAM_LENGTH)
             ),
         )
-        await self._client.client.exec(tx, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(tx, raise_on_error=True)
 
     @valkey_stream_resilience.apply()
     async def auto_claim_stream_message(
@@ -277,14 +282,15 @@ class ValkeyStreamClient:
         :return: An AutoClaimMessage containing the next start ID and claimed messages, or None if no messages are available.
         :raises: GlideClientError if the group does not exist or other errors occur.
         """
-        res = await self._client.client.xautoclaim(
-            key=stream_key,
-            group_name=group_name,
-            consumer_name=consumer_name,
-            start=start_id,
-            min_idle_time_ms=min_idle_timeout,
-            count=count,
-        )
+        async with self._client.client() as conn:
+            res = await conn.xautoclaim(
+                key=stream_key,
+                group_name=group_name,
+                consumer_name=consumer_name,
+                start=start_id,
+                min_idle_time_ms=min_idle_timeout,
+                count=count,
+            )
         if len(res) < 2:
             return None
         next_start_id = cast(bytes, res[0])
@@ -311,7 +317,8 @@ class ValkeyStreamClient:
         :raises: GlideClientError if the message cannot be broadcasted.
         """
         message = dump_json(payload)
-        await self._client.client.publish(message=message, channel=channel)
+        async with self._client.client() as conn:
+            await conn.publish(message=message, channel=channel)
 
     @valkey_stream_resilience.apply()
     async def broadcast_with_cache(
@@ -337,7 +344,8 @@ class ValkeyStreamClient:
             message=message,
             channel=channel,
         )
-        await self._client.client.exec(tx, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(tx, raise_on_error=True)
 
     @valkey_stream_resilience.apply()
     async def fetch_cached_broadcast_message(
@@ -350,7 +358,8 @@ class ValkeyStreamClient:
         :param cache_id: The ID of the cached message.
         :return: The cached message payload or None if not found.
         """
-        result = await self._client.client.get(cache_id)
+        async with self._client.client() as conn:
+            result = await conn.get(cache_id)
         if not result:
             return None
         payload = load_json(result)
@@ -388,7 +397,8 @@ class ValkeyStreamClient:
                 message=message,
                 channel=channel,
             )
-        await self._client.client.exec(tx, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(tx, raise_on_error=True)
 
     @valkey_stream_resilience.apply()
     async def receive_broadcast_message(
@@ -400,7 +410,8 @@ class ValkeyStreamClient:
 
         :return: The payload of the received message.
         """
-        message = await self._client.client.get_pubsub_message()
+        async with self._client.client() as conn:
+            message = await conn.get_pubsub_message()
         return cast(Mapping[str, str], load_json(message.message))
 
     def _create_batch(self, is_atomic: bool = False) -> Batch:

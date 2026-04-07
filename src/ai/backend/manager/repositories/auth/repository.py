@@ -113,17 +113,16 @@ class AuthRepository:
         user_id: UUID,
         access_key: str,
         domain_name: str,
-        *,
-        max_concurrent_sessions: int = 1,
-        tokens_to_invalidate: list[str] | None = None,
     ) -> LoginSessionCreationResult:
         return await self._db_source.create_login_session(
             user_id,
             access_key,
             domain_name,
-            max_concurrent_sessions=max_concurrent_sessions,
-            tokens_to_invalidate=tokens_to_invalidate,
         )
+
+    @auth_repository_resilience.apply()
+    async def invalidate_login_sessions_by_tokens(self, session_tokens: list[str]) -> None:
+        await self._db_source.invalidate_sessions_by_tokens(session_tokens)
 
     @auth_repository_resilience.apply()
     async def check_credential_without_migration(

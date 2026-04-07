@@ -55,6 +55,7 @@ from ai.backend.manager.api.gql.common_types import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -154,6 +155,18 @@ class UpdateKeypairResourcePolicyInputGQL(PydanticInputMixin[UpdateKeypairResour
 class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePolicyInputDTO]):
     name: str = gql_field(description="Policy name. Must be unique.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a user can create.")
+    max_concurrent_logins: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Maximum number of concurrent authenticated login sessions per user."
+                " Null means unlimited."
+                " Distinct from keypair_resource_policies.max_concurrent_sessions"
+                " which caps compute sessions."
+            ),
+        ),
+        default=UNSET,
+    )
     max_quota_scope_size: BinarySizeInputGQL = gql_field(
         description="Maximum quota scope size (e.g., '1g', '536870912').",
     )
@@ -174,6 +187,18 @@ class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePoli
 class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePolicyInputDTO]):
     max_vfolder_count: int | None = gql_field(
         default=UNSET, description="Updated max vfolder count."
+    )
+    max_concurrent_logins: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Updated maximum number of concurrent authenticated login sessions per user."
+                " Set to null to clear (unlimited)."
+                " Distinct from keypair_resource_policies.max_concurrent_sessions"
+                " which caps compute sessions."
+            ),
+        ),
+        default=UNSET,
     )
     max_quota_scope_size: BinarySizeInputGQL | None = gql_field(
         default=UNSET, description="Updated max quota scope size."

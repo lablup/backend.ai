@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.errors.auth import ActiveLoginSessionExistsError, AuthorizationFailed
+from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -260,12 +260,11 @@ class TestLoginSessionForce:
         assert cred_result.user["uuid"] == sample_user.user_id
         assert len(cred_result.active_sessions) == 0
 
-        # Step 2: create login session (no tokens to invalidate since no active sessions)
+        # Step 2: create login session (no active sessions to evict)
         session_result = await auth_db_source.create_login_session(
             user_id=sample_user.user_id,
             access_key=sample_user.access_key,
             domain_name=sample_user.domain_name,
-            tokens_to_invalidate=[],
         )
         assert session_result.session_token
 
@@ -298,13 +297,13 @@ class TestLoginSessionForce:
         assert cred_result.user["uuid"] == user_id
         assert len(cred_result.active_sessions) == 1
 
-        # Step 2: create login session with force (invalidate existing tokens)
+        # Step 2: evict existing tokens via the dedicated repository call, then create
         tokens_to_invalidate = [s.session_token for s in cred_result.active_sessions]
+        await auth_db_source.invalidate_sessions_by_tokens(tokens_to_invalidate)
         session_result = await auth_db_source.create_login_session(
             user_id=user_id,
             access_key=access_key,
             domain_name=sample_user.domain_name,
-            tokens_to_invalidate=tokens_to_invalidate,
         )
         assert session_result.session_token
 
@@ -318,42 +317,7 @@ class TestLoginSessionForce:
         )
         assert success_count == 1
 
-    # --- Scenario 4: active session + no force → fail ---
-
-    async def test_login_active_session_without_force_fails(
-        self,
-        auth_db_source: AuthDBSource,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_user: SampleUserData,
-    ) -> None:
-        user_id = sample_user.user_id
-        access_key = sample_user.access_key
-        await self._insert_active_session(db_with_cleanup, user_id, access_key)
-
-        # Step 1: verify credentials — returns active sessions
-        cred_result = await auth_db_source.verify_credential(
-            domain_name=sample_user.domain_name,
-            email=sample_user.email,
-            target_password_info=self._make_password_info(),
-        )
-        assert len(cred_result.active_sessions) == 1
-
-        # Step 2: create_login_session without force raises ActiveLoginSessionExistsError
-        with pytest.raises(ActiveLoginSessionExistsError):
-            await auth_db_source.create_login_session(
-                user_id=user_id,
-                access_key=access_key,
-                domain_name=sample_user.domain_name,
-            )
-
-        # No history recorded because create_login_session rolls back on failure
-        history_count = await self._count_login_history(
-            db_with_cleanup,
-            user_id,
-        )
-        assert history_count == 0
-
-    # --- Scenario 5: invalid credentials → still fails regardless of force ---
+    # --- Scenario 4: invalid credentials → still fails regardless of force ---
 
     async def test_login_invalid_credentials_still_fails(
         self,

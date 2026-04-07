@@ -2237,6 +2237,11 @@ input CreateUserResourcePolicyInputGQL {
   """Maximum vfolders a user can create."""
   maxVfolderCount: Int!
 
+  """
+  Added in UNRELEASED. Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
+  """
+  maxConcurrentLogins: Int = null
+
   """Maximum quota scope size (e.g., '1g', '536870912')."""
   maxQuotaScopeSize: BinarySizeInput!
 
@@ -11310,6 +11315,11 @@ input UpdateUserResourcePolicyInputGQL {
   """Updated max vfolder count."""
   maxVfolderCount: Int = null
 
+  """
+  Added in UNRELEASED. Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
+  """
+  maxConcurrentLogins: Int = null
+
   """Updated max quota scope size."""
   maxQuotaScopeSize: BinarySizeInput = null
 
@@ -11748,6 +11758,11 @@ type UserResourcePolicyV2 implements Node {
   """Maximum vfolders a user can create."""
   maxVfolderCount: Int!
 
+  """
+  Added in UNRELEASED. Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
+  """
+  maxConcurrentLogins: Int
+
   """Maximum quota scope size."""
   maxQuotaScopeSize: BinarySizeInfo!
 
@@ -11784,6 +11799,7 @@ input UserResourcePolicyV2Filter {
   name: StringFilter = null
   createdAt: DateTimeFilter = null
   maxVfolderCount: IntFilter = null
+  maxConcurrentLogins: IntFilter = null
   maxQuotaScopeSize: IntFilter = null
   maxSessionCountPerModelSession: IntFilter = null
   maxCustomizedImageCount: IntFilter = null
@@ -11807,6 +11823,7 @@ enum UserResourcePolicyV2OrderField {
   NAME
   CREATED_AT
   MAX_VFOLDER_COUNT
+  MAX_CONCURRENT_LOGINS
   MAX_QUOTA_SCOPE_SIZE
   MAX_SESSION_COUNT_PER_MODEL_SESSION
   MAX_CUSTOMIZED_IMAGE_COUNT

@@ -16,7 +16,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionTokenData,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -24,11 +24,11 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
 from ai.backend.manager.errors.auth import (
-    ActiveLoginSessionExistsError,
     AuthorizationFailed,
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
     PasswordExpired,
+    TooManyConcurrentLoginSessions,
     UserCreationError,
 )
 from ai.backend.manager.errors.common import (
@@ -53,6 +53,9 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
@@ -116,7 +119,7 @@ _FAILURE_MAP: dict[type[Exception], LoginAttemptResult] = {
     AuthorizationFailed: LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
     PasswordExpired: LoginAttemptResult.FAILED_PASSWORD_EXPIRED,
     RejectedByHook: LoginAttemptResult.FAILED_REJECTED_BY_HOOK,
-    ActiveLoginSessionExistsError: LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
+    TooManyConcurrentLoginSessions: LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
 }
 
 
@@ -129,6 +132,7 @@ class AuthService:
     _auth_repository: AuthRepository
     _config_provider: ManagerConfigProvider
     _valkey_session_client: ValkeySessionClient
+    _user_resource_policy_repository: UserResourcePolicyRepository
 
     def __init__(
         self,
@@ -136,11 +140,13 @@ class AuthService:
         auth_repository: AuthRepository,
         config_provider: ManagerConfigProvider,
         valkey_session_client: ValkeySessionClient,
+        user_resource_policy_repository: UserResourcePolicyRepository,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
         self._config_provider = config_provider
         self._valkey_session_client = valkey_session_client
+        self._user_resource_policy_repository = user_resource_policy_repository
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
@@ -186,7 +192,7 @@ class AuthService:
             AuthorizationFailed,
             PasswordExpired,
             RejectedByHook,
-            ActiveLoginSessionExistsError,
+            TooManyConcurrentLoginSessions,
         ) as e:
             await self._record_login_failure(
                 user.uuid,
@@ -271,6 +277,42 @@ class AuthService:
 
         return main_keypair_row, live_sessions
 
+    def _enforce_max_concurrent_logins(
+        self,
+        max_concurrent_logins: int | None,
+        live_sessions: list[ActiveSessionInfo],
+        force: bool,
+    ) -> list[str] | None:
+        """Apply the per-user ``max_concurrent_logins`` cap and return tokens to evict.
+
+        Behavior:
+        - ``max_concurrent_logins is None`` (unlimited or no policy): no cap, returns ``None``.
+        - Below the cap: no eviction, returns ``None``.
+        - At or over the cap with ``force=True``: returns the oldest session tokens
+          (``count - max_concurrent_logins + 1`` of them) so the caller can invalidate
+          them before creating the new login session.
+        - At or over the cap with ``force=False``: raises ``TooManyConcurrentLoginSessions``.
+
+        ``live_sessions`` must already be the authoritative active set (cross-checked
+        against Valkey by the caller) and ordered oldest-first.
+        """
+        if max_concurrent_logins is None:
+            return None
+        if max_concurrent_logins <= 0:
+            # Cap of 0 (or negative) means no logins allowed at all; force cannot help
+            # since even evicting every existing session still leaves the new login over cap.
+            raise TooManyConcurrentLoginSessions()
+        count = len(live_sessions)
+        if count < max_concurrent_logins:
+            return None
+        if not force:
+            raise TooManyConcurrentLoginSessions()
+        # Normally evicts just the oldest session (result is 1). Can be >1 when an admin
+        # lowered max_concurrent_logins after the user already exceeded the new cap — in
+        # that case this brings the user back down to (max_concurrent_logins - 1) in one shot.
+        sessions_to_invalidate = count - max_concurrent_logins + 1
+        return [s.session_token for s in live_sessions[:sessions_to_invalidate]]
+
     async def _create_login_session(
         self,
         action: AuthorizeAction,
@@ -279,24 +321,42 @@ class AuthService:
         live_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
     ) -> AuthorizeActionResult:
-        """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed."""
-        max_concurrent_sessions = keypair_row.resource_policy_row.max_concurrent_sessions
-        tokens_to_invalidate: list[str] | None = None
-        if action.force and len(live_sessions) >= max_concurrent_sessions:
-            sessions_to_remove = len(live_sessions) - max_concurrent_sessions + 1
-            tokens_to_invalidate = [s.session_token for s in live_sessions[:sessions_to_remove]]
+        """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed.
 
+        Enforcement uses ``user_resource_policy.max_concurrent_logins``:
+        - None (unlimited): always proceed.
+        - Set: if ``len(live_sessions) >= limit`` and ``action.force`` is True, evict the
+          oldest sessions to make room; otherwise raise ``TooManyConcurrentLoginSessions``.
+
+        ``live_sessions`` is already the authoritative active set (cross-checked against
+        Valkey by the caller), so no additional repository count query is needed.
+        """
+        try:
+            user_resource_policy = await self._user_resource_policy_repository.get_by_name(
+                user.resource_policy
+            )
+            max_concurrent_logins: int | None = user_resource_policy.max_concurrent_logins
+        except UserResourcePolicyNotFound:
+            # If no matching resource policy is found, skip login-session limit enforcement.
+            max_concurrent_logins = None
+
+        tokens_to_invalidate = self._enforce_max_concurrent_logins(
+            max_concurrent_logins=max_concurrent_logins,
+            live_sessions=live_sessions,
+            force=action.force,
+        )
+
+        # Create-before-destroy: evict old sessions only after the new one is persisted.
         session_result = await self._auth_repository.create_login_session(
             user_id=user.uuid,
             access_key=keypair_row.access_key,
             domain_name=action.domain_name,
-            max_concurrent_sessions=max_concurrent_sessions,
-            tokens_to_invalidate=tokens_to_invalidate,
         )
 
         if tokens_to_invalidate:
             for token in tokens_to_invalidate:
                 await self._valkey_session_client.delete_login_session(token)
+            await self._auth_repository.invalidate_login_sessions_by_tokens(tokens_to_invalidate)
 
         session_data = LoginSessionData(
             created=int(time.time()),
