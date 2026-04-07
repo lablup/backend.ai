@@ -340,9 +340,11 @@ class AuthService:
             force=action.force,
         )
 
-        if tokens_to_invalidate:
-            await self._auth_repository.invalidate_login_sessions_by_tokens(tokens_to_invalidate)
-
+        # Create the new session first. If this fails we must NOT have already
+        # destroyed the user's existing sessions — the user would lose every
+        # session without getting a replacement. Only after the new session is
+        # persisted do we evict the old ones (Valkey first so cross-checks stop
+        # seeing them, then DB invalidation).
         session_result = await self._auth_repository.create_login_session(
             user_id=user.uuid,
             access_key=keypair_row.access_key,
@@ -352,6 +354,7 @@ class AuthService:
         if tokens_to_invalidate:
             for token in tokens_to_invalidate:
                 await self._valkey_session_client.delete_login_session(token)
+            await self._auth_repository.invalidate_login_sessions_by_tokens(tokens_to_invalidate)
 
         session_data = LoginSessionData(
             created=int(time.time()),
