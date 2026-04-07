@@ -565,7 +565,6 @@ class PurgeRoleInput(PydanticInputMixin[PurgeRoleInputDTO]):
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for delete role mutation."),
     model=DeleteRolePayloadDTO,
-    fields=["id"],
     name="DeleteRolePayload",
 )
 class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
@@ -575,7 +574,6 @@ class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for purge role mutation."),
     model=PurgeRolePayloadDTO,
-    fields=["id"],
     name="PurgeRolePayload",
 )
 class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
