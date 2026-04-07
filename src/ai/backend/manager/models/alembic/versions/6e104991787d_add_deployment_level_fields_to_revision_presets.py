@@ -1,6 +1,6 @@
 """add deployment-level fields to deployment_revision_presets
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: 6e104991787d
 Revises: 9dc6609c92ce
 Create Date: 2026-04-07
 
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 
 # revision identifiers, used by Alembic.
 # Part of: 26.3.0 (main)
-revision = "a1b2c3d4e5f6"
+revision = "6e104991787d"
 down_revision = "9dc6609c92ce"
 branch_labels = None
 depends_on = None
