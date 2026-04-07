@@ -149,14 +149,9 @@ class SchedulingController:
             session_spec: Session creation specification
 
         Returns:
-            str: The resolved scaling group name
+            AllowedScalingGroup: The resolved scaling group
         """
-        # Fetch allowed groups to determine the scaling group
-        allowed_groups = await self._repository.query_allowed_scaling_groups(
-            session_spec.user_scope.domain_name,
-            str(session_spec.user_scope.group_id),
-            session_spec.access_key,
-        )
+        allowed_groups = await self._repository.collect_accessible_scaling_groups(session_spec)
         if session_spec.scaling_group:
             for sg in allowed_groups:
                 if sg.name == session_spec.scaling_group:

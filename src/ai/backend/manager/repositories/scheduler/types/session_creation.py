@@ -101,6 +101,12 @@ class SessionCreationSpec:
 
     # Optional parameters
     is_preemptible: bool = True
+    # When the session is created on behalf of another user (delegation via
+    # owner_access_key), this holds the key of the original requester so that
+    # the scheduling controller can resolve scaling group access using the
+    # union of the requester's and the owner's permissions. None means the
+    # requester is the same as the owner.
+    requester_access_key: AccessKey | None = None
     scaling_group: str | None = None
     session_tag: str | None = None
     starts_at: datetime | None = None

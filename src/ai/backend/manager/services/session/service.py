@@ -448,6 +448,7 @@ class SessionService:
                 enqueue_only=enqueue_only,
                 max_wait_seconds=max_wait_seconds,
                 sudo_session_enabled=sudo_session_enabled,
+                requester_access_key=requester_access_key,
             )
             return CreateClusterActionResult(result=resp, session_id=resp["kernelId"])
         except TooManySessionsMatched as e:
@@ -541,6 +542,7 @@ class SessionService:
                 tag=tag,
                 callback_url=callback_url,
                 sudo_session_enabled=sudo_session_enabled,
+                requester_access_key=requester_access_key,
             )
             await self._session_repository.update_image_last_used_at(
                 image_row.id, datetime.now(tzutc())
@@ -745,6 +747,7 @@ class SessionService:
                 tag=tag,
                 callback_url=callback_url,
                 sudo_session_enabled=sudo_session_enabled,
+                requester_access_key=requester_access_key,
             )
             return CreateFromTemplateActionResult(session_id=resp["sessionId"], result=resp)
         except UnknownImageReference as e:

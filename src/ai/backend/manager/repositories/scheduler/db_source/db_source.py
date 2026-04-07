@@ -1450,12 +1450,7 @@ class ScheduleDBSource:
 
             # Fetch all data using private methods that reuse the session
             network_info = await self._get_scaling_group_network_info(db_sess, scaling_group_name)
-            allowed_groups = await self._query_allowed_scaling_groups(
-                db_sess,
-                spec.user_scope.domain_name,
-                str(spec.user_scope.group_id),
-                spec.access_key,
-            )
+            allowed_groups = await self._collect_accessible_scaling_groups(db_sess, spec)
             image_infos = await self._resolve_image_info(db_sess, image_refs)
 
             # Build typed mount requests from creation_spec
@@ -1515,12 +1510,7 @@ class ScheduleDBSource:
 
             # Fetch all data using private methods that reuse the session
             network_info = await self._get_scaling_group_network_info(db_sess, scaling_group_name)
-            allowed_groups = await self._query_allowed_scaling_groups(
-                db_sess,
-                spec.user_scope.domain_name,
-                str(spec.user_scope.group_id),
-                spec.access_key,
-            )
+            allowed_groups = await self._collect_accessible_scaling_groups(db_sess, spec)
             image_infos = await self._resolve_image_info(db_sess, image_refs)
 
             return SessionCreationContext(
@@ -1601,6 +1591,19 @@ class ScheduleDBSource:
             return await self._query_allowed_scaling_groups(
                 db_sess, domain_name, group_id, access_key
             )
+
+    async def collect_accessible_scaling_groups(
+        self,
+        spec: SessionCreationSpec,
+    ) -> list[AllowedScalingGroup]:
+        """
+        Return scaling groups accessible to the spec (public method).
+
+        For delegated creation (owner_access_key), unions the owner's and the
+        requester's allowed groups (deduplicated by name).
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            return await self._collect_accessible_scaling_groups(db_sess, spec)
 
     @staticmethod
     def _build_mount_requests_from_spec(
@@ -1780,6 +1783,37 @@ class ScheduleDBSource:
             )
             for sg in allowed_sgroups
         ]
+
+    async def _collect_accessible_scaling_groups(
+        self,
+        db_sess: SASession,
+        spec: SessionCreationSpec,
+    ) -> list[AllowedScalingGroup]:
+        """
+        Return scaling groups accessible to the spec.
+
+        For delegated creation (owner_access_key), unions the owner's and the
+        requester's allowed groups (deduplicated by name).
+        """
+        owner_groups = await self._query_allowed_scaling_groups(
+            db_sess,
+            spec.user_scope.domain_name,
+            str(spec.user_scope.group_id),
+            spec.access_key,
+        )
+        if spec.requester_access_key is not None and spec.requester_access_key != spec.access_key:
+            requester_groups = await self._query_allowed_scaling_groups(
+                db_sess,
+                spec.user_scope.domain_name,
+                str(spec.user_scope.group_id),
+                spec.requester_access_key,
+            )
+            seen_names = {sg.name for sg in owner_groups}
+            for sg in requester_groups:
+                if sg.name not in seen_names:
+                    owner_groups.append(sg)
+                    seen_names.add(sg.name)
+        return owner_groups
 
     async def allocate_sessions(
         self, allocation_batch: AllocationBatch

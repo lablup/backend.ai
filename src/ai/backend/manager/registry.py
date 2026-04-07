@@ -382,6 +382,7 @@ class AgentRegistry:
         callback_url: yarl.URL | None = None,
         route_id: uuid.UUID | None = None,
         sudo_session_enabled: bool = False,
+        requester_access_key: AccessKey | None = None,
     ) -> Mapping[str, Any]:
         log.debug("create_session():")
         resp: MutableMapping[str, Any] = {}
@@ -592,6 +593,7 @@ class AgentRegistry:
                         sudo_session_enabled=sudo_session_enabled,
                         network=network,
                         startup_command=startup_command,
+                        requester_access_key=requester_access_key,
                     )
                 ),
             )
@@ -672,6 +674,7 @@ class AgentRegistry:
         max_wait_seconds: int = 0,
         sudo_session_enabled: bool = False,
         attach_network: uuid.UUID | None = None,
+        requester_access_key: AccessKey | None = None,
     ) -> Mapping[str, Any]:
         resp: MutableMapping[str, Any] = {}
 
@@ -831,6 +834,7 @@ class AgentRegistry:
                         session_tag=tag,
                         sudo_session_enabled=sudo_session_enabled,
                         network=network,
+                        requester_access_key=requester_access_key,
                     ),
                 )
             )
@@ -927,6 +931,7 @@ class AgentRegistry:
         network: NetworkRow | None,
         startup_command: str | None,
         is_preemptible: bool,
+        requester_access_key: AccessKey | None = None,
     ) -> SessionId:
         """Enqueue session using Sokovan scheduling controller."""
         kernel_enqueue_configs: list[KernelEnqueueingConfig] = session_enqueue_configs[
@@ -960,6 +965,7 @@ class AgentRegistry:
             public_sgroup_only=public_sgroup_only,
             startup_command=startup_command,
             is_preemptible=is_preemptible,
+            requester_access_key=requester_access_key,
         )
 
         # Delegate to scheduling controller
@@ -992,6 +998,7 @@ class AgentRegistry:
         sudo_session_enabled: bool = False,
         network: NetworkRow | None = None,
         startup_command: str | None = None,
+        requester_access_key: AccessKey | None = None,
     ) -> SessionId:
         return await self._enqueue_session_via_sokovan(
             session_creation_id=session_creation_id,
@@ -1018,6 +1025,7 @@ class AgentRegistry:
             sudo_session_enabled=sudo_session_enabled,
             network=network,
             startup_command=startup_command,
+            requester_access_key=requester_access_key,
         )
 
     def convert_resource_spec_to_resource_slot(

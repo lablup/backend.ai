@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import PurePosixPath
 from typing import Any, cast
@@ -11,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.common.types import (
     AccessKey,
@@ -1107,3 +1109,115 @@ class TestMarkSessionsForTermination:
         broadcast_events = event_producer.broadcast_events_batch.call_args[0][0]
         assert len(broadcast_events) == 1
         assert broadcast_events[0].status_transition == str(SessionStatus.TERMINATING)
+
+
+@dataclass(frozen=True)
+class _ResolveScalingGroupCase:
+    """Parametrized case for `_resolve_scaling_group` regression tests."""
+
+    requested_sg: str
+    mocked_allowed: list[str]
+    requester_ak: AccessKey | None
+    expected: str | None  # None means the resolve should raise
+
+
+class TestResolveScalingGroupForDelegation:
+    """
+    Regression tests for BA-5608 issue #1.
+
+    When a session is created with owner_access_key (delegation), the scaling
+    group access check should be the union of the owner's and the requester's
+    permissions, so that an admin/superadmin can delegate sessions using a
+    scaling group granted to their own keypair even if the owner does not have
+    direct access.
+    """
+
+    def _make_spec(
+        self,
+        scaling_group: str,
+        owner_access_key: AccessKey,
+        requester_access_key: AccessKey | None,
+    ) -> SessionCreationSpec:
+        return SessionCreationSpec(
+            session_creation_id="sg-resolve-test",
+            session_name="sg-resolve-test",
+            access_key=owner_access_key,
+            user_scope=UserScope(
+                domain_name="default",
+                group_id=uuid.uuid4(),
+                user_uuid=uuid.uuid4(),
+                user_role="user",
+            ),
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
+            cluster_size=1,
+            priority=10,
+            resource_policy={},
+            kernel_specs=[],
+            creation_spec={},
+            scaling_group=scaling_group,
+            requester_access_key=requester_access_key,
+        )
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            pytest.param(
+                _ResolveScalingGroupCase(
+                    requested_sg="admin-only-sg",
+                    mocked_allowed=["default", "admin-only-sg"],
+                    requester_ak=AccessKey("AKIAADMINEXAMPLE0000"),
+                    expected="admin-only-sg",
+                ),
+                id="delegation-union-grants-access",
+            ),
+            pytest.param(
+                _ResolveScalingGroupCase(
+                    requested_sg="default",
+                    mocked_allowed=["default"],
+                    requester_ak=None,
+                    expected="default",
+                ),
+                id="own-session-uses-owner-only",
+            ),
+            pytest.param(
+                _ResolveScalingGroupCase(
+                    requested_sg="nonexistent-sg",
+                    mocked_allowed=["default"],
+                    requester_ak=AccessKey("AKIAADMINEXAMPLE0000"),
+                    expected=None,
+                ),
+                id="neither-party-has-access-raises",
+            ),
+        ],
+    )
+    async def test_resolve_scaling_group_for_delegation(
+        self,
+        scheduling_controller: Any,
+        mock_repository: Any,
+        case: _ResolveScalingGroupCase,
+    ) -> None:
+        """
+        Verify the union policy in `_resolve_scaling_group`:
+        - delegation case where the requester (but not the owner) grants access
+        - non-delegation case where only the owner is consulted
+        - failure case where neither party has access
+        """
+        owner_ak = AccessKey("AKIAOWNEREXAMPLE0000")
+        mock_repository.collect_accessible_scaling_groups = AsyncMock(
+            return_value=[
+                AllowedScalingGroup(name=name, is_private=False, scheduler_opts=ScalingGroupOpts())
+                for name in case.mocked_allowed
+            ]
+        )
+
+        spec = self._make_spec(case.requested_sg, owner_ak, case.requester_ak)
+
+        if case.expected is None:
+            with pytest.raises(InvalidAPIParameters, match="not accessible"):
+                await scheduling_controller._resolve_scaling_group(spec)
+        else:
+            result = await scheduling_controller._resolve_scaling_group(spec)
+            assert result.name == case.expected
+
+        mock_repository.collect_accessible_scaling_groups.assert_awaited_once_with(spec)

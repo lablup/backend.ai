@@ -299,6 +299,19 @@ class SchedulerRepository:
         return await self._db_source.query_allowed_scaling_groups(domain_name, group_id, access_key)
 
     @scheduler_repository_resilience.apply()
+    async def collect_accessible_scaling_groups(
+        self,
+        spec: SessionCreationSpec,
+    ) -> list[AllowedScalingGroup]:
+        """
+        Return scaling groups accessible to the spec.
+
+        For delegated creation (owner_access_key), unions the owner's and the
+        requester's allowed groups (deduplicated by name).
+        """
+        return await self._db_source.collect_accessible_scaling_groups(spec)
+
+    @scheduler_repository_resilience.apply()
     async def prepare_vfolder_mounts(
         self,
         storage_manager: StorageSessionManager,
