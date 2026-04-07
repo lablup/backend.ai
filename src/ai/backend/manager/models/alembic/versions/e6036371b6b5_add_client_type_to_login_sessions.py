@@ -28,17 +28,22 @@ def upgrade() -> None:
                 "client_type",
                 sa.String(length=64),
                 nullable=False,
-                server_default="core",
+                # Pre-existing sessions are assumed to be webui logins, matching
+                # the AuthorizeRequest default for callers that omit client_type.
+                server_default="webui",
             ),
         )
     else:
-        # Previous iteration of this migration used "default" as the placeholder
-        # value. Collapse any such rows onto the canonical "core" bucket and
-        # update the column default so new INSERTs land there too.
+        # Previous iterations of this migration used "default" or "core" as the
+        # placeholder. Collapse any such rows onto "webui" to match the
+        # AuthorizeRequest default, and update the column default accordingly.
         op.execute(
-            sa.text("UPDATE login_sessions SET client_type = 'core' WHERE client_type = 'default'")
+            sa.text(
+                "UPDATE login_sessions SET client_type = 'webui' "
+                "WHERE client_type IN ('default', 'core')"
+            )
         )
-        op.alter_column("login_sessions", "client_type", server_default="core")
+        op.alter_column("login_sessions", "client_type", server_default="webui")
     existing_indexes = {idx["name"] for idx in inspector.get_indexes("login_sessions")}
     if "ix_login_sessions_user_id_client_type_status" not in existing_indexes:
         op.create_index(
