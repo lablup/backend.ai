@@ -1261,26 +1261,33 @@ class ModelServiceHelper:
             storage_reply = await ModelServiceHelper._listdir(
                 storage_manager, proxy_name, volume_name, vfid, path.parent.as_posix()
             )
-            for item in storage_reply["items"]:
-                if item["name"] == path.name:
-                    return suggested_path
-            else:
-                raise InvalidAPIParameters(
-                    f"Model definition YAML file {suggested_path} not found inside the model storage"
-                )
-        else:
-            storage_reply = await ModelServiceHelper._listdir(
-                storage_manager, proxy_name, volume_name, vfid, "."
+            names = {item["name"] for item in storage_reply["items"]}
+            if path.name in names:
+                return suggested_path
+            # YAML and YML are equivalent extensions per the YAML specification.
+            # If the user/WebUI sent the canonical `model-definition.yaml` (or its
+            # `.yml` counterpart) but only the other extension is present, accept it.
+            yaml_yml_aliases = {
+                "model-definition.yaml": "model-definition.yml",
+                "model-definition.yml": "model-definition.yaml",
+            }
+            alias = yaml_yml_aliases.get(path.name)
+            if alias is not None and alias in names:
+                return path.with_name(alias).as_posix()
+            raise InvalidAPIParameters(
+                f"Model definition YAML file {suggested_path} not found inside the model storage"
             )
-            model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
-            for item in storage_reply["items"]:
-                if item["name"] in model_definition_candidates:
-                    result: str = item["name"]
-                    return result
-            else:
-                raise InvalidAPIParameters(
-                    'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
-                )
+        storage_reply = await ModelServiceHelper._listdir(
+            storage_manager, proxy_name, volume_name, vfid, "."
+        )
+        model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
+        for item in storage_reply["items"]:
+            if item["name"] in model_definition_candidates:
+                result: str = item["name"]
+                return result
+        raise InvalidAPIParameters(
+            'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
+        )
 
     @staticmethod
     async def _read_model_definition(
