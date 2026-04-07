@@ -98,6 +98,13 @@ class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
     name: str = gql_field(description="Policy name.")
     created_at: datetime | None = gql_field(description="Timestamp when the policy was created.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a user can create.")
+    max_concurrent_logins: int | None = gql_field(
+        description=(
+            "Maximum number of concurrent authenticated login sessions per user."
+            " Null means unlimited."
+            " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
+        )
+    )
     max_quota_scope_size: BinarySizeInfoGQL = gql_field(description="Maximum quota scope size.")
     max_session_count_per_model_session: int = gql_field(
         description="Maximum sessions per model session."

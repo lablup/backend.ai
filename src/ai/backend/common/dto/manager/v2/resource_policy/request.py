@@ -305,6 +305,9 @@ class UserResourcePolicyFilter(BaseRequestModel):
     max_vfolder_count: IntFilter | None = Field(
         default=None, description="Filter by max vfolder count."
     )
+    max_concurrent_logins: IntFilter | None = Field(
+        default=None, description="Filter by max concurrent logins."
+    )
     max_quota_scope_size: IntFilter | None = Field(
         default=None, description="Filter by max quota scope size."
     )

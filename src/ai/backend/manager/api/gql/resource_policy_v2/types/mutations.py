@@ -154,6 +154,14 @@ class UpdateKeypairResourcePolicyInputGQL(PydanticInputMixin[UpdateKeypairResour
 class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePolicyInputDTO]):
     name: str = gql_field(description="Policy name. Must be unique.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a user can create.")
+    max_concurrent_logins: int | None = gql_field(
+        default=UNSET,
+        description=(
+            "Maximum number of concurrent authenticated login sessions per user."
+            " Null means unlimited."
+            " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
+        ),
+    )
     max_quota_scope_size: BinarySizeInputGQL = gql_field(
         description="Maximum quota scope size (e.g., '1g', '536870912').",
     )
@@ -174,6 +182,14 @@ class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePoli
 class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePolicyInputDTO]):
     max_vfolder_count: int | None = gql_field(
         default=UNSET, description="Updated max vfolder count."
+    )
+    max_concurrent_logins: int | None = gql_field(
+        default=UNSET,
+        description=(
+            "Updated maximum number of concurrent authenticated login sessions per user."
+            " Set to null to clear (unlimited)."
+            " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
+        ),
     )
     max_quota_scope_size: BinarySizeInputGQL | None = gql_field(
         default=UNSET, description="Updated max quota scope size."

@@ -81,6 +81,12 @@ class UserResourcePolicyOrders:
         return UserResourcePolicyRow.max_vfolder_count.desc()
 
     @staticmethod
+    def max_concurrent_logins(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return UserResourcePolicyRow.max_concurrent_logins.asc()
+        return UserResourcePolicyRow.max_concurrent_logins.desc()
+
+    @staticmethod
     def max_quota_scope_size(ascending: bool = True) -> QueryOrder:
         if ascending:
             return UserResourcePolicyRow.max_quota_scope_size.asc()
