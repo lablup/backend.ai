@@ -317,10 +317,10 @@ class RoleGQL(PydanticNodeMixin[Any]):
         self,
         info: Info[StrawberryGQLContext],
     ) -> list[ScopeRefGQL]:
-        result = await info.context.adapters.rbac.admin_search_role_scopes_gql(
+        items = await info.context.adapters.rbac.get_role_scopes(
             role_id=uuid.UUID(self.id),
         )
-        return [ScopeRefGQL.from_pydantic(item) for item in result.items]
+        return [ScopeRefGQL.from_pydantic(item) for item in items]
 
 
 @gql_node_type(
@@ -393,10 +393,9 @@ class ScopeRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.element_association_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
-        ])
-        return cast(list[Self | None], results)
+        ids = [uuid.UUID(nid) for nid in node_ids]
+        dtos = await info.context.adapters.rbac.batch_load_element_associations_by_ids(ids)
+        return [cls.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
 
 # ==================== Filter Types ====================
