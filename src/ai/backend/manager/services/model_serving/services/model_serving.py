@@ -973,7 +973,7 @@ class ModelServingService:
                 self._storage_manager,
                 ctx.model_folder_host,
                 vfid,
-                None,
+                action.config.model_definition_path,
             )
 
         return ValidateModelServiceActionResult(
