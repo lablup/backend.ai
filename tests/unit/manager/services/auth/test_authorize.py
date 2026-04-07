@@ -496,10 +496,13 @@ async def test_authorize_force_invalidates_existing_sessions(
 
     result = await auth_service.authorize(action)
 
-    # create_login_session should have been called with tokens_to_invalidate
+    # Eviction happens via a dedicated repository call before create_login_session.
+    mock_auth_repository.invalidate_login_sessions_by_tokens.assert_awaited_once_with([
+        "existing_live_token"
+    ])
     mock_auth_repository.create_login_session.assert_awaited_once()
-    call_kwargs = mock_auth_repository.create_login_session.call_args
-    assert call_kwargs.kwargs.get("tokens_to_invalidate") == ["existing_live_token"]
+    create_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
+    assert "tokens_to_invalidate" not in create_kwargs
 
     # Old session should be deleted from Valkey
     mock_valkey_session_client.delete_login_session.assert_awaited_once_with("existing_live_token")
@@ -512,10 +515,11 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
 ) -> None:
-    """create_login_session must not pass max_concurrent_sessions to the repository.
+    """create_login_session must not pass any enforcement knobs to the repository.
 
     Enforcement now lives entirely in the service layer; the repository only receives
-    tokens_to_invalidate (if any).
+    the identity fields needed to create the row. Eviction, when needed, is performed
+    via a separate ``invalidate_login_sessions_by_tokens`` call.
     """
     mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
         session_token="new_token",
@@ -545,3 +549,5 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
 
     call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
     assert "max_concurrent_sessions" not in call_kwargs
+    assert "tokens_to_invalidate" not in call_kwargs
+    mock_auth_repository.invalidate_login_sessions_by_tokens.assert_not_called()

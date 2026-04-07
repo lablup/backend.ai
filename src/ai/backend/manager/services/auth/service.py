@@ -340,11 +340,13 @@ class AuthService:
             force=action.force,
         )
 
+        if tokens_to_invalidate:
+            await self._auth_repository.invalidate_login_sessions_by_tokens(tokens_to_invalidate)
+
         session_result = await self._auth_repository.create_login_session(
             user_id=user.uuid,
             access_key=keypair_row.access_key,
             domain_name=action.domain_name,
-            tokens_to_invalidate=tokens_to_invalidate,
         )
 
         if tokens_to_invalidate:

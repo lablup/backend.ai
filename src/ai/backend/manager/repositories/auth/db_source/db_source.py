@@ -433,37 +433,45 @@ class AuthDBSource:
             )
 
     @auth_db_source_resilience.apply()
+    async def invalidate_sessions_by_tokens(self, session_tokens: list[str]) -> None:
+        """Invalidate the given active login sessions in bulk.
+
+        Rows whose status is not ACTIVE are left untouched. Callers that need to
+        evict specific sessions before creating a new one should call this first and
+        then ``create_login_session``.
+        """
+        if not session_tokens:
+            return
+        async with self._db.begin_session() as db_session:
+            query = (
+                sa.update(LoginSessionRow)
+                .where(
+                    LoginSessionRow.session_token.in_(session_tokens)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .values(
+                    status=LoginSessionStatus.INVALIDATED,
+                    invalidated_at=sa.func.now(),
+                )
+            )
+            await db_session.execute(query)
+
+    @auth_db_source_resilience.apply()
     async def create_login_session(
         self,
         user_id: UUID,
         access_key: str,
         domain_name: str,
-        *,
-        tokens_to_invalidate: list[str] | None = None,
     ) -> LoginSessionCreationResult:
-        """Atomically invalidate old sessions (if provided), create a new session, and record success history.
+        """Create a new active login session and record a successful login history entry.
 
         All enforcement (cap check and force-eviction decision) is performed by the
-        service layer before this method is called. This method only executes the
-        resulting DB writes: invalidate the specified tokens and insert the new session.
+        service layer before this method is called. Eviction of old sessions, when
+        needed, must also be performed by the service layer via
+        ``invalidate_login_sessions_by_tokens`` prior to this call.
         """
         session_token = uuid_mod.uuid4().hex
         async with self._db.connect() as conn:
-            # Invalidate sessions that the service layer decided to evict.
-            if tokens_to_invalidate:
-                await conn.execute(
-                    sa.update(LoginSessionRow.__table__)
-                    .where(
-                        LoginSessionRow.__table__.c.session_token.in_(tokens_to_invalidate)
-                        & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
-                    )
-                    .values(
-                        status=LoginSessionStatus.INVALIDATED,
-                        invalidated_at=sa.func.now(),
-                    )
-                )
-
-            # Insert the new active session.
             await conn.execute(
                 sa.insert(LoginSessionRow.__table__).values(
                     user_id=user_id,

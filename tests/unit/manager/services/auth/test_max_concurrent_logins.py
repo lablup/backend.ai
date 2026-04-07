@@ -322,6 +322,9 @@ class TestMaxConcurrentLoginsEnforcement:
             auth_config=_make_auth_config(),
         )
 
-        call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
-        assert call_kwargs.get("tokens_to_invalidate") == case.expected_evicted_tokens
+        invalidate_mock = mock_auth_repository.invalidate_login_sessions_by_tokens
+        if case.expected_evicted_tokens is None:
+            invalidate_mock.assert_not_called()
+        else:
+            invalidate_mock.assert_called_once_with(case.expected_evicted_tokens)
         assert result.authorization_result is not None
