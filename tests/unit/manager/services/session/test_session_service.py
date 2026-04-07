@@ -509,7 +509,7 @@ class TestDestroySession:
 
         assert result.result == {"stats": {"status": "cancelled"}}
         mock_session_repository.get_target_session_ids.assert_called_once_with(
-            "test-session", sample_access_key, recursive=False
+            "test-session", sample_access_key, recursive=False, owner_user_uuid=None
         )
         mock_scheduling_controller.mark_sessions_for_termination.assert_called_once()
 
@@ -612,7 +612,7 @@ class TestDestroySession:
         result = await session_service.destroy_session(action)
 
         mock_session_repository.get_target_session_ids.assert_called_once_with(
-            "test-session", sample_access_key, recursive=True
+            "test-session", sample_access_key, recursive=True, owner_user_uuid=None
         )
         assert result.result == {"stats": {"status": "cancelled"}}
 
@@ -986,7 +986,7 @@ class TestRenameSession:
         assert isinstance(result, RenameSessionActionResult)
         assert result.session_data == sample_session_data
         mock_session_repository.update_session_name.assert_called_once_with(
-            "test-session", "new-session-name", sample_access_key
+            "test-session", "new-session-name", sample_access_key, owner_user_uuid=None
         )
 
     async def test_not_running_session(
