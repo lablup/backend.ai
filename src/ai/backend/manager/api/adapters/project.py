@@ -168,7 +168,7 @@ class ProjectAdapter(BaseAdapter):
             domain_name=input.domain_name,
             type=DataProjectType(input.type.value) if input.type else None,
             description=input.description,
-            integration_id=input.integration_id,
+            integration_name=input.integration_name,
             resource_policy=input.resource_policy,
         )
         result = await self._processors.group.create_group.wait_for_complete(
@@ -196,12 +196,12 @@ class ProjectAdapter(BaseAdapter):
                 if input.is_active is not None
                 else OptionalState.nop()
             ),
-            integration_id=(
-                OptionalState.nop()
-                if isinstance(input.integration_id, Sentinel)
-                else OptionalState.nop()
-                if input.integration_id is None
-                else OptionalState.update(input.integration_id)
+            integration_name=(
+                TriState.nop()
+                if isinstance(input.integration_name, Sentinel)
+                else TriState.nullify()
+                if input.integration_name is None
+                else TriState.update(input.integration_name)
             ),
             resource_policy=(
                 OptionalState.update(input.resource_policy)
@@ -324,7 +324,9 @@ class ProjectAdapter(BaseAdapter):
     ) -> AssignUsersToProjectPayload:
         """Assign users to a project."""
         result = await self._processors.group.assign_users_to_project.wait_for_complete(
-            AssignUsersToProjectAction(project_id=project_id, user_ids=input.user_ids)
+            AssignUsersToProjectAction(
+                project_id=project_id, user_ids=input.user_ids, role_id=input.role_id
+            )
         )
         return AssignUsersToProjectPayload(
             items=[UserAdapter._user_data_to_node(u) for u in result.assigned_users],
@@ -484,6 +486,13 @@ class ProjectAdapter(BaseAdapter):
     @staticmethod
     def _convert_user_nested_filter(user_filter: ProjectUserFilter) -> list[QueryCondition]:
         raw_conditions: list[QueryCondition] = []
+        if user_filter.id is not None:
+            condition = user_filter.id.build_query_condition(
+                equals_factory=GroupConditions.by_user_id_equals,
+                in_factory=GroupConditions.by_user_id_in,
+            )
+            if condition is not None:
+                raw_conditions.append(condition)
         if user_filter.username is not None:
             condition = user_filter.username.build_query_condition(
                 contains_factory=GroupConditions.by_user_username_contains,
@@ -529,7 +538,7 @@ class ProjectAdapter(BaseAdapter):
                 name=data.name,
                 description=data.description,
                 type=ProjectType(data.type.value),
-                integration_id=data.integration_id,
+                integration_name=data.integration_name,
             ),
             organization=ProjectOrganizationInfo(
                 domain_name=data.domain_name,

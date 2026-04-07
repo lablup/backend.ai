@@ -53,7 +53,7 @@ class CreateProjectInput(BaseRequestModel):
         default=None,
         description="Optional description of the project.",
     )
-    integration_id: str | None = Field(
+    integration_name: str | None = Field(
         default=None,
         description="External system integration identifier for the project.",
     )
@@ -79,7 +79,7 @@ class UpdateProjectInput(BaseRequestModel):
         default=None,
         description="Updated active status.",
     )
-    integration_id: str | Sentinel | None = Field(
+    integration_name: str | Sentinel | None = Field(
         default=SENTINEL,
         description="New external integration identifier. Set to null to clear.",
     )
@@ -176,6 +176,7 @@ class AssignUsersToProjectInput(BaseRequestModel):
     """Input for assigning users to a project."""
 
     user_ids: list[UUID] = Field(description="List of user UUIDs to assign to the project.")
+    role_id: UUID = Field(description="UUID of the project role to assign to the users.")
 
 
 class UnassignUsersFromProjectInput(BaseRequestModel):

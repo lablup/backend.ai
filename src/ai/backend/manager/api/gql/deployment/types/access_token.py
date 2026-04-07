@@ -19,11 +19,17 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateAccessTokenInput as CreateAccessTokenInputDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeleteAccessTokenInput as DeleteAccessTokenInputDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment.response import (
     AccessTokenNode as AccessTokenNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     CreateAccessTokenPayload as CreateAccessTokenPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    DeleteAccessTokenPayload as DeleteAccessTokenPayloadDTO,
 )
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -50,7 +56,7 @@ class AccessTokenFilter(PydanticInputMixin[AccessTokenFilterDTO]):
     """Filter for access tokens."""
 
     token: StringFilter | None = None
-    valid_until: DateTimeFilter | None = None
+    expires_at: DateTimeFilter | None = None
     created_at: DateTimeFilter | None = None
 
     AND: list[Self] | None = None
@@ -73,7 +79,9 @@ class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
     id: NodeID[str]
     token: str = gql_field(description="The access token.")
     created_at: datetime = gql_field(description="The creation timestamp of the access token.")
-    valid_until: datetime = gql_field(description="The expiration timestamp of the access token.")
+    expires_at: datetime | None = gql_field(
+        description="The expiration timestamp of the access token."
+    )
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -113,7 +121,9 @@ class CreateAccessTokenInput(PydanticInputMixin[CreateAccessTokenInputDTO]):
     model_deployment_id: ID = gql_field(
         description="The ID of the model deployment for which the access token is created."
     )
-    valid_until: datetime = gql_field(description="The expiration timestamp of the access token.")
+    expires_at: datetime | None = gql_field(
+        description="The expiration timestamp of the access token."
+    )
 
 
 @gql_pydantic_type(
@@ -122,3 +132,21 @@ class CreateAccessTokenInput(PydanticInputMixin[CreateAccessTokenInputDTO]):
 )
 class CreateAccessTokenPayload:
     access_token: AccessToken
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for deleting an access token.",
+        added_version="25.16.0",
+    ),
+)
+class DeleteAccessTokenInput(PydanticInputMixin[DeleteAccessTokenInputDTO]):
+    id: ID = gql_field(description="The ID of the access token to delete.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="25.16.0", description="Payload for deleting an access token."),
+    model=DeleteAccessTokenPayloadDTO,
+)
+class DeleteAccessTokenPayload:
+    id: UUID

@@ -38,7 +38,7 @@ type AccessToken implements Node
   createdAt: DateTime!
 
   """The expiration timestamp of the access token."""
-  validUntil: DateTime!
+  expiresAt: DateTime
 }
 
 """Added in 25.16.0. Connection for access tokens."""
@@ -69,7 +69,7 @@ input AccessTokenFilter
   @join__type(graph: STRAWBERRY)
 {
   token: StringFilter = null
-  validUntil: DateTimeFilter = null
+  expiresAt: DateTimeFilter = null
   createdAt: DateTimeFilter = null
   AND: [AccessTokenFilter!] = null
   OR: [AccessTokenFilter!] = null
@@ -1303,6 +1303,7 @@ input AssignRoleInput
 {
   userId: UUID!
   roleId: UUID!
+  projectId: UUID
 }
 
 """Added in 24.03.9."""
@@ -1791,6 +1792,7 @@ input BulkAssignRoleInput
 {
   roleId: UUID!
   userIds: [UUID!]!
+  projectId: UUID
 }
 
 """Added in 26.3.0. Payload for bulk role assignment mutation."""
@@ -2772,7 +2774,7 @@ input CreateAccessTokenInput
   modelDeploymentId: ID!
 
   """The expiration timestamp of the access token."""
-  validUntil: DateTime!
+  expiresAt: DateTime
 }
 
 """Added in 25.16.0. Payload for creating an access token."""
@@ -2990,7 +2992,7 @@ input CreateDomainInputGQL
   allowedDockerRegistries: [String!] = null
 
   """External integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
 }
 
 """Added in 24.12.0."""
@@ -3317,7 +3319,7 @@ input CreateProjectInputGQL
   description: String = null
 
   """External integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
 
   """Name of the resource policy to apply."""
   resourcePolicy: String = null
@@ -3524,6 +3526,7 @@ input CreateRoleInput
   name: String!
   description: String = null
   source: RoleSource! = CUSTOM
+  scopes: [ScopeInput!] = null
 }
 
 """Added in UNRELEASED. Input for creating a runtime variant."""
@@ -3606,6 +3609,16 @@ input CreateScalingGroupInput
   scheduler: String!
   scheduler_opts: JSONString = "{}"
   use_host_network: Boolean = false
+}
+
+"""
+Added in UNRELEASED. Session types allowed for user-initiated creation.
+"""
+enum CreateSessionType
+  @join__type(graph: STRAWBERRY)
+{
+  INTERACTIVE @join__enumValue(graph: STRAWBERRY)
+  BATCH @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in UNRELEASED. Input for creating a file upload session."""
@@ -4912,7 +4925,7 @@ type DomainBasicInfo
   description: String
 
   """External system integration identifier."""
-  integrationId: String
+  integrationName: String
 }
 
 """Added in 24.12.0"""
@@ -5700,6 +5713,82 @@ type EndpointTokenList implements PaginatedList
 {
   items: [EndpointToken]!
   total_count: Int!
+}
+
+"""Added in UNRELEASED. Input for creating a new compute session."""
+input EnqueueSessionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Session name."""
+  sessionName: String!
+
+  """Session type."""
+  sessionType: CreateSessionType!
+
+  """Image UUID."""
+  imageId: ID!
+
+  """Resource slot allocations."""
+  resourceEntries: [SessionResourceSlotEntryInput!]!
+
+  """Scaling group name."""
+  resourceGroup: String = null
+
+  """Additional resource options."""
+  resourceOpts: SessionResourceOptsInput = null
+
+  """Cluster mode."""
+  clusterMode: SessionClusterMode! = SINGLE_NODE
+
+  """Number of containers."""
+  clusterSize: Int! = 1
+
+  """Virtual folder mounts."""
+  mounts: [SessionMountItemInput!] = null
+
+  """Environment variables."""
+  environ: JSON = null
+
+  """Ports to pre-open."""
+  preopenPorts: [Int!] = null
+
+  """Bootstrap script."""
+  bootstrapScript: String = null
+
+  """Scheduling priority (0-100)."""
+  priority: Int! = 10
+
+  """Whether preemptible."""
+  isPreemptible: Boolean! = true
+
+  """Dependent session IDs."""
+  dependencies: [ID!] = null
+
+  """Designated agent IDs."""
+  agentList: [String!] = null
+
+  """Network UUID to attach."""
+  attachNetwork: ID = null
+
+  """User-defined tag."""
+  tag: String = null
+
+  """Webhook URL."""
+  callbackUrl: String = null
+
+  """Batch configuration."""
+  batch: SessionBatchConfigInput = null
+
+  """Project UUID."""
+  projectId: ID = null
+}
+
+"""Added in UNRELEASED. Payload returned after creating a session."""
+type EnqueueSessionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Created session details."""
+  session: SessionV2!
 }
 
 """Added in UNRELEASED. Entity with its allowed actions within a scope."""
@@ -7957,6 +8046,16 @@ type ModelCard implements Node
   error_msg: String
 }
 
+"""
+Added in UNRELEASED. Scope for querying available presets that satisfy a model card's resource requirements.
+"""
+input ModelCardAvailablePresetsScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Model card UUID to check resource requirements against."""
+  modelCardId: UUID!
+}
+
 """Added in 24.03.4"""
 type ModelCardConnection
   @join__type(graph: GRAPHENE)
@@ -8022,6 +8121,11 @@ type ModelCardV2 implements Node
   metadata: ModelCardV2Metadata!
 
   """
+  Minimum resource requirements for serving this model. Each entry maps a resource slot (e.g. 'cpu', 'cuda.shares') to its minimum required quantity. Used to filter compatible deployment revision presets via `available_presets`.
+  """
+  minResource: [ModelCardV2ResourceSlotEntry!]
+
+  """
   README content from the model VFolder, typically containing usage instructions and model documentation.
   """
   readme: String
@@ -8034,6 +8138,16 @@ type ModelCardV2 implements Node
 
   """Timestamp of the last modification to this model card."""
   updatedAt: DateTime
+
+  """
+  The VFolder that stores this model card's files. Resolved through a DataLoader so that listing many model cards does not trigger N+1 fetches.
+  """
+  vfolder: VFolder
+
+  """
+  Deployment revision presets that satisfy this model card's minimum resource requirements. Equivalent to the root `model_card_available_presets` query but scoped to this card.
+  """
+  availablePresets(filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection
 }
 
 """Added in UNRELEASED. Access level for model cards."""
@@ -8116,6 +8230,19 @@ enum ModelCardV2OrderField
 {
   NAME @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. A single resource requirement entry for a model card. The quantity is represented as a string because model card requirements are descriptive (display/matching) rather than arithmetic.
+"""
+type ModelCardV2ResourceSlotEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource type name."""
+  resourceType: String!
+
+  """Resource quantity."""
+  quantity: String!
 }
 
 """
@@ -8442,7 +8569,7 @@ input ModelMountConfigInput
 }
 
 """
-Added in 25.19.0. A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness) and traffic weight for load balancing.
+Added in 25.19.0. A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness).
 """
 type ModelReplica implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -8459,11 +8586,8 @@ type ModelReplica implements Node
   """Whether the replica is currently running and able to serve requests."""
   livenessStatus: LivenessStatus!
 
-  """Whether the replica is currently active and able to serve requests."""
+  """Whether the replica is actively receiving traffic."""
   activenessStatus: ActivenessStatus!
-
-  """Traffic weight for load balancing between replicas."""
-  weight: Int!
 
   """Timestamp when the replica was created."""
   createdAt: DateTime!
@@ -10221,6 +10345,9 @@ type Mutation
   """Added in UNRELEASED. Create a download session for a virtual folder."""
   vfolderCreateDownloadSessionV2(vfolderId: UUID!, input: CreateDownloadSessionV2Input!): CreateDownloadSessionV2Payload! @join__field(graph: STRAWBERRY)
 
+  """Added in UNRELEASED. Enqueue a new compute session."""
+  enqueueSession(input: EnqueueSessionInput!): EnqueueSessionPayload! @join__field(graph: STRAWBERRY)
+
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload! @join__field(graph: STRAWBERRY)
 }
@@ -10911,7 +11038,15 @@ type ProjectBasicInfo
   type: ProjectTypeV2!
 
   """External system integration identifier."""
-  integrationId: String
+  integrationName: String
+}
+
+"""Added in 25.19.0. Scope for project-level deployment operations."""
+input ProjectDeploymentScope
+  @join__type(graph: STRAWBERRY)
+{
+  """Project UUID to scope the deployment operation."""
+  projectId: UUID!
 }
 
 """
@@ -11488,6 +11623,7 @@ Added in 26.2.0. Nested filter for users belonging to a project. Filters project
 input ProjectUserNestedFilter
   @join__type(graph: STRAWBERRY)
 {
+  id: UUIDFilter = null
   username: StringFilter = null
   email: StringFilter = null
   isActive: Boolean = null
@@ -12231,11 +12367,6 @@ type Query
   """
   mergedAppConfig: AppConfig! @join__field(graph: STRAWBERRY)
 
-  """
-  Added in 25.16.0. List deployments with optional filtering and pagination (admin, all deployments).
-  """
-  deployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
-
   """Added in 25.16.0. Get a specific deployment by ID."""
   deployment(id: ID!): ModelDeployment @join__field(graph: STRAWBERRY)
 
@@ -12257,6 +12388,11 @@ type Query
 
   """Added in UNRELEASED. List available notification rule types"""
   notificationRuleTypes: [NotificationRuleType!] @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Get JSON schema for a notification rule type's message format
+  """
+  notificationRuleTypeSchema(ruleType: NotificationRuleType!): JSON! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0. Get an object storage by ID"""
   objectStorage(id: ID!): ObjectStorage @join__field(graph: STRAWBERRY)
@@ -12326,6 +12462,9 @@ type Query
 
   """Added in UNRELEASED. List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection @join__field(graph: STRAWBERRY)
+
+  """Added in 25.16.0. List all deployments (superadmin only)."""
+  adminDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. List deployment history (admin only)"""
   adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection @join__field(graph: STRAWBERRY)
@@ -12417,6 +12556,12 @@ type Query
   """
   projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection! @join__field(graph: STRAWBERRY)
 
+  """Added in 25.19.0. List deployments within a specific project."""
+  projectDeployments(scope: ProjectDeploymentScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
+
+  """Added in 25.19.0. List deployments owned by the current user."""
+  myDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection @join__field(graph: STRAWBERRY)
+
   """
   Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
   """
@@ -12432,18 +12577,20 @@ type Query
   """
   adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection @join__field(graph: STRAWBERRY)
 
-  """Added in 26.3.0. Get a single query definition by ID (admin only)."""
-  adminPrometheusQueryPreset(id: ID!): QueryDefinition @join__field(graph: STRAWBERRY)
+  """
+  Added in UNRELEASED. Get a single prometheus query preset by ID. Available to any authenticated user since presets are a shared catalog of metric query templates.
+  """
+  prometheusQueryPreset(id: ID!): QueryDefinition @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.3.0. List query definitions with filtering and pagination (admin only).
+  Added in UNRELEASED. List prometheus query presets with filtering and pagination. Available to any authenticated user since presets are a shared catalog of metric query templates.
   """
-  adminPrometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, limit: Int = null, offset: Int = null): QueryDefinitionConnection @join__field(graph: STRAWBERRY)
+  prometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, limit: Int = null, offset: Int = null): QueryDefinitionConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.3.0. Execute a query definition by ID and return the result (admin only).
+  Added in UNRELEASED. Execute a prometheus query preset by ID and return the result. Available to any authenticated user; the underlying preset query is the same regardless of who runs it.
   """
-  adminPrometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult! @join__field(graph: STRAWBERRY)
+  prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult! @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role @join__field(graph: STRAWBERRY)
@@ -12774,6 +12921,11 @@ type Query
 
   """Added in UNRELEASED. Get a single model card by ID."""
   modelCardV2(id: UUID!): ModelCardV2 @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Search deployment revision presets that satisfy a model card's minimum resource requirements.
+  """
+  modelCardAvailablePresets(scope: ModelCardAvailablePresetsScope!, filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Get my keypair resource allocation (current user).
@@ -14917,6 +15069,16 @@ scalar ScopeField
   @join__type(graph: GRAPHENE)
 
 """
+Added in UNRELEASED. Scope reference for associating an entity with a scope.
+"""
+input ScopeInput
+  @join__type(graph: STRAWBERRY)
+{
+  scopeType: RBACElementType!
+  scopeId: String!
+}
+
+"""
 Added in UNRELEASED. Resource usage for a single scope (keypair, project, domain).
 """
 type ScopeResourceUsageV2
@@ -15143,6 +15305,42 @@ type ServicePorts
   entries: [ServicePortEntry!]!
 }
 
+"""Added in UNRELEASED. Batch session specific configuration."""
+input SessionBatchConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Shell command to execute."""
+  startupCommand: String!
+
+  """Scheduled start time (ISO 8601)."""
+  startsAt: String = null
+
+  """Execution timeout in seconds."""
+  batchTimeout: Int = null
+}
+
+"""Added in UNRELEASED. Cluster networking modes for session creation."""
+enum SessionClusterMode
+  @join__type(graph: STRAWBERRY)
+{
+  SINGLE_NODE @join__enumValue(graph: STRAWBERRY)
+  MULTI_NODE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in UNRELEASED. A virtual folder mount specification."""
+input SessionMountItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Virtual folder UUID."""
+  vfolderId: ID!
+
+  """Custom mount path."""
+  mountPath: String = null
+
+  """Mount permission ('rw' or 'ro')."""
+  permission: String = null
+}
+
 """Added in 25.13.0."""
 type SessionPendingQueueConnection
   @join__type(graph: GRAPHENE)
@@ -15175,6 +15373,25 @@ Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session'
 """
 scalar SessionPermissionValueField
   @join__type(graph: GRAPHENE)
+
+"""Added in UNRELEASED. Additional resource options for session creation."""
+input SessionResourceOptsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Shared memory size (e.g., '1g')."""
+  shmem: BinarySizeInput = null
+}
+
+"""Added in UNRELEASED. A single resource slot allocation entry."""
+input SessionResourceSlotEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource type identifier."""
+  resourceType: String!
+
+  """Quantity as a decimal string."""
+  quantity: String!
+}
 
 """Added in 26.3.0. Session scheduling history record."""
 type SessionSchedulingHistory implements Node
@@ -16176,7 +16393,7 @@ input UpdateDomainInputGQL
   allowedDockerRegistries: [String!] = null
 
   """New external integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
 }
 
 """Added in 25.14.0. """
@@ -16435,7 +16652,7 @@ input UpdateProjectInputGQL
   isActive: Boolean = null
 
   """New external integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
 
   """New resource policy name."""
   resourcePolicy: String = null
@@ -17776,6 +17993,9 @@ type UserV2BasicInfo
 
   """Optional description or notes about the user."""
   description: String
+
+  """External system integration identifier."""
+  integrationName: String
 }
 
 """
@@ -17826,7 +18046,7 @@ type UserV2Edge
 }
 
 """
-Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
+Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, integration_name, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input UserV2Filter
   @join__type(graph: STRAWBERRY)
@@ -17836,6 +18056,9 @@ input UserV2Filter
   email: StringFilter = null
   status: UserStatusV2EnumFilter = null
   domainName: StringFilter = null
+
+  """Added in UNRELEASED. Filter by external integration identifier."""
+  integrationName: StringFilter = null
   role: UserRoleV2EnumFilter = null
   createdAt: DateTimeFilter = null
   domain: UserDomainNestedFilter = null

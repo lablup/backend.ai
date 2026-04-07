@@ -39,7 +39,10 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
     ResourceSpec,
     RevisionDraft,
+    RouteHealthStatus,
     RouteInfo,
+    RouteStatus,
+    RouteTrafficStatus,
     merge_revision_drafts,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
@@ -70,13 +73,29 @@ from ai.backend.manager.repositories.deployment_revision_preset.repository impor
 from ai.backend.manager.repositories.runtime_variant_preset.repository import (
     RuntimeVariantPresetRepository,
 )
+from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
+    BulkDeleteAccessTokensAction,
+    BulkDeleteAccessTokensActionResult,
+)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
 )
+from ai.backend.manager.services.deployment.actions.access_token.delete_access_token import (
+    DeleteAccessTokenAction,
+    DeleteAccessTokenActionResult,
+)
+from ai.backend.manager.services.deployment.actions.access_token.get_access_token import (
+    GetAccessTokenAction,
+    GetAccessTokenActionResult,
+)
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
     SearchAccessTokensActionResult,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
+    BulkDeleteAutoScalingRulesAction,
+    BulkDeleteAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -279,22 +298,54 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
     )
 
 
-def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
-    """Convert RouteInfo to ModelReplicaData.
+_HEALTH_STATUS_TO_READINESS: dict[RouteHealthStatus, ReadinessStatus] = {
+    RouteHealthStatus.HEALTHY: ReadinessStatus.HEALTHY,
+    RouteHealthStatus.UNHEALTHY: ReadinessStatus.UNHEALTHY,
+    RouteHealthStatus.DEGRADED: ReadinessStatus.UNHEALTHY,
+    RouteHealthStatus.NOT_CHECKED: ReadinessStatus.NOT_CHECKED,
+}
 
-    Note: Some fields are set to defaults as RouteInfo doesn't have all the data.
+_ROUTE_STATUS_TO_LIVENESS: dict[RouteStatus, LivenessStatus] = {
+    RouteStatus.RUNNING: LivenessStatus.HEALTHY,
+    RouteStatus.PROVISIONING: LivenessStatus.NOT_CHECKED,
+    RouteStatus.TERMINATING: LivenessStatus.DEGRADED,
+    RouteStatus.TERMINATED: LivenessStatus.UNHEALTHY,
+    RouteStatus.FAILED_TO_START: LivenessStatus.UNHEALTHY,
+}
+
+
+def _resolve_activeness(
+    traffic_status: RouteTrafficStatus,
+    readiness: ReadinessStatus,
+    liveness: LivenessStatus,
+) -> ActivenessStatus:
+    """Determine activeness from traffic_status, readiness, and liveness.
+
+    A replica is ACTIVE only when:
+    - traffic_status is ACTIVE (admin hasn't disabled it), AND
+    - readiness is HEALTHY (health check passed), AND
+    - liveness is HEALTHY (container is running)
     """
+    if traffic_status != RouteTrafficStatus.ACTIVE:
+        return ActivenessStatus.INACTIVE
+    if readiness != ReadinessStatus.HEALTHY:
+        return ActivenessStatus.INACTIVE
+    if liveness != LivenessStatus.HEALTHY:
+        return ActivenessStatus.INACTIVE
+    return ActivenessStatus.ACTIVE
+
+
+def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
+    """Convert RouteInfo to ModelReplicaData."""
+    readiness = _HEALTH_STATUS_TO_READINESS.get(route.health_status) or ReadinessStatus.NOT_CHECKED
+    liveness = _ROUTE_STATUS_TO_LIVENESS.get(route.status) or LivenessStatus.NOT_CHECKED
     return ModelReplicaData(
         id=route.route_id,
-        revision_id=route.revision_id
-        or route.endpoint_id,  # Fallback to endpoint_id if no revision
+        revision_id=route.revision_id or route.endpoint_id,
         session_id=route.session_id or route.route_id,
-        readiness_status=ReadinessStatus.HEALTHY,  # Derived from route status
-        liveness_status=LivenessStatus.HEALTHY,  # Default
-        activeness_status=ActivenessStatus.ACTIVE
-        if route.traffic_ratio > 0
-        else ActivenessStatus.INACTIVE,
-        weight=int(route.traffic_ratio * 100),  # Convert ratio to weight
+        readiness_status=readiness,
+        liveness_status=liveness,
+        activeness_status=_resolve_activeness(route.traffic_status, readiness, liveness),
         detail=route.error_data,
         created_at=route.created_at,
     )
@@ -1062,6 +1113,15 @@ class DeploymentService:
         )
         return DeleteAutoScalingRuleActionResult(success=success)
 
+    async def bulk_delete_auto_scaling_rules(
+        self, action: BulkDeleteAutoScalingRulesAction
+    ) -> BulkDeleteAutoScalingRulesActionResult:
+        """Bulk delete auto-scaling rules."""
+        deleted_ids = await self._deployment_repository.bulk_delete_autoscaling_rules(
+            action.auto_scaling_rule_ids
+        )
+        return BulkDeleteAutoScalingRulesActionResult(deleted_ids=deleted_ids)
+
     # ========== Access Token ==========
 
     async def create_access_token(
@@ -1087,6 +1147,7 @@ class DeploymentService:
             domain=endpoint_info.metadata.domain,
             project_id=endpoint_info.metadata.project,
             session_owner_id=endpoint_info.metadata.session_owner,
+            expires_at=action.creator.expires_at,
         )
         creator: RBACEntityCreator[EndpointTokenRow] = RBACEntityCreator(
             spec=spec,
@@ -1100,15 +1161,34 @@ class DeploymentService:
         # Create the token via repository
         token_row = await self._deployment_repository.create_access_token(creator)
 
-        # Convert to ModelDeploymentAccessTokenData
-        # Note: valid_until is returned as provided but not persisted in DB
         data = ModelDeploymentAccessTokenData(
             id=token_row.id,
             token=token_row.token,
-            valid_until=action.creator.valid_until,
+            expires_at=token_row.expires_at,
             created_at=token_row.created_at or datetime.now(UTC),
         )
         return CreateAccessTokenActionResult(data=data)
+
+    async def get_access_token(self, action: GetAccessTokenAction) -> GetAccessTokenActionResult:
+        """Get an access token by ID."""
+        data = await self._deployment_repository.get_access_token(action.access_token_id)
+        return GetAccessTokenActionResult(data=data)
+
+    async def delete_access_token(
+        self, action: DeleteAccessTokenAction
+    ) -> DeleteAccessTokenActionResult:
+        """Delete an access token."""
+        success = await self._deployment_repository.delete_access_token(action.access_token_id)
+        return DeleteAccessTokenActionResult(success=success)
+
+    async def bulk_delete_access_tokens(
+        self, action: BulkDeleteAccessTokensAction
+    ) -> BulkDeleteAccessTokensActionResult:
+        """Bulk delete access tokens."""
+        deleted_ids = await self._deployment_repository.bulk_delete_access_tokens(
+            action.access_token_ids
+        )
+        return BulkDeleteAccessTokensActionResult(deleted_ids=deleted_ids)
 
     # ========== Replica Operations ==========
 

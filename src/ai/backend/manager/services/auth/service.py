@@ -280,7 +280,7 @@ class AuthService:
         auth_config: AuthConfig,
     ) -> AuthorizeActionResult:
         """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed."""
-        max_concurrent_sessions = 1
+        max_concurrent_sessions = keypair_row.resource_policy_row.max_concurrent_sessions
         tokens_to_invalidate: list[str] | None = None
         if action.force and len(live_sessions) >= max_concurrent_sessions:
             sessions_to_remove = len(live_sessions) - max_concurrent_sessions + 1

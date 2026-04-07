@@ -11,7 +11,14 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 
-from .types import OrderDirection, RoleSource, RoleSourceFilter, RoleStatus, RoleStatusFilter
+from .types import (
+    OrderDirection,
+    RoleSource,
+    RoleSourceFilter,
+    RoleStatus,
+    RoleStatusFilter,
+    ScopeInputDTO,
+)
 
 __all__ = (
     "AdminSearchEntitiesGQLInput",
@@ -48,6 +55,9 @@ class CreateRoleInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=256, description="Role name")
     description: str | None = Field(default=None, description="Role description")
     source: RoleSource = Field(default=RoleSource.CUSTOM, description="Role source")
+    scopes: list[ScopeInputDTO] | None = Field(
+        default=None, description="Scopes to register the role in"
+    )
 
     @field_validator("name")
     @classmethod
@@ -121,6 +131,10 @@ class AssignRoleInput(BaseRequestModel):
 
     user_id: UUID = Field(description="User ID to assign the role to")
     role_id: UUID = Field(description="Role ID to assign")
+    project_id: UUID | None = Field(
+        default=None,
+        description="When provided, also add the user to this project",
+    )
 
 
 class RevokeRoleInput(BaseRequestModel):
@@ -135,6 +149,10 @@ class BulkAssignRoleInput(BaseRequestModel):
 
     role_id: UUID = Field(description="Role ID to assign")
     user_ids: list[UUID] = Field(description="List of user IDs to assign the role to")
+    project_id: UUID | None = Field(
+        default=None,
+        description="When provided, also add the users to this project",
+    )
 
 
 class BulkRevokeRoleInput(BaseRequestModel):

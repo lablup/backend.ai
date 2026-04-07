@@ -62,7 +62,7 @@ class TestCreateGroupMutation:
             dotfiles=b"",
             resource_policy="default",
             type=ProjectType.GENERAL,
-            integration_id=None,
+            integration_name=None,
             container_registry={},
         )
 

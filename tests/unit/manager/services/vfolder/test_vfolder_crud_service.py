@@ -63,6 +63,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.file_v2 import CloneVFolderV2Action
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
 
@@ -1235,6 +1236,122 @@ class TestCloneVFolderAction:
 
         with pytest.raises(InvalidAPIParameters):
             await vfolder_service.clone(action)
+
+    async def test_clone_project_vfolder_checks_user_resource_policy(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        user_uuid: uuid.UUID,
+        vfolder_uuid: uuid.UUID,
+        group_uuid: uuid.UUID,
+    ) -> None:
+        """Regression test for BA-5520: cloning a project-owned vfolder must check
+        the user's resource policy (group_uuid=None), not the source project's."""
+        source_data = _make_vfolder_data(
+            vfolder_uuid,
+            user_uuid,
+            cloneable=True,
+            ownership_type=VFolderOwnershipType.GROUP,
+            group=group_uuid,
+        )
+        task_id = uuid.uuid4()
+        target_id = uuid.uuid4()
+
+        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
+        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
+            return_value=VFolderListResult(
+                vfolders=[
+                    VFolderAccessInfo(
+                        vfolder_data=source_data,
+                        is_owner=True,
+                        effective_permission=None,
+                    )
+                ]
+            )
+        )
+        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
+        mock_vfolder_repository.get_allowed_vfolder_hosts = AsyncMock(
+            return_value={"local:volume1": set()}
+        )
+        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
+        mock_vfolder_repository.get_max_vfolder_count = AsyncMock(return_value=0)
+        mock_vfolder_repository.get_user_email_by_id = AsyncMock(return_value="test@example.com")
+        mock_vfolder_repository.initiate_vfolder_clone = AsyncMock(
+            return_value=(task_id, target_id)
+        )
+
+        action = CloneVFolderAction(
+            requester_user_uuid=user_uuid,
+            source_vfolder_uuid=vfolder_uuid,
+            target_name="cloned-vfolder",
+            target_host=None,
+            target_quota_scope_id=None,
+            cloneable=True,
+            usage_mode=VFolderUsageMode.GENERAL,
+            mount_permission=VFolderPermission.READ_WRITE,
+        )
+
+        await vfolder_service.clone(action)
+
+        # Must check user resource policy (None), not source project's group
+        mock_vfolder_repository.get_max_vfolder_count.assert_called_once_with(user_uuid, None)
+
+
+class TestCloneVFolderV2Action:
+    async def test_clone_v2_project_vfolder_checks_user_resource_policy(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        user_uuid: uuid.UUID,
+        vfolder_uuid: uuid.UUID,
+        group_uuid: uuid.UUID,
+    ) -> None:
+        """Regression test for BA-5520: clone_v2 must check the user's resource
+        policy (group_uuid=None), not the source project's."""
+        source_data = _make_vfolder_data(
+            vfolder_uuid,
+            user_uuid,
+            cloneable=True,
+            ownership_type=VFolderOwnershipType.GROUP,
+            group=group_uuid,
+        )
+        task_id = uuid.uuid4()
+        target_id = uuid.uuid4()
+
+        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
+        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
+            return_value=VFolderListResult(
+                vfolders=[
+                    VFolderAccessInfo(
+                        vfolder_data=source_data,
+                        is_owner=True,
+                        effective_permission=None,
+                    )
+                ]
+            )
+        )
+        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
+        mock_vfolder_repository.ensure_host_permission_allowed_by_user = AsyncMock()
+        mock_vfolder_repository.get_max_vfolder_count = AsyncMock(return_value=0)
+        mock_vfolder_repository.get_user_email_by_id = AsyncMock(return_value="test@example.com")
+        mock_vfolder_repository.initiate_vfolder_clone = AsyncMock(
+            return_value=(task_id, target_id)
+        )
+
+        action = CloneVFolderV2Action(
+            user_id=user_uuid,
+            vfolder_id=vfolder_uuid,
+            target_name="cloned-vfolder",
+            target_host=None,
+            usage_mode="general",
+            permission="rw",
+            cloneable=True,
+        )
+
+        await vfolder_service.clone_v2(action)
+
+        # Must check user resource policy (None), not source project's group
+        mock_vfolder_repository.get_max_vfolder_count.assert_called_once_with(user_uuid, None)
 
 
 class TestGetAccessibleVFolderAction:

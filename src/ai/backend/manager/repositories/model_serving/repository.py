@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from decimal import Decimal
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -638,12 +639,22 @@ class ModelServingRepository:
             if endpoint.lifecycle_stage in EndpointLifecycle.inactive_states():
                 return None
 
+            # Convert legacy threshold+comparator to min/max_threshold
+            min_threshold_val: Decimal | None = None
+            max_threshold_val: Decimal | None = None
+            if comparator in (
+                AutoScalingMetricComparator.GREATER_THAN,
+                AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL,
+            ):
+                max_threshold_val = Decimal(str(threshold))
+            else:
+                min_threshold_val = Decimal(str(threshold))
             rule = await endpoint.create_auto_scaling_rule(
                 session,
                 metric_source,
                 metric_name,
-                threshold,
-                comparator,
+                min_threshold_val,
+                max_threshold_val,
                 step_size,
                 cooldown_seconds=cooldown_seconds,
                 min_replicas=min_replicas,

@@ -66,7 +66,14 @@ __all__ = (
     "RouteTrafficStatus",
     "RuntimeVariant",
     "IntOrPercent",
+    "ProjectDeploymentScope",
 )
+
+
+class ProjectDeploymentScope(BaseModel):
+    """Scope for project-level deployment operations."""
+
+    project_id: UUID = Field(description="Project UUID to scope the deployment operation.")
 
 
 class DeploymentOrderField(StrEnum):

@@ -236,7 +236,7 @@ class TestAuthRepository:
                 password_changed_at=user.password_changed_at,
                 domain_name=user.domain_name,
                 role=user.role,
-                integration_id=user.integration_id,
+                integration_name=user.integration_id,  # ORM column is integration_id
                 resource_policy=user.resource_policy,
                 sudo_session_enabled=user.sudo_session_enabled,
                 access_key=access_key,
@@ -306,7 +306,7 @@ class TestAuthRepository:
                 is_active=group.is_active,
                 created_at=group.created_at,
                 modified_at=group.modified_at,
-                integration_id=group.integration_id,
+                integration_name=group.integration_id,  # ORM column is integration_id
                 domain_name=group.domain_name,
                 total_resource_slots=group.total_resource_slots,
                 allowed_vfolder_hosts=VFolderHostPermissionMap(group.allowed_vfolder_hosts),

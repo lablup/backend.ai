@@ -28,7 +28,7 @@ class TestCreateProjectInput:
         assert req.name == "test-group"
         assert req.domain_name == "default"
         assert req.description is None
-        assert req.integration_id is None
+        assert req.integration_name is None
         assert req.resource_policy is None
 
     def test_valid_creation_with_all_fields(self) -> None:
@@ -36,11 +36,11 @@ class TestCreateProjectInput:
             name="research-group",
             domain_name="research-domain",
             description="Research team group",
-            integration_id="ext-456",
+            integration_name="ext-456",
             resource_policy="research-policy",
         )
         assert req.description == "Research team group"
-        assert req.integration_id == "ext-456"
+        assert req.integration_name == "ext-456"
         assert req.resource_policy == "research-policy"
 
     def test_name_max_length_64_enforced(self) -> None:
@@ -79,8 +79,8 @@ class TestUpdateProjectInput:
         req = UpdateProjectInput()
         assert req.description is SENTINEL
         assert isinstance(req.description, Sentinel)
-        assert req.integration_id is SENTINEL
-        assert isinstance(req.integration_id, Sentinel)
+        assert req.integration_name is SENTINEL
+        assert isinstance(req.integration_name, Sentinel)
 
     def test_non_sentinel_fields_default_to_none(self) -> None:
         req = UpdateProjectInput()
@@ -108,13 +108,13 @@ class TestUpdateProjectInput:
         req = UpdateProjectInput(is_active=False)
         assert req.is_active is False
 
-    def test_integration_id_none_clears(self) -> None:
-        req = UpdateProjectInput(integration_id=None)
-        assert req.integration_id is None
+    def test_integration_name_none_clears(self) -> None:
+        req = UpdateProjectInput(integration_name=None)
+        assert req.integration_name is None
 
-    def test_integration_id_string_update(self) -> None:
-        req = UpdateProjectInput(integration_id="new-ext-id")
-        assert req.integration_id == "new-ext-id"
+    def test_integration_name_string_update(self) -> None:
+        req = UpdateProjectInput(integration_name="new-ext-id")
+        assert req.integration_name == "new-ext-id"
 
     def test_resource_policy_update(self) -> None:
         req = UpdateProjectInput(resource_policy="new-policy")
@@ -125,14 +125,14 @@ class TestUpdateProjectInput:
             name="updated",
             description=None,
             is_active=True,
-            integration_id=None,
+            integration_name=None,
         )
         json_data = req.model_dump_json()
         restored = UpdateProjectInput.model_validate_json(json_data)
         assert restored.name == "updated"
         assert restored.description is None
         assert restored.is_active is True
-        assert restored.integration_id is None
+        assert restored.integration_name is None
 
 
 class TestDeleteProjectInput:

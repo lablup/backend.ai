@@ -100,6 +100,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.rbac.types.scope import ScopeInputGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -491,6 +492,7 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     name: str
     description: str | None = None
     source: RoleSourceGQL = RoleSourceGQL.CUSTOM
+    scopes: list[ScopeInputGQL] | None = None
 
 
 @gql_pydantic_input(
@@ -509,6 +511,7 @@ class UpdateRoleInput(PydanticInputMixin[UpdateRoleInputDTO]):
 class AssignRoleInput(PydanticInputMixin[AssignRoleInputDTO]):
     user_id: uuid.UUID
     role_id: uuid.UUID
+    project_id: uuid.UUID | None = strawberry.UNSET
 
 
 @gql_pydantic_input(
@@ -528,6 +531,7 @@ class RevokeRoleInput(PydanticInputMixin[RevokeRoleInputDTO]):
 class BulkAssignRoleInputGQL(PydanticInputMixin[BulkAssignRoleInputDTO]):
     role_id: uuid.UUID
     user_ids: list[uuid.UUID]
+    project_id: uuid.UUID | None = strawberry.UNSET
 
 
 @gql_pydantic_input(

@@ -1,7 +1,7 @@
 import logging
 import uuid
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -31,8 +31,10 @@ from ai.backend.manager.data.permission.role import (
     BulkRoleRevocationFailure,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
+    ProjectRoleCount,
     RoleListResult,
     RolePermissionsUpdateInput,
+    RoleRevocationResult,
     ScopeChainPermissionCheckInput,
     UserRoleAssignmentInput,
     UserRoleRevocationData,
@@ -71,6 +73,10 @@ from ai.backend.manager.repositories.base.creator import (
 )
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     ObjectPermissionCreatorSpec,
@@ -90,6 +96,7 @@ class CreateRoleInput:
 
     creator: Creator[RoleRow]
     object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation]
+    scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
 
 
 class PermissionDBSource:
@@ -98,11 +105,15 @@ class PermissionDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    # ------------------------------------------------------------------ role CRUD
+
     async def create_role(self, input_data: CreateRoleInput) -> RoleRow:
         """
         Create a new role with object permissions.
 
         All related entities are created in a single transaction.
+        When scope_refs is non-empty, the role is also registered in
+        association_scopes_entities via RBACEntityCreator.
 
         Args:
             input_data: Input containing creator and object permissions
@@ -111,9 +122,16 @@ class PermissionDBSource:
             Created role row
         """
         async with self._db.begin_session() as db_session:
-            # 1. Create role
-            result = await execute_creator(db_session, input_data.creator)
-            role_row = result.row
+            if input_data.scope_refs:
+                rbac_creator = RBACEntityCreator(
+                    spec=input_data.creator.spec,
+                    element_type=RBACElementType.ROLE,
+                    scope_ref=input_data.scope_refs[0],
+                    additional_scope_refs=input_data.scope_refs[1:],
+                )
+                role_row = (await execute_rbac_entity_creator(db_session, rbac_creator)).row
+            else:
+                role_row = (await execute_creator(db_session, input_data.creator)).row
 
             await db_session.refresh(role_row)
             return role_row
@@ -259,24 +277,61 @@ class PermissionDBSource:
             result = await execute_creator(db_session, creator)
             return result.row
 
-    async def revoke_role(self, data: UserRoleRevocationInput) -> uuid.UUID:
+    async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
+        """Revoke a role from a user.
+
+        Returns (user_role_id, project_remaining_roles) where
+        project_remaining_roles lists how many roles the user still
+        holds in each project that this role belongs to.
+        """
         async with self._db.begin_session() as db_session:
-            stmt = (
+            user_role_row = await db_session.scalar(
                 sa.select(UserRoleRow)
                 .where(UserRoleRow.user_id == data.user_id)
                 .where(UserRoleRow.role_id == data.role_id)
             )
-            user_role_row = await db_session.scalar(stmt)
-
             if user_role_row is None:
                 raise RoleNotAssigned(
                     f"Role {data.role_id} is not assigned to user {data.user_id}."
                 )
-
             user_role_id = user_role_row.id
             await db_session.delete(user_role_row)
             await db_session.flush()
-            return user_role_id
+
+            # Single query: find projects this role belongs to and count
+            # remaining user-role mappings per project
+            ase = AssociationScopesEntitiesRow
+            project_subq = (
+                sa.select(ase.scope_id).where(
+                    ase.entity_type == EntityType.ROLE,
+                    ase.scope_type == ScopeType.PROJECT,
+                    sa.cast(ase.entity_id, sa.String) == str(data.role_id),
+                )
+            ).subquery()
+
+            rows = (
+                await db_session.execute(
+                    sa.select(ase.scope_id, sa.func.count(UserRoleRow.id))
+                    .outerjoin(
+                        UserRoleRow,
+                        (sa.cast(UserRoleRow.role_id, sa.String) == ase.entity_id)
+                        & (UserRoleRow.user_id == data.user_id),
+                    )
+                    .where(
+                        ase.entity_type == EntityType.ROLE,
+                        ase.scope_type == ScopeType.PROJECT,
+                        ase.scope_id.in_(sa.select(project_subq.c.scope_id)),
+                    )
+                    .group_by(ase.scope_id)
+                )
+            ).all()
+
+            return RoleRevocationResult(
+                user_role_id=user_role_id,
+                project_remaining_roles=[
+                    ProjectRoleCount(project_id=uuid.UUID(r[0]), remaining_count=r[1]) for r in rows
+                ],
+            )
 
     async def update_role_permissions(
         self,

@@ -8,7 +8,10 @@ from functools import lru_cache
 from pathlib import PurePosixPath
 from uuid import UUID
 
+import sqlalchemy as sa
+
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     RouteHealthStatus,
@@ -16,6 +19,7 @@ from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
+    BulkDeleteAutoScalingRulesInput,
     CreateAutoScalingRuleInput,
     DeleteAutoScalingRuleInput,
     UpdateAutoScalingRuleInput,
@@ -25,8 +29,10 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     AddRevisionGQLInputDTO,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
+    BulkDeleteAccessTokensInput,
     CreateAccessTokenInput,
     CreateDeploymentInput,
+    DeleteAccessTokenInput,
     DeleteDeploymentInput,
     DeploymentOrder,
     ReplicaOrder,
@@ -48,13 +54,17 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     AdminSearchDeploymentsPayload,
     AdminSearchRevisionsPayload,
     AutoScalingRuleNode,
+    BulkDeleteAccessTokensPayload,
+    BulkDeleteAutoScalingRulesPayload,
     CreateAccessTokenPayload,
     CreateAutoScalingRulePayload,
     CreateDeploymentPayload,
+    DeleteAccessTokenPayload,
     DeleteAutoScalingRulePayload,
     DeleteDeploymentPayload,
     DeploymentNode,
     DeploymentPolicyNode,
+    GetAccessTokenPayload,
     GetAutoScalingRulePayload,
     GetDeploymentPolicyPayload,
     ReplicaNode,
@@ -149,6 +159,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
+from ai.backend.manager.errors.service import EndpointTokenNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
@@ -196,11 +207,23 @@ from ai.backend.manager.repositories.deployment.updaters import (
     ReplicaSpecUpdaterSpec,
     RevisionStateUpdaterSpec,
 )
+from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
+    BulkDeleteAccessTokensAction,
+)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
 )
+from ai.backend.manager.services.deployment.actions.access_token.delete_access_token import (
+    DeleteAccessTokenAction,
+)
+from ai.backend.manager.services.deployment.actions.access_token.get_access_token import (
+    GetAccessTokenAction,
+)
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
+    BulkDeleteAutoScalingRulesAction,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -370,49 +393,55 @@ class DeploymentAdapter(BaseAdapter):
     ) -> CreateDeploymentPayload:
         """Create a new deployment."""
         initial_revision = input.initial_revision
-        if initial_revision is None:
-            raise ValueError("initial_revision is required for deployment creation")
-        mounts_creator = VFolderMountsCreator(
-            model_vfolder_id=initial_revision.model_mount_config.vfolder_id,
-            model_definition_path=initial_revision.model_mount_config.definition_path,
-            model_mount_destination=initial_revision.model_mount_config.mount_destination,
-            extra_mounts=[
-                MountInfo(
-                    vfolder_id=m.vfolder_id,
-                    kernel_path=PurePosixPath(m.mount_destination) if m.mount_destination else None,
-                )
-                for m in (initial_revision.extra_mounts or [])
-            ],
-        )
-        model_revision_creator = ModelRevisionCreator(
-            image_id=initial_revision.image.id,
-            resource_spec=ResourceSpec(
-                cluster_mode=initial_revision.cluster_config.mode,
-                cluster_size=initial_revision.cluster_config.size,
-                resource_slots={
-                    e.resource_type: e.quantity
-                    for e in initial_revision.resource_config.resource_slots.entries
-                },
-                resource_opts={
-                    e.name: e.value for e in initial_revision.resource_config.resource_opts.entries
-                }
-                if initial_revision.resource_config.resource_opts
-                else None,
-            ),
-            mounts=mounts_creator,
-            model_definition=initial_revision.model_definition,
-            revision_preset_id=initial_revision.revision_preset_id,
-            execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant(
-                    initial_revision.model_runtime_config.runtime_variant
+        model_revision_creator: ModelRevisionCreator | None = None
+        resource_group_name: str | None = None
+        if initial_revision is not None:
+            mounts_creator = VFolderMountsCreator(
+                model_vfolder_id=initial_revision.model_mount_config.vfolder_id,
+                model_definition_path=initial_revision.model_mount_config.definition_path,
+                model_mount_destination=initial_revision.model_mount_config.mount_destination,
+                extra_mounts=[
+                    MountInfo(
+                        vfolder_id=m.vfolder_id,
+                        kernel_path=PurePosixPath(m.mount_destination)
+                        if m.mount_destination
+                        else None,
+                    )
+                    for m in (initial_revision.extra_mounts or [])
+                ],
+            )
+            model_revision_creator = ModelRevisionCreator(
+                image_id=initial_revision.image.id,
+                resource_spec=ResourceSpec(
+                    cluster_mode=initial_revision.cluster_config.mode,
+                    cluster_size=initial_revision.cluster_config.size,
+                    resource_slots={
+                        e.resource_type: e.quantity
+                        for e in initial_revision.resource_config.resource_slots.entries
+                    },
+                    resource_opts={
+                        e.name: e.value
+                        for e in initial_revision.resource_config.resource_opts.entries
+                    }
+                    if initial_revision.resource_config.resource_opts
+                    else None,
                 ),
-                environ={
-                    e.name: e.value for e in initial_revision.model_runtime_config.environ.entries
-                }
-                if initial_revision.model_runtime_config.environ
-                else None,
-            ),
-        )
+                mounts=mounts_creator,
+                model_definition=initial_revision.model_definition,
+                revision_preset_id=initial_revision.revision_preset_id,
+                execution=ExecutionSpec(
+                    runtime_variant=RuntimeVariant(
+                        initial_revision.model_runtime_config.runtime_variant
+                    ),
+                    environ={
+                        e.name: e.value
+                        for e in initial_revision.model_runtime_config.environ.entries
+                    }
+                    if initial_revision.model_runtime_config.environ
+                    else None,
+                ),
+            )
+            resource_group_name = initial_revision.resource_config.resource_group.name
         strategy = input.default_deployment_strategy
         policy: DeploymentPolicyConfig | None = None
         if strategy.rolling_update is not None:
@@ -442,7 +471,7 @@ class DeploymentAdapter(BaseAdapter):
                 name=meta.name or f"deployment-{created_user_id.hex[:8]}",
                 domain=meta.domain_name,
                 project=meta.project_id,
-                resource_group=initial_revision.resource_config.resource_group.name,
+                resource_group=resource_group_name or "default",
                 created_user=created_user_id,
                 session_owner=created_user_id,
                 created_at=None,
@@ -468,6 +497,108 @@ class DeploymentAdapter(BaseAdapter):
     ) -> AdminSearchDeploymentsPayload:
         """Search deployments (admin, no scope)."""
         querier = self._build_deployment_querier(input)
+        action_result = await self._processors.deployment.search_deployments.wait_for_complete(
+            SearchDeploymentsAction(querier=querier)
+        )
+        return AdminSearchDeploymentsPayload(
+            items=[self._deployment_data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def my_search(
+        self,
+        input: AdminSearchDeploymentsInput,
+    ) -> AdminSearchDeploymentsPayload:
+        """Search deployments owned by the current user."""
+        user = current_user()
+        if user is None:
+            raise RuntimeError("No authenticated user in context")
+        conditions: list[QueryCondition] = []
+        if input.filter:
+            f = input.filter
+            if f.name is not None:
+                condition = self.convert_string_filter(
+                    f.name,
+                    contains_factory=DeploymentConditions.by_name_contains,
+                    equals_factory=DeploymentConditions.by_name_equals,
+                    starts_with_factory=DeploymentConditions.by_name_starts_with,
+                    ends_with_factory=DeploymentConditions.by_name_ends_with,
+                )
+                if condition is not None:
+                    conditions.append(condition)
+            if f.open_to_public is not None:
+                conditions.append(DeploymentConditions.by_open_to_public(f.open_to_public))
+        orders: list[QueryOrder] = (
+            self._convert_deployment_orders(input.order) if input.order else []
+        )
+
+        def _by_created_user() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.created_user == user.user_id
+
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_deployment_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[_by_created_user],
+        )
+        action_result = await self._processors.deployment.search_deployments.wait_for_complete(
+            SearchDeploymentsAction(querier=querier)
+        )
+        return AdminSearchDeploymentsPayload(
+            items=[self._deployment_data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def project_search(
+        self,
+        project_id: UUID,
+        input: AdminSearchDeploymentsInput,
+    ) -> AdminSearchDeploymentsPayload:
+        """Search deployments within a specific project."""
+        conditions: list[QueryCondition] = []
+        if input.filter:
+            f = input.filter
+            if f.name is not None:
+                condition = self.convert_string_filter(
+                    f.name,
+                    contains_factory=DeploymentConditions.by_name_contains,
+                    equals_factory=DeploymentConditions.by_name_equals,
+                    starts_with_factory=DeploymentConditions.by_name_starts_with,
+                    ends_with_factory=DeploymentConditions.by_name_ends_with,
+                )
+                if condition is not None:
+                    conditions.append(condition)
+            if f.open_to_public is not None:
+                conditions.append(DeploymentConditions.by_open_to_public(f.open_to_public))
+        orders: list[QueryOrder] = (
+            self._convert_deployment_orders(input.order) if input.order else []
+        )
+
+        def _by_project_id() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.project == project_id
+
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_deployment_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[_by_project_id],
+        )
         action_result = await self._processors.deployment.search_deployments.wait_for_complete(
             SearchDeploymentsAction(querier=querier)
         )
@@ -587,7 +718,7 @@ class DeploymentAdapter(BaseAdapter):
         """Create a new access token for a deployment."""
         creator = ModelDeploymentAccessTokenCreator(
             model_deployment_id=input.deployment_id,
-            valid_until=input.valid_until,
+            expires_at=input.expires_at,
         )
         action_result = await self._processors.deployment.create_access_token.wait_for_complete(
             CreateAccessTokenAction(creator=creator)
@@ -595,6 +726,42 @@ class DeploymentAdapter(BaseAdapter):
         return CreateAccessTokenPayload(
             access_token=self._access_token_data_to_dto(action_result.data)
         )
+
+    async def get_access_token(
+        self,
+        token_id: UUID,
+    ) -> GetAccessTokenPayload:
+        """Get a single access token by ID."""
+        action_result = await self._processors.deployment.get_access_token.wait_for_complete(
+            GetAccessTokenAction(access_token_id=token_id)
+        )
+        return GetAccessTokenPayload(
+            access_token=self._access_token_data_to_dto(action_result.data)
+        )
+
+    async def delete_access_token(
+        self,
+        input: DeleteAccessTokenInput,
+    ) -> DeleteAccessTokenPayload:
+        """Delete an access token."""
+        action_result = await self._processors.deployment.delete_access_token.wait_for_complete(
+            DeleteAccessTokenAction(access_token_id=input.id)
+        )
+        if not action_result.success:
+            raise EndpointTokenNotFound(f"Access token {input.id} not found")
+        return DeleteAccessTokenPayload(id=input.id)
+
+    async def bulk_delete_access_tokens(
+        self,
+        input: BulkDeleteAccessTokensInput,
+    ) -> BulkDeleteAccessTokensPayload:
+        """Bulk delete access tokens."""
+        action_result = (
+            await self._processors.deployment.bulk_delete_access_tokens.wait_for_complete(
+                BulkDeleteAccessTokensAction(access_token_ids=input.ids)
+            )
+        )
+        return BulkDeleteAccessTokensPayload(ids=action_result.deleted_ids)
 
     async def search_access_tokens(
         self,
@@ -733,6 +900,17 @@ class DeploymentAdapter(BaseAdapter):
         )
         return DeleteAutoScalingRulePayload(id=input.id)
 
+    async def bulk_delete_rules(
+        self, input: BulkDeleteAutoScalingRulesInput
+    ) -> BulkDeleteAutoScalingRulesPayload:
+        """Bulk delete auto-scaling rules."""
+        action_result = (
+            await self._processors.deployment.bulk_delete_auto_scaling_rules.wait_for_complete(
+                BulkDeleteAutoScalingRulesAction(auto_scaling_rule_ids=input.ids)
+            )
+        )
+        return BulkDeleteAutoScalingRulesPayload(ids=action_result.deleted_ids)
+
     # ------------------------------------------------------------------
     # Deployment policy operations
     # ------------------------------------------------------------------
@@ -840,6 +1018,7 @@ class DeploymentAdapter(BaseAdapter):
             ),
             model_definition=input.model_definition,
             revision_preset_id=input.revision_preset_id,
+            auto_activate=input.auto_activate,
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(model_deployment_id=input.deployment_id, adder=adder)
@@ -1643,7 +1822,7 @@ class DeploymentAdapter(BaseAdapter):
         return AccessTokenNode(
             id=data.id,
             token=data.token,
-            valid_until=data.valid_until,
+            expires_at=data.expires_at,
             created_at=data.created_at,
         )
 
@@ -1698,6 +1877,5 @@ class DeploymentAdapter(BaseAdapter):
             readiness_status=data.readiness_status,
             liveness_status=data.liveness_status,
             activeness_status=data.activeness_status,
-            weight=data.weight,
             created_at=data.created_at,
         )

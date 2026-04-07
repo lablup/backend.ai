@@ -29,7 +29,6 @@ from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import (
-    AutoScalingMetricComparator,
     AutoScalingMetricSource,
     EndpointAutoScalingRuleRow,
     EndpointRow,
@@ -330,8 +329,7 @@ class TestSearchAutoScalingRulesValidated:
                     endpoint=sample_endpoint_id,
                     metric_source=AutoScalingMetricSource.KERNEL,
                     metric_name=metric_name,
-                    threshold=Decimal(str(50.0 + i * 10)),
-                    comparator=AutoScalingMetricComparator.GREATER_THAN,
+                    max_threshold=Decimal(str(50.0 + i * 10)),
                     step_size=1 + i,
                     cooldown_seconds=300 + i * 60,
                     min_replicas=1,
@@ -361,8 +359,7 @@ class TestSearchAutoScalingRulesValidated:
                     endpoint=sample_endpoint_id,
                     metric_source=AutoScalingMetricSource.KERNEL,
                     metric_name=f"metric_{i:02d}",
-                    threshold=Decimal(str(50.0 + i)),
-                    comparator=AutoScalingMetricComparator.GREATER_THAN,
+                    max_threshold=Decimal(str(50.0 + i)),
                     step_size=1,
                     cooldown_seconds=300,
                     min_replicas=1,
@@ -504,11 +501,11 @@ class TestSearchAutoScalingRulesValidated:
         model_serving_repository: ModelServingRepository,
         sample_auto_scaling_rules: list[uuid.UUID],
     ) -> None:
-        """Test searching rules ordered by threshold ascending."""
+        """Test searching rules ordered by max_threshold ascending."""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
-            orders=[EndpointAutoScalingRuleRow.threshold.asc()],
+            orders=[EndpointAutoScalingRuleRow.max_threshold.asc()],
         )
 
         result = await model_serving_repository.search_auto_scaling_rules(

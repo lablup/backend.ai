@@ -13,11 +13,20 @@ This file contains core rules for AI coding agents. For detailed patterns and wo
 
 **Skills (Invoke with `/skill-name`):**
 
-Design: `/bep-guide`
-Development: `/repository-guide`, `/service-guide`, `/api-guide`, `/tdd-guide`
-Utilities: `/cli-executor`, `/db-status`, `/db-migrate`, `/local-dev`, `/halfstack`
+When to use:
+- Designing features → `/bep-guide`
+- Implementing repo/service/API layers → `/repository-guide`, `/service-guide`, `/api-guide`
+- Implementing SDK/CLI code → `/cli-sdk-guide`
+- Writing tests → `/tdd-guide`
+- Restarting services after code changes → `/local-dev`
+- **Running any `./bai` command → `/bai-cli` (MUST load before executing)**
+- Docker/halfstack issues → `/halfstack`
+- Checking/applying DB migrations → `/db-status`, `/db-migrate`
+- Running component servers directly → `/cli-executor`
+- Submitting PR → `/submit`
+- Preparing release → `/release`
 
-Skills are in `.claude/skills/{name}/SKILL.md`. See `.claude/skills/README.md` for complete documentation.
+Skills source: `.claude/skills/{name}/SKILL.md`
 
 ## Absolute Rules
 
@@ -50,8 +59,9 @@ pants test --changed-since=HEAD~1
 
 **Fix all lint, type, and test errors — never suppress or skip.**
 
-**After API/CLI changes, verify with live server using `./bai` CLI** — see `/local-dev` skill.
-If docker service changes are needed, see `/halfstack` skill.
+**After API/CLI changes, verify with live server using `./bai` CLI.**
+**MUST invoke `/bai-cli` skill before running any `./bai` command.** The skill contains the entity-command reference — without it, you will guess wrong commands.
+For service restarts, see `/local-dev`. For docker service changes, see `/halfstack` skill.
 
 ## Alembic Migration Backport
 
@@ -84,8 +94,8 @@ API Handler → Processor → Service → Repository → DB
 - For SDK/CLI patterns: `/cli-sdk-guide`
 
 **After implementing new API endpoints, verify with the live server:**
-1. Restart server: `./dev restart mgr`
-2. Test each operation via `./bai` CLI (see `/local-dev` skill for setup and commands)
+1. Restart server: `./dev restart mgr` (invoke `/local-dev`)
+2. Invoke `/bai-cli` skill, then test each operation via `./bai` CLI
 3. Verify both admin and non-admin scenarios
 
 ## Development Guidelines

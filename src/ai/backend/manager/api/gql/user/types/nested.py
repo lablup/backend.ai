@@ -22,8 +22,10 @@ from ai.backend.common.dto.manager.v2.user.response import (
 from ai.backend.common.dto.manager.v2.user.response import (
     UserStatusInfo as UserStatusInfoDTO,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_type,
 )
@@ -51,6 +53,13 @@ class UserBasicInfoGQL:
     email: str = gql_field(description="User's email address. Used for login and notifications.")
     full_name: str | None = gql_field(description="User's full display name.")
     description: str | None = gql_field(description="Optional description or notes about the user.")
+    integration_name: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="External system integration identifier.",
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_type(

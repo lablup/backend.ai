@@ -190,7 +190,7 @@ class AccessTokenNode(BaseResponseModel):
 
     id: UUID = Field(description="Access token ID")
     token: str = Field(description="Token value")
-    valid_until: datetime = Field(description="Token expiration timestamp")
+    expires_at: datetime | None = Field(default=None, description="Token expiration timestamp")
     created_at: datetime = Field(description="Creation timestamp")
 
 
@@ -270,6 +270,24 @@ class SearchAccessTokensPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether a previous page exists")
 
 
+class GetAccessTokenPayload(BaseResponseModel):
+    """Payload for access token get result."""
+
+    access_token: AccessTokenNode = Field(description="Access token")
+
+
+class DeleteAccessTokenPayload(BaseResponseModel):
+    """Payload for access token deletion result."""
+
+    id: UUID = Field(description="ID of the deleted access token")
+
+
+class BulkDeleteAccessTokensPayload(BaseResponseModel):
+    """Payload for bulk access token deletion result."""
+
+    ids: list[UUID] = Field(description="IDs of the deleted access tokens")
+
+
 class CreateAutoScalingRulePayload(BaseResponseModel):
     """Payload for auto-scaling rule creation result."""
 
@@ -292,6 +310,12 @@ class DeleteAutoScalingRulePayload(BaseResponseModel):
     """Payload for auto-scaling rule deletion result."""
 
     id: UUID = Field(description="ID of the deleted auto-scaling rule")
+
+
+class BulkDeleteAutoScalingRulesPayload(BaseResponseModel):
+    """Payload for bulk auto-scaling rule deletion result."""
+
+    ids: list[UUID] = Field(description="IDs of the deleted auto-scaling rules")
 
 
 class SearchAutoScalingRulesPayload(BaseResponseModel):
@@ -333,7 +357,6 @@ class ReplicaNode(BaseResponseModel):
     readiness_status: ReadinessStatus = Field(description="Readiness status")
     liveness_status: LivenessStatus = Field(description="Liveness status")
     activeness_status: ActivenessStatus = Field(description="Activeness status")
-    weight: int = Field(description="Traffic weight for load balancing")
     created_at: datetime = Field(description="Creation timestamp")
 
 

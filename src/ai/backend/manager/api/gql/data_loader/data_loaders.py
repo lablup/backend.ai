@@ -83,6 +83,9 @@ if TYPE_CHECKING:
         StorageNamespace,
     )
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.vfolder_v2.types.node import (  # pants: no-infer-dep
+        VFolderGQL,
+    )
     from ai.backend.manager.api.gql.vfs_storage import VFSStorage  # pants: no-infer-dep
 
 
@@ -129,6 +132,22 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_names(names)
             return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def vfolder_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, VFolderGQL | None]:
+        adapter = self._adapters.vfolder
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[VFolderGQL | None]:
+            from ai.backend.manager.api.gql.vfolder_v2.types.node import (  # pants: no-infer-dep
+                VFolderGQL as VF,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [VF.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 

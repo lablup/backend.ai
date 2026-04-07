@@ -10,6 +10,7 @@ from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
+    BulkDeleteAutoScalingRulesInput,
     CreateAutoScalingRuleInput,
     DeleteAutoScalingRuleInput,
     UpdateAutoScalingRuleInput,
@@ -19,8 +20,10 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     AddRevisionGQLInputDTO,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
+    BulkDeleteAccessTokensInput,
     CreateAccessTokenInput,
     CreateDeploymentInput,
+    DeleteAccessTokenInput,
     DeleteDeploymentInput,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
@@ -38,9 +41,11 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import (
     DeploymentIdPathParam,
+    ProjectIdPathParam,
     ReplicaIdPathParam,
     RevisionIdPathParam,
     RuleIdPathParam,
+    TokenIdPathParam,
 )
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchScope,
@@ -85,6 +90,23 @@ class V2DeploymentHandler:
     ) -> APIResponse:
         """Search deployments with admin scope."""
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def project_search(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[AdminSearchDeploymentsInput],
+    ) -> APIResponse:
+        """Search deployments within a project."""
+        result = await self._adapter.project_search(path.parsed.project_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_search(
+        self,
+        body: BodyParam[AdminSearchDeploymentsInput],
+    ) -> APIResponse:
+        """Search deployments owned by the current user."""
+        result = await self._adapter.my_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def get(
@@ -269,6 +291,30 @@ class V2DeploymentHandler:
         result = await self._adapter.search_access_tokens(scope, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def get_access_token(
+        self,
+        path: PathParam[TokenIdPathParam],
+    ) -> APIResponse:
+        """Get an access token by ID."""
+        result = await self._adapter.get_access_token(path.parsed.token_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def delete_access_token(
+        self,
+        body: BodyParam[DeleteAccessTokenInput],
+    ) -> APIResponse:
+        """Delete an access token."""
+        result = await self._adapter.delete_access_token(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def bulk_delete_access_tokens(
+        self,
+        body: BodyParam[BulkDeleteAccessTokensInput],
+    ) -> APIResponse:
+        """Bulk delete access tokens."""
+        result = await self._adapter.bulk_delete_access_tokens(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     # ------------------------------------------------------------------
     # Auto-scaling rule operations
     # ------------------------------------------------------------------
@@ -314,6 +360,14 @@ class V2DeploymentHandler:
     ) -> APIResponse:
         """Delete an auto-scaling rule."""
         result = await self._adapter.delete_rule(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def bulk_delete_auto_scaling_rules(
+        self,
+        body: BodyParam[BulkDeleteAutoScalingRulesInput],
+    ) -> APIResponse:
+        """Bulk delete auto-scaling rules."""
+        result = await self._adapter.bulk_delete_rules(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     # ------------------------------------------------------------------

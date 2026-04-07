@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     ExecuteQueryDefinitionOptionsInput as ExecuteQueryDefinitionOptionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
-    AdminSearchQueryDefinitionsPayload,
     CreateQueryDefinitionPayload,
     DeleteQueryDefinitionPayload,
     GetQueryDefinitionPayload,
@@ -27,6 +26,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     QueryDefinitionMetricResultInfo,
     QueryDefinitionNode,
     QueryDefinitionResultInfo,
+    SearchQueryDefinitionsPayload,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
     MetricLabelEntryInfo,
@@ -96,10 +96,12 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
         return CreateQueryDefinitionPayload(item=self._data_to_dto(action_result.preset))
 
-    async def admin_search(
-        self, input: SearchQueryDefinitionsInput
-    ) -> AdminSearchQueryDefinitionsPayload:
-        """Search query definitions with admin scope."""
+    async def search(self, input: SearchQueryDefinitionsInput) -> SearchQueryDefinitionsPayload:
+        """Search prometheus query presets.
+
+        Available to any authenticated user via REST/GQL — presets are a
+        shared catalog of metric query templates.
+        """
         querier = self.build_querier(input)
 
         action_result = (
@@ -108,7 +110,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             )
         )
 
-        return AdminSearchQueryDefinitionsPayload(
+        return SearchQueryDefinitionsPayload(
             items=[self._data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,

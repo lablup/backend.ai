@@ -1685,6 +1685,7 @@ class ValkeyTarget:
     sentinel: list[str] | None = None
     service_name: str | None = None
     password: str | None = None
+    sentinel_password: str | None = None
     request_timeout: int | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
@@ -1708,6 +1709,7 @@ class RedisTarget:
     sentinel: str | list[HostPortPair] | None = None
     service_name: str | None = None
     password: str | None = None
+    sentinel_password: str | None = None
     redis_helper_config: RedisHelperConfig | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
@@ -1730,6 +1732,7 @@ class RedisTarget:
             sentinel=self.sentinel,
             service_name=self.service_name,
             password=self.password,
+            sentinel_password=self.sentinel_password,
             redis_helper_config=self.redis_helper_config,
             use_tls=self.use_tls,
             tls_skip_verify=self.tls_skip_verify,
@@ -1753,6 +1756,7 @@ class RedisTarget:
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
+            sentinel_password=self.sentinel_password,
             request_timeout=None,
             use_tls=self.use_tls,
             tls_skip_verify=self.tls_skip_verify,
@@ -1771,6 +1775,7 @@ class ValkeyProfileTarget:
         sentinel: list[str] | None = None,
         service_name: str | None = None,
         password: str | None = None,
+        sentinel_password: str | None = None,
         request_timeout: int | None = None,
         override_targets: Mapping[str, ValkeyTarget] | None = None,
     ) -> None:
@@ -1779,6 +1784,7 @@ class ValkeyProfileTarget:
             sentinel=sentinel,
             service_name=service_name,
             password=password,
+            sentinel_password=sentinel_password,
             request_timeout=request_timeout,
         )
         self._override_targets = override_targets
@@ -1802,6 +1808,7 @@ class RedisProfileTarget:
         sentinel: str | list[HostPortPair] | None = None,
         service_name: str | None = None,
         password: str | None = None,
+        sentinel_password: str | None = None,
         redis_helper_config: RedisHelperConfig | None = None,
         override_targets: Mapping[str, RedisTarget] | None = None,
         use_tls: bool = False,
@@ -1812,6 +1819,7 @@ class RedisProfileTarget:
             sentinel=sentinel,
             service_name=service_name,
             password=password,
+            sentinel_password=sentinel_password,
             redis_helper_config=redis_helper_config,
             use_tls=use_tls,
             tls_skip_verify=tls_skip_verify,
@@ -1862,6 +1870,7 @@ class RedisProfileTarget:
             sentinel=sentinel,
             service_name=data.get("service_name"),
             password=data.get("password"),
+            sentinel_password=data.get("sentinel_password"),
             redis_helper_config=data.get("redis_helper_config"),
             override_targets=override_targets,
         )
@@ -1869,8 +1878,10 @@ class RedisProfileTarget:
 
 def safe_print_redis_config(config: RedisConfig) -> str:
     safe_config = copy.deepcopy(config)
-    if config.password:
+    if config.password is not None:
         safe_config.password = "********"
+    if config.sentinel_password is not None:
+        safe_config.sentinel_password = "********"
     return str(safe_config)
 
 

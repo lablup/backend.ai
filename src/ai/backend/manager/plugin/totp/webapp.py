@@ -240,6 +240,8 @@ async def _webapp_shutdown(app: web.Application) -> None:
 
 
 class TOTPWebapp(WebappPlugin):
+    require_explicit_allow = True
+
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         """
         Instantiate the plugin with the given initial configuration.

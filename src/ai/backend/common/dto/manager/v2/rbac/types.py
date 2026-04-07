@@ -33,6 +33,7 @@ __all__ = (
     "RoleStatus",
     "RoleStatusDTO",
     "RoleStatusFilter",
+    "ScopeInputDTO",
 )
 
 
@@ -173,6 +174,13 @@ class EntityTypeFilter(BaseRequestModel):
 
     equals: str | None = None
     in_: list[str] | None = None
+
+
+class ScopeInputDTO(BaseRequestModel):
+    """Scope reference for associating an entity with a scope."""
+
+    scope_type: RBACElementTypeDTO
+    scope_id: str
 
 
 class PermissionSummary(BaseResponseModel):

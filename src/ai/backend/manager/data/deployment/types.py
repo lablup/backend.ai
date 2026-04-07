@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
+    MountPermission,
     ResourceSlot,
     RuntimeVariant,
     SessionId,
@@ -314,7 +315,10 @@ class MountMetadata:
             self.model_vfolder_id: self.model_mount_destination,
             **{m.vfid.folder_id: m.kernel_path.as_posix() for m in self.extra_mounts},
         }
-        mount_options = {m.vfid.folder_id: {"permission": m.mount_perm} for m in self.extra_mounts}
+        mount_options: dict[UUID, dict[str, MountPermission]] = {
+            self.model_vfolder_id: {"permission": MountPermission.READ_ONLY},
+            **{m.vfid.folder_id: {"permission": m.mount_perm} for m in self.extra_mounts},
+        }
         return MountSpec(mounts=mounts, mount_map=mount_map, mount_options=mount_options)
 
 
@@ -607,7 +611,7 @@ class ModelDeploymentAutoScalingRuleData:
 class ModelDeploymentAccessTokenData:
     id: UUID
     token: str
-    valid_until: datetime
+    expires_at: datetime | None
     created_at: datetime
 
 
@@ -619,7 +623,6 @@ class ModelReplicaData:
     readiness_status: ReadinessStatus
     liveness_status: LivenessStatus
     activeness_status: ActivenessStatus
-    weight: int
     detail: dict[str, Any]
     created_at: datetime
 

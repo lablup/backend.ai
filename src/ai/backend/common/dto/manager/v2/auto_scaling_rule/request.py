@@ -83,6 +83,12 @@ class DeleteAutoScalingRuleInput(BaseRequestModel):
     id: UUID = Field(description="ID of the auto-scaling rule to delete")
 
 
+class BulkDeleteAutoScalingRulesInput(BaseRequestModel):
+    """Input for bulk deleting auto-scaling rules."""
+
+    ids: list[UUID] = Field(description="List of auto-scaling rule UUIDs to delete.")
+
+
 class AutoScalingRuleFilter(BaseRequestModel):
     """Filter conditions for auto-scaling rule search."""
 

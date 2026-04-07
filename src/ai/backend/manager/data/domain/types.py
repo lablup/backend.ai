@@ -36,7 +36,7 @@ class DomainData:
     allowed_vfolder_hosts: VFolderHostPermissionMap
     allowed_docker_registries: list[str]
     dotfiles: bytes
-    integration_id: str | None
+    integration_name: str | None
 
     def scope_id(self) -> ScopeId:
         return ScopeId(
@@ -64,7 +64,7 @@ class DomainModifier(PartialModifier):
         default_factory=OptionalState.nop
     )
     allowed_docker_registries: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
-    integration_id: TriState[str] = field(default_factory=TriState.nop)
+    integration_name: TriState[str] = field(default_factory=TriState.nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
@@ -75,7 +75,8 @@ class DomainModifier(PartialModifier):
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
         self.allowed_docker_registries.update_dict(to_update, "allowed_docker_registries")
-        self.integration_id.update_dict(to_update, "integration_id")
+        # Field is named integration_name above model layer; DB column remains integration_id.
+        self.integration_name.update_dict(to_update, "integration_id")
         return to_update
 
 
@@ -90,7 +91,7 @@ class DomainNodeModifier(PartialModifier):
     allowed_docker_registries: OptionalState[list[str]] = field(
         default_factory=OptionalState[list[str]].nop
     )
-    integration_id: TriState[str] = field(default_factory=TriState[str].nop)
+    integration_name: TriState[str] = field(default_factory=TriState[str].nop)
     dotfiles: OptionalState[bytes] = field(default_factory=OptionalState[bytes].nop)
 
     @override
@@ -101,6 +102,7 @@ class DomainNodeModifier(PartialModifier):
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
         self.allowed_docker_registries.update_dict(to_update, "allowed_docker_registries")
-        self.integration_id.update_dict(to_update, "integration_id")
+        # Field is named integration_name above model layer; DB column remains integration_id.
+        self.integration_name.update_dict(to_update, "integration_id")
         self.dotfiles.update_dict(to_update, "dotfiles")
         return to_update

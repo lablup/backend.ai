@@ -23,6 +23,8 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class OIDCHookPlugin(HookPlugin):
+    require_explicit_allow = True
+
     # Pre-defined attributes from the base class:
     #   - local_config is populated from the manager TOML.
     #   - plugin_config is populated from the "/config/plugins/hook/openid/" etcd key

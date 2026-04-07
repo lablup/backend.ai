@@ -94,6 +94,10 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
+    BatchLoadVFoldersByIdsAction,
+    BatchLoadVFoldersByIdsActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.create_v2 import (
     CreateVFolderV2Action,
     CreateVFolderV2ActionResult,
@@ -199,6 +203,16 @@ class VFolderService:
         self._user_repository = user_repository
         self._background_task_manager = background_task_manager
         self._valkey_stat_client = valkey_stat_client
+
+    async def batch_load_by_ids(
+        self, action: BatchLoadVFoldersByIdsAction
+    ) -> BatchLoadVFoldersByIdsActionResult:
+        """Batch fetch vfolders by IDs for cross-entity reference resolution.
+
+        Audit log records this as ``vfolder.GET`` (not as a search).
+        """
+        data = await self._vfolder_repository.batch_load_by_ids(action.ids)
+        return BatchLoadVFoldersByIdsActionResult(data=data)
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role
@@ -739,11 +753,11 @@ class VFolderService:
             user_uuid=action.requester_user_uuid,
             resource_policy={"allowed_vfolder_hosts": allowed_vfolder_hosts},
             domain_name=user_domain_name,
-            group_id=source_vfolder_data.group,
+            group_id=None,
         )
 
         max_vfolder_count = await self._vfolder_repository.get_max_vfolder_count(
-            action.requester_user_uuid, source_vfolder_data.group
+            action.requester_user_uuid, None
         )
 
         # Check resource policy's max_vfolder_count
@@ -1681,8 +1695,9 @@ class VFolderService:
             user_uuid=action.user_id,
         )
 
+        # clone_v2 always creates user-owned vfolders, so check user resource policy (group_uuid=None)
         max_vfolder_count = await self._vfolder_repository.get_max_vfolder_count(
-            action.user_id, source_vfolder_data.group
+            action.user_id, None
         )
 
         # Check resource policy's max_vfolder_count

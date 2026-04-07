@@ -51,6 +51,7 @@ class ProjectDomainNestedFilter(PydanticInputMixin[ProjectDomainFilter]):
 class ProjectUserNestedFilter(PydanticInputMixin[ProjectUserFilter]):
     """Nested filter for users within a project."""
 
+    id: UUIDFilter | None = None
     username: StringFilter | None = None
     email: StringFilter | None = None
     is_active: bool | None = None

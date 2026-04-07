@@ -95,12 +95,14 @@ def _make_mock_keypair_row(
     *,
     access_key: str = "test_access_key",
     secret_key: str = "test_secret_key",
+    max_concurrent_sessions: int = 1,
 ) -> MagicMock:
     """Create a mock keypair row with access_key, secret_key, and mapping."""
     mock_keypair = MagicMock()
     mock_keypair.access_key = access_key
     mock_keypair.secret_key = secret_key
     mock_keypair.mapping = {"access_key": access_key}
+    mock_keypair.resource_policy_row.max_concurrent_sessions = max_concurrent_sessions
     return mock_keypair
 
 
@@ -470,3 +472,38 @@ async def test_authorize_force_invalidates_existing_sessions(
 
     assert result.authorization_result is not None
     assert result.authorization_result.session_token == "forced_new_token"
+
+
+async def test_create_login_session_uses_max_concurrent_sessions_from_resource_policy(
+    auth_service: AuthService,
+    mock_auth_repository: AsyncMock,
+) -> None:
+    """Regression: max_concurrent_sessions must come from keypair_resource_policy, not hardcoded."""
+    mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
+        session_token="new_token",
+    )
+
+    await auth_service._create_login_session(
+        action=AuthorizeAction(
+            type=AuthTokenType.KEYPAIR,
+            domain_name="default",
+            email="test@example.com",
+            password="password",
+            request=MagicMock(),
+            stoken=None,
+            otp=None,
+        ),
+        user=_make_mock_user(),
+        keypair_row=_make_mock_keypair_row(max_concurrent_sessions=5),
+        live_sessions=[],
+        auth_config=AuthConfig(
+            max_password_age=timedelta(days=90),
+            password_hash_algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            password_hash_rounds=100_000,
+            password_hash_salt_size=32,
+            login_session_max_age=604800,
+        ),
+    )
+
+    call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
+    assert call_kwargs["max_concurrent_sessions"] == 5
