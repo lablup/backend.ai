@@ -180,10 +180,10 @@ from ai.backend.manager.repositories.permission_controller.updaters import (
     PermissionUpdaterSpec,
     RoleUpdaterSpec,
 )
-from ai.backend.manager.services.group.actions.assign_users_by_name_to_project import (
+from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
+from ai.backend.manager.services.permission_contoller.actions.assign_users_by_name_to_project import (
     AssignUsersByNameToProjectAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
     BulkAssignRoleAction,
 )
@@ -908,7 +908,7 @@ class RBACAdapter(BaseAdapter):
         self, input: AssignUsersByNameToProjectInputDTO
     ) -> AssignUsersByNameToProjectPayload:
         """Assign a role to users identified by email or username, with project binding."""
-        result = await self._processors.group.assign_users_by_name_to_project.wait_for_complete(
+        result = await self._processors.permission_controller.assign_users_by_name_to_project.wait_for_complete(
             AssignUsersByNameToProjectAction(
                 project_id=input.project_id,
                 names=input.names,

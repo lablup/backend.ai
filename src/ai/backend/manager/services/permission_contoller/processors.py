@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
@@ -32,6 +33,10 @@ from .actions import (
     UpdateRoleActionResult,
     UpdateRolePermissionsAction,
     UpdateRolePermissionsActionResult,
+)
+from .actions.assign_users_by_name_to_project import (
+    AssignUsersByNameToProjectAction,
+    AssignUsersByNameToProjectActionResult,
 )
 from .actions.get_entity_types import (
     GetEntityTypesAction,
@@ -109,6 +114,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
     update_permission: ActionProcessor[UpdatePermissionAction, UpdatePermissionActionResult]
     delete_permission: ActionProcessor[DeletePermissionAction, DeletePermissionActionResult]
+    assign_users_by_name_to_project: SingleEntityActionProcessor[
+        AssignUsersByNameToProjectAction, AssignUsersByNameToProjectActionResult
+    ]
 
     def __init__(
         self,
@@ -148,6 +156,11 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.create_permission = ActionProcessor(service.create_permission, action_monitors)
         self.update_permission = ActionProcessor(service.update_permission, action_monitors)
         self.delete_permission = ActionProcessor(service.delete_permission, action_monitors)
+        self.assign_users_by_name_to_project = SingleEntityActionProcessor(
+            service.assign_users_by_name_to_project,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -175,4 +188,5 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             CreatePermissionAction.spec(),
             UpdatePermissionAction.spec(),
             DeletePermissionAction.spec(),
+            AssignUsersByNameToProjectAction.spec(),
         ]

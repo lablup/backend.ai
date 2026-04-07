@@ -21,10 +21,6 @@ from ai.backend.manager.models.resource_usage import (
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
-from ai.backend.manager.services.group.actions.assign_users_by_name_to_project import (
-    AssignUsersByNameToProjectAction,
-    AssignUsersByNameToProjectActionResult,
-)
 from ai.backend.manager.services.group.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
     AssignUsersToProjectActionResult,
@@ -256,29 +252,6 @@ class GroupService:
         )
         return AssignUsersToProjectActionResult(
             project_id=action.project_id, assigned_users=assigned_users
-        )
-
-    async def assign_users_by_name_to_project(
-        self, action: AssignUsersByNameToProjectAction
-    ) -> AssignUsersByNameToProjectActionResult:
-        # 1. Resolve names → user UUIDs
-        user_ids, failed_names = await self._group_repository.resolve_users_by_name(
-            action.project_id, action.names
-        )
-        # 2. Assign resolved users (bind to project + role mapping)
-        #    Follows PermissionControllerService.assign_role() pattern:
-        #    bind_user_to_project() + role assignment in one step.
-        #    Use actual result count to handle race conditions where users
-        #    may get assigned between resolve and assign.
-        assigned_users = []
-        if user_ids:
-            assigned_users = await self._group_repository.assign_users_to_project(
-                action.project_id, user_ids, action.role_id
-            )
-        return AssignUsersByNameToProjectActionResult(
-            project_id=action.project_id,
-            assigned_count=len(assigned_users),
-            failed_names=failed_names,
         )
 
     async def get_project(self, action: GetProjectAction) -> GetProjectActionResult:
