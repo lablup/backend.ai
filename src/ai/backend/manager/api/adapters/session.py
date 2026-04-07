@@ -148,7 +148,6 @@ from ai.backend.manager.services.session.actions.terminate_sessions import (
 from ai.backend.manager.services.session.actions.terminate_sessions_in_project import (
     TerminateSessionsInProjectAction,
 )
-from ai.backend.manager.services.user.actions.get_user import GetUserAction
 
 from .base import BaseAdapter
 
@@ -202,24 +201,6 @@ _KERNEL_PAGINATION_SPEC = PaginationSpec(
 class SessionAdapter(BaseAdapter):
     """Adapter for session and kernel domain operations."""
 
-    async def _resolve_owner_access_key(
-        self,
-        owner_id: UUID | None,
-        fallback_access_key: str,
-    ) -> AccessKey:
-        """Resolve a delegated owner UUID to that user's main access key.
-
-        Returns the caller's ``fallback_access_key`` when ``owner_id`` is None.
-        Otherwise loads the target user via the user processor (which enforces
-        RBAC) and returns the target user's main access key.
-        """
-        if owner_id is None:
-            return AccessKey(fallback_access_key)
-        result = await self._processors.user.get_user.wait_for_complete(
-            GetUserAction(user_uuid=owner_id),
-        )
-        return AccessKey(result.user.main_access_key)
-
     @staticmethod
     def _require_user_id() -> UUID:
         """Return the current user's UUID from request context.
@@ -251,21 +232,6 @@ class SessionAdapter(BaseAdapter):
         of the caller's. The target user must be loadable via the user
         processor (RBAC enforced).
         """
-        if input.owner_id is not None:
-            owner_result = await self._processors.user.get_user.wait_for_complete(
-                GetUserAction(user_uuid=input.owner_id),
-            )
-            owner = owner_result.user
-            if owner.main_access_key is None:
-                raise RuntimeError(
-                    f"Delegated owner {input.owner_id} has no main access key configured"
-                )
-            user_id = owner.id
-            access_key = owner.main_access_key
-            if owner.role is not None:
-                user_role = owner.role.value
-            if owner.domain_name is not None:
-                domain_name = owner.domain_name
         batch_spec: SessionBatchSpec | None = None
         if input.batch is not None:
             starts_at = None
@@ -873,15 +839,15 @@ class SessionAdapter(BaseAdapter):
         access_key: str,
     ) -> StartSessionServicePayload:
         """Start an app service in a session."""
-        owner_access_key = await self._resolve_owner_access_key(input.owner_id, access_key)
         action = StartServiceAction(
             session_name=str(session_id),
-            access_key=owner_access_key,
+            access_key=AccessKey(access_key),
             service=input.service,
             login_session_token=input.login_session_token,
             port=input.port,
             arguments=json.dumps(input.arguments) if input.arguments else None,
             envs=json.dumps(input.envs) if input.envs else None,
+            owner_id=input.owner_id,
         )
         result = await self._processors.session.start_service.wait_for_complete(action)
         return StartSessionServicePayload(token=result.token, wsproxy_addr=result.wsproxy_addr)
@@ -893,11 +859,11 @@ class SessionAdapter(BaseAdapter):
         access_key: str,
     ) -> None:
         """Shut down a service in a session."""
-        owner_access_key = await self._resolve_owner_access_key(input.owner_id, access_key)
         action = ShutdownServiceAction(
             session_name=str(session_id),
-            owner_access_key=owner_access_key,
+            owner_access_key=AccessKey(access_key),
             service_name=input.service,
+            owner_id=input.owner_id,
         )
         await self._processors.session.shutdown_service.wait_for_complete(action)
 
@@ -912,10 +878,10 @@ class SessionAdapter(BaseAdapter):
         access_key: str,
     ) -> RestartSessionPayload:
         """Restart a session, optionally on behalf of a delegated owner."""
-        owner_access_key = await self._resolve_owner_access_key(input.owner_id, access_key)
         action = RestartSessionAction(
             session_name=str(session_id),
-            owner_access_key=owner_access_key,
+            owner_access_key=AccessKey(access_key),
+            owner_id=input.owner_id,
         )
         await self._processors.session.restart_session.wait_for_complete(action)
         return RestartSessionPayload()
@@ -928,13 +894,13 @@ class SessionAdapter(BaseAdapter):
         access_key: str,
     ) -> DestroySessionPayload:
         """Destroy a session, optionally on behalf of a delegated owner."""
-        owner_access_key = await self._resolve_owner_access_key(input.owner_id, access_key)
         action = DestroySessionAction(
             user_role=user_role,
             session_name=str(session_id),
             forced=input.forced,
             recursive=input.recursive,
-            owner_access_key=owner_access_key,
+            owner_access_key=AccessKey(access_key),
+            owner_id=input.owner_id,
         )
         result = await self._processors.session.destroy_session.wait_for_complete(action)
         return DestroySessionPayload(result=result.result or {})
@@ -951,11 +917,11 @@ class SessionAdapter(BaseAdapter):
         When ``owner_id`` is provided, the logs are fetched on behalf of the
         delegated owner. Otherwise the caller's own access key is used.
         """
-        owner_access_key = await self._resolve_owner_access_key(owner_id, access_key)
         action = GetContainerLogsAction(
             session_name=str(session_id),
-            owner_access_key=owner_access_key,
+            owner_access_key=AccessKey(access_key),
             kernel_id=KernelId(kernel_id) if kernel_id else None,
+            owner_id=owner_id,
         )
         result = await self._processors.session.get_container_logs.wait_for_complete(action)
         logs_text = result.result.get("result", {}).get("logs", "")
@@ -973,11 +939,11 @@ class SessionAdapter(BaseAdapter):
     ) -> UpdateSessionPayload:
         """Update session fields (currently supports rename only)."""
         if input.name is not None:
-            owner_access_key = await self._resolve_owner_access_key(input.owner_id, access_key)
             action = RenameSessionAction(
                 session_name=str(session_id),
                 new_name=input.name,
-                owner_access_key=owner_access_key,
+                owner_access_key=AccessKey(access_key),
+                owner_id=input.owner_id,
             )
             result = await self._processors.session.rename_session.wait_for_complete(action)
             return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))

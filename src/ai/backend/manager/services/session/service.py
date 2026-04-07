@@ -269,6 +269,27 @@ class SessionService:
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
 
+    async def _resolve_owner_access_key(
+        self,
+        owner_id: uuid.UUID | None,
+        fallback: AccessKey,
+    ) -> AccessKey:
+        """Resolve a delegated owner UUID to that user's main access key.
+
+        Returns ``fallback`` when ``owner_id`` is None. Otherwise loads the
+        target user via the user repository and returns its main access key.
+        Raises ``InternalServerError`` if the target user has no main access
+        key configured.
+        """
+        if owner_id is None:
+            return fallback
+        user_data = await self._user_repository.get_user_by_uuid(owner_id)
+        if user_data.main_access_key is None:
+            raise InternalServerError(
+                f"Delegated owner {owner_id} has no main access key configured"
+            )
+        return AccessKey(user_data.main_access_key)
+
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
@@ -763,7 +784,9 @@ class SessionService:
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_access_key = await self._resolve_owner_access_key(
+            action.owner_id, action.owner_access_key
+        )
         forced = action.forced
         recursive = action.recursive
 
@@ -1034,7 +1057,9 @@ class SessionService:
     ) -> GetContainerLogsActionResult:
         resp = {"result": {"logs": ""}}
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_access_key = await self._resolve_owner_access_key(
+            action.owner_id, action.owner_access_key
+        )
         kernel_id = action.kernel_id
 
         compute_session = await self._session_repository.get_session_validated(
@@ -1269,7 +1294,9 @@ class SessionService:
 
     async def rename_session(self, action: RenameSessionAction) -> RenameSessionActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_access_key = await self._resolve_owner_access_key(
+            action.owner_id, action.owner_access_key
+        )
         new_name = action.new_name
 
         try:
@@ -1287,7 +1314,9 @@ class SessionService:
 
     async def restart_session(self, action: RestartSessionAction) -> RestartSessionActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_access_key = await self._resolve_owner_access_key(
+            action.owner_id, action.owner_access_key
+        )
 
         session = await self._session_repository.get_session_validated(
             session_name,
@@ -1300,7 +1329,9 @@ class SessionService:
 
     async def shutdown_service(self, action: ShutdownServiceAction) -> ShutdownServiceActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_access_key = await self._resolve_owner_access_key(
+            action.owner_id, action.owner_access_key
+        )
         service_name = action.service_name
 
         session = await self._session_repository.get_session_validated(
@@ -1313,7 +1344,7 @@ class SessionService:
 
     async def start_service(self, action: StartServiceAction) -> StartServiceActionResult:
         session_name = action.session_name
-        access_key = action.access_key
+        access_key = await self._resolve_owner_access_key(action.owner_id, action.access_key)
         service = action.service
         port = action.port
 
