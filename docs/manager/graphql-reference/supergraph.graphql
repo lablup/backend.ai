@@ -3700,7 +3700,7 @@ input CreateUserResourcePolicyInputGQL
   maxVfolderCount: Int!
 
   """
-  Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
+  Added in UNRELEASED. Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
   """
   maxConcurrentLogins: Int = null
 
@@ -16928,7 +16928,7 @@ input UpdateUserResourcePolicyInputGQL
   maxVfolderCount: Int = null
 
   """
-  Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
+  Added in UNRELEASED. Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
   """
   maxConcurrentLogins: Int = null
 
@@ -17637,7 +17637,7 @@ type UserResourcePolicyV2 implements Node
   maxVfolderCount: Int!
 
   """
-  Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
+  Added in UNRELEASED. Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
   """
   maxConcurrentLogins: Int
 
