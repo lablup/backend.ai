@@ -94,6 +94,10 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
+    BatchLoadVFoldersByIdsAction,
+    BatchLoadVFoldersByIdsActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.create_v2 import (
     CreateVFolderV2Action,
     CreateVFolderV2ActionResult,
@@ -199,6 +203,16 @@ class VFolderService:
         self._user_repository = user_repository
         self._background_task_manager = background_task_manager
         self._valkey_stat_client = valkey_stat_client
+
+    async def batch_load_by_ids(
+        self, action: BatchLoadVFoldersByIdsAction
+    ) -> BatchLoadVFoldersByIdsActionResult:
+        """Batch fetch vfolders by IDs for cross-entity reference resolution.
+
+        Audit log records this as ``vfolder.GET`` (not as a search).
+        """
+        data = await self._vfolder_repository.batch_load_by_ids(action.ids)
+        return BatchLoadVFoldersByIdsActionResult(data=data)
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role

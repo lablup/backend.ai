@@ -32,6 +32,10 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
+    BatchLoadVFoldersByIdsAction,
+    BatchLoadVFoldersByIdsActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.create_v2 import (
     CreateVFolderV2Action,
     CreateVFolderV2ActionResult,
@@ -137,6 +141,9 @@ class VFolderProcessors(AbstractProcessorPackage):
     get_accessible_vfolder: ActionProcessor[
         GetAccessibleVFolderAction, GetAccessibleVFolderActionResult
     ]
+    batch_load_vfolders_by_ids: ActionProcessor[
+        BatchLoadVFoldersByIdsAction, BatchLoadVFoldersByIdsActionResult
+    ]
     create_vfolder_v2: ActionProcessor[CreateVFolderV2Action, CreateVFolderV2ActionResult]
     create_upload_session_v2: ActionProcessor[
         CreateUploadSessionV2Action, CreateUploadSessionV2ActionResult
@@ -217,6 +224,11 @@ class VFolderProcessors(AbstractProcessorPackage):
             service.get_accessible_vfolder, action_monitors
         )
 
+        # Cross-entity loaders (no RBAC validation; caller has parent access)
+        self.batch_load_vfolders_by_ids = ActionProcessor(
+            service.batch_load_by_ids, action_monitors
+        )
+
         # V2 actions
         self.create_vfolder_v2 = ActionProcessor(service.create_v2, action_monitors)
         self.create_upload_session_v2 = ActionProcessor(
@@ -256,6 +268,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             UmountHostAction.spec(),
             GetFstabContentsAction.spec(),
             GetAccessibleVFolderAction.spec(),
+            BatchLoadVFoldersByIdsAction.spec(),
             CreateVFolderV2Action.spec(),
             CreateUploadSessionV2Action.spec(),
             DeleteVFolderV2Action.spec(),

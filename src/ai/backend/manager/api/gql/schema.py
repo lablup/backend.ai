@@ -179,6 +179,7 @@ from .model_card import (
     admin_model_cards_v2,
     admin_update_model_card_v2,
     deploy_model_card_v2,
+    model_card_available_presets,
     model_card_v2,
     project_model_cards_v2,
     scan_project_model_cards_v2,
@@ -203,6 +204,7 @@ from .notification import (
     notification_channel,
     notification_channels,
     notification_rule,
+    notification_rule_type_schema,
     notification_rule_types,
     notification_rules,
     update_notification_channel,
@@ -234,9 +236,9 @@ from .prometheus_query_preset import (
     admin_create_prometheus_query_preset,
     admin_delete_prometheus_query_preset,
     admin_modify_prometheus_query_preset,
-    admin_prometheus_query_preset,
-    admin_prometheus_query_preset_result,
-    admin_prometheus_query_presets,
+    prometheus_query_preset,
+    prometheus_query_preset_result,
+    prometheus_query_presets,
 )
 from .rbac import (
     admin_assign_role,
@@ -364,6 +366,7 @@ from .scheduling_history import (
 from .service_catalog import admin_service_catalogs
 from .session.resolver import (
     admin_sessions_v2,
+    enqueue_session,
     project_sessions_v2,
     terminate_project_sessions_v2,
 )
@@ -434,6 +437,7 @@ class Query:
     replicas = replicas
     replica = replica
     notification_rule_types = notification_rule_types
+    notification_rule_type_schema = notification_rule_type_schema
     object_storage = object_storage
     object_storages = object_storages
     vfs_storage = vfs_storage
@@ -484,10 +488,10 @@ class Query:
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases
-    # Prometheus Query Preset Admin APIs
-    admin_prometheus_query_preset = admin_prometheus_query_preset
-    admin_prometheus_query_presets = admin_prometheus_query_presets
-    admin_prometheus_query_preset_result = admin_prometheus_query_preset_result
+    # Prometheus Query Preset APIs (read available to any authenticated user)
+    prometheus_query_preset = prometheus_query_preset
+    prometheus_query_presets = prometheus_query_presets
+    prometheus_query_preset_result = prometheus_query_preset_result
     # RBAC Admin APIs
     admin_role = admin_role
     admin_roles = admin_roles
@@ -592,6 +596,7 @@ class Query:
     admin_model_cards_v2 = admin_model_cards_v2
     project_model_cards_v2 = project_model_cards_v2
     model_card_v2 = model_card_v2
+    model_card_available_presets = model_card_available_presets
     # Resource Allocation V2 APIs
     my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
     project_resource_allocation_v2 = project_resource_allocation_v2
@@ -811,6 +816,7 @@ class Mutation:
     vfolder_create_upload_session_v2 = vfolder_create_upload_session_v2
     vfolder_create_download_session_v2 = vfolder_create_download_session_v2
     # Session V2 mutations
+    enqueue_session = enqueue_session
     terminate_project_sessions_v2 = terminate_project_sessions_v2
 
 

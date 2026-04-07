@@ -11,9 +11,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     DeploymentRevisionPresetOrder,
     SearchDeploymentRevisionPresetsInput,
 )
-from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
-    SearchDeploymentRevisionPresetsPayload,
-)
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
@@ -28,11 +25,10 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
-    DeploymentRevisionPresetEdge,
     DeploymentRevisionPresetFilterGQL,
-    DeploymentRevisionPresetGQL,
     DeploymentRevisionPresetOrderByGQL,
 )
+from ai.backend.manager.api.gql.model_card._preset_helpers import build_preset_connection
 from ai.backend.manager.api.gql.model_card.types import (
     CreateModelCardInputGQL,
     CreateModelCardPayloadGQL,
@@ -256,7 +252,7 @@ def _build_search_input(
         description="Search deployment revision presets that satisfy a model card's minimum resource requirements.",
     )
 )  # type: ignore[misc]
-async def model_card_available_presets_v2(
+async def model_card_available_presets(
     info: Info[StrawberryGQLContext],
     scope: ModelCardAvailablePresetsScopeGQL,
     filter: DeploymentRevisionPresetFilterGQL | None = None,
@@ -291,29 +287,7 @@ async def model_card_available_presets_v2(
     result = await info.context.adapters.model_card.available_presets(
         scope.model_card_id, search_input
     )
-    return _build_preset_connection(result)
-
-
-def _build_preset_connection(
-    result: SearchDeploymentRevisionPresetsPayload,
-) -> DeploymentRevisionPresetConnection:
-    edges = [
-        DeploymentRevisionPresetEdge(
-            node=DeploymentRevisionPresetGQL.from_pydantic(item),
-            cursor=str(item.id),
-        )
-        for item in result.items
-    ]
-    return DeploymentRevisionPresetConnection(
-        edges=edges,
-        page_info=PageInfo(
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=result.total_count,
-    )
+    return build_preset_connection(result)
 
 
 def _build_connection(result: SearchModelCardsPayload) -> ModelCardV2Connection:

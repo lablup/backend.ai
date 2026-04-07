@@ -1,4 +1,9 @@
-"""Admin CLI commands for the v2 prometheus query definition resource."""
+"""Admin CLI commands for the v2 prometheus query definition resource.
+
+Only write operations (create, update, delete) live here. Read operations
+(search, get, execute) are user-facing and live under
+``cli/v2/prometheus_query_preset/commands.py``.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +15,6 @@ import click
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
-    parse_order_options,
     print_result,
 )
 
@@ -18,68 +22,6 @@ from ai.backend.client.cli.v2.helpers import (
 @click.group()
 def prometheus_query_preset() -> None:
     """Admin prometheus query definition commands."""
-
-
-@prometheus_query_preset.command()
-@click.option("--limit", default=20, help="Maximum number of results to return.")
-@click.option("--offset", default=0, help="Number of results to skip.")
-@click.option(
-    "--name-contains",
-    default=None,
-    type=str,
-    help="Filter presets whose name contains this substring.",
-)
-@click.option(
-    "--order-by",
-    multiple=True,
-    help="Order by field:direction (e.g., name:asc, created_at:desc).",
-)
-def search(
-    limit: int,
-    offset: int,
-    name_contains: str | None,
-    order_by: tuple[str, ...],
-) -> None:
-    """Search prometheus query definitions (superadmin only)."""
-    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
-        QueryDefinitionFilter,
-        QueryDefinitionOrder,
-        SearchQueryDefinitionsInput,
-    )
-    from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
-        QueryDefinitionOrderField,
-    )
-
-    filter_dto: QueryDefinitionFilter | None = None
-    if name_contains is not None:
-        from ai.backend.common.dto.manager.query import StringFilter
-
-        filter_dto = QueryDefinitionFilter(
-            name=StringFilter(contains=name_contains),
-        )
-
-    orders = (
-        parse_order_options(order_by, QueryDefinitionOrderField, QueryDefinitionOrder)
-        if order_by
-        else None
-    )
-
-    async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
-        try:
-            result = await registry.prometheus_query_preset.search(
-                SearchQueryDefinitionsInput(
-                    filter=filter_dto,
-                    order=orders,
-                    limit=limit,
-                    offset=offset,
-                ),
-            )
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
 
 
 @prometheus_query_preset.command()
