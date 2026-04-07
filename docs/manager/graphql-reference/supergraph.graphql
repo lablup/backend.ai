@@ -3583,7 +3583,7 @@ input CreateRuntimeVariantPresetInput
   presetTarget: String!
 
   """
-  Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'exist').
+  Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag').
   """
   valueType: String!
 

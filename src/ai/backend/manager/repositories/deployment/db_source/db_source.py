@@ -2115,7 +2115,7 @@ class DeploymentDBSource:
                     if vp.preset_target == PresetTarget.ENV:
                         resolved_environ[vp.key] = pv.value
                     elif vp.preset_target == PresetTarget.ARGS:
-                        if vp.value_type == PresetValueType.EXIST:
+                        if vp.value_type == PresetValueType.FLAG:
                             if (pv.value or "").strip().lower() in ("true", "1"):
                                 resolved_args.append(vp.key)
                         else:

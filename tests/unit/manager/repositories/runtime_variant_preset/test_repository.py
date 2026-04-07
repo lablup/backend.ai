@@ -20,7 +20,7 @@ from ai.backend.manager.repositories.runtime_variant_preset.repository import (
 from ai.backend.testutils.db import with_tables
 
 
-class TestRuntimeVariantPresetRepositoryExist:
+class TestRuntimeVariantPresetRepositoryFlag:
     """Tests for creating and retrieving presets with value_type='exist'."""
 
     @pytest.fixture
@@ -72,7 +72,7 @@ class TestRuntimeVariantPresetRepositoryExist:
             description="Enable verbose logging",
             rank=0,
             preset_target="args",
-            value_type="exist",
+            value_type="flag",
             default_value="true",
             key="--verbose",
             category=None,
@@ -83,11 +83,11 @@ class TestRuntimeVariantPresetRepositoryExist:
         creator: Creator[RuntimeVariantPresetRow] = Creator(spec=spec)
         created = await repository.create(creator)
 
-        assert created.value_type == "exist"
+        assert created.value_type == "flag"
         assert created.preset_target == "args"
         assert created.key == "--verbose"
 
         fetched = await repository.get_by_id(created.id)
-        assert fetched.value_type == "exist"
+        assert fetched.value_type == "flag"
         assert fetched.preset_target == "args"
         assert fetched.default_value == "true"

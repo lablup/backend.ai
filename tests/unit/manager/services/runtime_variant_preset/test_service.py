@@ -28,7 +28,7 @@ from ai.backend.manager.types import OptionalState
 
 
 class TestRuntimeVariantPresetServiceUpdateValidation:
-    """Tests for exist + env cross-field validation in service update."""
+    """Tests for flag + env cross-field validation in service update."""
 
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
@@ -43,7 +43,7 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
         return uuid.uuid4()
 
     @pytest.fixture
-    def existing_preset_env(self, preset_id: uuid.UUID) -> RuntimeVariantPresetData:
+    def flaging_preset_env(self, preset_id: uuid.UUID) -> RuntimeVariantPresetData:
         """Existing preset with preset_target=env."""
         return RuntimeVariantPresetData(
             id=preset_id,
@@ -64,7 +64,7 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
         )
 
     @pytest.fixture
-    def existing_preset_args(self, preset_id: uuid.UUID) -> RuntimeVariantPresetData:
+    def flaging_preset_args(self, preset_id: uuid.UUID) -> RuntimeVariantPresetData:
         """Existing preset with preset_target=args."""
         return RuntimeVariantPresetData(
             id=preset_id,
@@ -84,38 +84,38 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
             updated_at=None,
         )
 
-    async def test_change_value_type_to_exist_with_existing_env_is_rejected(
+    async def test_change_value_type_to_flag_with_flaging_env_is_rejected(
         self,
         service: RuntimeVariantPresetService,
         mock_repository: MagicMock,
         preset_id: uuid.UUID,
-        existing_preset_env: RuntimeVariantPresetData,
+        flaging_preset_env: RuntimeVariantPresetData,
     ) -> None:
-        mock_repository.get_by_id = AsyncMock(return_value=existing_preset_env)
+        mock_repository.get_by_id = AsyncMock(return_value=flaging_preset_env)
         spec = RuntimeVariantPresetUpdaterSpec(
-            value_type=OptionalState.update("exist"),
+            value_type=OptionalState.update("flag"),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=preset_id)
         action = UpdateRuntimeVariantPresetAction(id=preset_id, updater=updater)
 
-        with pytest.raises(InvalidAPIParameters, match="exist"):
+        with pytest.raises(InvalidAPIParameters, match="flag"):
             await service.update(action)
 
-    async def test_change_value_type_to_exist_with_existing_args_is_valid(
+    async def test_change_value_type_to_flag_with_flaging_args_is_valid(
         self,
         service: RuntimeVariantPresetService,
         mock_repository: MagicMock,
         preset_id: uuid.UUID,
-        existing_preset_args: RuntimeVariantPresetData,
+        flaging_preset_args: RuntimeVariantPresetData,
     ) -> None:
         updated_data = RuntimeVariantPresetData(
             id=preset_id,
-            runtime_variant_id=existing_preset_args.runtime_variant_id,
+            runtime_variant_id=flaging_preset_args.runtime_variant_id,
             name="test",
             description=None,
             rank=0,
             preset_target="args",
-            value_type="exist",
+            value_type="flag",
             default_value=None,
             key="--flag",
             category=None,
@@ -125,31 +125,31 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             updated_at=datetime(2024, 1, 2, tzinfo=UTC),
         )
-        mock_repository.get_by_id = AsyncMock(return_value=existing_preset_args)
+        mock_repository.get_by_id = AsyncMock(return_value=flaging_preset_args)
         mock_repository.update = AsyncMock(return_value=updated_data)
         spec = RuntimeVariantPresetUpdaterSpec(
-            value_type=OptionalState.update("exist"),
+            value_type=OptionalState.update("flag"),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=preset_id)
         action = UpdateRuntimeVariantPresetAction(id=preset_id, updater=updater)
 
         result = await service.update(action)
-        assert result.preset.value_type == "exist"
+        assert result.preset.value_type == "flag"
 
-    async def test_change_preset_target_to_env_with_existing_exist_is_rejected(
+    async def test_change_preset_target_to_env_with_flaging_flag_is_rejected(
         self,
         service: RuntimeVariantPresetService,
         mock_repository: MagicMock,
         preset_id: uuid.UUID,
     ) -> None:
-        existing = RuntimeVariantPresetData(
+        flaging = RuntimeVariantPresetData(
             id=preset_id,
             runtime_variant_id=uuid.uuid4(),
             name="test",
             description=None,
             rank=0,
             preset_target="args",
-            value_type="exist",
+            value_type="flag",
             default_value=None,
             key="--flag",
             category=None,
@@ -159,12 +159,12 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             updated_at=None,
         )
-        mock_repository.get_by_id = AsyncMock(return_value=existing)
+        mock_repository.get_by_id = AsyncMock(return_value=flaging)
         spec = RuntimeVariantPresetUpdaterSpec(
             preset_target=OptionalState.update("env"),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=preset_id)
         action = UpdateRuntimeVariantPresetAction(id=preset_id, updater=updater)
 
-        with pytest.raises(InvalidAPIParameters, match="exist"):
+        with pytest.raises(InvalidAPIParameters, match="flag"):
             await service.update(action)

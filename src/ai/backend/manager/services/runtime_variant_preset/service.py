@@ -36,14 +36,14 @@ from ai.backend.manager.services.runtime_variant_preset.actions.update import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 VALID_PRESET_TARGETS = {"env", "args"}
-VALID_VALUE_TYPES = {"str", "int", "float", "bool", "exist"}
+VALID_VALUE_TYPES = {"str", "int", "float", "bool", "flag"}
 
 VALUE_TYPE_VALIDATORS: dict[str, type] = {
     "str": str,
     "int": int,
     "float": float,
     "bool": bool,
-    "exist": bool,
+    "flag": bool,
 }
 
 
@@ -102,12 +102,10 @@ class RuntimeVariantPresetService:
         effective_value_type = spec.value_type.optional_value() or current.value_type
         effective_preset_target = spec.preset_target.optional_value() or current.preset_target
         if (
-            effective_value_type == PresetValueType.EXIST
+            effective_value_type == PresetValueType.FLAG
             and effective_preset_target != PresetTarget.ARGS
         ):
-            raise InvalidAPIParameters(
-                "value_type 'exist' is only valid with preset_target 'args'."
-            )
+            raise InvalidAPIParameters("value_type 'flag' is only valid with preset_target 'args'.")
 
         action.updater.pk_value = action.id
         data = await self._repository.update(action.updater)

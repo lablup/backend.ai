@@ -12,7 +12,7 @@ from .types import UIOption
 
 class PresetTargetSpec(BaseResponseModel):
     preset_target: str = Field(description="Target: env or args.")
-    value_type: str = Field(description="Value type: str, int, float, bool, exist.")
+    value_type: str = Field(description="Value type: str, int, float, bool, flag.")
     default_value: str | None = Field(default=None, description="Default value.")
     key: str = Field(description="Env key or args flag.")
 

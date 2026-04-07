@@ -165,7 +165,7 @@ class ModelServingEventHandler:
                         if vp.preset_target == PresetTarget.ENV:
                             environ[vp.key] = pv.value
                         elif vp.preset_target == PresetTarget.ARGS:
-                            if vp.value_type == PresetValueType.EXIST:
+                            if vp.value_type == PresetValueType.FLAG:
                                 if (pv.value or "").strip().lower() in ("true", "1"):
                                     args_parts.append(vp.key)
                             else:

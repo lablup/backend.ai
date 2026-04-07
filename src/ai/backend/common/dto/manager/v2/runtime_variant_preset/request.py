@@ -23,7 +23,7 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=256, description="Preset name.")
     description: str | None = Field(default=None, description="Description.")
     preset_target: PresetTarget = Field(description="Target: env or args.")
-    value_type: PresetValueType = Field(description="Value type: str, int, float, bool, exist.")
+    value_type: PresetValueType = Field(description="Value type: str, int, float, bool, flag.")
     default_value: str | None = Field(default=None, max_length=512, description="Default value.")
     key: str = Field(min_length=1, max_length=256, description="Env key or args flag.")
     category: str | None = Field(default=None, max_length=64, description="UI category group.")
@@ -33,9 +33,9 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
     )
 
     @model_validator(mode="after")
-    def validate_exist_requires_args(self) -> Self:
-        if self.value_type == PresetValueType.EXIST and self.preset_target != PresetTarget.ARGS:
-            raise ValueError("value_type 'exist' is only valid with preset_target 'args'.")
+    def validate_flag_requires_args(self) -> Self:
+        if self.value_type == PresetValueType.FLAG and self.preset_target != PresetTarget.ARGS:
+            raise ValueError("value_type 'flag' is only valid with preset_target 'args'.")
         return self
 
 
@@ -53,13 +53,13 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
     ui_option: UIOption | Sentinel | None = Field(default=SENTINEL)
 
     @model_validator(mode="after")
-    def validate_exist_requires_args(self) -> Self:
+    def validate_flag_requires_args(self) -> Self:
         if (
-            self.value_type == PresetValueType.EXIST
+            self.value_type == PresetValueType.FLAG
             and self.preset_target is not None
             and self.preset_target != PresetTarget.ARGS
         ):
-            raise ValueError("value_type 'exist' is only valid with preset_target 'args'.")
+            raise ValueError("value_type 'flag' is only valid with preset_target 'args'.")
         return self
 
 
