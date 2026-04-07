@@ -155,6 +155,64 @@ def shutdown_service(session_id: str, service: str) -> None:
 
 @session.command()
 @click.argument("session_id", type=str)
+@click.option(
+    "--owner-id",
+    type=str,
+    default=None,
+    help="Delegated owner user UUID. Defaults to the caller when omitted.",
+)
+def restart(session_id: str, owner_id: str | None) -> None:
+    """Restart a session."""
+
+    from ai.backend.common.dto.manager.v2.session.request import RestartSessionInput
+
+    body = RestartSessionInput(owner_id=UUID(owner_id) if owner_id else None)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.session.restart(UUID(session_id), body)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@session.command()
+@click.argument("session_id", type=str)
+@click.option("--forced", is_flag=True, default=False, help="Force-destroy without cleanup.")
+@click.option("--recursive", is_flag=True, default=False, help="Destroy dependent sessions too.")
+@click.option(
+    "--owner-id",
+    type=str,
+    default=None,
+    help="Delegated owner user UUID. Defaults to the caller when omitted.",
+)
+def destroy(session_id: str, forced: bool, recursive: bool, owner_id: str | None) -> None:
+    """Destroy a session."""
+
+    from ai.backend.common.dto.manager.v2.session.request import DestroySessionInput
+
+    body = DestroySessionInput(
+        forced=forced,
+        recursive=recursive,
+        owner_id=UUID(owner_id) if owner_id else None,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.session.destroy(UUID(session_id), body)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@session.command()
+@click.argument("session_id", type=str)
 @click.option("--kernel-id", type=str, default=None, help="Specific kernel UUID.")
 @click.option(
     "--owner-id",
