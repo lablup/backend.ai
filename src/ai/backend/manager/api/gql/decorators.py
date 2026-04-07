@@ -198,7 +198,6 @@ def gql_pydantic_type[PydanticModel: BaseModel](
     meta: BackendAIGQLMeta,
     *,
     model: type[PydanticModel],
-    fields: list[str] | None = None,
     name: str | None = None,
     all_fields: bool = False,
     directives: Sequence[object] = (),
@@ -212,7 +211,6 @@ def gql_pydantic_type[PydanticModel: BaseModel](
     """
     return strawberry.experimental.pydantic.type(
         model=model,
-        fields=fields,
         name=name,
         description=_build_description(meta),
         directives=directives,
