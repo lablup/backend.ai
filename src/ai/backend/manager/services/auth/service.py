@@ -304,6 +304,7 @@ class AuthService:
             return None
         if not force:
             raise TooManyConcurrentLoginSessions()
+        # Usually 1. Can be >1 when the admin lowered the cap after the fact.
         sessions_to_invalidate = count - max_concurrent_logins + 1
         return [s.session_token for s in live_sessions[:sessions_to_invalidate]]
 
