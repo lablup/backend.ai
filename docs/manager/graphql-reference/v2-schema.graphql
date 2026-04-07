@@ -1,6 +1,6 @@
 directive @oneOf on INPUT_OBJECT
 
-schema @link(url: "https://specs.apollo.dev/federation/v2.11", import: ["@external", "@key", "@shareable"]) {
+schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key", "@shareable"]) {
   query: Query
   mutation: Mutation
   subscription: Subscription
