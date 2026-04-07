@@ -25,7 +25,6 @@ from ai.backend.common.dto.manager.auth.response import (
     UpdatePasswordResponse,
     VerifyAuthResponse,
 )
-from ai.backend.common.dto.manager.auth.types import LoginClientType
 
 
 class AuthClient(BaseDomainClient):
@@ -34,7 +33,6 @@ class AuthClient(BaseDomainClient):
         self._anon_client = anon_client
 
     async def authorize(self, request: AuthorizeRequest) -> AuthorizeResponse:
-        request = request.model_copy(update={"client_type": LoginClientType.CORE})
         return await self._anon_client.typed_request(
             "POST",
             "/auth/authorize",

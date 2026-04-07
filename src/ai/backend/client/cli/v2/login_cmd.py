@@ -10,6 +10,8 @@ from typing import Any
 
 import click
 
+from ai.backend.common.dto.manager.auth.types import LoginClientType
+
 from .helpers import COOKIE_FILE, SESSION_DIR, create_v2_registry, load_v2_config
 
 
@@ -43,7 +45,11 @@ def login(force: bool) -> None:
         try:
             client = registry._client
             login_url = client.build_url_raw("/server/login")
-            payload: dict[str, str | bool] = {"username": user_id, "password": password}
+            payload: dict[str, str | bool] = {
+                "username": user_id,
+                "password": password,
+                "client_type": LoginClientType.CORE.value,
+            }
             if force:
                 payload["force"] = True
             async with client.session.post(login_url, json=payload) as resp:
