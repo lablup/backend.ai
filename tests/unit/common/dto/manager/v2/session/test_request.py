@@ -105,19 +105,21 @@ class TestSearchSessionsInput:
 class TestRestartSessionInput:
     """Tests for RestartSessionInput model."""
 
-    def test_default_owner_access_key_is_none(self) -> None:
+    def test_default_owner_id_is_none(self) -> None:
         inp = RestartSessionInput()
-        assert inp.owner_access_key is None
+        assert inp.owner_id is None
 
-    def test_with_owner_access_key(self) -> None:
-        inp = RestartSessionInput(owner_access_key="AKIAIOSFODNN7EXAMPLE")
-        assert inp.owner_access_key == "AKIAIOSFODNN7EXAMPLE"
+    def test_with_owner_id(self) -> None:
+        owner = uuid.uuid4()
+        inp = RestartSessionInput(owner_id=owner)
+        assert inp.owner_id == owner
 
     def test_round_trip(self) -> None:
-        inp = RestartSessionInput(owner_access_key="some-key")
+        owner = uuid.uuid4()
+        inp = RestartSessionInput(owner_id=owner)
         json_str = inp.model_dump_json()
         restored = RestartSessionInput.model_validate_json(json_str)
-        assert restored.owner_access_key == "some-key"
+        assert restored.owner_id == owner
 
 
 class TestDestroySessionInput:
@@ -127,7 +129,7 @@ class TestDestroySessionInput:
         inp = DestroySessionInput()
         assert inp.forced is False
         assert inp.recursive is False
-        assert inp.owner_access_key is None
+        assert inp.owner_id is None
 
     def test_forced_true(self) -> None:
         inp = DestroySessionInput(forced=True)
@@ -139,17 +141,19 @@ class TestDestroySessionInput:
         assert inp.forced is True
         assert inp.recursive is True
 
-    def test_with_owner_access_key(self) -> None:
-        inp = DestroySessionInput(owner_access_key="some-key")
-        assert inp.owner_access_key == "some-key"
+    def test_with_owner_id(self) -> None:
+        owner = uuid.uuid4()
+        inp = DestroySessionInput(owner_id=owner)
+        assert inp.owner_id == owner
 
     def test_round_trip(self) -> None:
-        inp = DestroySessionInput(forced=True, recursive=True, owner_access_key="key")
+        owner = uuid.uuid4()
+        inp = DestroySessionInput(forced=True, recursive=True, owner_id=owner)
         json_str = inp.model_dump_json()
         restored = DestroySessionInput.model_validate_json(json_str)
         assert restored.forced is True
         assert restored.recursive is True
-        assert restored.owner_access_key == "key"
+        assert restored.owner_id == owner
 
 
 class TestCommitSessionInput:
@@ -329,7 +333,7 @@ class TestGetContainerLogsInput:
 
     def test_all_none_defaults(self) -> None:
         inp = GetContainerLogsInput()
-        assert inp.owner_access_key is None
+        assert inp.owner_id is None
         assert inp.kernel_id is None
 
     def test_with_kernel_id(self) -> None:
@@ -339,6 +343,7 @@ class TestGetContainerLogsInput:
 
     def test_with_all_fields(self) -> None:
         kernel_id = uuid.uuid4()
-        inp = GetContainerLogsInput(owner_access_key="my-key", kernel_id=kernel_id)
-        assert inp.owner_access_key == "my-key"
+        owner = uuid.uuid4()
+        inp = GetContainerLogsInput(owner_id=owner, kernel_id=kernel_id)
+        assert inp.owner_id == owner
         assert inp.kernel_id == kernel_id
