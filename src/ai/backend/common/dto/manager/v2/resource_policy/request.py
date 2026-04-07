@@ -159,9 +159,10 @@ class CreateUserResourcePolicyInput(BaseRequestModel):
     )
     max_concurrent_logins: int | None = Field(
         default=None,
+        ge=1,
         description=(
             "Maximum number of concurrent authenticated login sessions per user."
-            " Null means unlimited."
+            " Null means unlimited. Must be >= 1 when set."
             " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
         ),
     )
@@ -194,9 +195,10 @@ class UpdateUserResourcePolicyInput(BaseRequestModel):
     )
     max_concurrent_logins: int | Sentinel | None = Field(
         default=SENTINEL,
+        ge=1,
         description=(
             "Updated maximum number of concurrent authenticated login sessions per user."
-            " Set to null to clear (unlimited)."
+            " Set to null to clear (unlimited). Must be >= 1 when set."
             " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
         ),
     )

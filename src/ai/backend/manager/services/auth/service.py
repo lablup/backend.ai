@@ -24,7 +24,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
 from ai.backend.manager.errors.auth import (
-    ActiveLoginSessionExistsError,
     AuthorizationFailed,
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
@@ -120,7 +119,7 @@ _FAILURE_MAP: dict[type[Exception], LoginAttemptResult] = {
     AuthorizationFailed: LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
     PasswordExpired: LoginAttemptResult.FAILED_PASSWORD_EXPIRED,
     RejectedByHook: LoginAttemptResult.FAILED_REJECTED_BY_HOOK,
-    ActiveLoginSessionExistsError: LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
+    TooManyConcurrentLoginSessions: LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
 }
 
 
@@ -193,7 +192,7 @@ class AuthService:
             AuthorizationFailed,
             PasswordExpired,
             RejectedByHook,
-            ActiveLoginSessionExistsError,
+            TooManyConcurrentLoginSessions,
         ) as e:
             await self._record_login_failure(
                 user.uuid,
@@ -299,6 +298,10 @@ class AuthService:
         """
         if max_concurrent_logins is None:
             return None
+        if max_concurrent_logins <= 0:
+            # Cap of 0 (or negative) means no logins allowed at all; force cannot help
+            # since even evicting every existing session still leaves the new login over cap.
+            raise TooManyConcurrentLoginSessions()
         count = len(live_sessions)
         if count < max_concurrent_logins:
             return None

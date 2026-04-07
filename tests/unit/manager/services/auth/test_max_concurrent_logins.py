@@ -200,6 +200,24 @@ class TestMaxConcurrentLoginsEnforcement:
                 ),
                 id="limit-5-5-live-no-force",
             ),
+            # Non-positive caps must reject regardless of force (no number of evictions
+            # can bring a fresh login back under a cap of 0).
+            pytest.param(
+                RejectCase(
+                    configured_max_logins=0,
+                    existing_active_sessions=0,
+                    force_evict_oldest=True,
+                ),
+                id="limit-0-no-sessions-force-rejected",
+            ),
+            pytest.param(
+                RejectCase(
+                    configured_max_logins=0,
+                    existing_active_sessions=3,
+                    force_evict_oldest=True,
+                ),
+                id="limit-0-with-sessions-force-rejected",
+            ),
         ],
     )
     async def test_rejects_when_limit_reached_without_force(

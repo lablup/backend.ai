@@ -436,9 +436,10 @@ class AuthDBSource:
     async def invalidate_sessions_by_tokens(self, session_tokens: list[str]) -> None:
         """Invalidate the given active login sessions in bulk.
 
-        Rows whose status is not ACTIVE are left untouched. Callers that need to
-        evict specific sessions before creating a new one should call this first and
-        then ``create_login_session``.
+        Rows whose status is not ACTIVE are left untouched. This method only
+        invalidates the specified sessions; the caller decides whether to invoke it
+        before or after ``create_login_session`` as appropriate for the surrounding
+        workflow.
         """
         if not session_tokens:
             return
