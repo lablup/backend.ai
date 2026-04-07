@@ -819,6 +819,7 @@ class SessionAdapter(BaseAdapter):
             port=input.port,
             arguments=json.dumps(input.arguments) if input.arguments else None,
             envs=json.dumps(input.envs) if input.envs else None,
+            owner_id=input.owner_id,
         )
         result = await self._processors.session.start_service.wait_for_complete(action)
         return StartSessionServicePayload(token=result.token, wsproxy_addr=result.wsproxy_addr)
@@ -834,6 +835,7 @@ class SessionAdapter(BaseAdapter):
             session_name=str(session_id),
             owner_access_key=AccessKey(access_key),
             service_name=input.service,
+            owner_id=input.owner_id,
         )
         await self._processors.session.shutdown_service.wait_for_complete(action)
 
