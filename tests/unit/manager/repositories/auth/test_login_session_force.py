@@ -260,12 +260,11 @@ class TestLoginSessionForce:
         assert cred_result.user["uuid"] == sample_user.user_id
         assert len(cred_result.active_sessions) == 0
 
-        # Step 2: create login session (no tokens to invalidate since no active sessions)
+        # Step 2: create login session (no active sessions to evict)
         session_result = await auth_db_source.create_login_session(
             user_id=sample_user.user_id,
             access_key=sample_user.access_key,
             domain_name=sample_user.domain_name,
-            tokens_to_invalidate=[],
         )
         assert session_result.session_token
 
@@ -298,13 +297,13 @@ class TestLoginSessionForce:
         assert cred_result.user["uuid"] == user_id
         assert len(cred_result.active_sessions) == 1
 
-        # Step 2: create login session with force (invalidate existing tokens)
+        # Step 2: evict existing tokens via the dedicated repository call, then create
         tokens_to_invalidate = [s.session_token for s in cred_result.active_sessions]
+        await auth_db_source.invalidate_sessions_by_tokens(tokens_to_invalidate)
         session_result = await auth_db_source.create_login_session(
             user_id=user_id,
             access_key=access_key,
             domain_name=sample_user.domain_name,
-            tokens_to_invalidate=tokens_to_invalidate,
         )
         assert session_result.session_token
 
