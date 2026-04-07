@@ -65,7 +65,6 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator, execute_bulk_creator
-from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
@@ -663,24 +662,16 @@ class GroupDBSource:
 
             return [row.to_data() for row in new_user_rows]
 
-    async def resolve_users_by_username(self, names: list[str]) -> ResolveUsersByUsernameResult:
-        """Resolve email/username to user UUIDs.
+    async def resolve_users_by_username(
+        self, querier: BatchQuerier
+    ) -> ResolveUsersByUsernameResult:
+        """Resolve email/username to user UUIDs using the given querier.
 
         If a single name matches multiple distinct users (e.g. one user's
         email equals another user's username), the name is treated as
-        ambiguous and returned in ``failed_names``.
+        ambiguous and excluded from the result.
         """
-        if not names:
-            return ResolveUsersByUsernameResult(name_to_uid={}, failed_names=[])
-
         async with self._db.begin_session_read_committed() as session:
-            unique_names = set(names)
-            querier = BatchQuerier(
-                pagination=NoPagination(),
-                conditions=[
-                    lambda: UserRow.email.in_(unique_names) | UserRow.username.in_(unique_names)
-                ],
-            )
             result = await execute_batch_querier(session, sa.select(UserRow), querier)
 
             # Build per-name → user mappings.
@@ -690,7 +681,7 @@ class GroupDBSource:
             for row in result.rows:
                 user_row = row._mapping[UserRow]
                 for name in (user_row.email, user_row.username):
-                    if name is None or name not in unique_names:
+                    if name is None:
                         continue
                     if name in ambiguous_names:
                         continue
@@ -700,8 +691,7 @@ class GroupDBSource:
                     else:
                         name_to_user[name] = user_row.uuid
 
-            failed_names = [n for n in names if n not in name_to_user]
-            return ResolveUsersByUsernameResult(name_to_uid=name_to_user, failed_names=failed_names)
+            return ResolveUsersByUsernameResult(name_to_uid=name_to_user)
 
     async def unassign_users_from_project(
         self, unbinder: UserProjectEntityUnbinder

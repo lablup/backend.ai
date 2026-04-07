@@ -157,6 +157,7 @@ from ai.backend.manager.models.rbac_models.orders import (
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.user import UserRow as UserRowModel
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
@@ -908,16 +909,23 @@ class RBACAdapter(BaseAdapter):
         self, input: AssignUsersToRoleByUsernameInputDTO
     ) -> AssignUsersToRoleByUsernamePayload:
         """Assign a role to users identified by email or username, with project binding."""
+        unique_names = list(set(input.names))
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[
+                lambda: UserRowModel.email.in_(unique_names)
+                | UserRowModel.username.in_(unique_names)
+            ],
+        )
         result = await self._processors.permission_controller.assign_users_to_role_by_username.wait_for_complete(
             AssignUsersToRoleByUsernameAction(
                 project_id=input.project_id,
-                names=input.names,
+                querier=querier,
                 role_id=input.role_id,
             )
         )
         return AssignUsersToRoleByUsernamePayload(
             assigned_count=result.assigned_count,
-            failed_names=result.failed_names,
         )
 
     async def bulk_revoke_role(self, input: BulkRevokeRoleInputDTO) -> BulkRevokeRoleResultPayload:

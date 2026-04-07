@@ -12,12 +12,13 @@ from ai.backend.manager.actions.action.single_entity import (
 from ai.backend.manager.actions.action.types import FieldData
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 
 
 @dataclass
 class AssignUsersToRoleByUsernameAction(BaseSingleEntityAction):
     project_id: UUID
-    names: list[str]
+    querier: BatchQuerier
     role_id: UUID
 
     @override
@@ -47,7 +48,6 @@ class AssignUsersToRoleByUsernameAction(BaseSingleEntityAction):
 class AssignUsersToRoleByUsernameActionResult(BaseSingleEntityActionResult):
     project_id: UUID
     assigned_count: int
-    failed_names: list[str]
 
     @override
     def target_entity_id(self) -> str:

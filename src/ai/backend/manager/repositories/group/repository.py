@@ -133,9 +133,11 @@ class GroupRepository:
         return await self._db_source.assign_users_to_project(project_id, user_ids, role_id)
 
     @group_repository_resilience.apply()
-    async def resolve_users_by_username(self, names: list[str]) -> ResolveUsersByUsernameResult:
+    async def resolve_users_by_username(
+        self, querier: BatchQuerier
+    ) -> ResolveUsersByUsernameResult:
         """Resolve email/username to user UUIDs."""
-        return await self._db_source.resolve_users_by_username(names)
+        return await self._db_source.resolve_users_by_username(querier)
 
     @group_repository_resilience.apply()
     async def unassign_users_from_project(

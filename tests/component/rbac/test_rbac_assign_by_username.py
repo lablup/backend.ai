@@ -133,7 +133,6 @@ class TestAssignRoleByUsername:
         )
         assert isinstance(result, AssignUsersToRoleByUsernamePayload)
         assert result.assigned_count == 1
-        assert result.failed_names == []
 
         # Verify role assignment in DB
         async with db_engine.begin() as conn:
@@ -147,13 +146,13 @@ class TestAssignRoleByUsername:
             ).fetchall()
             assert len(rows) == 1
 
-    async def test_nonexistent_name_in_failed(
+    async def test_nonexistent_name_assigns_zero(
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
         role_factory: RoleFactory,
     ) -> None:
-        """Non-existent names appear in failed_names."""
+        """Non-existent names result in zero assignments."""
         role = await role_factory()
         result = await admin_v2_registry.rbac.assign_role_by_username(
             AssignUsersToRoleByUsernameInput(
@@ -163,7 +162,6 @@ class TestAssignRoleByUsername:
             ),
         )
         assert result.assigned_count == 0
-        assert result.failed_names == ["nonexistent@nowhere.com"]
 
     async def test_mixed_valid_and_invalid_names(
         self,
@@ -173,7 +171,7 @@ class TestAssignRoleByUsername:
         group_fixture: uuid.UUID,
         role_factory: RoleFactory,
     ) -> None:
-        """Valid names resolve; invalid names appear in failed_names."""
+        """Only valid names are assigned; invalid names are silently skipped."""
         role = await role_factory()
         result = await admin_v2_registry.rbac.assign_role_by_username(
             AssignUsersToRoleByUsernameInput(
@@ -183,4 +181,3 @@ class TestAssignRoleByUsername:
             ),
         )
         assert result.assigned_count == 1
-        assert result.failed_names == ["ghost@nowhere.com"]
