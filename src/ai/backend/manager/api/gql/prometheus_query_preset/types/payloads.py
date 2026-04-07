@@ -98,7 +98,6 @@ class QueryDefinitionResultGQL(PydanticOutputMixin[QueryDefinitionResultInfoDTO]
         description="Payload returned after deleting a query definition.",
     ),
     model=DeleteQueryDefinitionPayloadDTO,
-    fields=["id"],
     name="DeleteQueryDefinitionPayload",
 )
 class DeleteQueryDefinitionPayload(PydanticOutputMixin[DeleteQueryDefinitionPayloadDTO]):
