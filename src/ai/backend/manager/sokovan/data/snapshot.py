@@ -19,6 +19,7 @@ from ai.backend.common.types import (
 from .workload import (
     KeyPairResourcePolicy,
     PendingSessionInfo,
+    RunningSessionData,
     SessionDependencyInfo,
     UserResourcePolicy,
 )
@@ -85,6 +86,13 @@ class SessionDependencySnapshot:
 
 
 @dataclass
+class RunningSessionSnapshot:
+    """Snapshot of running sessions for preemption candidate selection."""
+
+    sessions: list[RunningSessionData]
+
+
+@dataclass
 class SystemSnapshot:
     """Represents a complete snapshot of the system's state for scheduling decisions."""
 
@@ -105,6 +113,11 @@ class SystemSnapshot:
 
     # Session dependency state
     session_dependencies: SessionDependencySnapshot
+
+    # Running session state for preemption
+    running_sessions: RunningSessionSnapshot = field(
+        default_factory=lambda: RunningSessionSnapshot(sessions=[])
+    )
 
     # Known slot types from etcd config
     known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)

@@ -61,6 +61,7 @@ class ScheduleType(StrEnum):
         "detect_kernel_termination"  # Detect active sessions with any kernel TERMINATED/CANCELLED
     )
     OBSERVE_FAIR_SHARE = "observe_fair_share"  # Observe RUNNING kernels for fair share calculation
+    PREEMPT = "preempt"  # Preempt low-priority running sessions for high-priority pending ones
 
 
 def merge_resource(
