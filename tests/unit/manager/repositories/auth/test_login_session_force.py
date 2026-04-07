@@ -173,6 +173,7 @@ class TestLoginSessionForce:
                     access_key=access_key,
                     session_token=session_token,
                     status=LoginSessionStatus.ACTIVE,
+                    client_type=LoginClientType.CORE,
                 )
             )
         return session_token
