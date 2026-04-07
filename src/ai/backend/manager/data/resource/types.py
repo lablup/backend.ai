@@ -13,6 +13,7 @@ class UserResourcePolicyData:
     max_quota_scope_size: int = 0
     max_session_count_per_model_session: int = 0
     max_customized_image_count: int = 3
+    max_concurrent_logins: int | None = None
 
 
 @dataclass
