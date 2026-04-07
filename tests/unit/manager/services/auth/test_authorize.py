@@ -454,7 +454,7 @@ async def test_authorize_force_invalidates_existing_sessions(
         force=True,
     )
 
-    # Set limit=1 so that the one live session triggers force-eviction.
+    # Set max_concurrent_logins=1 so that the one live session triggers force-eviction.
     mock_user_resource_policy_repository.get_by_name.return_value = UserResourcePolicyData(
         name="default",
         max_vfolder_count=10,
