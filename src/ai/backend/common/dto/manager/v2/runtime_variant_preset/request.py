@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
@@ -22,7 +23,7 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=256, description="Preset name.")
     description: str | None = Field(default=None, description="Description.")
     preset_target: PresetTarget = Field(description="Target: env or args.")
-    value_type: PresetValueType = Field(description="Value type: str, int, float, bool.")
+    value_type: PresetValueType = Field(description="Value type: str, int, float, bool, exist.")
     default_value: str | None = Field(default=None, max_length=512, description="Default value.")
     key: str = Field(min_length=1, max_length=256, description="Env key or args flag.")
     category: str | None = Field(default=None, max_length=64, description="UI category group.")
@@ -30,6 +31,12 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
     ui_option: UIOption | None = Field(
         default=None, description="UI rendering option. Contains ui_type and type-specific config."
     )
+
+    @model_validator(mode="after")
+    def validate_exist_requires_args(self) -> Self:
+        if self.value_type == PresetValueType.EXIST and self.preset_target != PresetTarget.ARGS:
+            raise ValueError("value_type 'exist' is only valid with preset_target 'args'.")
+        return self
 
 
 class UpdateRuntimeVariantPresetInput(BaseRequestModel):
@@ -44,6 +51,16 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
     category: str | Sentinel | None = Field(default=SENTINEL)
     display_name: str | Sentinel | None = Field(default=SENTINEL)
     ui_option: UIOption | Sentinel | None = Field(default=SENTINEL)
+
+    @model_validator(mode="after")
+    def validate_exist_requires_args(self) -> Self:
+        if (
+            self.value_type == PresetValueType.EXIST
+            and self.preset_target is not None
+            and self.preset_target != PresetTarget.ARGS
+        ):
+            raise ValueError("value_type 'exist' is only valid with preset_target 'args'.")
+        return self
 
 
 class RuntimeVariantPresetFilter(BaseRequestModel):

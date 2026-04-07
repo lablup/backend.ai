@@ -1,6 +1,10 @@
 import logging
 from typing import cast
 
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    PresetTarget,
+    PresetValueType,
+)
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.runtime_variant_preset.creators import (
@@ -8,6 +12,9 @@ from ai.backend.manager.repositories.runtime_variant_preset.creators import (
 )
 from ai.backend.manager.repositories.runtime_variant_preset.repository import (
     RuntimeVariantPresetRepository,
+)
+from ai.backend.manager.repositories.runtime_variant_preset.updaters import (
+    RuntimeVariantPresetUpdaterSpec,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
@@ -29,13 +36,14 @@ from ai.backend.manager.services.runtime_variant_preset.actions.update import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 VALID_PRESET_TARGETS = {"env", "args"}
-VALID_VALUE_TYPES = {"str", "int", "float", "bool"}
+VALID_VALUE_TYPES = {"str", "int", "float", "bool", "exist"}
 
 VALUE_TYPE_VALIDATORS: dict[str, type] = {
     "str": str,
     "int": int,
     "float": float,
     "bool": bool,
+    "exist": bool,
 }
 
 
@@ -89,6 +97,18 @@ class RuntimeVariantPresetService:
     async def update(
         self, action: UpdateRuntimeVariantPresetAction
     ) -> UpdateRuntimeVariantPresetActionResult:
+        spec = cast(RuntimeVariantPresetUpdaterSpec, action.updater.spec)
+        current = await self._repository.get_by_id(action.id)
+        effective_value_type = spec.value_type.optional_value() or current.value_type
+        effective_preset_target = spec.preset_target.optional_value() or current.preset_target
+        if (
+            effective_value_type == PresetValueType.EXIST
+            and effective_preset_target != PresetTarget.ARGS
+        ):
+            raise InvalidAPIParameters(
+                "value_type 'exist' is only valid with preset_target 'args'."
+            )
+
         action.updater.pk_value = action.id
         data = await self._repository.update(action.updater)
         return UpdateRuntimeVariantPresetActionResult(preset=data)

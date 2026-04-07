@@ -3582,7 +3582,9 @@ input CreateRuntimeVariantPresetInput
   """
   presetTarget: String!
 
-  """Data type for validation (e.g., 'str', 'int', 'float', 'bool')."""
+  """
+  Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'exist').
+  """
   valueType: String!
 
   """The default value shown to users when creating a deployment."""
@@ -11064,7 +11066,7 @@ type PresetTargetSpec
   """Target: env or args."""
   presetTarget: String!
 
-  """Value type: str, int, float, bool."""
+  """Value type: str, int, float, bool, exist."""
   valueType: String!
 
   """Default value."""

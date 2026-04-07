@@ -154,7 +154,7 @@ class PresetTargetSpecGQL(PydanticOutputMixin[PresetTargetSpecDTO]):
         description="How the value is applied to the container: 'env' sets it as an environment variable, 'args' appends it as a command-line argument."
     )
     value_type: str = gql_field(
-        description="Data type used for input validation (e.g., 'str', 'int', 'float', 'bool')."
+        description="Data type used for input validation (e.g., 'str', 'int', 'float', 'bool', 'exist')."
     )
     default_value: str | None = gql_field(
         description="The default value shown to users when they create a deployment using this preset."
@@ -245,7 +245,7 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
         description="How the value is applied: 'env' for environment variable, 'args' for command-line argument."
     )
     value_type: str = gql_field(
-        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool')."
+        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'exist')."
     )
     default_value: str | None = gql_field(
         default=None, description="The default value shown to users when creating a deployment."
