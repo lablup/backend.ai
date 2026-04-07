@@ -954,6 +954,7 @@ type ArtifactVerifierResultEntry {
 input AssignRoleInput {
   userId: UUID!
   roleId: UUID!
+  projectId: UUID
 }
 
 """Added in 24.09.0. Filter criteria for querying audit logs."""
@@ -1205,6 +1206,7 @@ type BulkAssignRoleError {
 input BulkAssignRoleInput {
   roleId: UUID!
   userIds: [UUID!]!
+  projectId: UUID
 }
 
 """Added in 26.3.0. Payload for bulk role assignment mutation."""

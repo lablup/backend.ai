@@ -1303,6 +1303,7 @@ input AssignRoleInput
 {
   userId: UUID!
   roleId: UUID!
+  projectId: UUID
 }
 
 """Added in 24.03.9."""
@@ -1791,6 +1792,7 @@ input BulkAssignRoleInput
 {
   roleId: UUID!
   userIds: [UUID!]!
+  projectId: UUID
 }
 
 """Added in 26.3.0. Payload for bulk role assignment mutation."""
