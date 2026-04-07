@@ -9,6 +9,7 @@ from ai.backend.manager.actions.action.rbac import (
     RBACActionName,
     RBACRequiredPermission,
 )
+from ai.backend.manager.data.permission.role import UserRoleRevocationData
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
@@ -204,11 +205,19 @@ class PermissionControllerService:
         If the role was project-scoped and no remaining roles exist in that
         project, the user is also removed from the project.
         """
-        data, project_remaining = await self._repository.revoke_role(action.input)
-        for prc in project_remaining:
+        result = await self._repository.revoke_role(action.input)
+        for prc in result.project_remaining_roles:
             if prc.remaining_count == 0:
-                await self._group_repository.unbind_user_from_project(data.user_id, prc.project_id)
-        return RevokeRoleActionResult(data=data)
+                await self._group_repository.unbind_user_from_project(
+                    action.input.user_id, prc.project_id
+                )
+        return RevokeRoleActionResult(
+            data=UserRoleRevocationData(
+                user_role_id=result.user_role_id,
+                user_id=action.input.user_id,
+                role_id=action.input.role_id,
+            )
+        )
 
     async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
         """Assigns a role to multiple users with partial failure support.

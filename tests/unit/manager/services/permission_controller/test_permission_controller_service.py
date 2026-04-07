@@ -36,9 +36,9 @@ from ai.backend.manager.data.permission.role import (
     RoleData,
     RoleDetailData,
     RolePermissionsUpdateInput,
+    RoleRevocationResult,
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
-    UserRoleRevocationData,
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import PermissionStatus, RoleStatus
@@ -494,12 +494,9 @@ class TestRevokeRole:
     ) -> None:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
-        revocation_data = UserRoleRevocationData(
+        mock_repository.revoke_role.return_value = RoleRevocationResult(
             user_role_id=uuid.uuid4(),
-            user_id=user_id,
-            role_id=role_id,
         )
-        mock_repository.revoke_role.return_value = (revocation_data, [])
 
         input_data = UserRoleRevocationInput(user_id=user_id, role_id=role_id)
         action = RevokeRoleAction(input=input_data)

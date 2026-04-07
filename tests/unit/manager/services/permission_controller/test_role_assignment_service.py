@@ -10,9 +10,9 @@ import pytest
 from ai.backend.manager.data.permission.role import (
     BulkRoleAssignmentResultData,
     ProjectRoleCount,
+    RoleRevocationResult,
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
-    UserRoleRevocationData,
     UserRoleRevocationInput,
 )
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -104,9 +104,9 @@ class TestRevokeRoleWithProject:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
         project_id = uuid.uuid4()
-        mock_repository.revoke_role.return_value = (
-            UserRoleRevocationData(user_role_id=uuid.uuid4(), user_id=user_id, role_id=role_id),
-            [ProjectRoleCount(project_id=project_id, remaining_count=0)],
+        mock_repository.revoke_role.return_value = RoleRevocationResult(
+            user_role_id=uuid.uuid4(),
+            project_remaining_roles=[ProjectRoleCount(project_id=project_id, remaining_count=0)],
         )
 
         action = RevokeRoleAction(input=UserRoleRevocationInput(user_id=user_id, role_id=role_id))
@@ -123,9 +123,9 @@ class TestRevokeRoleWithProject:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
         project_id = uuid.uuid4()
-        mock_repository.revoke_role.return_value = (
-            UserRoleRevocationData(user_role_id=uuid.uuid4(), user_id=user_id, role_id=role_id),
-            [ProjectRoleCount(project_id=project_id, remaining_count=1)],
+        mock_repository.revoke_role.return_value = RoleRevocationResult(
+            user_role_id=uuid.uuid4(),
+            project_remaining_roles=[ProjectRoleCount(project_id=project_id, remaining_count=1)],
         )
 
         action = RevokeRoleAction(input=UserRoleRevocationInput(user_id=user_id, role_id=role_id))
@@ -141,9 +141,8 @@ class TestRevokeRoleWithProject:
     ) -> None:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
-        mock_repository.revoke_role.return_value = (
-            UserRoleRevocationData(user_role_id=uuid.uuid4(), user_id=user_id, role_id=role_id),
-            [],
+        mock_repository.revoke_role.return_value = RoleRevocationResult(
+            user_role_id=uuid.uuid4(),
         )
 
         action = RevokeRoleAction(input=UserRoleRevocationInput(user_id=user_id, role_id=role_id))
