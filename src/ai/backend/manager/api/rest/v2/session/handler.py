@@ -10,8 +10,10 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, Qu
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
+    DestroySessionInput,
     EnqueueSessionInput,
     GetSessionLogsQuery,
+    RestartSessionInput,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
     TerminateSessionsInput,
@@ -162,6 +164,35 @@ class V2SessionHandler:
             path.parsed.session_id, body.parsed, access_key=user_ctx.access_key
         )
         return APIResponse.no_content(status_code=HTTPStatus.NO_CONTENT)
+
+    async def restart(
+        self,
+        user_ctx: UserContext,
+        path: PathParam[SessionIdPathParamDTO],
+        body: BodyParam[RestartSessionInput],
+    ) -> APIResponse:
+        """Restart a session."""
+        result = await self._adapter.restart(
+            path.parsed.session_id,
+            body.parsed,
+            access_key=user_ctx.access_key,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def destroy(
+        self,
+        user_ctx: UserContext,
+        path: PathParam[SessionIdPathParamDTO],
+        body: BodyParam[DestroySessionInput],
+    ) -> APIResponse:
+        """Destroy a session."""
+        result = await self._adapter.destroy(
+            path.parsed.session_id,
+            body.parsed,
+            user_role=user_ctx.user_role,
+            access_key=user_ctx.access_key,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def get_logs(
         self,
