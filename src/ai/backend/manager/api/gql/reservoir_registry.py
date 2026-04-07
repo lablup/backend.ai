@@ -206,7 +206,6 @@ class UpdateReservoirRegistryPayload(PydanticOutputMixin[UpdateReservoirRegistry
         description="Payload for deleting a reservoir registry.",
     ),
     model=DeleteReservoirRegistryPayloadDTO,
-    fields=["id"],
 )
 class DeleteReservoirRegistryPayload(PydanticOutputMixin[DeleteReservoirRegistryPayloadDTO]):
     id: ID
