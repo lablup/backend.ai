@@ -96,7 +96,10 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
             resource_group=creator.metadata.resource_group,
             created_user=creator.metadata.created_user,
             session_owner=creator.metadata.session_owner,
-            revision_history_limit=creator.metadata.revision_history_limit,
+            # Fall back to the legacy default when metadata leaves this as None.
+            revision_history_limit=creator.metadata.revision_history_limit
+            if creator.metadata.revision_history_limit is not None
+            else 10,
             tag=creator.metadata.tag,
             # Replica
             replicas=creator.replica_spec.replica_count,

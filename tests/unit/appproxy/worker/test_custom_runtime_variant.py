@@ -1,7 +1,7 @@
 """
 Tests for Custom inference runtime variant metrics collection.
 
-Verifies that RuntimeVariant.CUSTOM:
+Verifies that RuntimeVariant("custom"):
 - Returns all metrics without prefix filtering (same as HUGGINGFACE_TGI)
 - Handles multiple replicas correctly
 - Returns a list (not None) so metrics are collected
@@ -79,10 +79,10 @@ def _make_custom_circuit(routes: list[RouteInfo], port: int = 10300) -> Circuit:
         port=port,
         app_info=InferenceAppInfo(
             endpoint_id=uuid4(),
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
         ),
         subdomain=None,
-        runtime_variant=RuntimeVariant.CUSTOM,
+        runtime_variant=RuntimeVariant("custom"),
         envs={},
         arguments=None,
         open_to_public=False,
@@ -130,7 +130,7 @@ def _make_unsupported_circuit(
 
 
 class TestCustomRuntimeVariantMetrics:
-    """Tests for RuntimeVariant.CUSTOM metrics collection."""
+    """Tests for RuntimeVariant("custom") metrics collection."""
 
     async def test_custom_variant_collects_all_metrics_without_filtering(
         self, mock_metrics_client_pool: Any
@@ -211,8 +211,8 @@ custom_metric_a 10
     @pytest.mark.parametrize(
         "variant",
         [
-            pytest.param(RuntimeVariant.NIM, id="nim"),
-            pytest.param(RuntimeVariant.CMD, id="cmd"),
+            pytest.param(RuntimeVariant("nim"), id="nim"),
+            pytest.param(RuntimeVariant("cmd"), id="cmd"),
         ],
     )
     async def test_unsupported_variants_return_none(

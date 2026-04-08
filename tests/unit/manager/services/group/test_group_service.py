@@ -66,7 +66,7 @@ def _make_group_data(
         is_active=is_active,
         created_at=datetime.now(tz=UTC),
         modified_at=datetime.now(tz=UTC),
-        integration_id=None,
+        integration_name=None,
         domain_name=domain_name,
         total_resource_slots=ResourceSlot.from_user_input({}, None),
         allowed_vfolder_hosts=VFolderHostPermissionMap({}),

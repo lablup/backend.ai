@@ -6,7 +6,8 @@ from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -24,7 +25,6 @@ from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     KernelId,
-    RuntimeVariant,
     SessionId,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -77,6 +77,7 @@ from ai.backend.manager.errors.service import (
     AutoScalingRuleNotFound,
     DeploymentPolicyNotFound,
     EndpointNotFound,
+    EndpointTokenNotFound,
     NoUpdatesToApply,
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
@@ -97,7 +98,12 @@ from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.resource_slot.row import (
+    DeploymentRevisionResourceSlotRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, scaling_groups
 from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
@@ -150,6 +156,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ContainerUserContext,
     DeploymentContext,
     ImageContext,
+    ResolvedPresetValues,
     UserContext,
 )
 from ai.backend.manager.utils import query_userinfo_from_session
@@ -328,7 +335,6 @@ class DeploymentDBSource:
                 model_mount_destination=spec.model_mount_destination,
                 model_definition_path=spec.model_definition_path,
                 resource_group=spec.resource_group,
-                resource_slots=spec.resource_slots,
                 resource_opts=dict(spec.resource_opts) if spec.resource_opts else {},
                 cluster_mode=spec.cluster_mode.value,
                 cluster_size=spec.cluster_size,
@@ -339,6 +345,13 @@ class DeploymentDBSource:
                 runtime_variant=spec.runtime_variant,
                 extra_mounts=list(spec.extra_mounts),
             )
+            initial_revision.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(
+                    slot_name=str(slot_name),
+                    quantity=quantity,
+                )
+                for slot_name, quantity in spec.resource_slots.items()
+            ]
             db_sess.add(initial_revision)
             await db_sess.flush()
             endpoint.current_revision = initial_revision.id
@@ -963,6 +976,22 @@ class DeploymentDBSource:
             result = await db_sess.execute(query)
             return cast(CursorResult[Any], result).rowcount > 0
 
+    async def bulk_delete_autoscaling_rules(
+        self,
+        rule_ids: list[uuid.UUID],
+    ) -> list[uuid.UUID]:
+        """Delete multiple autoscaling rules and return the IDs that were actually deleted."""
+        if not rule_ids:
+            return []
+        async with self._begin_session_read_committed() as db_sess:
+            query = (
+                sa.delete(EndpointAutoScalingRuleRow)
+                .where(EndpointAutoScalingRuleRow.id.in_(rule_ids))
+                .returning(EndpointAutoScalingRuleRow.id)
+            )
+            result = await db_sess.execute(query)
+            return [row[0] for row in result.fetchall()]
+
     # New Model Deployment Auto-scaling Rule methods (using new types)
 
     async def create_model_deployment_autoscaling_rule(
@@ -1346,7 +1375,7 @@ class DeploymentDBSource:
                         route_id=row.route_id,
                         endpoint_id=row.endpoint_id,
                         endpoint_name=row.endpoint_name,
-                        runtime_variant=row.runtime_variant.value,
+                        runtime_variant=row.runtime_variant,
                         kernel_host=row.kernel_host,
                         kernel_port=inference_port,
                         session_owner=row.session_owner,
@@ -1557,6 +1586,7 @@ class DeploymentDBSource:
                 quota_scope_id=row.quota_scope_id,
                 host=row.host,
                 ownership_type=row.ownership_type,
+                usage_mode=row.usage_mode,
             )
 
     async def fetch_scaling_group_proxy_targets(
@@ -1957,7 +1987,7 @@ class DeploymentDBSource:
                 profile = MODEL_SERVICE_RUNTIME_PROFILES[row.runtime_variant]
                 if profile.health_check_endpoint:
                     configs[row.id] = ModelHealthCheck(path=profile.health_check_endpoint)
-                elif row.runtime_variant == RuntimeVariant.CUSTOM and row.model_definition:
+                elif row.runtime_variant == "custom" and row.model_definition:
                     md = ModelDefinition.model_validate(row.model_definition)
                     configs[row.id] = md.health_check_config()
                 else:
@@ -2063,6 +2093,29 @@ class DeploymentDBSource:
             )
             image_row = await ImageRow.resolve(db_sess, [image_identifier])
 
+            # Resolve preset_values from revision
+            resolved_presets: ResolvedPresetValues | None = None
+            if revision_row.preset_values:
+                preset_ids = [pv.preset_id for pv in revision_row.preset_values]
+                vp_stmt = sa.select(RuntimeVariantPresetRow).where(
+                    RuntimeVariantPresetRow.id.in_(preset_ids)
+                )
+                vp_rows = (await db_sess.execute(vp_stmt)).scalars().all()
+                vp_map = {row.id: row for row in vp_rows}
+                resolved_environ: dict[str, str] = {}
+                resolved_args: list[str] = []
+                for pv in revision_row.preset_values:
+                    vp = vp_map.get(pv.preset_id)
+                    if vp is None:
+                        continue
+                    if vp.preset_target == "env":
+                        resolved_environ[vp.key] = pv.value
+                    elif vp.preset_target == "args":
+                        resolved_args.append(f"{vp.key} {pv.value}")
+                resolved_presets = ResolvedPresetValues(
+                    environ=resolved_environ, args=resolved_args
+                )
+
             # Build DeploymentContext
             return DeploymentContext(
                 created_user=UserContext(
@@ -2088,6 +2141,7 @@ class DeploymentDBSource:
                     ref=image_row.image_ref,
                     labels=image_row.labels or {},
                 ),
+                resolved_presets=resolved_presets,
             )
 
     async def fetch_session_statuses_by_route_ids(
@@ -2141,6 +2195,21 @@ class DeploymentDBSource:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
             return await endpoint.generate_route_info(db_sess)
 
+    async def list_active_endpoint_ids(self) -> list[uuid.UUID]:
+        """Return every endpoint id whose lifecycle_stage is considered active.
+
+        Used by the manager-side periodic route sync loop to re-push route
+        connection info into Redis for every live deployment, so the app
+        proxy coordinator can eventually converge on the manager's DB state.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(
+                sa.select(EndpointRow.id).where(
+                    EndpointRow.lifecycle_stage.in_(EndpointLifecycle.active_states())
+                )
+            )
+            return [row[0] for row in result.all()]
+
     async def get_endpoint_health_check_config(
         self,
         endpoint_id: uuid.UUID,
@@ -2173,7 +2242,7 @@ class DeploymentDBSource:
                 endpoint_data.runtime_variant
             ].health_check_endpoint:
                 _info = ModelHealthCheck(path=_path)
-            elif endpoint_data.runtime_variant == RuntimeVariant.CUSTOM:
+            elif endpoint_data.runtime_variant == "custom":
                 # For custom runtime, check model definition file
                 model_definition_path = (
                     await ModelServiceHelper.validate_model_definition_file_exists(
@@ -2190,9 +2259,13 @@ class DeploymentDBSource:
                     model_definition_path,
                 )
 
-                # Check each model in the definition for health check config
+                # Check each model in the definition for health check config.
+                # `service` can be explicitly null in the model definition YAML,
+                # in which case dict.get("service", {}) still returns None — so
+                # normalize to an empty dict before chaining the next .get().
                 for model_info in model_definition["models"]:
-                    if health_check_info := model_info.get("service", {}).get("health_check"):
+                    service_info = model_info.get("service") or {}
+                    if health_check_info := service_info.get("health_check"):
                         _info = ModelHealthCheck(
                             path=health_check_info["path"],
                             interval=health_check_info.get("interval"),
@@ -2653,6 +2726,50 @@ class DeploymentDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    async def get_access_token(
+        self,
+        token_id: uuid.UUID,
+    ) -> ModelDeploymentAccessTokenData:
+        """Get a single access token by ID."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointTokenRow).where(EndpointTokenRow.id == token_id)
+            result = await db_sess.execute(query)
+            row = result.scalar_one_or_none()
+            if not row:
+                raise EndpointTokenNotFound(f"Access token {token_id} not found")
+            return ModelDeploymentAccessTokenData(
+                id=row.id,
+                token=row.token,
+                expires_at=row.expires_at,
+                created_at=row.created_at or datetime.now(UTC),
+            )
+
+    async def delete_access_token(
+        self,
+        token_id: uuid.UUID,
+    ) -> bool:
+        """Delete an access token."""
+        async with self._begin_session_read_committed() as db_sess:
+            query = sa.delete(EndpointTokenRow).where(EndpointTokenRow.id == token_id)
+            result = await db_sess.execute(query)
+            return cast(CursorResult[Any], result).rowcount > 0
+
+    async def bulk_delete_access_tokens(
+        self,
+        token_ids: list[uuid.UUID],
+    ) -> list[uuid.UUID]:
+        """Delete multiple access tokens and return the IDs that were actually deleted."""
+        if not token_ids:
+            return []
+        async with self._begin_session_read_committed() as db_sess:
+            query = (
+                sa.delete(EndpointTokenRow)
+                .where(EndpointTokenRow.id.in_(token_ids))
+                .returning(EndpointTokenRow.id)
+            )
+            result = await db_sess.execute(query)
+            return [row[0] for row in result.fetchall()]
+
     async def search_access_tokens(
         self,
         querier: BatchQuerier,
@@ -2677,10 +2794,10 @@ class DeploymentDBSource:
             return AccessTokenSearchResult(
                 items=[
                     ModelDeploymentAccessTokenData(
-                        id=row.id,
-                        token=row.token,
-                        valid_until=row.valid_until,
-                        created_at=row.created_at,
+                        id=row.EndpointTokenRow.id,
+                        token=row.EndpointTokenRow.token,
+                        expires_at=row.EndpointTokenRow.expires_at,
+                        created_at=row.EndpointTokenRow.created_at,
                     )
                     for row in result.rows
                 ],
@@ -2802,3 +2919,32 @@ class DeploymentDBSource:
                 )
             )
             await db_sess.execute(query)
+
+    async def search_revision_resource_slots(
+        self,
+        revision_id: uuid.UUID,
+        querier: BatchQuerier,
+    ) -> tuple[list[tuple[str, Decimal]], int, bool, bool]:
+        """Search resource slots allocated to a deployment revision.
+
+        Returns (items, total_count, has_next_page, has_previous_page).
+        Each item is a (slot_name, quantity) tuple.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(DeploymentRevisionResourceSlotRow, ResourceSlotTypeRow.rank)
+                .join(
+                    ResourceSlotTypeRow,
+                    DeploymentRevisionResourceSlotRow.slot_name == ResourceSlotTypeRow.slot_name,
+                )
+                .where(DeploymentRevisionResourceSlotRow.revision_id == revision_id)
+            )
+            result = await execute_batch_querier(db_sess, query, querier)
+            items: list[tuple[str, Decimal]] = [
+                (
+                    row.DeploymentRevisionResourceSlotRow.slot_name,
+                    row.DeploymentRevisionResourceSlotRow.quantity,
+                )
+                for row in result.rows
+            ]
+            return items, result.total_count, result.has_next_page, result.has_previous_page

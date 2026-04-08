@@ -29,6 +29,7 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     KernelId,
     SessionId,
+    VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.api.gql_legacy.statistics import EndpointStatistics, KernelStatistics
@@ -55,6 +56,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyUpsertResult,
     DeploymentSummarySearchResult,
     DeploymentWithHistory,
+    ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -405,6 +407,14 @@ class DeploymentRepository:
         """Delete an autoscaling rule."""
         return await self._db_source.delete_autoscaling_rule(rule_id)
 
+    @deployment_repository_resilience.apply()
+    async def bulk_delete_autoscaling_rules(
+        self,
+        rule_ids: list[uuid.UUID],
+    ) -> list[uuid.UUID]:
+        """Delete multiple autoscaling rules."""
+        return await self._db_source.bulk_delete_autoscaling_rules(rule_ids)
+
     # Model Deployment Auto-scaling Rule operations (new types)
 
     @deployment_repository_resilience.apply()
@@ -457,7 +467,10 @@ class DeploymentRepository:
             dict: Parsed model definition content
         """
         vfolder_location = await self._db_source.get_vfolder_by_id(vfolder_id)
-        if vfolder_location.ownership_type == VFolderOwnershipType.GROUP:
+        if (
+            vfolder_location.ownership_type == VFolderOwnershipType.GROUP
+            and vfolder_location.usage_mode != VFolderUsageMode.MODEL
+        ):
             raise InvalidAPIParameters(
                 "Cannot create model service with the project type's vfolder"
             )
@@ -520,7 +533,10 @@ class DeploymentRepository:
             dict: Parsed deployment config content, or None if not found
         """
         vfolder_location = await self._db_source.get_vfolder_by_id(vfolder_id)
-        if vfolder_location.ownership_type == VFolderOwnershipType.GROUP:
+        if (
+            vfolder_location.ownership_type == VFolderOwnershipType.GROUP
+            and vfolder_location.usage_mode != VFolderUsageMode.MODEL
+        ):
             raise InvalidAPIParameters(
                 "Cannot create model service with the project type's vfolder"
             )
@@ -1078,6 +1094,14 @@ class DeploymentRepository:
         )
 
     @deployment_repository_resilience.apply()
+    async def list_active_endpoint_ids(self) -> list[uuid.UUID]:
+        """Return every endpoint id whose lifecycle_stage is considered active.
+
+        Used by the periodic app proxy route sync loop.
+        """
+        return await self._db_source.list_active_endpoint_ids()
+
+    @deployment_repository_resilience.apply()
     async def get_endpoint_id_by_session(
         self,
         session_id: uuid.UUID,
@@ -1377,6 +1401,15 @@ class DeploymentRepository:
         return await self._db_source.search_routes(querier)
 
     @deployment_repository_resilience.apply()
+    async def search_revision_resource_slots(
+        self,
+        revision_id: uuid.UUID,
+        querier: BatchQuerier,
+    ) -> tuple[list[tuple[str, Decimal]], int, bool, bool]:
+        """Search resource slots allocated to a deployment revision."""
+        return await self._db_source.search_revision_resource_slots(revision_id, querier)
+
+    @deployment_repository_resilience.apply()
     async def get_route(
         self,
         route_id: uuid.UUID,
@@ -1431,6 +1464,30 @@ class DeploymentRepository:
             Created EndpointTokenRow.
         """
         return await self._db_source.create_access_token(creator)
+
+    @deployment_repository_resilience.apply()
+    async def get_access_token(
+        self,
+        token_id: uuid.UUID,
+    ) -> ModelDeploymentAccessTokenData:
+        """Get a single access token by ID."""
+        return await self._db_source.get_access_token(token_id)
+
+    @deployment_repository_resilience.apply()
+    async def delete_access_token(
+        self,
+        token_id: uuid.UUID,
+    ) -> bool:
+        """Delete an access token."""
+        return await self._db_source.delete_access_token(token_id)
+
+    @deployment_repository_resilience.apply()
+    async def bulk_delete_access_tokens(
+        self,
+        token_ids: list[uuid.UUID],
+    ) -> list[uuid.UUID]:
+        """Delete multiple access tokens."""
+        return await self._db_source.bulk_delete_access_tokens(token_ids)
 
     # ========== Additional Search Operations ==========
 

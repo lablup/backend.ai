@@ -20,7 +20,7 @@ class DomainCreatorSpec(CreatorSpec[DomainRow]):
     total_resource_slots: ResourceSlot | None = None
     allowed_vfolder_hosts: dict[str, list[str]] | None = None
     allowed_docker_registries: list[str] | None = None
-    integration_id: str | None = None
+    integration_name: str | None = None
     dotfiles: bytes | None = None
 
     @override
@@ -38,6 +38,6 @@ class DomainCreatorSpec(CreatorSpec[DomainRow]):
             allowed_docker_registries=self.allowed_docker_registries
             if self.allowed_docker_registries
             else [],
-            integration_id=self.integration_id,
+            integration_id=self.integration_name,  # DB column is integration_id
             dotfiles=self.dotfiles if self.dotfiles else b"\x90",
         )

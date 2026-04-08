@@ -71,3 +71,9 @@ class DeleteAutoScalingRulePayload(BaseResponseModel):
     """Payload for auto-scaling rule deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted auto-scaling rule")
+
+
+class BulkDeleteAutoScalingRulesPayload(BaseResponseModel):
+    """Payload for bulk auto-scaling rule deletion mutation result."""
+
+    ids: list[UUID] = Field(description="IDs of the deleted auto-scaling rules")

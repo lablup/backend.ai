@@ -4,6 +4,9 @@ import pytest
 
 from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.actions.update_full_name import (
     UpdateFullNameAction,
 )
@@ -26,6 +29,7 @@ def auth_service(
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
         valkey_session_client=AsyncMock(),
+        user_resource_policy_repository=AsyncMock(spec=UserResourcePolicyRepository),
     )
 
 

@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
     RuntimeVariantPresetOrderField,
+    UIOption,
 )
 
 
@@ -24,6 +25,11 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
     value_type: PresetValueType = Field(description="Value type: str, int, float, bool.")
     default_value: str | None = Field(default=None, max_length=512, description="Default value.")
     key: str = Field(min_length=1, max_length=256, description="Env key or args flag.")
+    category: str | None = Field(default=None, max_length=64, description="UI category group.")
+    display_name: str | None = Field(default=None, max_length=256, description="UI display name.")
+    ui_option: UIOption | None = Field(
+        default=None, description="UI rendering option. Contains ui_type and type-specific config."
+    )
 
 
 class UpdateRuntimeVariantPresetInput(BaseRequestModel):
@@ -35,6 +41,9 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
     value_type: PresetValueType | None = Field(default=None)
     default_value: str | Sentinel | None = Field(default=SENTINEL)
     key: str | None = Field(default=None, min_length=1, max_length=256)
+    category: str | Sentinel | None = Field(default=SENTINEL)
+    display_name: str | Sentinel | None = Field(default=SENTINEL)
+    ui_option: UIOption | Sentinel | None = Field(default=SENTINEL)
 
 
 class RuntimeVariantPresetFilter(BaseRequestModel):

@@ -44,7 +44,7 @@ def mock_deployment_repo() -> AsyncMock:
     repo.fetch_metrics_for_autoscaling = AsyncMock(return_value=MagicMock())
     repo.calculate_desired_replicas_for_deployment = AsyncMock(return_value=None)
     mock_revision_spec = MagicMock()
-    mock_revision_spec.execution.runtime_variant = RuntimeVariant.CUSTOM
+    mock_revision_spec.execution.runtime_variant = RuntimeVariant("custom")
     repo.get_revision_spec_from_endpoint = AsyncMock(return_value=mock_revision_spec)
     return repo
 

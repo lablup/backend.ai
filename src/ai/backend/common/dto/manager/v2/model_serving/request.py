@@ -89,7 +89,7 @@ class CreateServiceInput(BaseRequestModel):
         description="Number of sessions to serve traffic",
     )
     runtime_variant: RuntimeVariant = Field(
-        default=RuntimeVariant.CUSTOM,
+        default=RuntimeVariant("custom"),
         description="Type of the inference runtime",
     )
     cluster_size: int = Field(

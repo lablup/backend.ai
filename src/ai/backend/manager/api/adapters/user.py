@@ -411,6 +411,7 @@ class UserAdapter(BaseAdapter):
             container_uid=input.container_uid,
             container_main_gid=input.container_main_gid,
             container_gids=input.container_gids,
+            integration_name=input.integration_name,
         )
         group_ids = [str(gid) for gid in input.group_ids] if input.group_ids else None
         result = await self._processors.user.create_user.wait_for_complete(
@@ -506,6 +507,11 @@ class UserAdapter(BaseAdapter):
                 TriState.nop()
                 if isinstance(input.container_gids, Sentinel)
                 else TriState.from_graphql(input.container_gids)
+            ),
+            integration_name=(
+                TriState.nop()
+                if isinstance(input.integration_name, Sentinel)
+                else TriState.from_graphql(input.integration_name)
             ),
             group_ids=(
                 OptionalState.nop()
@@ -957,6 +963,17 @@ class UserAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter_req.integration_name is not None:
+            condition = self.convert_string_filter(
+                filter_req.integration_name,
+                contains_factory=UserConditions.by_integration_name_contains,
+                equals_factory=UserConditions.by_integration_name_equals,
+                starts_with_factory=UserConditions.by_integration_name_starts_with,
+                ends_with_factory=UserConditions.by_integration_name_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter_req.role is not None:
             conditions.extend(self._convert_role_filter(filter_req.role))
 
@@ -1133,6 +1150,17 @@ class UserAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter_req.integration_name is not None:
+            condition = self.convert_string_filter(
+                filter_req.integration_name,
+                contains_factory=UserConditions.by_integration_name_contains,
+                equals_factory=UserConditions.by_integration_name_equals,
+                starts_with_factory=UserConditions.by_integration_name_starts_with,
+                ends_with_factory=UserConditions.by_integration_name_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter_req.status is not None:
             status_f = filter_req.status
             if status_f.equals is not None:
@@ -1212,6 +1240,7 @@ class UserAdapter(BaseAdapter):
                 email=data.email,
                 full_name=data.full_name,
                 description=data.description,
+                integration_name=data.integration_name,
             ),
             status=UserStatusInfo(
                 status=UserStatusDTO(data.status),

@@ -28,6 +28,12 @@ class DeleteRuntimeVariantPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the deleted runtime variant.")
 
 
+class DeleteRuntimeVariantsPayload(BaseResponseModel):
+    """Payload for bulk runtime variant deletion."""
+
+    deleted_count: int = Field(description="Number of runtime variants successfully deleted.")
+
+
 class SearchRuntimeVariantsPayload(BaseResponseModel):
     items: list[RuntimeVariantNode] = Field(description="List of runtime variants.")
     total_count: int = Field(description="Total number of matching items.")

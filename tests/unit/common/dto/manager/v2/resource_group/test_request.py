@@ -25,7 +25,7 @@ class TestCreateResourceGroupInput:
         assert req.description is None
         assert req.total_resource_slots is None
         assert req.allowed_vfolder_hosts is None
-        assert req.integration_id is None
+        assert req.integration_name is None
         assert req.resource_policy is None
 
     def test_valid_creation_with_all_fields(self) -> None:
@@ -35,7 +35,7 @@ class TestCreateResourceGroupInput:
             description="A test group",
             total_resource_slots={"cpu": "4"},
             allowed_vfolder_hosts={"default": "rw"},
-            integration_id="ext-001",
+            integration_name="ext-001",
             resource_policy="default",
         )
         assert req.name == "my-group"
@@ -91,7 +91,7 @@ class TestUpdateResourceGroupInput:
         assert isinstance(req.description, Sentinel)
         assert req.total_resource_slots is SENTINEL
         assert req.allowed_vfolder_hosts is SENTINEL
-        assert req.integration_id is SENTINEL
+        assert req.integration_name is SENTINEL
         assert req.resource_policy is SENTINEL
 
     def test_sentinel_description_signals_clear(self) -> None:
@@ -121,7 +121,7 @@ class TestUpdateResourceGroupInput:
             is_active=None,
             total_resource_slots=None,
             allowed_vfolder_hosts=None,
-            integration_id=None,
+            integration_name=None,
             resource_policy=None,
         )
         json_data = req.model_dump_json()

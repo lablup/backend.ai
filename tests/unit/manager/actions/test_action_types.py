@@ -70,9 +70,10 @@ class TestEntityType:
             EntityType.NOTIFICATION_CHANNEL,
             EntityType.NOTIFICATION_RULE,
             EntityType.MODEL_DEPLOYMENT,
+            EntityType.MODEL_CARD,
         }
         assert resource_types == expected
-        assert len(resource_types) == 9
+        assert len(resource_types) == 10
 
     def test_scope_and_resource_types_no_overlap(self) -> None:
         scope_types = EntityType._scope_types()

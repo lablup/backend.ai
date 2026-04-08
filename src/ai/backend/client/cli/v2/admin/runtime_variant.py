@@ -200,3 +200,24 @@ def delete(variant_id: uuid.UUID) -> None:
             await registry.close()
 
     _run_async(_run)
+
+
+@runtime_variant.command(name="bulk-delete")
+@click.argument("ids", nargs=-1, required=True, type=click.UUID)
+def bulk_delete(ids: tuple[uuid.UUID, ...]) -> None:
+    """Delete multiple runtime variants by ID (superadmin only)."""
+    from ai.backend.common.dto.manager.v2.runtime_variant.request import (
+        DeleteRuntimeVariantsInput,
+    )
+
+    input_dto = DeleteRuntimeVariantsInput(ids=list(ids))
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.runtime_variant.bulk_delete(input_dto)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    _run_async(_run)

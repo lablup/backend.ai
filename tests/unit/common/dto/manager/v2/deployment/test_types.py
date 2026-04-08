@@ -17,7 +17,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentBasicInfo,
     DeploymentOrderField,
     DeploymentPolicyInfo,
-    DeploymentRevisionInfo,
     IntOrPercent,
     NetworkConfigInfo,
     OrderDirection,
@@ -41,7 +40,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     RouteTrafficStatus as ExportedRouteTrafficStatus,
 )
-from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 
 class TestOrderDirection:
@@ -299,70 +297,6 @@ class TestReplicaStateInfo:
         restored = ReplicaStateInfo.model_validate_json(json_str)
         assert restored.desired_replica_count == info.desired_replica_count
         assert restored.replica_ids == info.replica_ids
-
-
-class TestDeploymentRevisionInfo:
-    """Tests for DeploymentRevisionInfo model creation and serialization."""
-
-    def test_creation_with_all_fields(self) -> None:
-        image_id = uuid.uuid4()
-        model_vfolder_id = uuid.uuid4()
-        info = DeploymentRevisionInfo(
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            cluster_size=1,
-            resource_group="default",
-            resource_slots={"cpu": "2", "mem": "4g"},
-            image_id=image_id,
-            runtime_variant=RuntimeVariant.CUSTOM,
-            model_vfolder_id=model_vfolder_id,
-            model_mount_destination="/models",
-            model_definition_path="/models/model.yaml",
-        )
-        assert info.cluster_mode == ClusterMode.SINGLE_NODE
-        assert info.cluster_size == 1
-        assert info.resource_group == "default"
-        assert info.image_id == image_id
-        assert info.runtime_variant == RuntimeVariant.CUSTOM
-        assert info.model_vfolder_id == model_vfolder_id
-        assert info.model_mount_destination == "/models"
-        assert info.model_definition_path == "/models/model.yaml"
-
-    def test_creation_with_optional_none(self) -> None:
-        info = DeploymentRevisionInfo(
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            cluster_size=1,
-            resource_group="default",
-            resource_slots={},
-            image_id=uuid.uuid4(),
-            runtime_variant=RuntimeVariant.VLLM,
-            model_vfolder_id=None,
-            model_mount_destination=None,
-            model_definition_path=None,
-        )
-        assert info.model_vfolder_id is None
-        assert info.model_mount_destination is None
-        assert info.model_definition_path is None
-
-    def test_serialization_round_trip(self) -> None:
-        image_id = uuid.uuid4()
-        model_id = uuid.uuid4()
-        info = DeploymentRevisionInfo(
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            cluster_size=2,
-            resource_group="gpu-group",
-            resource_slots={"cpu": "4", "cuda.shares": "1"},
-            image_id=image_id,
-            runtime_variant=RuntimeVariant.CUSTOM,
-            model_vfolder_id=model_id,
-            model_mount_destination="/models",
-            model_definition_path="/models/def.yaml",
-        )
-        json_str = info.model_dump_json()
-        restored = DeploymentRevisionInfo.model_validate_json(json_str)
-        assert restored.cluster_mode == info.cluster_mode
-        assert restored.cluster_size == info.cluster_size
-        assert restored.image_id == info.image_id
-        assert restored.model_vfolder_id == info.model_vfolder_id
 
 
 class TestRollingUpdateConfigInfo:

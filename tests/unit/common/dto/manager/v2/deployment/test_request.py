@@ -107,7 +107,7 @@ class TestRevisionInput:
 
     def test_default_runtime_variant_is_custom(self) -> None:
         rev = _make_revision_input()
-        assert rev.runtime_variant == RuntimeVariant.CUSTOM
+        assert rev.runtime_variant == RuntimeVariant("custom")
 
     def test_default_model_mount_destination(self) -> None:
         rev = _make_revision_input()
@@ -137,8 +137,8 @@ class TestRevisionInput:
         assert rev.extra_mounts[0].mount_destination == "/data"
 
     def test_with_vllm_runtime_variant(self) -> None:
-        rev = _make_revision_input(runtime_variant=RuntimeVariant.VLLM)
-        assert rev.runtime_variant == RuntimeVariant.VLLM
+        rev = _make_revision_input(runtime_variant=RuntimeVariant("vllm"))
+        assert rev.runtime_variant == RuntimeVariant("vllm")
 
 
 class TestExtraVFolderMountInput:

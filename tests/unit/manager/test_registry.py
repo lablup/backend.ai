@@ -261,28 +261,28 @@ class TestGetHealthCheckInfo:
     @pytest.fixture
     def mock_endpoint_custom(self) -> MockEndpointData:
         return MockEndpointData(
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
             model_definition_path="model-definition.yaml",
         )
 
     @pytest.fixture
     def mock_endpoint_vllm_with_definition(self) -> MockEndpointData:
         return MockEndpointData(
-            runtime_variant=RuntimeVariant.VLLM,
+            runtime_variant=RuntimeVariant("vllm"),
             model_definition_path="model-definition.yaml",
         )
 
     @pytest.fixture
     def mock_endpoint_cmd(self) -> MockEndpointData:
         return MockEndpointData(
-            runtime_variant=RuntimeVariant.CMD,
+            runtime_variant=RuntimeVariant("cmd"),
             model_definition_path=None,
         )
 
     @pytest.fixture
     def mock_endpoint_cmd_with_definition(self) -> MockEndpointData:
         return MockEndpointData(
-            runtime_variant=RuntimeVariant.CMD,
+            runtime_variant=RuntimeVariant("cmd"),
             model_definition_path="model-definition.yaml",
         )
 
@@ -453,7 +453,7 @@ class TestGetHealthCheckInfo:
     ) -> None:
         """Test VLLM variant returns default health check endpoint from profile."""
         endpoint = MockEndpointData(
-            runtime_variant=RuntimeVariant.VLLM,
+            runtime_variant=RuntimeVariant("vllm"),
             model_definition_path=None,
         )
 
@@ -464,7 +464,7 @@ class TestGetHealthCheckInfo:
         )
 
         assert result is not None
-        expected_path = MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.VLLM].health_check_endpoint
+        expected_path = MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant("vllm")].health_check_endpoint
         assert result.path == expected_path
 
     async def test_vllm_variant_override_preserves_default_initial_delay(

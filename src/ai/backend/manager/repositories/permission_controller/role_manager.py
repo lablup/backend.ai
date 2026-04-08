@@ -17,6 +17,7 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     OperationType,
+    RBACElementRef,
     RoleSource,
 )
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
@@ -28,6 +29,10 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
     ObjectPermissionCreatorSpec,
@@ -61,14 +66,20 @@ class RoleManager:
     async def _create_system_role(
         self, db_session: SASession, data: ScopeSystemRoleData
     ) -> RoleData:
-        creator = Creator(
+        scope_id = data.scope_id()
+        rbac_creator = RBACEntityCreator(
             spec=RoleCreatorSpec(
                 name=data.role_name(),
                 source=RoleSource.SYSTEM,
                 status=RoleStatus.ACTIVE,
-            )
+            ),
+            element_type=RBACElementType.ROLE,
+            scope_ref=RBACElementRef(
+                element_type=scope_id.scope_type.to_element(),
+                element_id=scope_id.scope_id,
+            ),
         )
-        result = await execute_creator(db_session, creator)
+        result = await execute_rbac_entity_creator(db_session, rbac_creator)
         return result.row.to_data()
 
     async def _create_permissions(

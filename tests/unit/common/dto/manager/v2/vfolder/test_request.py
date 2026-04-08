@@ -40,7 +40,7 @@ class TestCreateVFolderInput:
         assert req.usage_mode == VFolderUsageMode.GENERAL
         assert req.permission == VFolderPermissionField.READ_WRITE
         assert req.host is None
-        assert req.group_id is None
+        assert req.project_id is None
         assert req.cloneable is False
         assert req.unmanaged_path is None
 
@@ -63,13 +63,13 @@ class TestCreateVFolderInput:
             host="nfs01",
             usage_mode=VFolderUsageMode.MODEL,
             permission=VFolderPermissionField.READ_ONLY,
-            group_id=gid,
+            project_id=gid,
             cloneable=True,
             unmanaged_path="/data/shared",
         )
         assert req.host == "nfs01"
         assert req.usage_mode == VFolderUsageMode.MODEL
-        assert req.group_id == gid
+        assert req.project_id == gid
 
     def test_round_trip_serialization(self) -> None:
         req = CreateVFolderInput(name="roundtrip")
@@ -134,18 +134,18 @@ class TestCloneVFolderInput:
     """Tests for CloneVFolderInput model."""
 
     def test_valid_creation(self) -> None:
-        req = CloneVFolderInput(source_id=uuid.uuid4(), target_name="clone-folder")
-        assert req.target_name == "clone-folder"
+        req = CloneVFolderInput(name="clone-folder")
+        assert req.name == "clone-folder"
         assert req.usage_mode == VFolderUsageMode.GENERAL
         assert req.cloneable is False
 
-    def test_target_name_whitespace_stripped(self) -> None:
-        req = CloneVFolderInput(source_id=uuid.uuid4(), target_name="  clone  ")
-        assert req.target_name == "clone"
+    def test_name_whitespace_stripped(self) -> None:
+        req = CloneVFolderInput(name="  clone  ")
+        assert req.name == "clone"
 
-    def test_empty_target_name_raises(self) -> None:
+    def test_empty_name_raises(self) -> None:
         with pytest.raises(ValidationError):
-            CloneVFolderInput(source_id=uuid.uuid4(), target_name="")
+            CloneVFolderInput(name="")
 
 
 class TestFileOperationInputs:
@@ -196,9 +196,9 @@ class TestFileOperationInputs:
         with pytest.raises(ValidationError):
             DeleteFilesInput(files=[])
 
-    def test_list_files_default_path(self) -> None:
-        req = ListFilesInput()
-        assert req.path == ""
+    def test_list_files_requires_path(self) -> None:
+        req = ListFilesInput(path="/")
+        assert req.path == "/"
 
 
 class TestSharingInputs:

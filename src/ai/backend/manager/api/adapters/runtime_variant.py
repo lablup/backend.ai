@@ -4,6 +4,7 @@ from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput,
+    DeleteRuntimeVariantsInput,
     RuntimeVariantFilter,
     RuntimeVariantOrder,
     SearchRuntimeVariantsInput,
@@ -12,6 +13,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     CreateRuntimeVariantPayload,
     DeleteRuntimeVariantPayload,
+    DeleteRuntimeVariantsPayload,
     RuntimeVariantNode,
     SearchRuntimeVariantsPayload,
     UpdateRuntimeVariantPayload,
@@ -134,6 +136,14 @@ class RuntimeVariantAdapter(BaseAdapter):
             DeleteRuntimeVariantAction(id=variant_id)
         )
         return DeleteRuntimeVariantPayload(id=result.runtime_variant.id)
+
+    async def bulk_delete(self, input: DeleteRuntimeVariantsInput) -> DeleteRuntimeVariantsPayload:
+        """Delete multiple runtime variants by ID."""
+        for variant_id in input.ids:
+            await self._processors.runtime_variant.delete.wait_for_complete(
+                DeleteRuntimeVariantAction(id=variant_id)
+            )
+        return DeleteRuntimeVariantsPayload(deleted_count=len(input.ids))
 
     def _convert_filter(self, filter_: RuntimeVariantFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

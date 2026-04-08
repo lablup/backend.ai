@@ -49,5 +49,11 @@ def register_v2_runtime_variant_routes(
         handler.delete,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "POST",
+        "/delete",
+        handler.bulk_delete,
+        middlewares=[superadmin_required],
+    )
 
     return registry

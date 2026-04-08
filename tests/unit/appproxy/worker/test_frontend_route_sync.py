@@ -74,10 +74,10 @@ def _make_circuit(routes: list[RouteInfo], port: int = 10200) -> Circuit:
         port=port,
         app_info=InferenceAppInfo(
             endpoint_id=uuid4(),
-            runtime_variant=RuntimeVariant.VLLM,
+            runtime_variant=RuntimeVariant("vllm"),
         ),
         subdomain=None,
-        runtime_variant=RuntimeVariant.VLLM,
+        runtime_variant=RuntimeVariant("vllm"),
         envs={},
         arguments=None,
         open_to_public=False,

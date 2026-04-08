@@ -33,7 +33,7 @@ from ai.backend.common.types import (
     AccessKey,
     ImageAlias,
     KernelEnqueueingConfig,
-    RuntimeVariant,
+    MountPermission,
     SessionTypes,
     VFolderID,
 )
@@ -282,7 +282,11 @@ class ModelServingService:
             },
         }
         creation_config["mount_options"] = {
-            m.vfid.folder_id: {"permission": m.mount_perm} for m in service_prepare_ctx.extra_mounts
+            model_vfolder_id: {"permission": MountPermission.READ_ONLY},
+            **{
+                m.vfid.folder_id: {"permission": m.mount_perm}
+                for m in service_prepare_ctx.extra_mounts
+            },
         }
         sudo_session_enabled = action.creator.sudo_session_enabled
 
@@ -536,7 +540,11 @@ class ModelServingService:
         for m in service_prepare_ctx.extra_mounts:
             mount_map[m.vfid.folder_id] = str(m.kernel_path)
         mount_options: dict[uuid.UUID, dict[str, Any]] = {
-            m.vfid.folder_id: {"permission": m.mount_perm} for m in service_prepare_ctx.extra_mounts
+            model_vfolder_id: {"permission": MountPermission.READ_ONLY},
+            **{
+                m.vfid.folder_id: {"permission": m.mount_perm}
+                for m in service_prepare_ctx.extra_mounts
+            },
         }
         environ = creation_config.get("environ", {})
 
@@ -938,7 +946,7 @@ class ModelServingService:
             storage_manager=self._storage_manager,
         )
 
-        if action.runtime_variant == RuntimeVariant.CUSTOM:
+        if action.runtime_variant == "custom":
             vfid = VFolderID(ctx.model_folder_quota_scope_id, ctx.model_id)
             yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self._storage_manager,
@@ -954,7 +962,7 @@ class ModelServingService:
             )
         else:
             if (
-                action.runtime_variant != RuntimeVariant.CMD
+                action.runtime_variant != "cmd"
                 and action.config.model_mount_destination != "/models"
             ):
                 raise InvalidAPIParameters(

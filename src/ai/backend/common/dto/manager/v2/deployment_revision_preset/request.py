@@ -8,6 +8,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
@@ -34,9 +35,7 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     )
     name: str = Field(min_length=1, max_length=256, description="Preset name.")
     description: str | None = Field(default=None, description="Description.")
-    image: str | None = Field(
-        default=None, max_length=512, description="Container image reference."
-    )
+    image_id: UUID = Field(description="Container image UUID.")
     model_definition: dict[str, Any] | None = Field(
         default=None, description="Model definition configuration."
     )
@@ -56,6 +55,25 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     preset_values: list[PresetValueInput] | None = Field(
         default=None, description="Preset values from runtime variant presets."
     )
+    open_to_public: bool | None = Field(
+        default=None,
+        description="Default open_to_public for deployments created from this preset.",
+    )
+    replica_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Default replica count for deployments created from this preset.",
+    )
+    revision_history_limit: int | None = Field(
+        default=None,
+        ge=0,
+        description="Default revision history limit for deployments created from this preset.",
+    )
+    deployment_strategy: DeploymentStrategyInput | None = Field(
+        default=None,
+        description="Default deployment strategy (rolling or blue-green) for "
+        "deployments created from this preset.",
+    )
 
 
 class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
@@ -63,7 +81,7 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     name: str | None = Field(default=None, min_length=1, max_length=256)
     description: str | Sentinel | None = Field(default=SENTINEL)
     rank: int | None = Field(default=None, ge=0)
-    image: str | Sentinel | None = Field(default=SENTINEL)
+    image_id: UUID | Sentinel | None = Field(default=SENTINEL)
     model_definition: dict[str, Any] | Sentinel | None = Field(default=SENTINEL)
     resource_slots: list[ResourceSlotEntryInput] | None = Field(default=None)
     resource_opts: list[ResourceOptsEntryInput] | None = Field(default=None)
@@ -73,6 +91,10 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     bootstrap_script: str | Sentinel | None = Field(default=SENTINEL)
     environ: list[EnvironEntryInput] | None = Field(default=None)
     preset_values: list[PresetValueInput] | None = Field(default=None)
+    open_to_public: bool | Sentinel | None = Field(default=SENTINEL)
+    replica_count: int | Sentinel | None = Field(default=SENTINEL, ge=0)
+    revision_history_limit: int | Sentinel | None = Field(default=SENTINEL, ge=0)
+    deployment_strategy: DeploymentStrategyInput | Sentinel | None = Field(default=SENTINEL)
 
 
 class DeploymentRevisionPresetFilter(BaseRequestModel):

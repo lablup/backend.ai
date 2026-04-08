@@ -11,6 +11,9 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
 )
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    SearchAllocatedResourceSlotsInput,
+)
 from ai.backend.manager.api.adapters.deployment_revision_preset import (
     DeploymentRevisionPresetAdapter,
 )
@@ -59,4 +62,16 @@ class V2DeploymentRevisionPresetHandler:
         path: PathParam[PresetIdPathParam],
     ) -> APIResponse:
         result = await self._adapter.delete(path.parsed.preset_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def search_resource_slots(
+        self,
+        path: PathParam[PresetIdPathParam],
+        body: BodyParam[SearchAllocatedResourceSlotsInput],
+    ) -> APIResponse:
+        """Search resource slots allocated to a deployment revision preset."""
+        result = await self._adapter.search_resource_slots(
+            preset_id=path.parsed.preset_id,
+            input=body.parsed,
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

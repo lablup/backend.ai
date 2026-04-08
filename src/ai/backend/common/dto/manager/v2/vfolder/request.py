@@ -23,6 +23,8 @@ from .types import (
 
 __all__ = (
     "AcceptInvitationInput",
+    "BulkDeleteVFoldersInput",
+    "BulkPurgeVFoldersInput",
     "SearchVFoldersInput",
     "CloneVFolderInput",
     "CreateDownloadSessionInput",
@@ -63,7 +65,9 @@ class CreateVFolderInput(BaseRequestModel):
         default=VFolderPermissionField.READ_WRITE,
         description="Default permission of the vfolder",
     )
-    group_id: UUID | None = Field(default=None, description="Group ID for group-owned vfolder")
+    project_id: UUID | None = Field(
+        default=None, description="Project ID for project-owned vfolder"
+    )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
     unmanaged_path: str | None = Field(default=None, description="Path for unmanaged vfolders")
 
@@ -113,6 +117,18 @@ class PurgeVFolderInput(BaseRequestModel):
     id: UUID = Field(description="VFolder ID to purge")
 
 
+class BulkDeleteVFoldersInput(BaseRequestModel):
+    """Input for soft-deleting multiple virtual folders."""
+
+    ids: list[UUID] = Field(description="List of VFolder UUIDs to soft-delete.")
+
+
+class BulkPurgeVFoldersInput(BaseRequestModel):
+    """Input for permanently purging multiple virtual folders."""
+
+    ids: list[UUID] = Field(description="List of VFolder UUIDs to purge.")
+
+
 class RestoreVFolderInput(BaseRequestModel):
     """Input for restoring a virtual folder from trash."""
 
@@ -120,13 +136,17 @@ class RestoreVFolderInput(BaseRequestModel):
 
 
 class CloneVFolderInput(BaseRequestModel):
-    """Input for cloning a virtual folder."""
+    """Input for cloning a virtual folder.
 
-    source_id: UUID = Field(description="Source vfolder ID to clone")
-    target_name: str = Field(
-        min_length=1, max_length=256, description="Name for the cloned vfolder"
+    The source vfolder is identified by the path parameter {vfolder_id}.
+    """
+
+    name: str = Field(min_length=1, max_length=256, description="Name for the cloned vfolder")
+    project_id: UUID | None = Field(
+        default=None,
+        description="Project ID for the cloned vfolder. If omitted, cloned as user-owned.",
     )
-    target_host: str | None = Field(default=None, description="Target host for the clone")
+    host: str | None = Field(default=None, description="Target storage host for the clone")
     usage_mode: VFolderUsageMode = Field(
         default=VFolderUsageMode.GENERAL, description="Usage mode of the cloned vfolder"
     )
@@ -136,12 +156,12 @@ class CloneVFolderInput(BaseRequestModel):
     )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
 
-    @field_validator("target_name")
+    @field_validator("name")
     @classmethod
-    def strip_and_validate_target_name(cls, v: str) -> str:
+    def strip_and_validate_name(cls, v: str) -> str:
         stripped = v.strip()
         if not stripped:
-            raise ValueError("target_name must not be blank or whitespace-only")
+            raise ValueError("name must not be blank or whitespace-only")
         return stripped
 
 
@@ -196,7 +216,7 @@ class DeleteFilesInput(BaseRequestModel):
 class ListFilesInput(BaseRequestModel):
     """Input for listing files in a virtual folder."""
 
-    path: str = Field(default="", description="Directory path to list files from")
+    path: str = Field(description="Directory path to list files from")
 
 
 # ============================================================

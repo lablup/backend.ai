@@ -23,6 +23,7 @@ from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
@@ -136,12 +137,35 @@ class ModelServingEventHandler:
                 )
 
                 environ = {**(current_rev.environ or {})}
+                startup_command = current_rev.startup_command
                 if "BACKEND_MODEL_NAME" not in environ:
                     # Look up the model VFolder name for BACKEND_MODEL_NAME
                     if current_rev.model is not None:
                         model_row = await VFolderRow.get(db_sess, current_rev.model)
                         if model_row is not None:
                             environ["BACKEND_MODEL_NAME"] = model_row.name
+
+                # Resolve preset_values into environ and startup_command args
+                if current_rev.preset_values:
+                    preset_ids = [pv.preset_id for pv in current_rev.preset_values]
+                    stmt = sa.select(RuntimeVariantPresetRow).where(
+                        RuntimeVariantPresetRow.id.in_(preset_ids)
+                    )
+                    vp_rows = (await db_sess.execute(stmt)).scalars().all()
+                    vp_map = {row.id: row for row in vp_rows}
+                    args_parts: list[str] = []
+                    for pv in current_rev.preset_values:
+                        vp = vp_map.get(pv.preset_id)
+                        if vp is None:
+                            continue
+                        if vp.preset_target == "env":
+                            environ[vp.key] = pv.value
+                        elif vp.preset_target == "args":
+                            args_parts.append(f"{vp.key} {pv.value}")
+                    if args_parts and startup_command:
+                        startup_command = f"{startup_command} {' '.join(args_parts)}"
+                    elif args_parts:
+                        startup_command = " ".join(args_parts)
 
                 await self._registry.create_session(
                     f"{endpoint.name}-{event.route_id!s}",
@@ -172,7 +196,7 @@ class ModelServingEventHandler:
                             for m in current_rev.extra_mounts
                         },
                         "model_definition_path": current_rev.model_definition_path,
-                        "runtime_variant": current_rev.runtime_variant.value,
+                        "runtime_variant": current_rev.runtime_variant,
                         "environ": environ,
                         "scaling_group": endpoint.resource_group,
                         "resources": current_rev.resource_slots,
@@ -183,7 +207,7 @@ class ModelServingEventHandler:
                     ClusterMode(current_rev.cluster_mode),
                     current_rev.cluster_size,
                     bootstrap_script=current_rev.bootstrap_script,
-                    startup_command=current_rev.startup_command,
+                    startup_command=startup_command,
                     tag=endpoint.tag,
                     callback_url=(
                         yarl.URL(current_rev.callback_url) if current_rev.callback_url else None

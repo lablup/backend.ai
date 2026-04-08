@@ -2,15 +2,20 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from decimal import Decimal, InvalidOperation
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.config import ModelDefinition
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.types import BinarySize
+from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetConflict
-from ai.backend.manager.models.base import ResourceOptsEntry, ResourceSlotEntry
+from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
@@ -21,9 +26,9 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
     name: str
     description: str | None
     rank: int
-    image: str | None
+    image_id: UUID
     model_definition: ModelDefinition | None
-    resource_slots: list[ResourceSlotEntry]
+    resource_slots: list[ResourceSlotEntryData]
     resource_opts: list[ResourceOptsEntry]
     cluster_mode: str
     cluster_size: int
@@ -31,6 +36,11 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
     bootstrap_script: str | None
     environ: dict[str, str]
     preset_values: list[PresetValueEntry]
+    open_to_public: bool | None = None
+    replica_count: int | None = None
+    revision_history_limit: int | None = None
+    deployment_strategy: DeploymentStrategy | None = None
+    deployment_strategy_spec: dict[str, Any] | None = None
 
     @property
     @override
@@ -51,9 +61,8 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
         row.name = self.name
         row.description = self.description
         row.rank = self.rank
-        row.image = self.image
+        row.image_id = self.image_id
         row.model_definition = self.model_definition
-        row.resource_slots = self.resource_slots
         row.resource_opts = self.resource_opts
         row.cluster_mode = self.cluster_mode
         row.cluster_size = self.cluster_size
@@ -61,4 +70,23 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
         row.bootstrap_script = self.bootstrap_script
         row.environ = self.environ
         row.preset_values = self.preset_values
+        row.open_to_public = self.open_to_public
+        row.replica_count = self.replica_count
+        row.revision_history_limit = self.revision_history_limit
+        row.deployment_strategy = self.deployment_strategy
+        row.deployment_strategy_spec = self.deployment_strategy_spec
+        row.resource_slot_rows = [
+            PresetResourceSlotRow(
+                slot_name=entry.resource_type,
+                quantity=self._parse_quantity(entry.quantity),
+            )
+            for entry in self.resource_slots
+        ]
         return row
+
+    @staticmethod
+    def _parse_quantity(value: str) -> Decimal:
+        try:
+            return Decimal(value)
+        except InvalidOperation:
+            return Decimal(BinarySize.from_str(value))

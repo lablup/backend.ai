@@ -7,7 +7,7 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import PageInfo
 
-from ai.backend.common.dto.manager.v2.group.request import AdminSearchGroupsInput
+from ai.backend.common.dto.manager.v2.group.request import AdminSearchProjectsInput
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -61,7 +61,7 @@ async def admin_projects_v2(
     """List all projects with optional filtering, ordering, and pagination."""
     check_admin_only()
     payload = await info.context.adapters.project.admin_search(
-        AdminSearchGroupsInput(
+        AdminSearchProjectsInput(
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -110,7 +110,7 @@ async def domain_projects_v2(
     repo_scope = DomainProjectSearchScope(domain_name=scope.domain_name)
     payload = await info.context.adapters.project.search_by_domain(
         scope=repo_scope,
-        input=AdminSearchGroupsInput(
+        input=AdminSearchProjectsInput(
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import secrets
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from typing import override
 
 from ai.backend.manager.models.endpoint import EndpointTokenRow
@@ -24,6 +25,7 @@ class EndpointTokenCreatorSpec(CreatorSpec[EndpointTokenRow]):
     domain: str
     project_id: uuid.UUID
     session_owner_id: uuid.UUID
+    expires_at: datetime | None = None
 
     @override
     def build_row(self) -> EndpointTokenRow:
@@ -34,4 +36,5 @@ class EndpointTokenCreatorSpec(CreatorSpec[EndpointTokenRow]):
             domain=self.domain,
             project=self.project_id,
             session_owner=self.session_owner_id,
+            expires_at=self.expires_at,
         )

@@ -322,6 +322,14 @@ class SessionRepository:
         return await self._db_source.resolve_image_by_id(image_id)
 
     @session_repository_resilience.apply()
+    async def get_keypair_resource_policy(
+        self,
+        access_key: AccessKey,
+    ) -> dict[str, Any]:
+        """Fetch the keypair resource policy for the given access key."""
+        return await self._db_source.get_keypair_resource_policy(access_key)
+
+    @session_repository_resilience.apply()
     async def get_session_data_by_id(
         self,
         session_id: SessionId,

@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
-from .resolver import admin_sessions_v2, project_sessions_v2, terminate_project_sessions_v2
+from .resolver import (
+    admin_sessions_v2,
+    enqueue_session,
+    project_sessions_v2,
+    terminate_project_sessions_v2,
+)
 from .types import (
+    EnqueueSessionInputGQL,
+    EnqueueSessionPayloadGQL,
     ProjectSessionScopeGQL,
     SessionV2ConnectionGQL,
     SessionV2EdgeGQL,
@@ -24,9 +31,12 @@ from .types import (
 __all__ = [
     # Resolvers
     "admin_sessions_v2",
+    "enqueue_session",
     "project_sessions_v2",
     "terminate_project_sessions_v2",
     # V2 types
+    "EnqueueSessionInputGQL",
+    "EnqueueSessionPayloadGQL",
     "ProjectSessionScopeGQL",
     "SessionV2ConnectionGQL",
     "SessionV2EdgeGQL",

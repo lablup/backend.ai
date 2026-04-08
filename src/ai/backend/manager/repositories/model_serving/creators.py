@@ -41,7 +41,7 @@ class EndpointCreatorSpec(CreatorSpec[EndpointRow]):
     callback_url: yarl.URL | None = None
     environ: dict[str, str] | None = None
     open_to_public: bool = False
-    runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
+    runtime_variant: RuntimeVariant = RuntimeVariant("custom")
     model_mount_destination: str = "/models"
     url: str | None = None
     resource_opts: dict[str, Any] | None = None

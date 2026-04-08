@@ -160,7 +160,7 @@ class TestDomainRepository:
             total_resource_slots=ResourceSlot.from_user_input({"cpu": "10", "mem": "20g"}, None),
             allowed_vfolder_hosts={"local": ["modify-vfolder", "upload-file", "download-file"]},
             allowed_docker_registries=["registry.example.com"],
-            integration_id="test-integration",
+            integration_name="test-integration",
             dotfiles=b"test dotfiles",
         )
 
@@ -429,7 +429,7 @@ class TestDomainRepository:
         assert created_domain.description == sample_domain_creator.description
         assert created_domain.is_active == sample_domain_creator.is_active
         assert created_domain.total_resource_slots == sample_domain_creator.total_resource_slots
-        assert created_domain.integration_id == sample_domain_creator.integration_id
+        assert created_domain.integration_name == sample_domain_creator.integration_name
 
         # Verify domain exists in database
         async with db_with_default_resource_policies.begin() as conn:
@@ -486,7 +486,7 @@ class TestDomainRepository:
                 ),
                 allowed_vfolder_hosts={"local": ["modify-vfolder"]},
                 allowed_docker_registries=["registry.example.com"],
-                integration_id="test-integration",
+                integration_name="test-integration",
                 dotfiles=b"test dotfiles",
             )
         )
@@ -547,7 +547,7 @@ class TestDomainRepository:
                 ),
                 allowed_vfolder_hosts={"local": ["modify-vfolder"]},
                 allowed_docker_registries=["registry.example.com"],
-                integration_id="test-integration",
+                integration_name="test-integration",
                 dotfiles=b"test dotfiles",
             )
         )
@@ -631,7 +631,7 @@ class TestDomainRepository:
                     "registry.example.com",
                     "private.registry",
                 ],
-                integration_id="comprehensive-integration",
+                integration_name="comprehensive-integration",
                 dotfiles=b"comprehensive dotfiles configuration",
             )
         )
@@ -644,7 +644,7 @@ class TestDomainRepository:
         assert created_domain.total_resource_slots == ResourceSlot.from_user_input(
             {"cpu": "100", "mem": "500g", "cuda.device": "8"}, None
         )
-        assert created_domain.integration_id == "comprehensive-integration"
+        assert created_domain.integration_name == "comprehensive-integration"
         assert len(created_domain.allowed_docker_registries) == 3
         assert created_domain.dotfiles == b"comprehensive dotfiles configuration"
 

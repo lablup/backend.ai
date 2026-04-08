@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ai.backend.manager.data.model_card.types import ModelCardData
-from ai.backend.manager.models.base import GUID, Base, PydanticColumn
-from ai.backend.manager.models.model_card.types import MinResourceSpec
+from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
+from ai.backend.manager.models.base import GUID, Base
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 
 __all__ = ("ModelCardRow",)
 
@@ -68,10 +71,10 @@ class ModelCardRow(Base):  # type: ignore[misc]
         "label", pgsql.ARRAY(sa.String), nullable=False, server_default="{}"
     )
     license: Mapped[str | None] = mapped_column("license", sa.String(length=128), nullable=True)
-    min_resource: Mapped[MinResourceSpec | None] = mapped_column(
-        "min_resource", PydanticColumn(MinResourceSpec), nullable=True
-    )
     readme: Mapped[str | None] = mapped_column("readme", sa.Text, nullable=True)
+    access_level: Mapped[str] = mapped_column(
+        "access_level", sa.String(length=32), nullable=False, default="internal"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -86,7 +89,17 @@ class ModelCardRow(Base):  # type: ignore[misc]
         onupdate=sa.func.now(),
     )
 
+    resource_requirement_rows: Mapped[list[ModelCardResourceRequirementRow]] = relationship(
+        "ModelCardResourceRequirementRow",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
     def to_data(self) -> ModelCardData:
+        min_resource = [
+            ResourceRequirementEntry(slot_name=r.slot_name, min_quantity=str(r.min_quantity))
+            for r in self.resource_requirement_rows
+        ]
         return ModelCardData(
             id=self.id,
             name=self.name,
@@ -104,8 +117,9 @@ class ModelCardRow(Base):  # type: ignore[misc]
             framework=self.framework or [],
             label=self.label or [],
             license=self.license,
-            min_resource=self.min_resource.slots if self.min_resource else None,
+            min_resource=min_resource,
             readme=self.readme,
+            access_level=self.access_level,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

@@ -27,17 +27,16 @@ class TestValkeyArtifactDownloadTrackingClient:
         # Cleanup all artifact tracking data after test
         # Skip if client is already closed (e.g., in test_client_lifecycle)
         try:
-            cursor = b"0"
-            while cursor:
-                result = await test_valkey_artifact._client.client.scan(
-                    cursor, match="artifact:*", count=100
-                )
-                cursor = cast(bytes, result[0])
-                keys = cast(list[bytes], result[1])
-                if keys:
-                    await test_valkey_artifact._client.client.delete(cast(list[str | bytes], keys))
-                if cursor == b"0":
-                    break
+            async with test_valkey_artifact._client.client() as conn:
+                cursor = b"0"
+                while cursor:
+                    result = await conn.scan(cursor, match="artifact:*", count=100)
+                    cursor = cast(bytes, result[0])
+                    keys = cast(list[bytes], result[1])
+                    if keys:
+                        await conn.delete(cast(list[str | bytes], keys))
+                    if cursor == b"0":
+                        break
         except ClientNotConnectedError:
             # Client already closed, skip cleanup
             pass
@@ -255,7 +254,8 @@ class TestValkeyArtifactDownloadTrackingClient:
 
         # Get initial TTL (should be close to 24 hours = 86400 seconds)
         artifact_key = valkey_client_with_cleanup._get_artifact_key(model_id, revision)
-        initial_ttl = await valkey_client_with_cleanup._client.client.ttl(artifact_key)
+        async with valkey_client_with_cleanup._client.client() as conn:
+            initial_ttl = await conn.ttl(artifact_key)
         assert initial_ttl is not None
         assert initial_ttl > 86000  # Should be close to 24 hours
 
@@ -272,7 +272,8 @@ class TestValkeyArtifactDownloadTrackingClient:
         )
 
         # Check TTL again - should be roughly 2 seconds less, not reset
-        updated_ttl = await valkey_client_with_cleanup._client.client.ttl(artifact_key)
+        async with valkey_client_with_cleanup._client.client() as conn:
+            updated_ttl = await conn.ttl(artifact_key)
         assert updated_ttl is not None
         # TTL should have decreased by ~2 seconds (with some tolerance)
         assert abs((initial_ttl - updated_ttl) - 2) < 2  # Within 2 second tolerance

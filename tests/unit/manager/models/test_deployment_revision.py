@@ -33,6 +33,10 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_slot.row import (
+    DeploymentRevisionResourceSlotRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
@@ -82,8 +86,10 @@ class TestDeploymentRevisionRow:
                 VFolderRow,
                 ImageRow,
                 ResourcePresetRow,
+                ResourceSlotTypeRow,
                 EndpointRow,
                 DeploymentRevisionRow,
+                DeploymentRevisionResourceSlotRow,
                 DeploymentAutoScalingPolicyRow,
                 DeploymentPolicyRow,
                 SessionRow,
@@ -91,6 +97,16 @@ class TestDeploymentRevisionRow:
                 RoutingRow,
             ],
         ):
+            async with database_connection.begin_session() as sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    await sess.execute(
+                        sa.text(
+                            "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                            " VALUES (:slot_name, :slot_type, 0)"
+                            " ON CONFLICT DO NOTHING"
+                        ),
+                        {"slot_name": slot_name, "slot_type": slot_type},
+                    )
             yield database_connection
 
     @pytest.fixture
@@ -298,14 +314,17 @@ class TestDeploymentRevisionRow:
                 model=None,
                 model_mount_destination="/models",
                 resource_group="default",
-                resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 environ={},
                 extra_mounts=[],
             )
+            revision.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("1")),
+                DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("1024")),
+            ]
             db_sess.add(revision)
             await db_sess.flush()
 
@@ -330,16 +349,19 @@ class TestDeploymentRevisionRow:
                 model_mount_destination="/models",
                 model_definition_path="model.yaml",
                 resource_group="default",
-                resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 resource_opts={"gpu_mem": "8G"},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
                 startup_command="python serve.py",
                 bootstrap_script="#!/bin/bash\necho hello",
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 environ={"DEBUG": "true"},
                 extra_mounts=[],
             )
+            revision.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("1")),
+                DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("1024")),
+            ]
             db_sess.add(revision)
             await db_sess.flush()
 
@@ -356,7 +378,7 @@ class TestDeploymentRevisionRow:
             assert data.model_mount_config.vfolder_id == model_id
             assert data.model_mount_config.mount_destination == "/models"
             assert data.model_mount_config.definition_path == "model.yaml"
-            assert data.model_runtime_config.runtime_variant == RuntimeVariant.CUSTOM
+            assert data.model_runtime_config.runtime_variant == RuntimeVariant("custom")
             assert data.model_runtime_config.environ == {"DEBUG": "true"}
             assert data.image_id == test_image.id
 
@@ -375,14 +397,17 @@ class TestDeploymentRevisionRow:
                 model=None,
                 model_mount_destination="/models",
                 resource_group="default",
-                resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 environ={},
                 extra_mounts=[],
             )
+            revision1.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("1")),
+                DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("1024")),
+            ]
             db_sess.add(revision1)
             await db_sess.flush()
 
@@ -394,14 +419,17 @@ class TestDeploymentRevisionRow:
                 model=None,
                 model_mount_destination="/models",
                 resource_group="default",
-                resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("2048")}),
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 environ={},
                 extra_mounts=[],
             )
+            revision2.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("2")),
+                DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("2048")),
+            ]
             db_sess.add(revision2)
 
             with pytest.raises(sa.exc.IntegrityError):

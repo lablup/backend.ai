@@ -45,5 +45,6 @@ def server_module_registries(
             ),
             route_deps,
             sub_registries=[quota_scope_registry],
+            gql_ws_handler=MagicMock(),
         ),
     ]

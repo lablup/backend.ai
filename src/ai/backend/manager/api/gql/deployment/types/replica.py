@@ -155,7 +155,7 @@ class ReplicaOrderBy(PydanticInputMixin[ReplicaOrderDTO]):
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
-        description="A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness) and traffic weight for load balancing.",
+        description="A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness).",
     )
 )
 class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
@@ -169,9 +169,8 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         description="Whether the replica is currently running and able to serve requests."
     )
     activeness_status: ActivenessStatus = gql_field(
-        description="Whether the replica is currently active and able to serve requests."
+        description="Whether the replica is actively receiving traffic."
     )
-    weight: int = gql_field(description="Traffic weight for load balancing between replicas.")
     created_at: datetime = gql_field(description="Timestamp when the replica was created.")
 
     @gql_field(

@@ -55,6 +55,14 @@ class ImageContext:
 
 
 @dataclass
+class ResolvedPresetValues:
+    """Resolved preset values ready for session injection."""
+
+    environ: dict[str, str]
+    args: list[str]
+
+
+@dataclass
 class DeploymentContext:
     """Context data needed to create a session from deployment info."""
 
@@ -64,6 +72,7 @@ class DeploymentContext:
     group_id: UUID
     resource_policy: dict[str, Any]
     image: ImageContext
+    resolved_presets: ResolvedPresetValues | None = None
 
 
 @dataclass
@@ -120,10 +129,17 @@ class SessionCreationSpec:
         mount_spec = target_revision.mounts.to_mount_spec()
 
         # Prepare environment variables
-        environ = target_revision.execution.environ or {}
+        environ = dict(target_revision.execution.environ or {})
+        startup_command = target_revision.execution.startup_command
         if "BACKEND_MODEL_NAME" not in environ:
-            # Add model name to environment if not already present
             environ["BACKEND_MODEL_NAME"] = deployment_info.metadata.name
+
+        # Apply resolved preset values (env vars and command args)
+        if context.resolved_presets:
+            environ.update(context.resolved_presets.environ)
+            if context.resolved_presets.args:
+                args_str = " ".join(context.resolved_presets.args)
+                startup_command = f"{startup_command} {args_str}" if startup_command else args_str
 
         # Create kernel specs for cluster
         DEFAULT_ROLE = "main"
@@ -147,7 +163,7 @@ class SessionCreationSpec:
                 main_gid=context.container_user.main_gid,
                 supplementary_gids=context.container_user.supplementary_gids,
                 bootstrap_script=target_revision.execution.bootstrap_script or "",
-                startup_command=target_revision.execution.startup_command,
+                startup_command=startup_command,
             )
             kernel_specs.append(kernel_spec)
 

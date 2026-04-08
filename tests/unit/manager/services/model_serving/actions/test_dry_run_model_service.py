@@ -160,7 +160,7 @@ class TestDryRunModelService:
                     model_definition_path=None,
                 ),
                 execution=ExecutionSpec(
-                    runtime_variant=RuntimeVariant.CUSTOM,
+                    runtime_variant=RuntimeVariant("custom"),
                     startup_command=None,
                     environ={},
                 ),
@@ -276,7 +276,7 @@ class TestDryRunModelService:
                     service_name="test-model-v1.0",
                     replicas=2,
                     image="ai.backend/python:3.9",
-                    runtime_variant=RuntimeVariant.CUSTOM,
+                    runtime_variant=RuntimeVariant("custom"),
                     architecture="x86_64",
                     group_name="group1",
                     domain_name="default",
@@ -388,7 +388,7 @@ class TestDryRunModelServiceActionWithRevision:
             service_name="test-service",
             replicas=1,
             image="api-image:v1",
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
             architecture="x86_64",
             group_name="default",
             domain_name="default",
@@ -425,7 +425,7 @@ class TestDryRunModelServiceActionWithRevision:
                 model_definition_path=None,
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 startup_command=None,
                 environ={"SERVICE_DEF_VAR": "service-def-value"},
             ),
@@ -528,7 +528,7 @@ class TestDryRunModelServiceActionWithRevision:
                 model_definition_path=None,
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 startup_command=None,
                 environ=None,
             ),
@@ -647,7 +647,7 @@ class TestDryRunWithDeploymentConfigOverrides:
                 model_definition_path=None,
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 startup_command=None,
                 environ={"SERVICE_DEF_VAR": "from-deployment-config"},
             ),
@@ -769,7 +769,7 @@ class TestDryRunWithDeploymentConfigOverrides:
             service_name="test-model-v1.0",
             replicas=1,
             image="api-request-image:v1",  # Different from service def
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
             architecture="x86_64",  # Different from service def (arm64)
             group_name="group1",
             domain_name="default",
@@ -960,7 +960,7 @@ class TestDryRunExtraMountsHandling:
                     model_definition_path=None,
                 ),
                 execution=ExecutionSpec(
-                    runtime_variant=RuntimeVariant.CUSTOM,
+                    runtime_variant=RuntimeVariant("custom"),
                     startup_command=None,
                     environ={},
                 ),
@@ -1087,7 +1087,7 @@ class TestDryRunExtraMountsHandling:
             service_name="test-model-v1.0",
             replicas=1,
             image="ai.backend/python:3.9",
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
             architecture="x86_64",
             group_name="group1",
             domain_name="default",

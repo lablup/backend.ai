@@ -136,7 +136,7 @@ class NewServiceRequestModel(BaseRequestModel):
     )
     runtime_variant: RuntimeVariant = Field(
         description="Type of the inference runtime the image will try to load.",
-        default=RuntimeVariant.CUSTOM,
+        default=RuntimeVariant("custom"),
     )
     architecture: str | None = Field(
         description=(

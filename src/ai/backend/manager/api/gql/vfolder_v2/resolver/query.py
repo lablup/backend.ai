@@ -15,6 +15,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.api.gql.vfolder_v2.types import (
     VFolderConnection,
     VFolderFilterGQL,
@@ -22,6 +23,66 @@ from ai.backend.manager.api.gql.vfolder_v2.types import (
     VFolderOrderByGQL,
 )
 from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderEdge
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Search all virtual folders (superadmin only).",
+    )
+)  # type: ignore[misc]
+async def admin_vfolders_v2(
+    info: Info[StrawberryGQLContext],
+    filter: VFolderFilterGQL | None = None,
+    order_by: list[VFolderOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> VFolderConnection:
+    """Search all virtual folders (superadmin only)."""
+    check_admin_only()
+    result = await info.context.adapters.vfolder.admin_search(
+        SearchVFoldersInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    nodes = [VFolderGQL.from_pydantic(item) for item in result.items]
+    edges = [VFolderEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    return VFolderConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get a single virtual folder by ID.",
+    )
+)  # type: ignore[misc]
+async def vfolder_v2(
+    info: Info[StrawberryGQLContext],
+    vfolder_id: UUID,
+) -> VFolderGQL | None:
+    """Get a single virtual folder by ID."""
+    node = await info.context.adapters.vfolder.get(vfolder_id)
+    return VFolderGQL.from_pydantic(node)
 
 
 @gql_root_field(

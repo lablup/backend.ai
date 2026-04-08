@@ -7,7 +7,7 @@ mirror from silently reaching production as a runtime ValueError.
 from __future__ import annotations
 
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.api.gql.rbac.types.permission import RBACElementTypeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL
 
 
 class TestRBACElementTypeEnumSync:

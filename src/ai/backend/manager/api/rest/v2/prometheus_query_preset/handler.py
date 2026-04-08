@@ -41,12 +41,16 @@ class V2PrometheusQueryPresetHandler:
         result = await self._adapter.create(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
-    async def admin_search(
+    async def search(
         self,
         body: BodyParam[SearchQueryDefinitionsInput],
     ) -> APIResponse:
-        """Search query definitions with admin scope."""
-        result = await self._adapter.admin_search(body.parsed)
+        """Search prometheus query presets.
+
+        Available to any authenticated user since presets are a shared
+        catalog of metric query templates.
+        """
+        result = await self._adapter.search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def get(

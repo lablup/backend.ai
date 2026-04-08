@@ -7,7 +7,11 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import EntityType, RBACElementType
 from ai.backend.manager.errors.permission import RoleNotFound
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -47,6 +51,32 @@ class PermissionSearchScope(SearchScope):
                 error=RoleNotFound(),
             ),
         ]
+
+
+@dataclass(frozen=True)
+class ScopedRoleSearchScope(SearchScope):
+    """Scope for searching roles registered in a given scope (project, domain, etc.)."""
+
+    element_type: RBACElementType
+    scope_id: str
+
+    def to_condition(self) -> QueryCondition:
+        element_type = self.element_type
+        scope_id = self.scope_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                AssociationScopesEntitiesRow.scope_type == element_type.to_scope_type(),
+                AssociationScopesEntitiesRow.scope_id == scope_id,
+                AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+            )
+            return sa.cast(RoleRow.id, sa.String).in_(subq)
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return []
 
 
 @dataclass(frozen=True)

@@ -97,7 +97,7 @@ class DeploymentExecutionFields:
     Corresponds to ExecutionSpec in data layer.
     """
 
-    runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
+    runtime_variant: RuntimeVariant
     startup_command: str | None = None
     bootstrap_script: str | None = None
     environ: Mapping[str, str] | None = None
@@ -112,7 +112,7 @@ class ModelRevisionFields:
     Note: image_id is a resolved UUID, not ImageIdentifier.
     """
 
-    image_id: uuid.UUID
+    image_id: uuid.UUID | None
     resource: DeploymentResourceFields
     mounts: DeploymentMountFields
     execution: DeploymentExecutionFields

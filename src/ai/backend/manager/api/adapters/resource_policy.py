@@ -398,6 +398,7 @@ class ResourcePolicyAdapter(BaseAdapter):
         spec = UserResourcePolicyCreatorSpec(
             name=input.name,
             max_vfolder_count=input.max_vfolder_count,
+            max_concurrent_logins=input.max_concurrent_logins,
             max_quota_scope_size=input.max_quota_scope_size.bytes,
             max_session_count_per_model_session=input.max_session_count_per_model_session,
             max_customized_image_count=input.max_customized_image_count,
@@ -419,6 +420,13 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else OptionalState.update(input.max_vfolder_count)
                 if input.max_vfolder_count is not None
                 else OptionalState.nop()
+            ),
+            max_concurrent_logins=(
+                TriState.nop()
+                if isinstance(input.max_concurrent_logins, Sentinel)
+                else TriState.nullify()
+                if input.max_concurrent_logins is None
+                else TriState.update(input.max_concurrent_logins)
             ),
             max_quota_scope_size=(
                 OptionalState.nop()
@@ -637,6 +645,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             id=data.name,
             name=data.name,
             max_vfolder_count=data.max_vfolder_count,
+            max_concurrent_logins=data.max_concurrent_logins,
             max_quota_scope_size=_to_binary_size_info(data.max_quota_scope_size),
             max_session_count_per_model_session=data.max_session_count_per_model_session,
             max_customized_image_count=data.max_customized_image_count,
@@ -744,6 +753,13 @@ class ResourcePolicyAdapter(BaseAdapter):
             cond = self.convert_int_filter(
                 filter.max_vfolder_count,
                 UserResourcePolicyConditions.by_max_vfolder_count,
+            )
+            if cond is not None:
+                conditions.append(cond)
+        if filter.max_concurrent_logins is not None:
+            cond = self.convert_int_filter(
+                filter.max_concurrent_logins,
+                UserResourcePolicyConditions.by_max_concurrent_logins,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -868,6 +884,8 @@ def _resolve_user_order(
             return UserResourcePolicyOrders.created_at(ascending)
         case UserResourcePolicyOrderField.MAX_VFOLDER_COUNT:
             return UserResourcePolicyOrders.max_vfolder_count(ascending)
+        case UserResourcePolicyOrderField.MAX_CONCURRENT_LOGINS:
+            return UserResourcePolicyOrders.max_concurrent_logins(ascending)
         case UserResourcePolicyOrderField.MAX_QUOTA_SCOPE_SIZE:
             return UserResourcePolicyOrders.max_quota_scope_size(ascending)
         case UserResourcePolicyOrderField.MAX_SESSION_COUNT_PER_MODEL_SESSION:

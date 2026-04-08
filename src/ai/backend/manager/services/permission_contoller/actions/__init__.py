@@ -13,6 +13,10 @@ from .search_permissions import (
     SearchPermissionsActionResult,
 )
 from .search_roles import SearchRolesAction, SearchRolesActionResult
+from .search_roles_in_scope import (
+    SearchRolesInScopeAction,
+    SearchRolesInScopeActionResult,
+)
 from .search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
@@ -47,6 +51,8 @@ __all__ = [
     "RevokeRoleActionResult",
     "SearchRolesAction",
     "SearchRolesActionResult",
+    "SearchRolesInScopeAction",
+    "SearchRolesInScopeActionResult",
     "SearchPermissionsAction",
     "SearchPermissionsActionResult",
     "SearchUsersAssignedToRoleAction",

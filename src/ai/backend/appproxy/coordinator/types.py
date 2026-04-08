@@ -2,9 +2,10 @@ import asyncio
 import itertools
 import logging
 from collections import defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
-from dataclasses import dataclass
+from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass, field
 from typing import (
     Annotated,
     Any,
@@ -46,6 +47,7 @@ from .config import ServerConfig
 from .defs import LockID
 from .models import Circuit
 from .models.utils import ExtendedAsyncSAEngine
+from .models.worker import Worker
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -83,6 +85,20 @@ class CircuitManager:
     event_producer: EventProducer
     traefik_etcd: TraefikEtcd | None
     local_config: ServerConfig
+    _circuit_locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
+
+    def _get_lock(self, circuit_id: UUID) -> asyncio.Lock:
+        if circuit_id not in self._circuit_locks:
+            self._circuit_locks[circuit_id] = asyncio.Lock()
+        return self._circuit_locks[circuit_id]
+
+    def _release_circuit_lock(self, circuit_id: UUID) -> None:
+        self._circuit_locks.pop(circuit_id, None)
+
+    @actxmgr
+    async def circuit_lock(self, circuit_id: UUID) -> AsyncIterator[None]:
+        async with self._get_lock(circuit_id):
+            yield
 
     async def initialize_circuits(self, circuits: Sequence[Circuit]) -> None:
         if self.local_config.proxy_coordinator.enable_traefik:
@@ -155,6 +171,12 @@ class CircuitManager:
         self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
     async def update_circuit_routes(self, circuit: Circuit, old_routes: list[RouteInfo]) -> None:
+        async with self.circuit_lock(circuit.id):
+            await self._update_circuit_routes_unlocked(circuit, old_routes)
+
+    async def _update_circuit_routes_unlocked(
+        self, circuit: Circuit, old_routes: list[RouteInfo]
+    ) -> None:
         if self.local_config.proxy_coordinator.enable_traefik:
             await self.update_traefik_circuit_routes(circuit, old_routes)
         else:
@@ -170,25 +192,14 @@ class CircuitManager:
         worker_authority = circuit.worker_row.authority
         etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
 
-        # Use health-aware services configuration
-        new_route_keys = {
-            f"bai_session_{r.session_id}_{circuit.id}" for r in circuit.healthy_routes
-        }
+        # Circuit.traefik_services now emits a single bai_service_{circuit.id}
+        # loadBalancer (see models/circuit.py) instead of one weighted entry
+        # per session, so cleanup only needs to drop that single prefix before
+        # re-publishing the new config. The old_routes argument is kept for
+        # signature compatibility but is no longer consulted.
+        del old_routes  # legacy signature; no per-session cleanup needed
         new_services = circuit.traefik_services
-        new_services = {
-            f"bai_service_{circuit.id}": new_services[f"bai_service_{circuit.id}"],
-            **{k: v for k, v in new_services.items() if k in new_route_keys},
-        }
 
-        # clear old routes
-        for route in old_routes:
-            log.debug(
-                "traefik_etcd.delete_prefix {}",
-                f"{etcd_prefix}/services/bai_session_{route.session_id}_{circuit.id}",
-            )
-            await self.traefik_etcd.delete_prefix(
-                f"{etcd_prefix}/services/bai_session_{route.session_id}_{circuit.id}"
-            )
         log.debug(
             "traefik_etcd.delete_prefix {}", f"{etcd_prefix}/services/bai_service_{circuit.id}"
         )
@@ -219,11 +230,17 @@ class CircuitManager:
         await self.event_producer.broadcast_event(event)
 
     async def unload_circuits(self, circuits: Sequence[Circuit]) -> None:
-        if self.local_config.proxy_coordinator.enable_traefik:
-            for circuit in circuits:
-                await self.unload_traefik_circuit(circuit)
-        else:
-            await self.unload_legacy_circuits(circuits)
+        for circuit in circuits:
+            try:
+                async with self.circuit_lock(circuit.id):
+                    if self.local_config.proxy_coordinator.enable_traefik:
+                        await self.unload_traefik_circuit(circuit)
+                    else:
+                        await self.unload_legacy_circuit(circuit)
+            except Exception:
+                log.exception("Failed to unload circuit {}", circuit.id)
+            finally:
+                self._release_circuit_lock(circuit.id)
 
     async def unload_traefik_circuit(self, circuit: Circuit) -> None:
         log.debug("unload_traefik_circuit(): start")
@@ -233,12 +250,12 @@ class CircuitManager:
         worker_authority = circuit.worker_row.authority
         etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
 
+        # Circuit.traefik_services now emits a single bai_service_{circuit.id}
+        # prefix per circuit (no per-session sub-keys), so cleanup only needs
+        # to drop router / service / middleware prefixes scoped to the circuit id.
         prefixes_to_remove = [
             f"{etcd_prefix}/routers/bai_router_{circuit.id}",
             f"{etcd_prefix}/services/bai_service_{circuit.id}",
-        ] + [
-            f"{etcd_prefix}/services/bai_session_{r.session_id}_{circuit.id}"
-            for r in circuit.route_info
         ]
         if circuit.protocol == ProxyProtocol.HTTP:
             prefixes_to_remove.append(
@@ -253,17 +270,95 @@ class CircuitManager:
             await self.traefik_etcd.delete_prefix(prefix)
         log.debug("unload_traefik_circuit(): end")
 
-    async def unload_legacy_circuits(self, circuits: Sequence[Circuit]) -> None:
-        circuits_by_worker: defaultdict[str, list[Circuit]] = defaultdict(list)
-        for circuit in circuits:
-            circuits_by_worker[circuit.worker_row.authority].append(circuit)
+    async def reconcile_traefik_etcd_state(
+        self,
+        live_circuits: Sequence[Circuit],
+        workers: Sequence[Worker],
+    ) -> None:
+        """Drop stale circuit keys left behind in etcd by missed unloads.
 
-        for authority, circuits in circuits_by_worker.items():
-            event = AppProxyCircuitRemovedEvent(
-                target_worker_authority=authority,
-                circuits=[SerializableCircuit(**c.dump_model()) for c in circuits],
-            )
-            await self.event_producer.broadcast_event(event)
+        For each (worker, protocol) scope, compare the set of circuit ids
+        currently in the coordinator DB against the set of ``bai_service_{id}``
+        keys present under ``worker_{authority}/{protocol}/services``. Any
+        circuit id present in etcd but missing from the DB is an orphan
+        (lost unload event, coordinator crash between DB delete and etcd
+        cleanup, etc.) and gets the same prefix set removed as
+        ``unload_traefik_circuit`` would have.
+
+        The per-circuit put reconcile still runs before this helper, so this
+        method is a pure cleanup pass — it never adds keys, only removes them.
+        """
+        if not self.traefik_etcd:
+            raise ServerMisconfiguredError("proxy-coordinator.traefik")
+
+        live_by_scope: dict[tuple[str, str], set[UUID]] = defaultdict(set)
+        for circuit in live_circuits:
+            scope = (circuit.worker_row.authority, circuit.protocol.value.lower())
+            live_by_scope[scope].add(circuit.id)
+
+        dropped = 0
+        for worker in workers:
+            for protocol in ("http", "tcp"):
+                etcd_prefix = f"worker_{worker.authority}/{protocol}"
+                services_prefix = f"{etcd_prefix}/services"
+                try:
+                    existing = await self.traefik_etcd.get_prefix(services_prefix)
+                except Exception:
+                    log.exception(
+                        "reconcile_traefik_etcd_state: failed to list etcd services at {}",
+                        services_prefix,
+                    )
+                    continue
+
+                existing_ids: set[UUID] = set()
+                for top_key in existing.keys():
+                    if not top_key.startswith("bai_service_"):
+                        continue
+                    try:
+                        existing_ids.add(UUID(top_key.removeprefix("bai_service_")))
+                    except ValueError:
+                        continue
+
+                live_ids = live_by_scope.get((worker.authority, protocol), set())
+                stale_ids = existing_ids - live_ids
+
+                for stale_id in stale_ids:
+                    prefixes_to_remove = [
+                        f"{etcd_prefix}/routers/bai_router_{stale_id}",
+                        f"{etcd_prefix}/services/bai_service_{stale_id}",
+                    ]
+                    if protocol == "http":
+                        prefixes_to_remove.append(
+                            f"{etcd_prefix}/middlewares/bai_appproxy_plugin_{stale_id}"
+                        )
+                        prefixes_to_remove.append(
+                            f"{etcd_prefix}/middlewares/appproxy/plugin/bai_appproxy_plugin_{stale_id}"
+                        )
+                    for prefix in prefixes_to_remove:
+                        try:
+                            await self.traefik_etcd.delete_prefix(prefix)
+                        except Exception:
+                            log.exception(
+                                "reconcile_traefik_etcd_state: delete_prefix {} failed",
+                                prefix,
+                            )
+                    log.info(
+                        "reconcile_traefik_etcd_state: dropped stale circuit {} from worker={} protocol={}",
+                        stale_id,
+                        worker.authority,
+                        protocol,
+                    )
+                    dropped += 1
+
+        if dropped:
+            log.info("reconcile_traefik_etcd_state: dropped {} stale circuit(s)", dropped)
+
+    async def unload_legacy_circuit(self, circuit: Circuit) -> None:
+        event = AppProxyCircuitRemovedEvent(
+            target_worker_authority=circuit.worker_row.authority,
+            circuits=[SerializableCircuit(**circuit.dump_model())],
+        )
+        await self.event_producer.broadcast_event(event)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)

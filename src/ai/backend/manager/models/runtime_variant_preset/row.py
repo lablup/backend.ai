@@ -7,8 +7,17 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
-from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.data.runtime_variant_preset.types import (
+    ChoiceItemData,
+    ChoiceOptionData,
+    NumberOptionData,
+    RuntimeVariantPresetData,
+    SliderOptionData,
+    TextOptionData,
+    UIOptionData,
+)
+from ai.backend.manager.models.base import GUID, Base, PydanticColumn
+from ai.backend.manager.models.runtime_variant_preset.types import UIOption
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
@@ -48,6 +57,16 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
     )
     key: Mapped[str] = mapped_column("key", sa.String(length=256), nullable=False)
 
+    # UI metadata
+    category: Mapped[str | None] = mapped_column("category", sa.String(length=64), nullable=True)
+    ui_type: Mapped[str | None] = mapped_column("ui_type", sa.String(length=32), nullable=True)
+    display_name: Mapped[str | None] = mapped_column(
+        "display_name", sa.String(length=256), nullable=True
+    )
+    ui_option: Mapped[UIOption | None] = mapped_column(
+        "ui_option", PydanticColumn(UIOption), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -66,6 +85,24 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
         primaryjoin=_get_runtime_variant_join_condition,
     )
 
+    @staticmethod
+    def _convert_ui_option_to_data(opt: UIOption | None) -> UIOptionData | None:
+        if opt is None:
+            return None
+        return UIOptionData(
+            ui_type=opt.ui_type.value,
+            slider=SliderOptionData(min=opt.slider.min, max=opt.slider.max, step=opt.slider.step)
+            if opt.slider
+            else None,
+            number=NumberOptionData(min=opt.number.min, max=opt.number.max) if opt.number else None,
+            choices=ChoiceOptionData(
+                items=[ChoiceItemData(value=c.value, label=c.label) for c in opt.choices.items]
+            )
+            if opt.choices
+            else None,
+            text=TextOptionData(placeholder=opt.text.placeholder) if opt.text else None,
+        )
+
     def to_data(self) -> RuntimeVariantPresetData:
         return RuntimeVariantPresetData(
             id=self.id,
@@ -77,6 +114,10 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
             value_type=self.value_type,
             default_value=self.default_value,
             key=self.key,
+            category=self.category,
+            ui_type=self.ui_type,
+            display_name=self.display_name,
+            ui_option=self._convert_ui_option_to_data(self.ui_option),
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

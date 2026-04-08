@@ -227,7 +227,7 @@ class TestGetModelServiceInfo:
                             "https://api.example.com/v1/models/test-model/v1.0"
                         ),
                         is_public=False,
-                        runtime_variant=RuntimeVariant.CUSTOM,
+                        runtime_variant=RuntimeVariant("custom"),
                     ),
                 ),
             ),

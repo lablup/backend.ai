@@ -8,10 +8,13 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchResourceSlotTypesInput,
     AgentResourceFilter,
     AgentResourceOrder,
+    AllocatedResourceSlotFilter,
+    AllocatedResourceSlotOrder,
     ResourceAllocationFilter,
     ResourceAllocationOrder,
     ResourceSlotTypeFilter,
     ResourceSlotTypeOrder,
+    SearchAllocatedResourceSlotsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     ActiveResourceOverviewInfoDTO,
@@ -19,11 +22,14 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AdminSearchResourceAllocationsPayload,
     AdminSearchResourceSlotTypesPayload,
     AgentResourceNode,
+    AllocatedResourceSlotNode,
     ResourceAllocationNode,
     ResourceSlotTypeNode,
+    SearchAllocatedResourceSlotsPayload,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     AgentResourceOrderField,
+    AllocatedResourceSlotOrderField,
     NumberFormatInfo,
     OrderDirection,
     ResourceAllocationOrderField,
@@ -37,6 +43,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 __all__ = (
     # Types
     "AgentResourceOrderField",
+    "AllocatedResourceSlotOrderField",
     "NumberFormatInfo",
     "OrderDirection",
     "ResourceAllocationOrderField",
@@ -51,16 +58,21 @@ __all__ = (
     "AdminSearchResourceSlotTypesInput",
     "AgentResourceFilter",
     "AgentResourceOrder",
+    "AllocatedResourceSlotFilter",
+    "AllocatedResourceSlotOrder",
     "ResourceAllocationFilter",
     "ResourceAllocationOrder",
     "ResourceSlotTypeFilter",
     "ResourceSlotTypeOrder",
+    "SearchAllocatedResourceSlotsInput",
     # Response models
     "ActiveResourceOverviewInfoDTO",
     "AdminSearchAgentResourcesPayload",
     "AdminSearchResourceAllocationsPayload",
     "AdminSearchResourceSlotTypesPayload",
     "AgentResourceNode",
+    "AllocatedResourceSlotNode",
     "ResourceAllocationNode",
     "ResourceSlotTypeNode",
+    "SearchAllocatedResourceSlotsPayload",
 )

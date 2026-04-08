@@ -12,6 +12,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 from .types import (
+    FileEntryType,
     VFolderAccessControlInfo,
     VFolderInvitationState,
     VFolderMetadataInfo,
@@ -22,6 +23,8 @@ from .types import (
 )
 
 __all__ = (
+    "BulkDeleteVFoldersPayload",
+    "BulkPurgeVFoldersPayload",
     "CloneVFolderPayload",
     "CreateDownloadSessionPayload",
     "CreateUploadSessionPayload",
@@ -32,6 +35,7 @@ __all__ = (
     "InviteVFolderPayload",
     "ListFilesPayload",
     "MkdirPayload",
+    "MoveFilePayload",
     "PurgeVFolderPayload",
     "RestoreVFolderPayload",
     "ShareVFolderPayload",
@@ -94,11 +98,11 @@ class FileEntryNode(BaseResponseModel):
     """Node model representing a file entry inside a virtual folder."""
 
     name: str = Field(description="File or directory name")
-    type: str = Field(description="Entry type (file or directory)")
+    type: FileEntryType = Field(description="Entry type")
     size: int = Field(description="File size in bytes")
-    mode: str = Field(description="File permission mode string")
-    created: str = Field(description="Creation timestamp string")
-    modified: str = Field(description="Last modification timestamp string")
+    mode: int = Field(description="POSIX file permission mode (e.g., 33188 for 0o100644)")
+    created_at: str = Field(description="Creation timestamp")
+    updated_at: str = Field(description="Last modification timestamp")
 
 
 # ============================================================
@@ -128,6 +132,18 @@ class PurgeVFolderPayload(BaseResponseModel):
     """Payload for virtual folder purge mutation result."""
 
     id: UUID = Field(description="ID of the purged virtual folder")
+
+
+class BulkDeleteVFoldersPayload(BaseResponseModel):
+    """Payload for bulk virtual folder soft-deletion."""
+
+    deleted_count: int = Field(description="Number of virtual folders successfully soft-deleted.")
+
+
+class BulkPurgeVFoldersPayload(BaseResponseModel):
+    """Payload for bulk virtual folder purge."""
+
+    purged_count: int = Field(description="Number of virtual folders successfully purged.")
 
 
 class RestoreVFolderPayload(BaseResponseModel):
@@ -168,12 +184,17 @@ class CreateUploadSessionPayload(BaseResponseModel):
     url: str = Field(description="Upload URL")
 
 
-class DeleteFilesPayload(BaseResponseModel):
-    """Payload for file deletion mutation result."""
+class MoveFilePayload(BaseResponseModel):
+    """Payload for file move mutation result."""
 
-    bgtask_id: str | None = Field(
-        default=None, description="Background task ID if deletion is async"
-    )
+    src: str = Field(description="Source path that was moved")
+    dst: str = Field(description="Destination path")
+
+
+class DeleteFilesPayload(BaseResponseModel):
+    """Payload for async file deletion. Always runs as a background task."""
+
+    bgtask_id: str = Field(description="Background task ID for the deletion operation")
 
 
 class ListFilesPayload(BaseResponseModel):

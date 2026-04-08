@@ -18,7 +18,7 @@ type AccessToken implements Node {
   createdAt: DateTime!
 
   """The expiration timestamp of the access token."""
-  validUntil: DateTime!
+  expiresAt: DateTime
 }
 
 """Added in 25.16.0. Connection for access tokens."""
@@ -43,7 +43,7 @@ type AccessTokenEdge {
 """Added in 25.16.0. """
 input AccessTokenFilter {
   token: StringFilter = null
-  validUntil: DateTimeFilter = null
+  expiresAt: DateTimeFilter = null
   createdAt: DateTimeFilter = null
   AND: [AccessTokenFilter!] = null
   OR: [AccessTokenFilter!] = null
@@ -479,6 +479,68 @@ type AgentV2Edge {
   node: AgentV2!
 }
 
+"""
+Added in UNRELEASED. Represents a single allocated resource slot entry for a deployment revision or preset.
+"""
+type AllocatedResourceSlot implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
+  slotName: String!
+
+  """Allocated quantity for this resource slot."""
+  quantity: Decimal!
+}
+
+"""
+Added in UNRELEASED. Connection type for paginated allocated resource slot results.
+"""
+type AllocatedResourceSlotConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AllocatedResourceSlotEdge!]!
+
+  """Total number of allocated resource slots matching the filter criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AllocatedResourceSlotEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AllocatedResourceSlot!
+}
+
+"""Added in UNRELEASED. Filter for allocated resource slots."""
+input AllocatedResourceSlotFilter {
+  slotName: StringFilter = null
+  AND: [AllocatedResourceSlotFilter!] = null
+  OR: [AllocatedResourceSlotFilter!] = null
+  NOT: [AllocatedResourceSlotFilter!] = null
+}
+
+"""
+Added in UNRELEASED. Order by specification for allocated resource slots.
+"""
+input AllocatedResourceSlotOrderBy {
+  field: AllocatedResourceSlotOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering allocated resource slots.
+"""
+enum AllocatedResourceSlotOrderField {
+  SLOT_NAME
+  QUANTITY
+  RANK
+}
+
 """Added in UNRELEASED. Payload containing allowed domain names."""
 type AllowedDomainsPayload {
   """Allowed domain names."""
@@ -892,6 +954,7 @@ type ArtifactVerifierResultEntry {
 input AssignRoleInput {
   userId: UUID!
   roleId: UUID!
+  projectId: UUID
 }
 
 """Added in 24.09.0. Filter criteria for querying audit logs."""
@@ -1143,6 +1206,7 @@ type BulkAssignRoleError {
 input BulkAssignRoleInput {
   roleId: UUID!
   userIds: [UUID!]!
+  projectId: UUID
 }
 
 """Added in 26.3.0. Payload for bulk role assignment mutation."""
@@ -1186,6 +1250,18 @@ type BulkCreateUsersV2Payload {
   failed: [BulkCreateUserV2Error!]!
 }
 
+"""Added in UNRELEASED. Input for soft-deleting multiple virtual folders."""
+input BulkDeleteVFoldersV2Input {
+  """List of VFolder UUIDs to soft-delete."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk virtual folder soft-deletion."""
+type BulkDeleteVFoldersV2Payload {
+  """Number of virtual folders successfully soft-deleted."""
+  deletedCount: Int!
+}
+
 """Added in 26.3.0. Error information for a failed user in bulk purge."""
 type BulkPurgeUserV2Error {
   """UUID of the user that failed to purge."""
@@ -1224,6 +1300,20 @@ type BulkPurgeUsersV2Payload {
 
   """List of errors for users that failed to purge."""
   failed: [BulkPurgeUserV2Error!]!
+}
+
+"""
+Added in UNRELEASED. Input for permanently purging multiple virtual folders.
+"""
+input BulkPurgeVFoldersV2Input {
+  """List of VFolder UUIDs to purge."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk virtual folder purge."""
+type BulkPurgeVFoldersV2Payload {
+  """Number of virtual folders successfully purged."""
+  purgedCount: Int!
 }
 
 """
@@ -1384,6 +1474,21 @@ input CheckPresetAvailabilityV2Input {
   resourceGroupName: String!
 }
 
+"""Added in UNRELEASED. Choice item."""
+type ChoiceItem {
+  """Option value."""
+  value: String!
+
+  """Display label."""
+  label: String!
+}
+
+"""Added in UNRELEASED. Select/radio UI config."""
+type ChoiceOption {
+  """List of choices."""
+  items: [ChoiceItem!]!
+}
+
 """
 Added in 24.09.0. Input for cleaning up stored artifact revision data.
 
@@ -1400,6 +1505,27 @@ Added in 25.14.0. Response payload for artifact revision cleanup operations. Con
 type CleanupArtifactRevisionsPayload {
   """Cleaned up artifact revisions."""
   artifactRevisions: ArtifactRevisionConnection!
+}
+
+"""Added in UNRELEASED. Input for cloning a virtual folder."""
+input CloneVFolderV2Input {
+  """Name for the cloned vfolder."""
+  name: String!
+
+  """Project ID for the cloned vfolder. If omitted, cloned as user-owned."""
+  projectId: UUID = null
+
+  """Target storage host for the clone."""
+  host: String = null
+}
+
+"""Added in UNRELEASED. Payload returned after cloning a virtual folder."""
+type CloneVFolderV2Payload {
+  """Cloned virtual folder"""
+  vfolder: VFolder!
+
+  """Background task ID for the clone operation"""
+  bgtaskId: String!
 }
 
 """
@@ -1568,7 +1694,7 @@ input CreateAccessTokenInput {
   modelDeploymentId: ID!
 
   """The expiration timestamp of the access token."""
-  validUntil: DateTime!
+  expiresAt: DateTime
 }
 
 """Added in 25.16.0. Payload for creating an access token."""
@@ -1656,6 +1782,20 @@ input CreateDeploymentRevisionPresetInput {
 
   """Preset name."""
   name: String!
+
+  """Default open_to_public for deployments created from this preset."""
+  openToPublic: Boolean = null
+
+  """Default replica count for deployments created from this preset."""
+  replicaCount: Int = null
+
+  """
+  Default revision history limit for deployments created from this preset.
+  """
+  revisionHistoryLimit: Int = null
+
+  """Default deployment strategy for deployments created from this preset."""
+  deploymentStrategy: PresetDeploymentStrategyInput = null
 }
 
 """Added in UNRELEASED. Create deployment revision preset payload."""
@@ -1679,7 +1819,27 @@ input CreateDomainInputGQL {
   allowedDockerRegistries: [String!] = null
 
   """External integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
+}
+
+"""Added in UNRELEASED. Input for creating a file download session."""
+input CreateDownloadSessionV2Input {
+  """File path to download."""
+  path: String!
+
+  """Whether to archive the file for download."""
+  archive: Boolean! = false
+}
+
+"""
+Added in UNRELEASED. Payload returned after creating a download session.
+"""
+type CreateDownloadSessionV2Payload {
+  """Download session token"""
+  token: String!
+
+  """Download URL"""
+  url: String!
 }
 
 """Added in 25.14.0. """
@@ -1757,7 +1917,43 @@ input CreateModelCardV2Input {
   projectId: UUID!
 
   """Domain name."""
-  domainName: String!
+  domainName: String = null
+
+  """Author."""
+  author: String = null
+
+  """Model title."""
+  title: String = null
+
+  """Model version."""
+  modelVersion: String = null
+
+  """Description."""
+  description: String = null
+
+  """ML task."""
+  task: String = null
+
+  """Category."""
+  category: String = null
+
+  """Architecture."""
+  architecture: String = null
+
+  """Frameworks."""
+  framework: [String!] = null
+
+  """Labels."""
+  label: [String!] = null
+
+  """License."""
+  license: String = null
+
+  """README content."""
+  readme: String = null
+
+  """Access level (public or internal)."""
+  accessLevel: ModelCardV2AccessLevel = null
 }
 
 """Added in 24.09.0. Input for creating a notification channel"""
@@ -1830,7 +2026,7 @@ input CreateProjectInputGQL {
   description: String = null
 
   """External integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
 
   """Name of the resource policy to apply."""
   resourcePolicy: String = null
@@ -1965,6 +2161,7 @@ input CreateRoleInput {
   name: String!
   description: String = null
   source: RoleSource! = CUSTOM
+  scopes: [ScopeInput!] = null
 }
 
 """Added in UNRELEASED. Input for creating a runtime variant."""
@@ -2018,6 +2215,34 @@ type CreateRuntimeVariantPresetPayloadGQL {
   preset: RuntimeVariantPreset!
 }
 
+"""
+Added in UNRELEASED. Session types allowed for user-initiated creation.
+"""
+enum CreateSessionType {
+  INTERACTIVE
+  BATCH
+}
+
+"""Added in UNRELEASED. Input for creating a file upload session."""
+input CreateUploadSessionV2Input {
+  """File path to upload to."""
+  path: String!
+
+  """File size in bytes."""
+  size: Int!
+}
+
+"""
+Added in UNRELEASED. Payload returned after creating an upload session.
+"""
+type CreateUploadSessionV2Payload {
+  """Upload session token"""
+  token: String!
+
+  """Upload URL"""
+  url: String!
+}
+
 """Added in UNRELEASED. Input for creating a user resource policy."""
 input CreateUserResourcePolicyInputGQL {
   """Policy name. Must be unique."""
@@ -2025,6 +2250,11 @@ input CreateUserResourcePolicyInputGQL {
 
   """Maximum vfolders a user can create."""
   maxVfolderCount: Int!
+
+  """
+  Added in UNRELEASED. Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
+  """
+  maxConcurrentLogins: Int = null
 
   """Maximum quota scope size (e.g., '1g', '536870912')."""
   maxQuotaScopeSize: BinarySizeInput!
@@ -2117,6 +2347,33 @@ input CreateVFSStorageInput {
 type CreateVFSStoragePayload {
   """Created VFS storage"""
   vfsStorage: VFSStorage!
+}
+
+"""Added in UNRELEASED. Input for creating a new virtual folder."""
+input CreateVFolderV2Input {
+  """VFolder name."""
+  name: String!
+
+  """Project ID for project-owned vfolder."""
+  projectId: UUID = null
+
+  """Storage host for the vfolder."""
+  host: String = null
+
+  """Usage mode of the vfolder (general, model, data)."""
+  usageMode: String! = "general"
+
+  """Default permission of the vfolder (ro, rw, wd)."""
+  permission: String! = "rw"
+
+  """Whether the vfolder is cloneable."""
+  cloneable: Boolean! = false
+}
+
+"""Added in UNRELEASED. Payload returned after creating a virtual folder."""
+type CreateVFolderV2Payload {
+  """Created virtual folder"""
+  vfolder: VFolder!
 }
 
 """Date (isoformat)"""
@@ -2290,6 +2547,23 @@ type DeleteDomainPayloadGQL {
   deleted: Boolean!
 }
 
+"""Added in UNRELEASED. Input for deleting files inside a virtual folder."""
+input DeleteFilesV2Input {
+  """List of file paths to delete."""
+  files: [String!]!
+
+  """Whether to delete directories recursively."""
+  recursive: Boolean! = false
+}
+
+"""
+Added in UNRELEASED. Payload returned after deleting files in a virtual folder.
+"""
+type DeleteFilesV2Payload {
+  """Background task ID for the deletion operation"""
+  bgtaskId: String!
+}
+
 """Added in 25.14.0. """
 input DeleteHuggingFaceRegistryInput {
   id: ID!
@@ -2311,6 +2585,18 @@ type DeleteKeypairResourcePolicyPayloadGQL {
 type DeleteModelCardPayloadGQL {
   """ID of the deleted model card."""
   id: UUID!
+}
+
+"""Added in UNRELEASED. Input for deleting multiple model cards."""
+input DeleteModelCardsV2Input {
+  """List of model card UUIDs to delete."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk model card deletion."""
+type DeleteModelCardsV2Payload {
+  """Number of model cards successfully deleted."""
+  deletedCount: Int!
 }
 
 """Added in 24.09.0. Input for deleting a notification channel"""
@@ -2421,6 +2707,18 @@ type DeleteRuntimeVariantPresetPayloadGQL {
   id: UUID!
 }
 
+"""Added in UNRELEASED. Input for deleting multiple runtime variants."""
+input DeleteRuntimeVariantsInput {
+  """List of runtime variant UUIDs to delete."""
+  ids: [UUID!]!
+}
+
+"""Added in UNRELEASED. Payload for bulk runtime variant deletion."""
+type DeleteRuntimeVariantsPayloadGQL {
+  """Number of runtime variants successfully deleted."""
+  deletedCount: Int!
+}
+
 """
 Added in 24.09.0. Input for deleting user-level app configuration.
 If user_id is not provided, the current user's configuration will be deleted.
@@ -2472,6 +2770,56 @@ input DeleteVFSStorageInput {
 type DeleteVFSStoragePayload {
   """ID of the deleted VFS storage"""
   id: UUID!
+}
+
+"""
+Added in UNRELEASED. Payload returned after soft-deleting a virtual folder.
+"""
+type DeleteVFolderV2Payload {
+  """ID of the deleted virtual folder"""
+  id: UUID!
+}
+
+"""
+Added in UNRELEASED. Input for deploying a model card as a new deployment.
+"""
+input DeployModelCardV2Input {
+  """Target project UUID for the deployment."""
+  projectId: UUID!
+
+  """Deployment revision preset UUID."""
+  revisionPresetId: UUID!
+
+  """Resource group name."""
+  resourceGroup: String!
+
+  """Number of replicas."""
+  desiredReplicaCount: Int! = 1
+
+  """Override open_to_public. Defaults to the preset value, then False."""
+  openToPublic: Boolean = null
+
+  """
+  Override replica_count. Defaults to the preset value, then desired_replica_count.
+  """
+  replicaCount: Int = null
+
+  """
+  Override revision_history_limit. Defaults to the preset value, then 10.
+  """
+  revisionHistoryLimit: Int = null
+
+  """Override deployment strategy. Defaults to the preset value, then none."""
+  deploymentStrategy: PresetDeploymentStrategyInput = null
+}
+
+"""Added in UNRELEASED. Result of deploying a model card."""
+type DeployModelCardV2Payload {
+  """ID of the created deployment."""
+  deploymentId: UUID!
+
+  """Name of the created deployment."""
+  deploymentName: String!
 }
 
 """Added in 25.19.0. """
@@ -2610,6 +2958,11 @@ type DeploymentRevisionPreset implements Node {
   execution: PresetExecutionSpec!
 
   """
+  Deployment-level default values (open_to_public, replica_count, revision_history_limit, deployment_strategy) provided by this preset.
+  """
+  deploymentDefaults: PresetDeploymentDefaults!
+
+  """
   Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.
   """
   modelDefinition: ModelDefinition
@@ -2624,6 +2977,9 @@ type DeploymentRevisionPreset implements Node {
 
   """Timestamp of the last modification to this deployment preset."""
   updatedAt: DateTime
+
+  """Added in UNRELEASED. Resource slot allocations for this preset."""
+  resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AllocatedResourceSlotConnection!
 }
 
 """Added in UNRELEASED. Paginated list of deployment revision presets."""
@@ -2758,7 +3114,7 @@ type DomainBasicInfo {
   description: String
 
   """External system integration identifier."""
-  integrationId: String
+  integrationName: String
 }
 
 """
@@ -3255,6 +3611,78 @@ input EmailSpecInput {
   smtp: SMTPConnectionInput!
   message: EmailMessageInput!
   auth: SMTPAuthInput = null
+}
+
+"""Added in UNRELEASED. Input for creating a new compute session."""
+input EnqueueSessionInput {
+  """Session name."""
+  sessionName: String!
+
+  """Session type."""
+  sessionType: CreateSessionType!
+
+  """Image UUID."""
+  imageId: ID!
+
+  """Resource slot allocations."""
+  resourceEntries: [SessionResourceSlotEntryInput!]!
+
+  """Scaling group name."""
+  resourceGroup: String = null
+
+  """Additional resource options."""
+  resourceOpts: SessionResourceOptsInput = null
+
+  """Cluster mode."""
+  clusterMode: SessionClusterMode! = SINGLE_NODE
+
+  """Number of containers."""
+  clusterSize: Int! = 1
+
+  """Virtual folder mounts."""
+  mounts: [SessionMountItemInput!] = null
+
+  """Environment variables."""
+  environ: JSON = null
+
+  """Ports to pre-open."""
+  preopenPorts: [Int!] = null
+
+  """Bootstrap script."""
+  bootstrapScript: String = null
+
+  """Scheduling priority (0-100)."""
+  priority: Int! = 10
+
+  """Whether preemptible."""
+  isPreemptible: Boolean! = true
+
+  """Dependent session IDs."""
+  dependencies: [ID!] = null
+
+  """Designated agent IDs."""
+  agentList: [String!] = null
+
+  """Network UUID to attach."""
+  attachNetwork: ID = null
+
+  """User-defined tag."""
+  tag: String = null
+
+  """Webhook URL."""
+  callbackUrl: String = null
+
+  """Batch configuration."""
+  batch: SessionBatchConfigInput = null
+
+  """Project UUID."""
+  projectId: ID = null
+}
+
+"""Added in UNRELEASED. Payload returned after creating a session."""
+type EnqueueSessionPayload {
+  """Created session details."""
+  session: SessionV2!
 }
 
 """Added in UNRELEASED. Entity with its allowed actions within a scope."""
@@ -4394,6 +4822,20 @@ enum KeypairResourcePolicyV2OrderField {
   MAX_PENDING_SESSION_COUNT
 }
 
+"""Added in UNRELEASED. Input for listing files in a virtual folder."""
+input ListFilesV2Input {
+  """Directory path to list files from."""
+  path: String!
+}
+
+"""
+Added in UNRELEASED. Payload returned after listing files in a virtual folder.
+"""
+type ListFilesV2Payload {
+  """List of file entries"""
+  items: [VFolderFileEntryV2!]!
+}
+
 """
 Added in 25.19.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
 """
@@ -4601,6 +5043,36 @@ input MetricLabelEntryInput {
 }
 
 """
+Added in UNRELEASED. Input for creating directories inside a virtual folder.
+"""
+input MkdirV2Input {
+  """Directory path(s) to create."""
+  path: [String!]!
+
+  """Create parent directories if needed."""
+  parents: Boolean! = true
+
+  """Do not raise error if directory exists."""
+  existOk: Boolean! = false
+}
+
+"""
+Added in UNRELEASED. Payload returned after creating directories in a virtual folder.
+"""
+type MkdirV2Payload {
+  """List of created directory paths"""
+  results: [String!]!
+}
+
+"""
+Added in UNRELEASED. Scope for querying available presets that satisfy a model card's resource requirements.
+"""
+input ModelCardAvailablePresetsScope {
+  """Model card UUID to check resource requirements against."""
+  modelCardId: UUID!
+}
+
+"""
 Added in UNRELEASED. Represents a registered AI model with metadata extracted from model-definition.yaml. A model card links to a VFolder containing the actual model files and belongs to a MODEL_STORE type project for access control scoping.
 """
 type ModelCardV2 implements Node {
@@ -4637,15 +5109,39 @@ type ModelCardV2 implements Node {
   metadata: ModelCardV2Metadata!
 
   """
+  Minimum resource requirements for serving this model. Each entry maps a resource slot (e.g. 'cpu', 'cuda.shares') to its minimum required quantity. Used to filter compatible deployment revision presets via `available_presets`.
+  """
+  minResource: [ModelCardV2ResourceSlotEntry!]
+
+  """
   README content from the model VFolder, typically containing usage instructions and model documentation.
   """
   readme: String
+
+  """Access level of the model card (public or internal)."""
+  accessLevel: ModelCardV2AccessLevel!
 
   """Timestamp when this model card was registered."""
   createdAt: DateTime!
 
   """Timestamp of the last modification to this model card."""
   updatedAt: DateTime
+
+  """
+  The VFolder that stores this model card's files. Resolved through a DataLoader so that listing many model cards does not trigger N+1 fetches.
+  """
+  vfolder: VFolder
+
+  """
+  Deployment revision presets that satisfy this model card's minimum resource requirements. Equivalent to the root `model_card_available_presets` query but scoped to this card.
+  """
+  availablePresets(filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection
+}
+
+"""Added in UNRELEASED. Access level for model cards."""
+enum ModelCardV2AccessLevel {
+  PUBLIC
+  INTERNAL
 }
 
 """Added in UNRELEASED. Paginated list of model cards."""
@@ -4708,6 +5204,17 @@ input ModelCardV2OrderBy {
 enum ModelCardV2OrderField {
   NAME
   CREATED_AT
+}
+
+"""
+Added in UNRELEASED. A single resource requirement entry for a model card. The quantity is represented as a string because model card requirements are descriptive (display/matching) rather than arithmetic.
+"""
+type ModelCardV2ResourceSlotEntry {
+  """Resource type name."""
+  resourceType: String!
+
+  """Resource quantity."""
+  quantity: String!
 }
 
 """
@@ -4999,7 +5506,7 @@ input ModelMountConfigInput {
 }
 
 """
-Added in 25.19.0. A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness) and traffic weight for load balancing.
+Added in 25.19.0. A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness).
 """
 type ModelReplica implements Node {
   """The Globally Unique ID of this object"""
@@ -5013,11 +5520,8 @@ type ModelReplica implements Node {
   """Whether the replica is currently running and able to serve requests."""
   livenessStatus: LivenessStatus!
 
-  """Whether the replica is currently active and able to serve requests."""
+  """Whether the replica is actively receiving traffic."""
   activenessStatus: ActivenessStatus!
-
-  """Traffic weight for load balancing between replicas."""
-  weight: Int!
 
   """Timestamp when the replica was created."""
   createdAt: DateTime!
@@ -5088,6 +5592,9 @@ type ModelRevision implements Node {
 
   """The image of this entity."""
   image: ImageNode!
+
+  """Added in UNRELEASED. Resource slot allocations for this revision."""
+  resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AllocatedResourceSlotConnection!
 }
 
 """Added in 25.19.0. Connection for model revisions."""
@@ -5232,6 +5739,26 @@ input ModifyQueryDefinitionOptionsInput {
 type ModifyQueryDefinitionPayload {
   """Updated query definition."""
   preset: QueryDefinition!
+}
+
+"""Added in UNRELEASED. Input for moving a file inside a virtual folder."""
+input MoveFileV2Input {
+  """Source file path."""
+  src: String!
+
+  """Destination file path."""
+  dst: String!
+}
+
+"""
+Added in UNRELEASED. Payload returned after moving a file in a virtual folder.
+"""
+type MoveFileV2Payload {
+  """Source path that was moved"""
+  src: String!
+
+  """Destination path"""
+  dst: String!
 }
 
 type Mutation {
@@ -5807,6 +6334,11 @@ type Mutation {
   adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL!
 
   """
+  Added in UNRELEASED. Delete multiple runtime variants (superadmin only).
+  """
+  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayloadGQL!
+
+  """
   Added in UNRELEASED. Create a runtime variant preset (superadmin only).
   """
   adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayloadGQL!
@@ -5821,14 +6353,14 @@ type Mutation {
   """
   adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL!
 
-  """Added in UNRELEASED. Create a deployment revision preset."""
-  createDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL!
+  """Added in UNRELEASED. Create a deployment revision preset (admin only)."""
+  adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL!
 
-  """Added in UNRELEASED. Update a deployment revision preset."""
-  updateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL!
+  """Added in UNRELEASED. Update a deployment revision preset (admin only)."""
+  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL!
 
-  """Added in UNRELEASED. Delete a deployment revision preset."""
-  deleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL!
+  """Added in UNRELEASED. Delete a deployment revision preset (admin only)."""
+  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL!
 
   """Added in UNRELEASED. Create a model card (admin only)."""
   adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL!
@@ -5838,6 +6370,58 @@ type Mutation {
 
   """Added in UNRELEASED. Delete a model card (admin only)."""
   adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL!
+
+  """Added in UNRELEASED. Delete multiple model cards (admin only)."""
+  adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload!
+
+  """
+  Added in UNRELEASED. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.
+  """
+  scanProjectModelCardsV2(projectId: UUID!): ScanProjectModelCardsV2Payload!
+
+  """
+  Added in UNRELEASED. Deploy a model card by creating a deployment with a revision preset.
+  """
+  deployModelCardV2(cardId: UUID!, input: DeployModelCardV2Input!): DeployModelCardV2Payload!
+
+  """Added in UNRELEASED. Create a new virtual folder."""
+  createVfolderV2(input: CreateVFolderV2Input!): CreateVFolderV2Payload!
+
+  """Added in UNRELEASED. Soft-delete a virtual folder (move to trash)."""
+  deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload!
+
+  """Added in UNRELEASED. Permanently purge a virtual folder."""
+  purgeVfolderV2(vfolderId: UUID!): PurgeVFolderV2Payload!
+
+  """Added in UNRELEASED. Soft-delete multiple virtual folders."""
+  bulkDeleteVfoldersV2(input: BulkDeleteVFoldersV2Input!): BulkDeleteVFoldersV2Payload!
+
+  """Added in UNRELEASED. Permanently purge multiple virtual folders."""
+  bulkPurgeVfoldersV2(input: BulkPurgeVFoldersV2Input!): BulkPurgeVFoldersV2Payload!
+
+  """Added in UNRELEASED. Clone a virtual folder."""
+  cloneVfolderV2(vfolderId: UUID!, input: CloneVFolderV2Input!): CloneVFolderV2Payload!
+
+  """Added in UNRELEASED. List files in a virtual folder."""
+  vfolderListFilesV2(vfolderId: UUID!, input: ListFilesV2Input!): ListFilesV2Payload!
+
+  """Added in UNRELEASED. Create directories inside a virtual folder."""
+  vfolderMkdirV2(vfolderId: UUID!, input: MkdirV2Input!): MkdirV2Payload!
+
+  """Added in UNRELEASED. Move a file within a virtual folder."""
+  vfolderMoveFileV2(vfolderId: UUID!, input: MoveFileV2Input!): MoveFileV2Payload!
+
+  """Added in UNRELEASED. Delete files inside a virtual folder."""
+  vfolderDeleteFilesV2(vfolderId: UUID!, input: DeleteFilesV2Input!): DeleteFilesV2Payload!
+
+  """Added in UNRELEASED. Create an upload session for a virtual folder."""
+  vfolderCreateUploadSessionV2(vfolderId: UUID!, input: CreateUploadSessionV2Input!): CreateUploadSessionV2Payload!
+
+  """Added in UNRELEASED. Create a download session for a virtual folder."""
+  vfolderCreateDownloadSessionV2(vfolderId: UUID!, input: CreateDownloadSessionV2Input!): CreateDownloadSessionV2Payload!
+
+  """Added in UNRELEASED. Enqueue a new compute session."""
+  enqueueSession(input: EnqueueSessionInput!): EnqueueSessionPayload!
 
   """Added in UNRELEASED. Terminate sessions within a project scope."""
   terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload!
@@ -6034,6 +6618,15 @@ Added in 26.3.0. Display number format configuration for a resource slot type.
 type NumberFormat {
   binary: Boolean!
   roundLength: Int!
+}
+
+"""Added in UNRELEASED. Number input UI config."""
+type NumberOption {
+  """Minimum value."""
+  min: Float
+
+  """Maximum value."""
+  max: Float
 }
 
 """Added in 25.14.0. Object storage node."""
@@ -6292,10 +6885,46 @@ type PresetClusterSpec {
 }
 
 """
+Added in UNRELEASED. Deployment-level defaults stored on the preset. Any null field means the preset does not specify a default and callers should fall back to user input or the system default.
+"""
+type PresetDeploymentDefaults {
+  """Default open_to_public for deployments from this preset."""
+  openToPublic: Boolean
+
+  """Default replica count for deployments from this preset."""
+  replicaCount: Int
+
+  """Default revision history limit for deployments from this preset."""
+  revisionHistoryLimit: Int
+
+  """Default deployment strategy type (ROLLING or BLUE_GREEN)."""
+  deploymentStrategy: DeploymentStrategyType
+
+  """Strategy-specific configuration (rolling or blue-green)."""
+  deploymentStrategySpec: JSON
+}
+
+"""
+Added in UNRELEASED. Deployment strategy input for a revision preset, used to establish a default deployment strategy applied to any deployment created from this preset.
+"""
+input PresetDeploymentStrategyInput {
+  """Strategy type (ROLLING or BLUE_GREEN)."""
+  type: DeploymentStrategyType!
+
+  """Rolling update configuration (required when type is ROLLING)."""
+  rollingUpdate: RollingUpdateConfigInput = null
+
+  """Blue/green configuration (required when type is BLUE_GREEN)."""
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""
 Added in UNRELEASED. Container execution configuration for the deployment, including the inference server image, startup commands, and environment variables.
 """
 type PresetExecutionSpec {
-  """Container image reference."""
+  """
+  Container image to run the inference server (e.g., 'cr.backend.ai/stable/vllm:latest').
+  """
   image: String
 
   """Startup command."""
@@ -6312,9 +6941,6 @@ type PresetExecutionSpec {
 Added in UNRELEASED. Compute resource allocation for the deployment, specifying CPU, memory, and accelerator requirements along with additional resource options.
 """
 type PresetResourceAllocation {
-  """Resource slot allocations."""
-  resourceSlots: [ResourceSlotEntry!]!
-
   """Additional resource options."""
   resourceOpts: [ResourceOptsEntry!]!
 }
@@ -6350,7 +6976,13 @@ type ProjectBasicInfo {
   type: ProjectTypeV2!
 
   """External system integration identifier."""
-  integrationId: String
+  integrationName: String
+}
+
+"""Added in 25.19.0. Scope for project-level deployment operations."""
+input ProjectDeploymentScope {
+  """Project UUID to scope the deployment operation."""
+  projectId: UUID!
 }
 
 """
@@ -6552,6 +7184,14 @@ type ProjectLifecycleInfo {
 
   """Timestamp when the project was last modified."""
   modifiedAt: DateTime
+}
+
+"""
+Added in UNRELEASED. Scope for model card queries within a MODEL_STORE project.
+"""
+input ProjectModelCardV2Scope {
+  """MODEL_STORE project UUID."""
+  projectId: UUID!
 }
 
 """
@@ -6826,6 +7466,7 @@ input ProjectUsageScope {
 Added in 26.2.0. Nested filter for users belonging to a project. Filters projects that have at least one user matching all specified conditions.
 """
 input ProjectUserNestedFilter {
+  id: UUIDFilter = null
   username: StringFilter = null
   email: StringFilter = null
   isActive: Boolean = null
@@ -7014,6 +7655,14 @@ type PurgeUserV2Payload {
   success: Boolean!
 }
 
+"""
+Added in UNRELEASED. Payload returned after permanently purging a virtual folder.
+"""
+type PurgeVFolderV2Payload {
+  """ID of the purged virtual folder"""
+  id: UUID!
+}
+
 type Query {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
@@ -7054,11 +7703,6 @@ type Query {
   """
   mergedAppConfig: AppConfig!
 
-  """
-  Added in 25.16.0. List deployments with optional filtering and pagination (admin, all deployments).
-  """
-  deployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
-
   """Added in 25.16.0. Get a specific deployment by ID."""
   deployment(id: ID!): ModelDeployment
 
@@ -7080,6 +7724,11 @@ type Query {
 
   """Added in UNRELEASED. List available notification rule types"""
   notificationRuleTypes: [NotificationRuleType!]
+
+  """
+  Added in UNRELEASED. Get JSON schema for a notification rule type's message format
+  """
+  notificationRuleTypeSchema(ruleType: NotificationRuleType!): JSON!
 
   """Added in 25.14.0. Get an object storage by ID"""
   objectStorage(id: ID!): ObjectStorage
@@ -7149,6 +7798,9 @@ type Query {
 
   """Added in UNRELEASED. List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
+
+  """Added in 25.16.0. List all deployments (superadmin only)."""
+  adminDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
 
   """Added in UNRELEASED. List deployment history (admin only)"""
   adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection
@@ -7240,6 +7892,12 @@ type Query {
   """
   projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
 
+  """Added in 25.19.0. List deployments within a specific project."""
+  projectDeployments(scope: ProjectDeploymentScope!, filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
+
+  """Added in 25.19.0. List deployments owned by the current user."""
+  myDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
+
   """
   Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
   """
@@ -7255,18 +7913,20 @@ type Query {
   """
   adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
-  """Added in 26.3.0. Get a single query definition by ID (admin only)."""
-  adminPrometheusQueryPreset(id: ID!): QueryDefinition
+  """
+  Added in UNRELEASED. Get a single prometheus query preset by ID. Available to any authenticated user since presets are a shared catalog of metric query templates.
+  """
+  prometheusQueryPreset(id: ID!): QueryDefinition
 
   """
-  Added in 26.3.0. List query definitions with filtering and pagination (admin only).
+  Added in UNRELEASED. List prometheus query presets with filtering and pagination. Available to any authenticated user since presets are a shared catalog of metric query templates.
   """
-  adminPrometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, limit: Int = null, offset: Int = null): QueryDefinitionConnection
+  prometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, limit: Int = null, offset: Int = null): QueryDefinitionConnection
 
   """
-  Added in 26.3.0. Execute a query definition by ID and return the result (admin only).
+  Added in UNRELEASED. Execute a prometheus query preset by ID and return the result. Available to any authenticated user; the underlying preset query is the same regardless of who runs it.
   """
-  adminPrometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult!
+  prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult!
 
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role
@@ -7320,6 +7980,9 @@ type Query {
   Added in 26.3.0. List roles assigned to the current authenticated user.
   """
   myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
+
+  """Added in UNRELEASED. List roles registered in a project scope."""
+  projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection!
 
   """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
   rbacScopeEntityCombinations: [ScopeEntityCombination!]!
@@ -7589,11 +8252,19 @@ type Query {
   """Added in UNRELEASED. Get a single deployment revision preset by ID."""
   deploymentRevisionPreset(id: UUID!): DeploymentRevisionPreset
 
-  """Added in UNRELEASED. Search model cards."""
-  modelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+  """Added in UNRELEASED. Search all model cards (superadmin only)."""
+  adminModelCardsV2(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+
+  """Added in UNRELEASED. Search model cards within a MODEL_STORE project."""
+  projectModelCardsV2(scope: ProjectModelCardV2Scope!, filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 
   """Added in UNRELEASED. Get a single model card by ID."""
   modelCardV2(id: UUID!): ModelCardV2
+
+  """
+  Added in UNRELEASED. Search deployment revision presets that satisfy a model card's minimum resource requirements.
+  """
+  modelCardAvailablePresets(scope: ModelCardAvailablePresetsScope!, filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection
 
   """
   Added in UNRELEASED. Get my keypair resource allocation (current user).
@@ -7623,6 +8294,12 @@ type Query {
   Added in UNRELEASED. Check which resource presets are available for session creation.
   """
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2!
+
+  """Added in UNRELEASED. Search all virtual folders (superadmin only)."""
+  adminVfoldersV2(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
+
+  """Added in UNRELEASED. Get a single virtual folder by ID."""
+  vfolderV2(vfolderId: UUID!): VFolder
 
   """Added in UNRELEASED. List virtual folders within a specific project."""
   projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
@@ -7791,6 +8468,7 @@ enum RBACElementType {
   ARTIFACT_REGISTRY
   SESSION_TEMPLATE
   APP_CONFIG
+  MODEL_CARD
   RESOURCE_PRESET
   USER_RESOURCE_POLICY
   KEYPAIR_RESOURCE_POLICY
@@ -8046,7 +8724,6 @@ type ResourceConfig {
   """The resource group of this entity."""
   resourceGroup: ScalingGroupNode!
   resourceGroupName: String!
-  resourceSlots: ResourceSlot!
   resourceOpts: ResourceOpts
 }
 
@@ -9033,6 +9710,15 @@ type RuntimeVariantPreset implements Node {
   """
   targetSpec: PresetTargetSpec!
 
+  """UI category group for organizing parameters."""
+  category: String
+
+  """Human-readable display label for the UI."""
+  displayName: String
+
+  """UI rendering options."""
+  uiOption: UIOption
+
   """Timestamp when this preset was created."""
   createdAt: DateTime!
 
@@ -9146,6 +9832,20 @@ type ScanArtifactsPayload {
 }
 
 """
+Added in UNRELEASED. Result of scanning a MODEL_STORE project for model cards.
+"""
+type ScanProjectModelCardsV2Payload {
+  """Number of newly created model cards."""
+  createdCount: Int!
+
+  """Number of updated existing model cards."""
+  updatedCount: Int!
+
+  """Per-vfolder error messages."""
+  errors: [String!]!
+}
+
+"""
 Added in 26.2.0. Type of scheduler used for session scheduling in a resource group.
 """
 enum SchedulerType {
@@ -9230,6 +9930,14 @@ type ScopeEntityOperationCombination {
 
   """Entities and their valid operations within this scope"""
   entities: [EntityActionInfo!]!
+}
+
+"""
+Added in UNRELEASED. Scope reference for associating an entity with a scope.
+"""
+input ScopeInput {
+  scopeType: RBACElementType!
+  scopeId: String!
 }
 
 """
@@ -9387,6 +10095,51 @@ Added in 26.2.0. A collection of exposed service ports. Each entry defines a ser
 type ServicePorts {
   """List of service port entries"""
   entries: [ServicePortEntry!]!
+}
+
+"""Added in UNRELEASED. Batch session specific configuration."""
+input SessionBatchConfigInput {
+  """Shell command to execute."""
+  startupCommand: String!
+
+  """Scheduled start time (ISO 8601)."""
+  startsAt: String = null
+
+  """Execution timeout in seconds."""
+  batchTimeout: Int = null
+}
+
+"""Added in UNRELEASED. Cluster networking modes for session creation."""
+enum SessionClusterMode {
+  SINGLE_NODE
+  MULTI_NODE
+}
+
+"""Added in UNRELEASED. A virtual folder mount specification."""
+input SessionMountItemInput {
+  """Virtual folder UUID."""
+  vfolderId: ID!
+
+  """Custom mount path."""
+  mountPath: String = null
+
+  """Mount permission ('rw' or 'ro')."""
+  permission: String = null
+}
+
+"""Added in UNRELEASED. Additional resource options for session creation."""
+input SessionResourceOptsInput {
+  """Shared memory size (e.g., '1g')."""
+  shmem: BinarySizeInput = null
+}
+
+"""Added in UNRELEASED. A single resource slot allocation entry."""
+input SessionResourceSlotEntryInput {
+  """Resource type identifier."""
+  resourceType: String!
+
+  """Quantity as a decimal string."""
+  quantity: String!
 }
 
 """Added in 26.3.0. Session scheduling history record."""
@@ -9695,6 +10448,18 @@ enum SessionV2Type {
   SYSTEM
 }
 
+"""Added in UNRELEASED. Slider UI config."""
+type SliderOption {
+  """Minimum value."""
+  min: Float!
+
+  """Maximum value."""
+  max: Float!
+
+  """Increment step."""
+  step: Float!
+}
+
 """
 Added in 25.14.0. Information about the source or registry of an artifact. Contains the name and URL of the registry where the artifact is stored or originates from.
 """
@@ -9860,6 +10625,12 @@ type TerminateSessionsPayload {
   skipped: [ID!]!
 }
 
+"""Added in UNRELEASED. Text input UI config."""
+type TextOption {
+  """Placeholder text."""
+  placeholder: String
+}
+
 """
 Added in 25.19.0. This enum represents the traffic status of a replica.
 """
@@ -9873,6 +10644,24 @@ input TrafficStatusFilter {
   """The in  field."""
   in: [TrafficStatus!] = null
   equals: TrafficStatus = null
+}
+
+"""Added in UNRELEASED. UI rendering options."""
+type UIOption {
+  """UI render type."""
+  uiType: String!
+
+  """Slider config."""
+  slider: SliderOption
+
+  """Number input config."""
+  number: NumberOption
+
+  """Select/radio config."""
+  choices: ChoiceOption
+
+  """Text input config."""
+  text: TextOption
 }
 
 scalar UUID
@@ -10116,6 +10905,26 @@ input UpdateDeploymentRevisionPresetInput {
 
   """New rank."""
   rank: Int = null
+
+  """
+  Default open_to_public for deployments created from this preset. Set to null to clear.
+  """
+  openToPublic: Boolean
+
+  """
+  Default replica count for deployments created from this preset. Set to null to clear.
+  """
+  replicaCount: Int
+
+  """
+  Default revision history limit for deployments created from this preset. Set to null to clear.
+  """
+  revisionHistoryLimit: Int
+
+  """
+  Default deployment strategy for deployments created from this preset. Set to null to clear.
+  """
+  deploymentStrategy: PresetDeploymentStrategyInput
 }
 
 """Added in UNRELEASED. Update deployment revision preset payload."""
@@ -10141,7 +10950,7 @@ input UpdateDomainInputGQL {
   allowedDockerRegistries: [String!] = null
 
   """New external integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
 }
 
 """Added in 25.14.0. """
@@ -10215,8 +11024,41 @@ input UpdateModelCardV2Input {
   """New name."""
   name: String = null
 
-  """New description."""
+  """Author."""
+  author: String = null
+
+  """Title."""
+  title: String = null
+
+  """Version."""
+  modelVersion: String = null
+
+  """Description."""
   description: String = null
+
+  """ML task."""
+  task: String = null
+
+  """Category."""
+  category: String = null
+
+  """Architecture."""
+  architecture: String = null
+
+  """Frameworks."""
+  framework: [String!] = null
+
+  """Labels."""
+  label: [String!] = null
+
+  """License."""
+  license: String = null
+
+  """README content."""
+  readme: String = null
+
+  """Access level (public or internal)."""
+  accessLevel: ModelCardV2AccessLevel = null
 }
 
 """
@@ -10331,7 +11173,7 @@ input UpdateProjectInputGQL {
   isActive: Boolean = null
 
   """New external integration identifier."""
-  integrationId: String = null
+  integrationName: String = null
 
   """New resource policy name."""
   resourcePolicy: String = null
@@ -10564,6 +11406,11 @@ Added in UNRELEASED. Input for updating a user resource policy. All fields optio
 input UpdateUserResourcePolicyInputGQL {
   """Updated max vfolder count."""
   maxVfolderCount: Int = null
+
+  """
+  Added in UNRELEASED. Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
+  """
+  maxConcurrentLogins: Int = null
 
   """Updated max quota scope size."""
   maxQuotaScopeSize: BinarySizeInput = null
@@ -11003,6 +11850,11 @@ type UserResourcePolicyV2 implements Node {
   """Maximum vfolders a user can create."""
   maxVfolderCount: Int!
 
+  """
+  Added in UNRELEASED. Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
+  """
+  maxConcurrentLogins: Int
+
   """Maximum quota scope size."""
   maxQuotaScopeSize: BinarySizeInfo!
 
@@ -11039,6 +11891,7 @@ input UserResourcePolicyV2Filter {
   name: StringFilter = null
   createdAt: DateTimeFilter = null
   maxVfolderCount: IntFilter = null
+  maxConcurrentLogins: IntFilter = null
   maxQuotaScopeSize: IntFilter = null
   maxSessionCountPerModelSession: IntFilter = null
   maxCustomizedImageCount: IntFilter = null
@@ -11062,6 +11915,7 @@ enum UserResourcePolicyV2OrderField {
   NAME
   CREATED_AT
   MAX_VFOLDER_COUNT
+  MAX_CONCURRENT_LOGINS
   MAX_QUOTA_SCOPE_SIZE
   MAX_SESSION_COUNT_PER_MODEL_SESSION
   MAX_CUSTOMIZED_IMAGE_COUNT
@@ -11304,6 +12158,9 @@ type UserV2BasicInfo {
 
   """Optional description or notes about the user."""
   description: String
+
+  """External system integration identifier."""
+  integrationName: String
 }
 
 """
@@ -11348,7 +12205,7 @@ type UserV2Edge {
 }
 
 """
-Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
+Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, integration_name, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input UserV2Filter {
   uuid: UUIDFilter = null
@@ -11356,6 +12213,9 @@ input UserV2Filter {
   email: StringFilter = null
   status: UserStatusV2EnumFilter = null
   domainName: StringFilter = null
+
+  """Added in UNRELEASED. Filter by external integration identifier."""
+  integrationName: StringFilter = null
   role: UserRoleV2EnumFilter = null
   createdAt: DateTimeFilter = null
   domain: UserDomainNestedFilter = null
@@ -11552,6 +12412,29 @@ type VFolderEdge {
 
   """The item at the end of the edge"""
   node: VFolder!
+}
+
+"""
+Added in UNRELEASED. A file or directory entry inside a virtual folder.
+"""
+type VFolderFileEntryV2 {
+  """File or directory name"""
+  name: String!
+
+  """Entry type"""
+  type: String!
+
+  """File size in bytes"""
+  size: Int!
+
+  """POSIX file permission mode (e.g., 33188 for 0o100644)"""
+  mode: Int!
+
+  """Creation timestamp"""
+  createdAt: String!
+
+  """Last modification timestamp"""
+  updatedAt: String!
 }
 
 """
