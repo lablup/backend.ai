@@ -1,8 +1,8 @@
 """
-Tests for scaling-group discovery queries in ScheduleDBSource.
+Tests for resource-group discovery queries in ScheduleDBSource.
 
 Regression coverage for BA-5629: session status promotions must run on
-scaling groups even when all their agents have ``schedulable=False``.
+resource groups even when all their agents have ``schedulable=False``.
 """
 
 import uuid
@@ -24,7 +24,7 @@ from ai.backend.testutils.db import with_tables
 
 @dataclass(frozen=True)
 class ScalingGroupFixture:
-    """Named scaling groups used by the mixed-agent scenario."""
+    """Named resource groups used by the mixed-agent scenario."""
 
     schedulable: str
     unschedulable: str
@@ -79,7 +79,7 @@ async def _make_agent(
 
 
 class TestScalingGroupQueries:
-    """Tests for get_schedulable_scaling_groups / get_scaling_groups_with_active_agents."""
+    """Tests for get_schedulable_scaling_groups / get_all_scaling_groups."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -100,11 +100,11 @@ class TestScalingGroupQueries:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ScalingGroupFixture:
-        """Three scaling groups, each holding a single agent:
+        """Three resource groups, each holding a single agent:
 
         - ``schedulable``: ALIVE + schedulable=True
         - ``unschedulable``: ALIVE + schedulable=False (the BA-5629 case)
-        - ``lost``: LOST + schedulable=True (should be filtered out everywhere)
+        - ``lost``: LOST + schedulable=True (included only in the all-groups query)
         """
         fixture = ScalingGroupFixture(
             schedulable=f"sg-sched-{uuid.uuid4().hex[:8]}",
@@ -146,21 +146,20 @@ class TestScalingGroupQueries:
         assert mixed_agents_scenario.unschedulable not in schedulable
         assert mixed_agents_scenario.lost not in schedulable
 
-    async def test_active_query_includes_unschedulable_agents(
+    async def test_all_scaling_groups_query_includes_unschedulable_and_lost_agents(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         mixed_agents_scenario: ScalingGroupFixture,
     ) -> None:
         """Regression for BA-5629.
 
-        ``get_scaling_groups_with_active_agents()`` must return scaling
-        groups whose only ALIVE agents have ``schedulable=False``, so that
-        session status promotions (e.g. TERMINATING -> TERMINATED) still
-        run for sessions pinned to those agents.
+        ``get_all_scaling_groups()`` must return resource groups even when
+        they have no ALIVE or schedulable agents, so that coordinator
+        promotion and termination checks still visit sessions pinned there.
         """
         db_source = ScheduleDBSource(db_with_cleanup)
-        active = set(await db_source.get_scaling_groups_with_active_agents())
+        scaling_groups = set(await db_source.get_all_scaling_groups())
 
-        assert mixed_agents_scenario.schedulable in active
-        assert mixed_agents_scenario.unschedulable in active
-        assert mixed_agents_scenario.lost not in active
+        assert mixed_agents_scenario.schedulable in scaling_groups
+        assert mixed_agents_scenario.unschedulable in scaling_groups
+        assert mixed_agents_scenario.lost in scaling_groups
