@@ -195,10 +195,8 @@ class VFolderGetIDResponse(BaseRootResponseModel[CompactVFolderInfoDTO]):
     """Response for getting vfolder ID by name."""
 
 
-class VFolderCloneResponse(BaseResponseModel):
+class VFolderCloneResponse(BaseRootResponseModel[VFolderCloneInfoDTO]):
     """Response for cloning a vfolder."""
-
-    item: VFolderCloneInfoDTO = Field(description="Cloned vfolder info")
 
 
 # ============================================================
