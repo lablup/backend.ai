@@ -93,6 +93,23 @@ class SessionStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
+    def force_terminatable_statuses(cls) -> frozenset[SessionStatus]:
+        """Return statuses that can transition directly to TERMINATED."""
+        return frozenset(
+            status
+            for status in cls
+            if status
+            not in (
+                cls.PENDING,
+                cls.DEPRIORITIZING,
+                cls.TERMINATED,
+                cls.CANCELLED,
+                cls.ERROR,
+            )
+        )
+
+    @classmethod
+    @lru_cache(maxsize=1)
     def terminal_statuses(cls) -> frozenset[SessionStatus]:
         return frozenset((
             cls.ERROR,
