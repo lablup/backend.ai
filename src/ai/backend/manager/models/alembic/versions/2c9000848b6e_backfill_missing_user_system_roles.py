@@ -21,6 +21,7 @@ from sqlalchemy.engine import Connection, Row
 
 from ai.backend.manager.models.base import EnumValueType, IDColumn
 from ai.backend.manager.models.rbac_models.migration.enums import (
+    RoleSource,
     ScopeType,
 )
 from ai.backend.manager.models.rbac_models.migration.models import (
@@ -71,11 +72,18 @@ def _role_name(user_uuid: uuid.UUID) -> str:
     return f"user-{str(user_uuid)[:8]}"
 
 
-def _query_users_without_roles(
+def _query_users_without_system_roles(
     db_conn: Connection, offset: int, page_size: int
 ) -> Sequence[Row[Any]]:
     users_table = _get_users_table()
     user_roles_table = get_user_roles_table()
+    roles_table = get_roles_table()
+    # Subquery: user_ids that already have a system role
+    system_role_subq = (
+        sa.select(user_roles_table.c.user_id)
+        .join(roles_table, user_roles_table.c.role_id == roles_table.c.id)
+        .where(roles_table.c.source == RoleSource.SYSTEM)
+    ).subquery()
     query = (
         sa.select(
             users_table.c.uuid,
@@ -83,8 +91,7 @@ def _query_users_without_roles(
             users_table.c.domain_name,
             users_table.c.role,
         )
-        .outerjoin(user_roles_table, users_table.c.uuid == user_roles_table.c.user_id)
-        .where(user_roles_table.c.id.is_(None))
+        .where(users_table.c.uuid.notin_(sa.select(system_role_subq.c.user_id)))
         .offset(offset)
         .limit(page_size)
         .order_by(users_table.c.uuid)
@@ -151,7 +158,7 @@ def upgrade() -> None:
     offset = 0
     page_size = 1000
     while True:
-        rows = _query_users_without_roles(conn, offset, page_size)
+        rows = _query_users_without_system_roles(conn, offset, page_size)
         if not rows:
             break
         _backfill_roles_and_permissions(conn, rows)
