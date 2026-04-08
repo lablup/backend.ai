@@ -4215,7 +4215,7 @@ type DeleteNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted notification channel"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 24.09.0. Input for deleting a notification rule"""
@@ -4230,7 +4230,7 @@ type DeleteNotificationRulePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted notification rule"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 25.14.0. """
@@ -4245,7 +4245,7 @@ type DeleteObjectStoragePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted object storage"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 26.3.0. Input for deleting a scoped permission"""
@@ -4260,7 +4260,7 @@ type DeletePermissionPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted permission"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in UNRELEASED. Payload for project deletion mutation."""
@@ -4291,7 +4291,7 @@ type DeleteQueryDefinitionPayload
   @join__type(graph: STRAWBERRY)
 {
   """Deleted query definition ID"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 25.14.0. """
@@ -4344,7 +4344,7 @@ type DeleteRolePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted role"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in UNRELEASED. Payload for runtime variant deletion."""
@@ -11883,7 +11883,7 @@ type PurgeRolePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the purged role"""
-  id: ID!
+  id: UUID!
 }
 
 """
@@ -18233,7 +18233,7 @@ type ValidateNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the validated notification channel"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 24.09.0. Input for validate notification rule mutation"""

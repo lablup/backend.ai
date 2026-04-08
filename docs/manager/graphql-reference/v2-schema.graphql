@@ -2593,7 +2593,7 @@ input DeleteNotificationChannelInput {
 """Added in 26.3.0. Payload for delete notification channel mutation."""
 type DeleteNotificationChannelPayload {
   """ID of the deleted notification channel"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 24.09.0. Input for deleting a notification rule"""
@@ -2604,7 +2604,7 @@ input DeleteNotificationRuleInput {
 """Added in 26.3.0. Payload for delete notification rule mutation."""
 type DeleteNotificationRulePayload {
   """ID of the deleted notification rule"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 25.14.0. """
@@ -2615,7 +2615,7 @@ input DeleteObjectStorageInput {
 """Added in 25.14.0. Payload for deleting an object storage."""
 type DeleteObjectStoragePayload {
   """ID of the deleted object storage"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 26.3.0. Input for deleting a scoped permission"""
@@ -2626,7 +2626,7 @@ input DeletePermissionInput {
 """Added in 26.3.0. Payload for delete permission mutation."""
 type DeletePermissionPayload {
   """ID of the deleted permission"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in UNRELEASED. Payload for project deletion mutation."""
@@ -2644,7 +2644,7 @@ type DeleteProjectResourcePolicyPayloadGQL {
 """Added in 26.3.0. Payload returned after deleting a query definition."""
 type DeleteQueryDefinitionPayload {
   """Deleted query definition ID"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 25.14.0. """
@@ -2678,7 +2678,7 @@ input DeleteRoleInput {
 """Added in 26.3.0. Payload for delete role mutation."""
 type DeleteRolePayload {
   """ID of the deleted role"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in UNRELEASED. Payload for runtime variant deletion."""
@@ -7555,7 +7555,7 @@ input PurgeRoleInput {
 """Added in 26.3.0. Payload for purge role mutation."""
 type PurgeRolePayload {
   """ID of the purged role"""
-  id: ID!
+  id: UUID!
 }
 
 """
@@ -12509,7 +12509,7 @@ input ValidateNotificationChannelInput {
 """Added in 26.3.0. Payload for validate notification channel mutation."""
 type ValidateNotificationChannelPayload {
   """ID of the validated notification channel"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 24.09.0. Input for validate notification rule mutation"""
