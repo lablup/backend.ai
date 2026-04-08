@@ -2607,7 +2607,7 @@ input DeleteNotificationChannelInput {
 """Added in 26.3.0. Payload for delete notification channel mutation."""
 type DeleteNotificationChannelPayload {
   """ID of the deleted notification channel"""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 24.09.0. Input for deleting a notification rule"""
