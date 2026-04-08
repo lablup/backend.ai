@@ -12,6 +12,7 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
+from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.permission.entity import (
     ElementAssociationListResult,
@@ -1022,29 +1023,33 @@ class PermissionDBSource:
         target_entity_type = (
             data.permission_entity_type or data.target_element_ref.element_type.to_entity_type()
         )
-        target_scope_type = data.target_element_ref.element_type.to_scope_type()
 
-        combined_query = sa.select(
-            sa.or_(
-                sa.exists(
-                    self._build_scope_chain_permission_query(
-                        data.user_id,
-                        data.target_element_ref,
-                        target_entity_type,
-                        data.operation,
-                    )
-                ),
-                sa.exists(
-                    self._build_self_scope_permission_query(
-                        data.user_id,
-                        data.target_element_ref,
-                        target_entity_type,
-                        target_scope_type,
-                        data.operation,
-                    )
-                ),
-            )
+        scope_chain_query = self._build_scope_chain_permission_query(
+            data.user_id,
+            data.target_element_ref,
+            target_entity_type,
+            data.operation,
         )
+
+        try:
+            target_scope_type = data.target_element_ref.element_type.to_scope_type()
+        except RBACTypeConversionError:
+            combined_query = sa.select(sa.exists(scope_chain_query))
+        else:
+            combined_query = sa.select(
+                sa.or_(
+                    sa.exists(scope_chain_query),
+                    sa.exists(
+                        self._build_self_scope_permission_query(
+                            data.user_id,
+                            data.target_element_ref,
+                            target_entity_type,
+                            target_scope_type,
+                            data.operation,
+                        )
+                    ),
+                )
+            )
 
         async with self._db.begin_readonly_session_read_committed() as db_session:
             result = await db_session.scalar(combined_query)
