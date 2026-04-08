@@ -7,6 +7,7 @@ scaling groups even when all their agents have ``schedulable=False``.
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
 
@@ -19,6 +20,62 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGro
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.testutils.db import with_tables
+
+
+@dataclass(frozen=True)
+class ScalingGroupFixture:
+    """Named scaling groups used by the mixed-agent scenario."""
+
+    schedulable: str
+    unschedulable: str
+    lost: str
+
+
+async def _make_scaling_group(db: ExtendedAsyncSAEngine, name: str) -> None:
+    async with db.begin_session() as db_sess:
+        db_sess.add(
+            ScalingGroupRow(
+                name=name,
+                driver="static",
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(
+                    allowed_session_types=[],
+                    pending_timeout=timedelta(hours=1),
+                    config={},
+                ),
+                driver_opts={},
+                is_active=True,
+            )
+        )
+
+
+async def _make_agent(
+    db: ExtendedAsyncSAEngine,
+    scaling_group: str,
+    *,
+    status: AgentStatus,
+    schedulable: bool,
+) -> AgentId:
+    agent_id = AgentId(f"test-agent-{uuid.uuid4().hex[:8]}")
+    async with db.begin_session() as db_sess:
+        db_sess.add(
+            AgentRow(
+                id=agent_id,
+                status=status,
+                region="local",
+                scaling_group=scaling_group,
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("10"),
+                    "mem": Decimal("10240"),
+                }),
+                occupied_slots=ResourceSlot(),
+                addr="127.0.0.1:6001",
+                version="1.0.0",
+                architecture="x86_64",
+                schedulable=schedulable,
+            )
+        )
+    return agent_id
 
 
 class TestScalingGroupQueries:
@@ -38,82 +95,61 @@ class TestScalingGroupQueries:
         ):
             yield database_connection
 
-    async def _make_scaling_group(self, db: ExtendedAsyncSAEngine, name: str) -> None:
-        async with db.begin_session() as db_sess:
-            db_sess.add(
-                ScalingGroupRow(
-                    name=name,
-                    driver="static",
-                    scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
-                        allowed_session_types=[],
-                        pending_timeout=timedelta(hours=1),
-                        config={},
-                    ),
-                    driver_opts={},
-                    is_active=True,
-                )
-            )
-
-    async def _make_agent(
+    @pytest.fixture
+    async def mixed_agents_scenario(
         self,
-        db: ExtendedAsyncSAEngine,
-        scaling_group: str,
-        *,
-        status: AgentStatus,
-        schedulable: bool,
-    ) -> AgentId:
-        agent_id = AgentId(f"test-agent-{uuid.uuid4().hex[:8]}")
-        async with db.begin_session() as db_sess:
-            db_sess.add(
-                AgentRow(
-                    id=agent_id,
-                    status=status,
-                    region="local",
-                    scaling_group=scaling_group,
-                    available_slots=ResourceSlot({
-                        "cpu": Decimal("10"),
-                        "mem": Decimal("10240"),
-                    }),
-                    occupied_slots=ResourceSlot(),
-                    addr="127.0.0.1:6001",
-                    version="1.0.0",
-                    architecture="x86_64",
-                    schedulable=schedulable,
-                )
-            )
-        return agent_id
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> ScalingGroupFixture:
+        """Three scaling groups, each holding a single agent:
+
+        - ``schedulable``: ALIVE + schedulable=True
+        - ``unschedulable``: ALIVE + schedulable=False (the BA-5629 case)
+        - ``lost``: LOST + schedulable=True (should be filtered out everywhere)
+        """
+        fixture = ScalingGroupFixture(
+            schedulable=f"sg-sched-{uuid.uuid4().hex[:8]}",
+            unschedulable=f"sg-unsched-{uuid.uuid4().hex[:8]}",
+            lost=f"sg-lost-{uuid.uuid4().hex[:8]}",
+        )
+        await _make_scaling_group(db_with_cleanup, fixture.schedulable)
+        await _make_scaling_group(db_with_cleanup, fixture.unschedulable)
+        await _make_scaling_group(db_with_cleanup, fixture.lost)
+        await _make_agent(
+            db_with_cleanup,
+            fixture.schedulable,
+            status=AgentStatus.ALIVE,
+            schedulable=True,
+        )
+        await _make_agent(
+            db_with_cleanup,
+            fixture.unschedulable,
+            status=AgentStatus.ALIVE,
+            schedulable=False,
+        )
+        await _make_agent(
+            db_with_cleanup,
+            fixture.lost,
+            status=AgentStatus.LOST,
+            schedulable=True,
+        )
+        return fixture
 
     async def test_schedulable_query_excludes_unschedulable_agents(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        mixed_agents_scenario: ScalingGroupFixture,
     ) -> None:
-        sg_schedulable = f"sg-sched-{uuid.uuid4().hex[:8]}"
-        sg_unschedulable = f"sg-unsched-{uuid.uuid4().hex[:8]}"
-        await self._make_scaling_group(db_with_cleanup, sg_schedulable)
-        await self._make_scaling_group(db_with_cleanup, sg_unschedulable)
-        await self._make_agent(
-            db_with_cleanup,
-            sg_schedulable,
-            status=AgentStatus.ALIVE,
-            schedulable=True,
-        )
-        await self._make_agent(
-            db_with_cleanup,
-            sg_unschedulable,
-            status=AgentStatus.ALIVE,
-            schedulable=False,
-        )
-
         db_source = ScheduleDBSource(db_with_cleanup)
         schedulable = set(await db_source.get_schedulable_scaling_groups())
 
-        assert sg_schedulable in schedulable
-        assert sg_unschedulable not in schedulable
+        assert mixed_agents_scenario.schedulable in schedulable
+        assert mixed_agents_scenario.unschedulable not in schedulable
+        assert mixed_agents_scenario.lost not in schedulable
 
     async def test_active_query_includes_unschedulable_agents(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        mixed_agents_scenario: ScalingGroupFixture,
     ) -> None:
         """Regression for BA-5629.
 
@@ -122,34 +158,9 @@ class TestScalingGroupQueries:
         session status promotions (e.g. TERMINATING -> TERMINATED) still
         run for sessions pinned to those agents.
         """
-        sg_schedulable = f"sg-sched-{uuid.uuid4().hex[:8]}"
-        sg_unschedulable = f"sg-unsched-{uuid.uuid4().hex[:8]}"
-        sg_lost = f"sg-lost-{uuid.uuid4().hex[:8]}"
-        await self._make_scaling_group(db_with_cleanup, sg_schedulable)
-        await self._make_scaling_group(db_with_cleanup, sg_unschedulable)
-        await self._make_scaling_group(db_with_cleanup, sg_lost)
-        await self._make_agent(
-            db_with_cleanup,
-            sg_schedulable,
-            status=AgentStatus.ALIVE,
-            schedulable=True,
-        )
-        await self._make_agent(
-            db_with_cleanup,
-            sg_unschedulable,
-            status=AgentStatus.ALIVE,
-            schedulable=False,
-        )
-        await self._make_agent(
-            db_with_cleanup,
-            sg_lost,
-            status=AgentStatus.LOST,
-            schedulable=True,
-        )
-
         db_source = ScheduleDBSource(db_with_cleanup)
         active = set(await db_source.get_scaling_groups_with_active_agents())
 
-        assert sg_schedulable in active
-        assert sg_unschedulable in active
-        assert sg_lost not in active
+        assert mixed_agents_scenario.schedulable in active
+        assert mixed_agents_scenario.unschedulable in active
+        assert mixed_agents_scenario.lost not in active
