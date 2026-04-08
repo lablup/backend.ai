@@ -214,6 +214,16 @@ type AdminDeleteKeypairPayload
 }
 
 """
+Added in UNRELEASED. Payload returned after admin clears a user's SSH keypair.
+"""
+type AdminDeleteSSHKeypairPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Access key whose SSH keypair was cleared."""
+  accessKey: String!
+}
+
+"""
 Added in UNRELEASED. Input for admin querying effective assignable resources for a specific user.
 """
 input AdminEffectiveResourceAllocationV2Input
@@ -227,6 +237,40 @@ input AdminEffectiveResourceAllocationV2Input
 
   """Resource group name to check allocation for."""
   resourceGroupName: String!
+}
+
+"""Added in UNRELEASED. Payload returned by admin SSH keypair lookup."""
+type AdminGetSSHKeypairPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """SSH keypair public information."""
+  keypair: SSHKeypairNode!
+}
+
+"""
+Added in UNRELEASED. Admin input for registering (overwriting) a user's SSH keypair.
+"""
+input AdminRegisterSSHKeypairInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Access key whose SSH keypair will be replaced."""
+  accessKey: String!
+
+  """PEM-encoded SSH public key."""
+  sshPublicKey: String!
+
+  """PEM-encoded SSH private key."""
+  sshPrivateKey: String!
+}
+
+"""
+Added in UNRELEASED. Payload returned after admin registers a user's SSH keypair.
+"""
+type AdminRegisterSSHKeypairPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Access key whose SSH keypair was updated."""
+  accessKey: String!
 }
 
 """Added in UNRELEASED. Admin input for updating a keypair."""
@@ -3195,8 +3239,8 @@ input CreateModelCardV2Input
   """VFolder ID."""
   vfolderId: UUID!
 
-  """Project ID."""
-  projectId: UUID!
+  """MODEL_STORE project UUID where the model card belongs."""
+  modelStoreProjectId: UUID!
 
   """Domain name."""
   domainName: String = null
@@ -4871,6 +4915,52 @@ input DeployModelCardV2Input
 
 """Added in UNRELEASED. Result of deploying a model card."""
 type DeployModelCardV2Payload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the created deployment."""
+  deploymentId: UUID!
+
+  """Name of the created deployment."""
+  deploymentName: String!
+}
+
+"""
+Added in UNRELEASED. Input for deploying a model VFolder as a new deployment.
+"""
+input DeployVFolderV2Input
+  @join__type(graph: STRAWBERRY)
+{
+  """Target project UUID for the deployment."""
+  projectId: UUID!
+
+  """Deployment revision preset UUID."""
+  revisionPresetId: UUID!
+
+  """Resource group name."""
+  resourceGroup: String!
+
+  """Number of replicas."""
+  desiredReplicaCount: Int! = 1
+
+  """Override open_to_public. Defaults to the preset value, then False."""
+  openToPublic: Boolean = null
+
+  """
+  Override replica_count. Defaults to the preset value, then desired_replica_count.
+  """
+  replicaCount: Int = null
+
+  """
+  Override revision_history_limit. Defaults to the preset value, then 10.
+  """
+  revisionHistoryLimit: Int = null
+
+  """Override deployment strategy. Defaults to the preset value, then none."""
+  deploymentStrategy: PresetDeploymentStrategyInput = null
+}
+
+"""Added in UNRELEASED. Payload for deploying a model VFolder."""
+type DeployVFolderV2Payload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the created deployment."""
@@ -8235,6 +8325,11 @@ input ModelCardV2Filter
 
   """Project filter."""
   projectId: UUID = null
+
+  """
+  Filter by the storage host backing the model card's VFolder. Matches via an EXISTS subquery against the VFolder host column.
+  """
+  storageHost: StringFilter = null
 }
 
 """
@@ -10192,6 +10287,14 @@ type Mutation
   """
   adminDeleteKeypairV2(accessKey: String!): AdminDeleteKeypairPayload! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in UNRELEASED. Admin registers (overwrites) a user's SSH keypair.
+  """
+  adminRegisterSshKeypairV2(input: AdminRegisterSSHKeypairInput!): AdminRegisterSSHKeypairPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Admin clears a user's SSH keypair."""
+  adminDeleteSshKeypairV2(accessKey: String!): AdminDeleteSSHKeypairPayload! @join__field(graph: STRAWBERRY)
+
   """Added in UNRELEASED. Revoke a login session. (admin only)"""
   adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload! @join__field(graph: STRAWBERRY)
 
@@ -10360,6 +10463,11 @@ type Mutation
   """Added in UNRELEASED. Permanently purge a virtual folder."""
   purgeVfolderV2(vfolderId: UUID!): PurgeVFolderV2Payload! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in UNRELEASED. Deploy a deployment directly from a model VFolder.
+  """
+  deployVfolderV2(vfolderId: UUID!, input: DeployVFolderV2Input!): DeployVFolderV2Payload! @join__field(graph: STRAWBERRY)
+
   """Added in UNRELEASED. Soft-delete multiple virtual folders."""
   bulkDeleteVfoldersV2(input: BulkDeleteVFoldersV2Input!): BulkDeleteVFoldersV2Payload! @join__field(graph: STRAWBERRY)
 
@@ -10402,6 +10510,16 @@ type MyClientIp
 {
   """The client's IP address as seen by the server"""
   clientIp: String!
+}
+
+"""
+Added in UNRELEASED. Payload listing storage hosts the current user is allowed to use.
+"""
+type MyStorageHostPermissionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Storage hosts the current user is allowed to use."""
+  items: [StorageHostPermission!]!
 }
 
 """Added in 24.12.0."""
@@ -12732,6 +12850,11 @@ type Query
   adminKeypairsV2(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection! @join__field(graph: STRAWBERRY)
 
   """
+  Added in UNRELEASED. Get a user's SSH public key (admin only). The private key is never returned.
+  """
+  adminSshKeypairV2(accessKey: String!): AdminGetSSHKeypairPayload! @join__field(graph: STRAWBERRY)
+
+  """
   Added in UNRELEASED. Query login sessions of the current user with pagination and filtering.
   """
   myLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection! @join__field(graph: STRAWBERRY)
@@ -12992,6 +13115,11 @@ type Query
 
   """Added in UNRELEASED. Get the current user's user resource policy."""
   myUserResourcePolicyV2: UserResourcePolicyV2 @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. List storage hosts the current user is allowed to mount, with the union of permissions inherited from domain, project, and keypair resource policies.
+  """
+  myStorageHostPermissions: MyStorageHostPermissionsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. List resource presets (admin only)."""
   adminResourcePresetsV2(filter: ResourcePresetFilter = null, orderBy: [ResourcePresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourcePresetConnection @join__field(graph: STRAWBERRY)
@@ -15906,6 +16034,32 @@ type SourceInfo
 }
 
 """
+Added in UNRELEASED. SSH keypair read model. Never includes the private key.
+"""
+type SSHKeypairNode
+  @join__type(graph: STRAWBERRY)
+{
+  """Access key owning this SSH keypair."""
+  accessKey: String!
+
+  """PEM-encoded SSH public key, or null if none is registered."""
+  sshPublicKey: String
+}
+
+"""
+Added in UNRELEASED. A single storage host together with the permissions granted to a user.
+"""
+type StorageHostPermission
+  @join__type(graph: STRAWBERRY)
+{
+  """Storage host name."""
+  host: String!
+
+  """Permissions granted to the current user on this storage host."""
+  permissions: [VFolderHostPermissionV2!]!
+}
+
+"""
 Added in 25.15.0. Storage namespace provides logical separation of data within a single storage system
 to organize and isolate domain-specific concerns.
 
@@ -16014,6 +16168,18 @@ input StringFilter
 
   """The i not equals field."""
   iNotEquals: String = null
+
+  """Value is in the provided list (case-sensitive)."""
+  in: [String!] = null
+
+  """Value is not in the provided list (case-sensitive)."""
+  notIn: [String!] = null
+
+  """Value is in the provided list (case-insensitive)."""
+  iIn: [String!] = null
+
+  """Value is not in the provided list (case-insensitive)."""
+  iNotIn: [String!] = null
 }
 
 type Subscription
