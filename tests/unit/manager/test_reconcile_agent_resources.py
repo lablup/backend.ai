@@ -416,3 +416,220 @@ class TestReconcileAgentResources:
 
         used = await self._get_agent_resource_used(db, agent_id)
         assert used["cpu"] == Decimal("0")
+
+    # --- Orphaned allocation cleanup tests ---
+
+    async def _get_allocation_free_at(
+        self,
+        db: ExtendedAsyncSAEngine,
+        kernel_id: uuid.UUID,
+    ) -> dict[str, datetime | None]:
+        """Read current resource_allocations.free_at values for a kernel."""
+        ra = ResourceAllocationRow.__table__
+        async with db.begin_session() as db_sess:
+            rows = (
+                await db_sess.execute(
+                    sa.select(ra.c.slot_name, ra.c.free_at).where(ra.c.kernel_id == kernel_id)
+                )
+            ).all()
+        return {row.slot_name: row.free_at for row in rows}
+
+    async def test_orphaned_cancelled_kernel_freed(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """CANCELLED kernel with free_at=NULL should have free_at set."""
+        db = db_with_tables
+        await self._seed_slot_types(db)
+        domain_name, project_id, agent_id = await self._seed_infrastructure(db)
+
+        kernel_id = await self._create_kernel_with_allocations(
+            db,
+            domain_name=domain_name,
+            project_id=project_id,
+            agent_id=agent_id,
+            status=KernelStatus.CANCELLED,
+            allocations={"cpu": (Decimal("2"), None)},
+            free_at=None,
+        )
+        await self._seed_agent_resources(db, agent_id, {"cpu": (Decimal("8"), Decimal("0"))})
+
+        with caplog.at_level(logging.WARNING):
+            await registry._reconcile_agent_resources()
+
+        assert "freed orphaned resource allocation" in caplog.text
+
+        free_at = await self._get_allocation_free_at(db, kernel_id)
+        assert free_at["cpu"] is not None
+
+    async def test_orphaned_terminated_kernel_freed(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """TERMINATED kernel with free_at=NULL should have free_at set."""
+        db = db_with_tables
+        await self._seed_slot_types(db)
+        domain_name, project_id, agent_id = await self._seed_infrastructure(db)
+
+        kernel_id = await self._create_kernel_with_allocations(
+            db,
+            domain_name=domain_name,
+            project_id=project_id,
+            agent_id=agent_id,
+            status=KernelStatus.TERMINATED,
+            allocations={"cpu": (Decimal("4"), Decimal("4"))},
+            free_at=None,
+        )
+        await self._seed_agent_resources(db, agent_id, {"cpu": (Decimal("8"), Decimal("0"))})
+
+        with caplog.at_level(logging.WARNING):
+            await registry._reconcile_agent_resources()
+
+        assert "freed orphaned resource allocation" in caplog.text
+
+        free_at = await self._get_allocation_free_at(db, kernel_id)
+        assert free_at["cpu"] is not None
+
+    async def test_orphaned_error_kernel_freed(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """ERROR kernel with free_at=NULL should have free_at set."""
+        db = db_with_tables
+        await self._seed_slot_types(db)
+        domain_name, project_id, agent_id = await self._seed_infrastructure(db)
+
+        kernel_id = await self._create_kernel_with_allocations(
+            db,
+            domain_name=domain_name,
+            project_id=project_id,
+            agent_id=agent_id,
+            status=KernelStatus.ERROR,
+            allocations={"cpu": (Decimal("2"), Decimal("2"))},
+            free_at=None,
+        )
+        await self._seed_agent_resources(db, agent_id, {"cpu": (Decimal("8"), Decimal("0"))})
+
+        with caplog.at_level(logging.WARNING):
+            await registry._reconcile_agent_resources()
+
+        assert "freed orphaned resource allocation" in caplog.text
+
+        free_at = await self._get_allocation_free_at(db, kernel_id)
+        assert free_at["cpu"] is not None
+
+    async def test_running_kernel_not_touched(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """RUNNING kernel with free_at=NULL should NOT be modified (normal state)."""
+        db = db_with_tables
+        await self._seed_slot_types(db)
+        domain_name, project_id, agent_id = await self._seed_infrastructure(db)
+
+        kernel_id = await self._create_kernel_with_allocations(
+            db,
+            domain_name=domain_name,
+            project_id=project_id,
+            agent_id=agent_id,
+            status=KernelStatus.RUNNING,
+            allocations={"cpu": (Decimal("2"), Decimal("2"))},
+            free_at=None,
+        )
+        await self._seed_agent_resources(db, agent_id, {"cpu": (Decimal("8"), Decimal("2"))})
+
+        with caplog.at_level(logging.WARNING):
+            await registry._reconcile_agent_resources()
+
+        assert "freed orphaned resource allocation" not in caplog.text
+
+        free_at = await self._get_allocation_free_at(db, kernel_id)
+        assert free_at["cpu"] is None
+
+    async def test_orphan_cleanup_then_reconcile_in_one_transaction(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Orphan cleanup runs before reconcile, so drift is computed on corrected data."""
+        db = db_with_tables
+        await self._seed_slot_types(db)
+        domain_name, project_id, agent_id = await self._seed_infrastructure(db)
+
+        # RUNNING kernel occupying cpu=2 (legitimate)
+        await self._create_kernel_with_allocations(
+            db,
+            domain_name=domain_name,
+            project_id=project_id,
+            agent_id=agent_id,
+            status=KernelStatus.RUNNING,
+            allocations={"cpu": (Decimal("2"), Decimal("2"))},
+        )
+        # CANCELLED kernel with orphaned allocation (free_at=NULL but terminal)
+        orphan_kernel_id = await self._create_kernel_with_allocations(
+            db,
+            domain_name=domain_name,
+            project_id=project_id,
+            agent_id=agent_id,
+            status=KernelStatus.CANCELLED,
+            allocations={"cpu": (Decimal("4"), None)},
+            free_at=None,
+        )
+
+        # agent_resources.used=6 (includes orphan's 4, which is wrong)
+        await self._seed_agent_resources(db, agent_id, {"cpu": (Decimal("8"), Decimal("6"))})
+
+        with caplog.at_level(logging.WARNING):
+            await registry._reconcile_agent_resources()
+
+        # Orphan should be freed
+        assert "freed orphaned resource allocation" in caplog.text
+        free_at = await self._get_allocation_free_at(db, orphan_kernel_id)
+        assert free_at["cpu"] is not None
+
+        # Drift should be corrected: 6 → 2 (only RUNNING kernel counts)
+        assert "agent_resources drift detected" in caplog.text
+        used = await self._get_agent_resource_used(db, agent_id)
+        assert used["cpu"] == Decimal("2")
+
+    async def test_already_freed_allocation_not_touched(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """TERMINATED kernel with free_at already set should NOT be modified."""
+        db = db_with_tables
+        await self._seed_slot_types(db)
+        domain_name, project_id, agent_id = await self._seed_infrastructure(db)
+
+        already_freed = datetime.now(tzutc())
+        kernel_id = await self._create_kernel_with_allocations(
+            db,
+            domain_name=domain_name,
+            project_id=project_id,
+            agent_id=agent_id,
+            status=KernelStatus.TERMINATED,
+            allocations={"cpu": (Decimal("2"), Decimal("2"))},
+            free_at=already_freed,
+        )
+        await self._seed_agent_resources(db, agent_id, {"cpu": (Decimal("8"), Decimal("0"))})
+
+        with caplog.at_level(logging.WARNING):
+            await registry._reconcile_agent_resources()
+
+        assert "freed orphaned resource allocation" not in caplog.text
+
+        free_at = await self._get_allocation_free_at(db, kernel_id)
+        # free_at should remain the original value, not updated
+        assert free_at["cpu"] is not None
+        assert abs((free_at["cpu"] - already_freed).total_seconds()) < 2

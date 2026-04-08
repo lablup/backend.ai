@@ -1267,14 +1267,14 @@ class AgentRegistry:
         transaction: orphan cleanup first, then drift correction.
         """
         repo = ResourceSlotRepository(self.db)
-        orphans, drifts = await repo.reconcile_agent_resources()
-        for o in orphans:
+        result = await repo.reconcile_agent_resources()
+        for o in result.orphaned_allocations:
             log.warning(
                 "freed orphaned resource allocation: kernel={}, slot={}",
                 o.kernel_id,
                 o.slot_name,
             )
-        for d in drifts:
+        for d in result.agent_resource_drifts:
             log.warning(
                 "agent_resources drift detected for {}:{}: tracked={}, actual={}",
                 d.agent_id,

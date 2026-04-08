@@ -16,6 +16,7 @@ from ai.backend.manager.data.resource_slot.types import (
     AgentResourceSearchResult,
     NumberFormatData,
     OrphanedAllocation,
+    ReconciliationResult,
     ResourceAllocationData,
     ResourceAllocationSearchResult,
     ResourceOccupancy,
@@ -331,9 +332,7 @@ class ResourceSlotDBSource:
             rows = (await db_sess.execute(self._build_actual_usage_query())).all()
         return {(row.agent, row.slot_name): row.total_amount for row in rows}
 
-    async def reconcile_agent_resources(
-        self,
-    ) -> tuple[list[OrphanedAllocation], list[AgentResourceDrift]]:
+    async def reconcile_agent_resources(self) -> ReconciliationResult:
         """Clean up orphaned allocations and reconcile agent_resources in one transaction.
 
         Within a single transaction:
@@ -344,9 +343,6 @@ class ResourceSlotDBSource:
 
         Orphan cleanup runs first so that the subsequent reconciliation operates on
         a corrected set of active allocations.
-
-        Returns:
-            Tuple of (orphaned allocations freed, agent resource drifts corrected).
         """
         ra = ResourceAllocationRow.__table__
         k = KernelRow.__table__
@@ -412,7 +408,10 @@ class ResourceSlotDBSource:
                     )
                 )
 
-        return orphans, drifts
+        return ReconciliationResult(
+            orphaned_allocations=orphans,
+            agent_resource_drifts=drifts,
+        )
 
     async def aggregate_occupied_by_project(self, project_id: uuid.UUID) -> ResourceOccupancy:
         """Aggregate active resource occupancy for a project (group).

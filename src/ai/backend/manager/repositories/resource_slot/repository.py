@@ -16,9 +16,8 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.resource_slot.types import (
-    AgentResourceDrift,
     AgentResourceSearchResult,
-    OrphanedAllocation,
+    ReconciliationResult,
     ResourceAllocationSearchResult,
     ResourceOccupancy,
     ResourceSlotTypeSearchResult,
@@ -131,9 +130,7 @@ class ResourceSlotRepository:
         return await self._db_source.compute_actual_agent_resource_usage()
 
     @resource_slot_repository_resilience.apply()
-    async def reconcile_agent_resources(
-        self,
-    ) -> tuple[list[OrphanedAllocation], list[AgentResourceDrift]]:
+    async def reconcile_agent_resources(self) -> ReconciliationResult:
         """Clean up orphaned allocations and reconcile agent_resources in one transaction."""
         return await self._db_source.reconcile_agent_resources()
 
