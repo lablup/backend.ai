@@ -45,9 +45,6 @@ from ai.backend.manager.repositories.container_registry.creators import (
     ContainerRegistryCreatorSpec,
     ContainerRegistryGroupCreatorSpec,
 )
-from ai.backend.manager.repositories.container_registry.db_source.db_source import (
-    ContainerRegistryDBSource,
-)
 from ai.backend.manager.repositories.container_registry.scope_binders import (
     ContainerRegistryProjectEntityUnbinder,
 )
@@ -56,6 +53,8 @@ from ai.backend.manager.repositories.container_registry.updaters import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+__all__ = ("ContainerRegistryDBSource",)
 
 
 class ContainerRegistryDBSource:
