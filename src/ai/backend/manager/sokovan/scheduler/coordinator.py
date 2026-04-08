@@ -327,8 +327,9 @@ class ScheduleCoordinator:
             log.debug("Processing promotion schedule type: {}", schedule_type.value)
 
             with self._operation_metrics.measure_operation(spec.name):
-                # Process each scaling group in parallel
-                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+                # Promotions are pure status transitions; must run on
+                # unschedulable agents too.
+                scaling_groups = await self._repository.get_scaling_groups_with_active_agents()
 
                 results = await asyncio.gather(
                     *[
