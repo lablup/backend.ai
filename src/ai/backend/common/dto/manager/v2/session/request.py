@@ -413,20 +413,12 @@ class StartSessionServiceInput(BaseRequestModel):
     login_session_token: str | None = Field(
         default=None, description="Login session token for proxy auth."
     )
-    owner_id: UUID | None = Field(
-        default=None,
-        description="Delegated owner user UUID. Defaults to the caller when omitted.",
-    )
 
 
 class ShutdownSessionServiceInput(BaseRequestModel):
     """Input for shutting down a service in a session."""
 
     service: str = Field(description="Service name to shut down.")
-    owner_id: UUID | None = Field(
-        default=None,
-        description="Delegated owner user UUID. Defaults to the caller when omitted.",
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -458,7 +450,3 @@ class UpdateSessionInput(BaseRequestModel):
         default=None, min_length=1, max_length=64, description="New session name."
     )
     tag: str | None = Field(default=None, max_length=64, description="Updated tag.")
-    owner_id: UUID | None = Field(
-        default=None,
-        description="Delegated owner user UUID. Defaults to the caller when omitted.",
-    )

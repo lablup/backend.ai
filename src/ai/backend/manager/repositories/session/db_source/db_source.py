@@ -140,7 +140,6 @@ class SessionDBSource:
         session_name_or_id: str | SessionId,
         new_name: str,
         owner_access_key: AccessKey,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> SessionRow:
         async def _update(db_session: AsyncSession) -> SessionRow:
             # Check if new name already exists for this owner
@@ -149,7 +148,6 @@ class SessionDBSource:
                     db_session,
                     new_name,
                     owner_access_key,
-                    user_uuid=owner_user_uuid,
                     kernel_loading_strategy=KernelLoadingStrategy.NONE,
                 )
                 raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
@@ -161,7 +159,6 @@ class SessionDBSource:
                 db_session,
                 session_name_or_id,
                 owner_access_key,
-                user_uuid=owner_user_uuid,
                 kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
             )
 
@@ -501,7 +498,6 @@ class SessionDBSource:
         self,
         session_name_or_id: str | SessionId,
         owner_access_key: AccessKey,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> SessionRow:
         """Get session with minimal routing information"""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -509,7 +505,6 @@ class SessionDBSource:
                 db_sess,
                 session_name_or_id,
                 owner_access_key,
-                user_uuid=owner_user_uuid,
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 eager_loading_op=[
                     selectinload(SessionRow.routing).options(noload("*")),

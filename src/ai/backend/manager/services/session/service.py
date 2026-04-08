@@ -1296,14 +1296,12 @@ class SessionService:
 
     async def rename_session(self, action: RenameSessionAction) -> RenameSessionActionResult:
         session_name = action.session_name
-        owner_access_key = await self._resolve_owner_access_key(
-            action.owner_id, action.owner_access_key
-        )
+        owner_access_key = action.owner_access_key
         new_name = action.new_name
 
         try:
             compute_session = await self._session_repository.update_session_name(
-                session_name, new_name, owner_access_key, owner_user_uuid=action.owner_id
+                session_name, new_name, owner_access_key
             )
             if compute_session.status != SessionStatus.RUNNING:
                 raise InvalidAPIParameters("Can't change name of not running session")
@@ -1332,23 +1330,20 @@ class SessionService:
 
     async def shutdown_service(self, action: ShutdownServiceAction) -> ShutdownServiceActionResult:
         session_name = action.session_name
-        owner_access_key = await self._resolve_owner_access_key(
-            action.owner_id, action.owner_access_key
-        )
+        owner_access_key = action.owner_access_key
         service_name = action.service_name
 
         session = await self._session_repository.get_session_validated(
             session_name,
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-            owner_user_uuid=action.owner_id,
         )
         await self._agent_registry.shutdown_service(session, service_name)
         return ShutdownServiceActionResult(result=None, session_data=session.to_dataclass())
 
     async def start_service(self, action: StartServiceAction) -> StartServiceActionResult:
         session_name = action.session_name
-        access_key = await self._resolve_owner_access_key(action.owner_id, action.access_key)
+        access_key = action.access_key
         service = action.service
         port = action.port
 
@@ -1361,7 +1356,6 @@ class SessionService:
                 self._session_repository.get_session_with_routing_minimal(
                     session_name,
                     access_key,
-                    owner_user_uuid=action.owner_id,
                 )
             )
         )
