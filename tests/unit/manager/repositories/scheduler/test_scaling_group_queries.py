@@ -38,9 +38,7 @@ class TestScalingGroupQueries:
         ):
             yield database_connection
 
-    async def _make_scaling_group(
-        self, db: ExtendedAsyncSAEngine, name: str
-    ) -> None:
+    async def _make_scaling_group(self, db: ExtendedAsyncSAEngine, name: str) -> None:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 ScalingGroupRow(
