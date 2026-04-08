@@ -300,7 +300,7 @@ class TestCancelFreesResourceAllocations:
             await db_sess.flush()
         yield
 
-    async def _create_pre_running_session(
+    async def _insert_session(
         self,
         db: ExtendedAsyncSAEngine,
         *,
@@ -313,9 +313,6 @@ class TestCancelFreesResourceAllocations:
         agent_id: str | None,
         image: str = "python:3.8",
     ) -> tuple[SessionId, KernelId]:
-        """Insert a session+kernel in a pre-RUNNING state with allocations
-        whose ``used`` is ``NULL`` (production state between PENDING and CREATING).
-        """
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
         cpu = Decimal("2")
@@ -384,23 +381,64 @@ class TestCancelFreesResourceAllocations:
 
             db_sess.add(
                 ResourceAllocationRow(
-                    kernel_id=kernel_id,
-                    slot_name="cpu",
-                    requested=cpu,
-                    used=None,
+                    kernel_id=kernel_id, slot_name="cpu", requested=cpu, used=None
                 )
             )
             db_sess.add(
                 ResourceAllocationRow(
-                    kernel_id=kernel_id,
-                    slot_name="mem",
-                    requested=mem,
-                    used=None,
+                    kernel_id=kernel_id, slot_name="mem", requested=mem, used=None
                 )
             )
             await db_sess.flush()
 
         return session_id, kernel_id
+
+    @pytest.fixture
+    async def pending_session(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        resource_slot_types: None,
+    ) -> tuple[SessionId, KernelId]:
+        return await self._insert_session(
+            db_with_cleanup,
+            kernel_status=KernelStatus.PENDING,
+            domain_name=test_domain_name,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            agent_id=None,
+        )
+
+    @pytest.fixture
+    async def pulling_session_on_agent(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        resource_slot_types: None,
+    ) -> tuple[SessionId, KernelId, str]:
+        session_id, kernel_id = await self._insert_session(
+            db_with_cleanup,
+            kernel_status=KernelStatus.PULLING,
+            domain_name=test_domain_name,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            agent_id=test_agent_id,
+            image="python:3.8",
+        )
+        return session_id, kernel_id, test_agent_id
 
     async def _assert_all_freed(self, db: ExtendedAsyncSAEngine, kernel_id: KernelId) -> None:
         async with db.begin_readonly_session() as db_sess:
@@ -422,24 +460,10 @@ class TestCancelFreesResourceAllocations:
     async def test_cancel_pending_sessions_sets_free_at(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_scaling_group_name: str,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-        test_access_key: AccessKey,
-        resource_slot_types: None,
+        pending_session: tuple[SessionId, KernelId],
     ) -> None:
+        session_id, kernel_id = pending_session
         db_source = ScheduleDBSource(db_with_cleanup)
-        session_id, kernel_id = await self._create_pre_running_session(
-            db_with_cleanup,
-            kernel_status=KernelStatus.PENDING,
-            domain_name=test_domain_name,
-            scaling_group_name=test_scaling_group_name,
-            group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
-            agent_id=None,
-        )
 
         result = await db_source.mark_sessions_terminating([session_id])
 
@@ -449,29 +473,13 @@ class TestCancelFreesResourceAllocations:
     async def test_cancel_kernels_for_failed_image_sets_free_at(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_scaling_group_name: str,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-        test_access_key: AccessKey,
-        test_agent_id: str,
-        resource_slot_types: None,
+        pulling_session_on_agent: tuple[SessionId, KernelId, str],
     ) -> None:
+        session_id, kernel_id, agent_id = pulling_session_on_agent
         db_source = ScheduleDBSource(db_with_cleanup)
-        session_id, kernel_id = await self._create_pre_running_session(
-            db_with_cleanup,
-            kernel_status=KernelStatus.PULLING,
-            domain_name=test_domain_name,
-            scaling_group_name=test_scaling_group_name,
-            group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
-            agent_id=test_agent_id,
-            image="python:3.8",
-        )
 
         affected = await db_source.cancel_kernels_for_failed_image(
-            AgentId(test_agent_id), "python:3.8", "image pull failed for test"
+            AgentId(agent_id), "python:3.8", "image pull failed for test"
         )
 
         assert session_id in affected
