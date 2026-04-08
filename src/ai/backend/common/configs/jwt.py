@@ -11,7 +11,12 @@ from typing import Annotated
 from pydantic import AliasChoices, Field
 
 from ai.backend.common.config import BaseConfigSchema
-from ai.backend.common.jwt.config import JWTConfig as CoreJWTConfig
+from ai.backend.common.jwt.config import (
+    JWTAlgorithm as CoreJWTAlgorithm,
+)
+from ai.backend.common.jwt.config import (
+    JWTConfig as CoreJWTConfig,
+)
 from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
 
 
@@ -58,6 +63,6 @@ class SharedJWTConfig(BaseConfigSchema):
     def to_jwt_config(self) -> CoreJWTConfig:
         """Convert to ai.backend.common.jwt.config.JWTConfig."""
         return CoreJWTConfig(
-            algorithm=self.algorithm,
+            algorithm=CoreJWTAlgorithm(self.algorithm),
             token_expiration_seconds=self.token_expiration_seconds,
         )
