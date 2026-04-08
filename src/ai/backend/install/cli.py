@@ -100,6 +100,12 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     default=None,
     help="OpenTelemetry collector endpoint (e.g., http://10.122.10.56:4317).",
 )
+@click.option(
+    "--metric-access-cidr",
+    type=str,
+    default="10.122.0.0/16",
+    help="CIDR for metric access allowed hosts (default: 10.122.0.0/16).",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
@@ -117,6 +123,7 @@ def main(
     frontend_mode: str,
     use_wildcard_binding: bool,
     otel_endpoint: str | None,
+    metric_access_cidr: str,
     accelerator: str,
 ) -> None:
     """The installer"""
@@ -147,6 +154,7 @@ def main(
         frontend_mode=FrontendMode(frontend_mode),
         use_wildcard_binding=use_wildcard_binding,
         otel_endpoint=otel_endpoint,
+        metric_access_cidr=metric_access_cidr,
     )
     app = InstallerApp(args)
     app.run(headless=headless)

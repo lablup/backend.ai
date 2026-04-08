@@ -637,6 +637,7 @@ class ModeMenu(Static):
             frontend_mode=args.frontend_mode,
             use_wildcard_binding=args.use_wildcard_binding,
             otel_endpoint=args.otel_endpoint,
+            metric_access_cidr=args.metric_access_cidr,
         )
 
     def compose(self) -> ComposeResult:

@@ -75,6 +75,7 @@ class CliArgs:
     frontend_mode: FrontendMode = FrontendMode.PORT
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
+    metric_access_cidr: str = "10.122.0.0/16"
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -213,6 +214,7 @@ class InstallVariable:
     frontend_mode: FrontendMode = FrontendMode.PORT
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
+    metric_access_cidr: str = "10.122.0.0/16"
 
     @property
     def apphub_address(self) -> str:
