@@ -10,6 +10,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair.request import (
     AdminCreateKeypairInput,
+    AdminRegisterSSHKeypairInput,
     AdminSearchKeypairsInput,
     AdminUpdateKeypairInput,
     RevokeMyKeypairInput,
@@ -131,4 +132,28 @@ class V2KeypairHandler:
     ) -> APIResponse:
         """Delete a keypair (admin only)."""
         result = await self._adapter.admin_delete_keypair(path.parsed.access_key)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_register_ssh_keypair(
+        self,
+        body: BodyParam[AdminRegisterSSHKeypairInput],
+    ) -> APIResponse:
+        """Register (overwrite) a user's SSH keypair (admin only)."""
+        result = await self._adapter.admin_register_ssh_keypair(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_delete_ssh_keypair(
+        self,
+        path: PathParam[AccessKeyPathParam],
+    ) -> APIResponse:
+        """Clear a user's SSH keypair (admin only)."""
+        result = await self._adapter.admin_delete_ssh_keypair(path.parsed.access_key)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_get_ssh_keypair(
+        self,
+        path: PathParam[AccessKeyPathParam],
+    ) -> APIResponse:
+        """Get a user's SSH public key (admin only)."""
+        result = await self._adapter.admin_get_ssh_keypair(path.parsed.access_key)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

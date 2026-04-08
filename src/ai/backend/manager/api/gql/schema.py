@@ -156,8 +156,11 @@ from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .keypair import (
     admin_create_keypair_v2,
     admin_delete_keypair_v2,
+    admin_delete_ssh_keypair_v2,
     admin_keypair_v2,
     admin_keypairs_v2,
+    admin_register_ssh_keypair_v2,
+    admin_ssh_keypair_v2,
     admin_update_keypair_v2,
     issue_my_keypair,
     my_keypairs,
@@ -505,6 +508,7 @@ class Query:
     # Keypair admin queries
     admin_keypair_v2 = admin_keypair_v2
     admin_keypairs_v2 = admin_keypairs_v2
+    admin_ssh_keypair_v2 = admin_ssh_keypair_v2
     # Login session/history self-service queries
     my_login_sessions_v2 = my_login_sessions_v2
     my_login_history_v2 = my_login_history_v2
@@ -751,6 +755,8 @@ class Mutation:
     admin_create_keypair_v2 = admin_create_keypair_v2
     admin_update_keypair_v2 = admin_update_keypair_v2
     admin_delete_keypair_v2 = admin_delete_keypair_v2
+    admin_register_ssh_keypair_v2 = admin_register_ssh_keypair_v2
+    admin_delete_ssh_keypair_v2 = admin_delete_ssh_keypair_v2
     # Login session mutations
     admin_revoke_login_session = admin_revoke_login_session
     my_revoke_login_session = my_revoke_login_session

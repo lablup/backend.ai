@@ -15,12 +15,16 @@ from ai.backend.common.dto.manager.pagination import PaginationInfo
 __all__ = (
     "AdminCreateKeypairPayload",
     "AdminDeleteKeypairPayload",
+    "AdminDeleteSSHKeypairPayload",
+    "AdminGetSSHKeypairPayload",
+    "AdminRegisterSSHKeypairPayload",
     "AdminSearchKeypairsPayload",
     "AdminUpdateKeypairPayload",
     "IssueMyKeypairPayload",
     "KeypairNode",
     "RevokeMyKeypairPayload",
     "SearchMyKeypairsPayload",
+    "SSHKeypairNode",
     "SwitchMyMainAccessKeyPayload",
     "UpdateMyKeypairPayload",
 )
@@ -119,3 +123,30 @@ class AdminSearchKeypairsPayload(BaseResponseModel):
     pagination: PaginationInfo = Field(
         description="Pagination information for the result set.",
     )
+
+
+class SSHKeypairNode(BaseResponseModel):
+    """SSH keypair read model. Never includes the private key."""
+
+    access_key: str = Field(description="Access key owning this SSH keypair.")
+    ssh_public_key: str | None = Field(
+        default=None, description="PEM-encoded SSH public key, or null if none is registered."
+    )
+
+
+class AdminRegisterSSHKeypairPayload(BaseResponseModel):
+    """Payload returned after admin registers an SSH keypair for a user."""
+
+    access_key: str = Field(description="Access key whose SSH keypair was updated.")
+
+
+class AdminDeleteSSHKeypairPayload(BaseResponseModel):
+    """Payload returned after admin clears a user's SSH keypair."""
+
+    access_key: str = Field(description="Access key whose SSH keypair was cleared.")
+
+
+class AdminGetSSHKeypairPayload(BaseResponseModel):
+    """Payload returned by admin SSH keypair lookup (public key only)."""
+
+    keypair: SSHKeypairNode = Field(description="SSH keypair public information.")
