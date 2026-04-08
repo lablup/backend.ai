@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 import graphene
 import pytest
 
-from ai.backend.manager.api.gql_legacy.schema import Query
 from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.models.gql import Query
 from ai.backend.manager.models.user import UserRole
 
 
