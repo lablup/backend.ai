@@ -331,27 +331,52 @@ class ResourceSlotDBSource:
             rows = (await db_sess.execute(self._build_actual_usage_query())).all()
         return {(row.agent, row.slot_name): row.total_amount for row in rows}
 
-    async def reconcile_agent_resources(self) -> list[AgentResourceDrift]:
-        """Compare agent_resources.used against actual resource_allocations and correct drift.
+    async def reconcile_agent_resources(
+        self,
+    ) -> tuple[list[OrphanedAllocation], list[AgentResourceDrift]]:
+        """Clean up orphaned allocations and reconcile agent_resources in one transaction.
 
-        Computes actual per-agent per-slot usage from active allocations (free_at IS NULL),
-        compares with tracked agent_resources.used, and UPDATEs any mismatches.
-        All reads and writes happen within a single transaction.
+        Within a single transaction:
+        1. Free orphaned allocations — resource_allocations where free_at IS NULL but
+           the kernel is in a terminal status (CANCELLED, TERMINATED, ERROR).
+        2. Reconcile agent_resources.used against actual active allocations (free_at IS NULL)
+           and correct any drift.
+
+        Orphan cleanup runs first so that the subsequent reconciliation operates on
+        a corrected set of active allocations.
 
         Returns:
-            List of drift entries that were detected and corrected.
+            Tuple of (orphaned allocations freed, agent resource drifts corrected).
         """
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
         ar = AgentResourceRow.__table__
+        terminal_statuses = KernelStatus.terminal_statuses()
         drifts: list[AgentResourceDrift] = []
 
         async with self._db.begin_session() as db_sess:
-            # Compute actual usage within the same transaction
+            # Step 1: Free orphaned allocations for terminal kernels
+            orphan_result = await db_sess.execute(
+                sa.update(ra)
+                .where(
+                    ra.c.free_at.is_(None),
+                    ra.c.kernel_id.in_(sa.select(k.c.id).where(k.c.status.in_(terminal_statuses))),
+                )
+                .values(free_at=sa.func.now())
+                .returning(ra.c.kernel_id, ra.c.slot_name)
+            )
+            orphan_rows = orphan_result.all()
+            orphans = [
+                OrphanedAllocation(kernel_id=row.kernel_id, slot_name=row.slot_name)
+                for row in orphan_rows
+            ]
+
+            # Step 2: Reconcile agent_resources.used against actual allocations
             actual_rows = (await db_sess.execute(self._build_actual_usage_query())).all()
             actual_usage: dict[tuple[str, str], Decimal] = {
                 (row.agent, row.slot_name): row.total_amount for row in actual_rows
             }
 
-            # Fetch tracked values and compare
             tracked_rows = (
                 await db_sess.execute(sa.select(ar.c.agent_id, ar.c.slot_name, ar.c.used))
             ).all()
@@ -387,38 +412,7 @@ class ResourceSlotDBSource:
                     )
                 )
 
-        return drifts
-
-    async def cleanup_orphaned_allocations(self) -> list[OrphanedAllocation]:
-        """Find and fix resource_allocations where free_at IS NULL but the kernel is terminal.
-
-        Terminal statuses (CANCELLED, TERMINATED, ERROR) indicate the kernel is no longer
-        active, so any allocation with free_at IS NULL is orphaned and should be freed.
-        This acts as a safety net for cases where free_at was not properly set during
-        normal lifecycle transitions.
-
-        Returns:
-            List of orphaned allocations that were corrected.
-        """
-        ra = ResourceAllocationRow.__table__
-        k = KernelRow.__table__
-        terminal_statuses = KernelStatus.terminal_statuses()
-
-        async with self._db.begin_session() as db_sess:
-            result = await db_sess.execute(
-                sa.update(ra)
-                .where(
-                    ra.c.free_at.is_(None),
-                    ra.c.kernel_id.in_(sa.select(k.c.id).where(k.c.status.in_(terminal_statuses))),
-                )
-                .values(free_at=sa.func.now())
-                .returning(ra.c.kernel_id, ra.c.slot_name)
-            )
-            rows = result.all()
-
-        return [
-            OrphanedAllocation(kernel_id=row.kernel_id, slot_name=row.slot_name) for row in rows
-        ]
+        return orphans, drifts
 
     async def aggregate_occupied_by_project(self, project_id: uuid.UUID) -> ResourceOccupancy:
         """Aggregate active resource occupancy for a project (group).

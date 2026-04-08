@@ -131,14 +131,11 @@ class ResourceSlotRepository:
         return await self._db_source.compute_actual_agent_resource_usage()
 
     @resource_slot_repository_resilience.apply()
-    async def reconcile_agent_resources(self) -> list[AgentResourceDrift]:
-        """Compare agent_resources.used against actual allocations and correct drift."""
+    async def reconcile_agent_resources(
+        self,
+    ) -> tuple[list[OrphanedAllocation], list[AgentResourceDrift]]:
+        """Clean up orphaned allocations and reconcile agent_resources in one transaction."""
         return await self._db_source.reconcile_agent_resources()
-
-    @resource_slot_repository_resilience.apply()
-    async def cleanup_orphaned_allocations(self) -> list[OrphanedAllocation]:
-        """Free allocations where kernel is terminal but free_at is NULL."""
-        return await self._db_source.cleanup_orphaned_allocations()
 
     @resource_slot_repository_resilience.apply()
     async def get_domain_resource_overview(self, domain_name: str) -> ResourceOccupancy:
