@@ -52,9 +52,11 @@ class _ClassifiedRoutes:
     def total_new_running(self) -> int:
         """Count of new-revision routes whose processes are still running.
 
-        Includes UNHEALTHY and DEGRADED to prevent duplicate route creation
-        in surge calculation.  (They are excluded from ``available_count``
-        in termination calculation, since they cannot serve traffic.)
+        Includes all non-terminal RUNNING routes (HEALTHY, UNHEALTHY,
+        DEGRADED, NOT_CHECKED) as well as PROVISIONING, to prevent
+        duplicate route creation in surge calculation.  Non-HEALTHY
+        routes are excluded from ``available_count`` in termination
+        calculation, since they cannot serve traffic.
         """
         return self.new_provisioning_count + self.new_healthy_count + self.new_unhealthy_count
 
@@ -126,16 +128,15 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
                 classified.new_provisioning_count += 1
             elif route.status.is_inactive():
                 classified.new_failed_count += 1
-            elif (
-                route.status == RouteStatus.RUNNING
-                and route.health_status == RouteHealthStatus.HEALTHY
-            ):
-                classified.new_healthy_count += 1
-            elif (
-                route.status == RouteStatus.RUNNING
-                and route.health_status == RouteHealthStatus.UNHEALTHY
-            ):
-                classified.new_unhealthy_count += 1
+            elif route.status == RouteStatus.RUNNING:
+                if route.health_status == RouteHealthStatus.HEALTHY:
+                    classified.new_healthy_count += 1
+                else:
+                    # UNHEALTHY / DEGRADED / NOT_CHECKED all count here:
+                    # the process is up, so another replica must not be
+                    # spun up for it, but it cannot yet serve traffic so
+                    # it is excluded from the termination availability budget.
+                    classified.new_unhealthy_count += 1
         return classified
 
     def _check_completed(

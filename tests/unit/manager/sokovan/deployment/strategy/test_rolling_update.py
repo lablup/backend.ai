@@ -497,7 +497,7 @@ class TestRouteStatusClassification:
     """Test how different route statuses affect classification."""
 
     def test_degraded_new_waits_provisioning(self) -> None:
-        """DEGRADED new routes are treated as PROVISIONING (still warming up)."""
+        """DEGRADED new route occupies a replica slot — no duplicate creation."""
         deployment = make_deployment(desired=1)
         spec = RollingUpdateSpec(
             max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
@@ -513,9 +513,38 @@ class TestRouteStatusClassification:
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
+        assert len(result.route_changes.rollout_specs) == 0
+        assert len(result.route_changes.drain_route_ids) == 0
+
+    def test_not_checked_new_waits_provisioning(self) -> None:
+        """NOT_CHECKED new route occupies a replica slot — no duplicate creation.
+
+        Regression test for over-provisioning bug: health checker had not yet
+        run when the FSM evaluated, so the route's health_status was
+        NOT_CHECKED — which used to be unclassified and produced
+        ``total_new_running=0``, causing the FSM to create another route on
+        every cycle.
+        """
+        deployment = make_deployment(desired=1)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [
+            make_route(
+                revision_id=NEW_REV,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.NOT_CHECKED,
+            ),
+        ]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
+        assert len(result.route_changes.rollout_specs) == 0
+        assert len(result.route_changes.drain_route_ids) == 0
 
     def test_unhealthy_new_retries(self) -> None:
-        """All new UNHEALTHY → PROVISIONING (retries, timeout handles rollback)."""
+        """All new UNHEALTHY → PROVISIONING, no further creation (timeout rolls back)."""
         deployment = make_deployment(desired=1)
         spec = RollingUpdateSpec(
             max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
@@ -531,6 +560,8 @@ class TestRouteStatusClassification:
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
+        assert len(result.route_changes.rollout_specs) == 0
+        assert len(result.route_changes.drain_route_ids) == 0
 
     @pytest.mark.parametrize(
         "inactive_status",
