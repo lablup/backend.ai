@@ -91,19 +91,13 @@ class TestRuntimeVariantPresetFixture:
         assert preset.ui_option.choices.items[0].value == "auto"
 
     @pytest.fixture
-    def preset_fixture_data_without_ui_option(
+    def preset_fixture_data_with_unknown_variant(
         self,
     ) -> dict[str, list[dict[str, object]]]:
         return {
-            "runtime_variants": [
-                {
-                    "name": "vllm",
-                    "description": "vLLM",
-                }
-            ],
             "runtime_variant_presets": [
                 {
-                    "runtime_variant_name": "vllm",
+                    "runtime_variant_name": "nonexistent",
                     "name": "dtype",
                     "description": "Model weight dtype.",
                     "rank": 100,
@@ -118,7 +112,7 @@ class TestRuntimeVariantPresetFixture:
     async def test_populate_preset_raises_for_unknown_variant_name(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        preset_fixture_data_without_ui_option: dict[str, list[dict[str, object]]],
+        preset_fixture_data_with_unknown_variant: dict[str, list[dict[str, object]]],
     ) -> None:
-        with pytest.raises(DataTransformationFailed, match="unknown-variant"):
-            await populate_fixture(db_engine, preset_fixture_data_without_ui_option)
+        with pytest.raises(DataTransformationFailed):
+            await populate_fixture(db_engine, preset_fixture_data_with_unknown_variant)
