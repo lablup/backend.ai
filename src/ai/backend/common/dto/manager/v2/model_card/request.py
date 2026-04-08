@@ -22,7 +22,9 @@ class ResourceSlotEntryInput(BaseRequestModel):
 class CreateModelCardInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=512, description="Model card name.")
     vfolder_id: UUID = Field(description="VFolder ID containing the model.")
-    project_id: UUID = Field(description="Project ID (must be MODEL_STORE type).")
+    model_store_project_id: UUID = Field(
+        description="MODEL_STORE project UUID where the model card belongs."
+    )
     domain_name: str | None = Field(
         default=None,
         max_length=64,

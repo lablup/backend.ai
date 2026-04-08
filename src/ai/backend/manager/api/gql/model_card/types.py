@@ -335,7 +335,9 @@ class ModelCardOrderByGQL(PydanticInputMixin[OrderDTO]):
 class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
     name: str = gql_field(description="Model card name.")
     vfolder_id: UUID = gql_field(description="VFolder ID.")
-    project_id: UUID = gql_field(description="Project ID.")
+    model_store_project_id: UUID = gql_field(
+        description="MODEL_STORE project UUID where the model card belongs."
+    )
     domain_name: str | None = gql_field(default=None, description="Domain name.")
     author: str | None = gql_field(default=None, description="Author.")
     title: str | None = gql_field(default=None, description="Model title.")
