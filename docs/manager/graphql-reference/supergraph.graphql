@@ -200,6 +200,9 @@ type AdminCreateKeypairPayload
 {
   """The newly created keypair."""
   keypair: KeyPairGQL!
+
+  """The secret key. Only returned at creation time."""
+  secretKey: String!
 }
 
 """Added in UNRELEASED. Payload returned after admin deletes a keypair."""
@@ -6884,6 +6887,11 @@ type IssueMyKeypairPayload
 {
   """The newly created keypair."""
   keypair: KeyPairGQL!
+
+  """
+  The newly generated secret key. This value is only returned at creation time.
+  """
+  secretKey: String!
 }
 
 interface Item

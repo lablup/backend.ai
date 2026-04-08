@@ -154,6 +154,9 @@ Added in UNRELEASED. Payload returned after admin creates a keypair. The secret_
 type AdminCreateKeypairPayload {
   """The newly created keypair."""
   keypair: KeyPairGQL!
+
+  """The secret key. Only returned at creation time."""
+  secretKey: String!
 }
 
 """Added in UNRELEASED. Payload returned after admin deletes a keypair."""
@@ -4288,6 +4291,11 @@ Added in 26.2.0. Payload returned after issuing a new keypair. The secret_key is
 type IssueMyKeypairPayload {
   """The newly created keypair."""
   keypair: KeyPairGQL!
+
+  """
+  The newly generated secret key. This value is only returned at creation time.
+  """
+  secretKey: String!
 }
 
 """
