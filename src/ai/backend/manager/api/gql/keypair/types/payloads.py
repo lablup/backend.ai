@@ -43,6 +43,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 )
 class IssueMyKeypairPayloadGQL(PydanticOutputMixin[IssueMyKeypairPayloadDTO]):
     keypair: KeyPairGQL = gql_field(description="The newly created keypair.")
+    secret_key: str = gql_field(descsription="The newly generated secret key. This value is only returned at creation time.")
 
 
 @gql_pydantic_type(
@@ -93,6 +94,7 @@ class UpdateMyKeypairPayloadGQL(PydanticOutputMixin[UpdateMyKeypairPayloadDTO]):
 )
 class AdminCreateKeypairPayloadGQL(PydanticOutputMixin[AdminCreateKeypairPayloadDTO]):
     keypair: KeyPairGQL = gql_field(description="The newly created keypair.")
+    secret_key: str = gql_field(description="The secret key. Only returned at creation time.")
 
 
 @gql_pydantic_type(
