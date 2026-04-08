@@ -72,6 +72,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionSpec,
     ReplicaSpec,
+    RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
@@ -558,7 +559,13 @@ class EndpointRow(Base):  # type: ignore[misc]
         from ai.backend.manager.models.kernel import KernelRow
         from ai.backend.manager.models.routing import RoutingRow
 
-        active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
+        # Only routes whose traffic_status is ACTIVE should be exposed to the
+        # app proxy. INACTIVE routes (e.g. a blue-green deploying revision that
+        # has not been promoted yet) are intentionally hidden from Traefik.
+        all_active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
+        active_routes = [
+            r for r in all_active_routes if r.traffic_status == RouteTrafficStatus.ACTIVE
+        ]
         running_main_kernels = await KernelRow.batch_load_main_kernels_by_session_id(
             db_sess,
             [

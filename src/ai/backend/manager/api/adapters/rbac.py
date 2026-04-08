@@ -51,7 +51,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     AdminSearchRoleAssignmentsGQLInput,
-    AdminSearchRolesGQLInput,
+    SearchRolesInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AssignRoleInput as AssignRoleInputDTO,
@@ -171,6 +171,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     RoleCreatorSpec,
     UserRoleCreatorSpec,
 )
+from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
 from ai.backend.manager.repositories.permission_controller.updaters import (
     PermissionUpdaterSpec,
     RoleUpdaterSpec,
@@ -211,6 +212,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_permissions
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
     SearchRolesActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
+    SearchRolesInScopeAction,
+    SearchRolesInScopeActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
@@ -596,8 +601,7 @@ class RBACAdapter(BaseAdapter):
 
     async def admin_search_roles_gql(
         self,
-        input: AdminSearchRolesGQLInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
+        input: SearchRolesInput,
     ) -> SearchResult[RoleNode]:
         """Search roles with cursor/offset pagination."""
         conditions = self._convert_role_filter_gql(input.filter) if input.filter else []
@@ -612,11 +616,42 @@ class RBACAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=base_conditions,
         )
         action_result: SearchRolesActionResult = (
             await self._processors.permission_controller.search_roles.wait_for_complete(
                 SearchRolesAction(querier=querier)
+            )
+        )
+        raw = action_result.result
+        return SearchResult(
+            items=[self._role_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
+        )
+
+    async def search_roles_in_scope(
+        self,
+        scope: ScopedRoleSearchScope,
+        input: SearchRolesInput,
+    ) -> SearchResult[RoleNode]:
+        """Search roles registered in a given scope."""
+        conditions = self._convert_role_filter_gql(input.filter) if input.filter else []
+        orders = self._convert_role_orders_gql(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_role_gql_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result: SearchRolesInScopeActionResult = (
+            await self._processors.permission_controller.search_roles_in_scope.wait_for_complete(
+                SearchRolesInScopeAction(scope=scope, querier=querier)
             )
         )
         raw = action_result.result

@@ -47,7 +47,10 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.types import PermissionSearchScope
+from ai.backend.manager.repositories.permission_controller.types import (
+    PermissionSearchScope,
+    ScopedRoleSearchScope,
+)
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
 
@@ -229,6 +232,15 @@ class PermissionControllerRepository:
     ) -> RoleListResult:
         """Searches roles with pagination and filtering."""
         return await self._db_source.search_roles(querier=querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_roles_in_scope(
+        self,
+        querier: BatchQuerier,
+        scope: ScopedRoleSearchScope,
+    ) -> RoleListResult:
+        """Search roles registered in a project scope."""
+        return await self._db_source.search_roles_in_scope(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
     async def search_permissions(

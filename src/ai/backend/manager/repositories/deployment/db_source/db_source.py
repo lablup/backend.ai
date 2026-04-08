@@ -2195,6 +2195,21 @@ class DeploymentDBSource:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
             return await endpoint.generate_route_info(db_sess)
 
+    async def list_active_endpoint_ids(self) -> list[uuid.UUID]:
+        """Return every endpoint id whose lifecycle_stage is considered active.
+
+        Used by the manager-side periodic route sync loop to re-push route
+        connection info into Redis for every live deployment, so the app
+        proxy coordinator can eventually converge on the manager's DB state.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            result = await db_sess.execute(
+                sa.select(EndpointRow.id).where(
+                    EndpointRow.lifecycle_stage.in_(EndpointLifecycle.active_states())
+                )
+            )
+            return [row[0] for row in result.all()]
+
     async def get_endpoint_health_check_config(
         self,
         endpoint_id: uuid.UUID,
@@ -2244,9 +2259,13 @@ class DeploymentDBSource:
                     model_definition_path,
                 )
 
-                # Check each model in the definition for health check config
+                # Check each model in the definition for health check config.
+                # `service` can be explicitly null in the model definition YAML,
+                # in which case dict.get("service", {}) still returns None — so
+                # normalize to an empty dict before chaining the next .get().
                 for model_info in model_definition["models"]:
-                    if health_check_info := model_info.get("service", {}).get("health_check"):
+                    service_info = model_info.get("service") or {}
+                    if health_check_info := service_info.get("health_check"):
                         _info = ModelHealthCheck(
                             path=health_check_info["path"],
                             interval=health_check_info.get("interval"),

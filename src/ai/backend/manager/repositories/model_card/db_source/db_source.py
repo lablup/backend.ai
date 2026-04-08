@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from decimal import Decimal, InvalidOperation
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
@@ -135,14 +140,24 @@ class ModelCardDBSource:
         prs = PresetResourceSlotRow.__table__
         drp = DeploymentRevisionPresetRow.__table__
 
+        # Relational division: a preset is "available" iff for every required
+        # slot in model_card_resource_requirements there is a matching
+        # preset_resource_slot row whose quantity meets the requirement.
+        #
+        # Both sub-EXISTS clauses must correlate against the OUTER drp/mcr,
+        # otherwise SQLAlchemy injects fresh aliases into the inner FROM clause
+        # and the predicates degenerate into Cartesian-product matches that
+        # accept every preset.
         satisfying_condition = ~sa.exists(
             sa.select(sa.literal(1))
             .select_from(mcr)
+            .correlate(drp)
             .where(
                 mcr.c.model_card_id == model_card_id,
                 ~sa.exists(
                     sa.select(sa.literal(1))
                     .select_from(prs)
+                    .correlate(drp, mcr)
                     .where(
                         prs.c.preset_id == drp.c.id,
                         prs.c.slot_name == mcr.c.slot_name,
@@ -235,31 +250,36 @@ class ModelCardDBSource:
             updated = sum(1 for s in specs if s.name in existing_names)
             created = total - updated
 
+            # Resolve all upserted card ids by name so we can sync RBAC bindings
+            # and the normalized resource requirement child rows below.
+            all_card_rows = (
+                await session.execute(
+                    sa.select(ModelCardRow.id, ModelCardRow.name).where(
+                        sa.and_(
+                            ModelCardRow.name.in_({s.name for s in specs}),
+                            ModelCardRow.project == specs[0].project_id,
+                            ModelCardRow.domain == specs[0].domain,
+                        )
+                    )
+                )
+            ).all()
+            name_to_card_id: dict[str, UUID] = {row.name: row.id for row in all_card_rows}
+
             # Bind all upserted model cards to their project scope in RBAC
             # ON CONFLICT DO NOTHING ensures idempotency for existing bindings
             new_names = {s.name for s in specs} - existing_names
             if new_names:
-                card_rows = (
-                    await session.execute(
-                        sa.select(ModelCardRow.id, ModelCardRow.project).where(
-                            sa.and_(
-                                ModelCardRow.name.in_(new_names),
-                                ModelCardRow.project == specs[0].project_id,
-                                ModelCardRow.domain == specs[0].domain,
-                            )
-                        )
-                    )
-                ).all()
-                if card_rows:
+                new_card_rows = [row for row in all_card_rows if row.name in new_names]
+                if new_card_rows:
                     assoc_values = [
                         {
                             "scope_type": RBACElementType.PROJECT.to_scope_type(),
-                            "scope_id": str(row.project),
+                            "scope_id": str(specs[0].project_id),
                             "entity_type": RBACElementType.MODEL_CARD.to_entity_type(),
                             "entity_id": str(row.id),
                             "relation_type": RelationType.AUTO,
                         }
-                        for row in card_rows
+                        for row in new_card_rows
                     ]
                     await session.execute(
                         pg_insert(AssociationScopesEntitiesRow)
@@ -267,4 +287,61 @@ class ModelCardDBSource:
                         .on_conflict_do_nothing()
                     )
 
+            # Sync the normalized model_card_resource_requirements child rows.
+            # The bulk upserter only writes the model_cards table itself; without
+            # this step search_available_presets sees an empty requirements table
+            # and degrades into a vacuous-truth filter that returns every preset.
+            # Use delete-then-insert per card so re-scan stays idempotent (same
+            # input → same row count, no duplication).
+            await self._sync_model_card_resource_requirements(session, specs, name_to_card_id)
+
             return created, updated
+
+    async def _sync_model_card_resource_requirements(
+        self,
+        session: SASession,
+        specs: Sequence[ModelCardScanUpserterSpec],
+        name_to_card_id: dict[str, UUID],
+    ) -> None:
+        """Replace child rows for every (model_card, slot) requirement.
+
+        Idempotent: re-running with the same specs leaves the row count
+        unchanged. Decimal-coerced values are stored in the Numeric column.
+        """
+        target_card_ids = [
+            name_to_card_id[spec.name] for spec in specs if spec.name in name_to_card_id
+        ]
+        if not target_card_ids:
+            return
+
+        # Drop the old set of requirements for the cards we are about to write.
+        await session.execute(
+            sa.delete(ModelCardResourceRequirementRow).where(
+                ModelCardResourceRequirementRow.model_card_id.in_(target_card_ids)
+            )
+        )
+
+        new_rows: list[dict[str, object]] = []
+        for spec in specs:
+            card_id = name_to_card_id.get(spec.name)
+            if card_id is None:
+                continue
+            for entry in spec.min_resource:
+                try:
+                    quantity = Decimal(entry.min_quantity)
+                except (InvalidOperation, ValueError):
+                    log.warning(
+                        "model card scan: skipping invalid min_quantity {!r} for card {} slot {}",
+                        entry.min_quantity,
+                        card_id,
+                        entry.slot_name,
+                    )
+                    continue
+                new_rows.append({
+                    "model_card_id": card_id,
+                    "slot_name": entry.slot_name,
+                    "min_quantity": quantity,
+                })
+
+        if new_rows:
+            await session.execute(sa.insert(ModelCardResourceRequirementRow).values(new_rows))

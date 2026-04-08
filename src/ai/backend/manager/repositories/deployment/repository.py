@@ -1094,6 +1094,14 @@ class DeploymentRepository:
         )
 
     @deployment_repository_resilience.apply()
+    async def list_active_endpoint_ids(self) -> list[uuid.UUID]:
+        """Return every endpoint id whose lifecycle_stage is considered active.
+
+        Used by the periodic app proxy route sync loop.
+        """
+        return await self._db_source.list_active_endpoint_ids()
+
+    @deployment_repository_resilience.apply()
     async def get_endpoint_id_by_session(
         self,
         session_id: uuid.UUID,

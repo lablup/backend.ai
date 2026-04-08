@@ -24,7 +24,7 @@ __all__ = (
     "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",
     "AdminSearchRoleAssignmentsGQLInput",
-    "AdminSearchRolesGQLInput",
+    "SearchRolesInput",
     "AssignRoleInput",
     "BulkAssignRoleInput",
     "BulkRevokeRoleInput",
@@ -290,8 +290,8 @@ class AdminSearchPermissionsGQLInput(BaseRequestModel):
     offset: int | None = None
 
 
-class AdminSearchRolesGQLInput(BaseRequestModel):
-    """GQL pagination search input for roles."""
+class SearchRolesInput(BaseRequestModel):
+    """Pagination search input for roles."""
 
     filter: RoleFilter | None = None
     order: list[RoleOrderBy] | None = None

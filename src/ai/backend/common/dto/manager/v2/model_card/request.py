@@ -7,6 +7,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardAccessLevel,
     ModelCardOrderField,
@@ -114,4 +115,31 @@ class DeployModelCardInput(BaseRequestModel):
         default=1,
         ge=1,
         description="Number of replicas to deploy.",
+    )
+    # Optional deployment-level overrides. When set, these values win over
+    # whatever the revision preset specifies. When left as ``None``, the
+    # preset's default is used (falling back to system defaults if the preset
+    # does not specify the value either).
+    open_to_public: bool | None = Field(
+        default=None,
+        description="Override for the deployment's open_to_public setting. "
+        "If omitted, the preset default is used; otherwise falls back to False.",
+    )
+    replica_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Override for the deployment's replica_count. "
+        "If omitted, the preset default is used; otherwise falls back to "
+        "desired_replica_count or 1.",
+    )
+    revision_history_limit: int | None = Field(
+        default=None,
+        ge=0,
+        description="Override for the deployment's revision_history_limit. "
+        "If omitted, the preset default is used; otherwise falls back to 10.",
+    )
+    deployment_strategy: DeploymentStrategyInput | None = Field(
+        default=None,
+        description="Override for the deployment strategy (rolling or blue-green). "
+        "If omitted, the preset default is used; otherwise no policy is attached.",
     )

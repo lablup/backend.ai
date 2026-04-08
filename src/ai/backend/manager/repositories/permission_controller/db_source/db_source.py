@@ -85,6 +85,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
 )
 from ai.backend.manager.repositories.permission_controller.types import (
     PermissionSearchScope,
+    ScopedRoleSearchScope,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -613,6 +614,31 @@ class PermissionDBSource:
                 db_sess,
                 query,
                 querier,
+            )
+
+            items = [row.RoleRow.to_data() for row in result.rows]
+
+            return RoleListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_roles_in_scope(
+        self,
+        querier: BatchQuerier,
+        scope: ScopedRoleSearchScope,
+    ) -> RoleListResult:
+        """Search roles registered in a given scope via association_scopes_entities."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(RoleRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+                scope=scope,
             )
 
             items = [row.RoleRow.to_data() for row in result.rows]

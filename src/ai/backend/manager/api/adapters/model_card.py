@@ -5,7 +5,9 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
@@ -45,6 +47,7 @@ from ai.backend.manager.api.adapters.deployment_revision_preset import (
 )
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.deployment.creator import (
+    DeploymentPolicyConfig,
     ModelRevisionCreator,
     NewDeploymentCreator,
     VFolderMountsCreator,
@@ -59,6 +62,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ModelCardNotFound
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.row import ModelCardRow
@@ -83,6 +87,42 @@ from ai.backend.manager.services.model_card.actions.update import UpdateModelCar
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
+
+
+def _build_policy_from_strategy_input(
+    strategy_input: DeploymentStrategyInput | None,
+) -> DeploymentPolicyConfig | None:
+    """Convert a DeploymentStrategyInput DTO to DeploymentPolicyConfig.
+
+    Returns ``None`` when the caller did not provide a strategy. The deployment
+    service will then fall back to the preset's strategy default (if any).
+    """
+    if strategy_input is None:
+        return None
+    strategy_spec: RollingUpdateSpec | BlueGreenSpec
+    match strategy_input.type:
+        case DeploymentStrategy.ROLLING:
+            rolling = strategy_input.rolling_update
+            if rolling is not None:
+                strategy_spec = RollingUpdateSpec(
+                    max_surge=rolling.max_surge,
+                    max_unavailable=rolling.max_unavailable,
+                )
+            else:
+                strategy_spec = RollingUpdateSpec()
+        case DeploymentStrategy.BLUE_GREEN:
+            bg = strategy_input.blue_green
+            if bg is not None:
+                strategy_spec = BlueGreenSpec(
+                    auto_promote=bg.auto_promote,
+                    promote_delay_seconds=bg.promote_delay_seconds,
+                )
+            else:
+                strategy_spec = BlueGreenSpec()
+    return DeploymentPolicyConfig(
+        strategy=strategy_input.type,
+        strategy_spec=strategy_spec,
+    )
 
 
 def _model_card_pagination_spec() -> PaginationSpec:
@@ -366,15 +406,36 @@ class ModelCardAdapter(BaseAdapter):
         """Create a deployment from a model card using a revision preset.
 
         The revision preset provides image_id, resource_slots, environ,
-        startup_command, and runtime_variant_id. The model card provides
-        the model vfolder and project scope. The deployment service's
-        _apply_preset() merges preset values into the revision creator.
+        startup_command, runtime_variant_id, and (optionally) deployment-level
+        defaults (open_to_public, replica_count, revision_history_limit,
+        deployment_strategy). The model card provides the model vfolder and
+        project scope. The deployment service's ``_apply_preset`` and
+        ``_apply_deployment_level_preset`` merge preset values into the
+        creator; any explicit override on ``DeployModelCardInput`` takes
+        precedence over the preset default.
         """
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
 
         model_card = await self._get_model_card_data(card_id)
+
+        # Build optional override values. Leaving these as ``None`` signals the
+        # deployment service to fall back to the preset default, then to the
+        # system default.
+        replica_spec: ReplicaSpec | None = None
+        if input.replica_count is not None:
+            replica_spec = ReplicaSpec(replica_count=input.replica_count)
+        elif input.desired_replica_count != 1:
+            # Preserve prior behavior: when the caller specified a non-default
+            # ``desired_replica_count``, honor it as an explicit replica count.
+            replica_spec = ReplicaSpec(replica_count=input.desired_replica_count)
+
+        network_spec: DeploymentNetworkSpec | None = None
+        if input.open_to_public is not None:
+            network_spec = DeploymentNetworkSpec(open_to_public=input.open_to_public)
+
+        policy = _build_policy_from_strategy_input(input.deployment_strategy)
 
         creator = NewDeploymentCreator(
             metadata=DeploymentMetadata(
@@ -385,10 +446,10 @@ class ModelCardAdapter(BaseAdapter):
                 created_user=me.user_id,
                 session_owner=me.user_id,
                 created_at=None,
-                revision_history_limit=10,
+                revision_history_limit=input.revision_history_limit,
             ),
-            replica_spec=ReplicaSpec(replica_count=input.desired_replica_count),
-            network=DeploymentNetworkSpec(open_to_public=False),
+            replica_spec=replica_spec,
+            network=network_spec,
             model_revision=ModelRevisionCreator(
                 image_id=None,
                 resource_spec=ResourceSpec(
@@ -404,6 +465,7 @@ class ModelCardAdapter(BaseAdapter):
                 revision_preset_id=input.revision_preset_id,
                 auto_activate=True,
             ),
+            policy=policy,
         )
 
         result = await self._processors.deployment.create_deployment.wait_for_complete(

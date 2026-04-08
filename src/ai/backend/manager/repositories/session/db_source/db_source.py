@@ -125,7 +125,7 @@ class SessionDBSource:
             )
             result = await conn.execute(query)
             template_info = result.fetchone()
-            return dict(template_info) if template_info else None
+            return dict(template_info._mapping) if template_info else None
 
     async def update_session_name(
         self,

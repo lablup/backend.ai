@@ -119,6 +119,8 @@ from .revision_preset import (
     DeploymentRevisionPresetGQL,
     DeploymentRevisionPresetOrderByGQL,
     DeploymentRevisionPresetOrderFieldGQL,
+    PresetDeploymentDefaultsGQL,
+    PresetDeploymentStrategyInputGQL,
     UpdateDeploymentRevisionPresetInputGQL,
     UpdateDeploymentRevisionPresetPayloadGQL,
 )
@@ -261,6 +263,8 @@ __all__ = [
     "DeploymentRevisionPresetGQL",
     "DeploymentRevisionPresetOrderByGQL",
     "DeploymentRevisionPresetOrderFieldGQL",
+    "PresetDeploymentDefaultsGQL",
+    "PresetDeploymentStrategyInputGQL",
     "UpdateDeploymentRevisionPresetInputGQL",
     "UpdateDeploymentRevisionPresetPayloadGQL",
 ]

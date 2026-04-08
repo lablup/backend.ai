@@ -15,16 +15,22 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
+from ai.backend.manager.data.deployment.creator import (
+    DeploymentPolicyConfig,
+    ModelRevisionCreator,
+    NewDeploymentCreator,
+)
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
     DeploymentLifecycleSubStep,
+    DeploymentNetworkSpec,
     ExecutionSpec,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
@@ -35,6 +41,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionData,
     ModelRuntimeConfigData,
     MountMetadata,
+    ReplicaSpec,
     ReplicaStateData,
     ResourceConfigData,
     ResourceSpec,
@@ -45,10 +52,17 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
     merge_revision_drafts,
 )
-from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
+from ai.backend.manager.data.deployment_revision_preset.types import (
+    DeploymentRevisionPresetData,
+    PresetValueData,
+)
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy import (
+    BlueGreenSpec,
+    DeploymentPolicyRow,
+    RollingUpdateSpec,
+)
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -393,9 +407,26 @@ class DeploymentService:
         """
         log.info("Creating deployment with name: {}", action.creator.metadata.name)
 
+        # Resolve deployment-level fields (network, replica, history limit, policy)
+        # against the revision preset before building CreatorSpec. Caller-provided
+        # values always win; None values fall back to the preset, then to system
+        # defaults. Revision-level merging happens later inside add_model_revision.
+        resolved_creator = await self._apply_deployment_level_preset(action.creator)
+
         # Build CreatorSpec from action data
-        metadata = action.creator.metadata
-        revision = action.creator.model_revision
+        metadata = resolved_creator.metadata
+        revision = resolved_creator.model_revision
+        # After ``_apply_deployment_level_preset`` these fields are guaranteed to
+        # be populated; the explicit checks here both narrow the types for the
+        # type checker and surface the invariant violation if the resolution
+        # logic ever regresses.
+        replica_spec = resolved_creator.replica_spec
+        network_spec = resolved_creator.network
+        if replica_spec is None or network_spec is None or metadata.revision_history_limit is None:
+            raise UnreachableError(
+                "_apply_deployment_level_preset must populate replica_spec, network, "
+                "and revision_history_limit"
+            )
 
         # Build revision fields for EndpointRow only if initial_revision is provided
         revision_fields: ModelRevisionFields | None = None
@@ -436,12 +467,12 @@ class DeploymentService:
                 tag=metadata.tag,
             ),
             replica=DeploymentReplicaFields(
-                replica_count=action.creator.replica_spec.replica_count,
-                desired_replica_count=action.creator.replica_spec.desired_replica_count,
+                replica_count=replica_spec.replica_count,
+                desired_replica_count=replica_spec.desired_replica_count,
             ),
             network=DeploymentNetworkFields(
-                open_to_public=action.creator.network.open_to_public,
-                url=action.creator.network.url,
+                open_to_public=network_spec.open_to_public,
+                url=network_spec.url,
             ),
             revision=revision_fields,
         )
@@ -456,7 +487,7 @@ class DeploymentService:
 
         # Create endpoint via repository
         deployment_info = await self._deployment_repository.create_endpoint(
-            creator, action.creator.policy
+            creator, resolved_creator.policy
         )
 
         # Create initial revision if provided, via the same path as add_model_revision
@@ -720,6 +751,99 @@ class DeploymentService:
                 PresetValueData(preset_id=pv.preset_id, value=pv.value)
                 for pv in preset_data.preset_values
             ],
+        )
+
+    # System defaults used when neither the caller input nor the preset provides a value.
+    _DEFAULT_REVISION_HISTORY_LIMIT = 10
+    _DEFAULT_REPLICA_COUNT = 1
+    _DEFAULT_OPEN_TO_PUBLIC = False
+
+    async def _apply_deployment_level_preset(
+        self,
+        creator: NewDeploymentCreator,
+    ) -> NewDeploymentCreator:
+        """Resolve deployment-level fields against the revision preset defaults.
+
+        Priority: explicit caller input > preset default > system default.
+
+        Deployment-level fields currently resolved: ``metadata.revision_history_limit``,
+        ``replica_spec``, ``network``, and ``policy``. Fields that were left as ``None``
+        on the input creator are filled in from the preset (if a ``revision_preset_id``
+        is set on the model revision) and then from the system defaults.
+        """
+        preset_data: DeploymentRevisionPresetData | None = None
+        if (
+            creator.model_revision is not None
+            and creator.model_revision.revision_preset_id is not None
+            and self._deployment_revision_preset_repository is not None
+        ):
+            preset_data = await self._deployment_revision_preset_repository.get_by_id(
+                creator.model_revision.revision_preset_id,
+            )
+
+        resolved_history_limit = creator.metadata.revision_history_limit
+        if resolved_history_limit is None and preset_data is not None:
+            resolved_history_limit = preset_data.revision_history_limit
+        if resolved_history_limit is None:
+            resolved_history_limit = self._DEFAULT_REVISION_HISTORY_LIMIT
+        resolved_metadata = dataclasses.replace(
+            creator.metadata,
+            revision_history_limit=resolved_history_limit,
+        )
+
+        resolved_replica_spec = creator.replica_spec
+        if resolved_replica_spec is None:
+            preset_replica = (
+                preset_data.replica_count
+                if preset_data is not None and preset_data.replica_count is not None
+                else self._DEFAULT_REPLICA_COUNT
+            )
+            resolved_replica_spec = ReplicaSpec(replica_count=preset_replica)
+
+        resolved_network = creator.network
+        if resolved_network is None:
+            preset_open = (
+                preset_data.open_to_public
+                if preset_data is not None and preset_data.open_to_public is not None
+                else self._DEFAULT_OPEN_TO_PUBLIC
+            )
+            resolved_network = DeploymentNetworkSpec(open_to_public=preset_open)
+
+        resolved_policy = creator.policy
+        if resolved_policy is None and preset_data is not None:
+            resolved_policy = self._build_policy_from_preset(preset_data)
+
+        return dataclasses.replace(
+            creator,
+            metadata=resolved_metadata,
+            replica_spec=resolved_replica_spec,
+            network=resolved_network,
+            policy=resolved_policy,
+        )
+
+    @staticmethod
+    def _build_policy_from_preset(
+        preset_data: DeploymentRevisionPresetData,
+    ) -> DeploymentPolicyConfig | None:
+        """Reconstruct a DeploymentPolicyConfig from preset-stored strategy fields."""
+        if preset_data.deployment_strategy is None:
+            return None
+        spec_dict = preset_data.deployment_strategy_spec or {}
+        strategy_spec: RollingUpdateSpec | BlueGreenSpec
+        match preset_data.deployment_strategy:
+            case DeploymentStrategy.ROLLING:
+                strategy_spec = (
+                    RollingUpdateSpec.model_validate(spec_dict)
+                    if spec_dict
+                    else RollingUpdateSpec()
+                )
+            case DeploymentStrategy.BLUE_GREEN:
+                strategy_spec = (
+                    BlueGreenSpec.model_validate(spec_dict) if spec_dict else BlueGreenSpec()
+                )
+        return DeploymentPolicyConfig(
+            strategy=preset_data.deployment_strategy,
+            strategy_spec=strategy_spec,
         )
 
     async def _merge_deployment_config(

@@ -439,50 +439,65 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
 
     @property
     def traefik_services(self) -> dict[str, Any]:
-        # Use health-aware route filtering
-        healthy_routes = self.healthy_routes
+        # Emit a single bai_service_{circuit.id} loadBalancer fanning traffic
+        # to every active-traffic route's kernel (manager already filters out
+        # routes with traffic_status != ACTIVE before publishing). We no longer
+        # split per session into weighted sub-services: per-route weighting is
+        # intentionally removed and will be reintroduced at the revision level
+        # once blue-green/canary rollout lands.
+        routes = self.route_info
 
-        # If no healthy routes, return empty config to remove from load balancer
-        if not healthy_routes:
+        # If no routes, return empty config to remove from load balancer
+        if not routes:
             return {}
 
-        base = {  # services should be inserted separately to prevent overwritting whole `services` prefix
-            f"bai_service_{self.id}": {
-                "weighted": {
-                    "services": [
-                        {
-                            "name": f"bai_session_{r.session_id}_{self.id}",
-                            "weight": int(r.traffic_ratio),
-                        }
-                        for r in healthy_routes
-                    ]
-                }
-            },
-        }
+        # Build Traefik loadBalancer.healthCheck directive from endpoint config
+        # so that Traefik probes kernels directly and ejects unhealthy replicas
+        # without the coordinator polling them itself. Applied once at the
+        # loadBalancer level (not per-route) now that we have a flat structure.
+        health_check_block: dict[str, Any] | None = None
+        if (
+            self.app_mode == AppMode.INFERENCE
+            and self.endpoint_row is not None
+            and self.endpoint_row.health_check_enabled
+            and self.endpoint_row.health_check_config is not None
+        ):
+            hc = self.endpoint_row.health_check_config
+            health_check_block = {
+                "path": hc.path,
+                "interval": f"{int(hc.interval)}s",
+                "timeout": f"{int(hc.max_wait_time)}s",
+            }
+
         match self.protocol:
             case ProxyProtocol.HTTP:
-                for r in healthy_routes:
-                    base.update({
-                        f"bai_session_{r.session_id}_{self.id}": {
-                            "loadBalancer": {
-                                "servers": [
-                                    {"url": f"http://{r.current_kernel_host}:{r.kernel_port}/"}
-                                ],
-                            }
-                        }
-                    })
+                load_balancer: dict[str, Any] = {
+                    "servers": [
+                        {"url": f"http://{r.current_kernel_host}:{r.kernel_port}/"} for r in routes
+                    ],
+                }
+                if health_check_block is not None:
+                    load_balancer["healthCheck"] = health_check_block
+                return {
+                    f"bai_service_{self.id}": {
+                        "loadBalancer": load_balancer,
+                    },
+                }
             case ProxyProtocol.TCP:
-                for r in healthy_routes:
-                    base.update({
-                        f"bai_session_{r.session_id}_{self.id}": {
-                            "loadBalancer": {
-                                "servers": [
-                                    {"address": f"{r.current_kernel_host}:{r.kernel_port}"}
-                                ],
-                            }
-                        }
-                    })
-        return base
+                # Traefik TCP services use a different healthCheck syntax; skip
+                # directive injection here and rely on the coordinator's existing
+                # behaviour for TCP circuits (follow-up PR will add TCP support).
+                return {
+                    f"bai_service_{self.id}": {
+                        "loadBalancer": {
+                            "servers": [
+                                {"address": f"{r.current_kernel_host}:{r.kernel_port}"}
+                                for r in routes
+                            ],
+                        },
+                    },
+                }
+        return {}
 
     def get_traefik_middlewares(self, local_config: ServerConfig) -> dict[str, Any]:
         match self.protocol:
