@@ -74,6 +74,7 @@ class CliArgs:
     endpoint_protocol: EndpointProtocol | None = None
     frontend_mode: FrontendMode = FrontendMode.PORT
     use_wildcard_binding: bool = False
+    otel_endpoint: str | None = None
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -211,6 +212,7 @@ class InstallVariable:
     endpoint_protocol: EndpointProtocol | None = None
     frontend_mode: FrontendMode = FrontendMode.PORT
     use_wildcard_binding: bool = False
+    otel_endpoint: str | None = None
 
     @property
     def apphub_address(self) -> str:

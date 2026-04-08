@@ -578,6 +578,12 @@ class Context(metaclass=ABCMeta):
                 data["redis"]["password"] = halfstack.redis_password
         (base_path / "etcd.config.json").write_text(json.dumps(data))
         await self.etcd_put_json("config", data)
+        if self.install_variable.otel_endpoint:
+            self.sed_in_place(
+                toml_path,
+                'endpoint = "http://127.0.0.1:4317"',
+                f'endpoint = "{self.install_variable.otel_endpoint}"',
+            )
 
     async def configure_agent(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -628,6 +634,12 @@ class Context(metaclass=ABCMeta):
             re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.MULTILINE),
             f"allow-compute-plugins = [{', '.join(plugin_list)}]",
         )
+        if self.install_variable.otel_endpoint:
+            self.sed_in_place(
+                toml_path,
+                'endpoint = "http://127.0.0.1:4317"',
+                f'endpoint = "{self.install_variable.otel_endpoint}"',
+            )
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -692,6 +704,12 @@ class Context(metaclass=ABCMeta):
             data["volume"]["volume1"]["path"] = service.vfolder_relpath  # type: ignore
         with toml_path.open("w") as fp:
             tomlkit.dump(data, fp)
+        if self.install_variable.otel_endpoint:
+            self.sed_in_place(
+                toml_path,
+                'endpoint = "http://127.0.0.1:4317"',
+                f'endpoint = "{self.install_variable.otel_endpoint}"',
+            )
 
     async def configure_webserver(self) -> None:
         conf_path = self.copy_config("webserver.conf")
@@ -755,6 +773,12 @@ class Context(metaclass=ABCMeta):
             data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
+        if self.install_variable.otel_endpoint:
+            self.sed_in_place(
+                conf_path,
+                'endpoint = "http://127.0.0.1:4317"',
+                f'endpoint = "{self.install_variable.otel_endpoint}"',
+            )
 
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
@@ -972,6 +996,13 @@ class Context(metaclass=ABCMeta):
                 ),
             ],
         )
+        if self.install_variable.otel_endpoint:
+            for conf in (coord_conf, worker_conf):
+                self.sed_in_place(
+                    conf,
+                    'endpoint = "http://127.0.0.1:4317"',
+                    f'endpoint = "{self.install_variable.otel_endpoint}"',
+                )
 
     async def configure_appproxy_fixture(self) -> None:
         self.log_header("Updating manager scaling_groups to point to appproxy coordinator...")

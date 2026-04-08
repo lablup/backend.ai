@@ -94,6 +94,12 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     default=False,
     help="Use wildcard domain binding for app-proxy worker.",
 )
+@click.option(
+    "--otel-endpoint",
+    type=str,
+    default=None,
+    help="OpenTelemetry collector endpoint (e.g., http://10.122.10.56:4317).",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
@@ -110,6 +116,7 @@ def main(
     endpoint_protocol: str | None,
     frontend_mode: str,
     use_wildcard_binding: bool,
+    otel_endpoint: str | None,
     accelerator: str,
 ) -> None:
     """The installer"""
@@ -139,6 +146,7 @@ def main(
         endpoint_protocol=EndpointProtocol(endpoint_protocol) if endpoint_protocol else None,
         frontend_mode=FrontendMode(frontend_mode),
         use_wildcard_binding=use_wildcard_binding,
+        otel_endpoint=otel_endpoint,
     )
     app = InstallerApp(args)
     app.run(headless=headless)
