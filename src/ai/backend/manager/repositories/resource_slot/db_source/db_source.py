@@ -15,6 +15,7 @@ from ai.backend.manager.data.resource_slot.types import (
     AgentResourceDrift,
     AgentResourceSearchResult,
     NumberFormatData,
+    OrphanedAllocation,
     ResourceAllocationData,
     ResourceAllocationSearchResult,
     ResourceOccupancy,
@@ -387,6 +388,37 @@ class ResourceSlotDBSource:
                 )
 
         return drifts
+
+    async def cleanup_orphaned_allocations(self) -> list[OrphanedAllocation]:
+        """Find and fix resource_allocations where free_at IS NULL but the kernel is terminal.
+
+        Terminal statuses (CANCELLED, TERMINATED, ERROR) indicate the kernel is no longer
+        active, so any allocation with free_at IS NULL is orphaned and should be freed.
+        This acts as a safety net for cases where free_at was not properly set during
+        normal lifecycle transitions.
+
+        Returns:
+            List of orphaned allocations that were corrected.
+        """
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
+        terminal_statuses = KernelStatus.terminal_statuses()
+
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.update(ra)
+                .where(
+                    ra.c.free_at.is_(None),
+                    ra.c.kernel_id.in_(sa.select(k.c.id).where(k.c.status.in_(terminal_statuses))),
+                )
+                .values(free_at=sa.func.now())
+                .returning(ra.c.kernel_id, ra.c.slot_name)
+            )
+            rows = result.all()
+
+        return [
+            OrphanedAllocation(kernel_id=row.kernel_id, slot_name=row.slot_name) for row in rows
+        ]
 
     async def aggregate_occupied_by_project(self, project_id: uuid.UUID) -> ResourceOccupancy:
         """Aggregate active resource occupancy for a project (group).

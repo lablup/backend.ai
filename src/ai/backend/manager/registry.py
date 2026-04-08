@@ -1259,6 +1259,7 @@ class AgentRegistry:
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
         await self._update_concurrency(access_key_to_concurrency_used, do_fullscan)
         await self._reconcile_agent_resources()
+        await self._cleanup_orphaned_allocations()
 
     async def _reconcile_agent_resources(self) -> None:
         """Reconcile agent_resources.used against actual resource_allocations.
@@ -1274,6 +1275,21 @@ class AgentRegistry:
                 d.slot_name,
                 d.tracked,
                 d.actual,
+            )
+
+    async def _cleanup_orphaned_allocations(self) -> None:
+        """Free resource_allocations where the kernel is terminal but free_at is NULL.
+
+        Acts as a safety net to catch allocations that were not properly freed
+        during normal lifecycle transitions (e.g., CANCELLED, TERMINATED, ERROR kernels).
+        """
+        repo = ResourceSlotRepository(self.db)
+        orphans = await repo.cleanup_orphaned_allocations()
+        for o in orphans:
+            log.warning(
+                "freed orphaned resource allocation: kernel={}, slot={}",
+                o.kernel_id,
+                o.slot_name,
             )
 
     async def _update_concurrency(
