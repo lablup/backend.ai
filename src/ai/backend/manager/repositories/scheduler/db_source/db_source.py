@@ -814,7 +814,13 @@ class ScheduleDBSource:
     async def _cancel_pending_sessions(
         self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
     ) -> list[SessionId]:
-        """Cancel pending sessions and their kernels."""
+        """Cancel pending sessions and their kernels.
+
+        Invariant: every CANCELLED transition must also free the matching
+        ``resource_allocations`` rows in the same transaction. The kernels
+        affected here are filtered to ``PENDING``, so ``ResourceAllocationRow.used``
+        is always ``NULL`` and no ``agent_resources.used`` adjustment is needed.
+        """
         # Cancel pending sessions
         cancel_stmt = (
             sa.update(SessionRow)
@@ -852,6 +858,24 @@ class ScheduleDBSource:
                     ),
                 )
                 .where(KernelRow.session_id.in_(cancelled_sessions))
+            )
+
+            # Free resource allocations for the cancelled kernels in the
+            # same transaction. Required to keep `resource_allocations` in
+            # sync with `kernels.status`; without this the rows would
+            # become orphaned and inflate occupancy queries.
+            kernel_ids_subq = (
+                sa.select(KernelRow.id)
+                .where(KernelRow.session_id.in_(cancelled_sessions))
+                .scalar_subquery()
+            )
+            await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(
+                    ResourceAllocationRow.kernel_id.in_(kernel_ids_subq),
+                    ResourceAllocationRow.free_at.is_(None),
+                )
+                .values(free_at=sa.func.now())
             )
 
         return cancelled_sessions
@@ -2594,6 +2618,12 @@ class ScheduleDBSource:
         Cancel kernels for an image that failed to be available on an agent.
         Returns session IDs that may need to be checked for full cancellation.
 
+        Invariant: every CANCELLED transition must also free the matching
+        ``resource_allocations`` rows in the same transaction. The kernels
+        affected here are filtered to ``SCHEDULED/PULLING/PREPARING``, so
+        ``ResourceAllocationRow.used`` is always ``NULL`` and no
+        ``agent_resources.used`` adjustment is needed.
+
         :param agent_id: The agent ID where the image is unavailable
         :param image: The image name that failed
         :param error_msg: The error message to include in status
@@ -2629,10 +2659,27 @@ class ScheduleDBSource:
                         {KernelStatus.CANCELLED.name: now.isoformat()},
                     ),
                 )
-                .returning(KernelRow.session_id)
+                .returning(KernelRow.id, KernelRow.session_id)
             )
             result = await db_sess.execute(stmt)
-            return {row.session_id for row in result}
+            cancelled_rows = result.all()
+            cancelled_kernel_ids = [row.id for row in cancelled_rows]
+
+            # Free resource allocations for the cancelled kernels in the
+            # same transaction. Required to keep `resource_allocations` in
+            # sync with `kernels.status`; without this the rows would
+            # become orphaned and inflate occupancy queries.
+            if cancelled_kernel_ids:
+                await db_sess.execute(
+                    sa.update(ResourceAllocationRow)
+                    .where(
+                        ResourceAllocationRow.kernel_id.in_(cancelled_kernel_ids),
+                        ResourceAllocationRow.free_at.is_(None),
+                    )
+                    .values(free_at=sa.func.now())
+                )
+
+            return {row.session_id for row in cancelled_rows}
 
     async def check_and_cancel_session_if_needed(self, session_id: SessionId) -> bool:
         """
