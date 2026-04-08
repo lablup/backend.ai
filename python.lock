@@ -103,7 +103,7 @@
 //     "ruamel.yaml~=0.18.10",
 //     "setproctitle~=1.3.5",
 //     "setuptools~=80.0.0",
-//     "strawberry-graphql~=0.313.0",
+//     "strawberry-graphql~=0.314.0",
 //     "tabulate~=0.8.9",
 //     "temporenc~=0.1.0",
 //     "tenacity>=9.0",
@@ -5530,13 +5530,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "711ffd45bf766d5264d487b917733b453d917afd2b0ad65223959f59089f875b",
-              "url": "https://files.pythonhosted.org/packages/3b/ab/b3226f0bd7cdcf710fbede2b3548584366da3b19b5021e74f5bde2a8fa3f/pytest-9.0.2-py3-none-any.whl"
+              "hash": "2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9",
+              "url": "https://files.pythonhosted.org/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "75186651a92bd89611d1d9fc20f0b4345fd827c41ccd5c299a868a05d70edf11",
-              "url": "https://files.pythonhosted.org/packages/d1/db/7ef3487e0fb0049ddb5ce41d3a49c235bf9ad299b6a25d5780a89f19230f/pytest-9.0.2.tar.gz"
+              "hash": "b86ada508af81d19edeb213c681b1d48246c1a91d304c6c81a427674c17eb91c",
+              "url": "https://files.pythonhosted.org/packages/7d/0d/549bd94f1a0a402dc8cf64563a117c0f3765662e2e668477624baeec44d5/pytest-9.0.3.tar.gz"
             }
           ],
           "project_name": "pytest",
@@ -5557,7 +5557,7 @@
             "xmlschema; extra == \"dev\""
           ],
           "requires_python": ">=3.10",
-          "version": "9.0.2"
+          "version": "9.0.3"
         },
         {
           "artifacts": [
@@ -5672,13 +5672,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b6a957b24c1cd79252484d3566d1b49527581d46e789aaf43181005e56201502",
-              "url": "https://files.pythonhosted.org/packages/67/0f/019d3949a40280f6193b62bc010177d4ce702d0fce424322286488569cd3/python_discovery-1.2.1-py3-none-any.whl"
+              "hash": "e1ae95d9af875e78f15e19aed0c6137ab1bb49c200f21f5061786490c9585c7a",
+              "url": "https://files.pythonhosted.org/packages/d8/db/795879cc3ddfe338599bddea6388cc5100b088db0a4caf6e6c1af1c27e04/python_discovery-1.2.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "180c4d114bff1c32462537eac5d6a332b768242b76b69c0259c7d14b1b680c9e",
-              "url": "https://files.pythonhosted.org/packages/b9/88/815e53084c5079a59df912825a279f41dd2e0df82281770eadc732f5352c/python_discovery-1.2.1.tar.gz"
+              "hash": "876e9c57139eb757cb5878cbdd9ae5379e5d96266c99ef731119e04fffe533bb",
+              "url": "https://files.pythonhosted.org/packages/de/ef/3bae0e537cfe91e8431efcba4434463d2c5a65f5a89edd47c6cf2f03c55f/python_discovery-1.2.2.tar.gz"
             }
           ],
           "project_name": "python-discovery",
@@ -5696,7 +5696,7 @@
             "sphinxcontrib-mermaid>=2; extra == \"docs\""
           ],
           "requires_python": ">=3.8",
-          "version": "1.2.1"
+          "version": "1.2.2"
         },
         {
           "artifacts": [
@@ -6433,33 +6433,34 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "41d1e519c6efcc05e7fccaf4293e5febfb2ac4218a0bc7c94295e2db30ffda57",
-              "url": "https://files.pythonhosted.org/packages/d3/3a/20c2ee7f081300e4d525aa8846cd25d162e3c3d7c21852d0b0cb309f28f1/strawberry_graphql-0.313.0-py3-none-any.whl"
+              "hash": "6b0414ce8a6203e7859c22259576d38ea7b2232722062015c037708764730f18",
+              "url": "https://files.pythonhosted.org/packages/c7/c5/d83b781641370855805548a733907c974810f664904fe837c2987a362f2c/strawberry_graphql-0.314.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f22071c4e2b90bb87d10a2420f8fa6206b30dd8758e73f6acee1d1af359de10e",
-              "url": "https://files.pythonhosted.org/packages/cd/d0/c14cb1e1797c2eb987af51e728fc5675b00bce877eb492896722c217b670/strawberry_graphql-0.313.0.tar.gz"
+              "hash": "9748d4e68c92bafde87bf6b27db520a44000f1c575c74e1632a0b38b9a13484e",
+              "url": "https://files.pythonhosted.org/packages/cb/28/593ed0722f99d74d8ab6edcfb93b9719360b8ae535aecb39b83c4aabbe2a/strawberry_graphql-0.314.0.tar.gz"
             }
           ],
           "project_name": "strawberry-graphql",
           "requires_dists": [
-            "Django>=3.2; extra == \"django\"",
             "aiohttp<4,>=3.7.4.post0; extra == \"aiohttp\"",
             "asgiref>=3.2; extra == \"channels\"",
             "asgiref>=3.2; extra == \"django\"",
             "chalice>=1.22; extra == \"chalice\"",
             "channels>=3.0.5; extra == \"channels\"",
             "cross-web>=0.4.0",
+            "django>=3.2; extra == \"django\"",
             "fastapi>=0.65.2; extra == \"fastapi\"",
             "flask>=1.1; extra == \"flask\"",
             "graphql-core<3.4.0,>=3.2.0",
             "libcst; extra == \"cli\"",
             "libcst; extra == \"debug\"",
-            "litestar>=2; python_version ~= \"3.10\" and extra == \"litestar\"",
+            "litestar>=2; python_full_version >= \"3.10\" and python_full_version < \"4\" and extra == \"litestar\"",
             "opentelemetry-api<2; extra == \"opentelemetry\"",
             "opentelemetry-sdk<2; extra == \"opentelemetry\"",
             "packaging>=23",
+            "protobuf>=3.20; extra == \"apollo-federation\"",
             "pydantic>1.6.1; extra == \"pydantic\"",
             "pygments>=2.3; extra == \"cli\"",
             "pyinstrument>=4.0.0; extra == \"pyinstrument\"",
@@ -6479,7 +6480,7 @@
             "websockets<16,>=15.0.1; extra == \"cli\""
           ],
           "requires_python": "<4.0,>=3.10",
-          "version": "0.313.0"
+          "version": "0.314.0"
         },
         {
           "artifacts": [
@@ -7899,7 +7900,7 @@
     "ruamel.yaml~=0.18.10",
     "setproctitle~=1.3.5",
     "setuptools~=80.0.0",
-    "strawberry-graphql~=0.313.0",
+    "strawberry-graphql~=0.314.0",
     "tabulate~=0.8.9",
     "temporenc~=0.1.0",
     "tenacity>=9.0",
