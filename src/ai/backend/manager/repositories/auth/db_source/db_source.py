@@ -128,7 +128,7 @@ class AuthDBSource:
         domain_name: str,
     ) -> UserData:
         """Insert a new user with keypair and add to default group in database."""
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_session_read_committed() as db_session:
             conn = await db_session.connection()
 
             # Create user
