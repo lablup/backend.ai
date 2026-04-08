@@ -2622,6 +2622,8 @@ class ScheduleDBSource:
         async with self._begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
             image_to_match = image_ref if image_ref else image
+            # SCHEDULED is included because image pull failure can occur
+            # before the kernel transitions to PREPARING.
             stmt = (
                 sa.update(KernelRow)
                 .where(
