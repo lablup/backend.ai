@@ -866,7 +866,7 @@ class VfolderRepository:
         )
         result = await session.scalar(stmt)
         if result is None:
-            raise ObjectNotFound(object_name="user system role", object_id=str(user_id))
+            raise ObjectNotFound(object_name="user system role", extra_msg=str(user_id))
         return result
 
     def _get_vfolder_scope(self, vfolder: VFolderData) -> ScopeId:
