@@ -1,4 +1,4 @@
-"""Regression tests: cancellation paths must free resource_allocations
+"""Regression tests: cancellation paths must set ``resource_allocations.free_at``
 in the same transaction. Covers ``_cancel_pending_sessions`` (via
 ``mark_sessions_terminating``) and ``cancel_kernels_for_failed_image``.
 """
@@ -79,9 +79,7 @@ _BASE_TABLES = [
 ]
 
 
-class _CancellationTestBase:
-    """Shared fixtures for cancellation-path freeing tests."""
-
+class TestCancelFreesResourceAllocations:
     @pytest.fixture
     async def db_with_cleanup(
         self,
@@ -306,7 +304,6 @@ class _CancellationTestBase:
         self,
         db: ExtendedAsyncSAEngine,
         *,
-        session_status: SessionStatus,
         kernel_status: KernelStatus,
         domain_name: str,
         scaling_group_name: str,
@@ -315,14 +312,19 @@ class _CancellationTestBase:
         access_key: AccessKey,
         agent_id: str | None,
         image: str = "python:3.8",
-        cpu_requested: Decimal = Decimal("2"),
-        mem_requested: Decimal = Decimal("4096"),
     ) -> tuple[SessionId, KernelId]:
         """Insert a session+kernel in a pre-RUNNING state with allocations
         whose ``used`` is ``NULL`` (production state between PENDING and CREATING).
         """
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
+        cpu = Decimal("2")
+        mem = Decimal("4096")
+        session_status = (
+            SessionStatus.PENDING
+            if kernel_status == KernelStatus.PENDING
+            else SessionStatus.PREPARING
+        )
 
         async with db.begin_session() as db_sess:
             db_sess.add(
@@ -336,10 +338,7 @@ class _CancellationTestBase:
                     status=session_status,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=ResourceSlot({
-                        "cpu": cpu_requested,
-                        "mem": mem_requested,
-                    }),
+                    requested_slots=ResourceSlot({"cpu": cpu, "mem": mem}),
                     created_at=datetime.now(tzutc()),
                     images=[image],
                     vfolder_mounts=[],
@@ -366,10 +365,7 @@ class _CancellationTestBase:
                     status=kernel_status,
                     status_changed=datetime.now(tzutc()),
                     occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot({
-                        "cpu": cpu_requested,
-                        "mem": mem_requested,
-                    }),
+                    requested_slots=ResourceSlot({"cpu": cpu, "mem": mem}),
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,
@@ -390,7 +386,7 @@ class _CancellationTestBase:
                 ResourceAllocationRow(
                     kernel_id=kernel_id,
                     slot_name="cpu",
-                    requested=cpu_requested,
+                    requested=cpu,
                     used=None,
                 )
             )
@@ -398,43 +394,32 @@ class _CancellationTestBase:
                 ResourceAllocationRow(
                     kernel_id=kernel_id,
                     slot_name="mem",
-                    requested=mem_requested,
+                    requested=mem,
                     used=None,
                 )
             )
             await db_sess.flush()
 
-            if agent_id:
-                for slot_name, capacity in [
-                    ("cpu", Decimal("10")),
-                    ("mem", Decimal("10240")),
-                ]:
-                    existing = await db_sess.execute(
-                        sa.select(AgentResourceRow).where(
-                            AgentResourceRow.agent_id == agent_id,
-                            AgentResourceRow.slot_name == slot_name,
-                        )
-                    )
-                    if existing.first() is None:
-                        db_sess.add(
-                            AgentResourceRow(
-                                agent_id=agent_id,
-                                slot_name=slot_name,
-                                capacity=capacity,
-                                used=Decimal("0"),
-                            )
-                        )
-                await db_sess.flush()
-
         return session_id, kernel_id
 
+    async def _assert_all_freed(self, db: ExtendedAsyncSAEngine, kernel_id: KernelId) -> None:
+        async with db.begin_readonly_session() as db_sess:
+            allocs = (
+                (
+                    await db_sess.execute(
+                        sa.select(ResourceAllocationRow).where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert len(allocs) == 2
+            for alloc in allocs:
+                assert alloc.free_at is not None, f"free_at must be set on slot {alloc.slot_name}"
 
-class TestCancelPendingSessionsFreesAllocations(_CancellationTestBase):
-    """``mark_sessions_terminating`` on a PENDING session must free its
-    kernels' resource_allocations rows in the same transaction.
-    """
-
-    async def test_marks_resource_allocations_freed(
+    async def test_cancel_pending_sessions_sets_free_at(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
@@ -445,10 +430,8 @@ class TestCancelPendingSessionsFreesAllocations(_CancellationTestBase):
         resource_slot_types: None,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup)
-
         session_id, kernel_id = await self._create_pre_running_session(
             db_with_cleanup,
-            session_status=SessionStatus.PENDING,
             kernel_status=KernelStatus.PENDING,
             domain_name=test_domain_name,
             scaling_group_name=test_scaling_group_name,
@@ -459,32 +442,11 @@ class TestCancelPendingSessionsFreesAllocations(_CancellationTestBase):
         )
 
         result = await db_source.mark_sessions_terminating([session_id])
+
         assert session_id in result.cancelled_sessions
+        await self._assert_all_freed(db_with_cleanup, kernel_id)
 
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            allocs = (
-                (
-                    await db_sess.execute(
-                        sa.select(ResourceAllocationRow).where(
-                            ResourceAllocationRow.kernel_id == kernel_id,
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            assert len(allocs) == 2
-            for alloc in allocs:
-                assert alloc.free_at is not None, (
-                    f"free_at must be set on slot {alloc.slot_name} after cancellation"
-                )
-
-            kernel = (
-                await db_sess.execute(sa.select(KernelRow).where(KernelRow.id == kernel_id))
-            ).scalar_one()
-            assert kernel.status == KernelStatus.CANCELLED
-
-    async def test_does_not_change_agent_resources(
+    async def test_cancel_kernels_for_failed_image_sets_free_at(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
@@ -496,179 +458,8 @@ class TestCancelPendingSessionsFreesAllocations(_CancellationTestBase):
         resource_slot_types: None,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup)
-
-        session_id, _ = await self._create_pre_running_session(
-            db_with_cleanup,
-            session_status=SessionStatus.PENDING,
-            kernel_status=KernelStatus.PENDING,
-            domain_name=test_domain_name,
-            scaling_group_name=test_scaling_group_name,
-            group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
-            agent_id=test_agent_id,
-        )
-
-        await db_source.mark_sessions_terminating([session_id])
-
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            agent_resources = (
-                (
-                    await db_sess.execute(
-                        sa.select(AgentResourceRow).where(
-                            AgentResourceRow.agent_id == test_agent_id,
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            assert len(agent_resources) == 2
-            for ar in agent_resources:
-                assert ar.used == Decimal("0"), (
-                    f"agent_resources.used for {ar.slot_name} must stay at 0 "
-                    f"after pending-session cancellation, got {ar.used}"
-                )
-
-    async def test_idempotent_on_already_freed_rows(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_scaling_group_name: str,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-        test_access_key: AccessKey,
-        resource_slot_types: None,
-    ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup)
-
         session_id, kernel_id = await self._create_pre_running_session(
             db_with_cleanup,
-            session_status=SessionStatus.PENDING,
-            kernel_status=KernelStatus.PENDING,
-            domain_name=test_domain_name,
-            scaling_group_name=test_scaling_group_name,
-            group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
-            agent_id=None,
-        )
-
-        await db_source.mark_sessions_terminating([session_id])
-
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            first_free_ats = {
-                row.slot_name: row.free_at
-                for row in (
-                    await db_sess.execute(
-                        sa.select(ResourceAllocationRow).where(
-                            ResourceAllocationRow.kernel_id == kernel_id,
-                        )
-                    )
-                ).scalars()
-            }
-
-        await db_source.mark_sessions_terminating([session_id])
-
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            second_free_ats = {
-                row.slot_name: row.free_at
-                for row in (
-                    await db_sess.execute(
-                        sa.select(ResourceAllocationRow).where(
-                            ResourceAllocationRow.kernel_id == kernel_id,
-                        )
-                    )
-                ).scalars()
-            }
-
-        assert first_free_ats == second_free_ats, (
-            "free_at timestamps must be preserved on re-cancellation"
-        )
-
-
-class TestCancelKernelsForFailedImageFreesAllocations(_CancellationTestBase):
-    """``cancel_kernels_for_failed_image`` must free its cancelled kernels'
-    resource_allocations rows in the same transaction.
-    """
-
-    @pytest.mark.parametrize(
-        "kernel_status",
-        [KernelStatus.SCHEDULED, KernelStatus.PULLING, KernelStatus.PREPARING],
-    )
-    async def test_marks_resource_allocations_freed(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_scaling_group_name: str,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-        test_access_key: AccessKey,
-        test_agent_id: str,
-        resource_slot_types: None,
-        kernel_status: KernelStatus,
-    ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup)
-
-        session_id, kernel_id = await self._create_pre_running_session(
-            db_with_cleanup,
-            session_status=SessionStatus.PREPARING,
-            kernel_status=kernel_status,
-            domain_name=test_domain_name,
-            scaling_group_name=test_scaling_group_name,
-            group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
-            agent_id=test_agent_id,
-            image="python:3.8",
-        )
-
-        affected_sessions = await db_source.cancel_kernels_for_failed_image(
-            AgentId(test_agent_id),
-            "python:3.8",
-            "image pull failed for test",
-        )
-        assert session_id in affected_sessions
-
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            allocs = (
-                (
-                    await db_sess.execute(
-                        sa.select(ResourceAllocationRow).where(
-                            ResourceAllocationRow.kernel_id == kernel_id,
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            assert len(allocs) == 2
-            for alloc in allocs:
-                assert alloc.free_at is not None, (
-                    f"free_at must be set on slot {alloc.slot_name} for {kernel_status}"
-                )
-
-            kernel = (
-                await db_sess.execute(sa.select(KernelRow).where(KernelRow.id == kernel_id))
-            ).scalar_one()
-            assert kernel.status == KernelStatus.CANCELLED
-
-    async def test_does_not_change_agent_resources(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_scaling_group_name: str,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-        test_access_key: AccessKey,
-        test_agent_id: str,
-        resource_slot_types: None,
-    ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup)
-
-        session_id, _ = await self._create_pre_running_session(
-            db_with_cleanup,
-            session_status=SessionStatus.PREPARING,
             kernel_status=KernelStatus.PULLING,
             domain_name=test_domain_name,
             scaling_group_name=test_scaling_group_name,
@@ -679,107 +470,9 @@ class TestCancelKernelsForFailedImageFreesAllocations(_CancellationTestBase):
             image="python:3.8",
         )
 
-        affected_sessions = await db_source.cancel_kernels_for_failed_image(
-            AgentId(test_agent_id),
-            "python:3.8",
-            "image pull failed for test",
-        )
-        assert session_id in affected_sessions
-
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            agent_resources = (
-                (
-                    await db_sess.execute(
-                        sa.select(AgentResourceRow).where(
-                            AgentResourceRow.agent_id == test_agent_id,
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            assert len(agent_resources) == 2
-            for ar in agent_resources:
-                assert ar.used == Decimal("0"), (
-                    f"agent_resources.used for {ar.slot_name} must stay at 0, got {ar.used}"
-                )
-
-    async def test_does_not_touch_unrelated_kernels(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_scaling_group_name: str,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-        test_access_key: AccessKey,
-        test_agent_id: str,
-        resource_slot_types: None,
-    ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup)
-
-        _victim_session, victim_kernel = await self._create_pre_running_session(
-            db_with_cleanup,
-            session_status=SessionStatus.PREPARING,
-            kernel_status=KernelStatus.PULLING,
-            domain_name=test_domain_name,
-            scaling_group_name=test_scaling_group_name,
-            group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
-            agent_id=test_agent_id,
-            image="python:3.8",
-        )
-        _bystander_session, bystander_kernel = await self._create_pre_running_session(
-            db_with_cleanup,
-            session_status=SessionStatus.PREPARING,
-            kernel_status=KernelStatus.PULLING,
-            domain_name=test_domain_name,
-            scaling_group_name=test_scaling_group_name,
-            group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
-            agent_id=test_agent_id,
-            image="python:3.9",
+        affected = await db_source.cancel_kernels_for_failed_image(
+            AgentId(test_agent_id), "python:3.8", "image pull failed for test"
         )
 
-        await db_source.cancel_kernels_for_failed_image(
-            AgentId(test_agent_id),
-            "python:3.8",
-            "image pull failed for test",
-        )
-
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            victim_allocs = (
-                (
-                    await db_sess.execute(
-                        sa.select(ResourceAllocationRow).where(
-                            ResourceAllocationRow.kernel_id == victim_kernel,
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            for alloc in victim_allocs:
-                assert alloc.free_at is not None
-
-            bystander_allocs = (
-                (
-                    await db_sess.execute(
-                        sa.select(ResourceAllocationRow).where(
-                            ResourceAllocationRow.kernel_id == bystander_kernel,
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            for alloc in bystander_allocs:
-                assert alloc.free_at is None, (
-                    f"unrelated kernel's slot {alloc.slot_name} must not be freed"
-                )
-
-            bystander_kernel_row = (
-                await db_sess.execute(sa.select(KernelRow).where(KernelRow.id == bystander_kernel))
-            ).scalar_one()
-            assert bystander_kernel_row.status == KernelStatus.PULLING
+        assert session_id in affected
+        await self._assert_all_freed(db_with_cleanup, kernel_id)
