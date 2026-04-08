@@ -62,6 +62,16 @@ class UserInfoContext:
     main_access_key: AccessKey
 
 
+@dataclass(frozen=True)
+class SessionOwnerContext:
+    """Resolved owner context for session creation."""
+
+    owner_uuid: UUID
+    group_id: UUID
+    resource_policy: dict[str, Any]
+    owner_role: UserRole
+
+
 @dataclass
 class UserData:
     id: UUID = field(compare=False)
