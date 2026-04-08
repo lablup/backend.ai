@@ -1064,14 +1064,10 @@ class ScheduleDBSource:
             result = await session.execute(query)
             return [row.scaling_group for row in result.fetchall()]
 
-    async def get_scaling_groups_with_active_agents(self) -> list[str]:
-        """Get scaling groups with any ALIVE agent, ignoring ``schedulable``."""
+    async def get_all_scaling_groups(self) -> list[str]:
+        """Get all scaling groups referenced by agents, ignoring agent state."""
         async with self._begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(AgentRow.scaling_group)
-                .where(AgentRow.status == AgentStatus.ALIVE)
-                .group_by(AgentRow.scaling_group)
-            )
+            query = sa.select(AgentRow.scaling_group).group_by(AgentRow.scaling_group)
             result = await session.execute(query)
             return [row.scaling_group for row in result.fetchall()]
 

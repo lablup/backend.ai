@@ -177,9 +177,9 @@ class SchedulerRepository:
         return await self._db_source.get_schedulable_scaling_groups()
 
     @scheduler_repository_resilience.apply()
-    async def get_scaling_groups_with_active_agents(self) -> list[str]:
-        """Get scaling groups with any ALIVE agent, ignoring ``schedulable``."""
-        return await self._db_source.get_scaling_groups_with_active_agents()
+    async def get_all_scaling_groups(self) -> list[str]:
+        """Get all scaling groups referenced by agents, ignoring agent state."""
+        return await self._db_source.get_all_scaling_groups()
 
     @scheduler_repository_resilience.apply()
     async def get_terminating_sessions_by_ids(

@@ -82,8 +82,6 @@ class SessionStatus(CIStrEnum):
             for status in cls
             if status
             not in (
-                cls.PENDING,
-                cls.DEPRIORITIZING,
                 cls.TERMINATING,
                 cls.TERMINATED,
                 cls.CANCELLED,
@@ -100,8 +98,6 @@ class SessionStatus(CIStrEnum):
             for status in cls
             if status
             not in (
-                cls.PENDING,
-                cls.DEPRIORITIZING,
                 cls.TERMINATED,
                 cls.CANCELLED,
                 cls.ERROR,
