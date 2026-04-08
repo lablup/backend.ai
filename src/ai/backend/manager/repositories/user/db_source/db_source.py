@@ -1289,8 +1289,15 @@ class UserDBSource:
                 user_id=user_uuid,
                 email=user_row.email,
             )
-            kp_creator = Creator(spec=kp_spec)
-            result = await execute_creator(session, kp_creator)
+            rbac_kp_creator = RBACEntityCreator(
+                spec=kp_spec,
+                element_type=RBACElementType.KEYPAIR,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.USER,
+                    element_id=str(user_uuid),
+                ),
+            )
+            result = await execute_rbac_entity_creator(session, rbac_kp_creator)
             return GeneratedKeyPairData(keypair=result.row.to_data())
 
     async def revoke_my_keypair(self, user_uuid: UUID, access_key: str) -> None:
@@ -1421,8 +1428,15 @@ class UserDBSource:
                 user_id=user_id,
                 email=user_row.email,
             )
-            kp_creator = Creator(spec=kp_spec)
-            result = await execute_creator(session, kp_creator)
+            rbac_kp_creator = RBACEntityCreator(
+                spec=kp_spec,
+                element_type=RBACElementType.KEYPAIR,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.USER,
+                    element_id=str(user_id),
+                ),
+            )
+            result = await execute_rbac_entity_creator(session, rbac_kp_creator)
             return GeneratedKeyPairData(keypair=result.row.to_data())
 
     async def admin_update_keypair(self, updater: Updater[KeyPairRow]) -> KeyPairData:
