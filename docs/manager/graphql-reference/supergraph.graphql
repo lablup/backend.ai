@@ -14234,7 +14234,7 @@ type Role implements Node
   users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 
   """Added in UNRELEASED. Scopes this role is registered in."""
-  scopes: [EntityRef!]!
+  scopes(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)."""
