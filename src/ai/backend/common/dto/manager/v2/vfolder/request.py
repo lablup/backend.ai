@@ -10,6 +10,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
@@ -33,6 +34,7 @@ __all__ = (
     "DeleteFilesInput",
     "DeleteInvitationInput",
     "DeleteVFolderInput",
+    "DeployVFolderInput",
     "InviteVFolderInput",
     "ListFilesInput",
     "MkdirInput",
@@ -306,3 +308,60 @@ class SearchVFoldersInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+# ============================================================
+# Deploy
+# ============================================================
+
+
+class DeployVFolderInput(BaseRequestModel):
+    """Input for creating a deployment directly from a model VFolder.
+
+    The target VFolder must have ``usage_mode == MODEL``. Non-model
+    vfolders are rejected with ``NotAModelVFolder`` at the service
+    layer. The revision preset supplies image, runtime variant,
+    resource slots, environ, startup command, and (optionally)
+    deployment-level defaults; explicit overrides below take
+    precedence.
+    """
+
+    project_id: UUID = Field(
+        description="Target project UUID where the deployment will be created. "
+        "Must be a general project, not MODEL_STORE.",
+    )
+    revision_preset_id: UUID = Field(
+        description="Deployment revision preset UUID that provides image, "
+        "runtime variant, resource slots, environ, and startup command.",
+    )
+    resource_group: str = Field(
+        description="Resource group (scaling group) name for scheduling.",
+    )
+    desired_replica_count: int = Field(
+        default=1,
+        ge=1,
+        description="Number of replicas to deploy.",
+    )
+    open_to_public: bool | None = Field(
+        default=None,
+        description="Override for the deployment's open_to_public setting. "
+        "If omitted, the preset default is used; otherwise falls back to False.",
+    )
+    replica_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Override for the deployment's replica_count. "
+        "If omitted, the preset default is used; otherwise falls back to "
+        "desired_replica_count or 1.",
+    )
+    revision_history_limit: int | None = Field(
+        default=None,
+        ge=0,
+        description="Override for the deployment's revision_history_limit. "
+        "If omitted, the preset default is used; otherwise falls back to 10.",
+    )
+    deployment_strategy: DeploymentStrategyInput | None = Field(
+        default=None,
+        description="Override for the deployment strategy (rolling or blue-green). "
+        "If omitted, the preset default is used; otherwise no policy is attached.",
+    )

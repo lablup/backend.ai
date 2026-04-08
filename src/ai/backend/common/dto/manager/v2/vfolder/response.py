@@ -31,6 +31,7 @@ __all__ = (
     "CreateVFolderPayload",
     "DeleteFilesPayload",
     "DeleteVFolderPayload",
+    "DeployVFolderPayload",
     "FileEntryNode",
     "InviteVFolderPayload",
     "ListFilesPayload",
@@ -240,3 +241,15 @@ class SearchVFoldersPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of records matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+# ============================================================
+# Deploy Payload
+# ============================================================
+
+
+class DeployVFolderPayload(BaseResponseModel):
+    """Payload for deploying a model VFolder as a new deployment."""
+
+    deployment_id: UUID = Field(description="ID of the created deployment.")
+    deployment_name: str = Field(description="Name of the created deployment.")

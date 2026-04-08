@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateUploadSessionInput,
     CreateVFolderInput,
     DeleteFilesInput,
+    DeployVFolderInput,
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
@@ -96,6 +97,15 @@ class V2VFolderHandler:
         """Permanently delete a vfolder."""
         result = await self._adapter.purge(path.parsed.vfolder_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def deploy(
+        self,
+        path: PathParam[VFolderIdPathParam],
+        body: BodyParam[DeployVFolderInput],
+    ) -> APIResponse:
+        """Deploy a deployment directly from a model VFolder."""
+        result = await self._adapter.deploy(path.parsed.vfolder_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def list_files(
         self,

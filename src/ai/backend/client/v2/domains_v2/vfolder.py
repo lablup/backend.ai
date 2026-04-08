@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateUploadSessionInput,
     CreateVFolderInput,
     DeleteFilesInput,
+    DeployVFolderInput,
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
@@ -27,6 +28,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     CreateVFolderPayload,
     DeleteFilesPayload,
     DeleteVFolderPayload,
+    DeployVFolderPayload,
     ListFilesPayload,
     MkdirPayload,
     MoveFilePayload,
@@ -122,6 +124,19 @@ class V2VFolderClient(BaseDomainClient):
             "POST",
             f"{_PATH}/{vfolder_id}/purge",
             response_model=PurgeVFolderPayload,
+        )
+
+    async def deploy(
+        self,
+        vfolder_id: UUID,
+        request: DeployVFolderInput,
+    ) -> DeployVFolderPayload:
+        """Deploy a deployment directly from a model VFolder."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{vfolder_id}/deploy",
+            request=request,
+            response_model=DeployVFolderPayload,
         )
 
     async def list_files(

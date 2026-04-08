@@ -26,6 +26,9 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     DeleteFilesInput as DeleteFilesInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    DeployVFolderInput as DeployInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
     ListFilesInput as ListFilesInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -59,6 +62,9 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     DeleteVFolderPayload as DeletePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
+    DeployVFolderPayload as DeployPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.response import (
     FileEntryNode as FileEntryNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
@@ -80,6 +86,9 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
     gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.deployment.types.revision_preset import (
+    PresetDeploymentStrategyInputGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderGQL
@@ -405,3 +414,46 @@ class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
 )
 class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
     purged_count: int = gql_field(description="Number of virtual folders successfully purged.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for deploying a model VFolder as a new deployment.",
+    ),
+    name="DeployVFolderV2Input",
+)
+class DeployVFolderInputGQL(PydanticInputMixin[DeployInputDTO]):
+    project_id: UUID = gql_field(description="Target project UUID for the deployment.")
+    revision_preset_id: UUID = gql_field(description="Deployment revision preset UUID.")
+    resource_group: str = gql_field(description="Resource group name.")
+    desired_replica_count: int = gql_field(default=1, description="Number of replicas.")
+    open_to_public: bool | None = gql_field(
+        default=None,
+        description="Override open_to_public. Defaults to the preset value, then False.",
+    )
+    replica_count: int | None = gql_field(
+        default=None,
+        description="Override replica_count. Defaults to the preset value, then desired_replica_count.",
+    )
+    revision_history_limit: int | None = gql_field(
+        default=None,
+        description="Override revision_history_limit. Defaults to the preset value, then 10.",
+    )
+    deployment_strategy: PresetDeploymentStrategyInputGQL | None = gql_field(
+        default=None,
+        description="Override deployment strategy. Defaults to the preset value, then none.",
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for deploying a model VFolder.",
+    ),
+    model=DeployPayloadDTO,
+    name="DeployVFolderV2Payload",
+)
+class DeployVFolderPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
+    deployment_id: UUID = gql_field(description="ID of the created deployment.")
+    deployment_name: str = gql_field(description="Name of the created deployment.")

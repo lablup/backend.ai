@@ -197,6 +197,81 @@ def purge(vfolder_id: UUID) -> None:
 
 @vfolder.command()
 @click.argument("vfolder_id", type=click.UUID)
+@click.option(
+    "--project-id",
+    required=True,
+    type=click.UUID,
+    help="Target project UUID where the deployment will be created.",
+)
+@click.option(
+    "--revision-preset-id",
+    required=True,
+    type=click.UUID,
+    help="Deployment revision preset UUID.",
+)
+@click.option("--resource-group", required=True, type=str, help="Resource group name.")
+@click.option(
+    "--desired-replica-count",
+    default=1,
+    type=int,
+    show_default=True,
+    help="Number of replicas.",
+)
+@click.option(
+    "--open-to-public",
+    type=bool,
+    default=None,
+    help="Override open_to_public. Defaults to the preset value.",
+)
+@click.option(
+    "--replica-count",
+    type=int,
+    default=None,
+    help="Override replica_count. Defaults to the preset value.",
+)
+@click.option(
+    "--revision-history-limit",
+    type=int,
+    default=None,
+    help="Override revision_history_limit. Defaults to the preset value.",
+)
+def deploy(
+    vfolder_id: UUID,
+    project_id: UUID,
+    revision_preset_id: UUID,
+    resource_group: str,
+    desired_replica_count: int,
+    open_to_public: bool | None,
+    replica_count: int | None,
+    revision_history_limit: int | None,
+) -> None:
+    """Deploy a deployment directly from a model VFolder."""
+    from ai.backend.common.dto.manager.v2.vfolder.request import DeployVFolderInput
+
+    input_dto = DeployVFolderInput(
+        project_id=project_id,
+        revision_preset_id=revision_preset_id,
+        resource_group=resource_group,
+        desired_replica_count=desired_replica_count,
+        open_to_public=open_to_public,
+        replica_count=replica_count,
+        revision_history_limit=revision_history_limit,
+        deployment_strategy=None,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.deploy(vfolder_id, input_dto)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
 @click.argument("path", type=str)
 def ls(vfolder_id: UUID, path: str) -> None:
     """List files in a vfolder."""

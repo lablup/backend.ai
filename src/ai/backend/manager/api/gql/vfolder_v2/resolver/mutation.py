@@ -21,6 +21,8 @@ from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
     DeleteFilesInputGQL,
     DeleteFilesPayloadGQL,
     DeleteVFolderPayloadGQL,
+    DeployVFolderInputGQL,
+    DeployVFolderPayloadGQL,
     DownloadSessionInputGQL,
     DownloadSessionPayloadGQL,
     ListFilesInputGQL,
@@ -75,6 +77,21 @@ async def purge_vfolder_v2(
 ) -> PurgeVFolderPayloadGQL:
     payload = await info.context.adapters.vfolder.purge(vfolder_id)
     return PurgeVFolderPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Deploy a deployment directly from a model VFolder.",
+    )
+)  # type: ignore[misc]
+async def deploy_vfolder_v2(
+    info: Info[StrawberryGQLContext],
+    vfolder_id: UUID,
+    input: DeployVFolderInputGQL,
+) -> DeployVFolderPayloadGQL:
+    payload = await info.context.adapters.vfolder.deploy(vfolder_id, input.to_pydantic())
+    return DeployVFolderPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(
