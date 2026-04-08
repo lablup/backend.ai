@@ -22,6 +22,7 @@ class PresetValueType(StrEnum):
     INT = "int"
     FLOAT = "float"
     BOOL = "bool"
+    FLAG = "flag"
 
 
 class UIType(StrEnum):

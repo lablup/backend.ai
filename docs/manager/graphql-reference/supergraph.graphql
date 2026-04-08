@@ -3580,10 +3580,12 @@ input CreateRuntimeVariantPresetInput
   """
   How the value is applied: 'env' for environment variable, 'args' for command-line argument.
   """
-  presetTarget: String!
+  presetTarget: PresetTarget!
 
-  """Data type for validation (e.g., 'str', 'int', 'float', 'bool')."""
-  valueType: String!
+  """
+  Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag').
+  """
+  valueType: PresetValueType!
 
   """The default value shown to users when creating a deployment."""
   defaultValue: String = null
@@ -11056,22 +11058,43 @@ type PresetResourceAllocation
 }
 
 """
+Added in UNRELEASED. Target for applying a preset value: environment variable or command-line argument.
+"""
+enum PresetTarget
+  @join__type(graph: STRAWBERRY)
+{
+  ENV @join__enumValue(graph: STRAWBERRY)
+  ARGS @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
 Added in UNRELEASED. Specifies how a runtime variant preset value is applied to the inference container, either as an environment variable or a command-line argument.
 """
 type PresetTargetSpec
   @join__type(graph: STRAWBERRY)
 {
   """Target: env or args."""
-  presetTarget: String!
+  presetTarget: PresetTarget!
 
-  """Value type: str, int, float, bool."""
-  valueType: String!
+  """Value type: str, int, float, bool, flag."""
+  valueType: PresetValueType!
 
   """Default value."""
   defaultValue: String
 
   """Env key or args flag."""
   key: String!
+}
+
+"""Added in UNRELEASED. Data type for preset value validation."""
+enum PresetValueType
+  @join__type(graph: STRAWBERRY)
+{
+  STR @join__enumValue(graph: STRAWBERRY)
+  INT @join__enumValue(graph: STRAWBERRY)
+  FLOAT @join__enumValue(graph: STRAWBERRY)
+  BOOL @join__enumValue(graph: STRAWBERRY)
+  FLAG @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -16997,10 +17020,10 @@ input UpdateRuntimeVariantPresetInput
   rank: Int = null
 
   """New target."""
-  presetTarget: String = null
+  presetTarget: PresetTarget = null
 
   """New value type."""
-  valueType: String = null
+  valueType: PresetValueType = null
 
   """New default value."""
   defaultValue: String = null

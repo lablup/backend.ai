@@ -20,6 +20,10 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.config import ModelDefinition, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    PresetTarget,
+    PresetValueType,
+)
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -2110,10 +2114,14 @@ class DeploymentDBSource:
                     vp = vp_map.get(pv.preset_id)
                     if vp is None:
                         continue
-                    if vp.preset_target == "env":
+                    if vp.preset_target == PresetTarget.ENV:
                         resolved_environ[vp.key] = pv.value
-                    elif vp.preset_target == "args":
-                        resolved_args.append(f"{vp.key} {pv.value}")
+                    elif vp.preset_target == PresetTarget.ARGS:
+                        if vp.value_type == PresetValueType.FLAG:
+                            if (pv.value or "").strip().lower() in ("true", "1"):
+                                resolved_args.append(vp.key)
+                        else:
+                            resolved_args.append(f"{vp.key} {pv.value}")
                 resolved_presets = ResolvedPresetValues(
                     environ=resolved_environ, args=resolved_args
                 )

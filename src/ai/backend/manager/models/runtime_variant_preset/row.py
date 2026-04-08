@@ -7,6 +7,10 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    PresetTarget,
+    PresetValueType,
+)
 from ai.backend.manager.data.runtime_variant_preset.types import (
     ChoiceItemData,
     ChoiceOptionData,
@@ -110,8 +114,8 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
             name=self.name,
             description=self.description,
             rank=self.rank,
-            preset_target=self.preset_target,
-            value_type=self.value_type,
+            preset_target=PresetTarget(self.preset_target),
+            value_type=PresetValueType(self.value_type),
             default_value=self.default_value,
             key=self.key,
             category=self.category,

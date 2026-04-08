@@ -246,8 +246,8 @@ class TestVFolderCloneResponse:
             cloneable=True,
             bgtask_id="task-123",
         )
-        resp = VFolderCloneResponse(item=clone_info)
-        assert resp.item.name == "cloned"
+        resp = VFolderCloneResponse(clone_info)
+        assert resp.root.name == "cloned"
 
 
 class TestFileOperationResponses:

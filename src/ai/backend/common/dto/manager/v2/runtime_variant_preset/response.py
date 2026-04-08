@@ -7,12 +7,12 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 
-from .types import UIOption
+from .types import PresetTarget, PresetValueType, UIOption
 
 
 class PresetTargetSpec(BaseResponseModel):
-    preset_target: str = Field(description="Target: env or args.")
-    value_type: str = Field(description="Value type: str, int, float, bool.")
+    preset_target: PresetTarget = Field(description="Target: env or args.")
+    value_type: PresetValueType = Field(description="Value type: str, int, float, bool, flag.")
     default_value: str | None = Field(default=None, description="Default value.")
     key: str = Field(description="Env key or args flag.")
 

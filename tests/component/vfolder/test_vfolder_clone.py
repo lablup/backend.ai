@@ -316,7 +316,48 @@ class TestVFolderClonePolicyCheck:
             cloneable_project_vfolder["name"],
             CloneVFolderReq(target_name="cloned-should-succeed"),
         )
-        assert result.item.name == "cloned-should-succeed"
+        assert result.root.name == "cloned-should-succeed"
+
+
+# ---------------------------------------------------------------------------
+# v1 clone response format (BA-4879)
+# ---------------------------------------------------------------------------
+
+
+class TestVFolderCloneResponseFormat:
+    """Clone response must be flat JSON without an 'item' wrapper (BA-4879)."""
+
+    async def test_clone_response_is_flat_json(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_factory: VFolderFactory,
+        set_main_access_key: None,
+        user_policy_unlimited_project_capped_at_1: None,
+        cloneable_project_vfolder: VFolderFixtureData,
+        storage_manager: StorageSessionManager,
+    ) -> None:
+        """The clone endpoint must return a flat dict with bgtask_id at the
+        top level, not wrapped in {"item": {...}}.
+
+        Regression test for BA-4879: VFolderCloneResponse was using
+        BaseResponseModel (which wraps as {"item": {...}}) instead of
+        BaseRootResponseModel (flat JSON).
+        """
+        _configure_clone_storage_mock(storage_manager)
+
+        source_name = cloneable_project_vfolder["name"]
+        raw = await admin_registry._client._request(
+            "POST",
+            f"/folders/{source_name}/clone",
+            json={"target_name": "clone-format-test"},
+        )
+        assert isinstance(raw, dict)
+        # Must NOT have an "item" wrapper
+        assert "item" not in raw
+        # Fields must be at top level
+        assert "bgtask_id" in raw
+        assert "name" in raw
+        assert raw["name"] == "clone-format-test"
 
 
 # ---------------------------------------------------------------------------

@@ -1261,13 +1261,20 @@ class AgentRegistry:
         await self._reconcile_agent_resources()
 
     async def _reconcile_agent_resources(self) -> None:
-        """Reconcile agent_resources.used against actual resource_allocations.
+        """Clean up orphaned allocations and reconcile agent_resources.
 
-        Delegates to ResourceSlotRepository for DB operations and logs any drift found.
+        Delegates to ResourceSlotRepository which runs both steps in a single
+        transaction: orphan cleanup first, then drift correction.
         """
         repo = ResourceSlotRepository(self.db)
-        drifts = await repo.reconcile_agent_resources()
-        for d in drifts:
+        result = await repo.reconcile_agent_resources()
+        for o in result.orphaned_allocations:
+            log.warning(
+                "freed orphaned resource allocation: kernel={}, slot={}",
+                o.kernel_id,
+                o.slot_name,
+            )
+        for d in result.agent_resource_drifts:
             log.warning(
                 "agent_resources drift detected for {}:{}: tracked={}, actual={}",
                 d.agent_id,

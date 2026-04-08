@@ -2195,10 +2195,12 @@ input CreateRuntimeVariantPresetInput {
   """
   How the value is applied: 'env' for environment variable, 'args' for command-line argument.
   """
-  presetTarget: String!
+  presetTarget: PresetTarget!
 
-  """Data type for validation (e.g., 'str', 'int', 'float', 'bool')."""
-  valueType: String!
+  """
+  Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag').
+  """
+  valueType: PresetValueType!
 
   """The default value shown to users when creating a deployment."""
   defaultValue: String = null
@@ -6946,20 +6948,37 @@ type PresetResourceAllocation {
 }
 
 """
+Added in UNRELEASED. Target for applying a preset value: environment variable or command-line argument.
+"""
+enum PresetTarget {
+  ENV
+  ARGS
+}
+
+"""
 Added in UNRELEASED. Specifies how a runtime variant preset value is applied to the inference container, either as an environment variable or a command-line argument.
 """
 type PresetTargetSpec {
   """Target: env or args."""
-  presetTarget: String!
+  presetTarget: PresetTarget!
 
-  """Value type: str, int, float, bool."""
-  valueType: String!
+  """Value type: str, int, float, bool, flag."""
+  valueType: PresetValueType!
 
   """Default value."""
   defaultValue: String
 
   """Env key or args flag."""
   key: String!
+}
+
+"""Added in UNRELEASED. Data type for preset value validation."""
+enum PresetValueType {
+  STR
+  INT
+  FLOAT
+  BOOL
+  FLAG
 }
 
 """
@@ -11385,10 +11404,10 @@ input UpdateRuntimeVariantPresetInput {
   rank: Int = null
 
   """New target."""
-  presetTarget: String = null
+  presetTarget: PresetTarget = null
 
   """New value type."""
-  valueType: String = null
+  valueType: PresetValueType = null
 
   """New default value."""
   defaultValue: String = null

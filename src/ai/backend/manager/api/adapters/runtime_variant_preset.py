@@ -146,8 +146,8 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 name=input.name,
                 description=input.description,
                 rank=0,
-                preset_target=input.preset_target.value,
-                value_type=input.value_type.value,
+                preset_target=input.preset_target,
+                value_type=input.value_type,
                 default_value=input.default_value,
                 key=input.key,
                 category=input.category,
@@ -180,12 +180,12 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
             ),
             preset_target=(
-                OptionalState.update(input.preset_target.value)
+                OptionalState.update(input.preset_target)
                 if input.preset_target is not None
                 else OptionalState.nop()
             ),
             value_type=(
-                OptionalState.update(input.value_type.value)
+                OptionalState.update(input.value_type)
                 if input.value_type is not None
                 else OptionalState.nop()
             ),

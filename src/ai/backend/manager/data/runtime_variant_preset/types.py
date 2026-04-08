@@ -4,6 +4,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    PresetTarget,
+    PresetValueType,
+)
+
 
 @dataclass(frozen=True)
 class SliderOptionData:
@@ -50,8 +55,8 @@ class RuntimeVariantPresetData:
     name: str
     description: str | None
     rank: int
-    preset_target: str
-    value_type: str
+    preset_target: PresetTarget
+    value_type: PresetValueType
     default_value: str | None
     key: str
     category: str | None

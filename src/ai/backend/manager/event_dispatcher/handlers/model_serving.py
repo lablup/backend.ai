@@ -5,6 +5,10 @@ import sqlalchemy as sa
 import yarl
 from sqlalchemy.exc import NoResultFound
 
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    PresetTarget,
+    PresetValueType,
+)
 from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
     RouteCreatedAnycastEvent,
@@ -160,10 +164,14 @@ class ModelServingEventHandler:
                         vp = vp_map.get(pv.preset_id)
                         if vp is None:
                             continue
-                        if vp.preset_target == "env":
+                        if vp.preset_target == PresetTarget.ENV:
                             environ[vp.key] = pv.value
-                        elif vp.preset_target == "args":
-                            args_parts.append(f"{vp.key} {pv.value}")
+                        elif vp.preset_target == PresetTarget.ARGS:
+                            if vp.value_type == PresetValueType.FLAG:
+                                if (pv.value or "").strip().lower() in ("true", "1"):
+                                    args_parts.append(vp.key)
+                            else:
+                                args_parts.append(f"{vp.key} {pv.value}")
                     if args_parts and startup_command:
                         startup_command = f"{startup_command} {' '.join(args_parts)}"
                     elif args_parts:

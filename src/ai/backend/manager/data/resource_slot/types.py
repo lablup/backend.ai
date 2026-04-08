@@ -77,3 +77,15 @@ class AgentResourceDrift:
     slot_name: str
     tracked: Decimal
     actual: Decimal
+
+
+@dataclass(frozen=True)
+class OrphanedAllocation:
+    kernel_id: uuid.UUID
+    slot_name: str
+
+
+@dataclass(frozen=True)
+class ReconciliationResult:
+    orphaned_allocations: list[OrphanedAllocation]
+    agent_resource_drifts: list[AgentResourceDrift]

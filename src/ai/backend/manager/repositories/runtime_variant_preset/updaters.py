@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    PresetTarget,
+    PresetValueType,
+)
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.runtime_variant_preset.types import UIOption
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
@@ -14,8 +18,12 @@ class RuntimeVariantPresetUpdaterSpec(UpdaterSpec[RuntimeVariantPresetRow]):
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    preset_target: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    value_type: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    preset_target: OptionalState[PresetTarget] = field(
+        default_factory=OptionalState[PresetTarget].nop
+    )
+    value_type: OptionalState[PresetValueType] = field(
+        default_factory=OptionalState[PresetValueType].nop
+    )
     default_value: TriState[str] = field(default_factory=TriState[str].nop)
     key: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     category: TriState[str] = field(default_factory=TriState[str].nop)

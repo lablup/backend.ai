@@ -69,6 +69,33 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 @gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description="Target for applying a preset value: environment variable or command-line argument.",
+    ),
+    name="PresetTarget",
+)
+class PresetTargetGQL(StrEnum):
+    ENV = "env"
+    ARGS = "args"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Data type for preset value validation.",
+    ),
+    name="PresetValueType",
+)
+class PresetValueTypeGQL(StrEnum):
+    STR = "str"
+    INT = "int"
+    FLOAT = "float"
+    BOOL = "bool"
+    FLAG = "flag"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description="Order fields for runtime variant presets.",
     ),
     name="RuntimeVariantPresetOrderField",
@@ -150,11 +177,11 @@ class UIOptionGQL(PydanticOutputMixin[UIOptionDTO]):
     name="PresetTargetSpec",
 )
 class PresetTargetSpecGQL(PydanticOutputMixin[PresetTargetSpecDTO]):
-    preset_target: str = gql_field(
+    preset_target: PresetTargetGQL = gql_field(
         description="How the value is applied to the container: 'env' sets it as an environment variable, 'args' appends it as a command-line argument."
     )
-    value_type: str = gql_field(
-        description="Data type used for input validation (e.g., 'str', 'int', 'float', 'bool')."
+    value_type: PresetValueTypeGQL = gql_field(
+        description="Data type used for input validation (e.g., 'str', 'int', 'float', 'bool', 'flag')."
     )
     default_value: str | None = gql_field(
         description="The default value shown to users when they create a deployment using this preset."
@@ -241,11 +268,11 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
     description: str | None = gql_field(
         default=None, description="Detailed explanation of what this parameter controls."
     )
-    preset_target: str = gql_field(
+    preset_target: PresetTargetGQL = gql_field(
         description="How the value is applied: 'env' for environment variable, 'args' for command-line argument."
     )
-    value_type: str = gql_field(
-        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool')."
+    value_type: PresetValueTypeGQL = gql_field(
+        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag')."
     )
     default_value: str | None = gql_field(
         default=None, description="The default value shown to users when creating a deployment."
@@ -264,8 +291,8 @@ class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     name: str | None = gql_field(default=None, description="New name.")
     description: str | None = gql_field(default=None, description="New description.")
     rank: int | None = gql_field(default=None, description="New rank.")
-    preset_target: str | None = gql_field(default=None, description="New target.")
-    value_type: str | None = gql_field(default=None, description="New value type.")
+    preset_target: PresetTargetGQL | None = gql_field(default=None, description="New target.")
+    value_type: PresetValueTypeGQL | None = gql_field(default=None, description="New value type.")
     default_value: str | None = gql_field(default=None, description="New default value.")
     key: str | None = gql_field(default=None, description="New key.")
 
