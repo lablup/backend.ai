@@ -1,17 +1,5 @@
-"""Component test for delegated session creation via ``owner_access_key``.
-
-Regression coverage for BA-5608: when an admin POSTs to ``/session`` with
-``owner_access_key`` set to a regular user's access key, the resulting
-``UserScope`` passed to ``AgentRegistry.create_session`` MUST carry the
-owner's identity (uuid + role + group_id), not the requester admin's.
-
-The unit test in ``tests/unit/manager/services/session/`` mocks the
-repository to verify the wiring inside ``SessionService``. This test
-exercises the same invariant end-to-end through the real HTTP layer
-(legacy v1 ``POST /session``), real auth (HMAC), real ``query_userinfo``
-against the database, and real scope resolution. Only the agent RPC and
-the image catalog lookup are stubbed since they require external systems.
-"""
+"""BA-5608: ``POST /session`` with ``owner_access_key`` must build ``UserScope``
+from the owner, not the requester admin."""
 
 from __future__ import annotations
 
