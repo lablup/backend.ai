@@ -44,6 +44,10 @@ from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
     CloneVFolderV2ActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions import (
+    GetMyStorageHostPermissionsAction,
+    GetMyStorageHostPermissionsActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
@@ -129,6 +133,9 @@ class VFolderProcessors(AbstractProcessorPackage):
     get_usage: ActionProcessor[GetVFolderUsageAction, GetVFolderUsageActionResult]
     get_used_bytes: ActionProcessor[GetVFolderUsedBytesAction, GetVFolderUsedBytesActionResult]
     list_hosts: ActionProcessor[ListHostsAction, ListHostsActionResult]
+    get_my_storage_host_permissions: ActionProcessor[
+        GetMyStorageHostPermissionsAction, GetMyStorageHostPermissionsActionResult
+    ]
     get_quota: ActionProcessor[GetQuotaAction, GetQuotaActionResult]
     update_quota: ActionProcessor[UpdateQuotaAction, UpdateQuotaActionResult]
     change_vfolder_ownership: ActionProcessor[
@@ -211,6 +218,9 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.get_usage = ActionProcessor(service.get_usage, action_monitors)
         self.get_used_bytes = ActionProcessor(service.get_used_bytes, action_monitors)
         self.list_hosts = ActionProcessor(service.list_hosts, action_monitors)
+        self.get_my_storage_host_permissions = ActionProcessor(
+            service.get_my_storage_host_permissions, action_monitors
+        )
         self.get_quota = ActionProcessor(service.get_quota, action_monitors)
         self.update_quota = ActionProcessor(service.update_quota, action_monitors)
         self.change_vfolder_ownership = ActionProcessor(
@@ -260,6 +270,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             GetVFolderUsageAction.spec(),
             GetVFolderUsedBytesAction.spec(),
             ListHostsAction.spec(),
+            GetMyStorageHostPermissionsAction.spec(),
             GetQuotaAction.spec(),
             UpdateQuotaAction.spec(),
             ChangeVFolderOwnershipAction.spec(),

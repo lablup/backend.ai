@@ -374,6 +374,7 @@ from .session.resolver import (
     project_sessions_v2,
     terminate_project_sessions_v2,
 )
+from .storage_host import my_storage_host_permissions
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -588,6 +589,8 @@ class Query:
     admin_project_resource_policies_v2 = admin_project_resource_policies_v2
     my_keypair_resource_policy_v2 = my_keypair_resource_policy_v2
     my_user_resource_policy_v2 = my_user_resource_policy_v2
+    # Storage Host APIs
+    my_storage_host_permissions = my_storage_host_permissions
     # Resource Preset V2 APIs
     admin_resource_presets_v2 = admin_resource_presets_v2
     admin_resource_preset_v2 = admin_resource_preset_v2

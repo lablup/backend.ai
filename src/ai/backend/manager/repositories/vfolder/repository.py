@@ -1729,6 +1729,47 @@ class VfolderRepository:
                 )
 
     @vfolder_repository_resilience.apply()
+    async def get_user_storage_host_permissions(
+        self,
+        user_uuid: uuid.UUID,
+        domain_name: str,
+    ) -> VFolderHostPermissionMap:
+        """
+        Resolve all storage hosts and per-host permissions accessible to a user.
+
+        Internally fetches the user's main keypair resource policy and unions
+        domain/group/keypair allowed vfolder hosts. Returns the host permission
+        map without filtering against currently mountable volumes — callers that
+        depend on volume availability must intersect with ``StorageSessionManager``.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            user_row: UserRow | None = await db_session.scalar(
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_uuid)
+                .options(
+                    selectinload(UserRow.main_keypair).selectinload(KeyPairRow.resource_policy_row)
+                )
+            )
+            if user_row is None:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
+            if user_row.main_keypair is None or user_row.main_keypair.resource_policy_row is None:
+                resource_policy: Mapping[str, Any] = {
+                    "allowed_vfolder_hosts": VFolderHostPermissionMap(),
+                }
+            else:
+                resource_policy = {
+                    "allowed_vfolder_hosts": user_row.main_keypair.resource_policy_row.allowed_vfolder_hosts,
+                }
+            conn = await db_session.connection()
+            return await get_allowed_vfolder_hosts_by_user(
+                conn=conn,
+                resource_policy=resource_policy,
+                domain_name=domain_name,
+                user_uuid=user_uuid,
+                group_id=None,
+            )
+
+    @vfolder_repository_resilience.apply()
     async def get_allowed_hosts_for_listing(
         self,
         user_uuid: uuid.UUID,

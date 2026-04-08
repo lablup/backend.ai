@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from .domains_v2.scheduling_history import V2SchedulingHistoryClient
     from .domains_v2.service_catalog import V2ServiceCatalogClient
     from .domains_v2.session import V2SessionClient
+    from .domains_v2.storage_host import V2StorageHostClient
     from .domains_v2.storage_namespace import V2StorageNamespaceClient
     from .domains_v2.user import V2UserClient
     from .domains_v2.vfolder import V2VFolderClient
@@ -287,6 +288,12 @@ class V2ClientRegistry:
         from .domains_v2.session import V2SessionClient
 
         return V2SessionClient(self._client)
+
+    @cached_property
+    def storage_host(self) -> V2StorageHostClient:
+        from .domains_v2.storage_host import V2StorageHostClient
+
+        return V2StorageHostClient(self._client)
 
     @cached_property
     def storage_namespace(self) -> V2StorageNamespaceClient:
