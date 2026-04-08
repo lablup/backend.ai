@@ -9,9 +9,7 @@ from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsIn
 from ai.backend.common.dto.manager.v2.kernel.response import AdminSearchKernelsPayload
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
-    DestroySessionInput,
     EnqueueSessionInput,
-    RestartSessionInput,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
     TerminateSessionsInput,
@@ -19,9 +17,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
-    DestroySessionPayload,
     EnqueueSessionPayload,
-    RestartSessionPayload,
     SessionLogsPayload,
     SessionNode,
     StartSessionServicePayload,
@@ -173,32 +169,6 @@ class V2SessionClient(BaseDomainClient):
             "POST",
             f"{_PATH}/{session_id}/services/shutdown",
             request=request,
-        )
-
-    async def restart(
-        self,
-        session_id: UUID,
-        request: RestartSessionInput,
-    ) -> RestartSessionPayload:
-        """Restart a session."""
-        return await self._client.typed_request(
-            "POST",
-            f"{_PATH}/{session_id}/restart",
-            request=request,
-            response_model=RestartSessionPayload,
-        )
-
-    async def destroy(
-        self,
-        session_id: UUID,
-        request: DestroySessionInput,
-    ) -> DestroySessionPayload:
-        """Destroy a session."""
-        return await self._client.typed_request(
-            "POST",
-            f"{_PATH}/{session_id}/destroy",
-            request=request,
-            response_model=DestroySessionPayload,
         )
 
     async def get_logs(
