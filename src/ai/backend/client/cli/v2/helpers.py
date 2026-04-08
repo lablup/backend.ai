@@ -13,6 +13,8 @@ import aiohttp
 from yarl import URL
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
 CONFIG_DIR = Path.home() / ".backend.ai"
@@ -154,6 +156,38 @@ def parse_order_options(
             )
         )
     return orders
+
+
+async def resolve_user_uuid(registry: V2ClientRegistry, identifier: str) -> UUID:
+    """Resolve a user identifier (UUID string or email) to a user UUID.
+
+    Tries to parse *identifier* as a UUID first; on failure, looks the user
+    up by exact email match via the v2 user search endpoint.
+    Raises ``click.ClickException`` when the user cannot be found.
+    """
+    from uuid import UUID
+
+    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.v2.user.request import (
+        SearchUsersRequest,
+        UserFilter,
+    )
+
+    try:
+        return UUID(identifier)
+    except ValueError:
+        pass
+
+    import click
+
+    request = SearchUsersRequest(
+        filter=UserFilter(email=StringFilter(equals=identifier)),
+        limit=1,
+    )
+    result = await registry.user.admin_search(request)
+    if not result.items:
+        raise click.ClickException(f"No user found with email '{identifier}'.")
+    return result.items[0].id
 
 
 def print_result(data: Any) -> None:

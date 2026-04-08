@@ -13,6 +13,7 @@ from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
     print_result,
+    resolve_user_uuid,
 )
 
 
@@ -157,17 +158,21 @@ def shutdown_service(session_id: str, service: str) -> None:
 @click.argument("session_id", type=str)
 @click.option("--kernel-id", type=str, default=None, help="Specific kernel UUID.")
 @click.option(
-    "--owner-id",
-    type=click.UUID,
+    "--owner",
+    type=str,
     default=None,
-    help="Delegated owner user UUID. Defaults to the caller when omitted.",
+    help=(
+        "Delegated owner — accepts a user UUID or email. "
+        "Defaults to the caller when omitted."
+    ),
 )
-def logs(session_id: str, kernel_id: str | None, owner_id: UUID | None) -> None:
+def logs(session_id: str, kernel_id: str | None, owner: str | None) -> None:
     """Get container logs for a session."""
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
+            owner_id = await resolve_user_uuid(registry, owner) if owner else None
             result = await registry.session.get_logs(
                 UUID(session_id),
                 UUID(kernel_id) if kernel_id else None,
