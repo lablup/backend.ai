@@ -2558,7 +2558,7 @@ input DeleteHuggingFaceRegistryInput {
 """Added in 25.14.0. Payload for deleting a HuggingFace registry."""
 type DeleteHuggingFaceRegistryPayload {
   """ID of the deleted HuggingFace registry"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in UNRELEASED. Payload for keypair resource policy deletion."""
@@ -2655,7 +2655,7 @@ input DeleteReservoirRegistryInput {
 """Added in 25.14.0. Payload for deleting a reservoir registry."""
 type DeleteReservoirRegistryPayload {
   """ID of the deleted Reservoir registry"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in UNRELEASED. Payload for resource group deletion."""
@@ -2755,7 +2755,7 @@ input DeleteVFSStorageInput {
 """Added in 25.16.0. Payload for deleting VFS storage."""
 type DeleteVFSStoragePayload {
   """ID of the deleted VFS storage"""
-  id: ID!
+  id: UUID!
 }
 
 """

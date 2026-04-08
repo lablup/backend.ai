@@ -4146,7 +4146,7 @@ type DeleteHuggingFaceRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted HuggingFace registry"""
-  id: ID!
+  id: UUID!
 }
 
 type DeleteKeyPair
@@ -4306,7 +4306,7 @@ type DeleteReservoirRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted Reservoir registry"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in UNRELEASED. Payload for resource group deletion."""
@@ -4481,7 +4481,7 @@ type DeleteVFSStoragePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted VFS storage"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 25.19.0. """
