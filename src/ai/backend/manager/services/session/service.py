@@ -271,18 +271,14 @@ class SessionService:
 
     async def _resolve_owner_main_access_key(
         self,
-        owner_id: uuid.UUID | None,
-        fallback: AccessKey,
+        owner_id: uuid.UUID,
     ) -> AccessKey:
         """Resolve a delegated owner UUID to that user's main access key.
 
-        Returns ``fallback`` when ``owner_id`` is None. Otherwise loads the
-        target user via the user repository and returns its main access key.
-        Raises ``InternalServerError`` if the target user has no main access
-        key configured.
+        Loads the target user via the user repository and returns the main
+        access key. Raises ``InternalServerError`` if the target user has no
+        main access key configured.
         """
-        if owner_id is None:
-            return fallback
         user_data = await self._user_repository.get_user_by_uuid(owner_id)
         if user_data.main_access_key is None:
             raise InternalServerError(
@@ -784,9 +780,10 @@ class SessionService:
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
         session_name = action.session_name
-        owner_access_key = await self._resolve_owner_main_access_key(
-            action.owner_id, action.owner_access_key
-        )
+        if action.owner_id is not None:
+            owner_access_key = await self._resolve_owner_main_access_key(action.owner_id)
+        else:
+            owner_access_key = action.owner_access_key
         forced = action.forced
         recursive = action.recursive
 
@@ -1058,9 +1055,10 @@ class SessionService:
     ) -> GetContainerLogsActionResult:
         resp = {"result": {"logs": ""}}
         session_name = action.session_name
-        owner_access_key = await self._resolve_owner_main_access_key(
-            action.owner_id, action.owner_access_key
-        )
+        if action.owner_id is not None:
+            owner_access_key = await self._resolve_owner_main_access_key(action.owner_id)
+        else:
+            owner_access_key = action.owner_access_key
         kernel_id = action.kernel_id
 
         compute_session = await self._session_repository.get_session_validated(
@@ -1314,9 +1312,10 @@ class SessionService:
 
     async def restart_session(self, action: RestartSessionAction) -> RestartSessionActionResult:
         session_name = action.session_name
-        owner_access_key = await self._resolve_owner_main_access_key(
-            action.owner_id, action.owner_access_key
-        )
+        if action.owner_id is not None:
+            owner_access_key = await self._resolve_owner_main_access_key(action.owner_id)
+        else:
+            owner_access_key = action.owner_access_key
 
         session = await self._session_repository.get_session_validated(
             session_name,
