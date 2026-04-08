@@ -1330,3 +1330,116 @@ class TestCheckPermissionWithScopeChain:
             )
         )
         assert result is expected
+
+    # ── L. Non-scope element type (KEYPAIR — no ScopeType counterpart) ──
+
+    @pytest.fixture
+    def keypair_id(self) -> str:
+        return str(uuid.uuid4())
+
+    @pytest.fixture
+    async def keypair_in_user_scope_auto(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        fixture_ids: ScopeChainFixture,
+        keypair_id: str,
+    ) -> None:
+        """KEYPAIR belongs to USER scope (auto edge)."""
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            assoc = AssociationScopesEntitiesRow(
+                scope_type=ScopeType.USER,
+                scope_id=fixture_ids.user_scope_id,
+                entity_type=EntityType.KEYPAIR,
+                entity_id=keypair_id,
+                relation_type=RelationType.AUTO,
+            )
+            db_sess.add(assoc)
+            await db_sess.flush()
+
+    @pytest.fixture
+    async def keypair_permission_setup(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        fixture_ids: ScopeChainFixture,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        scope_map: dict[str, tuple[ScopeType, str]] = {
+            "user_scope": (ScopeType.USER, fixture_ids.user_scope_id),
+        }
+        for scope_key, operation in request.param:
+            scope_type, scope_id = scope_map[scope_key]
+            async with db_with_rbac_tables.begin_session() as db_sess:
+                perm = PermissionRow(
+                    role_id=fixture_ids.role_id,
+                    scope_type=scope_type,
+                    scope_id=scope_id,
+                    entity_type=EntityType.KEYPAIR,
+                    operation=operation,
+                )
+                db_sess.add(perm)
+                await db_sess.flush()
+
+    @pytest.mark.parametrize(
+        ("keypair_permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [("user_scope", OperationType.READ)],
+                OperationType.READ,
+                True,
+                id="keypair-scope-chain-granted",
+            ),
+            pytest.param(
+                [("user_scope", OperationType.READ)],
+                OperationType.UPDATE,
+                False,
+                id="keypair-scope-chain-op-mismatch",
+            ),
+        ],
+        indirect=["keypair_permission_setup"],
+    )
+    async def test_non_scope_element_type_via_scope_chain(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        keypair_id: str,
+        keypair_in_user_scope_auto: None,
+        keypair_permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
+    ) -> None:
+        """KEYPAIR has no ScopeType counterpart; check uses scope-chain only (no self-scope)."""
+        fixture = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.KEYPAIR,
+                    element_id=keypair_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
+        )
+        assert result is expected
+
+    async def test_non_scope_element_type_no_permission(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        keypair_id: str,
+        keypair_in_user_scope_auto: None,
+    ) -> None:
+        """KEYPAIR with no permission granted returns False without raising."""
+        fixture = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.KEYPAIR,
+                    element_id=keypair_id,
+                ),
+                operation=OperationType.READ,
+                permission_entity_type=None,
+            )
+        )
+        assert result is False
