@@ -563,9 +563,6 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
     ) -> None:
         for vfolder in vfolders:
             if self.internal_data.get("prevent_vfolder_mounts", False):
-                # Only allow mount of ".logs" directory to prevent expose
-                # internal-only information, such as Docker credentials to user's ".docker" vfolder
-                # in image importer kernels.
                 if vfolder.name != ".logs":
                     continue
             mount = Mount(
@@ -3301,7 +3298,7 @@ class AbstractAgent[
         kernel_config: KernelCreationConfig,
     ) -> Any:
         image_command = await self.extract_image_command(kernel_config["image"]["canonical"])
-        if runtime_variant != RuntimeVariant.CUSTOM and not image_command:
+        if runtime_variant != "custom" and not image_command:
             raise ImageCommandRequiredError(
                 "Image should have its own command when runtime variant is set to values other than CUSTOM"
             )
@@ -3315,7 +3312,7 @@ class AbstractAgent[
 
         raw_definition: dict[str, Any]
         match runtime_variant:
-            case RuntimeVariant.VLLM:
+            case "vllm":
                 _model = {
                     "name": "vllm-model",
                     "model_path": model_folder.kernel_path.as_posix(),
@@ -3331,7 +3328,7 @@ class AbstractAgent[
                 }
                 raw_definition = {"models": [_model]}
 
-            case RuntimeVariant.HUGGINGFACE_TGI:
+            case "huggingface-tgi":
                 _model = {
                     "name": "tgi-model",
                     "model_path": model_folder.kernel_path.as_posix(),
@@ -3347,7 +3344,7 @@ class AbstractAgent[
                 }
                 raw_definition = {"models": [_model]}
 
-            case RuntimeVariant.NIM:
+            case "nim":
                 _model = {
                     "name": "nim-model",
                     "model_path": model_folder.kernel_path.as_posix(),
@@ -3363,7 +3360,7 @@ class AbstractAgent[
                 }
                 raw_definition = {"models": [_model]}
 
-            case RuntimeVariant.SGLANG:
+            case "sglang":
                 _model = {
                     "name": "sglang-model",
                     "model_path": model_folder.kernel_path.as_posix(),
@@ -3379,7 +3376,7 @@ class AbstractAgent[
                 }
                 raw_definition = {"models": [_model]}
 
-            case RuntimeVariant.MODULAR_MAX:
+            case "modular-max":
                 _model = {
                     "name": "max-model",
                     "model_path": model_folder.kernel_path.as_posix(),
@@ -3395,7 +3392,7 @@ class AbstractAgent[
                 }
                 raw_definition = {"models": [_model]}
 
-            case RuntimeVariant.CMD:
+            case "cmd":
                 _model = {
                     "name": "image-model",
                     "model_path": model_folder.kernel_path.as_posix(),
@@ -3406,7 +3403,7 @@ class AbstractAgent[
                 }
                 raw_definition = {"models": [_model]}
 
-            case RuntimeVariant.CUSTOM:
+            case "custom":
                 if _fname := (kernel_config.get("internal_data") or {}).get(
                     "model_definition_path"
                 ):

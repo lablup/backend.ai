@@ -106,6 +106,7 @@ class UserResourcePolicyV2Filter(PydanticInputMixin[UserResourcePolicyFilterDTO]
     name: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     max_vfolder_count: IntFilter | None = None
+    max_concurrent_logins: IntFilter | None = None
     max_quota_scope_size: IntFilter | None = None
     max_session_count_per_model_session: IntFilter | None = None
     max_customized_image_count: IntFilter | None = None
@@ -122,6 +123,7 @@ class UserResourcePolicyV2OrderField(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
     MAX_VFOLDER_COUNT = "max_vfolder_count"
+    MAX_CONCURRENT_LOGINS = "max_concurrent_logins"
     MAX_QUOTA_SCOPE_SIZE = "max_quota_scope_size"
     MAX_SESSION_COUNT_PER_MODEL_SESSION = "max_session_count_per_model_session"
     MAX_CUSTOMIZED_IMAGE_COUNT = "max_customized_image_count"

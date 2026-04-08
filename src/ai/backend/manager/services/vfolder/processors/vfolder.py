@@ -32,6 +32,18 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
+    BatchLoadVFoldersByIdsAction,
+    BatchLoadVFoldersByIdsActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.create_v2 import (
+    CreateVFolderV2Action,
+    CreateVFolderV2ActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.file_v2 import (
+    CloneVFolderV2Action,
+    CloneVFolderV2ActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
@@ -67,6 +79,16 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     UmountHostActionResult,
     UpdateQuotaAction,
     UpdateQuotaActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
+    CreateUploadSessionV2Action,
+    CreateUploadSessionV2ActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
+    DeleteVFolderV2Action,
+    DeleteVFolderV2ActionResult,
+    PurgeVFolderV2Action,
+    PurgeVFolderV2ActionResult,
 )
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
@@ -119,6 +141,16 @@ class VFolderProcessors(AbstractProcessorPackage):
     get_accessible_vfolder: ActionProcessor[
         GetAccessibleVFolderAction, GetAccessibleVFolderActionResult
     ]
+    batch_load_vfolders_by_ids: ActionProcessor[
+        BatchLoadVFoldersByIdsAction, BatchLoadVFoldersByIdsActionResult
+    ]
+    create_vfolder_v2: ActionProcessor[CreateVFolderV2Action, CreateVFolderV2ActionResult]
+    create_upload_session_v2: ActionProcessor[
+        CreateUploadSessionV2Action, CreateUploadSessionV2ActionResult
+    ]
+    delete_v2: ActionProcessor[DeleteVFolderV2Action, DeleteVFolderV2ActionResult]
+    purge_v2: ActionProcessor[PurgeVFolderV2Action, PurgeVFolderV2ActionResult]
+    clone_v2: ActionProcessor[CloneVFolderV2Action, CloneVFolderV2ActionResult]
 
     def __init__(
         self,
@@ -192,6 +224,20 @@ class VFolderProcessors(AbstractProcessorPackage):
             service.get_accessible_vfolder, action_monitors
         )
 
+        # Cross-entity loaders (no RBAC validation; caller has parent access)
+        self.batch_load_vfolders_by_ids = ActionProcessor(
+            service.batch_load_by_ids, action_monitors
+        )
+
+        # V2 actions
+        self.create_vfolder_v2 = ActionProcessor(service.create_v2, action_monitors)
+        self.create_upload_session_v2 = ActionProcessor(
+            service.create_upload_session_v2, action_monitors
+        )
+        self.delete_v2 = ActionProcessor(service.delete_v2, action_monitors)
+        self.purge_v2 = ActionProcessor(service.purge_v2, action_monitors)
+        self.clone_v2 = ActionProcessor(service.clone_v2, action_monitors)
+
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
@@ -222,4 +268,10 @@ class VFolderProcessors(AbstractProcessorPackage):
             UmountHostAction.spec(),
             GetFstabContentsAction.spec(),
             GetAccessibleVFolderAction.spec(),
+            BatchLoadVFoldersByIdsAction.spec(),
+            CreateVFolderV2Action.spec(),
+            CreateUploadSessionV2Action.spec(),
+            DeleteVFolderV2Action.spec(),
+            PurgeVFolderV2Action.spec(),
+            CloneVFolderV2Action.spec(),
         ]

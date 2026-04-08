@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import Self
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -223,7 +223,7 @@ class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
         required: bool = False,
     ) -> Iterable[NotificationChannel | None]:
         return await info.context.data_loaders.notification_channel_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            UUID(nid) for nid in node_ids
         ])
 
 
@@ -247,7 +247,7 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
         required: bool = False,
     ) -> Iterable[NotificationRule | None]:
         return await info.context.data_loaders.notification_rule_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            UUID(nid) for nid in node_ids
         ])
 
 
@@ -533,10 +533,9 @@ class UpdateNotificationChannelPayload(PydanticOutputMixin[UpdateNotificationCha
         added_version="26.3.0", description="Payload for delete notification channel mutation."
     ),
     model=DeleteNotificationChannelPayloadDTO,
-    fields=["id"],
 )
 class DeleteNotificationChannelPayload(PydanticOutputMixin[DeleteNotificationChannelPayloadDTO]):
-    id: ID = gql_field(description="ID of the deleted notification channel.")
+    id: UUID = gql_field(description="ID of the deleted notification channel.")
 
 
 @gql_pydantic_type(
@@ -564,10 +563,9 @@ class UpdateNotificationRulePayload(PydanticOutputMixin[UpdateNotificationRulePa
         added_version="26.3.0", description="Payload for delete notification rule mutation."
     ),
     model=DeleteNotificationRulePayloadDTO,
-    fields=["id"],
 )
 class DeleteNotificationRulePayload(PydanticOutputMixin[DeleteNotificationRulePayloadDTO]):
-    id: ID = gql_field(description="ID of the deleted notification rule.")
+    id: UUID = gql_field(description="ID of the deleted notification rule.")
 
 
 # Validate mutations
@@ -588,12 +586,11 @@ class ValidateNotificationChannelInput(PydanticInputMixin[ValidateNotificationCh
         added_version="26.3.0", description="Payload for validate notification channel mutation."
     ),
     model=ValidateNotificationChannelPayloadDTO,
-    fields=["id"],
 )
 class ValidateNotificationChannelPayload(
     PydanticOutputMixin[ValidateNotificationChannelPayloadDTO]
 ):
-    id: ID = gql_field(description="ID of the validated notification channel.")
+    id: UUID = gql_field(description="ID of the validated notification channel.")
 
 
 @gql_pydantic_input(

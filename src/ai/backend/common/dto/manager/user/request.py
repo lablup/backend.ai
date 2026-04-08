@@ -90,6 +90,9 @@ class UserFilter(BaseRequestModel):
     email: StringFilter | None = Field(default=None, description="Filter by email")
     username: StringFilter | None = Field(default=None, description="Filter by username")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
+    integration_name: StringFilter | None = Field(
+        default=None, description="Filter by external integration identifier"
+    )
     status: list[UserStatus] | None = Field(default=None, description="Filter by user statuses")
     role: list[UserRole] | None = Field(default=None, description="Filter by user roles")
 

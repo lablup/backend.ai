@@ -1,6 +1,6 @@
-import uuid
 from collections.abc import Iterable, Sequence
 from typing import Self, cast
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -70,13 +70,13 @@ class ReservoirRegistry(PydanticNodeMixin[ReservoirRegistryNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.reservoir_registry_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
     @classmethod
     async def load_by_id(
-        cls, ctx: StrawberryGQLContext, reservoir_ids: Sequence[uuid.UUID]
+        cls, ctx: StrawberryGQLContext, reservoir_ids: Sequence[UUID]
     ) -> list["ReservoirRegistry"]:
         nodes = await ctx.adapters.reservoir_registry.get_many(list(reservoir_ids))
         return [ReservoirRegistry.from_pydantic(node) for node in nodes]
@@ -108,7 +108,7 @@ class ReservoirRegistryConnection(Connection[ReservoirRegistry]):
     BackendAIGQLMeta(added_version="25.14.0", description="Get a reservoir registry by ID")
 )  # type: ignore[misc]
 async def reservoir_registry(id: ID, info: Info[StrawberryGQLContext]) -> ReservoirRegistry | None:
-    node = await info.context.adapters.reservoir_registry.get(uuid.UUID(id))
+    node = await info.context.adapters.reservoir_registry.get(UUID(id))
     return ReservoirRegistry.from_pydantic(node)
 
 
@@ -206,10 +206,9 @@ class UpdateReservoirRegistryPayload(PydanticOutputMixin[UpdateReservoirRegistry
         description="Payload for deleting a reservoir registry.",
     ),
     model=DeleteReservoirRegistryPayloadDTO,
-    fields=["id"],
 )
 class DeleteReservoirRegistryPayload(PydanticOutputMixin[DeleteReservoirRegistryPayloadDTO]):
-    id: ID
+    id: UUID = gql_field(description="ID of the deleted Reservoir registry")
 
 
 @gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create reservoir registry."))  # type: ignore[misc]
@@ -238,4 +237,4 @@ async def delete_reservoir_registry(
 ) -> DeleteReservoirRegistryPayload:
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.reservoir_registry.delete(pydantic_input)
-    return DeleteReservoirRegistryPayload(id=ID(str(result.id)))
+    return DeleteReservoirRegistryPayload(id=result.id)

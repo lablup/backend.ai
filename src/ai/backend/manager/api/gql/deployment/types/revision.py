@@ -11,7 +11,7 @@ from uuid import UUID
 import strawberry
 from pydantic import Field
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, NodeID
+from strawberry.relay import Connection, Edge, NodeID, PageInfo
 from strawberry.scalars import JSON
 
 from ai.backend.common.config import (
@@ -111,7 +111,7 @@ from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
     ResourceOptsInput,
 )
-from ai.backend.manager.api.gql.common_types import ResourceSlotEntryInputGQL, ResourceSlotGQL
+from ai.backend.manager.api.gql.common_types import ResourceSlotEntryInputGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -131,6 +131,14 @@ from ai.backend.manager.api.gql.vfolder import VFolder
 from ai.backend.manager.api.gql_legacy.image import ImageNode
 from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
+
+from .resource_slot import (
+    AllocatedResourceSlotConnection,
+    AllocatedResourceSlotEdge,
+    AllocatedResourceSlotFilterGQL,
+    AllocatedResourceSlotNodeGQL,
+    AllocatedResourceSlotOrderByGQL,
+)
 
 if TYPE_CHECKING:
     from .deployment import ModelDeployment
@@ -197,12 +205,6 @@ class ClusterConfig:
 )
 class ResourceConfig:
     resource_group_name: str
-    resource_slots: ResourceSlotGQL = gql_added_field(
-        BackendAIGQLMeta(
-            added_version="26.1.0",
-            description="Allocated compute resources including CPU, memory, and accelerators.",
-        )
-    )
     resource_opts: ResourceOptsGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.1.0", description="Additional resource options such as shared memory."
@@ -442,6 +444,56 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
             ImageNode, UUID(str(self.image_id)), is_target_graphene_object=True
         )
         return Image(id=ID(image_global_id))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Resource slot allocations for this revision.",
+        )
+    )  # type: ignore[misc]
+    async def resource_slots(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: AllocatedResourceSlotFilterGQL | None = None,
+        order_by: list[AllocatedResourceSlotOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> AllocatedResourceSlotConnection:
+        from ai.backend.common.dto.manager.v2.resource_slot.request import (
+            SearchAllocatedResourceSlotsInput,
+        )
+
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+        payload = await info.context.adapters.deployment.search_revision_resource_slots(
+            revision_id=UUID(str(self.id)),
+            input=SearchAllocatedResourceSlotsInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [AllocatedResourceSlotNodeGQL.from_pydantic(item) for item in payload.items]
+        edges = [AllocatedResourceSlotEdge(node=node, cursor=node.slot_name) for node in nodes]
+        return AllocatedResourceSlotConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+        )
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

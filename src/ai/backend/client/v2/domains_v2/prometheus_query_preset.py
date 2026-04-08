@@ -13,12 +13,12 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     SearchQueryDefinitionsInput,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
-    AdminSearchQueryDefinitionsPayload,
     CreateQueryDefinitionPayload,
     DeleteQueryDefinitionPayload,
     ExecuteQueryDefinitionPayload,
     GetQueryDefinitionPayload,
     ModifyQueryDefinitionPayload,
+    SearchQueryDefinitionsPayload,
 )
 
 _PATH = "/v2/prometheus-query-presets"
@@ -36,15 +36,13 @@ class V2PrometheusQueryPresetClient(BaseDomainClient):
             response_model=CreateQueryDefinitionPayload,
         )
 
-    async def search(
-        self, request: SearchQueryDefinitionsInput
-    ) -> AdminSearchQueryDefinitionsPayload:
+    async def search(self, request: SearchQueryDefinitionsInput) -> SearchQueryDefinitionsPayload:
         """Search query definitions with admin scope."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/search",
             request=request,
-            response_model=AdminSearchQueryDefinitionsPayload,
+            response_model=SearchQueryDefinitionsPayload,
         )
 
     async def get(self, preset_id: UUID) -> GetQueryDefinitionPayload:

@@ -25,11 +25,12 @@ This directory contains Claude Code skills for Backend.AI development tasks.
 | `/db-status` | Check schema version and migration status |
 | `/db-migrate` | Apply migrations (upgrade/downgrade) |
 
-## Local Development
+## Local Development & CLI
 
 | Skill | Purpose | Use When |
 |-------|---------|----------|
-| `/local-dev` | Service management (`./dev`) and v2 CLI testing (`./bai`) | Restarting services, testing v2 REST endpoints locally |
+| `/local-dev` | Service management (`./dev`) — start, stop, restart, crash debugging | Restarting services after code changes, debugging startup crashes |
+| `/bai-cli` | V2 CLI usage (`./bai`) — config, login, command patterns, entity reference | Testing API changes on live server, discovering CLI commands |
 
 ## Component Execution
 
@@ -54,7 +55,7 @@ This directory contains Claude Code skills for Backend.AI development tasks.
 **Feature Development Flow:**
 ```
 bep-guide → ┬→ repository-guide ─┐
-            ├→ service-guide ────┼→ integrate → cli-sdk-guide
+            ├→ service-guide ────┼→ integrate → cli-sdk-guide → local-dev → bai-cli
             └→ api-guide ────────┘
 ```
 
@@ -68,7 +69,7 @@ jira-issue → [implement] → submit (quality checks → commit → PR → chan
 release (pre-flight → release.sh → changelog editing → RC consolidation → summary)
 
 **Infrastructure Flow:**
-db-status → db-migrate → cli-executor
+halfstack → db-status → db-migrate → cli-executor → local-dev → bai-cli
 
 ## Related Documents
 

@@ -46,6 +46,8 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderID,
     VFolderMount,
+    VFolderMountOptions,
+    VFolderMountRequest,
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -70,6 +72,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionSpec,
     ReplicaSpec,
+    RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
@@ -484,8 +487,8 @@ class EndpointRow(Base):  # type: ignore[misc]
         session: AsyncSession,
         metric_source: AutoScalingMetricSource,
         metric_name: str,
-        threshold: Decimal,
-        comparator: AutoScalingMetricComparator,
+        min_threshold: Decimal | None,
+        max_threshold: Decimal | None,
         step_size: int,
         cooldown_seconds: int = 300,
         min_replicas: int | None = None,
@@ -496,8 +499,8 @@ class EndpointRow(Base):  # type: ignore[misc]
             endpoint=self.id,
             metric_source=metric_source,
             metric_name=metric_name,
-            threshold=threshold,
-            comparator=comparator,
+            min_threshold=min_threshold,
+            max_threshold=max_threshold,
             step_size=step_size,
             cooldown_seconds=cooldown_seconds,
             min_replicas=min_replicas,
@@ -556,7 +559,13 @@ class EndpointRow(Base):  # type: ignore[misc]
         from ai.backend.manager.models.kernel import KernelRow
         from ai.backend.manager.models.routing import RoutingRow
 
-        active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
+        # Only routes whose traffic_status is ACTIVE should be exposed to the
+        # app proxy. INACTIVE routes (e.g. a blue-green deploying revision that
+        # has not been promoted yet) are intentionally hidden from Traefik.
+        all_active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
+        active_routes = [
+            r for r in all_active_routes if r.traffic_status == RouteTrafficStatus.ACTIVE
+        ]
         running_main_kernels = await KernelRow.batch_load_main_kernels_by_session_id(
             db_sess,
             [
@@ -659,7 +668,11 @@ class EndpointRow(Base):  # type: ignore[misc]
             domain=self.domain,
             project=self.project,
             resource_group=self.resource_group,
-            resource_slots=current_rev.resource_slots if current_rev else ResourceSlot({}),
+            resource_slots=ResourceSlot({
+                r.slot_name: r.quantity for r in current_rev.resource_slot_rows
+            })
+            if current_rev
+            else ResourceSlot({}),
             url=self.url or "",
             model=current_rev.model or uuid.UUID(int=0) if current_rev else uuid.UUID(int=0),
             model_definition_path=current_rev.model_definition_path if current_rev else None,
@@ -690,7 +703,11 @@ class EndpointRow(Base):  # type: ignore[misc]
             destroyed_at=self.destroyed_at,
             retries=self.retries,
             lifecycle_stage=self.lifecycle_stage,
-            runtime_variant=(current_rev.runtime_variant if current_rev else RuntimeVariant.CUSTOM),
+            runtime_variant=(
+                RuntimeVariant(current_rev.runtime_variant)
+                if current_rev
+                else RuntimeVariant("custom")
+            ),
             extra_mounts=current_rev.extra_mounts if current_rev else [],
             routings=[routing.to_data() for routing in self.routings] if self.routings else None,
         )
@@ -796,6 +813,9 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         sa.ForeignKey("groups.id", ondelete="CASCADE"),
         nullable=False,
     )
+    expires_at: Mapped[datetime | None] = mapped_column(
+        "expires_at", sa.DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime | None] = mapped_column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
     )
@@ -815,6 +835,7 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         domain: str,
         project: UUID,
         session_owner: UUID,
+        expires_at: datetime | None = None,
     ) -> None:
         self.id = id
         self.token = token
@@ -822,6 +843,7 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         self.domain = domain
         self.project = project
         self.session_owner = session_owner
+        self.expires_at = expires_at
 
     @classmethod
     async def list(
@@ -901,9 +923,11 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         "metric_source", StrEnumType(AutoScalingMetricSource, use_name=False), nullable=False
     )
     metric_name: Mapped[str] = mapped_column("metric_name", sa.Text(), nullable=False)
-    threshold: Mapped[Decimal] = mapped_column("threshold", DecimalType(), nullable=False)
-    comparator: Mapped[AutoScalingMetricComparator] = mapped_column(
-        "comparator", StrEnumType(AutoScalingMetricComparator, use_name=False), nullable=False
+    min_threshold: Mapped[Decimal | None] = mapped_column(
+        "min_threshold", DecimalType(), nullable=True
+    )
+    max_threshold: Mapped[Decimal | None] = mapped_column(
+        "max_threshold", DecimalType(), nullable=True
     )
     step_size: Mapped[int] = mapped_column("step_size", sa.Integer(), nullable=False)
     cooldown_seconds: Mapped[int] = mapped_column(
@@ -974,12 +998,21 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         await session.delete(self)
 
     def to_data(self) -> EndpointAutoScalingRuleData:
+        if self.max_threshold is not None:
+            threshold_str = str(self.max_threshold)
+            comparator = AutoScalingMetricComparator.GREATER_THAN
+        elif self.min_threshold is not None:
+            threshold_str = str(self.min_threshold)
+            comparator = AutoScalingMetricComparator.LESS_THAN
+        else:
+            threshold_str = "0"
+            comparator = AutoScalingMetricComparator.GREATER_THAN
         return EndpointAutoScalingRuleData(
             id=self.id,
             metric_source=self.metric_source,
             metric_name=self.metric_name,
-            threshold=str(self.threshold),
-            comparator=self.comparator,
+            threshold=threshold_str,
+            comparator=comparator,
             step_size=self.step_size,
             cooldown_seconds=self.cooldown_seconds,
             min_replicas=self.min_replicas or 0,
@@ -991,13 +1024,22 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
 
     @classmethod
     def from_creator(cls, endpoint_id: UUID, creator: AutoScalingRuleCreator) -> Self:
+        min_threshold: Decimal | None = None
+        max_threshold: Decimal | None = None
+        if creator.condition.comparator in (
+            AutoScalingMetricComparator.GREATER_THAN,
+            AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL,
+        ):
+            max_threshold = Decimal(creator.condition.threshold)
+        else:
+            min_threshold = Decimal(creator.condition.threshold)
         return cls(
             id=uuid4(),
             endpoint=endpoint_id,
             metric_source=creator.condition.metric_source,
             metric_name=creator.condition.metric_name,
-            threshold=creator.condition.threshold,
-            comparator=creator.condition.comparator,
+            min_threshold=min_threshold,
+            max_threshold=max_threshold,
             step_size=creator.action.step_size,
             cooldown_seconds=creator.action.cooldown_seconds,
             min_replicas=creator.action.min_replicas,
@@ -1005,13 +1047,22 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         )
 
     def to_autoscaling_rule(self) -> AutoScalingRule:
+        if self.max_threshold is not None:
+            threshold_str = str(self.max_threshold)
+            comparator = AutoScalingMetricComparator.GREATER_THAN
+        elif self.min_threshold is not None:
+            threshold_str = str(self.min_threshold)
+            comparator = AutoScalingMetricComparator.LESS_THAN
+        else:
+            threshold_str = "0"
+            comparator = AutoScalingMetricComparator.GREATER_THAN
         return AutoScalingRule(
             id=self.id,
             condition=AutoScalingCondition(
                 metric_source=self.metric_source,
                 metric_name=self.metric_name,
-                threshold=str(self.threshold),
-                comparator=self.comparator,
+                threshold=threshold_str,
+                comparator=comparator,
             ),
             action=AutoScalingAction(
                 step_size=self.step_size,
@@ -1028,56 +1079,30 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     @classmethod
     def from_model_deployment_creator(cls, creator: ModelDeploymentAutoScalingRuleCreator) -> Self:
         """Create from ModelDeploymentAutoScalingRuleCreator (new type)."""
-        # Map min/max threshold to single threshold + comparator
-        # If max_threshold is set, use it with GREATER_THAN (scale down when above)
-        # If only min_threshold is set, use it with LESS_THAN (scale up when below)
-        if creator.max_threshold is not None:
-            threshold = creator.max_threshold
-            comparator = AutoScalingMetricComparator.GREATER_THAN
-        elif creator.min_threshold is not None:
-            threshold = creator.min_threshold
-            comparator = AutoScalingMetricComparator.LESS_THAN
-        else:
-            # Default: no threshold means no scaling trigger
-            threshold = Decimal("0")
-            comparator = AutoScalingMetricComparator.GREATER_THAN
-
         return cls(
             id=uuid4(),
             endpoint=creator.model_deployment_id,
             metric_source=creator.metric_source,
             metric_name=creator.metric_name,
-            threshold=threshold,
-            comparator=comparator,
+            min_threshold=creator.min_threshold,
+            max_threshold=creator.max_threshold,
             step_size=creator.step_size,
-            cooldown_seconds=creator.time_window,  # Map time_window to cooldown_seconds
+            cooldown_seconds=creator.time_window,
             min_replicas=creator.min_replicas,
             max_replicas=creator.max_replicas,
         )
 
     def to_model_deployment_data(self) -> ModelDeploymentAutoScalingRuleData:
         """Convert to ModelDeploymentAutoScalingRuleData (new type)."""
-        # Map threshold + comparator back to min/max threshold
-        min_threshold: Decimal | None = None
-        max_threshold: Decimal | None = None
-
-        if self.comparator == AutoScalingMetricComparator.GREATER_THAN:
-            max_threshold = self.threshold
-        elif self.comparator == AutoScalingMetricComparator.LESS_THAN:
-            min_threshold = self.threshold
-        else:
-            # For other comparators (EQUAL, etc.), default to max_threshold
-            max_threshold = self.threshold
-
         return ModelDeploymentAutoScalingRuleData(
             id=self.id,
             model_deployment_id=self.endpoint,
             metric_source=self.metric_source,
             metric_name=self.metric_name,
-            min_threshold=min_threshold,
-            max_threshold=max_threshold,
+            min_threshold=self.min_threshold,
+            max_threshold=self.max_threshold,
             step_size=self.step_size,
-            time_window=self.cooldown_seconds,  # Map cooldown_seconds to time_window
+            time_window=self.cooldown_seconds,
             min_replicas=self.min_replicas,
             max_replicas=self.max_replicas,
             created_at=self.created_at or datetime.now(UTC),
@@ -1105,13 +1130,10 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         if (max_replicas := modifier.max_replicas.optional_value()) is not None:
             self.max_replicas = max_replicas
 
-        # Update threshold and comparator based on min/max threshold
         if (max_threshold := modifier.max_threshold.optional_value()) is not None:
-            self.threshold = max_threshold
-            self.comparator = AutoScalingMetricComparator.GREATER_THAN
-        elif (min_threshold := modifier.min_threshold.optional_value()) is not None:
-            self.threshold = min_threshold
-            self.comparator = AutoScalingMetricComparator.LESS_THAN
+            self.max_threshold = max_threshold
+        if (min_threshold := modifier.min_threshold.optional_value()) is not None:
+            self.min_threshold = min_threshold
 
 
 class ModelServiceHelper:
@@ -1179,25 +1201,16 @@ class ModelServiceHelper:
                 "Same VFolder appears on both model specification and VFolder mount"
             )
 
-        requested_mounts = [*extra_mounts.keys()]
-        requested_mount_map: dict[str | UUID, str] = {
-            folder_id: options.mount_destination
+        mount_requests = [
+            VFolderMountRequest(
+                ref=folder_id,
+                dst_path=options.mount_destination,
+                options=VFolderMountOptions(
+                    permission=options.permission,
+                ),
+            )
             for folder_id, options in extra_mounts.items()
-            if options.mount_destination
-        }
-        requested_mount_options: dict[str | UUID, Any] = {
-            folder_id: {
-                "type": options.type,
-                "permission": options.permission,
-            }
-            for folder_id, options in extra_mounts.items()
-        }
-        log.debug(
-            "requested mounts: {}, mount_map: {}, mount_options: {}",
-            requested_mounts,
-            requested_mount_map,
-            requested_mount_options,
-        )
+        ]
         allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
         vfolder_mounts = await prepare_vfolder_mounts(
             conn,
@@ -1205,9 +1218,7 @@ class ModelServiceHelper:
             allowed_vfolder_types,
             user_scope,
             resource_policy,
-            requested_mounts,
-            requested_mount_map,
-            requested_mount_options,
+            mount_requests,
         )
 
         for vfolder in vfolder_mounts:

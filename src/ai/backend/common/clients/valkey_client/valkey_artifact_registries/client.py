@@ -126,11 +126,12 @@ class ValkeyArtifactRegistryClient:
         """
         key = self._make_registry_key(registry_id)
         value = dump_json_str(registry_data)
-        await self._client.client.set(
-            key=key,
-            value=value,
-            expiry=ExpirySet(ExpiryType.SEC, _EXPIRATION),
-        )
+        async with self._client.client() as conn:
+            await conn.set(
+                key=key,
+                value=value,
+                expiry=ExpirySet(ExpiryType.SEC, _EXPIRATION),
+            )
 
     @valkey_artifact_registries_resilience.apply()
     async def get_registry(
@@ -144,7 +145,8 @@ class ValkeyArtifactRegistryClient:
         :return: The cached registry data as dict or None if not found.
         """
         key = self._make_registry_key(registry_id)
-        value = await self._client.client.get(key)
+        async with self._client.client() as conn:
+            value = await conn.get(key)
         if value is None:
             return None
 
@@ -163,5 +165,6 @@ class ValkeyArtifactRegistryClient:
         :return: True if the key was deleted, False otherwise.
         """
         key = self._make_registry_key(registry_id)
-        result = await self._client.client.delete([key])
+        async with self._client.client() as conn:
+            result = await conn.delete([key])
         return result > 0

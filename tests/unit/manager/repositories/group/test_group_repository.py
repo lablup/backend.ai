@@ -181,7 +181,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
             is_active=True,
             total_resource_slots=ResourceSlot({}),
             allowed_vfolder_hosts=VFolderHostPermissionMap(),
-            integration_id=None,
+            integration_name=None,
             resource_policy=project_resource_policy,
             type=ProjectType.GENERAL,
         )
@@ -206,7 +206,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
             is_active=True,
             total_resource_slots=ResourceSlot({}),
             allowed_vfolder_hosts=VFolderHostPermissionMap(),
-            integration_id=None,
+            integration_name=None,
             resource_policy=nonexistent_policy,
             type=ProjectType.GENERAL,
         )

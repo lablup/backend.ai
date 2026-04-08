@@ -20,6 +20,7 @@ from .resolver import (
     notification_channel,
     notification_channels,
     notification_rule,
+    notification_rule_type_schema,
     notification_rule_types,
     notification_rules,
     update_notification_channel,
@@ -100,6 +101,7 @@ __all__ = (
     "notification_rule",
     "notification_rules",
     "notification_rule_types",
+    "notification_rule_type_schema",
     # Mutation Resolvers - Legacy (deprecated)
     "create_notification_channel",
     "update_notification_channel",

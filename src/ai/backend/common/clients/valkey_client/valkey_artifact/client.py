@@ -209,7 +209,8 @@ class ValkeyArtifactDownloadTrackingClient:
                 ),
             )
 
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
         log.debug(
             "Initialized artifact download tracking: model_id={}, revision={}, total_files={}, total_bytes={}",
             model_id,
@@ -243,51 +244,54 @@ class ValkeyArtifactDownloadTrackingClient:
         file_key = self._get_file_key(model_id, revision, file_path)
         artifact_key = self._get_artifact_key(model_id, revision)
 
-        # Get previous file data to calculate delta for artifact aggregation
-        previous_data_bytes = await self._client.client.get(file_key)
-        previous_current_bytes = 0
-        if previous_data_bytes:
-            try:
-                previous_data = FileDownloadProgressData.model_validate_json(previous_data_bytes)
-                previous_current_bytes = previous_data.current_bytes
-            except (ValidationError, UnicodeDecodeError):
-                log.warning("Failed to parse previous file data for progress update")
+        async with self._client.client() as conn:
+            # Get previous file data to calculate delta for artifact aggregation
+            previous_data_bytes = await conn.get(file_key)
+            previous_current_bytes = 0
+            if previous_data_bytes:
+                try:
+                    previous_data = FileDownloadProgressData.model_validate_json(
+                        previous_data_bytes
+                    )
+                    previous_current_bytes = previous_data.current_bytes
+                except (ValidationError, UnicodeDecodeError):
+                    log.warning("Failed to parse previous file data for progress update")
 
-        # Calculate bytes delta for artifact aggregation
-        bytes_delta = current_bytes - previous_current_bytes
+            # Calculate bytes delta for artifact aggregation
+            bytes_delta = current_bytes - previous_current_bytes
 
-        file_data = FileDownloadProgressData(
-            file_path=file_path,
-            success=success,
-            current_bytes=current_bytes,
-            total_bytes=total_bytes,
-            last_updated=time.time(),
-            error_message=error_message,
-        )
+            file_data = FileDownloadProgressData(
+                file_path=file_path,
+                success=success,
+                current_bytes=current_bytes,
+                total_bytes=total_bytes,
+                last_updated=time.time(),
+                error_message=error_message,
+            )
 
-        # Update file progress (file key should already exist from init_artifact_download)
-        batch = self._create_batch(is_atomic=False)
-        batch.set(
-            file_key,
-            file_data.model_dump_json(),
-            expiry=ExpirySet(expiry_type=ExpiryType.KEEP_TTL, value=None),
-        )
+            # Update file progress (file key should already exist from init_artifact_download)
+            batch = self._create_batch(is_atomic=False)
+            batch.set(
+                file_key,
+                file_data.model_dump_json(),
+                expiry=ExpirySet(expiry_type=ExpiryType.KEEP_TTL, value=None),
+            )
 
-        await self._client.client.exec(batch, raise_on_error=True)
+            await conn.exec(batch, raise_on_error=True)
 
-        # Update artifact aggregates atomically using HINCRBY
-        if bytes_delta != 0 or (success and previous_current_bytes < total_bytes):
-            current_time_str = str(time.time())
+            # Update artifact aggregates atomically using HINCRBY
+            if bytes_delta != 0 or (success and previous_current_bytes < total_bytes):
+                current_time_str = str(time.time())
 
-            # Use HINCRBY for atomic increments
-            if bytes_delta != 0:
-                await self._client.client.hincrby(artifact_key, "downloaded_bytes", bytes_delta)
+                # Use HINCRBY for atomic increments
+                if bytes_delta != 0:
+                    await conn.hincrby(artifact_key, "downloaded_bytes", bytes_delta)
 
-            if success and previous_current_bytes < total_bytes:
-                await self._client.client.hincrby(artifact_key, "completed_files", 1)
+                if success and previous_current_bytes < total_bytes:
+                    await conn.hincrby(artifact_key, "completed_files", 1)
 
-            # Update last_updated timestamp
-            await self._client.client.hset(artifact_key, {"last_updated": current_time_str})
+                # Update last_updated timestamp
+                await conn.hset(artifact_key, {"last_updated": current_time_str})
 
         log.trace(
             "Updated file progress: file_path={}, current={}, total={}, success={}",
@@ -311,7 +315,8 @@ class ValkeyArtifactDownloadTrackingClient:
         :return: Artifact progress data or None if not found
         """
         artifact_key = self._get_artifact_key(model_id, revision)
-        hash_data = await self._client.client.hgetall(artifact_key)
+        async with self._client.client() as conn:
+            hash_data = await conn.hgetall(artifact_key)
 
         if not hash_data:
             return None
@@ -348,7 +353,8 @@ class ValkeyArtifactDownloadTrackingClient:
         :return: File progress data or None if not found
         """
         file_key = self._get_file_key(model_id, revision, file_path)
-        data_bytes = await self._client.client.get(file_key)
+        async with self._client.client() as conn:
+            data_bytes = await conn.get(file_key)
 
         if not data_bytes:
             return None
@@ -376,26 +382,29 @@ class ValkeyArtifactDownloadTrackingClient:
         file_progress_list: list[FileDownloadProgressData] = []
 
         cursor = b"0"
-        while cursor:
-            result = await self._client.client.scan(cursor, match=file_pattern, count=100)
-            cursor = cast(bytes, result[0])
-            keys = cast(list[bytes], result[1])
+        async with self._client.client() as conn:
+            while cursor:
+                result = await conn.scan(cursor, match=file_pattern, count=100)
+                cursor = cast(bytes, result[0])
+                keys = cast(list[bytes], result[1])
 
-            if keys:
-                # Get all file progress data
-                values = await self._client.client.mget(cast(list[str | bytes], keys))
-                for key_bytes, value_bytes in zip(keys, values, strict=False):
-                    if value_bytes:
-                        try:
-                            file_progress = FileDownloadProgressData.model_validate_json(
-                                value_bytes
-                            )
-                            file_progress_list.append(file_progress)
-                        except (ValidationError, UnicodeDecodeError):
-                            log.warning("Failed to parse file progress data for key: {}", key_bytes)
+                if keys:
+                    # Get all file progress data
+                    values = await conn.mget(cast(list[str | bytes], keys))
+                    for key_bytes, value_bytes in zip(keys, values, strict=False):
+                        if value_bytes:
+                            try:
+                                file_progress = FileDownloadProgressData.model_validate_json(
+                                    value_bytes
+                                )
+                                file_progress_list.append(file_progress)
+                            except (ValidationError, UnicodeDecodeError):
+                                log.warning(
+                                    "Failed to parse file progress data for key: {}", key_bytes
+                                )
 
-            if cursor == b"0":
-                break
+                if cursor == b"0":
+                    break
 
         return file_progress_list
 
@@ -437,24 +446,25 @@ class ValkeyArtifactDownloadTrackingClient:
         artifact_key = self._get_artifact_key(model_id, revision)
         file_pattern = self._get_file_pattern(model_id, revision)
 
-        # Delete artifact key
-        await self._client.client.delete([artifact_key])
+        async with self._client.client() as conn:
+            # Delete artifact key
+            await conn.delete([artifact_key])
 
-        # Find and delete all file keys
-        # Note: SCAN is more efficient than KEYS for production use
-        cursor = b"0"
-        while True:
-            result = await self._client.client.scan(cursor, match=file_pattern, count=100)
-            if result is None or len(result) != 2:
-                break
+            # Find and delete all file keys
+            # Note: SCAN is more efficient than KEYS for production use
+            cursor = b"0"
+            while True:
+                result = await conn.scan(cursor, match=file_pattern, count=100)
+                if result is None or len(result) != 2:
+                    break
 
-            cursor = cast(bytes, result[0])
-            keys = cast(list[bytes], result[1])
-            if keys:
-                await self._client.client.delete(cast(list[str | bytes], keys))
+                cursor = cast(bytes, result[0])
+                keys = cast(list[bytes], result[1])
+                if keys:
+                    await conn.delete(cast(list[str | bytes], keys))
 
-            if cursor == b"0":
-                break
+                if cursor == b"0":
+                    break
 
         log.debug(
             "Cleaned up artifact download tracking: model_id={}, revision={}",

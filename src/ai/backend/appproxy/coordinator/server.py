@@ -55,6 +55,7 @@ from ai.backend.appproxy.common.events import (
     DoCheckUnusedPortEvent,
     DoCheckWorkerLostEvent,
     DoHealthCheckEvent,
+    DoReconcileTraefikRoutesEvent,
     WorkerLostEvent,
 )
 from ai.backend.appproxy.common.types import (
@@ -405,14 +406,16 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         config=leader_config,
     )
 
-    # Create task specs for all periodic tasks
+    # Create task specs for all periodic tasks.
+    #
+    # When Traefik is enabled, the coordinator no longer polls kernels itself
+    # for health status — instead Traefik probes kernels directly via the
+    # loadBalancer.healthCheck directive baked into the etcd config. We therefore
+    # skip the ``health_check`` task and add a ``reconcile_traefik_routes`` task
+    # that periodically re-publishes every inference circuit's etcd config as a
+    # safety net against missed propagation events (e.g. on coordinator restart
+    # or transient Redis issues).
     task_specs: list[EventTaskSpec] = [
-        EventTaskSpec(
-            name="health_check",
-            event_factory=lambda: DoHealthCheckEvent(),
-            interval=root_ctx.local_config.proxy_coordinator.health_check_timer_interval,
-            initial_delay=5.0,
-        ),
         EventTaskSpec(
             name="unused_port_collection",
             event_factory=lambda: DoCheckUnusedPortEvent(),
@@ -426,6 +429,25 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             initial_delay=10.0,
         ),
     ]
+    if root_ctx.local_config.proxy_coordinator.enable_traefik:
+        task_specs.append(
+            EventTaskSpec(
+                name="reconcile_traefik_routes",
+                event_factory=lambda: DoReconcileTraefikRoutesEvent(),
+                interval=30.0,
+                initial_delay=15.0,
+            )
+        )
+    else:
+        task_specs.insert(
+            0,
+            EventTaskSpec(
+                name="health_check",
+                event_factory=lambda: DoHealthCheckEvent(),
+                interval=root_ctx.local_config.proxy_coordinator.health_check_timer_interval,
+                initial_delay=5.0,
+            ),
+        )
 
     # Create and register LeaderCron
     leader_tasks: list[PeriodicTask] = [
@@ -541,8 +563,26 @@ async def on_route_update_event(
         new_routes = {}
 
     async def _update(db_sess: SASession) -> None:
-        endpoint = await Endpoint.get(db_sess, event.endpoint_id)
-        circuit = await Circuit.get_by_endpoint(db_sess, endpoint.id)
+        # The manager's periodic sync loop fires EndpointRouteListUpdatedEvent
+        # for every active endpoint in its DB — some of those may not yet be
+        # registered with the coordinator (still PENDING, or proxy register
+        # never happened). Swallow those quietly so they do not spam logs.
+        try:
+            endpoint = await Endpoint.get(db_sess, event.endpoint_id)
+        except ObjectNotFound:
+            log.debug(
+                "on_route_update_event: endpoint {} not registered in coordinator DB, skipping",
+                event.endpoint_id,
+            )
+            return
+        try:
+            circuit = await Circuit.get_by_endpoint(db_sess, endpoint.id)
+        except ObjectNotFound:
+            log.debug(
+                "on_route_update_event: no circuit for endpoint {}, skipping",
+                event.endpoint_id,
+            )
+            return
         old_routes = circuit.route_info or []
         if new_routes:
             traffic_ratios = await context.core_valkey_live.get_multiple_live_data([
@@ -578,6 +618,100 @@ async def on_route_update_event(
         await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
 
 
+async def _reconcile_worker_occupied_slots(
+    context: RootContext,
+    circuits: Sequence[Circuit],
+    workers: Sequence[Worker],
+) -> None:
+    """Recompute Worker.occupied_slots from the live circuit set and write back
+    any drifts.
+
+    ``Worker.occupied_slots`` is currently maintained as an incremental counter
+    (``+= 1`` on add_circuit, ``-= 1`` on unload), which can drift out of sync
+    with the actual ``circuits`` table whenever an unload event is missed, a
+    transaction rolls back partially, or external schema manipulation removes
+    rows. Once drifted, ``pick_worker`` filters every worker out and the
+    coordinator returns ``WorkerNotAvailable`` even though there are free
+    slots. This helper rebuilds the counter from the rows actually present in
+    the DB and writes back any worker whose stored value disagrees.
+    """
+    actual_counts: dict[UUID, int] = {}
+    for circuit in circuits:
+        actual_counts[circuit.worker] = actual_counts.get(circuit.worker, 0) + 1
+
+    drifted: list[tuple[Worker, int]] = []
+    for worker in workers:
+        expected = actual_counts.get(worker.id, 0)
+        if worker.occupied_slots != expected:
+            drifted.append((worker, expected))
+    if not drifted:
+        return
+
+    async def _fix(sess: SASession) -> None:
+        for worker, expected in drifted:
+            fresh = await Worker.get(sess, worker.id)
+            log.info(
+                "occupied_slots reconcile: worker={} {} -> {}",
+                fresh.authority,
+                fresh.occupied_slots,
+                expected,
+            )
+            fresh.occupied_slots = expected
+
+    try:
+        async with context.db.connect() as db_conn:
+            await execute_with_txn_retry(_fix, context.db.begin_session, db_conn)
+    except Exception:
+        log.exception("Failed to reconcile worker occupied_slots")
+
+
+async def on_reconcile_traefik_routes(
+    context: RootContext,
+    _source: AgentId,
+    _event: DoReconcileTraefikRoutesEvent,
+) -> None:
+    """Periodic reconcile handler that re-publishes every active circuit's
+    etcd routing config from the PG source of truth, then drops any stale
+    circuit keys that were left behind in etcd by missed unloads.
+
+    Three phases:
+
+    1. **Put reconcile** — iterate every circuit in the coordinator DB
+       (both inference and interactive) and re-invoke ``update_circuit_routes``.
+       Acts as a safety net for missed propagation events on the happy path.
+    2. **Stale cleanup** — compare the DB circuit set against etcd via
+       ``reconcile_traefik_etcd_state`` and remove any orphan
+       ``bai_service_*`` / ``bai_router_*`` / ``bai_appproxy_plugin_*``
+       prefixes so etcd cannot accumulate dead entries across crashes.
+    3. **Worker counter reconcile** — recompute ``Worker.occupied_slots``
+       from the actual circuit count and fix drifts. Without this the
+       counter can wedge a worker permanently after a missed unload.
+
+    Each phase swallows its own errors so a single bad circuit or worker
+    cannot short-circuit the entire reconcile cycle.
+    """
+    if not context.local_config.proxy_coordinator.enable_traefik:
+        return
+    async with context.db.begin_readonly_session() as db_sess:
+        circuits = await Circuit.list_circuits(db_sess, load_worker=True, load_endpoint=True)
+        workers = await Worker.list_workers(db_sess)
+    reconciled = 0
+    for circuit in circuits:
+        try:
+            await context.circuit_manager.update_circuit_routes(
+                circuit, list(circuit.route_info or [])
+            )
+            reconciled += 1
+        except Exception:
+            log.exception("Failed to reconcile traefik routes for circuit {}", circuit.id)
+    try:
+        await context.circuit_manager.reconcile_traefik_etcd_state(circuits, workers)
+    except Exception:
+        log.exception("Failed to reconcile stale traefik etcd state")
+    await _reconcile_worker_occupied_slots(context, circuits, workers)
+    log.debug("reconcile_traefik_routes cycle completed: {} circuits reconciled", reconciled)
+
+
 @asynccontextmanager
 async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     worker_lost_handler = root_ctx.event_dispatcher.consume(
@@ -589,11 +723,18 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         on_route_update_event,
         name="proxy-coordinator",
     )
+    reconcile_traefik_routes_handler = root_ctx.event_dispatcher.consume(
+        DoReconcileTraefikRoutesEvent,
+        root_ctx,
+        on_reconcile_traefik_routes,
+        name="proxy-coordinator",
+    )
     try:
         yield
     finally:
         root_ctx.event_dispatcher.unconsume(worker_lost_handler)
         root_ctx.core_event_dispatcher.unconsume(endpoint_route_update_handler)
+        root_ctx.event_dispatcher.unconsume(reconcile_traefik_routes_handler)
 
 
 @asynccontextmanager
@@ -623,6 +764,12 @@ async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await health_engine.start()
 
     async def _check_health(_context: None, _src: AgentId, _event: DoHealthCheckEvent) -> None:
+        # In Traefik mode, the loadBalancer.healthCheck directive takes care of
+        # probing kernels directly; the coordinator must NOT run its own polling
+        # loop. The leader cron also skips publishing DoHealthCheckEvent in this
+        # mode, but we guard here as well so stray events are never actioned.
+        if root_ctx.local_config.proxy_coordinator.enable_traefik:
+            return
         try:
             # Check all endpoints with health checking enabled
             # This now only performs individual route health checks

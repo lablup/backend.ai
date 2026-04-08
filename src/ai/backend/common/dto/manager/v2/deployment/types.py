@@ -21,7 +21,6 @@ from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.fair_share.types import ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
@@ -37,7 +36,6 @@ __all__ = (
     "DeploymentNetworkAccessInfoDTO",
     "DeploymentOrderField",
     "DeploymentPolicyInfo",
-    "DeploymentRevisionInfo",
     "DeploymentStrategy",
     "DeploymentStrategyInfoDTO",
     "DeploymentStrategySpecInfo",
@@ -68,7 +66,14 @@ __all__ = (
     "RouteTrafficStatus",
     "RuntimeVariant",
     "IntOrPercent",
+    "ProjectDeploymentScope",
 )
+
+
+class ProjectDeploymentScope(BaseModel):
+    """Scope for project-level deployment operations."""
+
+    project_id: UUID = Field(description="Project UUID to scope the deployment operation.")
 
 
 class DeploymentOrderField(StrEnum):
@@ -138,23 +143,6 @@ class DeploymentBasicInfo(BaseResponseModel):
     project_id: UUID
     domain_name: str
     created_user_id: UUID
-
-
-class DeploymentRevisionInfo(BaseResponseModel):
-    """Revision configuration details for a deployment."""
-
-    cluster_mode: ClusterMode
-    cluster_size: int
-    resource_group: str
-    resource_slots: dict[str, Any]
-    resource_opts: dict[str, Any] | None = None
-    image_id: UUID
-    runtime_variant: RuntimeVariant
-    inference_runtime_config: dict[str, Any] | None = None
-    environ: dict[str, str] | None = None
-    model_vfolder_id: UUID | None
-    model_mount_destination: str | None
-    model_definition_path: str | None
 
 
 class NetworkConfigInfo(BaseResponseModel):
@@ -352,7 +340,6 @@ class ResourceConfigInfoDTO(BaseResponseModel):
     """Resource configuration backing DTO for ResourceConfig GQL type."""
 
     resource_group_name: str
-    resource_slots: ResourceSlotInfo
     resource_opts: ResourceOptsInfoDTO | None = None
 
 

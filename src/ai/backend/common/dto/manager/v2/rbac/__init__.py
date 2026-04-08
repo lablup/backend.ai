@@ -6,7 +6,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     AdminSearchRoleAssignmentsGQLInput,
-    AdminSearchRolesGQLInput,
     AssignRoleInput,
     BulkAssignRoleInput,
     BulkRevokeRoleInput,
@@ -25,6 +24,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     RoleFilter,
     RoleNestedFilter,
     RoleOrderBy,
+    SearchRolesInput,
     UpdatePermissionInput,
     UpdateRoleInput,
 )
@@ -67,6 +67,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatus,
     RoleStatusDTO,
     RoleStatusFilter,
+    ScopeInputDTO,
 )
 
 __all__ = (
@@ -88,11 +89,12 @@ __all__ = (
     "RoleStatus",
     "RoleStatusDTO",
     "RoleStatusFilter",
+    "ScopeInputDTO",
     # Input models (request)
     "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",
     "AdminSearchRoleAssignmentsGQLInput",
-    "AdminSearchRolesGQLInput",
+    "SearchRolesInput",
     "AssignRoleInput",
     "BulkAssignRoleInput",
     "BulkRevokeRoleInput",

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Iterable
 from typing import Self, cast
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -89,7 +89,7 @@ class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.object_storage_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -105,7 +105,7 @@ class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
         offset: int | None,
     ) -> StorageNamespaceConnection:
         # TODO: Support pagination
-        items = await info.context.adapters.storage_namespace.get_namespaces(uuid.UUID(self.id))
+        items = await info.context.adapters.storage_namespace.get_namespaces(UUID(self.id))
         nodes = [StorageNamespace.from_pydantic(item) for item in items]
         edges = [StorageNamespaceEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
@@ -139,7 +139,7 @@ class ObjectStorageConnection(Connection[ObjectStorage]):
     BackendAIGQLMeta(added_version="25.14.0", description="Get an object storage by ID")
 )  # type: ignore[misc]
 async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> ObjectStorage | None:
-    node = await info.context.adapters.object_storage.get(uuid.UUID(id))
+    node = await info.context.adapters.object_storage.get(UUID(id))
     return ObjectStorage.from_pydantic(node, extra={"region": node.region or ""})
 
 
@@ -257,11 +257,10 @@ class UpdateObjectStoragePayload:
         description="Payload for deleting an object storage.",
     ),
     model=DeleteObjectStoragePayloadDTO,
-    fields=["id"],
     name="DeleteObjectStoragePayload",
 )
 class DeleteObjectStoragePayload(PydanticOutputMixin[DeleteObjectStoragePayloadDTO]):
-    id: ID = gql_field(description="ID of the deleted object storage.")
+    id: UUID = gql_field(description="ID of the deleted object storage.")
 
 
 @gql_pydantic_type(

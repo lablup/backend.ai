@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
-from decimal import Decimal
 from typing import Any
 
 from ai.backend.common.data.model_deployment.types import (
@@ -42,10 +41,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ResourceConfigInfoDTO,
     RollingUpdateConfigInfo,
 )
-from ai.backend.common.dto.manager.v2.fair_share.types import (
-    ResourceSlotEntryInfo,
-    ResourceSlotInfo,
-)
 
 
 def _make_cluster_config(**kwargs: object) -> ClusterConfigInfoDTO:
@@ -57,16 +52,9 @@ def _make_cluster_config(**kwargs: object) -> ClusterConfigInfoDTO:
     return ClusterConfigInfoDTO(**defaults)
 
 
-def _make_resource_slots() -> ResourceSlotInfo:
-    return ResourceSlotInfo(
-        entries=[ResourceSlotEntryInfo(resource_type="cpu", quantity=Decimal("2"))]
-    )
-
-
 def _make_resource_config(**kwargs: object) -> ResourceConfigInfoDTO:
     defaults: dict[str, Any] = {
         "resource_group_name": "default",
-        "resource_slots": _make_resource_slots(),
         "resource_opts": None,
     }
     defaults.update(kwargs)

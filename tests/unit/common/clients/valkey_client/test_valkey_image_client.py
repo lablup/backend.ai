@@ -37,17 +37,16 @@ class TestValkeyImageClient:
         finally:
             # Cleanup all installed_image keys after test
             try:
-                cursor = b"0"
-                while cursor:
-                    result = await client._client.client.scan(
-                        cursor, match="installed_image:*", count=100
-                    )
-                    cursor = cast(bytes, result[0])
-                    keys = cast(list[bytes], result[1])
-                    if keys:
-                        await client._client.client.delete(cast(list[str | bytes], keys))
-                    if cursor == b"0":
-                        break
+                async with client._client.client() as conn:
+                    cursor = b"0"
+                    while cursor:
+                        result = await conn.scan(cursor, match="installed_image:*", count=100)
+                        cursor = cast(bytes, result[0])
+                        keys = cast(list[bytes], result[1])
+                        if keys:
+                            await conn.delete(cast(list[str | bytes], keys))
+                        if cursor == b"0":
+                            break
             except ClientNotConnectedError:
                 # Client already closed, skip cleanup
                 pass

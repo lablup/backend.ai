@@ -24,6 +24,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
     VFolderMountPermissionGQL,
     VFolderOwnershipTypeGQL,
@@ -32,7 +33,6 @@ from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-    from ai.backend.manager.api.gql.types import StrawberryGQLContext
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 

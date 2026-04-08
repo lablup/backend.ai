@@ -36,6 +36,7 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
     container_uid: TriState[int] = field(default_factory=TriState.nop)
     container_main_gid: TriState[int] = field(default_factory=TriState.nop)
     container_gids: TriState[list[int]] = field(default_factory=TriState.nop)
+    integration_name: TriState[str] = field(default_factory=TriState.nop)
     group_ids: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
 
     @property
@@ -65,6 +66,8 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
         self.container_uid.update_dict(to_update, "container_uid")
         self.container_main_gid.update_dict(to_update, "container_main_gid")
         self.container_gids.update_dict(to_update, "container_gids")
+        # Field is named integration_name above model layer; DB column remains integration_id.
+        self.integration_name.update_dict(to_update, "integration_id")
         # Set status based on is_active if not explicitly set
         status = self.status.optional_value()
         if status is not None:

@@ -19,10 +19,20 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     UpdateRuntimeVariantPresetPayload,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    ChoiceItem,
+    ChoiceOption,
+    NumberOption,
     RuntimeVariantPresetOrderField,
+    SliderOption,
+    TextOption,
+    UIOption,
+    UIType,
 )
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
-from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
+from ai.backend.manager.data.runtime_variant_preset.types import (
+    RuntimeVariantPresetData,
+    UIOptionData,
+)
 from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
 from ai.backend.manager.models.runtime_variant_preset.conditions import (
     RuntimeVariantPresetConditions,
@@ -62,6 +72,24 @@ def _preset_pagination_spec() -> PaginationSpec:
         forward_condition_factory=RuntimeVariantPresetConditions.by_cursor_forward,
         backward_condition_factory=RuntimeVariantPresetConditions.by_cursor_backward,
         tiebreaker_order=RuntimeVariantPresetRow.id.asc(),
+    )
+
+
+def _convert_ui_option_data(opt: UIOptionData | None) -> UIOption | None:
+    if opt is None:
+        return None
+    return UIOption(
+        ui_type=UIType(opt.ui_type) if opt.ui_type else UIType.TEXT_INPUT,
+        slider=SliderOption(min=opt.slider.min, max=opt.slider.max, step=opt.slider.step)
+        if opt.slider
+        else None,
+        number=NumberOption(min=opt.number.min, max=opt.number.max) if opt.number else None,
+        choices=ChoiceOption(
+            items=[ChoiceItem(value=c.value, label=c.label) for c in opt.choices.items]
+        )
+        if opt.choices
+        else None,
+        text=TextOption(placeholder=opt.text.placeholder) if opt.text else None,
     )
 
 
@@ -122,6 +150,10 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 value_type=input.value_type.value,
                 default_value=input.default_value,
                 key=input.key,
+                category=input.category,
+                ui_type=input.ui_option.ui_type.value if input.ui_option else None,
+                display_name=input.display_name,
+                ui_option=input.ui_option,
             )
         )
         result = await self._processors.runtime_variant_preset.create.wait_for_complete(
@@ -165,6 +197,34 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 else TriState.update(input.default_value)
             ),
             key=(OptionalState.update(input.key) if input.key is not None else OptionalState.nop()),
+            category=(
+                TriState.nop()
+                if input.category is SENTINEL
+                else TriState.nullify()
+                if input.category is None
+                else TriState.update(input.category)
+            ),
+            ui_type=(
+                TriState.nop()
+                if input.ui_option is SENTINEL
+                else TriState.nullify()
+                if input.ui_option is None
+                else TriState.update(input.ui_option.ui_type.value)
+            ),
+            display_name=(
+                TriState.nop()
+                if input.display_name is SENTINEL
+                else TriState.nullify()
+                if input.display_name is None
+                else TriState.update(input.display_name)
+            ),
+            ui_option=(
+                TriState.nop()
+                if input.ui_option is SENTINEL
+                else TriState.nullify()
+                if input.ui_option is None
+                else TriState.update(input.ui_option)
+            ),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=input.id)
         result = await self._processors.runtime_variant_preset.update.wait_for_complete(
@@ -232,6 +292,10 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 default_value=data.default_value,
                 key=data.key,
             ),
+            category=data.category,
+            ui_type=data.ui_type,
+            display_name=data.display_name,
+            ui_option=_convert_ui_option_data(data.ui_option),
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

@@ -38,7 +38,7 @@ class UserData:
     password_changed_at: datetime | None
     domain_name: str
     role: UserRole
-    integration_id: str | None
+    integration_name: str | None
     resource_policy: str
     sudo_session_enabled: bool
 

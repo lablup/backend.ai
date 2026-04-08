@@ -514,7 +514,7 @@ class TestMergeRevision:
             ),
             mounts=base_mount_metadata,
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant=RuntimeVariant("vllm"),
                 startup_command="python -m vllm",
                 bootstrap_script=None,
                 environ=test_case.request.environ,
@@ -799,7 +799,7 @@ class TestCompleteOverridePipeline:
             ),
             mounts=base_mount_metadata,
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant=RuntimeVariant("vllm"),
                 startup_command="python -m vllm",
                 bootstrap_script=None,
                 environ=test_case.request.environ,
@@ -845,14 +845,14 @@ class TestDefinitionFileRequirement:
     @pytest.mark.parametrize(
         "runtime_variant",
         [
-            RuntimeVariant.VLLM,
-            RuntimeVariant.NIM,
-            RuntimeVariant.HUGGINGFACE_TGI,
-            RuntimeVariant.SGLANG,
-            RuntimeVariant.MODULAR_MAX,
-            RuntimeVariant.CMD,
+            RuntimeVariant("vllm"),
+            RuntimeVariant("nim"),
+            RuntimeVariant("huggingface-tgi"),
+            RuntimeVariant("sglang"),
+            RuntimeVariant("modular-max"),
+            RuntimeVariant("cmd"),
         ],
-        ids=lambda v: v.value,
+        ids=lambda v: v,
     )
     async def test_non_custom_variants_should_not_require_model_definition(
         self,
@@ -944,7 +944,7 @@ class TestDefinitionFileRequirement:
                 extra_mounts=[],
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant=RuntimeVariant("vllm"),
                 startup_command="python -m vllm",
                 bootstrap_script=None,
                 environ={"MY_VAR": "value"},
@@ -1002,7 +1002,7 @@ class TestDefinitionFileRequirement:
                 extra_mounts=[],
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 startup_command="python app.py",
                 bootstrap_script=None,
                 environ=None,
@@ -1055,7 +1055,7 @@ class TestDefinitionFileRequirement:
                 extra_mounts=[],
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 startup_command="python app.py",
                 bootstrap_script=None,
                 environ=None,
@@ -1109,7 +1109,7 @@ class TestDefinitionFileRequirement:
                 extra_mounts=[],
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
                 startup_command="python app.py",
                 bootstrap_script=None,
                 environ=None,

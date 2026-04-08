@@ -84,3 +84,37 @@ class EndpointRouteListUpdatedEvent(AbstractAnycastEvent):
     @override
     def user_event(self) -> UserEvent | None:
         return None
+
+
+class DoSyncRouteInfoToAppProxyEvent(AbstractAnycastEvent):
+    """Periodic trigger emitted by the manager leader cron to resync the
+    route_connection_info of every active endpoint into Redis and re-fire
+    EndpointRouteListUpdatedEvent for each. Acts as a safety net against
+    missed hook invocations so that the app proxy coordinator eventually
+    converges on the manager's DB-backed source of truth.
+    """
+
+    def serialize(self) -> tuple[Any, ...]:
+        return tuple()
+
+    @classmethod
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
+        return cls()
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_sync_route_info_to_appproxy"
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.MODEL_ROUTE
+
+    @override
+    def domain_id(self) -> str | None:
+        return None
+
+    @override
+    def user_event(self) -> UserEvent | None:
+        return None

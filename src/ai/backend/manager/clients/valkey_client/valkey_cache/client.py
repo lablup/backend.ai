@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import AbstractAsyncContextManager
 
 from glide import GlideClient
 
@@ -48,7 +49,6 @@ class ValkeyCache:
         """
         return cls(client)
 
-    @property
-    def client(self) -> GlideClient:
-        """Get the underlying Glide client for direct cache operations."""
-        return self._client.client
+    def client(self) -> AbstractAsyncContextManager[GlideClient]:
+        """Get the underlying client for cache operations."""
+        return self._client.client()

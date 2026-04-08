@@ -28,12 +28,14 @@ from ai.backend.manager.api.gql.deployment.types.deployment import (
     ModelDeployment,
     ModelDeploymentConnection,
     ModelDeploymentEdge,
+    ProjectDeploymentScopeGQL,
     SyncReplicaInput,
     SyncReplicaPayload,
     UpdateDeploymentInput,
     UpdateDeploymentPayload,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.errors.user import UserNotFound
 
 # Query resolvers
@@ -42,10 +44,10 @@ from ai.backend.manager.errors.user import UserNotFound
 @gql_root_field(
     BackendAIGQLMeta(
         added_version="25.16.0",
-        description="List deployments with optional filtering and pagination (admin, all deployments).",
+        description="List all deployments (superadmin only).",
     )
 )  # type: ignore[misc]
-async def deployments(
+async def admin_deployments(
     info: Info[StrawberryGQLContext],
     filter: DeploymentFilter | None = None,
     order_by: list[DeploymentOrderBy] | None = None,
@@ -56,7 +58,8 @@ async def deployments(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ModelDeploymentConnection | None:
-    """List deployments with optional filtering and pagination (admin, all deployments)."""
+    """List all deployments (superadmin only)."""
+    check_admin_only()
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.deployment.admin_search(
@@ -70,6 +73,100 @@ async def deployments(
             limit=limit,
             offset=offset,
         )
+    )
+    nodes = [ModelDeployment.from_pydantic(item) for item in payload.items]
+    edges = [ModelDeploymentEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return ModelDeploymentConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="List deployments within a specific project.",
+    )
+)  # type: ignore[misc]
+async def project_deployments(
+    info: Info[StrawberryGQLContext],
+    scope: ProjectDeploymentScopeGQL,
+    filter: DeploymentFilter | None = None,
+    order_by: list[DeploymentOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ModelDeploymentConnection | None:
+    """List deployments within a specific project."""
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+    payload = await info.context.adapters.deployment.project_search(
+        scope.project_id,
+        AdminSearchDeploymentsInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    nodes = [ModelDeployment.from_pydantic(item) for item in payload.items]
+    edges = [ModelDeploymentEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return ModelDeploymentConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="List deployments owned by the current user.",
+    )
+)  # type: ignore[misc]
+async def my_deployments(
+    info: Info[StrawberryGQLContext],
+    filter: DeploymentFilter | None = None,
+    order_by: list[DeploymentOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> ModelDeploymentConnection | None:
+    """List deployments owned by the current user."""
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+    payload = await info.context.adapters.deployment.my_search(
+        AdminSearchDeploymentsInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
     )
     nodes = [ModelDeployment.from_pydantic(item) for item in payload.items]
     edges = [ModelDeploymentEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]

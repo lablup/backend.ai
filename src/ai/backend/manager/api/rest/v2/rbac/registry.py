@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2RBACHandler
@@ -56,6 +56,12 @@ def register_v2_rbac_routes(
         "/roles/purge",
         handler.purge_role,
         middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/roles/projects/{project_id}/search",
+        handler.project_search_roles,
+        middlewares=[auth_required],
     )
 
     # Permissions

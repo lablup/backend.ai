@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from uuid import UUID
 
 from ai.backend.logging import BraceStyleAdapter
@@ -47,3 +48,18 @@ class DeploymentRevisionPresetRepository:
         querier: BatchQuerier,
     ) -> tuple[list[DeploymentRevisionPresetData], int, bool, bool]:
         return await self._db_source.search(querier)
+
+    async def get_resource_slots(
+        self,
+        preset_id: UUID,
+    ) -> list[tuple[str, Decimal]]:
+        """Get all resource slots for a preset."""
+        return await self._db_source.get_resource_slots(preset_id)
+
+    async def search_resource_slots(
+        self,
+        preset_id: UUID,
+        querier: BatchQuerier,
+    ) -> tuple[list[tuple[str, Decimal]], int, bool, bool]:
+        """Search resource slots allocated to a preset."""
+        return await self._db_source.search_resource_slots(preset_id, querier)

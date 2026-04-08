@@ -23,6 +23,12 @@ class UpdateRuntimeVariantInput(BaseRequestModel):
     description: str | None = Field(default=None, description="New description.")
 
 
+class DeleteRuntimeVariantsInput(BaseRequestModel):
+    """Input for deleting multiple runtime variants."""
+
+    ids: list[UUID] = Field(description="List of runtime variant UUIDs to delete.")
+
+
 class RuntimeVariantFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None)
     AND: list[RuntimeVariantFilter] | None = Field(default=None)

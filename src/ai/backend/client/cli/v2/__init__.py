@@ -125,6 +125,39 @@ def service_catalog() -> None:
     """Service catalog commands."""
 
 
+# ------------------------------------------------------------------ Runtime Variants
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.runtime_variant:runtime_variant",
+    name="runtime-variant",
+)
+def runtime_variant() -> None:
+    """Runtime variant commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.runtime_variant_preset:runtime_variant_preset",
+    name="runtime-variant-preset",
+)
+def runtime_variant_preset() -> None:
+    """Runtime variant preset commands."""
+
+
+# ------------------------------------------------------------------ Model Store
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.model_card:model_card",
+    name="model-card",
+)
+def model_card() -> None:
+    """Model card commands."""
+
+
 # ------------------------------------------------------------------ Storage
 
 

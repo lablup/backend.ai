@@ -1,0 +1,219 @@
+# Traefik static configuration for halfstack Docker Compose.
+#
+# Coordinator (`feat/appproxy-traefik-reconcile`) writes router/service/middleware
+# definitions into etcd under the namespace `traefik/worker_{authority}/...`,
+# so the etcd provider's `rootKey` must point at that worker-specific subtree.
+#
+# Traefik runs as a Docker container in the halfstack and reaches the host etcd
+# (exposed on port 8121) via the shared `half` network using the
+# `backendai-half-etcd` service hostname.
+
+api:
+  dashboard: true
+  insecure: true
+
+entryPoints:
+  traefik:
+    address: ":8080"
+  portproxy_10205:
+    address: ":10205"
+  portproxy_10206:
+    address: ":10206"
+  portproxy_10207:
+    address: ":10207"
+  portproxy_10208:
+    address: ":10208"
+  portproxy_10209:
+    address: ":10209"
+  portproxy_10210:
+    address: ":10210"
+  portproxy_10211:
+    address: ":10211"
+  portproxy_10212:
+    address: ":10212"
+  portproxy_10213:
+    address: ":10213"
+  portproxy_10214:
+    address: ":10214"
+  portproxy_10215:
+    address: ":10215"
+  portproxy_10216:
+    address: ":10216"
+  portproxy_10217:
+    address: ":10217"
+  portproxy_10218:
+    address: ":10218"
+  portproxy_10219:
+    address: ":10219"
+  portproxy_10220:
+    address: ":10220"
+  portproxy_10221:
+    address: ":10221"
+  portproxy_10222:
+    address: ":10222"
+  portproxy_10223:
+    address: ":10223"
+  portproxy_10224:
+    address: ":10224"
+  portproxy_10225:
+    address: ":10225"
+  portproxy_10226:
+    address: ":10226"
+  portproxy_10227:
+    address: ":10227"
+  portproxy_10228:
+    address: ":10228"
+  portproxy_10229:
+    address: ":10229"
+  portproxy_10230:
+    address: ":10230"
+  portproxy_10231:
+    address: ":10231"
+  portproxy_10232:
+    address: ":10232"
+  portproxy_10233:
+    address: ":10233"
+  portproxy_10234:
+    address: ":10234"
+  portproxy_10235:
+    address: ":10235"
+  portproxy_10236:
+    address: ":10236"
+  portproxy_10237:
+    address: ":10237"
+  portproxy_10238:
+    address: ":10238"
+  portproxy_10239:
+    address: ":10239"
+  portproxy_10240:
+    address: ":10240"
+  portproxy_10241:
+    address: ":10241"
+  portproxy_10242:
+    address: ":10242"
+  portproxy_10243:
+    address: ":10243"
+  portproxy_10244:
+    address: ":10244"
+  portproxy_10245:
+    address: ":10245"
+  portproxy_10246:
+    address: ":10246"
+  portproxy_10247:
+    address: ":10247"
+  portproxy_10248:
+    address: ":10248"
+  portproxy_10249:
+    address: ":10249"
+  portproxy_10250:
+    address: ":10250"
+  portproxy_10251:
+    address: ":10251"
+  portproxy_10252:
+    address: ":10252"
+  portproxy_10253:
+    address: ":10253"
+  portproxy_10254:
+    address: ":10254"
+  portproxy_10255:
+    address: ":10255"
+  portproxy_10256:
+    address: ":10256"
+  portproxy_10257:
+    address: ":10257"
+  portproxy_10258:
+    address: ":10258"
+  portproxy_10259:
+    address: ":10259"
+  portproxy_10260:
+    address: ":10260"
+  portproxy_10261:
+    address: ":10261"
+  portproxy_10262:
+    address: ":10262"
+  portproxy_10263:
+    address: ":10263"
+  portproxy_10264:
+    address: ":10264"
+  portproxy_10265:
+    address: ":10265"
+  portproxy_10266:
+    address: ":10266"
+  portproxy_10267:
+    address: ":10267"
+  portproxy_10268:
+    address: ":10268"
+  portproxy_10269:
+    address: ":10269"
+  portproxy_10270:
+    address: ":10270"
+  portproxy_10271:
+    address: ":10271"
+  portproxy_10272:
+    address: ":10272"
+  portproxy_10273:
+    address: ":10273"
+  portproxy_10274:
+    address: ":10274"
+  portproxy_10275:
+    address: ":10275"
+  portproxy_10276:
+    address: ":10276"
+  portproxy_10277:
+    address: ":10277"
+  portproxy_10278:
+    address: ":10278"
+  portproxy_10279:
+    address: ":10279"
+  portproxy_10280:
+    address: ":10280"
+  portproxy_10281:
+    address: ":10281"
+  portproxy_10282:
+    address: ":10282"
+  portproxy_10283:
+    address: ":10283"
+  portproxy_10284:
+    address: ":10284"
+  portproxy_10285:
+    address: ":10285"
+  portproxy_10286:
+    address: ":10286"
+  portproxy_10287:
+    address: ":10287"
+  portproxy_10288:
+    address: ":10288"
+  portproxy_10289:
+    address: ":10289"
+  portproxy_10290:
+    address: ":10290"
+  portproxy_10291:
+    address: ":10291"
+  portproxy_10292:
+    address: ":10292"
+  portproxy_10293:
+    address: ":10293"
+  portproxy_10294:
+    address: ":10294"
+  portproxy_10295:
+    address: ":10295"
+  portproxy_10296:
+    address: ":10296"
+  portproxy_10297:
+    address: ":10297"
+  portproxy_10298:
+    address: ":10298"
+  portproxy_10299:
+    address: ":10299"
+  portproxy_10300:
+    address: ":10300"
+
+providers:
+  etcd:
+    rootKey: "traefik/worker_worker-1"
+    endpoints:
+      - "backendai-half-etcd:2379"
+
+log:
+  level: INFO
+accessLog: {}

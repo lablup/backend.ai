@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.model_card.types import MinResourceSpec
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -22,8 +22,11 @@ class ModelCardUpdaterSpec(UpdaterSpec[ModelCardRow]):
     framework: OptionalState[list[str]] = field(default_factory=OptionalState[list[str]].nop)
     label: OptionalState[list[str]] = field(default_factory=OptionalState[list[str]].nop)
     license: TriState[str] = field(default_factory=TriState[str].nop)
-    min_resource: TriState[MinResourceSpec] = field(default_factory=TriState[MinResourceSpec].nop)
+    min_resource: TriState[list[ResourceRequirementEntry]] = field(
+        default_factory=TriState[list[ResourceRequirementEntry]].nop
+    )
     readme: TriState[str] = field(default_factory=TriState[str].nop)
+    access_level: OptionalState[str] = field(default_factory=OptionalState[str].nop)
 
     @property
     @override
@@ -44,6 +47,6 @@ class ModelCardUpdaterSpec(UpdaterSpec[ModelCardRow]):
         self.framework.update_dict(to_update, "framework")
         self.label.update_dict(to_update, "label")
         self.license.update_dict(to_update, "license")
-        self.min_resource.update_dict(to_update, "min_resource")
         self.readme.update_dict(to_update, "readme")
+        self.access_level.update_dict(to_update, "access_level")
         return to_update

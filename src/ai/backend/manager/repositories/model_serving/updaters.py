@@ -105,8 +105,19 @@ class EndpointAutoScalingRuleUpdaterSpec(UpdaterSpec[EndpointAutoScalingRuleRow]
         to_update: dict[str, Any] = {}
         self.metric_source.update_dict(to_update, "metric_source")
         self.metric_name.update_dict(to_update, "metric_name")
-        self.threshold.update_dict(to_update, "threshold")
-        self.comparator.update_dict(to_update, "comparator")
+        # Convert legacy threshold+comparator to DB min/max_threshold columns
+        threshold_val = self.threshold.optional_value()
+        comparator_val = self.comparator.optional_value()
+        if threshold_val is not None and comparator_val is not None:
+            if comparator_val in (
+                AutoScalingMetricComparator.GREATER_THAN,
+                AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL,
+            ):
+                to_update["max_threshold"] = threshold_val
+            else:
+                to_update["min_threshold"] = threshold_val
+        elif threshold_val is not None:
+            to_update["max_threshold"] = threshold_val
         self.step_size.update_dict(to_update, "step_size")
         self.cooldown_seconds.update_dict(to_update, "cooldown_seconds")
         self.min_replicas.update_dict(to_update, "min_replicas")

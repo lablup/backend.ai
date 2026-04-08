@@ -15,16 +15,22 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
+from ai.backend.manager.data.deployment.creator import (
+    DeploymentPolicyConfig,
+    ModelRevisionCreator,
+    NewDeploymentCreator,
+)
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
     DeploymentLifecycleSubStep,
+    DeploymentNetworkSpec,
     ExecutionSpec,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
@@ -35,16 +41,29 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionData,
     ModelRuntimeConfigData,
     MountMetadata,
+    ReplicaSpec,
     ReplicaStateData,
     ResourceConfigData,
     ResourceSpec,
     RevisionDraft,
+    RouteHealthStatus,
     RouteInfo,
+    RouteStatus,
+    RouteTrafficStatus,
     merge_revision_drafts,
+)
+from ai.backend.manager.data.deployment_revision_preset.types import (
+    DeploymentRevisionPresetData,
+    PresetValueData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy import (
+    BlueGreenSpec,
+    DeploymentPolicyRow,
+    RollingUpdateSpec,
+)
+from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.upserter import Upserter
@@ -65,13 +84,32 @@ from ai.backend.manager.repositories.deployment.upserters import DeploymentPolic
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentRevisionPresetRepository,
 )
+from ai.backend.manager.repositories.runtime_variant_preset.repository import (
+    RuntimeVariantPresetRepository,
+)
+from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
+    BulkDeleteAccessTokensAction,
+    BulkDeleteAccessTokensActionResult,
+)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
 )
+from ai.backend.manager.services.deployment.actions.access_token.delete_access_token import (
+    DeleteAccessTokenAction,
+    DeleteAccessTokenActionResult,
+)
+from ai.backend.manager.services.deployment.actions.access_token.get_access_token import (
+    GetAccessTokenAction,
+    GetAccessTokenActionResult,
+)
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
     SearchAccessTokensActionResult,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
+    BulkDeleteAutoScalingRulesAction,
+    BulkDeleteAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -128,6 +166,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
     GetRevisionByIdActionResult,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.search_revision_resource_slots import (
+    SearchRevisionResourceSlotsAction,
+    SearchRevisionResourceSlotsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
@@ -270,22 +312,54 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
     )
 
 
-def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
-    """Convert RouteInfo to ModelReplicaData.
+_HEALTH_STATUS_TO_READINESS: dict[RouteHealthStatus, ReadinessStatus] = {
+    RouteHealthStatus.HEALTHY: ReadinessStatus.HEALTHY,
+    RouteHealthStatus.UNHEALTHY: ReadinessStatus.UNHEALTHY,
+    RouteHealthStatus.DEGRADED: ReadinessStatus.UNHEALTHY,
+    RouteHealthStatus.NOT_CHECKED: ReadinessStatus.NOT_CHECKED,
+}
 
-    Note: Some fields are set to defaults as RouteInfo doesn't have all the data.
+_ROUTE_STATUS_TO_LIVENESS: dict[RouteStatus, LivenessStatus] = {
+    RouteStatus.RUNNING: LivenessStatus.HEALTHY,
+    RouteStatus.PROVISIONING: LivenessStatus.NOT_CHECKED,
+    RouteStatus.TERMINATING: LivenessStatus.DEGRADED,
+    RouteStatus.TERMINATED: LivenessStatus.UNHEALTHY,
+    RouteStatus.FAILED_TO_START: LivenessStatus.UNHEALTHY,
+}
+
+
+def _resolve_activeness(
+    traffic_status: RouteTrafficStatus,
+    readiness: ReadinessStatus,
+    liveness: LivenessStatus,
+) -> ActivenessStatus:
+    """Determine activeness from traffic_status, readiness, and liveness.
+
+    A replica is ACTIVE only when:
+    - traffic_status is ACTIVE (admin hasn't disabled it), AND
+    - readiness is HEALTHY (health check passed), AND
+    - liveness is HEALTHY (container is running)
     """
+    if traffic_status != RouteTrafficStatus.ACTIVE:
+        return ActivenessStatus.INACTIVE
+    if readiness != ReadinessStatus.HEALTHY:
+        return ActivenessStatus.INACTIVE
+    if liveness != LivenessStatus.HEALTHY:
+        return ActivenessStatus.INACTIVE
+    return ActivenessStatus.ACTIVE
+
+
+def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
+    """Convert RouteInfo to ModelReplicaData."""
+    readiness = _HEALTH_STATUS_TO_READINESS.get(route.health_status) or ReadinessStatus.NOT_CHECKED
+    liveness = _ROUTE_STATUS_TO_LIVENESS.get(route.status) or LivenessStatus.NOT_CHECKED
     return ModelReplicaData(
         id=route.route_id,
-        revision_id=route.revision_id
-        or route.endpoint_id,  # Fallback to endpoint_id if no revision
+        revision_id=route.revision_id or route.endpoint_id,
         session_id=route.session_id or route.route_id,
-        readiness_status=ReadinessStatus.HEALTHY,  # Derived from route status
-        liveness_status=LivenessStatus.HEALTHY,  # Default
-        activeness_status=ActivenessStatus.ACTIVE
-        if route.traffic_ratio > 0
-        else ActivenessStatus.INACTIVE,
-        weight=int(route.traffic_ratio * 100),  # Convert ratio to weight
+        readiness_status=readiness,
+        liveness_status=liveness,
+        activeness_status=_resolve_activeness(route.traffic_status, readiness, liveness),
         detail=route.error_data,
         created_at=route.created_at,
     )
@@ -299,6 +373,7 @@ class DeploymentService:
     _revision_generator_registry: RevisionGeneratorRegistry
     _model_definition_generator_registry: ModelDefinitionGeneratorRegistry
     _deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
+    _runtime_variant_preset_repository: RuntimeVariantPresetRepository | None
 
     def __init__(
         self,
@@ -307,6 +382,7 @@ class DeploymentService:
         revision_generator_registry: RevisionGeneratorRegistry,
         model_definition_generator_registry: ModelDefinitionGeneratorRegistry,
         deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None = None,
+        runtime_variant_preset_repository: RuntimeVariantPresetRepository | None = None,
     ) -> None:
         """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
@@ -314,6 +390,7 @@ class DeploymentService:
         self._revision_generator_registry = revision_generator_registry
         self._model_definition_generator_registry = model_definition_generator_registry
         self._deployment_revision_preset_repository = deployment_revision_preset_repository
+        self._runtime_variant_preset_repository = runtime_variant_preset_repository
 
     # ========== Deployment CRUD ==========
 
@@ -330,9 +407,26 @@ class DeploymentService:
         """
         log.info("Creating deployment with name: {}", action.creator.metadata.name)
 
+        # Resolve deployment-level fields (network, replica, history limit, policy)
+        # against the revision preset before building CreatorSpec. Caller-provided
+        # values always win; None values fall back to the preset, then to system
+        # defaults. Revision-level merging happens later inside add_model_revision.
+        resolved_creator = await self._apply_deployment_level_preset(action.creator)
+
         # Build CreatorSpec from action data
-        metadata = action.creator.metadata
-        revision = action.creator.model_revision
+        metadata = resolved_creator.metadata
+        revision = resolved_creator.model_revision
+        # After ``_apply_deployment_level_preset`` these fields are guaranteed to
+        # be populated; the explicit checks here both narrow the types for the
+        # type checker and surface the invariant violation if the resolution
+        # logic ever regresses.
+        replica_spec = resolved_creator.replica_spec
+        network_spec = resolved_creator.network
+        if replica_spec is None or network_spec is None or metadata.revision_history_limit is None:
+            raise UnreachableError(
+                "_apply_deployment_level_preset must populate replica_spec, network, "
+                "and revision_history_limit"
+            )
 
         # Build revision fields for EndpointRow only if initial_revision is provided
         revision_fields: ModelRevisionFields | None = None
@@ -373,12 +467,12 @@ class DeploymentService:
                 tag=metadata.tag,
             ),
             replica=DeploymentReplicaFields(
-                replica_count=action.creator.replica_spec.replica_count,
-                desired_replica_count=action.creator.replica_spec.desired_replica_count,
+                replica_count=replica_spec.replica_count,
+                desired_replica_count=replica_spec.desired_replica_count,
             ),
             network=DeploymentNetworkFields(
-                open_to_public=action.creator.network.open_to_public,
-                url=action.creator.network.url,
+                open_to_public=network_spec.open_to_public,
+                url=network_spec.url,
             ),
             revision=revision_fields,
         )
@@ -393,7 +487,7 @@ class DeploymentService:
 
         # Create endpoint via repository
         deployment_info = await self._deployment_repository.create_endpoint(
-            creator, action.creator.policy
+            creator, resolved_creator.policy
         )
 
         # Create initial revision if provided, via the same path as add_model_revision
@@ -589,10 +683,13 @@ class DeploymentService:
         preset_data = await self._deployment_revision_preset_repository.get_by_id(
             creator.revision_preset_id,
         )
+        preset_slots = await self._deployment_revision_preset_repository.get_resource_slots(
+            creator.revision_preset_id,
+        )
 
         preset_draft = RevisionDraft(
-            image_id=None,
-            resource_slots={s.resource_type: s.quantity for s in preset_data.resource_slots},
+            image_id=preset_data.image_id,
+            resource_slots={slot_name: str(quantity) for slot_name, quantity in preset_slots},
             resource_opts={o.name: o.value for o in preset_data.resource_opts},
             cluster_mode=ClusterMode(preset_data.cluster_mode)
             if preset_data.cluster_mode
@@ -650,6 +747,103 @@ class DeploymentService:
             ),
             model_definition=merged.model_definition,
             revision_preset_id=creator.revision_preset_id,
+            preset_values=[
+                PresetValueData(preset_id=pv.preset_id, value=pv.value)
+                for pv in preset_data.preset_values
+            ],
+        )
+
+    # System defaults used when neither the caller input nor the preset provides a value.
+    _DEFAULT_REVISION_HISTORY_LIMIT = 10
+    _DEFAULT_REPLICA_COUNT = 1
+    _DEFAULT_OPEN_TO_PUBLIC = False
+
+    async def _apply_deployment_level_preset(
+        self,
+        creator: NewDeploymentCreator,
+    ) -> NewDeploymentCreator:
+        """Resolve deployment-level fields against the revision preset defaults.
+
+        Priority: explicit caller input > preset default > system default.
+
+        Deployment-level fields currently resolved: ``metadata.revision_history_limit``,
+        ``replica_spec``, ``network``, and ``policy``. Fields that were left as ``None``
+        on the input creator are filled in from the preset (if a ``revision_preset_id``
+        is set on the model revision) and then from the system defaults.
+        """
+        preset_data: DeploymentRevisionPresetData | None = None
+        if (
+            creator.model_revision is not None
+            and creator.model_revision.revision_preset_id is not None
+            and self._deployment_revision_preset_repository is not None
+        ):
+            preset_data = await self._deployment_revision_preset_repository.get_by_id(
+                creator.model_revision.revision_preset_id,
+            )
+
+        resolved_history_limit = creator.metadata.revision_history_limit
+        if resolved_history_limit is None and preset_data is not None:
+            resolved_history_limit = preset_data.revision_history_limit
+        if resolved_history_limit is None:
+            resolved_history_limit = self._DEFAULT_REVISION_HISTORY_LIMIT
+        resolved_metadata = dataclasses.replace(
+            creator.metadata,
+            revision_history_limit=resolved_history_limit,
+        )
+
+        resolved_replica_spec = creator.replica_spec
+        if resolved_replica_spec is None:
+            preset_replica = (
+                preset_data.replica_count
+                if preset_data is not None and preset_data.replica_count is not None
+                else self._DEFAULT_REPLICA_COUNT
+            )
+            resolved_replica_spec = ReplicaSpec(replica_count=preset_replica)
+
+        resolved_network = creator.network
+        if resolved_network is None:
+            preset_open = (
+                preset_data.open_to_public
+                if preset_data is not None and preset_data.open_to_public is not None
+                else self._DEFAULT_OPEN_TO_PUBLIC
+            )
+            resolved_network = DeploymentNetworkSpec(open_to_public=preset_open)
+
+        resolved_policy = creator.policy
+        if resolved_policy is None and preset_data is not None:
+            resolved_policy = self._build_policy_from_preset(preset_data)
+
+        return dataclasses.replace(
+            creator,
+            metadata=resolved_metadata,
+            replica_spec=resolved_replica_spec,
+            network=resolved_network,
+            policy=resolved_policy,
+        )
+
+    @staticmethod
+    def _build_policy_from_preset(
+        preset_data: DeploymentRevisionPresetData,
+    ) -> DeploymentPolicyConfig | None:
+        """Reconstruct a DeploymentPolicyConfig from preset-stored strategy fields."""
+        if preset_data.deployment_strategy is None:
+            return None
+        spec_dict = preset_data.deployment_strategy_spec or {}
+        strategy_spec: RollingUpdateSpec | BlueGreenSpec
+        match preset_data.deployment_strategy:
+            case DeploymentStrategy.ROLLING:
+                strategy_spec = (
+                    RollingUpdateSpec.model_validate(spec_dict)
+                    if spec_dict
+                    else RollingUpdateSpec()
+                )
+            case DeploymentStrategy.BLUE_GREEN:
+                strategy_spec = (
+                    BlueGreenSpec.model_validate(spec_dict) if spec_dict else BlueGreenSpec()
+                )
+        return DeploymentPolicyConfig(
+            strategy=preset_data.deployment_strategy,
+            strategy_spec=strategy_spec,
         )
 
     async def _merge_deployment_config(
@@ -671,7 +865,7 @@ class DeploymentService:
         try:
             deployment_config = await generator.load_deployment_config(
                 vfolder_id=revision_creator.mounts.model_vfolder_id,
-                runtime_variant=revision_creator.execution.runtime_variant.value,
+                runtime_variant=revision_creator.execution.runtime_variant,
             )
         except Exception:
             log.warning(
@@ -775,6 +969,10 @@ class DeploymentService:
             runtime_variant=merged_creator.execution.runtime_variant,
             # TODO: Convert merged_creator.mounts.extra_mounts (list[MountInfo]) to Sequence[VFolderMount] instead of discarding.
             extra_mounts=(),
+            preset_values=[
+                PresetValueEntry(preset_id=pv.preset_id, value=pv.value)
+                for pv in merged_creator.preset_values
+            ],
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -931,6 +1129,25 @@ class DeploymentService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def search_revision_resource_slots(
+        self, action: SearchRevisionResourceSlotsAction
+    ) -> SearchRevisionResourceSlotsActionResult:
+        """Search resource slots allocated to a deployment revision."""
+        (
+            items,
+            total_count,
+            has_next_page,
+            has_previous_page,
+        ) = await self._deployment_repository.search_revision_resource_slots(
+            action.revision_id, action.querier
+        )
+        return SearchRevisionResourceSlotsActionResult(
+            items=items,
+            total_count=total_count,
+            has_next_page=has_next_page,
+            has_previous_page=has_previous_page,
+        )
+
     async def update_route_traffic_status(
         self, action: UpdateRouteTrafficStatusAction
     ) -> UpdateRouteTrafficStatusActionResult:
@@ -1020,6 +1237,15 @@ class DeploymentService:
         )
         return DeleteAutoScalingRuleActionResult(success=success)
 
+    async def bulk_delete_auto_scaling_rules(
+        self, action: BulkDeleteAutoScalingRulesAction
+    ) -> BulkDeleteAutoScalingRulesActionResult:
+        """Bulk delete auto-scaling rules."""
+        deleted_ids = await self._deployment_repository.bulk_delete_autoscaling_rules(
+            action.auto_scaling_rule_ids
+        )
+        return BulkDeleteAutoScalingRulesActionResult(deleted_ids=deleted_ids)
+
     # ========== Access Token ==========
 
     async def create_access_token(
@@ -1045,6 +1271,7 @@ class DeploymentService:
             domain=endpoint_info.metadata.domain,
             project_id=endpoint_info.metadata.project,
             session_owner_id=endpoint_info.metadata.session_owner,
+            expires_at=action.creator.expires_at,
         )
         creator: RBACEntityCreator[EndpointTokenRow] = RBACEntityCreator(
             spec=spec,
@@ -1058,15 +1285,34 @@ class DeploymentService:
         # Create the token via repository
         token_row = await self._deployment_repository.create_access_token(creator)
 
-        # Convert to ModelDeploymentAccessTokenData
-        # Note: valid_until is returned as provided but not persisted in DB
         data = ModelDeploymentAccessTokenData(
             id=token_row.id,
             token=token_row.token,
-            valid_until=action.creator.valid_until,
+            expires_at=token_row.expires_at,
             created_at=token_row.created_at or datetime.now(UTC),
         )
         return CreateAccessTokenActionResult(data=data)
+
+    async def get_access_token(self, action: GetAccessTokenAction) -> GetAccessTokenActionResult:
+        """Get an access token by ID."""
+        data = await self._deployment_repository.get_access_token(action.access_token_id)
+        return GetAccessTokenActionResult(data=data)
+
+    async def delete_access_token(
+        self, action: DeleteAccessTokenAction
+    ) -> DeleteAccessTokenActionResult:
+        """Delete an access token."""
+        success = await self._deployment_repository.delete_access_token(action.access_token_id)
+        return DeleteAccessTokenActionResult(success=success)
+
+    async def bulk_delete_access_tokens(
+        self, action: BulkDeleteAccessTokensAction
+    ) -> BulkDeleteAccessTokensActionResult:
+        """Bulk delete access tokens."""
+        deleted_ids = await self._deployment_repository.bulk_delete_access_tokens(
+            action.access_token_ids
+        )
+        return BulkDeleteAccessTokensActionResult(deleted_ids=deleted_ids)
 
     # ========== Replica Operations ==========
 

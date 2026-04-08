@@ -36,6 +36,8 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderID,
     VFolderMount,
+    VFolderMountOptions,
+    VFolderMountRequest,
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -693,6 +695,18 @@ async def query_accessible_vfolders(
             result = await conn.execute(query)
             grps = result.fetchall()
             group_ids = [g.group_id for g in grps]
+            # Include MODEL_STORE projects in the same domain for cross-project model access
+            from ai.backend.manager.data.group.types import ProjectType
+
+            model_store_query = sa.select(groups.c.id).where(
+                sa.and_(
+                    groups.c.domain_name == domain_name,
+                    groups.c.type == ProjectType.MODEL_STORE,
+                )
+            )
+            model_store_result = await conn.execute(model_store_query)
+            model_store_gids = [row.id for row in model_store_result.fetchall()]
+            group_ids = list({*group_ids, *model_store_gids})
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = (
             sa.select(*vfolders_selectors, vfolders.c.permission, groups.c.name)
@@ -871,33 +885,27 @@ async def prepare_vfolder_mounts(
     allowed_vfolder_types: Sequence[str],
     user_scope: UserScope,
     resource_policy: Mapping[str, Any],
-    requested_mount_references: Sequence[str | uuid.UUID],
-    requested_mount_reference_map: Mapping[str | uuid.UUID, str],
-    requested_mount_reference_options: Mapping[str | uuid.UUID, Any],
+    mount_requests: Sequence[VFolderMountRequest],
 ) -> Sequence[VFolderMount]:
     """
     Determine the actual mount information from the requested vfolder lists,
     vfolder configurations, and the given user scope.
     """
-    # TODO: Refactor the whole function:
-    # - Replace 'requested_mount_references', 'requested_mount_reference_map' and 'requested_mount_reference_options' with one mapping parameter.
-    # - DO NOT validate value of subdirectories here.
-    requested_mounts: list[str] = [
-        name for name in requested_mount_references if isinstance(name, str)
-    ]
-    requested_mount_name_map: dict[str, str] = {
-        name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
-    }
-    requested_mount_map: dict[uuid.UUID, str] = {
-        vfolder_uuid: path
-        for vfolder_uuid, path in requested_mount_reference_map.items()
-        if isinstance(vfolder_uuid, uuid.UUID)
-    }
-    requested_mount_options: dict[str | uuid.UUID, dict[str, Any]] = {
-        name: options
-        for name, options in requested_mount_reference_options.items()
-        if isinstance(name, str)
-    }
+    requested_mounts: list[str] = []
+    requested_mount_name_map: dict[str, str] = {}
+    requested_mount_map: dict[uuid.UUID, str] = {}
+    requested_mount_options: dict[str | uuid.UUID, VFolderMountOptions] = {}
+
+    for req in mount_requests:
+        if isinstance(req.ref, uuid.UUID):
+            if req.dst_path is not None:
+                requested_mount_map[req.ref] = req.dst_path
+            requested_mount_options[req.ref] = req.options
+        else:
+            requested_mounts.append(req.ref)
+            if req.dst_path is not None:
+                requested_mount_name_map[req.ref] = req.dst_path
+            requested_mount_options[req.ref] = req.options
 
     requested_vfolder_names: dict[str | uuid.UUID, str] = {}
     requested_vfolder_ids: set[uuid.UUID] = set()
@@ -907,7 +915,8 @@ async def prepare_vfolder_mounts(
     _already_resolved: set[str] = set()
 
     # Split the vfolder name and subpaths
-    for key in requested_mount_references:
+    for req in mount_requests:
+        key = req.ref
         if isinstance(key, uuid.UUID):
             requested_vfolder_ids.add(key)
             continue
@@ -934,6 +943,19 @@ async def prepare_vfolder_mounts(
                 raise InvalidAPIParameters(
                     f"VFolder source path '{p1}' overlaps with '{p2}'",
                 )
+
+    # Fetch MODEL_STORE project IDs for cross-project mount allowance
+    from ai.backend.manager.data.group.types import ProjectType as DataProjectType
+    from ai.backend.manager.models.group import groups as groups_table
+
+    _ms_query = sa.select(groups_table.c.id).where(
+        sa.and_(
+            groups_table.c.domain_name == user_scope.domain_name,
+            groups_table.c.type == DataProjectType.MODEL_STORE,
+        )
+    )
+    _ms_result = await conn.execute(_ms_query)
+    model_store_project_ids: set[str] = {str(row.id) for row in _ms_result.fetchall()}
 
     # Query the accessible vfolders that satisfy either:
     # - the name matches with the requested vfolder name, or
@@ -981,11 +1003,10 @@ async def prepare_vfolder_mounts(
         if name not in requested_names:
             requested_vfolder_names[vfid] = name
         requested_mounts.append(name)
-        if path := requested_mount_reference_map.get(vfid):
-            requested_mount_name_map[name] = path
-        if options := requested_mount_reference_options.get(vfid):
-            requested_mount_options[name] = options
-            requested_mount_options[vfid] = options
+        if vfid in requested_mount_map:
+            requested_mount_name_map[name] = requested_mount_map[vfid]
+        if vfid in requested_mount_options:
+            requested_mount_options[name] = requested_mount_options[vfid]
 
     # Check if there are overlapping mount sources
     check_overlapping_mounts(requested_mounts)
@@ -1046,10 +1067,17 @@ async def prepare_vfolder_mounts(
                 )
             )
             continue
-        if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
-            # User's accessible group vfolders should not be mounted
-            # if they do not belong to the execution kernel.
-            continue
+        is_cross_project = vfolder["group"] is not None and vfolder["group"] != str(
+            user_scope.group_id
+        )
+        is_model_store_vfolder = (
+            vfolder["group"] is not None and vfolder["group"] in model_store_project_ids
+        )
+        if is_cross_project:
+            if is_model_store_vfolder and vfolder["usage_mode"] == VFolderUsageMode.MODEL:
+                pass  # Allow cross-project MODEL_STORE model vfolders (read-only)
+            else:
+                continue
         try:
             proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
             manager_client = storage_manager.get_manager_facing_client(proxy_name)
@@ -1102,20 +1130,23 @@ async def prepare_vfolder_mounts(
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
                     kernel_path = PurePosixPath("/home/work", kernel_path_raw)
-            match requested_perm := requested_mount_options.get(requested_key, {}).get(
-                "permission"
-            ):
-                case MountPermission.READ_ONLY:
-                    mount_perm = MountPermission.READ_ONLY
-                case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
-                    if vfolder["permission"] == VFolderPermission.READ_ONLY:
-                        raise VFolderPermissionError(
-                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
-                            f"but attempted with '{requested_perm.value}' mode."
-                        )
-                    mount_perm = requested_perm
-                case _:  # None if unset
-                    mount_perm = vfolder["permission"]
+            mount_opts = requested_mount_options.get(requested_key, VFolderMountOptions())
+            if is_cross_project and is_model_store_vfolder:
+                mount_perm = MountPermission.READ_ONLY
+            else:
+                match mount_opts.permission:
+                    case MountPermission.READ_ONLY:
+                        mount_perm = MountPermission.READ_ONLY
+                    case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
+                        if vfolder["permission"] == VFolderPermission.READ_ONLY:
+                            raise VFolderPermissionError(
+                                f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
+                                f"but attempted with '{mount_opts.permission.value}' mode."
+                            )
+                        mount_perm = mount_opts.permission
+                    case _:  # None if unset
+                        mount_perm = vfolder["permission"]
+
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],

@@ -32,10 +32,10 @@ def create_circuit(port: int) -> Circuit:
         port=port,
         app_info=InferenceAppInfo(
             endpoint_id=UUID("b9567a3b-3ca1-4d8f-b8eb-a9567073808d"),
-            runtime_variant=RuntimeVariant.VLLM,
+            runtime_variant=RuntimeVariant("vllm"),
         ),
         subdomain=None,
-        runtime_variant=RuntimeVariant.VLLM,
+        runtime_variant=RuntimeVariant("vllm"),
         envs={},
         arguments=None,
         open_to_public=False,

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from ai.backend.common.dto.manager.v2.group.types import (
-    GroupOrderField,
     OrderDirection,
+    ProjectOrderField,
     ProjectType,
 )
 
@@ -55,30 +55,30 @@ class TestOrderDirection:
         assert OrderDirection("DESC") is OrderDirection.DESC
 
 
-class TestGroupOrderField:
-    """Tests for GroupOrderField enum."""
+class TestProjectOrderField:
+    """Tests for ProjectOrderField enum."""
 
     def test_name_value(self) -> None:
-        assert GroupOrderField.NAME.value == "name"
+        assert ProjectOrderField.NAME.value == "name"
 
     def test_created_at_value(self) -> None:
-        assert GroupOrderField.CREATED_AT.value == "created_at"
+        assert ProjectOrderField.CREATED_AT.value == "created_at"
 
     def test_modified_at_value(self) -> None:
-        assert GroupOrderField.MODIFIED_AT.value == "modified_at"
+        assert ProjectOrderField.MODIFIED_AT.value == "modified_at"
 
     def test_enum_members_count(self) -> None:
-        assert len(list(GroupOrderField)) == 8
+        assert len(list(ProjectOrderField)) == 8
 
     def test_all_values_are_strings(self) -> None:
-        for member in GroupOrderField:
+        for member in ProjectOrderField:
             assert isinstance(member.value, str)
 
     def test_from_string_name(self) -> None:
-        assert GroupOrderField("name") is GroupOrderField.NAME
+        assert ProjectOrderField("name") is ProjectOrderField.NAME
 
     def test_from_string_created_at(self) -> None:
-        assert GroupOrderField("created_at") is GroupOrderField.CREATED_AT
+        assert ProjectOrderField("created_at") is ProjectOrderField.CREATED_AT
 
     def test_from_string_modified_at(self) -> None:
-        assert GroupOrderField("modified_at") is GroupOrderField.MODIFIED_AT
+        assert ProjectOrderField("modified_at") is ProjectOrderField.MODIFIED_AT

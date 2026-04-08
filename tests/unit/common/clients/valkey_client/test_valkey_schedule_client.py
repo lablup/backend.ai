@@ -57,15 +57,16 @@ class TestValkeyScheduleClient:
         """Helper: Manually set stale health data for testing staleness detection"""
         key = client._get_route_health_key(route_id)
         stale_timestamp = str(int(time()) - MAX_HEALTH_STALENESS_SEC - 10)
-        await client._client.client.hset(
-            key,
-            {
-                "readiness": "1",
-                "last_readiness": stale_timestamp,
-                "liveness": "1",
-                "last_liveness": stale_timestamp,
-            },
-        )
+        async with client._client.client() as conn:
+            await conn.hset(
+                key,
+                {
+                    "readiness": "1",
+                    "last_readiness": stale_timestamp,
+                    "liveness": "1",
+                    "last_liveness": stale_timestamp,
+                },
+            )
 
     async def test_initialize_routes_health_status_batch(
         self, valkey_schedule_client: ValkeyScheduleClient
@@ -285,10 +286,11 @@ class TestValkeyScheduleClient:
         # Set route with old last_check timestamp
         key = valkey_schedule_client._get_route_health_key(route_id)
         old_timestamp = str(int(time()) - 60)  # 60 seconds ago
-        await valkey_schedule_client._client.client.hset(
-            key,
-            {"readiness": "1", "last_readiness": old_timestamp, "last_check": old_timestamp},
-        )
+        async with valkey_schedule_client._client.client() as conn:
+            await conn.hset(
+                key,
+                {"readiness": "1", "last_readiness": old_timestamp, "last_check": old_timestamp},
+            )
 
         # Check health status should update last_check
         await valkey_schedule_client.check_route_health_status([route_id])
@@ -402,16 +404,17 @@ class TestKernelPresenceStatus:
         kernel_id = KernelId(uuid4())
         key = valkey_schedule_client._get_kernel_presence_key(kernel_id)
         stale_timestamp = str(int(time()) - MAX_KERNEL_HEALTH_STALENESS_SEC - 10)
-        await valkey_schedule_client._client.client.hset(
-            key,
-            {
-                "presence": "1",
-                "last_presence": stale_timestamp,
-                "last_check": stale_timestamp,
-                "created_at": stale_timestamp,
-            },
-        )
-        await valkey_schedule_client._client.client.expire(key, KERNEL_HEALTH_TTL_SEC)
+        async with valkey_schedule_client._client.client() as conn:
+            await conn.hset(
+                key,
+                {
+                    "presence": "1",
+                    "last_presence": stale_timestamp,
+                    "last_check": stale_timestamp,
+                    "created_at": stale_timestamp,
+                },
+            )
+            await conn.expire(key, KERNEL_HEALTH_TTL_SEC)
         return kernel_id
 
     @pytest.fixture
@@ -564,15 +567,16 @@ class TestKernelPresenceStatus:
         kernel_id = KernelId(uuid4())
         key = valkey_schedule_client._get_kernel_presence_key(kernel_id)
         old_timestamp = str(int(time()) - 60)  # 60 seconds ago
-        await valkey_schedule_client._client.client.hset(
-            key,
-            {
-                "presence": "1",
-                "last_presence": old_timestamp,
-                "last_check": old_timestamp,
-                "created_at": old_timestamp,
-            },
-        )
+        async with valkey_schedule_client._client.client() as conn:
+            await conn.hset(
+                key,
+                {
+                    "presence": "1",
+                    "last_presence": old_timestamp,
+                    "last_check": old_timestamp,
+                    "created_at": old_timestamp,
+                },
+            )
 
         # Check should update last_check
         statuses = await valkey_schedule_client.check_kernel_presence_status_batch([kernel_id])
@@ -681,11 +685,12 @@ class TestAgentLastCheck:
         # Manually set agent_last_check
         key = valkey_schedule_client._get_agent_last_check_key(agent_id)
         expected_timestamp = int(time())
-        await valkey_schedule_client._client.client.set(
-            key,
-            str(expected_timestamp),
-            expiry=ExpirySet(ExpiryType.SEC, AGENT_LAST_CHECK_TTL_SEC),
-        )
+        async with valkey_schedule_client._client.client() as conn:
+            await conn.set(
+                key,
+                str(expected_timestamp),
+                expiry=ExpirySet(ExpiryType.SEC, AGENT_LAST_CHECK_TTL_SEC),
+            )
 
         result = await valkey_schedule_client.get_agent_last_check(agent_id)
         assert result == expected_timestamp

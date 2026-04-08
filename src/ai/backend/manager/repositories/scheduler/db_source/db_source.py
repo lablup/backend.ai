@@ -37,6 +37,8 @@ from ai.backend.common.types import (
     SlotQuantity,
     SlotTypes,
     VFolderMount,
+    VFolderMountOptions,
+    VFolderMountRequest,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -1456,15 +1458,8 @@ class ScheduleDBSource:
             )
             image_infos = await self._resolve_image_info(db_sess, image_refs)
 
-            # Prepare mount-related data
-            requested_mounts = spec.creation_spec.get("mounts") or []
-            requested_mount_ids = spec.creation_spec.get("mount_ids") or []
-            requested_mount_map = spec.creation_spec.get("mount_map") or {}
-            requested_mount_id_map = spec.creation_spec.get("mount_id_map") or {}
-            requested_mount_options = spec.creation_spec.get("mount_options") or {}
-
-            combined_mounts = requested_mounts + requested_mount_ids
-            combined_mount_map = {**requested_mount_map, **requested_mount_id_map}
+            # Build typed mount requests from creation_spec
+            mount_requests = self._build_mount_requests_from_spec(spec.creation_spec)
 
             # Fetch vfolder mounts
             vfolder_mounts = await self._fetch_vfolder_mounts(
@@ -1473,9 +1468,7 @@ class ScheduleDBSource:
                 allowed_vfolder_types,
                 spec.user_scope,
                 spec.resource_policy,
-                combined_mounts,
-                combined_mount_map,
-                requested_mount_options,
+                mount_requests,
             )
 
             # Fetch dotfile data
@@ -1609,6 +1602,44 @@ class ScheduleDBSource:
                 db_sess, domain_name, group_id, access_key
             )
 
+    @staticmethod
+    def _build_mount_requests_from_spec(
+        creation_spec: dict[str, Any],
+    ) -> list[VFolderMountRequest]:
+        """Convert legacy creation_spec dict into typed VFolderMountRequest list."""
+        requested_mounts: list[str] = creation_spec.get("mounts") or []
+        requested_mount_ids: list[UUID] = creation_spec.get("mount_ids") or []
+        requested_mount_map: dict[str, str] = creation_spec.get("mount_map") or {}
+        requested_mount_id_map: dict[UUID, str] = creation_spec.get("mount_id_map") or {}
+        requested_mount_options: dict[str | UUID, dict[str, Any]] = (
+            creation_spec.get("mount_options") or {}
+        )
+
+        requests: list[VFolderMountRequest] = []
+        for name in requested_mounts:
+            raw_opts = requested_mount_options.get(name, {})
+            requests.append(
+                VFolderMountRequest(
+                    ref=name,
+                    dst_path=requested_mount_map.get(name),
+                    options=VFolderMountOptions(
+                        permission=raw_opts.get("permission"),
+                    ),
+                )
+            )
+        for vfid in requested_mount_ids:
+            raw_opts = requested_mount_options.get(vfid, {})
+            requests.append(
+                VFolderMountRequest(
+                    ref=vfid,
+                    dst_path=requested_mount_id_map.get(vfid),
+                    options=VFolderMountOptions(
+                        permission=raw_opts.get("permission"),
+                    ),
+                )
+            )
+        return requests
+
     async def _fetch_vfolder_mounts(
         self,
         db_sess: SASession,
@@ -1616,14 +1647,11 @@ class ScheduleDBSource:
         allowed_vfolder_types: list[str],
         user_scope: UserScope,
         resource_policy: dict[str, Any],
-        combined_mounts: list[str],
-        combined_mount_map: dict[str | UUID, str],
-        requested_mount_options: dict[str | UUID, Any],
+        mount_requests: list[VFolderMountRequest],
     ) -> list[VFolderMount]:
         """
         Fetch vfolder mounts for the session using existing DB session.
         """
-        # Convert the async session to sync connection for legacy code
         conn = cast(SAConnection, db_sess.bind)
 
         vfolder_mounts = await prepare_vfolder_mounts(
@@ -1632,9 +1660,7 @@ class ScheduleDBSource:
             allowed_vfolder_types,
             user_scope,
             resource_policy,
-            combined_mounts,
-            combined_mount_map,
-            requested_mount_options,
+            mount_requests,
         )
         return list(vfolder_mounts)
 
@@ -1684,9 +1710,7 @@ class ScheduleDBSource:
         allowed_vfolder_types: list[str],
         user_scope: UserScope,
         resource_policy: dict[str, Any],
-        combined_mounts: list[str],
-        combined_mount_map: dict[str | UUID, str],
-        requested_mount_options: dict[str | UUID, Any],
+        mount_requests: list[VFolderMountRequest],
     ) -> list[VFolderMount]:
         """
         Prepare vfolder mounts for the session.
@@ -1698,9 +1722,7 @@ class ScheduleDBSource:
                 allowed_vfolder_types,
                 user_scope,
                 resource_policy,
-                combined_mounts,
-                combined_mount_map,
-                requested_mount_options,
+                mount_requests,
             )
         return list(vfolder_mounts)
 

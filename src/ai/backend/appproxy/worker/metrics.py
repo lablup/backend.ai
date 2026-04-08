@@ -9,7 +9,7 @@ from prometheus_client.parser import text_string_to_metric_families
 
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
-from ai.backend.common.types import MetricKey, ModelServiceStatus, RuntimeVariant
+from ai.backend.common.types import MetricKey, ModelServiceStatus
 from ai.backend.logging import BraceStyleAdapter
 
 from .errors import InvalidAppInfoTypeError, InvalidMatrixSizeError
@@ -235,7 +235,7 @@ async def gather_inference_measures(
     measures: list[InferenceMeasurement[Measurement | HistogramMeasurement]] = []
 
     match circuit.app_info.runtime_variant:
-        case RuntimeVariant.VLLM:
+        case "vllm":
             raw_measures = await gather_prometheus_inference_measures(
                 client_pool, circuit.route_info
             )
@@ -252,9 +252,9 @@ async def gather_inference_measures(
                     )
                 )
             return measures
-        case RuntimeVariant.HUGGINGFACE_TGI:
+        case "huggingface-tgi":
             return await gather_prometheus_inference_measures(client_pool, circuit.route_info)
-        case RuntimeVariant.SGLANG:
+        case "sglang":
             raw_measures = await gather_prometheus_inference_measures(
                 client_pool, circuit.route_info
             )
@@ -271,7 +271,7 @@ async def gather_inference_measures(
                     )
                 )
             return measures
-        case RuntimeVariant.MODULAR_MAX:
+        case "modular-max":
             raw_measures = await gather_prometheus_inference_measures(
                 client_pool, circuit.route_info
             )
@@ -288,7 +288,7 @@ async def gather_inference_measures(
                     )
                 )
             return measures
-        case RuntimeVariant.CUSTOM:
+        case "custom":
             return await gather_prometheus_inference_measures(client_pool, circuit.route_info)
         case _:
             return None

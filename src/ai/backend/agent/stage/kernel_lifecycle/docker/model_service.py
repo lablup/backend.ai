@@ -61,7 +61,7 @@ class ModelServiceSpecCheckProvisioner(Provisioner[ModelServiceSpecCheckArgs, Mo
     @override
     async def setup(self, spec: ModelServiceSpecCheckArgs) -> ModelServiceSpec:
         image_command = await self._extract_image_command(spec.image_canonical)
-        if spec.runtime_variant != RuntimeVariant.CUSTOM and not image_command:
+        if spec.runtime_variant != "custom" and not image_command:
             raise InvalidModelConfigurationError(
                 "image should have its own command when runtime variant is set to values other than CUSTOM!"
             )
@@ -133,23 +133,27 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
         image_command = spec.image_command
         model_folder = spec.model_vfolder_mount
         match spec.runtime_variant:
-            case RuntimeVariant.VLLM:
+            case "vllm":
                 return await self._get_model_definition_from_vllm(model_folder, image_command)
-            case RuntimeVariant.HUGGINGFACE_TGI:
+            case "huggingface-tgi":
                 return await self._get_model_definition_from_tgi(model_folder, image_command)
-            case RuntimeVariant.NIM:
+            case "nim":
                 return await self._get_model_definition_from_nim(model_folder, image_command)
-            case RuntimeVariant.SGLANG:
+            case "sglang":
                 return await self._get_model_definition_from_sglang(model_folder, image_command)
-            case RuntimeVariant.MODULAR_MAX:
+            case "modular-max":
                 return await self._get_model_definition_from_modular_max(
                     model_folder, image_command
                 )
-            case RuntimeVariant.CMD:
+            case "cmd":
                 return await self._get_model_definition_from_cmd(model_folder, image_command)
-            case RuntimeVariant.CUSTOM:
+            case "custom":
                 return await self._get_model_definition_from_custom(
                     model_folder, spec.model_definition_path
+                )
+            case _:
+                raise InvalidModelConfigurationError(
+                    f"Unsupported runtime variant: {spec.runtime_variant}"
                 )
 
     async def _get_model_definition_from_vllm(
@@ -160,11 +164,9 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             "model_path": model_folder.kernel_path.as_posix(),
             "service": {
                 "start_command": image_command,
-                "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.VLLM].port,
+                "port": MODEL_SERVICE_RUNTIME_PROFILES["vllm"].port,
                 "health_check": {
-                    "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                        RuntimeVariant.VLLM
-                    ].health_check_endpoint,
+                    "path": MODEL_SERVICE_RUNTIME_PROFILES["vllm"].health_check_endpoint,
                 },
             },
         }
@@ -181,11 +183,9 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             "model_path": model_folder.kernel_path.as_posix(),
             "service": {
                 "start_command": image_command,
-                "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.HUGGINGFACE_TGI].port,
+                "port": MODEL_SERVICE_RUNTIME_PROFILES["huggingface-tgi"].port,
                 "health_check": {
-                    "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                        RuntimeVariant.HUGGINGFACE_TGI
-                    ].health_check_endpoint,
+                    "path": MODEL_SERVICE_RUNTIME_PROFILES["huggingface-tgi"].health_check_endpoint,
                 },
             },
         }
@@ -202,11 +202,9 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             "model_path": model_folder.kernel_path.as_posix(),
             "service": {
                 "start_command": image_command,
-                "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.NIM].port,
+                "port": MODEL_SERVICE_RUNTIME_PROFILES["nim"].port,
                 "health_check": {
-                    "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                        RuntimeVariant.NIM
-                    ].health_check_endpoint,
+                    "path": MODEL_SERVICE_RUNTIME_PROFILES["nim"].health_check_endpoint,
                 },
             },
         }
@@ -223,11 +221,9 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             "model_path": model_folder.kernel_path.as_posix(),
             "service": {
                 "start_command": image_command,
-                "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.SGLANG].port,
+                "port": MODEL_SERVICE_RUNTIME_PROFILES["sglang"].port,
                 "health_check": {
-                    "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                        RuntimeVariant.SGLANG
-                    ].health_check_endpoint,
+                    "path": MODEL_SERVICE_RUNTIME_PROFILES["sglang"].health_check_endpoint,
                 },
             },
         }
@@ -244,11 +240,9 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             "model_path": model_folder.kernel_path.as_posix(),
             "service": {
                 "start_command": image_command,
-                "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.MODULAR_MAX].port,
+                "port": MODEL_SERVICE_RUNTIME_PROFILES["modular-max"].port,
                 "health_check": {
-                    "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                        RuntimeVariant.MODULAR_MAX
-                    ].health_check_endpoint,
+                    "path": MODEL_SERVICE_RUNTIME_PROFILES["modular-max"].health_check_endpoint,
                 },
             },
         }

@@ -33,6 +33,24 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     UpdateRuntimeVariantPresetPayload as UpdatePayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    ChoiceItem as ChoiceItemDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    ChoiceOption as ChoiceOptionDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    NumberOption as NumberOptionDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    SliderOption as SliderOptionDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    TextOption as TextOptionDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    UIOption as UIOptionDTO,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -59,6 +77,68 @@ class RuntimeVariantPresetOrderFieldGQL(StrEnum):
     NAME = "name"
     RANK = "rank"
     CREATED_AT = "created_at"
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Slider UI config."),
+    model=SliderOptionDTO,
+    name="SliderOption",
+)
+class SliderOptionGQL(PydanticOutputMixin[SliderOptionDTO]):
+    min: float = gql_field(description="Minimum value.")
+    max: float = gql_field(description="Maximum value.")
+    step: float = gql_field(description="Increment step.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Number input UI config."),
+    model=NumberOptionDTO,
+    name="NumberOption",
+)
+class NumberOptionGQL(PydanticOutputMixin[NumberOptionDTO]):
+    min: float | None = gql_field(description="Minimum value.")
+    max: float | None = gql_field(description="Maximum value.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Choice item."),
+    model=ChoiceItemDTO,
+    name="ChoiceItem",
+)
+class ChoiceItemGQL(PydanticOutputMixin[ChoiceItemDTO]):
+    value: str = gql_field(description="Option value.")
+    label: str = gql_field(description="Display label.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Select/radio UI config."),
+    model=ChoiceOptionDTO,
+    name="ChoiceOption",
+)
+class ChoiceOptionGQL(PydanticOutputMixin[ChoiceOptionDTO]):
+    items: list[ChoiceItemGQL] = gql_field(description="List of choices.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Text input UI config."),
+    model=TextOptionDTO,
+    name="TextOption",
+)
+class TextOptionGQL(PydanticOutputMixin[TextOptionDTO]):
+    placeholder: str | None = gql_field(description="Placeholder text.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="UI rendering options."),
+    model=UIOptionDTO,
+    name="UIOption",
+)
+class UIOptionGQL(PydanticOutputMixin[UIOptionDTO]):
+    ui_type: str = gql_field(description="UI render type.")
+    slider: SliderOptionGQL | None = gql_field(description="Slider config.")
+    number: NumberOptionGQL | None = gql_field(description="Number input config.")
+    choices: ChoiceOptionGQL | None = gql_field(description="Select/radio config.")
+    text: TextOptionGQL | None = gql_field(description="Text input config.")
 
 
 @gql_pydantic_type(
@@ -107,6 +187,9 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     target_spec: PresetTargetSpecGQL = gql_field(
         description="Specification defining how the user-provided value is applied to the inference container."
     )
+    category: str | None = gql_field(description="UI category group for organizing parameters.")
+    display_name: str | None = gql_field(description="Human-readable display label for the UI.")
+    ui_option: UIOptionGQL | None = gql_field(description="UI rendering options.")
     created_at: datetime = gql_field(description="Timestamp when this preset was created.")
     updated_at: datetime | None = gql_field(
         description="Timestamp of the last modification to this preset."

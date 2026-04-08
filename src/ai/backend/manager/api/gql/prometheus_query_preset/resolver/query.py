@@ -10,6 +10,7 @@ from strawberry.relay import PageInfo
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     SearchQueryDefinitionsInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -26,19 +27,18 @@ from ai.backend.manager.api.gql.prometheus_query_preset.types import (
     QueryTimeRangeInput,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.utils import check_admin_only
 
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version="26.3.0", description="Get a single query definition by ID (admin only)."
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get a single prometheus query preset by ID. Available to any authenticated user since presets are a shared catalog of metric query templates.",
     )
 )  # type: ignore[misc]
-async def admin_prometheus_query_preset(
+async def prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
 ) -> QueryDefinitionGQL | None:
-    check_admin_only()
     payload = await info.context.adapters.prometheus_query_preset.get(UUID(id))
     if payload.item is None:
         return None
@@ -47,23 +47,21 @@ async def admin_prometheus_query_preset(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version="26.3.0",
-        description="List query definitions with filtering and pagination (admin only).",
+        added_version=NEXT_RELEASE_VERSION,
+        description="List prometheus query presets with filtering and pagination. Available to any authenticated user since presets are a shared catalog of metric query templates.",
     )
 )  # type: ignore[misc]
-async def admin_prometheus_query_presets(
+async def prometheus_query_presets(
     info: Info[StrawberryGQLContext],
     filter: QueryDefinitionFilter | None = None,
     order_by: list[QueryDefinitionOrderBy] | None = None,
     limit: int | None = None,
     offset: int | None = None,
 ) -> QueryDefinitionConnection | None:
-    check_admin_only()
-
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
 
-    payload = await info.context.adapters.prometheus_query_preset.admin_search(
+    payload = await info.context.adapters.prometheus_query_preset.search(
         SearchQueryDefinitionsInput(
             filter=pydantic_filter,
             order=pydantic_order,
@@ -89,19 +87,17 @@ async def admin_prometheus_query_presets(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version="26.3.0",
-        description="Execute a query definition by ID and return the result (admin only).",
+        added_version=NEXT_RELEASE_VERSION,
+        description="Execute a prometheus query preset by ID and return the result. Available to any authenticated user; the underlying preset query is the same regardless of who runs it.",
     )
 )  # type: ignore[misc]
-async def admin_prometheus_query_preset_result(
+async def prometheus_query_preset_result(
     info: Info[StrawberryGQLContext],
     id: ID,
     time_range: QueryTimeRangeInput | None = None,
     options: ExecuteQueryDefinitionOptionsInput | None = None,
     time_window: str | None = None,
 ) -> QueryDefinitionResultGQL:
-    check_admin_only()
-
     dto = await info.context.adapters.prometheus_query_preset.execute_preset(
         preset_id=UUID(id),
         options=options.to_pydantic() if options is not None else None,

@@ -277,7 +277,8 @@ class ValkeyScheduleClient:
 
         :return: Current Unix timestamp in seconds
         """
-        result = await self._client.client.time()
+        async with self._client.client() as conn:
+            result = await conn.time()
         seconds_bytes, _ = result
         return int(seconds_bytes)
 
@@ -337,7 +338,8 @@ class ValkeyScheduleClient:
         key_values: Mapping[str | bytes, str | bytes] = {
             self._get_schedule_key(schedule_type): "1" for schedule_type in schedule_types
         }
-        await self._client.client.mset(key_values)
+        async with self._client.client() as conn:
+            await conn.mset(key_values)
 
     @valkey_schedule_resilience.apply()
     async def load_and_delete_schedule_mark(self, schedule_type: str) -> bool:
@@ -353,7 +355,8 @@ class ValkeyScheduleClient:
         batch = Batch(is_atomic=True)
         batch.get(key)
         batch.delete([key])
-        results = await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=True)
 
         # Check if results exist and the first element (GET result) is not None
         if results and len(results) > 0:
@@ -383,7 +386,8 @@ class ValkeyScheduleClient:
             batch.set(
                 pos_key, str(position), expiry=ExpirySet(ExpiryType.SEC, PENDING_QUEUE_EXPIRY_SEC)
             )
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
     async def get_pending_queue(self, resource_group_id: str) -> list[SessionId]:
@@ -391,7 +395,8 @@ class ValkeyScheduleClient:
         Get the pending queue for a specific resource group.
         """
         key = self._pending_queue_key(resource_group_id)
-        result = await self._client.client.get(key)
+        async with self._client.client() as conn:
+            result = await conn.get(key)
         if result is None:
             return []
         raw_session_ids = load_json(result)
@@ -408,7 +413,8 @@ class ValkeyScheduleClient:
         for session_id in session_ids:
             key = self._queue_position_key(session_id)
             batch.get(key)
-        batch_result = await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            batch_result = await conn.exec(batch, raise_on_error=True)
         if batch_result is None:
             return [None for _ in session_ids]
 
@@ -445,7 +451,8 @@ class ValkeyScheduleClient:
         batch = Batch(is_atomic=True)
         batch.sadd(key, members)
         batch.expire(key, ttl_sec)
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
     async def get_multiple_session_failed_agents(
@@ -465,7 +472,8 @@ class ValkeyScheduleClient:
         batch = Batch(is_atomic=False)
         for session_id in session_ids:
             batch.smembers(self._get_session_failed_agents_key(session_id))
-        batch_result = await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            batch_result = await conn.exec(batch, raise_on_error=True)
         # batch_result is None only for atomic batches (transactions) when a WATCH-guarded key
         # was modified before EXEC — non-atomic pipelines (is_atomic=False) never return None.
         # This guard is kept for defensive typing since exec() is annotated Optional[List[...]].
@@ -490,7 +498,8 @@ class ValkeyScheduleClient:
         :param sub_step: Optional sub-step for finer-grained marks
         """
         key = self._get_deployment_key(lifecycle_type, sub_step)
-        await self._client.client.set(key, b"1")
+        async with self._client.client() as conn:
+            await conn.set(key, b"1")
 
     @valkey_schedule_resilience.apply()
     async def load_and_delete_deployment_mark(
@@ -509,7 +518,8 @@ class ValkeyScheduleClient:
         batch = Batch(is_atomic=True)
         batch.get(key)
         batch.delete([key])
-        results = await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=True)
 
         # Check if results exist and the first element (GET result) is not None
         if results and len(results) > 0:
@@ -525,7 +535,8 @@ class ValkeyScheduleClient:
         :param lifecycle_type: The type of route lifecycle to mark
         """
         key = self._get_route_key(lifecycle_type)
-        await self._client.client.set(key, b"1")
+        async with self._client.client() as conn:
+            await conn.set(key, b"1")
 
     @valkey_schedule_resilience.apply()
     async def load_and_delete_route_mark(self, lifecycle_type: str) -> bool:
@@ -541,7 +552,8 @@ class ValkeyScheduleClient:
         batch = Batch(is_atomic=True)
         batch.get(key)
         batch.delete([key])
-        results = await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=True)
 
         # Check if results exist and the first element (GET result) is not None
         if results and len(results) > 0:
@@ -557,7 +569,8 @@ class ValkeyScheduleClient:
         :return: HealthStatus object or None if not found
         """
         key = self._get_route_health_key(route_id)
-        result = await self._client.client.hgetall(key)
+        async with self._client.client() as conn:
+            result = await conn.hgetall(key)
         if not result:
             return None
 
@@ -609,7 +622,8 @@ class ValkeyScheduleClient:
             batch.hset(key, data)
             batch.expire(key, ROUTE_HEALTH_TTL_SEC)
 
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
     async def update_route_readiness(self, route_id: str, readiness: bool) -> None:
@@ -629,7 +643,8 @@ class ValkeyScheduleClient:
         batch = Batch(is_atomic=False)
         batch.hset(key, data)
         batch.expire(key, ROUTE_HEALTH_TTL_SEC)
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
     async def update_route_liveness(self, route_id: str, liveness: bool) -> None:
@@ -649,7 +664,8 @@ class ValkeyScheduleClient:
         batch = Batch(is_atomic=False)
         batch.hset(key, data)
         batch.expire(key, ROUTE_HEALTH_TTL_SEC)
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
     async def refresh_route_health_ttl(self, route_id: str) -> None:
@@ -660,7 +676,8 @@ class ValkeyScheduleClient:
         :param route_id: The route ID to refresh
         """
         key = self._get_route_health_key(route_id)
-        await self._client.client.expire(key, ROUTE_HEALTH_TTL_SEC)
+        async with self._client.client() as conn:
+            await conn.expire(key, ROUTE_HEALTH_TTL_SEC)
 
     @valkey_schedule_resilience.apply()
     async def update_route_manager_health(self, route_id: str, healthy: bool) -> None:
@@ -681,7 +698,8 @@ class ValkeyScheduleClient:
         batch = Batch(is_atomic=False)
         batch.hset(key, data)
         batch.expire(key, ROUTE_HEALTH_TTL_SEC)
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
     async def check_route_health_status(
@@ -707,7 +725,8 @@ class ValkeyScheduleClient:
             batch.expire(key, ROUTE_HEALTH_TTL_SEC)
             batch.hgetall(key)
 
-        results = await self._client.client.exec(batch, raise_on_error=False)
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=False)
         if results is None:
             return dict.fromkeys(route_ids)
 
@@ -766,7 +785,8 @@ class ValkeyScheduleClient:
             batch.hset(key, data)
             batch.expire(key, ROUTE_HEALTH_TTL_SEC)
 
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     # ==================== RouteHealthRecord Methods ====================
 
@@ -789,7 +809,8 @@ class ValkeyScheduleClient:
             batch.hset(key, record.to_valkey_hash())
             batch.expire(key, ROUTE_HEALTH_TTL_SEC)
 
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
     async def get_route_health_record(self, route_id: str) -> RouteHealthRecord | None:
@@ -800,7 +821,8 @@ class ValkeyScheduleClient:
         :return: RouteHealthRecord or None if not found
         """
         key = self._get_route_health_key(route_id)
-        result = await self._client.client.hgetall(key)
+        async with self._client.client() as conn:
+            result = await conn.hgetall(key)
         if not result:
             return None
 
@@ -825,7 +847,8 @@ class ValkeyScheduleClient:
             key = self._get_route_health_key(route_id)
             batch.hgetall(key)
 
-        results = await self._client.client.exec(batch, raise_on_error=False)
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=False)
         if results is None:
             return dict.fromkeys(route_ids)
 
@@ -886,7 +909,8 @@ class ValkeyScheduleClient:
             batch.hset(key, data)
             batch.expire(key, KERNEL_HEALTH_TTL_SEC)
 
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
     async def update_kernel_presence_batch(
@@ -914,7 +938,8 @@ class ValkeyScheduleClient:
             batch.hset(key, data)
             batch.expire(key, KERNEL_HEALTH_TTL_SEC)
 
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
     async def delete_kernel_presence_batch(self, kernel_ids: Sequence[KernelId]) -> None:
@@ -927,7 +952,8 @@ class ValkeyScheduleClient:
             return
 
         keys: list[str | bytes] = [self._get_kernel_presence_key(kid) for kid in kernel_ids]
-        await self._client.client.delete(keys)
+        async with self._client.client() as conn:
+            await conn.delete(keys)
 
     @valkey_schedule_resilience.apply()
     async def check_kernel_presence_status_batch(
@@ -972,7 +998,8 @@ class ValkeyScheduleClient:
                     expiry=ExpirySet(ExpiryType.SEC, AGENT_LAST_CHECK_TTL_SEC),
                 )
 
-        results = await self._client.client.exec(batch, raise_on_error=False)
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=False)
         if results is None:
             return dict.fromkeys(kernel_ids)
 
@@ -1026,7 +1053,8 @@ class ValkeyScheduleClient:
         :return: Unix timestamp of last check, or None if not found
         """
         key = self._get_agent_last_check_key(agent_id)
-        result = await self._client.client.get(key)
+        async with self._client.client() as conn:
+            result = await conn.get(key)
         if result is None:
             return None
         return int(result)
@@ -1051,7 +1079,8 @@ class ValkeyScheduleClient:
             key = self._get_kernel_presence_key(kernel_id)
             batch.hgetall(key)
 
-        results = await self._client.client.exec(batch, raise_on_error=False)
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=False)
         if results is None:
             return dict.fromkeys(kernel_ids)
 

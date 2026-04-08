@@ -4,7 +4,6 @@ import logging
 import uuid
 from collections.abc import AsyncGenerator
 from enum import StrEnum
-from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry import Info
@@ -31,10 +30,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
     gql_subscription,
 )
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.errors.bgtask import InvalidBgtaskId
-
-if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

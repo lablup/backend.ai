@@ -27,6 +27,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
     ModelRuntimeConfigData,
     MountMetadata,
+    PresetValueSpec,
     ResourceConfigData,
     ResourceSpec,
 )
@@ -34,15 +35,16 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    ResourceSlotColumn,
-    StrEnumType,
+    PydanticListColumn,
     StructuredJSONObjectListColumn,
     URLColumn,
 )
+from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint import EndpointRow
     from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
     from ai.backend.manager.models.routing import RoutingRow
 
 __all__ = ("DeploymentRevisionRow",)
@@ -117,9 +119,6 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False
     )
-    resource_slots: Mapped[ResourceSlot] = mapped_column(
-        "resource_slots", ResourceSlotColumn(), nullable=False
-    )
     resource_opts: Mapped[dict[str, Any]] = mapped_column(
         "resource_opts", pgsql.JSONB(), nullable=False, default={}, server_default="{}"
     )
@@ -147,11 +146,11 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     callback_url: Mapped[str | None] = mapped_column(
         "callback_url", URLColumn, nullable=True, default=sa.null()
     )
-    runtime_variant: Mapped[RuntimeVariant] = mapped_column(
+    runtime_variant: Mapped[str] = mapped_column(
         "runtime_variant",
-        StrEnumType(RuntimeVariant),
+        sa.String(length=64),
         nullable=False,
-        default=RuntimeVariant.CUSTOM,
+        default="custom",
     )
 
     # Mount configuration
@@ -163,12 +162,28 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         server_default="[]",
     )
 
+    # Runtime variant preset values (resolved at session creation time)
+    preset_values: Mapped[list[PresetValueEntry]] = mapped_column(
+        "preset_values",
+        PydanticListColumn(PresetValueEntry),
+        nullable=False,
+        default=[],
+        server_default="[]",
+    )
+
     # Metadata
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
         nullable=False,
+    )
+
+    # Normalized resource slot rows
+    resource_slot_rows: Mapped[list[DeploymentRevisionResourceSlotRow]] = relationship(
+        "DeploymentRevisionResourceSlotRow",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
     # Relationships (without FK constraints)
@@ -203,7 +218,9 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode(self.cluster_mode),
                 cluster_size=self.cluster_size,
-                resource_slots=self.resource_slots,
+                resource_slots=ResourceSlot({
+                    r.slot_name: r.quantity for r in self.resource_slot_rows
+                }),
                 resource_opts=self.resource_opts,
             ),
             mounts=MountMetadata(
@@ -216,7 +233,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 startup_command=self.startup_command,
                 bootstrap_script=self.bootstrap_script,
                 environ=self.environ,
-                runtime_variant=self.runtime_variant,
+                runtime_variant=RuntimeVariant(self.runtime_variant),
                 callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
             ),
             model_definition=(
@@ -224,6 +241,10 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 if self.model_definition is not None
                 else None
             ),
+            preset_values=[
+                PresetValueSpec(preset_id=pv.preset_id, value=pv.value)
+                for pv in (self.preset_values or [])
+            ],
         )
 
     def to_data(self) -> ModelRevisionData:
@@ -237,11 +258,13 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             ),
             resource_config=ResourceConfigData(
                 resource_group_name=self.resource_group,
-                resource_slot=self.resource_slots,
+                resource_slot=ResourceSlot({
+                    r.slot_name: r.quantity for r in self.resource_slot_rows
+                }),
                 resource_opts=self.resource_opts or {},
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=self.runtime_variant,
+                runtime_variant=RuntimeVariant(self.runtime_variant),
                 environ=self.environ,
             ),
             model_mount_config=ModelMountConfigData(

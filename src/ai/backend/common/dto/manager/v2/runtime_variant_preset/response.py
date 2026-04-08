@@ -7,6 +7,8 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 
+from .types import UIOption
+
 
 class PresetTargetSpec(BaseResponseModel):
     preset_target: str = Field(description="Target: env or args.")
@@ -22,6 +24,12 @@ class RuntimeVariantPresetNode(BaseResponseModel):
     description: str | None = Field(default=None, description="Description.")
     rank: int = Field(description="Display order rank.")
     target_spec: PresetTargetSpec = Field(description="Preset target specification.")
+    category: str | None = Field(default=None, description="UI category group.")
+    ui_type: str | None = Field(
+        default=None, description="UI type for rendering (slider, number, choice, text)."
+    )
+    display_name: str | None = Field(default=None, description="UI display name.")
+    ui_option: UIOption | None = Field(default=None, description="UI rendering config.")
     created_at: datetime = Field(description="Creation timestamp.")
     updated_at: datetime | None = Field(default=None, description="Last update timestamp.")
 

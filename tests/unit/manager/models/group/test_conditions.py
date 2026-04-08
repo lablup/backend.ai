@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -375,6 +375,45 @@ class TestGroupNestedSearchIntegration:
         assert result.total_count == 1
 
 
+class TestGroupConditionsUserIdFilters:
+    """Tests for User ID (UUID) nested filter conditions in GroupConditions."""
+
+    def test_by_user_id_equals_generates_exists(self) -> None:
+        user_uuid = uuid.uuid4()
+        spec = UUIDEqualMatchSpec(value=user_uuid, negated=False)
+        condition = GroupConditions.by_user_id_equals(spec)
+        sql = str(condition().compile())
+        assert "EXISTS" in sql
+        assert "users" in sql
+        assert "association_groups_users" in sql
+
+    def test_by_user_id_equals_negated(self) -> None:
+        user_uuid = uuid.uuid4()
+        spec = UUIDEqualMatchSpec(value=user_uuid, negated=True)
+        condition = GroupConditions.by_user_id_equals(spec)
+        sql = str(condition().compile())
+        assert "EXISTS" in sql
+        assert "!=" in sql or "NOT" in sql.upper()
+
+    def test_by_user_id_in_generates_exists(self) -> None:
+        user_uuids = [uuid.uuid4(), uuid.uuid4()]
+        spec = UUIDInMatchSpec(values=user_uuids, negated=False)
+        condition = GroupConditions.by_user_id_in(spec)
+        sql = str(condition().compile())
+        assert "EXISTS" in sql
+        assert "users" in sql
+        assert "association_groups_users" in sql
+        assert "IN" in sql.upper()
+
+    def test_by_user_id_in_negated(self) -> None:
+        user_uuids = [uuid.uuid4(), uuid.uuid4()]
+        spec = UUIDInMatchSpec(values=user_uuids, negated=True)
+        condition = GroupConditions.by_user_id_in(spec)
+        sql = str(condition().compile())
+        assert "EXISTS" in sql
+        assert "NOT IN" in sql.upper()
+
+
 class TestGroupConditionsUserNestedFilters:
     """Tests for User nested filter conditions in GroupConditions (M:N)."""
 
@@ -664,17 +703,55 @@ class TestGroupUserNestedSearchIntegration:
 
         result["proj_alpha"] = {
             "project_id": proj_a_id,
+            "user_id": active_user_id,
             "username": "alice-active",
             "email": "alice@example.com",
             "is_active": True,
         }
         result["proj_beta"] = {
             "project_id": proj_b_id,
+            "user_id": inactive_user_id,
             "username": "bob-inactive",
             "email": "bob@example.com",
             "is_active": False,
         }
         return result
+
+    async def test_search_with_user_id_equals_filter(
+        self,
+        group_db_source: GroupDBSource,
+        projects_with_users: dict[str, dict[str, Any]],
+    ) -> None:
+        """Filter projects by user UUID (equals)."""
+        alpha_info = projects_with_users["proj_alpha"]
+        spec = UUIDEqualMatchSpec(value=alpha_info["user_id"], negated=False)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=50, offset=0),
+            conditions=[GroupConditions.by_user_id_equals(spec)],
+            orders=[],
+        )
+        result = await group_db_source.search_projects(querier)
+
+        assert result.total_count == 1
+        assert result.items[0].id == alpha_info["project_id"]
+
+    async def test_search_with_user_id_in_filter(
+        self,
+        group_db_source: GroupDBSource,
+        projects_with_users: dict[str, dict[str, Any]],
+    ) -> None:
+        """Filter projects by user UUID (in list)."""
+        alpha_info = projects_with_users["proj_alpha"]
+        beta_info = projects_with_users["proj_beta"]
+        spec = UUIDInMatchSpec(values=[alpha_info["user_id"], beta_info["user_id"]], negated=False)
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=50, offset=0),
+            conditions=[GroupConditions.by_user_id_in(spec)],
+            orders=[],
+        )
+        result = await group_db_source.search_projects(querier)
+
+        assert result.total_count == 2
 
     async def test_search_with_user_username_filter(
         self,

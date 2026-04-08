@@ -36,7 +36,7 @@ def _make_service_node(**kwargs: object) -> ServiceNode:
         "active_route_count": 2,
         "service_endpoint": None,
         "is_public": False,
-        "runtime_variant": RuntimeVariant.CUSTOM,
+        "runtime_variant": RuntimeVariant("custom"),
         "model_id": None,
         "model_definition_path": None,
         "active_routes": [],
@@ -56,14 +56,14 @@ class TestServiceNode:
             replicas=2,
             active_route_count=2,
             is_public=False,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
         )
         assert node.id == service_id
         assert node.name == "my-service"
         assert node.replicas == 2
         assert node.active_route_count == 2
         assert node.is_public is False
-        assert node.runtime_variant == RuntimeVariant.CUSTOM
+        assert node.runtime_variant == RuntimeVariant("custom")
 
     def test_service_endpoint_defaults_to_none(self) -> None:
         node = _make_service_node()
@@ -104,8 +104,8 @@ class TestServiceNode:
         assert node.service_endpoint == "https://service.example.com"
 
     def test_with_vllm_runtime_variant(self) -> None:
-        node = _make_service_node(runtime_variant=RuntimeVariant.VLLM)
-        assert node.runtime_variant == RuntimeVariant.VLLM
+        node = _make_service_node(runtime_variant=RuntimeVariant("vllm"))
+        assert node.runtime_variant == RuntimeVariant("vllm")
 
     def test_round_trip(self) -> None:
         service_id = uuid.uuid4()

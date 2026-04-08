@@ -6,8 +6,14 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from strawberry.relay import Connection, Edge, NodeID
+from strawberry import UNSET, Info
+from strawberry.relay import Connection, Edge, NodeID, PageInfo
+from strawberry.scalars import JSON
 
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentStrategyInput as DeploymentStrategyInputDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput as CreateInputDTO,
 )
@@ -36,6 +42,9 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
     PresetClusterSpec as PresetClusterSpecDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
+    PresetDeploymentDefaults as PresetDeploymentDefaultsDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     PresetExecutionSpec as PresetExecutionSpecDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
@@ -50,16 +59,27 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.common.types import ResourceOptsEntryGQL as ResourceOptsEntryInfoGQL
-from ai.backend.manager.api.gql.common_types import ResourceSlotEntryGQL as ResourceSlotEntryInfoGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.deployment.types.policy import (
+    BlueGreenConfigInputGQL,
+    RollingUpdateConfigInputGQL,
+)
+from ai.backend.manager.api.gql.deployment.types.resource_slot import (
+    AllocatedResourceSlotConnection,
+    AllocatedResourceSlotEdge,
+    AllocatedResourceSlotFilterGQL,
+    AllocatedResourceSlotNodeGQL,
+    AllocatedResourceSlotOrderByGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.revision import (
     EnvironmentVariableEntryGQL as EnvironEntryInfoGQL,
@@ -68,6 +88,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelDefinitionGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 @gql_enum(
@@ -141,9 +162,6 @@ class PresetClusterSpecGQL(PydanticOutputMixin[PresetClusterSpecDTO]):
     name="PresetResourceAllocation",
 )
 class PresetResourceAllocationGQL(PydanticOutputMixin[PresetResourceAllocationDTO]):
-    resource_slots: list[ResourceSlotEntryInfoGQL] = gql_field(
-        description="CPU, memory, and accelerator allocations (e.g., cpu=4, mem=16g, cuda.device=2)."
-    )
     resource_opts: list[ResourceOptsEntryInfoGQL] = gql_field(
         description="Additional resource options such as shared memory (shmem) size."
     )
@@ -169,6 +187,39 @@ class PresetExecutionSpecGQL(PydanticOutputMixin[PresetExecutionSpecDTO]):
     )
     environ: list[EnvironEntryInfoGQL] = gql_field(
         description="Environment variables injected into the inference container."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Deployment-level defaults stored on the preset. Any null field "
+        "means the preset does not specify a default and callers should fall back to "
+        "user input or the system default.",
+    ),
+    model=PresetDeploymentDefaultsDTO,
+    name="PresetDeploymentDefaults",
+)
+class PresetDeploymentDefaultsGQL(PydanticOutputMixin[PresetDeploymentDefaultsDTO]):
+    open_to_public: bool | None = gql_field(
+        default=None,
+        description="Default open_to_public for deployments created from this preset.",
+    )
+    replica_count: int | None = gql_field(
+        default=None,
+        description="Default replica count for deployments created from this preset.",
+    )
+    revision_history_limit: int | None = gql_field(
+        default=None,
+        description="Default revision history limit for deployments created from this preset.",
+    )
+    deployment_strategy: DeploymentStrategy | None = gql_field(
+        default=None,
+        description="Default deployment strategy type (ROLLING or BLUE_GREEN).",
+    )
+    deployment_strategy_spec: JSON | None = gql_field(
+        default=None,
+        description="Strategy-specific configuration (rolling or blue-green).",
     )
 
 
@@ -203,6 +254,10 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
     execution: PresetExecutionSpecGQL = gql_field(
         description="Container execution configuration including image, startup command, and environment."
     )
+    deployment_defaults: PresetDeploymentDefaultsGQL = gql_field(
+        description="Deployment-level default values (open_to_public, replica_count, "
+        "revision_history_limit, deployment_strategy) provided by this preset."
+    )
     model_definition: ModelDefinitionGQL | None = gql_field(
         description="Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.",
         default=None,
@@ -216,6 +271,56 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
     updated_at: datetime | None = gql_field(
         description="Timestamp of the last modification to this deployment preset."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Resource slot allocations for this preset.",
+        )
+    )  # type: ignore[misc]
+    async def resource_slots(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: AllocatedResourceSlotFilterGQL | None = None,
+        order_by: list[AllocatedResourceSlotOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> AllocatedResourceSlotConnection:
+        from ai.backend.common.dto.manager.v2.resource_slot.request import (
+            SearchAllocatedResourceSlotsInput,
+        )
+
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+        payload = await info.context.adapters.deployment_revision_preset.search_resource_slots(
+            preset_id=self.row_id,
+            input=SearchAllocatedResourceSlotsInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [AllocatedResourceSlotNodeGQL.from_pydantic(item) for item in payload.items]
+        edges = [AllocatedResourceSlotEdge(node=node, cursor=node.slot_name) for node in nodes]
+        return AllocatedResourceSlotConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+        )
 
 
 DeploymentRevisionPresetEdge = Edge[DeploymentRevisionPresetGQL]
@@ -262,6 +367,27 @@ class DeploymentRevisionPresetOrderByGQL(PydanticInputMixin[OrderDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description="Deployment strategy input for a revision preset, used to "
+        "establish a default deployment strategy applied to any deployment "
+        "created from this preset.",
+    ),
+    name="PresetDeploymentStrategyInput",
+)
+class PresetDeploymentStrategyInputGQL(PydanticInputMixin[DeploymentStrategyInputDTO]):
+    type: DeploymentStrategy = gql_field(description="Strategy type (ROLLING or BLUE_GREEN).")
+    rolling_update: RollingUpdateConfigInputGQL | None = gql_field(
+        default=None,
+        description="Rolling update configuration (required when type is ROLLING).",
+    )
+    blue_green: BlueGreenConfigInputGQL | None = gql_field(
+        default=None,
+        description="Blue/green configuration (required when type is BLUE_GREEN).",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description="Create deployment revision preset input.",
     ),
     name="CreateDeploymentRevisionPresetInput",
@@ -269,6 +395,22 @@ class DeploymentRevisionPresetOrderByGQL(PydanticInputMixin[OrderDTO]):
 class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
     runtime_variant_id: UUID = gql_field(description="Runtime variant ID.")
     name: str = gql_field(description="Preset name.")
+    open_to_public: bool | None = gql_field(
+        default=None,
+        description="Default open_to_public for deployments created from this preset.",
+    )
+    replica_count: int | None = gql_field(
+        default=None,
+        description="Default replica count for deployments created from this preset.",
+    )
+    revision_history_limit: int | None = gql_field(
+        default=None,
+        description="Default revision history limit for deployments created from this preset.",
+    )
+    deployment_strategy: PresetDeploymentStrategyInputGQL | None = gql_field(
+        default=None,
+        description="Default deployment strategy for deployments created from this preset.",
+    )
 
 
 @gql_pydantic_input(
@@ -283,6 +425,26 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
     name: str | None = gql_field(default=None, description="New name.")
     description: str | None = gql_field(default=None, description="New description.")
     rank: int | None = gql_field(default=None, description="New rank.")
+    open_to_public: bool | None = gql_field(
+        default=UNSET,
+        description="Default open_to_public for deployments created from this preset. "
+        "Set to null to clear.",
+    )
+    replica_count: int | None = gql_field(
+        default=UNSET,
+        description="Default replica count for deployments created from this preset. "
+        "Set to null to clear.",
+    )
+    revision_history_limit: int | None = gql_field(
+        default=UNSET,
+        description="Default revision history limit for deployments created from this "
+        "preset. Set to null to clear.",
+    )
+    deployment_strategy: PresetDeploymentStrategyInputGQL | None = gql_field(
+        default=UNSET,
+        description="Default deployment strategy for deployments created from this "
+        "preset. Set to null to clear.",
+    )
 
 
 @gql_pydantic_type(

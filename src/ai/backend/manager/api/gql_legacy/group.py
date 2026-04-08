@@ -397,7 +397,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             if dto.total_resource_slots
             else {},
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
-            integration_id=dto.integration_id,
+            integration_id=dto.integration_name,  # GroupData uses integration_name
             resource_policy=dto.resource_policy,
             type=dto.type.name,
             container_registry=dto.container_registry,
@@ -590,7 +590,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
                     is_active=is_active_val,
                     total_resource_slots=total_resource_slots_val,
                     allowed_vfolder_hosts=allowed_vfolder_hosts_val,
-                    integration_id=integration_id_val,
+                    integration_name=integration_id_val,
                     resource_policy=resource_policy_val,
                     container_registry=container_registry_val,
                 )
@@ -636,7 +636,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
                 self.allowed_vfolder_hosts,
             ),
-            integration_id=OptionalState[str].from_graphql(
+            integration_name=TriState[str].from_graphql(
                 self.integration_id,
             ),
             resource_policy=OptionalState[str].from_graphql(

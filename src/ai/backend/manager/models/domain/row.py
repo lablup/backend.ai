@@ -76,7 +76,7 @@ def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
         total_resource_slots=row.total_resource_slots,
         allowed_vfolder_hosts=row.allowed_vfolder_hosts,
         allowed_docker_registries=row.allowed_docker_registries,
-        integration_id=row.integration_id,
+        integration_name=row.integration_id,  # DB column is integration_id
         dotfiles=row.dotfiles,
     )
 
@@ -158,7 +158,7 @@ class DomainModel(RBACModel[DomainPermission]):
     _total_resource_slots: ResourceSlot
     _allowed_vfolder_hosts: VFolderHostPermissionMap
     _allowed_docker_registries: list[str]
-    _integration_id: str | None
+    _integration_name: str | None
     _dotfiles: bytes
 
     orm_obj: DomainRow
@@ -185,8 +185,8 @@ class DomainModel(RBACModel[DomainPermission]):
 
     @property
     @required_permission(DomainPermission.READ_SENSITIVE_ATTRIBUTE)
-    def integration_id(self) -> str | None:
-        return self._integration_id
+    def integration_name(self) -> str | None:
+        return self._integration_name
 
     @property
     @required_permission(DomainPermission.READ_SENSITIVE_ATTRIBUTE)
@@ -204,7 +204,7 @@ class DomainModel(RBACModel[DomainPermission]):
             _total_resource_slots=row.total_resource_slots,
             _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
             _allowed_docker_registries=row.allowed_docker_registries,
-            _integration_id=row.integration_id,
+            _integration_name=row.integration_id,  # DB column is integration_id
             _dotfiles=row.dotfiles,
             _permissions=frozenset(permissions),
             orm_obj=row,

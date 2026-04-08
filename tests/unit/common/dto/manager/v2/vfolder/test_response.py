@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     VFolderNode,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
+    FileEntryType,
     VFolderAccessControlInfo,
     VFolderInvitationState,
     VFolderMetadataInfo,
@@ -268,10 +269,6 @@ class TestPayloadModels:
         payload = CreateUploadSessionPayload(token="tok", url="https://example.com/ul")
         assert payload.url is not None
 
-    def test_delete_files_payload_none_bgtask(self) -> None:
-        payload = DeleteFilesPayload()
-        assert payload.bgtask_id is None
-
     def test_delete_files_payload_with_bgtask(self) -> None:
         payload = DeleteFilesPayload(bgtask_id="task-abc")
         assert payload.bgtask_id == "task-abc"
@@ -279,11 +276,11 @@ class TestPayloadModels:
     def test_list_files_payload(self) -> None:
         entry = FileEntryNode(
             name="file.txt",
-            type="file",
+            type=FileEntryType.FILE,
             size=100,
-            mode="0644",
-            created="2024-01-01T00:00:00",
-            modified="2024-01-02T00:00:00",
+            mode=0o100644,
+            created_at="2024-01-01T00:00:00",
+            updated_at="2024-01-02T00:00:00",
         )
         payload = ListFilesPayload(items=[entry])
         assert len(payload.items) == 1

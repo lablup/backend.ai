@@ -72,6 +72,78 @@ _WITH_TABLES = [
 ]
 
 
+class TestUserConditionsIntegrationNameFilters:
+    """Tests for integration_name filter conditions in UserConditions."""
+
+    def test_by_integration_name_contains(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_name_contains(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
+        assert "integration_id" in sql
+        assert "LIKE" in sql.upper()
+        assert "%ext-abc%" in sql
+
+    def test_by_integration_name_contains_case_insensitive(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=True, negated=False)
+        condition = UserConditions.by_integration_name_contains(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "lower" in sql.lower()
+
+    def test_by_integration_name_contains_negated(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=True)
+        condition = UserConditions.by_integration_name_contains(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "NOT LIKE" in sql.upper()
+
+    def test_by_integration_name_equals(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_name_equals(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
+        assert "integration_id" in sql
+        assert "ext-abc" in sql
+
+    def test_by_integration_name_equals_case_insensitive(self) -> None:
+        spec = StringMatchSpec(value="Ext-ABC", case_insensitive=True, negated=False)
+        condition = UserConditions.by_integration_name_equals(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "lower" in sql.lower()
+
+    def test_by_integration_name_equals_negated(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=True)
+        condition = UserConditions.by_integration_name_equals(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "!=" in sql or "NOT" in sql.upper()
+
+    def test_by_integration_name_starts_with(self) -> None:
+        spec = StringMatchSpec(value="ext-", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_name_starts_with(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
+        assert "integration_id" in sql
+        assert "LIKE" in sql.upper()
+
+    def test_by_integration_name_ends_with(self) -> None:
+        spec = StringMatchSpec(value="-abc", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_name_ends_with(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
+        assert "integration_id" in sql
+        assert "LIKE" in sql.upper()
+
+    def test_closure_independence(self) -> None:
+        spec_a = StringMatchSpec(value="alpha", case_insensitive=False, negated=False)
+        spec_b = StringMatchSpec(value="beta", case_insensitive=False, negated=False)
+        cond_a = UserConditions.by_integration_name_contains(spec_a)
+        cond_b = UserConditions.by_integration_name_contains(spec_b)
+        sql_a = str(cond_a().compile(compile_kwargs={"literal_binds": True}))
+        sql_b = str(cond_b().compile(compile_kwargs={"literal_binds": True}))
+        assert sql_a != sql_b
+        assert "alpha" in sql_a
+        assert "beta" in sql_b
+
+
 class TestUserConditionsDomainNestedFilters:
     """Tests for Domain nested filter conditions in UserConditions."""
 

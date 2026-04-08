@@ -14,7 +14,7 @@ from collections import UserDict, UserString, defaultdict, namedtuple
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from ipaddress import ip_address, ip_network
 from pathlib import Path, PurePosixPath
@@ -142,6 +142,8 @@ __all__ = (
     "VFolderHostPermission",
     "VFolderID",
     "VFolderMount",
+    "VFolderMountOptions",
+    "VFolderMountRequest",
     "VFolderUsageMode",
     "VolumeMountableNodeType",
     "aobject",
@@ -615,8 +617,25 @@ class MountTypes(enum.StrEnum):
     VOLUME = "volume"
     BIND = "bind"
     TMPFS = "tmpfs"
+    OVERLAY = "overlay"
     K8S_GENERIC = "k8s-generic"
     K8S_HOSTPATH = "k8s-hostpath"
+
+
+@attrs.define(slots=True)
+class VFolderMountOptions:
+    """Typed mount options for a single vfolder mount request."""
+
+    permission: MountPermission | None = None
+
+
+@attrs.define(slots=True)
+class VFolderMountRequest:
+    """A single vfolder mount request combining reference, destination path, and options."""
+
+    ref: str | uuid.UUID  # vfolder name (with optional /subpath) or UUID
+    dst_path: str | None = None  # custom mount destination path
+    options: VFolderMountOptions = attrs.Factory(VFolderMountOptions)
 
 
 class MountPoint(BaseModel):
@@ -750,6 +769,19 @@ class BinarySize(int):
             return Decimal("Infinity")
         orig_expr = expr
         expr = expr.strip().replace("_", "")
+        # Numeric DB columns and Decimal arithmetic frequently produce
+        # integer-equivalent strings with trailing zeros (e.g.,
+        # "536870912.000000"). BinarySize fundamentally expects whole bytes,
+        # so collapse such representations to the integer form before the
+        # main parse path. True fractional values like "1.5" still fall
+        # through to the existing rejection path below.
+        if "." in expr:
+            try:
+                _normalized = Decimal(expr)
+            except InvalidOperation:
+                _normalized = None
+            if _normalized is not None and _normalized == _normalized.to_integral_value():
+                expr = str(int(_normalized))
         try:
             return cls(expr)
         except ValueError:
@@ -1320,7 +1352,8 @@ class VFolderMount(JSONSerializableMixin):
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
-        return cls(**cls.as_trafaret().check(obj))
+        base = cls.as_trafaret().check(obj)
+        return cls(**base)
 
     @classmethod
     def from_dataclass(cls, obj: VFolderMountData) -> Self:
@@ -1665,6 +1698,7 @@ class ValkeyTarget:
     sentinel: list[str] | None = None
     service_name: str | None = None
     password: str | None = None
+    sentinel_password: str | None = None
     request_timeout: int | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
@@ -1688,6 +1722,7 @@ class RedisTarget:
     sentinel: str | list[HostPortPair] | None = None
     service_name: str | None = None
     password: str | None = None
+    sentinel_password: str | None = None
     redis_helper_config: RedisHelperConfig | None = None
     use_tls: bool = False
     tls_skip_verify: bool = False
@@ -1710,6 +1745,7 @@ class RedisTarget:
             sentinel=self.sentinel,
             service_name=self.service_name,
             password=self.password,
+            sentinel_password=self.sentinel_password,
             redis_helper_config=self.redis_helper_config,
             use_tls=self.use_tls,
             tls_skip_verify=self.tls_skip_verify,
@@ -1733,6 +1769,7 @@ class RedisTarget:
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
+            sentinel_password=self.sentinel_password,
             request_timeout=None,
             use_tls=self.use_tls,
             tls_skip_verify=self.tls_skip_verify,
@@ -1751,6 +1788,7 @@ class ValkeyProfileTarget:
         sentinel: list[str] | None = None,
         service_name: str | None = None,
         password: str | None = None,
+        sentinel_password: str | None = None,
         request_timeout: int | None = None,
         override_targets: Mapping[str, ValkeyTarget] | None = None,
     ) -> None:
@@ -1759,6 +1797,7 @@ class ValkeyProfileTarget:
             sentinel=sentinel,
             service_name=service_name,
             password=password,
+            sentinel_password=sentinel_password,
             request_timeout=request_timeout,
         )
         self._override_targets = override_targets
@@ -1782,6 +1821,7 @@ class RedisProfileTarget:
         sentinel: str | list[HostPortPair] | None = None,
         service_name: str | None = None,
         password: str | None = None,
+        sentinel_password: str | None = None,
         redis_helper_config: RedisHelperConfig | None = None,
         override_targets: Mapping[str, RedisTarget] | None = None,
         use_tls: bool = False,
@@ -1792,6 +1832,7 @@ class RedisProfileTarget:
             sentinel=sentinel,
             service_name=service_name,
             password=password,
+            sentinel_password=sentinel_password,
             redis_helper_config=redis_helper_config,
             use_tls=use_tls,
             tls_skip_verify=tls_skip_verify,
@@ -1842,6 +1883,7 @@ class RedisProfileTarget:
             sentinel=sentinel,
             service_name=data.get("service_name"),
             password=data.get("password"),
+            sentinel_password=data.get("sentinel_password"),
             redis_helper_config=data.get("redis_helper_config"),
             override_targets=override_targets,
         )
@@ -1849,8 +1891,10 @@ class RedisProfileTarget:
 
 def safe_print_redis_config(config: RedisConfig) -> str:
     safe_config = copy.deepcopy(config)
-    if config.password:
+    if config.password is not None:
         safe_config.password = "********"
+    if config.sentinel_password is not None:
+        safe_config.sentinel_password = "********"
     return str(safe_config)
 
 
@@ -1935,34 +1979,24 @@ class ModelServiceProfile:
     port: int | None = dataclasses.field(default=None)
 
 
-class RuntimeVariant(enum.StrEnum):
-    VLLM = "vllm"
-    NIM = "nim"
-    CMD = "cmd"
-    HUGGINGFACE_TGI = "huggingface-tgi"
-    SGLANG = "sglang"
-    MODULAR_MAX = "modular-max"
-    CUSTOM = "custom"
+RuntimeVariant = NewType("RuntimeVariant", str)
 
-
-MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
-    RuntimeVariant.CUSTOM: ModelServiceProfile(name="Custom (Default)"),
-    RuntimeVariant.VLLM: ModelServiceProfile(
-        name="vLLM", health_check_endpoint="/health", port=8000
-    ),
-    RuntimeVariant.NIM: ModelServiceProfile(
+# Default runtime variant profiles keyed by runtime_variants.name from DB.
+# Used as fallback for health check endpoints and ports when not specified.
+MODEL_SERVICE_RUNTIME_PROFILES: Mapping[str, ModelServiceProfile] = {
+    "custom": ModelServiceProfile(name="Custom (Default)"),
+    "vllm": ModelServiceProfile(name="vLLM", health_check_endpoint="/health", port=8000),
+    "nim": ModelServiceProfile(
         name="NVIDIA NIM", health_check_endpoint="/v1/health/ready", port=8000
     ),
-    RuntimeVariant.HUGGINGFACE_TGI: ModelServiceProfile(
+    "huggingface-tgi": ModelServiceProfile(
         name="Huggingface TGI", health_check_endpoint="/info", port=3000
     ),
-    RuntimeVariant.SGLANG: ModelServiceProfile(
-        name="SGLang", health_check_endpoint="/health", port=9001
-    ),
-    RuntimeVariant.MODULAR_MAX: ModelServiceProfile(
+    "sglang": ModelServiceProfile(name="SGLang", health_check_endpoint="/health", port=9001),
+    "modular-max": ModelServiceProfile(
         name="Modular MAX", health_check_endpoint="/health", port=8000
     ),
-    RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
+    "cmd": ModelServiceProfile(name="Predefined Image Command"),
 }
 
 

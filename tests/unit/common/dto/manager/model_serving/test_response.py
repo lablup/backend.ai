@@ -100,7 +100,7 @@ class TestServeInfoModel:
             ],
             service_endpoint=HttpUrl("https://serve.example.com"),
             is_public=False,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
         )
         assert model.endpoint_id == eid
         assert model.model_id == mid
@@ -109,7 +109,7 @@ class TestServeInfoModel:
         assert model.replicas == 2
         assert model.model_definition_path == "model-definition.yaml"
         assert len(model.active_routes) == 1
-        assert model.runtime_variant == RuntimeVariant.CUSTOM
+        assert model.runtime_variant == RuntimeVariant("custom")
 
     def test_nullable_fields(self) -> None:
         model = ServeInfoModel(
@@ -122,7 +122,7 @@ class TestServeInfoModel:
             model_definition_path=None,
             active_routes=[],
             is_public=True,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
         )
         assert model.service_endpoint is None
         assert model.model_definition_path is None
@@ -138,7 +138,7 @@ class TestServeInfoModel:
             model_definition_path=None,
             active_routes=[],
             is_public=False,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
         )
         data = model.model_dump()
         assert data["name"] == "svc"

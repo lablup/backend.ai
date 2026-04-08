@@ -6,7 +6,7 @@ from uuid import UUID
 
 from strawberry import Info
 
-from ai.backend.common.dto.manager.v2.group.request import DeleteGroupInput, PurgeGroupInput
+from ai.backend.common.dto.manager.v2.group.request import DeleteProjectInput, PurgeProjectInput
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -73,7 +73,7 @@ async def admin_delete_project_v2(
     """Soft-delete a project."""
     check_admin_only()
     ctx = info.context
-    payload = await ctx.adapters.project.admin_delete(DeleteGroupInput(group_id=project_id))
+    payload = await ctx.adapters.project.admin_delete(DeleteProjectInput(group_id=project_id))
     return DeleteProjectPayloadGQL.from_pydantic(payload)
 
 
@@ -90,7 +90,7 @@ async def admin_purge_project_v2(
     """Permanently purge a project."""
     check_admin_only()
     ctx = info.context
-    payload = await ctx.adapters.project.admin_purge(PurgeGroupInput(group_id=project_id))
+    payload = await ctx.adapters.project.admin_purge(PurgeProjectInput(group_id=project_id))
     return PurgeProjectPayloadGQL.from_pydantic(payload)
 
 

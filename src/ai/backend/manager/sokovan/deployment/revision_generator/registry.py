@@ -43,13 +43,13 @@ class RevisionGeneratorRegistry:
         base_generator = BaseRevisionGenerator(repo)
 
         self._generators: dict[RuntimeVariant, RevisionGenerator] = {
-            RuntimeVariant.CUSTOM: custom_generator,
-            RuntimeVariant.VLLM: base_generator,
-            RuntimeVariant.HUGGINGFACE_TGI: base_generator,
-            RuntimeVariant.NIM: base_generator,
-            RuntimeVariant.SGLANG: base_generator,
-            RuntimeVariant.MODULAR_MAX: base_generator,
-            RuntimeVariant.CMD: base_generator,
+            RuntimeVariant("custom"): custom_generator,
+            RuntimeVariant("vllm"): base_generator,
+            RuntimeVariant("huggingface-tgi"): base_generator,
+            RuntimeVariant("nim"): base_generator,
+            RuntimeVariant("sglang"): base_generator,
+            RuntimeVariant("modular-max"): base_generator,
+            RuntimeVariant("cmd"): base_generator,
         }
 
     def get(self, runtime_variant: RuntimeVariant) -> RevisionGenerator:

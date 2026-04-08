@@ -47,16 +47,25 @@ class InvalidModelDefinitionCase:
 
 
 VARIANT_EXPECTATIONS: dict[RuntimeVariant, VariantExpectation] = {
-    RuntimeVariant.VLLM: VariantExpectation("vllm-model", 8000, "/health"),
-    RuntimeVariant.NIM: VariantExpectation("nim-model", 8000, "/v1/health/ready"),
-    RuntimeVariant.HUGGINGFACE_TGI: VariantExpectation("tgi-model", 3000, "/info"),
-    RuntimeVariant.SGLANG: VariantExpectation("sglang-model", 9001, "/health"),
-    RuntimeVariant.MODULAR_MAX: VariantExpectation("max-model", 8000, "/health"),
-    RuntimeVariant.CMD: VariantExpectation("image-model", 8000, None),
+    RuntimeVariant("vllm"): VariantExpectation("vllm-model", 8000, "/health"),
+    RuntimeVariant("nim"): VariantExpectation("nim-model", 8000, "/v1/health/ready"),
+    RuntimeVariant("huggingface-tgi"): VariantExpectation("tgi-model", 3000, "/info"),
+    RuntimeVariant("sglang"): VariantExpectation("sglang-model", 9001, "/health"),
+    RuntimeVariant("modular-max"): VariantExpectation("max-model", 8000, "/health"),
+    RuntimeVariant("cmd"): VariantExpectation("image-model", 8000, None),
 }
 
-NON_CUSTOM_VARIANTS = [v for v in RuntimeVariant if v != RuntimeVariant.CUSTOM]
-VARIANTS_WITH_HEALTH_CHECK = [v for v in NON_CUSTOM_VARIANTS if v != RuntimeVariant.CMD]
+_ALL_VARIANTS = [
+    RuntimeVariant("custom"),
+    RuntimeVariant("vllm"),
+    RuntimeVariant("nim"),
+    RuntimeVariant("huggingface-tgi"),
+    RuntimeVariant("sglang"),
+    RuntimeVariant("modular-max"),
+    RuntimeVariant("cmd"),
+]
+NON_CUSTOM_VARIANTS = [v for v in _ALL_VARIANTS if v != RuntimeVariant("custom")]
+VARIANTS_WITH_HEALTH_CHECK = [v for v in NON_CUSTOM_VARIANTS if v != RuntimeVariant("cmd")]
 
 
 def create_context(
@@ -129,7 +138,7 @@ def definition_generator_registry_with_override(
 @pytest.fixture
 def db_model_definition() -> ModelDefinition:
     """Model definition simulating user-provided override."""
-    expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
+    expected = VARIANT_EXPECTATIONS[RuntimeVariant("vllm")]
     return ModelDefinition.model_validate({
         "models": [
             {
@@ -147,7 +156,7 @@ def db_model_definition() -> ModelDefinition:
 @pytest.fixture
 def storage_override_definition() -> dict[str, Any]:
     """Model definition dict simulating what is fetched from storage file."""
-    expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
+    expected = VARIANT_EXPECTATIONS[RuntimeVariant("vllm")]
     return {
         "models": [
             {
@@ -166,7 +175,7 @@ class TestModelDefinitionGeneratorRegistry:
     def test_initializes_all_generators(
         self, definition_generator_registry: ModelDefinitionGeneratorRegistry
     ) -> None:
-        for variant in RuntimeVariant:
+        for variant in _ALL_VARIANTS:
             assert definition_generator_registry.get(variant) is not None
 
     @pytest.mark.parametrize("variant", NON_CUSTOM_VARIANTS)
@@ -207,7 +216,7 @@ class TestModelDefinitionGeneratorRegistry:
         )
 
         result = await definition_generator_registry.generate_model_definition(
-            create_context(RuntimeVariant.CUSTOM, model_definition_path="model.yaml")
+            create_context(RuntimeVariant("custom"), model_definition_path="model.yaml")
         )
 
         mock_repo.fetch_model_definition.assert_called_once()
@@ -228,11 +237,11 @@ class TestModelDefinitionGeneratorRegistry:
         mock_repo: MagicMock,
         case: OverridePathCase,
     ) -> None:
-        expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
+        expected = VARIANT_EXPECTATIONS[RuntimeVariant("vllm")]
         mock_repo.fetch_model_definition = AsyncMock(return_value=create_override_dict(expected))
 
         result = await definition_generator_registry_with_override.generate_model_definition(
-            create_context(RuntimeVariant.VLLM, model_definition_path=case.path)
+            create_context(RuntimeVariant("vllm"), model_definition_path=case.path)
         )
 
         model = result.models[0]
@@ -278,10 +287,10 @@ class TestModelDefinitionGeneratorRegistry:
         exception: Exception,
     ) -> None:
         mock_repo.fetch_model_definition = AsyncMock(side_effect=exception)
-        expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
+        expected = VARIANT_EXPECTATIONS[RuntimeVariant("vllm")]
 
         result = await definition_generator_registry_with_override.generate_model_definition(
-            create_context(RuntimeVariant.VLLM, model_definition_path="model.yaml")
+            create_context(RuntimeVariant("vllm"), model_definition_path="model.yaml")
         )
 
         mock_repo.fetch_model_definition.assert_called_once()
@@ -320,10 +329,10 @@ class TestModelDefinitionGeneratorRegistry:
         case: InvalidModelDefinitionCase,
     ) -> None:
         """When model_definition is None or empty, generated definition is returned unchanged."""
-        expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
+        expected = VARIANT_EXPECTATIONS[RuntimeVariant("vllm")]
 
         result = await definition_generator_registry.generate_model_definition(
-            create_context(RuntimeVariant.VLLM, model_definition=case.value)
+            create_context(RuntimeVariant("vllm"), model_definition=case.value)
         )
 
         model = result.models[0]
@@ -343,7 +352,7 @@ class TestModelDefinitionGeneratorRegistry:
 
         result = await definition_generator_registry_with_override.generate_model_definition(
             create_context(
-                RuntimeVariant.VLLM,
+                RuntimeVariant("vllm"),
                 model_definition_path="model.yaml",
                 model_definition=db_model_definition,
             )
@@ -405,7 +414,7 @@ class TestModelDefinitionGeneratorRegistry:
 
         result = await definition_generator_registry.generate_model_definition(
             create_context(
-                RuntimeVariant.CUSTOM,
+                RuntimeVariant("custom"),
                 model_definition_path="model-definition.yaml",
                 model_definition=custom_user_override,
             )
@@ -437,7 +446,7 @@ class TestModelDefinitionGeneratorRegistry:
 
         result = await definition_generator_registry.generate_model_definition(
             create_context(
-                RuntimeVariant.CUSTOM,
+                RuntimeVariant("custom"),
                 model_definition_path="model-definition.yaml",
                 model_definition=None,
             )
@@ -504,7 +513,7 @@ class TestModelDefinitionGeneratorRegistry:
 
         result = await definition_generator_registry_with_override.generate_model_definition(
             create_context(
-                RuntimeVariant.VLLM,
+                RuntimeVariant("vllm"),
                 model_definition_path="model.yaml",
                 model_definition=vllm_user_override,
             )

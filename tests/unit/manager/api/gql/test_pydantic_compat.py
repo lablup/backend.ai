@@ -11,7 +11,7 @@ Verifies:
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import strawberry
@@ -178,7 +178,7 @@ class TestPydanticNodeMixin:
 
         gql = ItemGQL.from_pydantic(dto)
 
-        assert gql.extra_data == {"foo": "bar", "nested": [1, 2, 3]}
+        assert cast(dict[str, Any], gql.extra_data) == {"foo": "bar", "nested": [1, 2, 3]}
 
     def test_inherits_node(self) -> None:
         """PydanticNodeMixin inherits Node, so concrete types only need one parent."""
@@ -317,7 +317,7 @@ class TestContainerRegistryGQLFromPydantic:
         assert gql.password is None  # DTO has no password field
         assert gql.ssl_verify is True
         assert gql.is_global is False
-        assert gql.extra == {"key": "value"}
+        assert cast(dict[str, Any], gql.extra) == {"key": "value"}
 
     def test_from_pydantic_with_password_extra(self) -> None:
         dto = ContainerRegistryNode(

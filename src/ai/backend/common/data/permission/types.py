@@ -252,6 +252,7 @@ class EntityType(enum.StrEnum):
             cls.NOTIFICATION_CHANNEL,
             cls.NOTIFICATION_RULE,
             cls.MODEL_DEPLOYMENT,
+            cls.MODEL_CARD,
         }
 
     @classmethod
@@ -380,6 +381,7 @@ class RBACElementType(enum.StrEnum):
     ARTIFACT_REGISTRY = "artifact_registry"
     SESSION_TEMPLATE = "session_template"
     APP_CONFIG = "app_config"
+    MODEL_CARD = "model_card"
 
     # === Root-query-enabled entities (superadmin-only) ===
     RESOURCE_PRESET = "resource_preset"

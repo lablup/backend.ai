@@ -18,6 +18,8 @@ from ai.backend.manager.api.gql.runtime_variant.types import (
     CreateRuntimeVariantInputGQL,
     CreateRuntimeVariantPayloadGQL,
     DeleteRuntimeVariantPayloadGQL,
+    DeleteRuntimeVariantsInputGQL,
+    DeleteRuntimeVariantsPayloadGQL,
     RuntimeVariantConnection,
     RuntimeVariantEdge,
     RuntimeVariantFilterGQL,
@@ -148,3 +150,29 @@ async def admin_delete_runtime_variant(
     check_admin_only()
     payload = await info.context.adapters.runtime_variant.delete(id)
     return DeleteRuntimeVariantPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Delete multiple runtime variants (superadmin only).",
+    )
+)  # type: ignore[misc]
+async def admin_delete_runtime_variants(
+    info: Info[StrawberryGQLContext],
+    input: DeleteRuntimeVariantsInputGQL,
+) -> DeleteRuntimeVariantsPayloadGQL:
+    """Delete multiple runtime variants.
+
+    Args:
+        info: Strawberry GraphQL context.
+        input: Input containing list of runtime variant UUIDs to delete.
+
+    Returns:
+        DeleteRuntimeVariantsPayloadGQL with count of deleted runtime variants.
+    """
+    check_admin_only()
+    ctx = info.context
+    dto = input.to_pydantic()
+    payload = await ctx.adapters.runtime_variant.bulk_delete(dto)
+    return DeleteRuntimeVariantsPayloadGQL.from_pydantic(payload)

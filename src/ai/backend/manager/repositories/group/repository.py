@@ -124,13 +124,13 @@ class GroupRepository:
 
     @group_repository_resilience.apply()
     async def assign_users_to_project(
-        self, project_id: UUID, user_ids: list[UUID]
+        self, project_id: UUID, user_ids: list[UUID], role_id: UUID
     ) -> list[UserData]:
         """Assign users to a project with domain validation and RBAC scope binding.
 
         Returns the list of newly assigned users.
         """
-        return await self._db_source.assign_users_to_project(project_id, user_ids)
+        return await self._db_source.assign_users_to_project(project_id, user_ids, role_id)
 
     @group_repository_resilience.apply()
     async def unassign_users_from_project(
@@ -138,6 +138,19 @@ class GroupRepository:
     ) -> UnassignUsersResult:
         """Remove users from a project and return unassigned users and failures."""
         return await self._db_source.unassign_users_from_project(unbinder)
+
+    @group_repository_resilience.apply()
+    async def bind_user_to_project(self, user_id: UUID, project_id: UUID) -> None:
+        """Add a user to a project (business association + RBAC scope binding).
+
+        Skips if the user is already a member of the project.
+        """
+        await self._db_source.bind_user_to_project(user_id, project_id)
+
+    @group_repository_resilience.apply()
+    async def unbind_user_from_project(self, user_id: UUID, project_id: UUID) -> None:
+        """Remove a user from a project (business association + RBAC scope binding)."""
+        await self._db_source.unbind_user_from_project(user_id, project_id)
 
     @group_repository_resilience.apply()
     async def get_project(self, project_id: UUID) -> GroupData:

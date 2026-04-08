@@ -171,9 +171,9 @@ class LoginBlockedError(BackendAIError, web.HTTPTooManyRequests):
         )
 
 
-class ActiveLoginSessionExistsError(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/active-login-session-exists"
-    error_title = "An active login session already exists."
+class TooManyConcurrentLoginSessions(BackendAIError, web.HTTPTooManyRequests):
+    error_type = "https://api.backend.ai/probs/too-many-concurrent-logins"
+    error_title = "Too many concurrent login sessions for this user."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(

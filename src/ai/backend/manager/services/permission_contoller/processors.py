@@ -2,6 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
@@ -23,6 +24,8 @@ from .actions import (
     RevokeRoleActionResult,
     SearchRolesAction,
     SearchRolesActionResult,
+    SearchRolesInScopeAction,
+    SearchRolesInScopeActionResult,
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
     UpdateRoleAction,
@@ -83,6 +86,9 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     bulk_revoke_role: ActionProcessor[BulkRevokeRoleAction, BulkRevokeRoleActionResult]
     get_role_detail: ActionProcessor[GetRoleDetailAction, GetRoleDetailActionResult]
     search_roles: ActionProcessor[SearchRolesAction, SearchRolesActionResult]
+    search_roles_in_scope: ScopeActionProcessor[
+        SearchRolesInScopeAction, SearchRolesInScopeActionResult
+    ]
     search_users_assigned_to_role: ActionProcessor[
         SearchUsersAssignedToRoleAction, SearchUsersAssignedToRoleActionResult
     ]
@@ -120,6 +126,10 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.bulk_revoke_role = ActionProcessor(service.bulk_revoke_role, action_monitors)
         self.get_role_detail = ActionProcessor(service.get_role_detail, action_monitors)
         self.search_roles = ActionProcessor(service.search_roles, action_monitors)
+        scope_rbac_validators = [validators.rbac.scope]
+        self.search_roles_in_scope = ScopeActionProcessor(
+            service.search_roles_in_scope, action_monitors, validators=scope_rbac_validators
+        )
         self.search_users_assigned_to_role = ActionProcessor(
             service.search_users_assigned_to_role, action_monitors
         )
@@ -152,6 +162,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
             BulkRevokeRoleAction.spec(),
             GetRoleDetailAction.spec(),
             SearchRolesAction.spec(),
+            SearchRolesInScopeAction.spec(),
             SearchUsersAssignedToRoleAction.spec(),
             UpdateRolePermissionsAction.spec(),
             SearchScopesAction.spec(),
