@@ -2166,12 +2166,12 @@ class ScheduleDBSource:
             # kernel status transition to RUNNING, rather than waiting for
             # the session-level RUNNING transition.
             agent_id = current.agent_id if current else None
-            await self._allocate_kernel_resources_in_session(
+            await self._allocate_kernel_resources(
                 db_sess, KernelId(kernel_id), agent_id, occupied_slots
             )
             return True
 
-    async def _allocate_kernel_resources_in_session(
+    async def _allocate_kernel_resources(
         self,
         db_sess: SASession,
         kernel_id: KernelId,
