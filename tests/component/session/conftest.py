@@ -69,8 +69,18 @@ def scheduling_controller_mock() -> AsyncMock:
 
 
 @pytest.fixture()
-async def session_processors(
+def session_repository(
     database_engine: ExtendedAsyncSAEngine,
+) -> SessionRepository:
+    """Real ``SessionRepository`` exposed as a fixture so individual tests can
+    override or stub specific methods (e.g., ``resolve_image``) without
+    monkey-patching the class globally."""
+    return SessionRepository(database_engine)
+
+
+@pytest.fixture()
+async def session_processors(
+    session_repository: SessionRepository,
     agent_registry: AsyncMock,
     background_task_manager: BackgroundTaskManager,
     error_monitor: ErrorPluginContext,
@@ -78,7 +88,6 @@ async def session_processors(
     scheduling_controller_mock: AsyncMock,
 ) -> SessionProcessors:
     """Real SessionProcessors with real SessionService and SessionRepository."""
-    session_repo = SessionRepository(database_engine)
     args = SessionServiceArgs(
         agent_registry=agent_registry,
         event_fetcher=AsyncMock(),
@@ -86,7 +95,7 @@ async def session_processors(
         event_hub=AsyncMock(),
         error_monitor=error_monitor,
         idle_checker_host=AsyncMock(),
-        session_repository=session_repo,
+        session_repository=session_repository,
         scheduling_controller=scheduling_controller_mock,
         appproxy_client_pool=appproxy_client_pool,
     )
