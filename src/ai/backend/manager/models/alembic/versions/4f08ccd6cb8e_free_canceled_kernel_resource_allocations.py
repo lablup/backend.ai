@@ -55,7 +55,7 @@ def upgrade() -> None:
             SET free_at = NOW()
             FROM kernels AS k
             WHERE ra.kernel_id = k.id
-              AND k.status = 'CANCELLED'
+              AND k.status IN ('CANCELLED', 'TERMINATED')
               AND ra.free_at IS NULL
         """)
     )
