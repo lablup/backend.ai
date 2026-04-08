@@ -2103,7 +2103,7 @@ class ScheduleDBSource:
         )
         async with self._begin_session_read_committed() as db_sess:
             # Check current kernel status and fetch agent_id before update
-            check_stmt = sa.select(KernelRow.status, KernelRow.starts_at, KernelRow.agent_id).where(
+            check_stmt = sa.select(KernelRow.status, KernelRow.starts_at, KernelRow.agent).where(
                 KernelRow.id == kernel_id
             )
             check_result = await db_sess.execute(check_stmt)
@@ -2165,7 +2165,7 @@ class ScheduleDBSource:
             # This ensures resource allocation happens atomically with the
             # kernel status transition to RUNNING, rather than waiting for
             # the session-level RUNNING transition.
-            agent_id = current.agent_id if current else None
+            agent_id = current.agent if current else None
             await self._allocate_kernel_resources(
                 db_sess, KernelId(kernel_id), agent_id, occupied_slots
             )

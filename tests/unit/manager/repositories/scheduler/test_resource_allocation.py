@@ -1,7 +1,7 @@
 """
 Tests for per-kernel resource allocation during kernel RUNNING transition.
 
-BA-5627: Ensure _allocate_kernel_resources activates resource_allocations
+BA-5627: Ensure update_kernel_status_running activates resource_allocations
 (sets used + used_at) and increments agent_resources.used atomically
 with the kernel status transition to RUNNING.
 """
@@ -56,11 +56,32 @@ from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.sokovan.data import KernelCreationInfo
 from ai.backend.testutils.db import with_tables
 
 
-class TestAllocateKernelResources:
-    """Tests for _allocate_kernel_resources called during kernel RUNNING transition."""
+def _make_creation_info(
+    cpu: str = "2",
+    mem: str = "4096",
+) -> KernelCreationInfo:
+    """Build a KernelCreationInfo whose get_resource_allocations() returns the given slots."""
+    return KernelCreationInfo(
+        container_id="test-container",
+        resource_spec={
+            "allocations": {
+                "cpu": {"cpu": {"0": cpu}},
+                "mem": {"mem": {"0": mem}},
+            },
+        },
+        repl_in_port=2001,
+        repl_out_port=2002,
+        stdin_port=2003,
+        stdout_port=2004,
+    )
+
+
+class TestUpdateKernelStatusRunningResourceAllocation:
+    """Tests for resource allocation performed by update_kernel_status_running."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -315,7 +336,7 @@ class TestAllocateKernelResources:
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
-        agent_id: str,
+        agent_id: str | None,
         kernel_status: KernelStatus = KernelStatus.CREATING,
         cpu_requested: Decimal = Decimal("2"),
         mem_requested: Decimal = Decimal("4096"),
@@ -323,7 +344,7 @@ class TestAllocateKernelResources:
         """Create a session + kernel with pending (unactivated) resource allocations.
 
         Resource allocations have used=None and used_at=None, simulating the
-        state before _allocate_kernel_resources is called.
+        state before update_kernel_status_running is called.
         """
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
@@ -355,7 +376,7 @@ class TestAllocateKernelResources:
                     id=kernel_id,
                     session_id=session_id,
                     agent=agent_id,
-                    agent_addr="127.0.0.1:6001",
+                    agent_addr="127.0.0.1:6001" if agent_id else None,
                     scaling_group=scaling_group_name,
                     cluster_idx=0,
                     cluster_role="main",
@@ -424,7 +445,7 @@ class TestAllocateKernelResources:
                 )
             await db_sess.flush()
 
-    async def test_allocate_sets_used_and_used_at(
+    async def test_sets_used_and_used_at_on_resource_allocations(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
@@ -435,7 +456,7 @@ class TestAllocateKernelResources:
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """_allocate_kernel_resources sets used and used_at on resource_allocations."""
+        """update_kernel_status_running sets used and used_at on resource_allocations."""
         await self._seed_agent_resources(db_with_cleanup, test_agent_id)
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
@@ -450,11 +471,10 @@ class TestAllocateKernelResources:
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
-        occupied_slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")})
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_source._allocate_kernel_resources(
-                db_sess, kernel_id, test_agent_id, occupied_slots
-            )
+        result = await db_source.update_kernel_status_running(
+            kernel_id, "test-started", _make_creation_info(cpu="2", mem="4096")
+        )
+        assert result is True
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             allocs = (
@@ -474,7 +494,7 @@ class TestAllocateKernelResources:
                 assert alloc.used_at is not None, f"used_at should be set for {alloc.slot_name}"
                 assert alloc.used == alloc.requested
 
-    async def test_allocate_increments_agent_resources_used(
+    async def test_increments_agent_resources_used(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
@@ -485,7 +505,7 @@ class TestAllocateKernelResources:
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """_allocate_kernel_resources increments agent_resources.used."""
+        """update_kernel_status_running increments agent_resources.used."""
         await self._seed_agent_resources(
             db_with_cleanup, test_agent_id, cpu_used=Decimal("1"), mem_used=Decimal("1024")
         )
@@ -502,11 +522,9 @@ class TestAllocateKernelResources:
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
-        occupied_slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")})
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_source._allocate_kernel_resources(
-                db_sess, kernel_id, test_agent_id, occupied_slots
-            )
+        await db_source.update_kernel_status_running(
+            kernel_id, "test-started", _make_creation_info(cpu="2", mem="4096")
+        )
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             agent_resources = (
@@ -524,7 +542,7 @@ class TestAllocateKernelResources:
             assert by_slot["cpu"] == Decimal("3")  # 1 + 2
             assert by_slot["mem"] == Decimal("5120")  # 1024 + 4096
 
-    async def test_allocate_is_idempotent(
+    async def test_updates_kernel_status_to_running(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
@@ -535,7 +553,45 @@ class TestAllocateKernelResources:
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """Calling _allocate_kernel_resources twice does not double-increment."""
+        """update_kernel_status_running transitions kernel to RUNNING and sets occupied_slots."""
+        await self._seed_agent_resources(db_with_cleanup, test_agent_id)
+        _, kernel_id = await self._create_kernel_with_pending_allocations(
+            db_with_cleanup,
+            domain_name=test_domain_name,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            agent_id=test_agent_id,
+        )
+
+        db_source = ScheduleDBSource(db_with_cleanup)
+        result = await db_source.update_kernel_status_running(
+            kernel_id, "test-started", _make_creation_info()
+        )
+        assert result is True
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            kernel = (
+                await db_sess.execute(sa.select(KernelRow).where(KernelRow.id == kernel_id))
+            ).scalar_one()
+            assert kernel.status == KernelStatus.RUNNING
+            assert kernel.container_id == "test-container"
+            assert kernel.occupied_slots["cpu"] is not None
+            assert kernel.occupied_slots["mem"] is not None
+
+    async def test_is_idempotent_via_double_call(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        resource_slot_types: None,
+    ) -> None:
+        """Second call returns False (kernel already RUNNING) and does not double-increment."""
         await self._seed_agent_resources(db_with_cleanup, test_agent_id)
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
@@ -550,17 +606,12 @@ class TestAllocateKernelResources:
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
-        occupied_slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")})
+        creation_info = _make_creation_info(cpu="2", mem="4096")
 
-        # Call twice
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_source._allocate_kernel_resources(
-                db_sess, kernel_id, test_agent_id, occupied_slots
-            )
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_source._allocate_kernel_resources(
-                db_sess, kernel_id, test_agent_id, occupied_slots
-            )
+        first = await db_source.update_kernel_status_running(kernel_id, "started", creation_info)
+        second = await db_source.update_kernel_status_running(kernel_id, "started", creation_info)
+        assert first is True
+        assert second is False  # kernel is already RUNNING, not in PREPARED/CREATING
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             agent_resources = (
@@ -578,7 +629,7 @@ class TestAllocateKernelResources:
             assert by_slot["cpu"] == Decimal("2")  # Not 4
             assert by_slot["mem"] == Decimal("4096")  # Not 8192
 
-    async def test_allocate_raises_on_capacity_exceeded(
+    async def test_raises_on_capacity_exceeded(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
@@ -589,7 +640,7 @@ class TestAllocateKernelResources:
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """_allocate_kernel_resources raises AgentResourceCapacityExceeded when over capacity."""
+        """update_kernel_status_running raises AgentResourceCapacityExceeded on overflow."""
         await self._seed_agent_resources(
             db_with_cleanup,
             test_agent_id,
@@ -610,14 +661,12 @@ class TestAllocateKernelResources:
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
-        occupied_slots = ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("1024")})
         with pytest.raises(AgentResourceCapacityExceeded):
-            async with db_with_cleanup.begin_session() as db_sess:
-                await db_source._allocate_kernel_resources(
-                    db_sess, kernel_id, test_agent_id, occupied_slots
-                )
+            await db_source.update_kernel_status_running(
+                kernel_id, "test-started", _make_creation_info(cpu="4", mem="1024")
+            )
 
-    async def test_allocate_noop_when_agent_id_is_none(
+    async def test_returns_false_when_kernel_not_in_valid_status(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
@@ -628,7 +677,7 @@ class TestAllocateKernelResources:
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """_allocate_kernel_resources is a no-op when agent_id is None."""
+        """update_kernel_status_running returns False if kernel is not PREPARED/CREATING."""
         await self._seed_agent_resources(db_with_cleanup, test_agent_id)
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
@@ -638,12 +687,14 @@ class TestAllocateKernelResources:
             user_uuid=test_user_uuid,
             access_key=test_access_key,
             agent_id=test_agent_id,
+            kernel_status=KernelStatus.PENDING,  # Not a valid source status
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
-        occupied_slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")})
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_source._allocate_kernel_resources(db_sess, kernel_id, None, occupied_slots)
+        result = await db_source.update_kernel_status_running(
+            kernel_id, "test-started", _make_creation_info()
+        )
+        assert result is False
 
         # Allocations should remain unactivated
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -662,7 +713,7 @@ class TestAllocateKernelResources:
                 assert alloc.used is None
                 assert alloc.used_at is None
 
-    async def test_allocate_noop_when_slots_empty(
+    async def test_handles_no_agent_gracefully(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
@@ -673,8 +724,7 @@ class TestAllocateKernelResources:
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """_allocate_kernel_resources is a no-op when occupied_slots is empty."""
-        await self._seed_agent_resources(db_with_cleanup, test_agent_id)
+        """update_kernel_status_running succeeds without allocating when agent_id is None."""
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
             domain_name=test_domain_name,
@@ -682,27 +732,34 @@ class TestAllocateKernelResources:
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
-            agent_id=test_agent_id,
+            agent_id=None,  # No agent assigned
+            kernel_status=KernelStatus.CREATING,
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_source._allocate_kernel_resources(
-                db_sess, kernel_id, test_agent_id, ResourceSlot()
-            )
+        result = await db_source.update_kernel_status_running(
+            kernel_id, "test-started", _make_creation_info()
+        )
+        assert result is True
 
+        # Kernel should be RUNNING but allocations remain unactivated
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            agent_resources = (
+            kernel = (
+                await db_sess.execute(sa.select(KernelRow).where(KernelRow.id == kernel_id))
+            ).scalar_one()
+            assert kernel.status == KernelStatus.RUNNING
+
+            allocs = (
                 (
                     await db_sess.execute(
-                        sa.select(AgentResourceRow).where(
-                            AgentResourceRow.agent_id == test_agent_id,
+                        sa.select(ResourceAllocationRow).where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
                         )
                     )
                 )
                 .scalars()
                 .all()
             )
-            by_slot = {ar.slot_name: ar.used for ar in agent_resources}
-            assert by_slot["cpu"] == Decimal("0")
-            assert by_slot["mem"] == Decimal("0")
+            for alloc in allocs:
+                assert alloc.used is None
+                assert alloc.used_at is None
