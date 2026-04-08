@@ -1,7 +1,7 @@
 """add client_type to login_sessions
 
 Revision ID: e6036371b6b5
-Revises: 689f66507280
+Revises: 6e104991787d
 Create Date: 2026-04-06
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "e6036371b6b5"
-down_revision = "689f66507280"
+down_revision = "6e104991787d"
 # Part of: 26.3.0
 branch_labels = None
 depends_on = None
