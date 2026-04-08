@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
@@ -18,10 +17,6 @@ class StartServiceAction(SessionAppServiceAction):
     port: int | None
     arguments: str | None  # json_string
     envs: str | None  # json_string
-    owner_id: UUID | None = None
-    """Delegated owner user UUID. When set, the service resolves it to the
-    target user's main access key and overrides ``access_key``.
-    """
 
     @override
     def entity_id(self) -> str | None:

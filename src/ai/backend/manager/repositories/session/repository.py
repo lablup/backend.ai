@@ -107,10 +107,9 @@ class SessionRepository:
         session_name_or_id: str | SessionId,
         new_name: str,
         owner_access_key: AccessKey,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> SessionRow:
         return await self._db_source.update_session_name(
-            session_name_or_id, new_name, owner_access_key, owner_user_uuid=owner_user_uuid
+            session_name_or_id, new_name, owner_access_key
         )
 
     @session_repository_resilience.apply()
@@ -256,11 +255,10 @@ class SessionRepository:
         self,
         session_name_or_id: str | SessionId,
         owner_access_key: AccessKey,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> SessionRow:
         """Get session with minimal routing information"""
         return await self._db_source.get_session_with_routing_minimal(
-            session_name_or_id, owner_access_key, owner_user_uuid=owner_user_uuid
+            session_name_or_id, owner_access_key
         )
 
     @session_repository_resilience.apply()
