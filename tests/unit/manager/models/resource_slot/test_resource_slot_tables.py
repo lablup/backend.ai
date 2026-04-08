@@ -480,43 +480,55 @@ class TestResourceAllocationRow:
 class TestActualOccupiedSlotsOrdering:
     """Tests that actual_occupied_slots() returns slots sorted by resource_slot_types.rank."""
 
+    @pytest.mark.parametrize(
+        ("slot_type_ranks", "expected_order"),
+        [
+            pytest.param(
+                {"cpu": 10, "mem": 20, "cuda.shares": 30},
+                ["cpu", "mem", "cuda.shares"],
+                id="ascending-rank",
+            ),
+            pytest.param(
+                {"mem": 1, "cpu": 2, "cuda.shares": 3},
+                ["mem", "cpu", "cuda.shares"],
+                id="rank-differs-from-alphabetical",
+            ),
+        ],
+    )
     async def test_occupied_slots_sorted_by_rank(
         self,
         database_with_resource_slot_tables: ExtendedAsyncSAEngine,
         agent_id: str,
+        slot_type_ranks: dict[str, int],
+        expected_order: list[str],
     ) -> None:
-        """Slots with lower rank appear first in the returned ResourceSlot."""
+        """Slots are ordered by rank regardless of insertion order."""
+        slot_type_defs: dict[str, str] = {
+            "cpu": "count",
+            "mem": "bytes",
+            "cuda.shares": "count",
+        }
         async with database_with_resource_slot_tables.begin_session() as db_sess:
-            db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=10))
-            db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=20))
-            db_sess.add(ResourceSlotTypeRow(slot_name="cuda.shares", slot_type="count", rank=30))
+            for slot_name, rank in slot_type_ranks.items():
+                db_sess.add(
+                    ResourceSlotTypeRow(
+                        slot_name=slot_name,
+                        slot_type=slot_type_defs[slot_name],
+                        rank=rank,
+                    )
+                )
             await db_sess.flush()
 
         async with database_with_resource_slot_tables.begin_session() as db_sess:
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=agent_id,
-                    slot_name="cuda.shares",
-                    capacity=Decimal("8"),
-                    used=Decimal("4"),
+            for slot_name in slot_type_ranks:
+                db_sess.add(
+                    AgentResourceRow(
+                        agent_id=agent_id,
+                        slot_name=slot_name,
+                        capacity=Decimal("1"),
+                        used=Decimal("0"),
+                    )
                 )
-            )
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=agent_id,
-                    slot_name="mem",
-                    capacity=Decimal("2199023255552"),
-                    used=Decimal("1031310745600"),
-                )
-            )
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=agent_id,
-                    slot_name="cpu",
-                    capacity=Decimal("222"),
-                    used=Decimal("49"),
-                )
-            )
             await db_sess.flush()
 
         async with database_with_resource_slot_tables.begin_readonly_session() as db_sess:
@@ -532,60 +544,4 @@ class TestActualOccupiedSlotsOrdering:
             assert agent_row is not None
             occupied = agent_row.actual_occupied_slots()
 
-        slot_keys = list(occupied.keys())
-        assert slot_keys == ["cpu", "mem", "cuda.shares"]
-
-    async def test_occupied_slots_sorted_by_rank_reversed(
-        self,
-        database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-        agent_id: str,
-    ) -> None:
-        """When rank order differs from alphabetical, rank wins."""
-        async with database_with_resource_slot_tables.begin_session() as db_sess:
-            db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=1))
-            db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=2))
-            db_sess.add(ResourceSlotTypeRow(slot_name="cuda.shares", slot_type="count", rank=3))
-            await db_sess.flush()
-
-        async with database_with_resource_slot_tables.begin_session() as db_sess:
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=agent_id,
-                    slot_name="cpu",
-                    capacity=Decimal("4"),
-                    used=Decimal("2"),
-                )
-            )
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=agent_id,
-                    slot_name="cuda.shares",
-                    capacity=Decimal("8"),
-                    used=Decimal("0"),
-                )
-            )
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=agent_id,
-                    slot_name="mem",
-                    capacity=Decimal("4294967296"),
-                    used=Decimal("1073741824"),
-                )
-            )
-            await db_sess.flush()
-
-        async with database_with_resource_slot_tables.begin_readonly_session() as db_sess:
-            agent_row = await db_sess.scalar(
-                sa.select(AgentRow)
-                .where(AgentRow.id == agent_id)
-                .options(
-                    selectinload(AgentRow.agent_resource_rows).joinedload(
-                        AgentResourceRow.slot_type_row
-                    )
-                )
-            )
-            assert agent_row is not None
-            occupied = agent_row.actual_occupied_slots()
-
-        slot_keys = list(occupied.keys())
-        assert slot_keys == ["mem", "cpu", "cuda.shares"]
+        assert list(occupied.keys()) == expected_order
