@@ -265,7 +265,6 @@ class CUDAPlugin(AbstractComputePlugin):
         number_of_devices_per_container: dict[str, int] = {}
 
         if self.enabled:
-            dev_count = libnvml.get_device_count()
             mem_stats_by_device_id: dict[DeviceId, Measurement] = {}
             util_stats_by_device_id: dict[DeviceId, Measurement] = {}
             try:
@@ -281,29 +280,29 @@ class CUDAPlugin(AbstractComputePlugin):
                         Decimal(dev_stat.gpu_util), Decimal(100)
                     )
 
-                for cid in container_ids:
-                    async with aiodocker.Docker() as docker:
+                async with aiodocker.Docker() as docker:
+                    for cid in container_ids:
                         container_info = await docker.containers.get(cid)
-                    nvidia_device_reqs = [
-                        x
-                        for x in container_info["HostConfig"]["DeviceRequests"]
-                        if x["Driver"] == "nvidia"
-                    ]
-                    if not nvidia_device_reqs:
-                        continue
+                        nvidia_device_reqs = [
+                            x
+                            for x in container_info.get("HostConfig", {}).get("DeviceRequests", [])
+                            if x["Driver"] == "nvidia"
+                        ]
+                        if not nvidia_device_reqs:
+                            continue
 
-                    mem_stats[cid] = 0
-                    mem_sizes[cid] = 0
-                    util_stats[cid] = Decimal("0")
-                    number_of_devices_per_container[cid] = 0
+                        mem_stats[cid] = 0
+                        mem_sizes[cid] = 0
+                        util_stats[cid] = Decimal("0")
+                        number_of_devices_per_container[cid] = 0
 
-                    for device_id in nvidia_device_reqs[0]["DeviceIDs"]:
-                        mem_stat = mem_stats_by_device_id[DeviceId(device_id)]
-                        util_stat = util_stats_by_device_id[DeviceId(device_id)]
-                        mem_stats[cid] += int(mem_stat.value)
-                        mem_sizes[cid] += int(mem_stat.capacity or 0)
-                        util_stats[cid] += Decimal(util_stat.value)
-                        number_of_devices_per_container[cid] += 1
+                        for device_id in nvidia_device_reqs[0]["DeviceIDs"]:
+                            mem_stat = mem_stats_by_device_id[DeviceId(device_id)]
+                            util_stat = util_stats_by_device_id[DeviceId(device_id)]
+                            mem_stats[cid] += int(mem_stat.value)
+                            mem_sizes[cid] += int(mem_stat.capacity or 0)
+                            util_stats[cid] += Decimal(util_stat.value)
+                            number_of_devices_per_container[cid] += 1
             except ImportError:
                 log.warning("gather_container_measures(): NVML library is not found")
             except LibraryError as e:
