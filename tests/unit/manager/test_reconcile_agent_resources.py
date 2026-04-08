@@ -5,9 +5,9 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import cast
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
@@ -419,11 +419,19 @@ class TestReconcileAgentResources:
         assert used["cpu"] == Decimal("0")
 
 
+@dataclass(frozen=True)
+class KernelSpec:
+    status: KernelStatus
+    cpu: Decimal
+    cpu_used: Decimal | None = None
+    free_at: datetime | None = None
+
+
 class TestOrphanedAllocationCleanup:
     """Tests for orphaned allocation cleanup during reconciliation.
 
-    Each test sets up an inconsistent DB state (terminal kernel with free_at=NULL)
-    and verifies that reconcile normalizes it.
+    Each test sets up an inconsistent DB state via fixtures and verifies
+    that reconcile normalizes it by checking DB state directly.
     """
 
     @pytest.fixture
@@ -443,7 +451,7 @@ class TestOrphanedAllocationCleanup:
         await engine.dispose()
 
     @pytest.fixture
-    async def db_with_tables(
+    async def db(
         self,
         database_connection: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
@@ -467,7 +475,7 @@ class TestOrphanedAllocationCleanup:
     @pytest.fixture
     async def registry(
         self,
-        db_with_tables: ExtendedAsyncSAEngine,
+        db: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[AgentRegistry, None]:
         mock_config: MagicMock = MagicMock()
         mock_config.config.network.rpc.keepalive_timeout = 30
@@ -478,7 +486,7 @@ class TestOrphanedAllocationCleanup:
         ):
             reg = AgentRegistry(
                 config_provider=mock_config,
-                db=db_with_tables,
+                db=db,
                 agent_cache=MagicMock(),
                 agent_client_pool=MagicMock(),
                 valkey_stat=MagicMock(),
@@ -502,10 +510,9 @@ class TestOrphanedAllocationCleanup:
     @pytest.fixture
     async def infra(
         self,
-        db_with_tables: ExtendedAsyncSAEngine,
-    ) -> tuple[ExtendedAsyncSAEngine, str, uuid.UUID, str]:
-        """Seed common infrastructure: slot types, domain, project, scaling group, agent."""
-        db = db_with_tables
+        db: ExtendedAsyncSAEngine,
+    ) -> tuple[str, uuid.UUID, str]:
+        """Seed slot types, domain, project, scaling group, agent."""
         domain_name = "test-domain"
         project_id = uuid4()
         sg_name = "test-sg"
@@ -560,19 +567,18 @@ class TestOrphanedAllocationCleanup:
                     compute_plugins={},
                 )
             )
-        return db, domain_name, project_id, agent_id
+        return domain_name, project_id, agent_id
 
-    async def _create_kernel(
+    @pytest.fixture
+    async def kernel(
         self,
-        infra: tuple[ExtendedAsyncSAEngine, str, uuid.UUID, str],
-        *,
-        status: KernelStatus,
-        cpu: Decimal,
-        cpu_used: Decimal | None = None,
-        free_at: datetime | None = None,
+        request: pytest.FixtureRequest,
+        db: ExtendedAsyncSAEngine,
+        infra: tuple[str, uuid.UUID, str],
     ) -> uuid.UUID:
-        """Create a kernel with a single cpu allocation."""
-        db, domain_name, project_id, agent_id = infra
+        """Create a kernel from a KernelSpec passed via indirect parametrize."""
+        spec: KernelSpec = request.param
+        domain_name, project_id, agent_id = infra
         session_id = uuid4()
         kernel_id = uuid4()
         empty_slots = ResourceSlot({})
@@ -595,7 +601,7 @@ class TestOrphanedAllocationCleanup:
                     domain_name=domain_name,
                     group_id=project_id,
                     user_uuid=uuid4(),
-                    status=status,
+                    status=spec.status,
                     occupied_slots=empty_slots,
                     requested_slots=empty_slots,
                     repl_in_port=0,
@@ -611,153 +617,252 @@ class TestOrphanedAllocationCleanup:
                 ResourceAllocationRow(
                     kernel_id=kernel_id,
                     slot_name="cpu",
-                    requested=cpu,
-                    used=cpu_used,
-                    free_at=free_at,
+                    requested=spec.cpu,
+                    used=spec.cpu_used,
+                    free_at=spec.free_at,
                 )
             )
-        return kernel_id
-
-    async def _set_agent_cpu(
-        self,
-        infra: tuple[ExtendedAsyncSAEngine, str, uuid.UUID, str],
-        capacity: Decimal,
-        used: Decimal,
-    ) -> None:
-        db, _, _, agent_id = infra
+        # Also seed agent_resources with cpu capacity=8, used=0
         async with db.begin_session() as db_sess:
             db_sess.add(
                 AgentResourceRow(
                     agent_id=agent_id,
                     slot_name="cpu",
-                    capacity=capacity,
-                    used=used,
+                    capacity=Decimal("8"),
+                    used=Decimal("0"),
                 )
             )
+        return kernel_id
 
-    async def _get_free_at(
+    # ── Tests ──
+
+    @pytest.mark.parametrize(
+        "kernel",
+        [
+            pytest.param(
+                KernelSpec(status=KernelStatus.CANCELLED, cpu=Decimal("2")),
+                id="cancelled",
+            ),
+            pytest.param(
+                KernelSpec(status=KernelStatus.TERMINATED, cpu=Decimal("4"), cpu_used=Decimal("4")),
+                id="terminated",
+            ),
+            pytest.param(
+                KernelSpec(status=KernelStatus.ERROR, cpu=Decimal("2"), cpu_used=Decimal("2")),
+                id="error",
+            ),
+        ],
+        indirect=True,
+    )
+    async def test_terminal_kernel_with_unfree_allocation_is_freed(
         self,
-        infra: tuple[ExtendedAsyncSAEngine, str, uuid.UUID, str],
-        kernel_id: uuid.UUID,
-    ) -> datetime | None:
-        db = infra[0]
+        db: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        kernel: uuid.UUID,
+    ) -> None:
+        """Inconsistent: terminal kernel + free_at=NULL → reconcile sets free_at."""
+        ra = ResourceAllocationRow.__table__
+        # Before: free_at is NULL
+        async with db.begin_session() as db_sess:
+            row = (
+                await db_sess.execute(sa.select(ra.c.free_at).where(ra.c.kernel_id == kernel))
+            ).one()
+            assert row.free_at is None
+
+        await registry._reconcile_agent_resources()
+
+        # After: free_at is set
+        async with db.begin_session() as db_sess:
+            row = (
+                await db_sess.execute(sa.select(ra.c.free_at).where(ra.c.kernel_id == kernel))
+            ).one()
+            assert row.free_at is not None
+
+    @pytest.mark.parametrize(
+        "kernel",
+        [
+            pytest.param(
+                KernelSpec(status=KernelStatus.RUNNING, cpu=Decimal("2"), cpu_used=Decimal("2")),
+                id="running",
+            ),
+        ],
+        indirect=True,
+    )
+    async def test_running_kernel_allocation_not_touched(
+        self,
+        db: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        kernel: uuid.UUID,
+    ) -> None:
+        """Consistent: RUNNING kernel + free_at=NULL is normal, not modified."""
+        ra = ResourceAllocationRow.__table__
+
+        await registry._reconcile_agent_resources()
+
+        async with db.begin_session() as db_sess:
+            row = (
+                await db_sess.execute(sa.select(ra.c.free_at).where(ra.c.kernel_id == kernel))
+            ).one()
+            assert row.free_at is None
+
+    @pytest.mark.parametrize(
+        "kernel",
+        [
+            pytest.param(
+                KernelSpec(
+                    status=KernelStatus.TERMINATED,
+                    cpu=Decimal("2"),
+                    cpu_used=Decimal("2"),
+                    free_at=datetime.now(tzutc()),
+                ),
+                id="already-freed",
+            ),
+        ],
+        indirect=True,
+    )
+    async def test_already_freed_allocation_not_touched(
+        self,
+        db: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        kernel: uuid.UUID,
+    ) -> None:
+        """Consistent: TERMINATED kernel + free_at set → not modified."""
         ra = ResourceAllocationRow.__table__
         async with db.begin_session() as db_sess:
             row = (
-                await db_sess.execute(
-                    sa.select(ra.c.free_at).where(
-                        ra.c.kernel_id == kernel_id, ra.c.slot_name == "cpu"
-                    )
-                )
+                await db_sess.execute(sa.select(ra.c.free_at).where(ra.c.kernel_id == kernel))
             ).one()
-        return cast(datetime | None, row.free_at)
+            original_free_at = row.free_at
 
-    async def _get_agent_cpu_used(
+        await registry._reconcile_agent_resources()
+
+        async with db.begin_session() as db_sess:
+            row = (
+                await db_sess.execute(sa.select(ra.c.free_at).where(ra.c.kernel_id == kernel))
+            ).one()
+            assert row.free_at is not None
+            assert abs((row.free_at - original_free_at).total_seconds()) < 2
+
+    async def test_orphan_cleanup_runs_before_drift_correction(
         self,
-        infra: tuple[ExtendedAsyncSAEngine, str, uuid.UUID, str],
-    ) -> Decimal:
-        db, _, _, agent_id = infra
+        db: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        infra: tuple[str, uuid.UUID, str],
+    ) -> None:
+        """Inconsistent: orphan + stale agent_resources.used → both fixed atomically."""
+        domain_name, project_id, agent_id = infra
+        ra = ResourceAllocationRow.__table__
         ar = AgentResourceRow.__table__
+        empty_slots = ResourceSlot({})
+
+        # RUNNING kernel: legitimate cpu=2
+        running_sid, running_kid = uuid4(), uuid4()
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                SessionRow(
+                    id=running_sid,
+                    domain_name=domain_name,
+                    group_id=project_id,
+                    user_uuid=uuid4(),
+                    occupying_slots=empty_slots,
+                    requested_slots=empty_slots,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                KernelRow(
+                    id=running_kid,
+                    session_id=running_sid,
+                    domain_name=domain_name,
+                    group_id=project_id,
+                    user_uuid=uuid4(),
+                    status=KernelStatus.RUNNING,
+                    occupied_slots=empty_slots,
+                    requested_slots=empty_slots,
+                    repl_in_port=0,
+                    repl_out_port=0,
+                    stdin_port=0,
+                    stdout_port=0,
+                    scaling_group="test-sg",
+                    agent=agent_id,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                ResourceAllocationRow(
+                    kernel_id=running_kid,
+                    slot_name="cpu",
+                    requested=Decimal("2"),
+                    used=Decimal("2"),
+                )
+            )
+
+        # CANCELLED kernel: orphaned allocation (free_at=NULL)
+        orphan_sid, orphan_kid = uuid4(), uuid4()
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                SessionRow(
+                    id=orphan_sid,
+                    domain_name=domain_name,
+                    group_id=project_id,
+                    user_uuid=uuid4(),
+                    occupying_slots=empty_slots,
+                    requested_slots=empty_slots,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                KernelRow(
+                    id=orphan_kid,
+                    session_id=orphan_sid,
+                    domain_name=domain_name,
+                    group_id=project_id,
+                    user_uuid=uuid4(),
+                    status=KernelStatus.CANCELLED,
+                    occupied_slots=empty_slots,
+                    requested_slots=empty_slots,
+                    repl_in_port=0,
+                    repl_out_port=0,
+                    stdin_port=0,
+                    stdout_port=0,
+                    scaling_group="test-sg",
+                    agent=agent_id,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                ResourceAllocationRow(
+                    kernel_id=orphan_kid,
+                    slot_name="cpu",
+                    requested=Decimal("4"),
+                )
+            )
+
+        # agent_resources.used=6 (stale: includes orphan's 4)
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=agent_id,
+                    slot_name="cpu",
+                    capacity=Decimal("8"),
+                    used=Decimal("6"),
+                )
+            )
+
+        await registry._reconcile_agent_resources()
+
+        # Orphan freed
+        async with db.begin_session() as db_sess:
+            row = (
+                await db_sess.execute(sa.select(ra.c.free_at).where(ra.c.kernel_id == orphan_kid))
+            ).one()
+            assert row.free_at is not None
+
+        # Drift corrected: 6 → 2
         async with db.begin_session() as db_sess:
             row = (
                 await db_sess.execute(
                     sa.select(ar.c.used).where(ar.c.agent_id == agent_id, ar.c.slot_name == "cpu")
                 )
             ).one()
-        return cast(Decimal, row.used)
-
-    # ── Tests ──
-
-    @pytest.mark.parametrize(
-        "terminal_status",
-        [KernelStatus.CANCELLED, KernelStatus.TERMINATED, KernelStatus.ERROR],
-        ids=["cancelled", "terminated", "error"],
-    )
-    async def test_terminal_kernel_with_unfree_allocation_is_freed(
-        self,
-        infra: tuple[ExtendedAsyncSAEngine, str, uuid.UUID, str],
-        registry: AgentRegistry,
-        caplog: pytest.LogCaptureFixture,
-        terminal_status: KernelStatus,
-    ) -> None:
-        """Inconsistent: terminal kernel has free_at=NULL → reconcile sets free_at."""
-        kernel_id = await self._create_kernel(infra, status=terminal_status, cpu=Decimal("2"))
-        await self._set_agent_cpu(infra, capacity=Decimal("8"), used=Decimal("0"))
-
-        with caplog.at_level(logging.WARNING):
-            await registry._reconcile_agent_resources()
-
-        assert "freed orphaned resource allocation" in caplog.text
-        assert await self._get_free_at(infra, kernel_id) is not None
-
-    async def test_running_kernel_allocation_not_touched(
-        self,
-        infra: tuple[ExtendedAsyncSAEngine, str, uuid.UUID, str],
-        registry: AgentRegistry,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """Consistent: RUNNING kernel with free_at=NULL is normal, not modified."""
-        kernel_id = await self._create_kernel(
-            infra, status=KernelStatus.RUNNING, cpu=Decimal("2"), cpu_used=Decimal("2")
-        )
-        await self._set_agent_cpu(infra, capacity=Decimal("8"), used=Decimal("2"))
-
-        with caplog.at_level(logging.WARNING):
-            await registry._reconcile_agent_resources()
-
-        assert "freed orphaned resource allocation" not in caplog.text
-        assert await self._get_free_at(infra, kernel_id) is None
-
-    async def test_already_freed_allocation_not_touched(
-        self,
-        infra: tuple[ExtendedAsyncSAEngine, str, uuid.UUID, str],
-        registry: AgentRegistry,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """Consistent: TERMINATED kernel with free_at already set is not modified."""
-        already_freed = datetime.now(tzutc())
-        kernel_id = await self._create_kernel(
-            infra,
-            status=KernelStatus.TERMINATED,
-            cpu=Decimal("2"),
-            cpu_used=Decimal("2"),
-            free_at=already_freed,
-        )
-        await self._set_agent_cpu(infra, capacity=Decimal("8"), used=Decimal("0"))
-
-        with caplog.at_level(logging.WARNING):
-            await registry._reconcile_agent_resources()
-
-        assert "freed orphaned resource allocation" not in caplog.text
-        actual_free_at = await self._get_free_at(infra, kernel_id)
-        assert actual_free_at is not None
-        assert abs((actual_free_at - already_freed).total_seconds()) < 2
-
-    async def test_orphan_cleanup_runs_before_drift_correction(
-        self,
-        infra: tuple[ExtendedAsyncSAEngine, str, uuid.UUID, str],
-        registry: AgentRegistry,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """Inconsistent: orphan + stale used count → both fixed in one reconcile call."""
-        # RUNNING kernel: legitimate cpu=2
-        await self._create_kernel(
-            infra, status=KernelStatus.RUNNING, cpu=Decimal("2"), cpu_used=Decimal("2")
-        )
-        # CANCELLED kernel: orphaned allocation (free_at=NULL)
-        orphan_id = await self._create_kernel(
-            infra, status=KernelStatus.CANCELLED, cpu=Decimal("4")
-        )
-        # agent_resources.used=6 (includes orphan's 4)
-        await self._set_agent_cpu(infra, capacity=Decimal("8"), used=Decimal("6"))
-
-        with caplog.at_level(logging.WARNING):
-            await registry._reconcile_agent_resources()
-
-        # Orphan freed
-        assert "freed orphaned resource allocation" in caplog.text
-        assert await self._get_free_at(infra, orphan_id) is not None
-
-        # Drift corrected: 6 → 2 (only RUNNING kernel counted)
-        assert "agent_resources drift detected" in caplog.text
-        assert await self._get_agent_cpu_used(infra) == Decimal("2")
+            assert row.used == Decimal("2")
