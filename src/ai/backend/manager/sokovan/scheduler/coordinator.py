@@ -327,8 +327,9 @@ class ScheduleCoordinator:
             log.debug("Processing promotion schedule type: {}", schedule_type.value)
 
             with self._operation_metrics.measure_operation(spec.name):
-                # Promotions are pure status transitions; must run on
-                # unschedulable agents too.
+                # Use the active-agents query (not the schedulable one):
+                # promotions update session status based on kernel state and
+                # must run even when the underlying agents are unschedulable.
                 scaling_groups = await self._repository.get_scaling_groups_with_active_agents()
 
                 results = await asyncio.gather(
