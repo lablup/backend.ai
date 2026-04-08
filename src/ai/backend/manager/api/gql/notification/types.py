@@ -535,7 +535,7 @@ class UpdateNotificationChannelPayload(PydanticOutputMixin[UpdateNotificationCha
     model=DeleteNotificationChannelPayloadDTO,
 )
 class DeleteNotificationChannelPayload(PydanticOutputMixin[DeleteNotificationChannelPayloadDTO]):
-    id: ID = gql_field(description="ID of the deleted notification channel.")
+    id: UUID = gql_field(description="ID of the deleted notification channel.")
 
 
 @gql_pydantic_type(
