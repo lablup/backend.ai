@@ -38,66 +38,69 @@ if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
 
-@pytest.fixture()
-def stub_image_row() -> MagicMock:
-    """Return a fake image row that satisfies ``SessionService.create_from_params``.
-
-    The real ``resolve_image`` would query the ``images`` table; we bypass
-    it because seeding a fully-valid ImageRow (with registry, labels,
-    architecture) is out of scope for this test.
-    """
-    image_row = MagicMock()
-    image_row.id = uuid.uuid4()
-    image_row.image_ref = MagicMock()
-    return image_row
-
-
-@pytest.fixture()
-def patched_resolve_image(
-    monkeypatch: pytest.MonkeyPatch,
-    stub_image_row: MagicMock,
-) -> AsyncMock:
-    """Patch SessionRepository.resolve_image to return a stub row."""
-    mock = AsyncMock(return_value=stub_image_row)
-    monkeypatch.setattr(SessionRepository, "resolve_image", mock)
-    return mock
-
-
-@pytest.fixture()
-def stub_create_session_response(agent_registry: AgentRegistry) -> AsyncMock:
-    """Make the mocked AgentRegistry.create_session return a successful response."""
-    mock = AsyncMock(
-        return_value={
-            "sessionId": "00000000-0000-0000-0000-000000000001",
-            "sessionName": "delegated-session",
-            "status": "PENDING",
-            "service_ports": [],
-            "servicePorts": [],
-            "created": True,
-        }
-    )
-    # ``agent_registry`` from the shared fixture is ``AsyncMock(spec=AgentRegistry)``,
-    # which exposes attribute access for ``create_session`` automatically.
-    agent_registry.create_session = mock  # type: ignore[method-assign]
-    return mock
-
-
-@pytest.fixture()
-async def group_name_for_fixture(
-    db_engine: SAEngine,
-    group_fixture: uuid.UUID,
-) -> str:
-    """Resolve the group name corresponding to ``group_fixture`` (a UUID)."""
-    async with db_engine.begin() as conn:
-        result = await conn.execute(
-            sa.select(GroupRow.__table__.c.name).where(GroupRow.__table__.c.id == group_fixture)
-        )
-        name = result.scalar()
-    assert name is not None, "group_fixture row missing name"
-    return str(name)
-
-
 class TestDelegatedSessionCreation:
+    """Tests for legacy ``POST /session`` with ``owner_access_key`` (BA-5608)."""
+
+    @pytest.fixture()
+    def stub_image_row(self) -> MagicMock:
+        """Fake image row that satisfies ``SessionService.create_from_params``.
+
+        The real ``resolve_image`` would query the ``images`` table; we bypass
+        it because seeding a fully-valid ImageRow (with registry, labels,
+        architecture) is out of scope for this test.
+        """
+        image_row = MagicMock()
+        image_row.id = uuid.uuid4()
+        image_row.image_ref = MagicMock()
+        return image_row
+
+    @pytest.fixture()
+    def patched_resolve_image(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        stub_image_row: MagicMock,
+    ) -> AsyncMock:
+        """Patch ``SessionRepository.resolve_image`` to return a stub row."""
+        mock = AsyncMock(return_value=stub_image_row)
+        monkeypatch.setattr(SessionRepository, "resolve_image", mock)
+        return mock
+
+    @pytest.fixture()
+    def stub_create_session_response(
+        self,
+        agent_registry: AgentRegistry,
+    ) -> AsyncMock:
+        """Make the mocked ``AgentRegistry.create_session`` return a successful response."""
+        mock = AsyncMock(
+            return_value={
+                "sessionId": "00000000-0000-0000-0000-000000000001",
+                "sessionName": "delegated-session",
+                "status": "PENDING",
+                "service_ports": [],
+                "servicePorts": [],
+                "created": True,
+            }
+        )
+        # ``agent_registry`` from the shared fixture is ``AsyncMock(spec=AgentRegistry)``,
+        # which exposes attribute access for ``create_session`` automatically.
+        agent_registry.create_session = mock  # type: ignore[method-assign]
+        return mock
+
+    @pytest.fixture()
+    async def group_name_for_fixture(
+        self,
+        db_engine: SAEngine,
+        group_fixture: uuid.UUID,
+    ) -> str:
+        """Resolve the group name corresponding to ``group_fixture`` (a UUID)."""
+        async with db_engine.begin() as conn:
+            result = await conn.execute(
+                sa.select(GroupRow.__table__.c.name).where(GroupRow.__table__.c.id == group_fixture)
+            )
+            name = result.scalar()
+        assert name is not None, "group_fixture row missing name"
+        return str(name)
+
     async def test_admin_create_with_owner_access_key_routes_owner_into_user_scope(
         self,
         server: ServerInfo,
