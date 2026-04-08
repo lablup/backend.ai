@@ -283,7 +283,7 @@ class ScheduleCoordinator:
                     )
 
                 # Process each scaling group in parallel
-                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+                scaling_groups = await self._repository.get_scaling_groups_with_active_agents()
 
                 results = await asyncio.gather(
                     *[
@@ -389,7 +389,7 @@ class ScheduleCoordinator:
                     )
 
                 # Process each scaling group in parallel
-                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+                scaling_groups = await self._repository.get_scaling_groups_with_active_agents()
 
                 results = await asyncio.gather(
                     *[
@@ -447,7 +447,7 @@ class ScheduleCoordinator:
                 stack.enter_context(self._operation_metrics.measure_operation(observer.name()))
 
                 # Process each scaling group in parallel
-                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+                scaling_groups = await self._repository.get_scaling_groups_with_active_agents()
 
                 log.debug(
                     "[Coordinator] Found {} scaling groups to observe: {}",
