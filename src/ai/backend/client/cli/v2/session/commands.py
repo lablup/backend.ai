@@ -161,10 +161,7 @@ def shutdown_service(session_id: str, service: str) -> None:
     "--owner",
     type=str,
     default=None,
-    help=(
-        "Delegated owner — accepts a user UUID or email. "
-        "Defaults to the caller when omitted."
-    ),
+    help=("Delegated owner — accepts a user UUID or email. Defaults to the caller when omitted."),
 )
 def logs(session_id: str, kernel_id: str | None, owner: str | None) -> None:
     """Get container logs for a session."""
