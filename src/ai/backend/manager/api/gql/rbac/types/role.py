@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast
+from uuid import UUID
 
 import strawberry
 import strawberry.relay
-from strawberry import ID, UNSET, Info
+from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -158,7 +158,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
     ) -> Iterable[Self | None]:
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         results = await info.context.data_loaders.role_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -200,7 +200,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         )
 
         # Add role_id filter to scope permissions to this role
-        role_filter = PermissionFilter(role_id=uuid.UUID(self.id))
+        role_filter = PermissionFilter(role_id=UUID(self.id))
         if filter is not None:
             # Merge with user-provided filter
             combined_filter = PermissionFilter(
@@ -260,7 +260,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         offset: int | None = None,
     ) -> RoleAssignmentConnection:
         # Add role_id filter to scope assignments to this role
-        role_filter = RoleAssignmentFilter(role_id=uuid.UUID(self.id))
+        role_filter = RoleAssignmentFilter(role_id=UUID(self.id))
         if filter is not None:
             # Merge with user-provided filter
             combined_filter = RoleAssignmentFilter(
@@ -314,9 +314,9 @@ class RoleGQL(PydanticNodeMixin[Any]):
 )
 class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     id: NodeID[str]
-    user_id: uuid.UUID = gql_field(description="The assigned user ID.")
-    role_id: uuid.UUID = gql_field(description="The assigned role ID.")
-    granted_by: uuid.UUID | None = gql_field(description="The user who granted this assignment.")
+    user_id: UUID = gql_field(description="The assigned user ID.")
+    role_id: UUID = gql_field(description="The assigned role ID.")
+    granted_by: UUID | None = gql_field(description="The user who granted this assignment.")
     granted_at: datetime
 
     @classmethod
@@ -329,7 +329,7 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     ) -> Iterable[Self | None]:
         # DataLoader already returns RoleAssignmentGQL | None via from_pydantic conversion
         results = await info.context.data_loaders.role_assignment_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -435,7 +435,7 @@ class RoleAssignmentRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO])
     name="RoleAssignmentFilter",
 )
 class RoleAssignmentFilter(PydanticInputMixin[RoleAssignmentFilterDTO], GQLFilter):
-    role_id: uuid.UUID | None = None
+    role_id: UUID | None = None
     role: RoleAssignmentRoleNestedFilterGQL | None = None
     permission: (
         Annotated[
@@ -499,7 +499,7 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     BackendAIGQLMeta(description="Input for updating a role", added_version="26.3.0"),
 )
 class UpdateRoleInput(PydanticInputMixin[UpdateRoleInputDTO]):
-    id: uuid.UUID
+    id: UUID
     name: str | None = UNSET
     description: str | None = UNSET
     status: RoleStatusGQL | None = UNSET
@@ -509,17 +509,17 @@ class UpdateRoleInput(PydanticInputMixin[UpdateRoleInputDTO]):
     BackendAIGQLMeta(description="Input for assigning a role to a user", added_version="26.3.0"),
 )
 class AssignRoleInput(PydanticInputMixin[AssignRoleInputDTO]):
-    user_id: uuid.UUID
-    role_id: uuid.UUID
-    project_id: uuid.UUID | None = strawberry.UNSET
+    user_id: UUID
+    role_id: UUID
+    project_id: UUID | None = strawberry.UNSET
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for revoking a role from a user", added_version="26.3.0"),
 )
 class RevokeRoleInput(PydanticInputMixin[RevokeRoleInputDTO]):
-    user_id: uuid.UUID
-    role_id: uuid.UUID
+    user_id: UUID
+    role_id: UUID
 
 
 @gql_pydantic_input(
@@ -529,9 +529,9 @@ class RevokeRoleInput(PydanticInputMixin[RevokeRoleInputDTO]):
     name="BulkAssignRoleInput",
 )
 class BulkAssignRoleInputGQL(PydanticInputMixin[BulkAssignRoleInputDTO]):
-    role_id: uuid.UUID
-    user_ids: list[uuid.UUID]
-    project_id: uuid.UUID | None = strawberry.UNSET
+    role_id: UUID
+    user_ids: list[UUID]
+    project_id: UUID | None = strawberry.UNSET
 
 
 @gql_pydantic_input(
@@ -541,22 +541,22 @@ class BulkAssignRoleInputGQL(PydanticInputMixin[BulkAssignRoleInputDTO]):
     name="BulkRevokeRoleInput",
 )
 class BulkRevokeRoleInputGQL(PydanticInputMixin[BulkRevokeRoleInputDTO]):
-    role_id: uuid.UUID
-    user_ids: list[uuid.UUID]
+    role_id: UUID
+    user_ids: list[UUID]
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for soft-deleting a role", added_version="26.3.0"),
 )
 class DeleteRoleInput(PydanticInputMixin[DeleteRoleInputDTO]):
-    id: uuid.UUID
+    id: UUID
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for purging a role", added_version="26.3.0"),
 )
 class PurgeRoleInput(PydanticInputMixin[PurgeRoleInputDTO]):
-    id: uuid.UUID
+    id: UUID
 
 
 # ==================== Payload Types ====================
@@ -565,21 +565,19 @@ class PurgeRoleInput(PydanticInputMixin[PurgeRoleInputDTO]):
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for delete role mutation."),
     model=DeleteRolePayloadDTO,
-    fields=["id"],
     name="DeleteRolePayload",
 )
 class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
-    id: ID = gql_field(description="ID of the deleted role.")
+    id: UUID = gql_field(description="ID of the deleted role.")
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for purge role mutation."),
     model=PurgeRolePayloadDTO,
-    fields=["id"],
     name="PurgeRolePayload",
 )
 class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
-    id: ID = gql_field(description="ID of the purged role.")
+    id: UUID = gql_field(description="ID of the purged role.")
 
 
 @gql_pydantic_type(
@@ -591,7 +589,7 @@ class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
     name="BulkAssignRoleError",
 )
 class BulkAssignRoleErrorGQL(PydanticOutputMixin[BulkAssignRoleFailureInfoDTO]):
-    user_id: uuid.UUID = gql_field(description="UUID of the user that failed.")
+    user_id: UUID = gql_field(description="UUID of the user that failed.")
     message: str = gql_field(description="Error message describing the failure.")
 
 
@@ -620,7 +618,7 @@ class BulkAssignRolePayloadGQL(PydanticOutputMixin[BulkAssignRoleResultPayloadDT
     name="BulkRevokeRoleError",
 )
 class BulkRevokeRoleErrorGQL(PydanticOutputMixin[BulkRevokeRoleFailureInfoDTO]):
-    user_id: uuid.UUID = gql_field(description="UUID of the user that failed.")
+    user_id: UUID = gql_field(description="UUID of the user that failed.")
     message: str = gql_field(description="Error message describing the failure.")
 
 

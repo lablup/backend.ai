@@ -103,7 +103,7 @@
 //     "ruamel.yaml~=0.18.10",
 //     "setproctitle~=1.3.5",
 //     "setuptools~=80.0.0",
-//     "strawberry-graphql~=0.278.0",
+//     "strawberry-graphql~=0.314.0",
 //     "tabulate~=0.8.9",
 //     "temporenc~=0.1.0",
 //     "tenacity>=9.0",
@@ -3558,26 +3558,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e4e6e7a9381e228aca60a6f3d67dbae9a5f4638eced242d931f95797ddba3f8b",
-              "url": "https://files.pythonhosted.org/packages/a1/8b/b628fc18658f94b3d094708a18b71083cf47628e85cbc6b9edba54d5b2d7/lia_web-0.3.1-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "7f551269eddd729f1437e9341ad21622a849eb0c0975d9232ccbbaadbdc74c06",
-              "url": "https://files.pythonhosted.org/packages/05/3d/7d574a7a5cf5fbc5fc09c07ea3696dd400353b7702bc009cf596b8c12035/lia_web-0.3.1.tar.gz"
-            }
-          ],
-          "project_name": "lia-web",
-          "requires_dists": [
-            "cross-web>=0.3.0"
-          ],
-          "requires_python": ">=3.9",
-          "version": "0.3.1"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "0d252c1594ecba2ecedc444053db5d3a9b7ec1b0dd929c8f1d74dce89f86c05e",
               "url": "https://files.pythonhosted.org/packages/b4/de/88b3be5c31b22333b3ca2f6ff1de4e863d8fe45aaea7485f591970ec1d3e/linkify_it_py-2.1.0-py3-none-any.whl"
             },
@@ -5550,13 +5530,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "711ffd45bf766d5264d487b917733b453d917afd2b0ad65223959f59089f875b",
-              "url": "https://files.pythonhosted.org/packages/3b/ab/b3226f0bd7cdcf710fbede2b3548584366da3b19b5021e74f5bde2a8fa3f/pytest-9.0.2-py3-none-any.whl"
+              "hash": "2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9",
+              "url": "https://files.pythonhosted.org/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "75186651a92bd89611d1d9fc20f0b4345fd827c41ccd5c299a868a05d70edf11",
-              "url": "https://files.pythonhosted.org/packages/d1/db/7ef3487e0fb0049ddb5ce41d3a49c235bf9ad299b6a25d5780a89f19230f/pytest-9.0.2.tar.gz"
+              "hash": "b86ada508af81d19edeb213c681b1d48246c1a91d304c6c81a427674c17eb91c",
+              "url": "https://files.pythonhosted.org/packages/7d/0d/549bd94f1a0a402dc8cf64563a117c0f3765662e2e668477624baeec44d5/pytest-9.0.3.tar.gz"
             }
           ],
           "project_name": "pytest",
@@ -5577,7 +5557,7 @@
             "xmlschema; extra == \"dev\""
           ],
           "requires_python": ">=3.10",
-          "version": "9.0.2"
+          "version": "9.0.3"
         },
         {
           "artifacts": [
@@ -5692,13 +5672,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b6a957b24c1cd79252484d3566d1b49527581d46e789aaf43181005e56201502",
-              "url": "https://files.pythonhosted.org/packages/67/0f/019d3949a40280f6193b62bc010177d4ce702d0fce424322286488569cd3/python_discovery-1.2.1-py3-none-any.whl"
+              "hash": "e1ae95d9af875e78f15e19aed0c6137ab1bb49c200f21f5061786490c9585c7a",
+              "url": "https://files.pythonhosted.org/packages/d8/db/795879cc3ddfe338599bddea6388cc5100b088db0a4caf6e6c1af1c27e04/python_discovery-1.2.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "180c4d114bff1c32462537eac5d6a332b768242b76b69c0259c7d14b1b680c9e",
-              "url": "https://files.pythonhosted.org/packages/b9/88/815e53084c5079a59df912825a279f41dd2e0df82281770eadc732f5352c/python_discovery-1.2.1.tar.gz"
+              "hash": "876e9c57139eb757cb5878cbdd9ae5379e5d96266c99ef731119e04fffe533bb",
+              "url": "https://files.pythonhosted.org/packages/de/ef/3bae0e537cfe91e8431efcba4434463d2c5a65f5a89edd47c6cf2f03c55f/python_discovery-1.2.2.tar.gz"
             }
           ],
           "project_name": "python-discovery",
@@ -5716,7 +5696,7 @@
             "sphinxcontrib-mermaid>=2; extra == \"docs\""
           ],
           "requires_python": ">=3.8",
-          "version": "1.2.1"
+          "version": "1.2.2"
         },
         {
           "artifacts": [
@@ -5925,19 +5905,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a769305cd3994bb5fa2764aa4073452dc105a4ec39068ffe6efd3c20c60acc77",
-              "url": "https://files.pythonhosted.org/packages/a9/10/e4b1e0e5b6b6745c8098c275b69bc9d73e9542d5c7da4f137542b499ed44/readchar-4.2.1-py3-none-any.whl"
+              "hash": "92daf7e42c52b0787e6c75d01ecfb9a94f4ceff3764958b570c1dddedd47b200",
+              "url": "https://files.pythonhosted.org/packages/3d/ca/36133653e00939922dd1416f4c56177361289172a30563fcb9552c9ccde4/readchar-4.2.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "91ce3faf07688de14d800592951e5575e9c7a3213738ed01d394dcc949b79adb",
-              "url": "https://files.pythonhosted.org/packages/dd/f8/8657b8cbb4ebeabfbdf991ac40eca8a1d1bd012011bd44ad1ed10f5cb494/readchar-4.2.1.tar.gz"
+              "hash": "e3b270fe16fc90c50ac79107700330a133dd4c63d22939f5b03b4f24564d5dd8",
+              "url": "https://files.pythonhosted.org/packages/ed/49/a10341024c45bed95d13197ec9ef0f4e2fd10b5ca6e7f8d7684d18082398/readchar-4.2.2.tar.gz"
             }
           ],
           "project_name": "readchar",
           "requires_dists": [],
           "requires_python": ">=3.8",
-          "version": "4.2.1"
+          "version": "4.2.2"
         },
         {
           "artifacts": [
@@ -6453,57 +6433,54 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8b91566e34bbfaa4a5e576369333e15982eaceac17c44e262200319d7e87a1cf",
-              "url": "https://files.pythonhosted.org/packages/50/fd/a04e880ea1f25bd3e6a3a94dd2585880d49852e966fba33e9ea982d8932c/strawberry_graphql-0.278.1-py3-none-any.whl"
+              "hash": "6b0414ce8a6203e7859c22259576d38ea7b2232722062015c037708764730f18",
+              "url": "https://files.pythonhosted.org/packages/c7/c5/d83b781641370855805548a733907c974810f664904fe837c2987a362f2c/strawberry_graphql-0.314.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ac32e96eb2ea6a67738eefca8226d712e11706b80491e293f3e743455e9c301b",
-              "url": "https://files.pythonhosted.org/packages/cd/be/800e268d2a92241414ed89f2f2cc68ebcb01b6f4d0bcb2b1d09c1a6f2c75/strawberry_graphql-0.278.1.tar.gz"
+              "hash": "9748d4e68c92bafde87bf6b27db520a44000f1c575c74e1632a0b38b9a13484e",
+              "url": "https://files.pythonhosted.org/packages/cb/28/593ed0722f99d74d8ab6edcfb93b9719360b8ae535aecb39b83c4aabbe2a/strawberry_graphql-0.314.0.tar.gz"
             }
           ],
           "project_name": "strawberry-graphql",
           "requires_dists": [
-            "Django>=3.2; extra == \"django\"",
             "aiohttp<4,>=3.7.4.post0; extra == \"aiohttp\"",
-            "asgiref<4.0,>=3.2; extra == \"channels\"",
-            "asgiref<4.0,>=3.2; extra == \"django\"",
-            "chalice<2.0,>=1.22; extra == \"chalice\"",
+            "asgiref>=3.2; extra == \"channels\"",
+            "asgiref>=3.2; extra == \"django\"",
+            "chalice>=1.22; extra == \"chalice\"",
             "channels>=3.0.5; extra == \"channels\"",
+            "cross-web>=0.4.0",
+            "django>=3.2; extra == \"django\"",
             "fastapi>=0.65.2; extra == \"fastapi\"",
             "flask>=1.1; extra == \"flask\"",
             "graphql-core<3.4.0,>=3.2.0",
-            "lia-web>=0.2.1",
             "libcst; extra == \"cli\"",
             "libcst; extra == \"debug\"",
-            "libcst; extra == \"debug-server\"",
-            "litestar>=2; python_version ~= \"3.10\" and extra == \"litestar\"",
+            "litestar>=2; python_full_version >= \"3.10\" and python_full_version < \"4\" and extra == \"litestar\"",
             "opentelemetry-api<2; extra == \"opentelemetry\"",
             "opentelemetry-sdk<2; extra == \"opentelemetry\"",
             "packaging>=23",
+            "protobuf>=3.20; extra == \"apollo-federation\"",
             "pydantic>1.6.1; extra == \"pydantic\"",
-            "pygments<3.0,>=2.3; extra == \"cli\"",
-            "pygments<3.0,>=2.3; extra == \"debug-server\"",
+            "pygments>=2.3; extra == \"cli\"",
             "pyinstrument>=4.0.0; extra == \"pyinstrument\"",
-            "python-dateutil<3.0,>=2.7",
+            "python-dateutil>=2.7",
             "python-multipart>=0.0.7; extra == \"asgi\"",
-            "python-multipart>=0.0.7; extra == \"debug-server\"",
+            "python-multipart>=0.0.7; extra == \"cli\"",
             "python-multipart>=0.0.7; extra == \"fastapi\"",
             "quart>=0.19.3; extra == \"quart\"",
             "rich>=12.0.0; extra == \"cli\"",
             "rich>=12.0.0; extra == \"debug\"",
-            "rich>=12.0.0; extra == \"debug-server\"",
             "sanic>=20.12.2; extra == \"sanic\"",
             "starlette>=0.18.0; extra == \"asgi\"",
-            "starlette>=0.18.0; extra == \"debug-server\"",
-            "typer>=0.7.0; extra == \"cli\"",
-            "typer>=0.7.0; extra == \"debug-server\"",
+            "starlette>=0.18.0; extra == \"cli\"",
+            "typer>=0.12.4; extra == \"cli\"",
             "typing-extensions>=4.5.0",
-            "uvicorn>=0.11.6; extra == \"debug-server\"",
-            "websockets<16,>=15.0.1; extra == \"debug-server\""
+            "uvicorn>=0.11.6; extra == \"cli\"",
+            "websockets<16,>=15.0.1; extra == \"cli\""
           ],
-          "requires_python": "<4.0,>=3.9",
-          "version": "0.278.1"
+          "requires_python": "<4.0,>=3.10",
+          "version": "0.314.0"
         },
         {
           "artifacts": [
@@ -7923,7 +7900,7 @@
     "ruamel.yaml~=0.18.10",
     "setproctitle~=1.3.5",
     "setuptools~=80.0.0",
-    "strawberry-graphql~=0.278.0",
+    "strawberry-graphql~=0.314.0",
     "tabulate~=0.8.9",
     "temporenc~=0.1.0",
     "tenacity>=9.0",

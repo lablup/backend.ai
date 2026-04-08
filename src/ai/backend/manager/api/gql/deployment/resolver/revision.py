@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import cast
 from uuid import UUID
 
 from strawberry import ID, Info
@@ -103,17 +104,20 @@ async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | 
 async def inference_runtime_config(name: str) -> JSON:
     match name.lower():
         case "vllm":
-            return VLLMRuntimeConfig.to_json_schema()
+            return cast(JSON, VLLMRuntimeConfig.to_json_schema())
         case "sglang":
-            return SGLangRuntimeConfig.to_json_schema()
+            return cast(JSON, SGLangRuntimeConfig.to_json_schema())
         case "nvdianim":
-            return NVDIANIMRuntimeConfig.to_json_schema()
+            return cast(JSON, NVDIANIMRuntimeConfig.to_json_schema())
         case "mojo":
-            return MOJORuntimeConfig.to_json_schema()
+            return cast(JSON, MOJORuntimeConfig.to_json_schema())
         case _:
-            return {
-                "error": "Unknown service name",
-            }
+            return cast(
+                JSON,
+                {
+                    "error": "Unknown service name",
+                },
+            )
 
 
 @gql_root_field(
@@ -123,12 +127,15 @@ async def inference_runtime_config(name: str) -> JSON:
     )
 )  # type: ignore[misc]
 async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
-    return {
-        "vllm": VLLMRuntimeConfig.to_json_schema(),
-        "sglang": SGLangRuntimeConfig.to_json_schema(),
-        "nvdianim": NVDIANIMRuntimeConfig.to_json_schema(),
-        "mojo": MOJORuntimeConfig.to_json_schema(),
-    }
+    return cast(
+        JSON,
+        {
+            "vllm": VLLMRuntimeConfig.to_json_schema(),
+            "sglang": SGLangRuntimeConfig.to_json_schema(),
+            "nvdianim": NVDIANIMRuntimeConfig.to_json_schema(),
+            "mojo": MOJORuntimeConfig.to_json_schema(),
+        },
+    )
 
 
 # Mutation resolvers

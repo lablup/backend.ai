@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import strawberry
 from strawberry import ID, Info
 
@@ -271,7 +273,7 @@ async def admin_upsert_domain_app_config(
     """Create or update domain-level app configuration (admin only)."""
     check_admin_only()
     result = await info.context.adapters.app_config.upsert_domain_config(
-        input.domain_name, input.extra_config
+        input.domain_name, cast(dict[str, Any], input.extra_config)
     )
     return UpsertDomainConfigPayload(app_config=AppConfig.from_pydantic(result))
 
@@ -294,7 +296,7 @@ async def upsert_domain_app_config(
         raise InsufficientPrivilege("Admin privileges required to modify domain configuration")
 
     result = await info.context.adapters.app_config.upsert_domain_config(
-        input.domain_name, input.extra_config
+        input.domain_name, cast(dict[str, Any], input.extra_config)
     )
     return UpsertDomainConfigPayload(app_config=AppConfig.from_pydantic(result))
 
@@ -322,7 +324,7 @@ async def upsert_user_app_config(
         raise InsufficientPrivilege("Cannot modify another user's app configuration")
 
     result = await info.context.adapters.app_config.upsert_user_config(
-        target_user_id, input.extra_config
+        target_user_id, cast(dict[str, Any], input.extra_config)
     )
     return UpsertUserConfigPayload(app_config=AppConfig.from_pydantic(result))
 
