@@ -93,18 +93,6 @@ def register_v2_session_routes(
         middlewares=[auth_required],
     )
     registry.add(
-        "POST",
-        "/{session_id}/restart",
-        handler.restart,
-        middlewares=[auth_required],
-    )
-    registry.add(
-        "POST",
-        "/{session_id}/destroy",
-        handler.destroy,
-        middlewares=[auth_required],
-    )
-    registry.add(
         "GET",
         "/{session_id}/logs",
         handler.get_logs,
