@@ -352,7 +352,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         pydantic_filter = filter.to_pydantic() if filter is not None else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
 
-        result = await info.context.adapters.rbac.search_role_scopes_gql(
+        result = await info.context.adapters.rbac.search_role_scopes(
             role_id=UUID(self.id),
             input=AdminSearchEntitiesGQLInput(
                 filter=pydantic_filter,

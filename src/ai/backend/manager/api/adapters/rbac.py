@@ -725,7 +725,7 @@ class RBACAdapter(BaseAdapter):
             has_previous_page=raw.has_previous_page,
         )
 
-    async def search_role_scopes_gql(
+    async def search_role_scopes(
         self,
         role_id: UUID,
         input: AdminSearchEntitiesGQLInput,
