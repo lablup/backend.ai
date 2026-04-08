@@ -2388,6 +2388,16 @@ class DeploymentDBSource:
                 creator, spec=spec.with_revision_number(next_number)
             )
             rbac_result = await execute_rbac_entity_creator(db_sess, updated_creator)
+
+            # First revision: set as current_revision so the pending handler
+            # can register the endpoint with app-proxy (PENDING → SCALING flow).
+            if next_number == 1:
+                await db_sess.execute(
+                    sa.update(EndpointRow)
+                    .where(EndpointRow.id == endpoint_id)
+                    .values(current_revision=rbac_result.row.id)
+                )
+
             return rbac_result.row.to_data()
 
     async def get_revision(

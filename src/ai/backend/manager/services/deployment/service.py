@@ -492,14 +492,22 @@ class DeploymentService:
 
         # Create initial revision if provided, via the same path as add_model_revision
         # to ensure preset/merge/resolve logic is applied consistently.
+        # auto_activate=False: the first revision is set as current_revision directly
+        # by create_revision_with_next_number (revision_number == 1), letting the
+        # pending handler register the endpoint with app-proxy (PENDING → SCALING).
         if revision is not None:
-            initial_revision_creator = dataclasses.replace(revision, auto_activate=True)
+            initial_revision = dataclasses.replace(revision, auto_activate=False)
             await self.add_model_revision(
                 AddModelRevisionAction(
                     model_deployment_id=deployment_info.id,
-                    adder=initial_revision_creator,
+                    adder=initial_revision,
                 )
             )
+
+        # Trigger the pending handler to register the endpoint with app-proxy
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.CHECK_PENDING
+        )
 
         # Re-fetch deployment info to include the created revision
         updated_deployment_info = await self._deployment_repository.get_endpoint_info(
