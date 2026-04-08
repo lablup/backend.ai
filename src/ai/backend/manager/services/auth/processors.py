@@ -62,6 +62,27 @@ from ai.backend.manager.services.auth.actions.upload_ssh_keypair import (
     UploadSSHKeypairActionResult,
 )
 from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.manager.services.login_client_type.actions.create import (
+    CreateLoginClientTypeAction,
+    CreateLoginClientTypeActionResult,
+)
+from ai.backend.manager.services.login_client_type.actions.delete import (
+    DeleteLoginClientTypeAction,
+    DeleteLoginClientTypeActionResult,
+)
+from ai.backend.manager.services.login_client_type.actions.get import (
+    GetLoginClientTypeAction,
+    GetLoginClientTypeActionResult,
+)
+from ai.backend.manager.services.login_client_type.actions.list import (
+    ListLoginClientTypesAction,
+    ListLoginClientTypesActionResult,
+)
+from ai.backend.manager.services.login_client_type.actions.update import (
+    UpdateLoginClientTypeAction,
+    UpdateLoginClientTypeActionResult,
+)
+from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 
 
 class AuthProcessors(AbstractProcessorPackage):
@@ -100,10 +121,24 @@ class AuthProcessors(AbstractProcessorPackage):
     my_revoke_login_session: ActionProcessor[
         MyRevokeLoginSessionAction, RevokeLoginSessionActionResult
     ]
+    create_login_client_type: ActionProcessor[
+        CreateLoginClientTypeAction, CreateLoginClientTypeActionResult
+    ]
+    get_login_client_type: ActionProcessor[GetLoginClientTypeAction, GetLoginClientTypeActionResult]
+    list_login_client_types: ActionProcessor[
+        ListLoginClientTypesAction, ListLoginClientTypesActionResult
+    ]
+    update_login_client_type: ActionProcessor[
+        UpdateLoginClientTypeAction, UpdateLoginClientTypeActionResult
+    ]
+    delete_login_client_type: ActionProcessor[
+        DeleteLoginClientTypeAction, DeleteLoginClientTypeActionResult
+    ]
 
     def __init__(
         self,
         service: AuthService,
+        login_client_type_service: LoginClientTypeService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
@@ -144,6 +179,19 @@ class AuthProcessors(AbstractProcessorPackage):
         self.my_revoke_login_session = ActionProcessor(
             service.my_revoke_login_session, action_monitors
         )
+        self.create_login_client_type = ActionProcessor(
+            login_client_type_service.create, action_monitors
+        )
+        self.get_login_client_type = ActionProcessor(login_client_type_service.get, action_monitors)
+        self.list_login_client_types = ActionProcessor(
+            login_client_type_service.list_all, action_monitors
+        )
+        self.update_login_client_type = ActionProcessor(
+            login_client_type_service.update, action_monitors
+        )
+        self.delete_login_client_type = ActionProcessor(
+            login_client_type_service.delete, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -167,4 +215,9 @@ class AuthProcessors(AbstractProcessorPackage):
             SearchLoginHistoryAction.spec(),
             AdminRevokeLoginSessionAction.spec(),
             MyRevokeLoginSessionAction.spec(),
+            CreateLoginClientTypeAction.spec(),
+            GetLoginClientTypeAction.spec(),
+            ListLoginClientTypesAction.spec(),
+            UpdateLoginClientTypeAction.spec(),
+            DeleteLoginClientTypeAction.spec(),
         ]

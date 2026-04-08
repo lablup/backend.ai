@@ -31,7 +31,6 @@ from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.login_session.enums import (
     LoginAttemptResult,
-    LoginClientType,
     LoginSessionStatus,
 )
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
@@ -393,7 +392,7 @@ class AuthDBSource:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-        client_type: LoginClientType,
+        login_client_type_id: UUID | None,
     ) -> CredentialVerificationResult:
         """Verify credentials, migrate password hash, and fetch active sessions.
 
@@ -414,17 +413,21 @@ class AuthDBSource:
             await self._check_password(conn, row, target_password_info)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
-            # Fetch active sessions for the user within the same connection
+            # Fetch active sessions for the user within the same connection.
+            # If no client type is specified, all live sessions are considered.
+            session_where = (LoginSessionRow.__table__.c.user_id == row.uuid) & (
+                LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE
+            )
+            if login_client_type_id is not None:
+                session_where = session_where & (
+                    LoginSessionRow.__table__.c.login_client_type_id == login_client_type_id
+                )
             session_result = await conn.execute(
                 sa.select(
                     LoginSessionRow.__table__.c.session_token,
                     LoginSessionRow.__table__.c.created_at,
                 )
-                .where(
-                    (LoginSessionRow.__table__.c.user_id == row.uuid)
-                    & (LoginSessionRow.__table__.c.client_type == client_type)
-                    & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
-                )
+                .where(session_where)
                 .order_by(LoginSessionRow.__table__.c.created_at.asc())
             )
             active_sessions = [
@@ -470,7 +473,7 @@ class AuthDBSource:
         access_key: str,
         domain_name: str,
         *,
-        client_type: LoginClientType,
+        login_client_type_id: UUID | None,
     ) -> LoginSessionCreationResult:
         """Create a new active login session and record a successful login history entry.
 
@@ -486,7 +489,7 @@ class AuthDBSource:
                     user_id=user_id,
                     access_key=access_key,
                     session_token=session_token,
-                    client_type=client_type,
+                    login_client_type_id=login_client_type_id,
                     status=LoginSessionStatus.ACTIVE,
                 )
             )
@@ -546,19 +549,21 @@ class AuthDBSource:
     async def fetch_active_session_tokens(
         self,
         user_id: UUID,
-        client_type: LoginClientType | None = None,
+        login_client_type_id: UUID | None = None,
     ) -> list[ActiveSessionInfo]:
         """Fetch active session tokens for a user, ordered by created_at ASC (oldest first).
 
-        If ``client_type`` is None, all client types are returned; otherwise results are
-        filtered to the given client type.
+        If ``login_client_type_id`` is None, all client types are returned; otherwise
+        results are filtered to the given client type.
         """
         async with self._db.begin_readonly_session() as db_session:
             where_clause = (LoginSessionRow.user_id == user_id) & (
                 LoginSessionRow.status == LoginSessionStatus.ACTIVE
             )
-            if client_type is not None:
-                where_clause = where_clause & (LoginSessionRow.client_type == client_type)
+            if login_client_type_id is not None:
+                where_clause = where_clause & (
+                    LoginSessionRow.login_client_type_id == login_client_type_id
+                )
             query = (
                 sa.select(
                     LoginSessionRow.session_token,

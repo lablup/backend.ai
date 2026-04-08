@@ -6,7 +6,6 @@ from datetime import datetime
 
 from ai.backend.manager.models.login_session.enums import (
     LoginAttemptResult,
-    LoginClientType,
     LoginSessionStatus,
 )
 
@@ -17,7 +16,7 @@ class LoginSessionData:
     session_token: str
     user_id: uuid.UUID
     access_key: str
-    client_type: LoginClientType
+    login_client_type_id: uuid.UUID | None
     status: LoginSessionStatus
     created_at: datetime
     last_accessed_at: datetime | None

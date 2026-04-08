@@ -3,7 +3,7 @@ from typing import override
 
 from aiohttp import web
 
-from ai.backend.common.dto.manager.auth.types import AuthTokenType, LoginClientType
+from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.auth.types import AuthorizationResult
@@ -20,7 +20,7 @@ class AuthorizeAction(AuthAction):
     stoken: str | None
     otp: str | None
     force: bool
-    client_type: LoginClientType
+    client_type_name: str
 
     @override
     def entity_id(self) -> str | None:

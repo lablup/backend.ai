@@ -6,12 +6,13 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.dto.manager.auth.types import AuthTokenType, LoginClientType
+from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
@@ -26,6 +27,9 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     LoginSessionCreationResult,
 )
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.login_client_type.repository import (
+    LoginClientTypeRepository,
+)
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
@@ -81,6 +85,38 @@ def mock_user_resource_policy_repository() -> AsyncMock:
     return mock_repo
 
 
+_CORE_CLIENT_TYPE_ID = UUID("00000000-0000-0000-0000-00000000c02e")
+_WEBUI_CLIENT_TYPE_ID = UUID("00000000-0000-0000-0000-0000000000eb")
+_FASTTRACK_CLIENT_TYPE_ID = UUID("00000000-0000-0000-0000-00000000fa57")
+
+
+def _make_login_client_type_data(name: str) -> LoginClientTypeData:
+    mapping = {
+        "core": _CORE_CLIENT_TYPE_ID,
+        "webui": _WEBUI_CLIENT_TYPE_ID,
+        "fasttrack": _FASTTRACK_CLIENT_TYPE_ID,
+    }
+    now = datetime.now(tz=UTC)
+    return LoginClientTypeData(
+        id=mapping[name],
+        name=name,
+        description=None,
+        created_at=now,
+        modified_at=now,
+    )
+
+
+@pytest.fixture
+def mock_login_client_type_repository() -> AsyncMock:
+    mock_repo = AsyncMock(spec=LoginClientTypeRepository)
+
+    async def fake_get_by_name(name: str) -> LoginClientTypeData:
+        return _make_login_client_type_data(name)
+
+    mock_repo.get_by_name.side_effect = fake_get_by_name
+    return mock_repo
+
+
 @pytest.fixture
 def auth_service(
     mock_hook_plugin_ctx: MagicMock,
@@ -88,6 +124,7 @@ def auth_service(
     mock_config_provider: MagicMock,
     mock_valkey_session_client: AsyncMock,
     mock_user_resource_policy_repository: AsyncMock,
+    mock_login_client_type_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
@@ -95,6 +132,7 @@ def auth_service(
         config_provider=mock_config_provider,
         valkey_session_client=mock_valkey_session_client,
         user_resource_policy_repository=mock_user_resource_policy_repository,
+        login_client_type_repository=mock_login_client_type_repository,
     )
 
 
@@ -185,7 +223,7 @@ async def test_authorize_success(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.CORE,
+        client_type_name="core",
     )
 
     result = await auth_service.authorize(action)
@@ -213,7 +251,7 @@ async def test_authorize_invalid_token_type(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.CORE,
+        client_type_name="core",
     )
 
     with pytest.raises(InvalidAPIParameters):
@@ -241,7 +279,7 @@ async def test_authorize_invalid_credentials(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.CORE,
+        client_type_name="core",
     )
 
     with pytest.raises(AuthorizationFailed):
@@ -264,7 +302,7 @@ async def test_authorize_with_hook_authorization(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.CORE,
+        client_type_name="core",
     )
 
     # Hook returns user data directly (bypasses verify_credential)
@@ -322,7 +360,7 @@ async def test_authorize_with_password_expiry(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.CORE,
+        client_type_name="core",
     )
 
     # Setup expired password (changed 100 days ago, max age is 90 days)
@@ -366,7 +404,7 @@ async def test_authorize_with_post_hook_response(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.CORE,
+        client_type_name="core",
     )
 
     # Setup successful credential verification
@@ -411,7 +449,7 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
         stoken=None,
         otp=None,
         force=False,
-        client_type=LoginClientType.CORE,
+        client_type_name="core",
     )
 
     mock_user = _make_mock_user()
@@ -469,7 +507,7 @@ async def test_authorize_force_invalidates_existing_sessions(
         stoken=None,
         otp=None,
         force=True,
-        client_type=LoginClientType.CORE,
+        client_type_name="core",
     )
 
     # Set max_concurrent_logins=1 so that the one live session triggers force-eviction.
@@ -540,7 +578,7 @@ class TestPerClientTypeLoginCap:
     """
 
     @staticmethod
-    def _make_action(client_type: LoginClientType) -> AuthorizeAction:
+    def _make_action(client_type_name: str) -> AuthorizeAction:
         return AuthorizeAction(
             type=AuthTokenType.KEYPAIR,
             domain_name="default",
@@ -550,7 +588,7 @@ class TestPerClientTypeLoginCap:
             stoken=None,
             otp=None,
             force=False,
-            client_type=client_type,
+            client_type_name=client_type_name,
         )
 
     @staticmethod
@@ -597,13 +635,14 @@ class TestPerClientTypeLoginCap:
             mock_valkey_session_client,
         )
 
-        # Repository filters by client_type: return 1 session only when CORE is asked,
-        # empty for every other bucket (including the incoming WEBUI request).
+        # Repository filters by login_client_type_id: return 1 session only when the
+        # CORE id is asked, empty for every other bucket (including the incoming WEBUI
+        # request).
         async def fake_verify_credential(
             domain_name: str,
             email: str,
             target_password_info: PasswordInfo,
-            client_type: LoginClientType,
+            login_client_type_id: UUID | None,
         ) -> CredentialVerificationResult:
             sessions = (
                 [
@@ -612,7 +651,7 @@ class TestPerClientTypeLoginCap:
                         created_at=datetime.now(tz=UTC) - timedelta(hours=1),
                     )
                 ]
-                if client_type == LoginClientType.CORE
+                if login_client_type_id == _CORE_CLIENT_TYPE_ID
                 else []
             )
             return CredentialVerificationResult(
@@ -622,15 +661,15 @@ class TestPerClientTypeLoginCap:
 
         mock_auth_repository.verify_credential.side_effect = fake_verify_credential
 
-        result = await auth_service.authorize(self._make_action(LoginClientType.WEBUI))
+        result = await auth_service.authorize(self._make_action("webui"))
 
         assert result.authorization_result is not None
         assert result.authorization_result.session_token == "new_token"
         # Repository was consulted with the WEBUI bucket.
         verify_kwargs = mock_auth_repository.verify_credential.call_args.kwargs
-        assert verify_kwargs["client_type"] == LoginClientType.WEBUI
+        assert verify_kwargs["login_client_type_id"] == _WEBUI_CLIENT_TYPE_ID
         create_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
-        assert create_kwargs["client_type"] == LoginClientType.WEBUI
+        assert create_kwargs["login_client_type_id"] == _WEBUI_CLIENT_TYPE_ID
 
     async def test_same_client_type_at_cap_is_rejected(
         self,
@@ -659,6 +698,6 @@ class TestPerClientTypeLoginCap:
         )
 
         with pytest.raises(TooManyConcurrentLoginSessions):
-            await auth_service.authorize(self._make_action(LoginClientType.CORE))
+            await auth_service.authorize(self._make_action("core"))
 
         mock_auth_repository.create_login_session.assert_not_called()

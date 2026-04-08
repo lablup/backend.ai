@@ -8,10 +8,11 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.dto.manager.auth.types import AuthTokenType, LoginClientType
+from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.auth import TooManyConcurrentLoginSessions
 from ai.backend.manager.models.user import UserRole, UserStatus
@@ -20,6 +21,9 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     LoginSessionCreationResult,
 )
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.login_client_type.repository import (
+    LoginClientTypeRepository,
+)
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
@@ -28,6 +32,7 @@ from ai.backend.manager.services.auth.service import AuthService
 
 _DEFAULT_USER_UUID = UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 _DEFAULT_RESOURCE_POLICY = "default"
+_CORE_CLIENT_TYPE_ID = UUID("00000000-0000-0000-0000-00000000c02e")
 
 
 def _make_auth_config() -> AuthConfig:
@@ -69,7 +74,7 @@ def _make_action(*, force: bool = False) -> AuthorizeAction:
         stoken=None,
         otp=None,
         force=force,
-        client_type=LoginClientType.CORE,
+        client_type_name="core",
     )
 
 
@@ -116,12 +121,27 @@ def mock_valkey_session_client() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_login_client_type_repository() -> AsyncMock:
+    now = datetime.now(tz=UTC)
+    mock_repo = AsyncMock(spec=LoginClientTypeRepository)
+    mock_repo.get_by_name.return_value = LoginClientTypeData(
+        id=_CORE_CLIENT_TYPE_ID,
+        name="core",
+        description=None,
+        created_at=now,
+        modified_at=now,
+    )
+    return mock_repo
+
+
+@pytest.fixture
 def auth_service(
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
     mock_config_provider: MagicMock,
     mock_valkey_session_client: AsyncMock,
     mock_user_resource_policy_repository: AsyncMock,
+    mock_login_client_type_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
@@ -129,6 +149,7 @@ def auth_service(
         config_provider=mock_config_provider,
         valkey_session_client=mock_valkey_session_client,
         user_resource_policy_repository=mock_user_resource_policy_repository,
+        login_client_type_repository=mock_login_client_type_repository,
     )
 
 
@@ -239,6 +260,7 @@ class TestMaxConcurrentLoginsEnforcement:
                 keypair_row=_make_mock_keypair_row(),
                 live_sessions=_make_live_sessions(case.existing_active_sessions),
                 auth_config=_make_auth_config(),
+                login_client_type_id=_CORE_CLIENT_TYPE_ID,
             )
 
     @pytest.mark.parametrize(
@@ -339,6 +361,7 @@ class TestMaxConcurrentLoginsEnforcement:
             keypair_row=_make_mock_keypair_row(),
             live_sessions=_make_live_sessions(case.existing_active_sessions),
             auth_config=_make_auth_config(),
+            login_client_type_id=_CORE_CLIENT_TYPE_ID,
         )
 
         invalidate_mock = mock_auth_repository.invalidate_login_sessions_by_tokens

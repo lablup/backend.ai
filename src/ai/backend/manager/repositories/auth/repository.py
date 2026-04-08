@@ -11,7 +11,7 @@ from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, L
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginClientType
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -100,13 +100,13 @@ class AuthRepository:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-        client_type: LoginClientType,
+        login_client_type_id: UUID | None,
     ) -> CredentialVerificationResult:
         return await self._db_source.verify_credential(
             domain_name,
             email,
             target_password_info,
-            client_type=client_type,
+            login_client_type_id=login_client_type_id,
         )
 
     @auth_repository_resilience.apply()
@@ -116,13 +116,13 @@ class AuthRepository:
         access_key: str,
         domain_name: str,
         *,
-        client_type: LoginClientType,
+        login_client_type_id: UUID | None,
     ) -> LoginSessionCreationResult:
         return await self._db_source.create_login_session(
             user_id,
             access_key,
             domain_name,
-            client_type=client_type,
+            login_client_type_id=login_client_type_id,
         )
 
     @auth_repository_resilience.apply()
@@ -155,9 +155,11 @@ class AuthRepository:
     async def get_active_session_tokens(
         self,
         user_id: UUID,
-        client_type: LoginClientType | None = None,
+        login_client_type_id: UUID | None = None,
     ) -> list[ActiveSessionInfo]:
-        return await self._db_source.fetch_active_session_tokens(user_id, client_type=client_type)
+        return await self._db_source.fetch_active_session_tokens(
+            user_id, login_client_type_id=login_client_type_id
+        )
 
     @auth_repository_resilience.apply()
     async def invalidate_login_session_by_token(self, session_token: str) -> None:

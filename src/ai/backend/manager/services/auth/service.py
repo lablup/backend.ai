@@ -27,6 +27,7 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
+    LoginClientTypeNotFound,
     PasswordExpired,
     TooManyConcurrentLoginSessions,
     UserCreationError,
@@ -53,6 +54,9 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.login_client_type.repository import (
+    LoginClientTypeRepository,
+)
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
@@ -133,6 +137,7 @@ class AuthService:
     _config_provider: ManagerConfigProvider
     _valkey_session_client: ValkeySessionClient
     _user_resource_policy_repository: UserResourcePolicyRepository
+    _login_client_type_repository: LoginClientTypeRepository
 
     def __init__(
         self,
@@ -141,12 +146,31 @@ class AuthService:
         config_provider: ManagerConfigProvider,
         valkey_session_client: ValkeySessionClient,
         user_resource_policy_repository: UserResourcePolicyRepository,
+        login_client_type_repository: LoginClientTypeRepository,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
         self._config_provider = config_provider
         self._valkey_session_client = valkey_session_client
         self._user_resource_policy_repository = user_resource_policy_repository
+        self._login_client_type_repository = login_client_type_repository
+
+    async def _resolve_login_client_type_id(self, name: str) -> uuid.UUID:
+        """Resolve a login client type name to its stored UUID.
+
+        The name is the public identifier that REST/CLI clients pass; the
+        UUID is what the DB layer stores on login_sessions.
+        Raises ``InvalidAPIParameters`` when the name does not match any
+        registered client type, so callers get a 400 instead of a 500.
+        """
+        try:
+            client_type = await self._login_client_type_repository.get_by_name(name)
+        except LoginClientTypeNotFound as exc:
+            raise InvalidAPIParameters(
+                f"Unknown login client type '{name}'. "
+                "Ask an administrator to register it via the login_client_types API."
+            ) from exc
+        return client_type.id
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
@@ -177,7 +201,8 @@ class AuthService:
         if action.type != AuthTokenType.KEYPAIR:
             raise InvalidAPIParameters("Unsupported authorization type")
         auth_config = self._config_provider.config.auth
-        user, active_sessions = await self._verify_user(action, auth_config)
+        login_client_type_id = await self._resolve_login_client_type_id(action.client_type_name)
+        user, active_sessions = await self._verify_user(action, auth_config, login_client_type_id)
 
         try:
             post_result = await self._post_check(action, user, active_sessions, auth_config)
@@ -186,7 +211,12 @@ class AuthService:
             keypair_row, live_sessions = post_result
 
             return await self._create_login_session(
-                action, user, keypair_row, live_sessions, auth_config
+                action,
+                user,
+                keypair_row,
+                live_sessions,
+                auth_config,
+                login_client_type_id,
             )
         except (
             AuthorizationFailed,
@@ -205,6 +235,7 @@ class AuthService:
         self,
         action: AuthorizeAction,
         auth_config: AuthConfig,
+        login_client_type_id: uuid.UUID,
     ) -> tuple[RowMapping, list[ActiveSessionInfo]]:
         """Step 1: Verify user identity via hook or password."""
         params = action.hook_params
@@ -215,11 +246,10 @@ class AuthService:
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
-        client_type = action.client_type
         if hook_result.result:
             user = hook_result.result
             active_sessions = await self._auth_repository.get_active_session_tokens(
-                user.uuid, client_type=client_type
+                user.uuid, login_client_type_id=login_client_type_id
             )
             return user, active_sessions
 
@@ -233,7 +263,7 @@ class AuthService:
             action.domain_name,
             action.email,
             target_password_info=target_password_info,
-            client_type=client_type,
+            login_client_type_id=login_client_type_id,
         )
         return cred_result.user, cred_result.active_sessions
 
@@ -324,6 +354,7 @@ class AuthService:
         keypair_row: Any,
         live_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
+        login_client_type_id: uuid.UUID,
     ) -> AuthorizeActionResult:
         """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed.
 
@@ -335,7 +366,6 @@ class AuthService:
         ``live_sessions`` is already the authoritative active set (cross-checked against
         Valkey by the caller), so no additional repository count query is needed.
         """
-        client_type = action.client_type
         try:
             user_resource_policy = await self._user_resource_policy_repository.get_by_name(
                 user.resource_policy
@@ -356,7 +386,7 @@ class AuthService:
             user_id=user.uuid,
             access_key=keypair_row.access_key,
             domain_name=action.domain_name,
-            client_type=client_type,
+            login_client_type_id=login_client_type_id,
         )
 
         if tokens_to_invalidate:
@@ -367,7 +397,7 @@ class AuthService:
         session_data = LoginSessionData(
             created=int(time.time()),
             expiration_dt=int(time.time()) + auth_config.login_session_max_age,
-            client_type=client_type.value,
+            client_type=action.client_type_name,
             session=LoginSessionInner(
                 authenticated=True,
                 token=LoginSessionTokenData(

@@ -50,6 +50,7 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
+from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
 from ai.backend.manager.services.metric.processors.utilization_metric import (
@@ -312,6 +313,7 @@ def create_services(args: ServiceArgs) -> Services:
             config_provider=args.config_provider,
             valkey_session_client=args.valkey_session_client,
             user_resource_policy_repository=repositories.user_resource_policy.repository,
+            login_client_type_repository=repositories.auth.login_client_type,
         ),
         notification=NotificationService(
             repository=repositories.notification.repository,
@@ -472,7 +474,12 @@ def create_processors(
         model_serving_auto_scaling=ModelServingAutoScalingProcessors(
             services.model_serving_auto_scaling, action_monitors, validators
         ),
-        auth=AuthProcessors(services.auth, action_monitors, validators),
+        auth=AuthProcessors(
+            services.auth,
+            LoginClientTypeService(args.service_args.repositories.auth.login_client_type),
+            action_monitors,
+            validators,
+        ),
         notification=NotificationProcessors(services.notification, action_monitors, validators),
         object_storage=ObjectStorageProcessors(
             services.object_storage, action_monitors, validators

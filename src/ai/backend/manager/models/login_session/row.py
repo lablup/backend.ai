@@ -14,7 +14,6 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.login_session.enums import (
     LoginAttemptResult,
-    LoginClientType,
     LoginSessionStatus,
 )
 
@@ -41,12 +40,11 @@ class LoginSessionRow(Base):  # type: ignore[misc]
         index=True,
     )
     access_key: Mapped[str] = mapped_column("access_key", sa.String(20), nullable=False)
-    client_type: Mapped[LoginClientType] = mapped_column(
-        "client_type",
-        StrEnumType(LoginClientType),
-        nullable=False,
-        default=LoginClientType.WEBUI,
-        server_default=LoginClientType.WEBUI.value,
+    login_client_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        "login_client_type_id",
+        GUID,
+        sa.ForeignKey("login_client_types.id", ondelete="SET NULL"),
+        nullable=True,
     )
     status: Mapped[LoginSessionStatus] = mapped_column(
         "status",
@@ -71,7 +69,10 @@ class LoginSessionRow(Base):  # type: ignore[misc]
 
     __table_args__ = (
         sa.Index(
-            "ix_login_sessions_user_id_client_type_status", "user_id", "client_type", "status"
+            "ix_login_sessions_user_id_login_client_type_id_status",
+            "user_id",
+            "login_client_type_id",
+            "status",
         ),
     )
 
@@ -85,7 +86,7 @@ class LoginSessionRow(Base):  # type: ignore[misc]
             session_token=self.session_token,
             user_id=self.user_id,
             access_key=self.access_key,
-            client_type=self.client_type,
+            login_client_type_id=self.login_client_type_id,
             status=self.status,
             created_at=self.created_at,
             last_accessed_at=self.last_accessed_at,

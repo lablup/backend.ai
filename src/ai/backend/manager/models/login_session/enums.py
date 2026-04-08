@@ -2,11 +2,8 @@ from __future__ import annotations
 
 import enum
 
-from ai.backend.common.dto.manager.auth.types import LoginClientType
-
 __all__ = (
     "LoginAttemptResult",
-    "LoginClientType",
     "LoginSessionStatus",
 )
 

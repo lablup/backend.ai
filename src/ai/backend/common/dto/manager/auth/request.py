@@ -11,7 +11,9 @@ from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 
-from .types import AuthTokenType, LoginClientType
+from .types import AuthTokenType
+
+DEFAULT_LOGIN_CLIENT_TYPE_NAME = "webui"
 
 __all__ = (
     "AuthorizeRequest",
@@ -55,9 +57,11 @@ class AuthorizeRequest(BaseRequestModel):
         default=False,
         description="If true, invalidate existing active sessions and proceed with login",
     )
-    client_type: LoginClientType = Field(
-        default=LoginClientType.WEBUI,
-        description="Client type identifier ('core', 'webui', 'fasttrack'). "
+    client_type: str = Field(
+        default=DEFAULT_LOGIN_CLIENT_TYPE_NAME,
+        min_length=1,
+        max_length=64,
+        description="Login client type name (resolved against the login_client_types table). "
         "Defaults to 'webui' when omitted so that the web console does not need "
         "to set it explicitly; CLI and SDK clients must pass 'core' explicitly. "
         "Concurrent session limits are enforced per client type.",

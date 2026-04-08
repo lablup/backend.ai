@@ -10,9 +10,9 @@ from typing import Any
 
 import click
 
-from ai.backend.common.dto.manager.auth.types import LoginClientType
-
 from .helpers import COOKIE_FILE, SESSION_DIR, create_v2_registry, load_v2_config
+
+_CLI_LOGIN_CLIENT_TYPE = "core"
 
 
 @click.command()
@@ -48,7 +48,7 @@ def login(force: bool) -> None:
             payload: dict[str, str | bool] = {
                 "username": user_id,
                 "password": password,
-                "client_type": LoginClientType.CORE.value,
+                "client_type": _CLI_LOGIN_CLIENT_TYPE,
             }
             if force:
                 payload["force"] = True

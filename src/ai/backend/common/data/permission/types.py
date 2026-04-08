@@ -102,6 +102,7 @@ class EntityType(enum.StrEnum):
     GROUP = "group"
     KERNEL = "kernel"
     KEYPAIR = "keypair"
+    LOGIN_CLIENT_TYPE = "login_client_type"
     LOGIN_SESSION = "login_session"
     MODEL_SERVICE = "model_service"
     NETWORK = "network"
