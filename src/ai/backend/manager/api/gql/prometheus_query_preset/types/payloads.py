@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from strawberry import ID
+from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     DeleteQueryDefinitionPayload as DeleteQueryDefinitionPayloadDTO,
@@ -101,4 +101,4 @@ class QueryDefinitionResultGQL(PydanticOutputMixin[QueryDefinitionResultInfoDTO]
     name="DeleteQueryDefinitionPayload",
 )
 class DeleteQueryDefinitionPayload(PydanticOutputMixin[DeleteQueryDefinitionPayloadDTO]):
-    id: ID = gql_field(description="Deleted query definition ID.")
+    id: UUID = gql_field(description="Deleted query definition ID.")
