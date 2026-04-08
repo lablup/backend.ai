@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
@@ -14,10 +13,6 @@ class RenameSessionAction(SessionAction):
     session_name: str
     new_name: str
     owner_access_key: AccessKey
-    owner_id: UUID | None = None
-    """Delegated owner user UUID. When set, the service resolves it to the
-    target user's main access key and overrides ``owner_access_key``.
-    """
 
     @override
     def entity_id(self) -> str | None:

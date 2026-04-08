@@ -986,7 +986,7 @@ class TestRenameSession:
         assert isinstance(result, RenameSessionActionResult)
         assert result.session_data == sample_session_data
         mock_session_repository.update_session_name.assert_called_once_with(
-            "test-session", "new-session-name", sample_access_key, owner_user_uuid=None
+            "test-session", "new-session-name", sample_access_key
         )
 
     async def test_not_running_session(
