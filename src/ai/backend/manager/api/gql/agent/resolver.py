@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import cast
+
 import strawberry
 from strawberry import Info
+from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.agent.request import AdminSearchAgentsInput
 from ai.backend.manager.api.gql.agent.types import (
@@ -27,9 +30,9 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL | None:
     total = await info.context.adapters.agent.get_total_resources()
     resource = AgentResourceGQL(
-        free=total.total_free_slots.to_json(),
-        used=total.total_used_slots.to_json(),
-        capacity=total.total_capacity_slots.to_json(),
+        free=cast(JSON, total.total_free_slots.to_json()),
+        used=cast(JSON, total.total_used_slots.to_json()),
+        capacity=cast(JSON, total.total_capacity_slots.to_json()),
     )
     return AgentStatsGQL(total_resource=resource)
 

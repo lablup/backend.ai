@@ -228,4 +228,4 @@ async def delete_huggingface_registry(
 ) -> DeleteHuggingFaceRegistryPayload:
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.huggingface_registry.delete(pydantic_input)
-    return DeleteHuggingFaceRegistryPayload(id=ID(str(result.id)))
+    return DeleteHuggingFaceRegistryPayload(id=result.id)

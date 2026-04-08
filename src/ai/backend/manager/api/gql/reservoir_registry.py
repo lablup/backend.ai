@@ -237,4 +237,4 @@ async def delete_reservoir_registry(
 ) -> DeleteReservoirRegistryPayload:
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.reservoir_registry.delete(pydantic_input)
-    return DeleteReservoirRegistryPayload(id=ID(str(result.id)))
+    return DeleteReservoirRegistryPayload(id=result.id)
