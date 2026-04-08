@@ -178,7 +178,7 @@ class SchedulerRepository:
 
     @scheduler_repository_resilience.apply()
     async def get_all_scaling_groups(self) -> list[str]:
-        """Get all scaling groups referenced by agents, ignoring agent state."""
+        """Get all defined scaling groups."""
         return await self._db_source.get_all_scaling_groups()
 
     @scheduler_repository_resilience.apply()

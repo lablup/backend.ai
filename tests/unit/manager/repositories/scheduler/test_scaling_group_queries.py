@@ -29,6 +29,7 @@ class ScalingGroupFixture:
     schedulable: str
     unschedulable: str
     lost: str
+    empty: str
 
 
 async def _make_scaling_group(db: ExtendedAsyncSAEngine, name: str) -> None:
@@ -100,20 +101,23 @@ class TestScalingGroupQueries:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ScalingGroupFixture:
-        """Three resource groups, each holding a single agent:
+        """Four resource groups covering schedulable, unschedulable, lost, and empty cases:
 
         - ``schedulable``: ALIVE + schedulable=True
         - ``unschedulable``: ALIVE + schedulable=False (the BA-5629 case)
         - ``lost``: LOST + schedulable=True (included only in the all-groups query)
+        - ``empty``: no agents at all (must still be included in the all-groups query)
         """
         fixture = ScalingGroupFixture(
             schedulable=f"sg-sched-{uuid.uuid4().hex[:8]}",
             unschedulable=f"sg-unsched-{uuid.uuid4().hex[:8]}",
             lost=f"sg-lost-{uuid.uuid4().hex[:8]}",
+            empty=f"sg-empty-{uuid.uuid4().hex[:8]}",
         )
         await _make_scaling_group(db_with_cleanup, fixture.schedulable)
         await _make_scaling_group(db_with_cleanup, fixture.unschedulable)
         await _make_scaling_group(db_with_cleanup, fixture.lost)
+        await _make_scaling_group(db_with_cleanup, fixture.empty)
         await _make_agent(
             db_with_cleanup,
             fixture.schedulable,
@@ -145,6 +149,7 @@ class TestScalingGroupQueries:
         assert mixed_agents_scenario.schedulable in schedulable
         assert mixed_agents_scenario.unschedulable not in schedulable
         assert mixed_agents_scenario.lost not in schedulable
+        assert mixed_agents_scenario.empty not in schedulable
 
     async def test_all_scaling_groups_query_includes_unschedulable_and_lost_agents(
         self,
@@ -153,8 +158,8 @@ class TestScalingGroupQueries:
     ) -> None:
         """Regression for BA-5629.
 
-        ``get_all_scaling_groups()`` must return resource groups even when
-        they have no ALIVE or schedulable agents, so that coordinator
+        ``get_all_scaling_groups()`` must return all defined resource groups,
+        even when they have no ALIVE, schedulable, or any agents, so that coordinator
         promotion and termination checks still visit sessions pinned there.
         """
         db_source = ScheduleDBSource(db_with_cleanup)
@@ -163,3 +168,4 @@ class TestScalingGroupQueries:
         assert mixed_agents_scenario.schedulable in scaling_groups
         assert mixed_agents_scenario.unschedulable in scaling_groups
         assert mixed_agents_scenario.lost in scaling_groups
+        assert mixed_agents_scenario.empty in scaling_groups
