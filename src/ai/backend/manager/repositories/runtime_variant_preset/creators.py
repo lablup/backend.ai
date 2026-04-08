@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    PresetTarget,
+    PresetValueType,
+)
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import RuntimeVariantPresetConflict
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
@@ -19,8 +23,8 @@ class RuntimeVariantPresetCreatorSpec(CreatorSpec[RuntimeVariantPresetRow]):
     name: str
     description: str | None
     rank: int
-    preset_target: str
-    value_type: str
+    preset_target: PresetTarget
+    value_type: PresetValueType
     default_value: str | None
     key: str
     category: str | None
