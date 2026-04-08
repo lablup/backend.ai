@@ -27,6 +27,7 @@ import yarl
 from dateutil.parser import isoparse
 from pydantic import BaseModel
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
+from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicode, UnicodeText
@@ -832,6 +833,8 @@ async def populate_fixture(
         from .hasher.types import PasswordColumn
 
         async with engine.begin() as conn:
+            if table_name == "runtime_variant_presets":
+                await _resolve_runtime_variant_preset_references(conn, rows)
             # Apply typedecorator manually for required columns
             for col in table.columns:
                 if isinstance(col.type, sa.sql.sqltypes.DateTime):
@@ -946,6 +949,40 @@ async def populate_fixture(
                                 ) from e
                         update_data.append(update_row)
                     await conn.execute(update_stmt, update_data)
+
+
+async def _resolve_runtime_variant_preset_references(
+    conn: AsyncConnection,
+    rows: Sequence[dict[str, Any]],
+) -> None:
+    runtime_variant_names = {
+        cast(str, row["runtime_variant_name"])
+        for row in rows
+        if "runtime_variant" not in row and row.get("runtime_variant_name") is not None
+    }
+    if not runtime_variant_names:
+        return
+
+    runtime_variants_table = metadata.tables.get("runtime_variants")
+    if not isinstance(runtime_variants_table, sa.Table):
+        raise DataTransformationFailed("Table runtime_variants not found in metadata")
+
+    result = await conn.execute(
+        sa.select(runtime_variants_table.c.name, runtime_variants_table.c.id).where(
+            runtime_variants_table.c.name.in_(runtime_variant_names)
+        )
+    )
+    runtime_variant_ids = {name: row_id for name, row_id in result}
+    missing_variant_names = sorted(runtime_variant_names - runtime_variant_ids.keys())
+    if missing_variant_names:
+        raise DataTransformationFailed(
+            "Unknown runtime_variant_name in fixture: " + ", ".join(missing_variant_names)
+        )
+
+    for row in rows:
+        runtime_variant_name = row.pop("runtime_variant_name", None)
+        if runtime_variant_name is not None and "runtime_variant" not in row:
+            row["runtime_variant"] = runtime_variant_ids[runtime_variant_name]
 
 
 class DecimalType(TypeDecorator[Decimal], Decimal):

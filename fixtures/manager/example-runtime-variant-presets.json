@@ -1,0 +1,660 @@
+{
+  "runtime_variant_presets": [
+    {
+      "runtime_variant_name": "vllm",
+      "name": "model",
+      "description": "HuggingFace model name or local path.",
+      "rank": 100,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--model",
+      "category": "model_loading",
+      "ui_type": "text_input",
+      "display_name": "Model",
+      "ui_option": {
+        "ui_type": "text_input",
+        "text": {
+          "placeholder": "meta-llama/Llama-3.3-70B"
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "dtype",
+      "description": "Model weight dtype.",
+      "rank": 200,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": "auto",
+      "key": "--dtype",
+      "category": "model_loading",
+      "ui_type": "select",
+      "display_name": "DType",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "auto",
+              "label": "Auto"
+            },
+            {
+              "value": "bfloat16",
+              "label": "BFloat16"
+            },
+            {
+              "value": "float16",
+              "label": "Float16"
+            },
+            {
+              "value": "float32",
+              "label": "Float32"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "quantization",
+      "description": "Quantization backend.",
+      "rank": 300,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--quantization",
+      "category": "model_loading",
+      "ui_type": "select",
+      "display_name": "Quantization",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "awq",
+              "label": "AWQ"
+            },
+            {
+              "value": "gptq",
+              "label": "GPTQ"
+            },
+            {
+              "value": "fp8",
+              "label": "FP8"
+            },
+            {
+              "value": "squeezellm",
+              "label": "SqueezeLLM"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "max-model-len",
+      "description": "Maximum context length.",
+      "rank": 400,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": null,
+      "key": "--max-model-len",
+      "category": "model_loading",
+      "ui_type": "number_input",
+      "display_name": "Max Model Length",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 256,
+          "max": 131072
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "served-model-name",
+      "description": "Model name shown in API responses.",
+      "rank": 500,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--served-model-name",
+      "category": "model_loading",
+      "ui_type": "text_input",
+      "display_name": "Served Model Name",
+      "ui_option": {
+        "ui_type": "text_input"
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "trust-remote-code",
+      "description": "Trust HuggingFace remote code for custom architectures.",
+      "rank": 600,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--trust-remote-code",
+      "category": "model_loading",
+      "ui_type": "checkbox",
+      "display_name": "Trust Remote Code",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "gpu-memory-utilization",
+      "description": "GPU memory utilization ratio.",
+      "rank": 700,
+      "preset_target": "args",
+      "value_type": "float",
+      "default_value": "0.9",
+      "key": "--gpu-memory-utilization",
+      "category": "resource_memory",
+      "ui_type": "slider",
+      "display_name": "GPU Memory Utilization",
+      "ui_option": {
+        "ui_type": "slider",
+        "slider": {
+          "min": 0.1,
+          "max": 1.0,
+          "step": 0.05
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "tensor-parallel-size",
+      "description": "Number of GPUs for tensor parallelism.",
+      "rank": 800,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": "1",
+      "key": "--tensor-parallel-size",
+      "category": "resource_memory",
+      "ui_type": "select",
+      "display_name": "Tensor Parallel Size",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "1",
+              "label": "1"
+            },
+            {
+              "value": "2",
+              "label": "2"
+            },
+            {
+              "value": "4",
+              "label": "4"
+            },
+            {
+              "value": "8",
+              "label": "8"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "pipeline-parallel-size",
+      "description": "Pipeline parallel stage count.",
+      "rank": 900,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": "1",
+      "key": "--pipeline-parallel-size",
+      "category": "resource_memory",
+      "ui_type": "number_input",
+      "display_name": "Pipeline Parallel Size",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 1,
+          "max": 16
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "data-parallel-size",
+      "description": "Data parallel replica count.",
+      "rank": 1000,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": "1",
+      "key": "--data-parallel-size",
+      "category": "resource_memory",
+      "ui_type": "number_input",
+      "display_name": "Data Parallel Size",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 1,
+          "max": 64
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "kv-cache-dtype",
+      "description": "KV cache dtype.",
+      "rank": 1100,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": "auto",
+      "key": "--kv-cache-dtype",
+      "category": "resource_memory",
+      "ui_type": "select",
+      "display_name": "KV Cache DType",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "auto",
+              "label": "Auto"
+            },
+            {
+              "value": "fp8",
+              "label": "FP8"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "enable-prefix-caching",
+      "description": "Reuse KV cache for repeated prompts.",
+      "rank": 1200,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--enable-prefix-caching",
+      "category": "resource_memory",
+      "ui_type": "checkbox",
+      "display_name": "Enable Prefix Caching",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "max-num-seqs",
+      "description": "Maximum sequences processed per iteration.",
+      "rank": 1300,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": null,
+      "key": "--max-num-seqs",
+      "category": "serving_performance",
+      "ui_type": "number_input",
+      "display_name": "Max Num Seqs",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 1,
+          "max": 1024
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "max-num-batched-tokens",
+      "description": "Maximum batched tokens per iteration.",
+      "rank": 1400,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": null,
+      "key": "--max-num-batched-tokens",
+      "category": "serving_performance",
+      "ui_type": "number_input",
+      "display_name": "Max Num Batched Tokens",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 256,
+          "max": 131072
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "enable-chunked-prefill",
+      "description": "Split long prompts into smaller prefill chunks.",
+      "rank": 1500,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--enable-chunked-prefill",
+      "category": "serving_performance",
+      "ui_type": "checkbox",
+      "display_name": "Enable Chunked Prefill",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "scheduling-policy",
+      "description": "Scheduling policy for request handling.",
+      "rank": 1600,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": "fcfs",
+      "key": "--scheduling-policy",
+      "category": "serving_performance",
+      "ui_type": "select",
+      "display_name": "Scheduling Policy",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "fcfs",
+              "label": "FCFS"
+            },
+            {
+              "value": "priority",
+              "label": "Priority"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "performance-mode",
+      "description": "Serving optimization mode.",
+      "rank": 1700,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": "balanced",
+      "key": "--performance-mode",
+      "category": "serving_performance",
+      "ui_type": "select",
+      "display_name": "Performance Mode",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "balanced",
+              "label": "Balanced"
+            },
+            {
+              "value": "interactivity",
+              "label": "Interactivity"
+            },
+            {
+              "value": "throughput",
+              "label": "Throughput"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "limit-mm-per-prompt",
+      "description": "Per-prompt multimodal input limit.",
+      "rank": 1800,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--limit-mm-per-prompt",
+      "category": "multimodal",
+      "ui_type": "text_input",
+      "display_name": "Limit MM Per Prompt",
+      "ui_option": {
+        "ui_type": "text_input",
+        "text": {
+          "placeholder": "{\"image\": 5, \"audio\": 0}"
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "enable-auto-tool-choice",
+      "description": "Enable automatic tool selection.",
+      "rank": 1900,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--enable-auto-tool-choice",
+      "category": "tool_reasoning",
+      "ui_type": "checkbox",
+      "display_name": "Enable Auto Tool Choice",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "tool-call-parser",
+      "description": "Tool call parser implementation.",
+      "rank": 2000,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--tool-call-parser",
+      "category": "tool_reasoning",
+      "ui_type": "select",
+      "display_name": "Tool Call Parser",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "hermes",
+              "label": "Hermes"
+            },
+            {
+              "value": "llama3_json",
+              "label": "Llama 3 JSON"
+            },
+            {
+              "value": "llama4_json",
+              "label": "Llama 4 JSON"
+            },
+            {
+              "value": "mistral",
+              "label": "Mistral"
+            },
+            {
+              "value": "deepseek_v3",
+              "label": "DeepSeek V3"
+            },
+            {
+              "value": "qwen3_coder",
+              "label": "Qwen3 Coder"
+            },
+            {
+              "value": "openai",
+              "label": "OpenAI"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "reasoning-parser",
+      "description": "Parser for reasoning model output.",
+      "rank": 2100,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--reasoning-parser",
+      "category": "tool_reasoning",
+      "ui_type": "select",
+      "display_name": "Reasoning Parser",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "deepseek_v3",
+              "label": "DeepSeek V3"
+            },
+            {
+              "value": "qwen3",
+              "label": "Qwen3"
+            },
+            {
+              "value": "gemma4",
+              "label": "Gemma 4"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "host",
+      "description": "Listen host.",
+      "rank": 2200,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": "0.0.0.0",
+      "key": "--host",
+      "category": "network",
+      "ui_type": "text_input",
+      "display_name": "Host",
+      "ui_option": {
+        "ui_type": "text_input",
+        "text": {
+          "placeholder": "0.0.0.0"
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "port",
+      "description": "Listen port.",
+      "rank": 2300,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": "8000",
+      "key": "--port",
+      "category": "network",
+      "ui_type": "number_input",
+      "display_name": "Port",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 1,
+          "max": 65535
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "enable-log-requests",
+      "description": "Log incoming requests.",
+      "rank": 2400,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--enable-log-requests",
+      "category": "monitoring",
+      "ui_type": "checkbox",
+      "display_name": "Enable Log Requests",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "disable-log-stats",
+      "description": "Disable periodic stats logging.",
+      "rank": 2500,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--disable-log-stats",
+      "category": "monitoring",
+      "ui_type": "checkbox",
+      "display_name": "Disable Log Stats",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "enable-lora",
+      "description": "Enable LoRA support.",
+      "rank": 2600,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--enable-lora",
+      "category": "lora",
+      "ui_type": "checkbox",
+      "display_name": "Enable LoRA",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "lora-modules",
+      "description": "LoRA module definitions.",
+      "rank": 2700,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--lora-modules",
+      "category": "lora",
+      "ui_type": "text_input",
+      "display_name": "LoRA Modules",
+      "ui_option": {
+        "ui_type": "text_input",
+        "text": {
+          "placeholder": "adapter1=/path/to/adapter1"
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "cuda-visible-devices",
+      "description": "CUDA device visibility override.",
+      "rank": 2800,
+      "preset_target": "env",
+      "value_type": "str",
+      "default_value": null,
+      "key": "CUDA_VISIBLE_DEVICES",
+      "category": "environment",
+      "ui_type": "text_input",
+      "display_name": "CUDA Visible Devices",
+      "ui_option": {
+        "ui_type": "text_input",
+        "text": {
+          "placeholder": "0,1,2,3"
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "vllm",
+      "name": "hf-token-env",
+      "description": "HuggingFace token for gated model downloads.",
+      "rank": 2900,
+      "preset_target": "env",
+      "value_type": "str",
+      "default_value": null,
+      "key": "HF_TOKEN",
+      "category": "environment",
+      "ui_type": "text_input",
+      "display_name": "HF Token",
+      "ui_option": {
+        "ui_type": "text_input"
+      }
+    }
+  ]
+}
