@@ -7,6 +7,10 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    PresetTarget,
+    PresetValueType,
+)
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -71,8 +75,8 @@ class TestRuntimeVariantPresetRepositoryFlag:
             name="enable-verbose",
             description="Enable verbose logging",
             rank=0,
-            preset_target="args",
-            value_type="flag",
+            preset_target=PresetTarget.ARGS,
+            value_type=PresetValueType.FLAG,
             default_value="true",
             key="--verbose",
             category=None,
@@ -83,11 +87,11 @@ class TestRuntimeVariantPresetRepositoryFlag:
         creator: Creator[RuntimeVariantPresetRow] = Creator(spec=spec)
         created = await repository.create(creator)
 
-        assert created.value_type == "flag"
-        assert created.preset_target == "args"
+        assert created.value_type == PresetValueType.FLAG
+        assert created.preset_target == PresetTarget.ARGS
         assert created.key == "--verbose"
 
         fetched = await repository.get_by_id(created.id)
-        assert fetched.value_type == "flag"
-        assert fetched.preset_target == "args"
+        assert fetched.value_type == PresetValueType.FLAG
+        assert fetched.preset_target == PresetTarget.ARGS
         assert fetched.default_value == "true"
