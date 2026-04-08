@@ -34,7 +34,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.webapp import WebappPlugin
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    RoleManager,
+    UserSystemRoleSpec,
+)
 
 from . import __version__
 from .config import OIDCPluginConfig
@@ -218,8 +221,8 @@ async def create_user_if_not_exists(
 
             # Create RBAC system role and map user to role
             role_manager = RoleManager()
-            user_data = user.to_data()
-            role = await role_manager.create_system_role(dbsess, user_data)
+            role_spec = UserSystemRoleSpec(user_id=user.uuid)
+            role = await role_manager.create_system_role(dbsess, role_spec)
             user_role_creator = Creator(
                 spec=UserRoleCreatorSpec(user_id=user.uuid, role_id=role.id)
             )

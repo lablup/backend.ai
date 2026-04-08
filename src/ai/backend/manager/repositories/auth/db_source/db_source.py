@@ -44,7 +44,10 @@ from ai.backend.manager.repositories.base.creator import Creator, execute_creato
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.types import SearchScope
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    RoleManager,
+    UserSystemRoleSpec,
+)
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -163,14 +166,14 @@ class AuthDBSource:
                 await conn.execute(assoc_query)
 
             # Create RBAC system role and map user to role
-            created_user = self._user_row_to_data(user_row)
-            role = await self._role_manager.create_system_role(db_session, created_user)
+            role_spec = UserSystemRoleSpec(user_id=user_row.uuid)
+            role = await self._role_manager.create_system_role(db_session, role_spec)
             user_role_creator = Creator(
-                spec=UserRoleCreatorSpec(user_id=created_user.uuid, role_id=role.id)
+                spec=UserRoleCreatorSpec(user_id=user_row.uuid, role_id=role.id)
             )
             await execute_creator(db_session, user_role_creator)
 
-            return created_user
+            return self._user_row_to_data(user_row)
 
     @auth_db_source_resilience.apply()
     async def modify_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:

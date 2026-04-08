@@ -1,6 +1,7 @@
 import logging
 import uuid
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from typing import Protocol, cast
 
 import sqlalchemy as sa
@@ -16,9 +17,11 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
+    EntityType,
     OperationType,
     RBACElementRef,
     RoleSource,
+    ScopeType,
 )
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -50,6 +53,27 @@ class ScopeSystemRoleData(Protocol):
     def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
         """Returns a mapping of entity types to the set of operations that should be granted for each entity type."""
         ...
+
+
+@dataclass(frozen=True)
+class UserSystemRoleSpec:
+    """Minimal implementation of ScopeSystemRoleData for user system role creation."""
+
+    user_id: uuid.UUID
+
+    def scope_id(self) -> ScopeId:
+        return ScopeId(scope_type=ScopeType.USER, scope_id=str(self.user_id))
+
+    def role_name(self) -> str:
+        return f"user-{str(self.user_id)[:8]}"
+
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
+        resource_entity_permissions = {
+            entity.to_element(): OperationType.owner_operations()
+            for entity in EntityType.owner_accessible_entity_types_in_user()
+        }
+        user_permissions = OperationType.owner_operations() - {OperationType.CREATE}
+        return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
 
 class RoleManager:
