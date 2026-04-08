@@ -269,7 +269,7 @@ class SessionService:
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
 
-    async def _resolve_owner_access_key(
+    async def _resolve_owner_main_access_key(
         self,
         owner_id: uuid.UUID | None,
         fallback: AccessKey,
@@ -784,7 +784,7 @@ class SessionService:
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
         session_name = action.session_name
-        owner_access_key = await self._resolve_owner_access_key(
+        owner_access_key = await self._resolve_owner_main_access_key(
             action.owner_id, action.owner_access_key
         )
         forced = action.forced
@@ -1058,7 +1058,7 @@ class SessionService:
     ) -> GetContainerLogsActionResult:
         resp = {"result": {"logs": ""}}
         session_name = action.session_name
-        owner_access_key = await self._resolve_owner_access_key(
+        owner_access_key = await self._resolve_owner_main_access_key(
             action.owner_id, action.owner_access_key
         )
         kernel_id = action.kernel_id
@@ -1314,7 +1314,7 @@ class SessionService:
 
     async def restart_session(self, action: RestartSessionAction) -> RestartSessionActionResult:
         session_name = action.session_name
-        owner_access_key = await self._resolve_owner_access_key(
+        owner_access_key = await self._resolve_owner_main_access_key(
             action.owner_id, action.owner_access_key
         )
 
