@@ -8,6 +8,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    PresetTarget,
+    PresetValueType,
+)
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
@@ -51,8 +55,8 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
             name="test",
             description=None,
             rank=0,
-            preset_target="env",
-            value_type="str",
+            preset_target=PresetTarget.ENV,
+            value_type=PresetValueType.STR,
             default_value=None,
             key="MY_VAR",
             category=None,
@@ -72,8 +76,8 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
             name="test",
             description=None,
             rank=0,
-            preset_target="args",
-            value_type="str",
+            preset_target=PresetTarget.ARGS,
+            value_type=PresetValueType.STR,
             default_value=None,
             key="--flag",
             category=None,
@@ -93,7 +97,7 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
     ) -> None:
         mock_repository.get_by_id = AsyncMock(return_value=flaging_preset_env)
         spec = RuntimeVariantPresetUpdaterSpec(
-            value_type=OptionalState.update("flag"),
+            value_type=OptionalState.update(PresetValueType.FLAG),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=preset_id)
         action = UpdateRuntimeVariantPresetAction(id=preset_id, updater=updater)
@@ -114,8 +118,8 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
             name="test",
             description=None,
             rank=0,
-            preset_target="args",
-            value_type="flag",
+            preset_target=PresetTarget.ARGS,
+            value_type=PresetValueType.FLAG,
             default_value=None,
             key="--flag",
             category=None,
@@ -128,13 +132,13 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
         mock_repository.get_by_id = AsyncMock(return_value=flaging_preset_args)
         mock_repository.update = AsyncMock(return_value=updated_data)
         spec = RuntimeVariantPresetUpdaterSpec(
-            value_type=OptionalState.update("flag"),
+            value_type=OptionalState.update(PresetValueType.FLAG),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=preset_id)
         action = UpdateRuntimeVariantPresetAction(id=preset_id, updater=updater)
 
         result = await service.update(action)
-        assert result.preset.value_type == "flag"
+        assert result.preset.value_type == PresetValueType.FLAG
 
     async def test_change_preset_target_to_env_with_flaging_flag_is_rejected(
         self,
@@ -148,8 +152,8 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
             name="test",
             description=None,
             rank=0,
-            preset_target="args",
-            value_type="flag",
+            preset_target=PresetTarget.ARGS,
+            value_type=PresetValueType.FLAG,
             default_value=None,
             key="--flag",
             category=None,
@@ -161,7 +165,7 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
         )
         mock_repository.get_by_id = AsyncMock(return_value=flaging)
         spec = RuntimeVariantPresetUpdaterSpec(
-            preset_target=OptionalState.update("env"),
+            preset_target=OptionalState.update(PresetTarget.ENV),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=preset_id)
         action = UpdateRuntimeVariantPresetAction(id=preset_id, updater=updater)
