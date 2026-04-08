@@ -4229,7 +4229,7 @@ type DeleteNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted notification channel"""
-  id: ID!
+  id: UUID!
 }
 
 """Added in 24.09.0. Input for deleting a notification rule"""
