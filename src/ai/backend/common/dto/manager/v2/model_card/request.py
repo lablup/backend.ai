@@ -69,6 +69,13 @@ class ModelCardFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None)
     domain_name: str | None = Field(default=None)
     project_id: UUID | None = Field(default=None)
+    storage_host: StringFilter | None = Field(
+        default=None,
+        description=(
+            "Filter by the storage host backing the model card's VFolder. "
+            "Evaluated as an EXISTS subquery joining the model VFolder's host column."
+        ),
+    )
     AND: list[ModelCardFilter] | None = Field(default=None)
     OR: list[ModelCardFilter] | None = Field(default=None)
     NOT: list[ModelCardFilter] | None = Field(default=None)

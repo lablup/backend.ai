@@ -317,6 +317,13 @@ class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
     domain_name: str | None = gql_field(default=None, description="Domain filter.")
     project_id: UUID | None = gql_field(default=None, description="Project filter.")
+    storage_host: StringFilterGQL | None = gql_field(
+        default=None,
+        description=(
+            "Filter by the storage host backing the model card's VFolder. "
+            "Matches via an EXISTS subquery against the VFolder host column."
+        ),
+    )
 
 
 @gql_pydantic_input(

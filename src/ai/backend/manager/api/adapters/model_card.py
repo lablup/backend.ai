@@ -529,6 +529,17 @@ class ModelCardAdapter(BaseAdapter):
             )
             if cond:
                 conditions.append(cond)
+        if filter_.storage_host:
+            cond = self.convert_string_filter(
+                filter_.storage_host,
+                contains_factory=ModelCardConditions.by_storage_host_contains,
+                equals_factory=ModelCardConditions.by_storage_host_equals,
+                starts_with_factory=ModelCardConditions.by_storage_host_starts_with,
+                ends_with_factory=ModelCardConditions.by_storage_host_ends_with,
+                in_factory=ModelCardConditions.by_storage_host_in,
+            )
+            if cond:
+                conditions.append(cond)
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
