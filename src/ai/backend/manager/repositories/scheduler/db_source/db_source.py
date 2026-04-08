@@ -2102,8 +2102,8 @@ class ScheduleDBSource:
             reason,
         )
         async with self._begin_session_read_committed() as db_sess:
-            # Check current kernel status before update
-            check_stmt = sa.select(KernelRow.status, KernelRow.starts_at).where(
+            # Check current kernel status and fetch agent_id before update
+            check_stmt = sa.select(KernelRow.status, KernelRow.starts_at, KernelRow.agent_id).where(
                 KernelRow.id == kernel_id
             )
             check_result = await db_sess.execute(check_stmt)
@@ -2119,6 +2119,7 @@ class ScheduleDBSource:
                 log.debug("[DBSource] Kernel {} not found!", kernel_id)
 
             now = await self._get_db_now_in_session(db_sess)
+            occupied_slots = creation_info.get_resource_allocations()
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -2132,7 +2133,7 @@ class ScheduleDBSource:
                     status_info=reason,
                     status_changed=now,
                     starts_at=now,
-                    occupied_slots=creation_info.get_resource_allocations(),
+                    occupied_slots=occupied_slots,
                     container_id=creation_info.container_id,
                     attached_devices=creation_info.attached_devices,
                     repl_in_port=creation_info.repl_in_port,
@@ -2157,7 +2158,70 @@ class ScheduleDBSource:
                 rowcount,
                 now,
             )
-            return rowcount > 0
+            if rowcount == 0:
+                return False
+
+            # Allocate kernel resources in the same transaction.
+            # This ensures resource allocation happens atomically with the
+            # kernel status transition to RUNNING, rather than waiting for
+            # the session-level RUNNING transition.
+            agent_id = current.agent_id if current else None
+            await self._allocate_kernel_resources_in_session(
+                db_sess, KernelId(kernel_id), agent_id, occupied_slots
+            )
+            return True
+
+    async def _allocate_kernel_resources_in_session(
+        self,
+        db_sess: SASession,
+        kernel_id: KernelId,
+        agent_id: AgentId | None,
+        occupied_slots: ResourceSlot,
+    ) -> None:
+        """Activate resource allocations and increment agent resource usage.
+
+        Must be called within an existing DB session/transaction.
+        Idempotent: rows where used_at is already set are skipped.
+        No-op if agent_id is None or occupied_slots is empty.
+
+        Raises:
+            AgentResourceCapacityExceeded: If any slot would exceed agent capacity.
+        """
+        if not agent_id or not occupied_slots:
+            return
+        slots = resource_slot_to_quantities(occupied_slots)
+        for s in slots:
+            alloc_result = await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(
+                    ResourceAllocationRow.kernel_id == kernel_id,
+                    ResourceAllocationRow.slot_name == s.slot_name,
+                    ResourceAllocationRow.free_at.is_(None),
+                    ResourceAllocationRow.used_at.is_(None),
+                )
+                .values(used=s.quantity, used_at=sa.func.now())
+            )
+            if cast(CursorResult[Any], alloc_result).rowcount == 0:
+                continue
+            new_used = AgentResourceRow.used + s.quantity
+            agent_result = await db_sess.execute(
+                sa.update(AgentResourceRow)
+                .where(
+                    AgentResourceRow.agent_id == agent_id,
+                    AgentResourceRow.slot_name == s.slot_name,
+                    new_used <= AgentResourceRow.capacity,
+                )
+                .values(used=new_used)
+            )
+            if cast(CursorResult[Any], agent_result).rowcount == 0:
+                raise AgentResourceCapacityExceeded(
+                    f"Agent {agent_id}: capacity exceeded for slot '{s.slot_name}'"
+                )
+        log.debug(
+            "[DBSource] Allocated resources for kernel {} on agent {}",
+            kernel_id,
+            agent_id,
+        )
 
     async def update_kernel_status_preparing(self, kernel_id: UUID) -> bool:
         """

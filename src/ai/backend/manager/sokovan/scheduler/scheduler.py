@@ -44,7 +44,6 @@ def create_scheduler_components(
     """Create SchedulerComponents with all required dependencies."""
     hook_registry = HookRegistry(
         HookRegistryArgs(
-            scheduler_repository=repository,
             deployment_repository=deployment_repository,
             agent_client_pool=agent_client_pool,
             event_producer=event_producer,
