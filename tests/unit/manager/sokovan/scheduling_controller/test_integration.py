@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.common.types import (
     AccessKey,
@@ -1107,3 +1108,109 @@ class TestMarkSessionsForTermination:
         broadcast_events = event_producer.broadcast_events_batch.call_args[0][0]
         assert len(broadcast_events) == 1
         assert broadcast_events[0].status_transition == str(SessionStatus.TERMINATING)
+
+
+class TestOwnerOnlyScalingGroupForDelegation:
+    """
+    Regression tests for BA-5608.
+
+    When a session is created via ``owner_access_key`` (delegation), scaling
+    group access MUST be resolved using the owner's permissions only — never
+    the requester's, and never the union of both. The policy decision:
+    delegation lets an admin act *as* the owner, not grant the owner extra
+    access the admin happens to hold.
+
+    These tests lock the current behavior in place so that a future refactor
+    cannot silently reintroduce a union / requester-fallback path.
+    """
+
+    def _build_delegated_spec(
+        self,
+        *,
+        owner_access_key: AccessKey,
+        scaling_group: str | None,
+    ) -> SessionCreationSpec:
+        return SessionCreationSpec(
+            session_creation_id="deleg-sg-test",
+            session_name="deleg-sg-test",
+            # The service layer passes the *owner's* access key down into the
+            # spec for delegated sessions; this mirrors that wiring.
+            access_key=owner_access_key,
+            user_scope=UserScope(
+                domain_name="default",
+                group_id=uuid.uuid4(),
+                user_uuid=uuid.uuid4(),
+                user_role="user",
+            ),
+            session_type=SessionTypes.INTERACTIVE,
+            cluster_mode=ClusterMode.SINGLE_NODE,
+            cluster_size=1,
+            priority=10,
+            resource_policy={},
+            kernel_specs=[
+                cast(
+                    KernelEnqueueingConfig,
+                    {
+                        "image_ref": MagicMock(canonical="python:3.9"),
+                        "resources": {"cpu": "1", "mem": "1g"},
+                    },
+                )
+            ],
+            creation_spec={},
+            scaling_group=scaling_group,
+        )
+
+    async def test_requested_sg_inaccessible_to_owner_raises(
+        self,
+        scheduling_controller: Any,
+        mock_repository: AsyncMock,
+    ) -> None:
+        """
+        The requester (admin) has access to ``admin-only`` via their own
+        keypair, but the owner does not. The resolver must query using the
+        owner's access key, see an empty list, and reject the request.
+        """
+        owner_access_key = AccessKey("AKIAOWNERONLY00000000")
+        spec = self._build_delegated_spec(
+            owner_access_key=owner_access_key,
+            scaling_group="admin-only",
+        )
+
+        # Owner has no scaling groups at all.
+        mock_repository.query_allowed_scaling_groups = AsyncMock(return_value=[])
+
+        with pytest.raises(InvalidAPIParameters, match="admin-only"):
+            await scheduling_controller._resolve_scaling_group(spec)
+
+        # The query MUST be scoped to the owner's access key — not the
+        # requester's. This is the core invariant.
+        mock_repository.query_allowed_scaling_groups.assert_awaited_once()
+        call_args = mock_repository.query_allowed_scaling_groups.call_args
+        assert call_args.args[2] == owner_access_key, (
+            "Scaling group lookup must use the owner's access key"
+        )
+
+    async def test_requested_sg_accessible_to_owner_succeeds(
+        self,
+        scheduling_controller: Any,
+        mock_repository: AsyncMock,
+    ) -> None:
+        """Sanity: delegation succeeds when the owner has access to the SG."""
+        owner_access_key = AccessKey("AKIAOWNERGOOD00000000")
+        spec = self._build_delegated_spec(
+            owner_access_key=owner_access_key,
+            scaling_group="shared",
+        )
+
+        mock_repository.query_allowed_scaling_groups = AsyncMock(
+            return_value=[
+                AllowedScalingGroup(
+                    name="shared",
+                    is_private=False,
+                    scheduler_opts=ScalingGroupOpts(),
+                ),
+            ]
+        )
+
+        resolved = await scheduling_controller._resolve_scaling_group(spec)
+        assert resolved.name == "shared"
