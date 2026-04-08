@@ -14,6 +14,7 @@ from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     AdminSearchRoleAssignmentsGQLInput,
 )
@@ -105,7 +106,11 @@ from ai.backend.manager.api.gql.rbac.types.scope import ScopeInputGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.rbac.types.entity import EntityRefGQL
+    from ai.backend.manager.api.gql.rbac.types.entity import (
+        EntityConnection,
+        EntityFilter,
+        EntityOrderBy,
+    )
     from ai.backend.manager.api.gql.rbac.types.permission import (
         PermissionConnection,
         PermissionFilter,
@@ -316,18 +321,67 @@ class RoleGQL(PydanticNodeMixin[Any]):
     async def scopes(
         self,
         info: Info[StrawberryGQLContext],
-    ) -> list[
-        Annotated[
-            EntityRefGQL,
+        filter: Annotated[
+            EntityFilter,
             strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
         ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                EntityOrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Annotated[
+        EntityConnection,
+        strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
     ]:
-        from ai.backend.manager.api.gql.rbac.types.entity import EntityRefGQL
-
-        items = await info.context.adapters.rbac.get_role_scopes(
-            role_id=uuid.UUID(self.id),
+        from ai.backend.manager.api.gql.rbac.types.entity import (
+            EntityConnection,
+            EntityEdge,
+            EntityRefGQL,
         )
-        return [EntityRefGQL.from_pydantic(item) for item in items]
+
+        pydantic_filter = filter.to_pydantic() if filter is not None else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+        result = await info.context.adapters.rbac.search_role_scopes_gql(
+            role_id=UUID(self.id),
+            input=AdminSearchEntitiesGQLInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        edges = [
+            EntityEdge(
+                node=EntityRefGQL.from_pydantic(item),
+                cursor=encode_cursor(str(item.id)),
+            )
+            for item in result.items
+        ]
+        return EntityConnection(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=result.total_count,
+        )
 
 
 @gql_node_type(

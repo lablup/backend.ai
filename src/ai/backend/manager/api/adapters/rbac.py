@@ -725,25 +725,19 @@ class RBACAdapter(BaseAdapter):
             has_previous_page=raw.has_previous_page,
         )
 
-    async def get_role_scopes(
+    async def search_role_scopes_gql(
         self,
         role_id: UUID,
-    ) -> list[AssociationScopesEntitiesNode]:
-        """Get all scope associations for a specific role."""
-        conditions: list[QueryCondition] = [
+        input: AdminSearchEntitiesGQLInput,
+    ) -> SearchResult[AssociationScopesEntitiesNode]:
+        """Search scope associations for a specific role with pagination."""
+        base_conditions: list[QueryCondition] = [
             EntityScopeConditions.by_entity_type(RBACElementType.ROLE),
             EntityScopeConditions.by_entity_id_equals(
                 StringMatchSpec(value=str(role_id), case_insensitive=False, negated=False)
             ),
         ]
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=conditions,
-        )
-        action_result: SearchElementAssociationsActionResult = await self._processors.permission_controller.search_element_associations.wait_for_complete(
-            SearchElementAssociationsAction(querier=querier)
-        )
-        return [self._association_data_to_node(item) for item in action_result.result.items]
+        return await self.admin_search_entities_gql(input, base_conditions=base_conditions)
 
     # ------------------------------------------------------------------ get
 
