@@ -1,16 +1,6 @@
-"""
-Tests for resource_allocations being freed on CANCELLED transitions.
-
-Regression tests for the invariant: every code path that flips a session/kernel
-to CANCELLED must also free the matching ``resource_allocations`` rows in the
-same transaction. The two paths exercised here previously violated that
-invariant and silently leaked orphan rows:
-
-- ``mark_sessions_terminating`` -> ``_cancel_pending_sessions``
-- ``cancel_kernels_for_failed_image``
-
-Both paths only operate on pre-RUNNING kernels, so ``ResourceAllocationRow.used``
-is always ``NULL`` and ``agent_resources.used`` should be unchanged.
+"""Regression tests: cancellation paths must free resource_allocations
+in the same transaction. Covers ``_cancel_pending_sessions`` (via
+``mark_sessions_terminating``) and ``cancel_kernels_for_failed_image``.
 """
 
 import uuid
@@ -90,11 +80,7 @@ _BASE_TABLES = [
 
 
 class _CancellationTestBase:
-    """Shared fixtures for cancellation-path freeing tests.
-
-    Mirrors the per-class fixture pattern used by test_resource_deallocation.py
-    so the two files can be read independently without cross-imports.
-    """
+    """Shared fixtures for cancellation-path freeing tests."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -333,8 +319,8 @@ class _CancellationTestBase:
         mem_requested: Decimal = Decimal("4096"),
     ) -> tuple[SessionId, KernelId]:
         """Insert a session+kernel in a pre-RUNNING state with allocations
-        whose ``used`` is ``NULL`` (matching how the production code looks
-        between PENDING and CREATING)."""
+        whose ``used`` is ``NULL`` (production state between PENDING and CREATING).
+        """
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
 
@@ -400,9 +386,6 @@ class _CancellationTestBase:
             )
             await db_sess.flush()
 
-            # Allocations created at scheduling time but not yet charged
-            # against the agent: `used` and `used_at` stay NULL until the
-            # RUNNING transition. This mirrors the real production state.
             db_sess.add(
                 ResourceAllocationRow(
                     kernel_id=kernel_id,
@@ -421,8 +404,6 @@ class _CancellationTestBase:
             )
             await db_sess.flush()
 
-            # The agent counter starts at 0 because no kernel has reached
-            # RUNNING yet. Used to assert it stays at 0.
             if agent_id:
                 for slot_name, capacity in [
                     ("cpu", Decimal("10")),
@@ -449,10 +430,8 @@ class _CancellationTestBase:
 
 
 class TestCancelPendingSessionsFreesAllocations(_CancellationTestBase):
-    """``mark_sessions_terminating`` on a PENDING session must free
-    its kernels' resource_allocations rows in the same transaction.
-    Regression for the orphan rows that the companion data-cleanup
-    migration had to clean up.
+    """``mark_sessions_terminating`` on a PENDING session must free its
+    kernels' resource_allocations rows in the same transaction.
     """
 
     async def test_marks_resource_allocations_freed(
@@ -516,8 +495,6 @@ class TestCancelPendingSessionsFreesAllocations(_CancellationTestBase):
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """PENDING kernels never charge ``agent_resources.used``, so
-        cancelling them must leave the cache counter untouched."""
         db_source = ScheduleDBSource(db_with_cleanup)
 
         session_id, _ = await self._create_pre_running_session(
@@ -563,8 +540,6 @@ class TestCancelPendingSessionsFreesAllocations(_CancellationTestBase):
         test_access_key: AccessKey,
         resource_slot_types: None,
     ) -> None:
-        """Re-cancelling a session that already has freed allocations
-        must not overwrite the existing free_at timestamps."""
         db_source = ScheduleDBSource(db_with_cleanup)
 
         session_id, kernel_id = await self._create_pre_running_session(
@@ -593,9 +568,6 @@ class TestCancelPendingSessionsFreesAllocations(_CancellationTestBase):
                 ).scalars()
             }
 
-        # Second call: session is already CANCELLED, so the SessionRow
-        # update matches zero rows and the free_at update should not run
-        # against rows that already have free_at set.
         await db_source.mark_sessions_terminating([session_id])
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -616,8 +588,8 @@ class TestCancelPendingSessionsFreesAllocations(_CancellationTestBase):
 
 
 class TestCancelKernelsForFailedImageFreesAllocations(_CancellationTestBase):
-    """``cancel_kernels_for_failed_image`` must free its cancelled
-    kernels' resource_allocations rows in the same transaction.
+    """``cancel_kernels_for_failed_image`` must free its cancelled kernels'
+    resource_allocations rows in the same transaction.
     """
 
     @pytest.mark.parametrize(
@@ -692,10 +664,6 @@ class TestCancelKernelsForFailedImageFreesAllocations(_CancellationTestBase):
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """SCHEDULED/PULLING/PREPARING kernels never charge
-        ``agent_resources.used``, so cancelling them via the
-        image-pull-failure path must leave the cache counter untouched.
-        """
         db_source = ScheduleDBSource(db_with_cleanup)
 
         session_id, _ = await self._create_pre_running_session(
@@ -747,8 +715,6 @@ class TestCancelKernelsForFailedImageFreesAllocations(_CancellationTestBase):
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """An unrelated kernel on the same agent (different image) must
-        keep its allocations untouched."""
         db_source = ScheduleDBSource(db_with_cleanup)
 
         _victim_session, victim_kernel = await self._create_pre_running_session(

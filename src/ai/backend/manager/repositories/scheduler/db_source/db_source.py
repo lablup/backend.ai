@@ -817,17 +817,11 @@ class ScheduleDBSource:
         kernel_ids: Sequence[UUID],
         now: datetime,
     ) -> None:
-        """Mark allocations freed for kernels cancelled from a pre-RUNNING state.
+        """Set ``free_at`` for the given kernels' active allocations.
 
-        Pre-RUNNING (PENDING/SCHEDULED/PREPARING/PULLING/CREATING) kernels
-        have ``ResourceAllocationRow.used IS NULL`` because allocation only
-        happens at the RUNNING transition, so this only sets ``free_at``.
-        Callers must have already transitioned the kernels to a non-occupying
-        state in the same ``db_sess`` and pass the same ``now`` they used for
-        that update so both writes share one timestamp. Do NOT call this from
-        RUNNING/TERMINATING-capable paths -- use ``update_kernel_status_terminated``
-        which also decrements ``agent_resources.used``. Idempotent via
-        ``free_at IS NULL``.
+        Only safe for pre-RUNNING source statuses where ``used`` is NULL;
+        for RUNNING/TERMINATING use ``update_kernel_status_terminated``
+        which also decrements ``agent_resources.used``. Idempotent.
         """
         if not kernel_ids:
             return
@@ -843,11 +837,8 @@ class ScheduleDBSource:
     async def _cancel_pending_sessions(
         self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
     ) -> list[SessionId]:
-        """Cancel pending sessions, their kernels, and free the kernels'
-        ``resource_allocations`` rows in the same transaction. Kernels are
-        selected by ``session_id`` for the cancelled (PENDING) sessions and
-        are expected to also be pre-RUNNING, so the shared free helper is
-        sufficient and no ``agent_resources.used`` adjustment is needed.
+        """Cancel PENDING sessions and their kernels, and free the kernels'
+        ``resource_allocations`` rows in the same transaction.
         """
         cancel_stmt = (
             sa.update(SessionRow)
@@ -2625,15 +2616,9 @@ class ScheduleDBSource:
     async def cancel_kernels_for_failed_image(
         self, agent_id: AgentId, image: str, error_msg: str, image_ref: str | None = None
     ) -> set[SessionId]:
-        """Cancel kernels stuck on an image that failed to pull on an agent
-        and free their ``resource_allocations`` rows in the same transaction.
-        Returns the affected session IDs (caller may then check whether the
-        full session should be cancelled).
-
-        Source statuses are filtered to ``SCHEDULED/PULLING/PREPARING``
-        (SCHEDULED included because image pull failure can occur before
-        the kernel transitions to PREPARING), all of which are pre-RUNNING,
-        so the shared free helper suffices.
+        """Cancel SCHEDULED/PULLING/PREPARING kernels of a failed-to-pull
+        image on an agent and free their ``resource_allocations`` rows in
+        the same transaction. Returns affected session IDs.
         """
         async with self._begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
