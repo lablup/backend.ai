@@ -154,6 +154,7 @@ class RuntimeVariantAdapter(BaseAdapter):
                 equals_factory=RuntimeVariantConditions.by_name_equals,
                 starts_with_factory=RuntimeVariantConditions.by_name_starts_with,
                 ends_with_factory=RuntimeVariantConditions.by_name_ends_with,
+                in_factory=RuntimeVariantConditions.by_name_in,
             )
             if cond:
                 conditions.append(cond)

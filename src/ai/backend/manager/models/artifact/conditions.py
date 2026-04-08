@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.artifact.types import ArtifactAvailability, ArtifactType
 from ai.backend.manager.models.artifact.row import ArtifactRow
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.repositories.base import QueryCondition
 
 
@@ -178,6 +179,10 @@ class ArtifactConditions:
             return condition
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(ArtifactRow.name))
+    by_registry_in = staticmethod(make_string_in_factory(ArtifactRow.registry_type))
+    by_source_in = staticmethod(make_string_in_factory(ArtifactRow.source_registry_type))
 
     @staticmethod
     def by_types(types: list[ArtifactType]) -> QueryCondition:

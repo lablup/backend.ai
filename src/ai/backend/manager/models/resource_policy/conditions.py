@@ -7,7 +7,7 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.manager.models.condition_utils import make_int_conditions
+from ai.backend.manager.models.condition_utils import make_int_conditions, make_string_in_factory
 from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import KeyPairResourcePolicyRow, ProjectResourcePolicyRow, UserResourcePolicyRow
@@ -69,6 +69,8 @@ class KeypairResourcePolicyConditions:
             return cond
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(KeyPairResourcePolicyRow.name))
 
     # ==================== DateTime Filters ====================
 
@@ -194,6 +196,8 @@ class UserResourcePolicyConditions:
 
         return inner
 
+    by_name_in = staticmethod(make_string_in_factory(UserResourcePolicyRow.name))
+
     # ==================== DateTime Filters ====================
 
     @staticmethod
@@ -312,6 +316,8 @@ class ProjectResourcePolicyConditions:
             return cond
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(ProjectResourcePolicyRow.name))
 
     # ==================== DateTime Filters ====================
 

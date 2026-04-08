@@ -256,6 +256,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 equals_factory=SessionSchedulingHistoryConditions.by_phase_equals,
                 starts_with_factory=SessionSchedulingHistoryConditions.by_phase_starts_with,
                 ends_with_factory=SessionSchedulingHistoryConditions.by_phase_ends_with,
+                in_factory=SessionSchedulingHistoryConditions.by_phase_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -296,6 +297,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 equals_factory=SessionSchedulingHistoryConditions.by_error_code_equals,
                 starts_with_factory=SessionSchedulingHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=SessionSchedulingHistoryConditions.by_error_code_ends_with,
+                in_factory=SessionSchedulingHistoryConditions.by_error_code_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -306,6 +308,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 equals_factory=SessionSchedulingHistoryConditions.by_message_equals,
                 starts_with_factory=SessionSchedulingHistoryConditions.by_message_starts_with,
                 ends_with_factory=SessionSchedulingHistoryConditions.by_message_ends_with,
+                in_factory=SessionSchedulingHistoryConditions.by_message_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -424,6 +427,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 equals_factory=DeploymentHistoryConditions.by_phase_equals,
                 starts_with_factory=DeploymentHistoryConditions.by_phase_starts_with,
                 ends_with_factory=DeploymentHistoryConditions.by_phase_ends_with,
+                in_factory=DeploymentHistoryConditions.by_phase_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -456,6 +460,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 equals_factory=DeploymentHistoryConditions.by_error_code_equals,
                 starts_with_factory=DeploymentHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=DeploymentHistoryConditions.by_error_code_ends_with,
+                in_factory=DeploymentHistoryConditions.by_error_code_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -466,6 +471,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 equals_factory=DeploymentHistoryConditions.by_message_equals,
                 starts_with_factory=DeploymentHistoryConditions.by_message_starts_with,
                 ends_with_factory=DeploymentHistoryConditions.by_message_ends_with,
+                in_factory=DeploymentHistoryConditions.by_message_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -594,6 +600,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 equals_factory=RouteHistoryConditions.by_phase_equals,
                 starts_with_factory=RouteHistoryConditions.by_phase_starts_with,
                 ends_with_factory=RouteHistoryConditions.by_phase_ends_with,
+                in_factory=RouteHistoryConditions.by_phase_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -624,6 +631,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 equals_factory=RouteHistoryConditions.by_error_code_equals,
                 starts_with_factory=RouteHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=RouteHistoryConditions.by_error_code_ends_with,
+                in_factory=RouteHistoryConditions.by_error_code_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -634,6 +642,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 equals_factory=RouteHistoryConditions.by_message_equals,
                 starts_with_factory=RouteHistoryConditions.by_message_starts_with,
                 ends_with_factory=RouteHistoryConditions.by_message_ends_with,
+                in_factory=RouteHistoryConditions.by_message_in,
             )
             if condition is not None:
                 conditions.append(condition)

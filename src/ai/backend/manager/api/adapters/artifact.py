@@ -485,6 +485,7 @@ class ArtifactAdapter(BaseAdapter):
                 equals_factory=ArtifactConditions.by_name_equals,
                 starts_with_factory=ArtifactConditions.by_name_starts_with,
                 ends_with_factory=ArtifactConditions.by_name_ends_with,
+                in_factory=ArtifactConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -495,6 +496,7 @@ class ArtifactAdapter(BaseAdapter):
                 equals_factory=ArtifactConditions.by_registry_equals,
                 starts_with_factory=ArtifactConditions.by_registry_starts_with,
                 ends_with_factory=ArtifactConditions.by_registry_ends_with,
+                in_factory=ArtifactConditions.by_registry_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -505,6 +507,7 @@ class ArtifactAdapter(BaseAdapter):
                 equals_factory=ArtifactConditions.by_source_equals,
                 starts_with_factory=ArtifactConditions.by_source_starts_with,
                 ends_with_factory=ArtifactConditions.by_source_ends_with,
+                in_factory=ArtifactConditions.by_source_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -578,6 +581,7 @@ class ArtifactAdapter(BaseAdapter):
                 equals_factory=ArtifactRevisionConditions.by_version_equals,
                 starts_with_factory=ArtifactRevisionConditions.by_version_starts_with,
                 ends_with_factory=ArtifactRevisionConditions.by_version_ends_with,
+                in_factory=ArtifactRevisionConditions.by_version_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -687,6 +691,7 @@ class ArtifactAdapter(BaseAdapter):
                 equals_factory=ArtifactConditions.by_name_equals,
                 starts_with_factory=ArtifactConditions.by_name_starts_with,
                 ends_with_factory=ArtifactConditions.by_name_ends_with,
+                in_factory=ArtifactConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

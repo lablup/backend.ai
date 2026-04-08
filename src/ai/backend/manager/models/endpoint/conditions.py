@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
@@ -80,6 +81,9 @@ class DeploymentConditions:
             return condition
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(EndpointRow.name))
+    by_domain_name_in = staticmethod(make_string_in_factory(EndpointRow.domain))
 
     @staticmethod
     def by_project_id(project_id: uuid.UUID) -> QueryCondition:

@@ -408,6 +408,7 @@ class ProjectAdapter(BaseAdapter):
             equals_factory=GroupConditions.by_name_equals,
             starts_with_factory=GroupConditions.by_name_starts_with,
             ends_with_factory=GroupConditions.by_name_ends_with,
+            in_factory=GroupConditions.by_name_in,
         )
 
     def _convert_domain_name_filter(self, sf: StringFilter) -> QueryCondition | None:
@@ -417,6 +418,7 @@ class ProjectAdapter(BaseAdapter):
             equals_factory=GroupConditions.by_domain_name_equals,
             starts_with_factory=GroupConditions.by_domain_name_starts_with,
             ends_with_factory=GroupConditions.by_domain_name_ends_with,
+            in_factory=GroupConditions.by_domain_name_in,
         )
 
     @staticmethod
@@ -474,6 +476,7 @@ class ProjectAdapter(BaseAdapter):
                 equals_factory=DomainConditions.by_name_equals,
                 starts_with_factory=DomainConditions.by_name_starts_with,
                 ends_with_factory=DomainConditions.by_name_ends_with,
+                in_factory=DomainConditions.by_name_in,
             )
             if condition is not None:
                 raw_conditions.append(condition)
@@ -499,6 +502,7 @@ class ProjectAdapter(BaseAdapter):
                 equals_factory=GroupConditions.by_user_username_equals,
                 starts_with_factory=GroupConditions.by_user_username_starts_with,
                 ends_with_factory=GroupConditions.by_user_username_ends_with,
+                in_factory=GroupConditions.by_user_username_in,
             )
             if condition is not None:
                 raw_conditions.append(condition)
@@ -508,6 +512,7 @@ class ProjectAdapter(BaseAdapter):
                 equals_factory=GroupConditions.by_user_email_equals,
                 starts_with_factory=GroupConditions.by_user_email_starts_with,
                 ends_with_factory=GroupConditions.by_user_email_ends_with,
+                in_factory=GroupConditions.by_user_email_in,
             )
             if condition is not None:
                 raw_conditions.append(condition)

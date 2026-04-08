@@ -8,6 +8,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import AgentRow
@@ -68,6 +69,8 @@ class AgentConditions:
             return ~condition if spec.negated else condition
 
         return inner
+
+    by_id_in = staticmethod(make_string_in_factory(AgentRow.id))
 
     # --- status enum conditions ---
 
@@ -153,6 +156,8 @@ class AgentConditions:
             return ~condition if spec.negated else condition
 
         return inner
+
+    by_scaling_group_in = staticmethod(make_string_in_factory(AgentRow.scaling_group))
 
     # --- cursor pagination conditions ---
 

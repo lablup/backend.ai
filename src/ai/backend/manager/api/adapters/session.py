@@ -545,6 +545,7 @@ class SessionAdapter(BaseAdapter):
                 equals_factory=SessionConditions.by_name_equals,
                 starts_with_factory=SessionConditions.by_name_starts_with,
                 ends_with_factory=SessionConditions.by_name_ends_with,
+                in_factory=SessionConditions.by_name_in,
             )
             if c is not None:
                 conditions.append(c)
@@ -555,6 +556,7 @@ class SessionAdapter(BaseAdapter):
                 equals_factory=SessionConditions.by_domain_name_equals,
                 starts_with_factory=SessionConditions.by_domain_name_starts_with,
                 ends_with_factory=SessionConditions.by_domain_name_ends_with,
+                in_factory=SessionConditions.by_domain_name_in,
             )
             if c is not None:
                 conditions.append(c)

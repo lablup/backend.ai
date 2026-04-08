@@ -674,6 +674,7 @@ class ResourcePolicyAdapter(BaseAdapter):
                 equals_factory=KeypairResourcePolicyConditions.by_name_equals,
                 starts_with_factory=KeypairResourcePolicyConditions.by_name_starts_with,
                 ends_with_factory=KeypairResourcePolicyConditions.by_name_ends_with,
+                in_factory=KeypairResourcePolicyConditions.by_name_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -738,6 +739,7 @@ class ResourcePolicyAdapter(BaseAdapter):
                 equals_factory=UserResourcePolicyConditions.by_name_equals,
                 starts_with_factory=UserResourcePolicyConditions.by_name_starts_with,
                 ends_with_factory=UserResourcePolicyConditions.by_name_ends_with,
+                in_factory=UserResourcePolicyConditions.by_name_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -795,6 +797,7 @@ class ResourcePolicyAdapter(BaseAdapter):
                 equals_factory=ProjectResourcePolicyConditions.by_name_equals,
                 starts_with_factory=ProjectResourcePolicyConditions.by_name_starts_with,
                 ends_with_factory=ProjectResourcePolicyConditions.by_name_ends_with,
+                in_factory=ProjectResourcePolicyConditions.by_name_in,
             )
             if cond is not None:
                 conditions.append(cond)

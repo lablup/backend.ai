@@ -99,6 +99,7 @@ class AuditLogAdapter(BaseAdapter):
                 equals_factory=AuditLogConditions.by_entity_type_equals,
                 starts_with_factory=AuditLogConditions.by_entity_type_starts_with,
                 ends_with_factory=AuditLogConditions.by_entity_type_ends_with,
+                in_factory=AuditLogConditions.by_entity_type_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -109,6 +110,7 @@ class AuditLogAdapter(BaseAdapter):
                 equals_factory=AuditLogConditions.by_operation_equals,
                 starts_with_factory=AuditLogConditions.by_operation_starts_with,
                 ends_with_factory=AuditLogConditions.by_operation_ends_with,
+                in_factory=AuditLogConditions.by_operation_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -119,6 +121,7 @@ class AuditLogAdapter(BaseAdapter):
                 equals_factory=AuditLogConditions.by_triggered_by_equals,
                 starts_with_factory=AuditLogConditions.by_triggered_by_starts_with,
                 ends_with_factory=AuditLogConditions.by_triggered_by_ends_with,
+                in_factory=AuditLogConditions.by_triggered_by_in,
             )
             if condition is not None:
                 conditions.append(condition)

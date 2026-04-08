@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
@@ -141,6 +142,9 @@ class DomainFairShareConditions:
             return condition
 
         return inner
+
+    by_resource_group_in = staticmethod(make_string_in_factory(DomainFairShareRow.resource_group))
+    by_domain_name_in = staticmethod(make_string_in_factory(DomainFairShareRow.domain_name))
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
@@ -326,6 +330,9 @@ class ProjectFairShareConditions:
             return condition
 
         return inner
+
+    by_resource_group_in = staticmethod(make_string_in_factory(ProjectFairShareRow.resource_group))
+    by_domain_name_in = staticmethod(make_string_in_factory(ProjectFairShareRow.domain_name))
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
@@ -597,6 +604,9 @@ class UserFairShareConditions:
             return condition
 
         return inner
+
+    by_resource_group_in = staticmethod(make_string_in_factory(UserFairShareRow.resource_group))
+    by_domain_name_in = staticmethod(make_string_in_factory(UserFairShareRow.domain_name))
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
@@ -880,6 +890,9 @@ class RGDomainFairShareConditions:
 
         return inner
 
+    by_domain_name_in = staticmethod(make_string_in_factory(DomainRow.name))
+    by_resource_group_in = staticmethod(make_string_in_factory(DomainFairShareRow.resource_group))
+
 
 class RGProjectFairShareConditions:
     """Query conditions for rg-scoped project fair share queries.
@@ -1026,6 +1039,9 @@ class RGProjectFairShareConditions:
 
         return inner
 
+    by_domain_name_in = staticmethod(make_string_in_factory(DomainRow.name))
+    by_resource_group_in = staticmethod(make_string_in_factory(ProjectFairShareRow.resource_group))
+
 
 class RGUserFairShareConditions:
     """Query conditions for rg-scoped user fair share queries.
@@ -1132,6 +1148,9 @@ class RGUserFairShareConditions:
             return condition
 
         return inner
+
+    by_domain_name_in = staticmethod(make_string_in_factory(DomainRow.name))
+    by_resource_group_in = staticmethod(make_string_in_factory(UserFairShareRow.resource_group))
 
     @staticmethod
     def by_resource_group(resource_group: str) -> QueryCondition:

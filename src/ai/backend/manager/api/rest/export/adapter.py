@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
 from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.export import (
     AuditLogExportFilter,
@@ -747,12 +747,28 @@ class ExportAdapter(BaseFilterAdapter):
 
             return factory
 
+        def make_in_factory(
+            col: InstrumentedAttribute[Any],
+        ) -> Callable[[StringInMatchSpec], QueryCondition]:
+            def factory(spec: StringInMatchSpec) -> QueryCondition:
+                if spec.case_insensitive:
+                    lowered = [v.lower() for v in spec.values]
+                    if spec.negated:
+                        return lambda: ~sa.func.lower(col).in_(lowered)
+                    return lambda: sa.func.lower(col).in_(lowered)
+                if spec.negated:
+                    return lambda: ~col.in_(spec.values)
+                return lambda: col.in_(spec.values)
+
+            return factory
+
         return self.convert_string_filter(
             string_filter,
             contains_factory=make_contains_factory(column),
             equals_factory=make_equals_factory(column),
             starts_with_factory=make_starts_with_factory(column),
             ends_with_factory=make_ends_with_factory(column),
+            in_factory=make_in_factory(column),
         )
 
     def _build_datetime_conditions(

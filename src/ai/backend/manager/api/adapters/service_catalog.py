@@ -96,6 +96,7 @@ class ServiceCatalogAdapter(BaseAdapter):
             equals_factory=ServiceCatalogConditions.by_service_group_equals,
             starts_with_factory=ServiceCatalogConditions.by_service_group_starts_with,
             ends_with_factory=ServiceCatalogConditions.by_service_group_ends_with,
+            in_factory=ServiceCatalogConditions.by_service_group_in,
         )
 
     @staticmethod

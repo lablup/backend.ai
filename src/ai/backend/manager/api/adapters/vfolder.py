@@ -482,6 +482,7 @@ class VFolderAdapter(BaseAdapter):
                 equals_factory=VFolderConditions.by_name_equals,
                 starts_with_factory=VFolderConditions.by_name_starts_with,
                 ends_with_factory=VFolderConditions.by_name_ends_with,
+                in_factory=VFolderConditions.by_name_in,
             )
             if c is not None:
                 conditions.append(c)
@@ -492,6 +493,7 @@ class VFolderAdapter(BaseAdapter):
                 equals_factory=VFolderConditions.by_host_equals,
                 starts_with_factory=VFolderConditions.by_host_starts_with,
                 ends_with_factory=VFolderConditions.by_host_ends_with,
+                in_factory=VFolderConditions.by_host_in,
             )
             if c is not None:
                 conditions.append(c)

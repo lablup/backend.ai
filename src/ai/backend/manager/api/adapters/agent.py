@@ -164,6 +164,7 @@ class AgentAdapter(BaseAdapter):
             equals_factory=AgentConditions.by_id_equals,
             starts_with_factory=AgentConditions.by_id_starts_with,
             ends_with_factory=AgentConditions.by_id_ends_with,
+            in_factory=AgentConditions.by_id_in,
         )
 
     def _convert_scaling_group_filter(self, sf: StringFilter) -> QueryCondition | None:
@@ -173,6 +174,7 @@ class AgentAdapter(BaseAdapter):
             equals_factory=AgentConditions.by_scaling_group_equals,
             starts_with_factory=AgentConditions.by_scaling_group_starts_with,
             ends_with_factory=AgentConditions.by_scaling_group_ends_with,
+            in_factory=AgentConditions.by_scaling_group_in,
         )
 
     @staticmethod

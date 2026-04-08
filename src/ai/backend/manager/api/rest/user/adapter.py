@@ -177,6 +177,7 @@ class UserAdapter(BaseFilterAdapter):
                 equals_factory=UserConditions.by_email_equals,
                 starts_with_factory=UserConditions.by_email_starts_with,
                 ends_with_factory=UserConditions.by_email_ends_with,
+                in_factory=UserConditions.by_email_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -188,6 +189,7 @@ class UserAdapter(BaseFilterAdapter):
                 equals_factory=UserConditions.by_username_equals,
                 starts_with_factory=UserConditions.by_username_starts_with,
                 ends_with_factory=UserConditions.by_username_ends_with,
+                in_factory=UserConditions.by_username_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -199,6 +201,7 @@ class UserAdapter(BaseFilterAdapter):
                 equals_factory=UserConditions.by_domain_name_equals,
                 starts_with_factory=UserConditions.by_domain_name_starts_with,
                 ends_with_factory=UserConditions.by_domain_name_ends_with,
+                in_factory=UserConditions.by_domain_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -210,6 +213,7 @@ class UserAdapter(BaseFilterAdapter):
                 equals_factory=UserConditions.by_integration_name_equals,
                 starts_with_factory=UserConditions.by_integration_name_starts_with,
                 ends_with_factory=UserConditions.by_integration_name_ends_with,
+                in_factory=UserConditions.by_integration_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

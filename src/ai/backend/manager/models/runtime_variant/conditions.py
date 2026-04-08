@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.repositories.base import QueryCondition
 
@@ -65,6 +66,8 @@ class RuntimeVariantConditions:
             return condition
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(RuntimeVariantRow.name))
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:

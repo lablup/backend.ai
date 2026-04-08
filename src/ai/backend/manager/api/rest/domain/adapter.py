@@ -106,6 +106,7 @@ class DomainAdapter(BaseFilterAdapter):
                 equals_factory=DomainConditions.by_name_equals,
                 starts_with_factory=DomainConditions.by_name_starts_with,
                 ends_with_factory=DomainConditions.by_name_ends_with,
+                in_factory=DomainConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

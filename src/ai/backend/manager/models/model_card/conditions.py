@@ -7,6 +7,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.repositories.base import QueryCondition
 
@@ -86,6 +87,8 @@ class ModelCardConditions:
             return condition
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(ModelCardRow.name))
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:

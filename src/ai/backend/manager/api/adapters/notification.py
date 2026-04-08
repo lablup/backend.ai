@@ -539,6 +539,7 @@ class NotificationAdapter(BaseAdapter):
                 equals_factory=NotificationChannelConditions.by_name_equals,
                 starts_with_factory=NotificationChannelConditions.by_name_starts_with,
                 ends_with_factory=NotificationChannelConditions.by_name_ends_with,
+                in_factory=NotificationChannelConditions.by_name_in,
             )
             if cond:
                 conditions.append(cond)
@@ -619,6 +620,7 @@ class NotificationAdapter(BaseAdapter):
                 equals_factory=NotificationRuleConditions.by_name_equals,
                 starts_with_factory=NotificationRuleConditions.by_name_starts_with,
                 ends_with_factory=NotificationRuleConditions.by_name_ends_with,
+                in_factory=NotificationRuleConditions.by_name_in,
             )
             if cond:
                 conditions.append(cond)

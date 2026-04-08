@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import ContainerRegistryRow
@@ -69,6 +70,8 @@ class ContainerRegistryConditions:
             return ~condition if spec.negated else condition
 
         return inner
+
+    by_registry_name_in = staticmethod(make_string_in_factory(ContainerRegistryRow.registry_name))
 
     # --- type enum conditions ---
 

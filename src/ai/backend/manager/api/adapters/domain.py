@@ -282,6 +282,7 @@ class DomainAdapter(BaseAdapter):
                     equals_factory=DomainConditions.by_project_name_equals,
                     starts_with_factory=DomainConditions.by_project_name_starts_with,
                     ends_with_factory=DomainConditions.by_project_name_ends_with,
+                    in_factory=DomainConditions.by_project_name_in,
                 )
                 if condition is not None:
                     conditions.append(condition)
@@ -295,6 +296,7 @@ class DomainAdapter(BaseAdapter):
                     equals_factory=DomainConditions.by_user_username_equals,
                     starts_with_factory=DomainConditions.by_user_username_starts_with,
                     ends_with_factory=DomainConditions.by_user_username_ends_with,
+                    in_factory=DomainConditions.by_user_username_in,
                 )
                 if condition is not None:
                     conditions.append(condition)
@@ -304,6 +306,7 @@ class DomainAdapter(BaseAdapter):
                     equals_factory=DomainConditions.by_user_email_equals,
                     starts_with_factory=DomainConditions.by_user_email_starts_with,
                     ends_with_factory=DomainConditions.by_user_email_ends_with,
+                    in_factory=DomainConditions.by_user_email_in,
                 )
                 if condition is not None:
                     conditions.append(condition)
@@ -337,6 +340,7 @@ class DomainAdapter(BaseAdapter):
             equals_factory=DomainConditions.by_name_equals,
             starts_with_factory=DomainConditions.by_name_starts_with,
             ends_with_factory=DomainConditions.by_name_ends_with,
+            in_factory=DomainConditions.by_name_in,
         )
 
     def _convert_description_filter(self, sf: StringFilter) -> QueryCondition | None:
@@ -346,6 +350,7 @@ class DomainAdapter(BaseAdapter):
             equals_factory=DomainConditions.by_description_equals,
             starts_with_factory=DomainConditions.by_description_starts_with,
             ends_with_factory=DomainConditions.by_description_ends_with,
+            in_factory=DomainConditions.by_description_in,
         )
 
     @staticmethod

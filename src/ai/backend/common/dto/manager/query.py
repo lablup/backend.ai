@@ -8,7 +8,12 @@ from typing import TypeVar
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringInMatchSpec,
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 
 _QC = TypeVar("_QC")
 
@@ -199,12 +204,27 @@ class StringFilter(BaseRequestModel):
         default=None, description="Not ends with (case-insensitive)"
     )
 
+    # IN operations
+    in_: list[str] | None = Field(
+        default=None, alias="in", description="Value is in the provided list (case-sensitive)"
+    )
+    not_in: list[str] | None = Field(
+        default=None, description="Value is not in the provided list (case-sensitive)"
+    )
+    i_in: list[str] | None = Field(
+        default=None, description="Value is in the provided list (case-insensitive)"
+    )
+    i_not_in: list[str] | None = Field(
+        default=None, description="Value is not in the provided list (case-insensitive)"
+    )
+
     def build_query_condition(
         self,
         contains_factory: Callable[[StringMatchSpec], _QC],
         equals_factory: Callable[[StringMatchSpec], _QC],
         starts_with_factory: Callable[[StringMatchSpec], _QC],
         ends_with_factory: Callable[[StringMatchSpec], _QC],
+        in_factory: Callable[[StringInMatchSpec], _QC],
     ) -> _QC | None:
         """Build a query condition from this filter using the provided factory callables.
 
@@ -213,6 +233,7 @@ class StringFilter(BaseRequestModel):
             equals_factory: Factory for exact match (=) operations
             starts_with_factory: Factory for LIKE 'value%' operations
             ends_with_factory: Factory for LIKE '%value' operations
+            in_factory: Factory for IN (list membership) operations
 
         Returns:
             _QC if any filter field is set, None otherwise
@@ -287,6 +308,24 @@ class StringFilter(BaseRequestModel):
         if self.i_not_ends_with is not None:
             return ends_with_factory(
                 StringMatchSpec(self.i_not_ends_with, case_insensitive=True, negated=True)
+            )
+
+        # IN operations
+        if self.in_ is not None:
+            return in_factory(
+                StringInMatchSpec(values=self.in_, case_insensitive=False, negated=False)
+            )
+        if self.not_in is not None:
+            return in_factory(
+                StringInMatchSpec(values=self.not_in, case_insensitive=False, negated=True)
+            )
+        if self.i_in is not None:
+            return in_factory(
+                StringInMatchSpec(values=self.i_in, case_insensitive=True, negated=False)
+            )
+        if self.i_not_in is not None:
+            return in_factory(
+                StringInMatchSpec(values=self.i_not_in, case_insensitive=True, negated=True)
             )
 
         return None

@@ -11,6 +11,10 @@ import sqlalchemy as sa
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.condition_utils import (
+    make_nested_string_in_factory,
+    make_string_in_factory,
+)
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.group.row import GroupRow
@@ -77,6 +81,8 @@ class GroupConditions:
 
         return inner
 
+    by_name_in = staticmethod(make_string_in_factory(GroupRow.name))
+
     # ==================== Domain Name Filters ====================
 
     @staticmethod
@@ -130,6 +136,8 @@ class GroupConditions:
             return condition
 
         return inner
+
+    by_domain_name_in = staticmethod(make_string_in_factory(GroupRow.domain_name))
 
     # ==================== Type Filters ====================
 
@@ -329,6 +337,12 @@ class GroupConditions:
 
         return inner
 
+    by_domain_description_in = staticmethod(
+        make_nested_string_in_factory(
+            DomainRow.description, lambda c: GroupConditions._exists_domain(c)
+        )
+    )
+
     @staticmethod
     def exists_domain_combined(domain_conditions: list[QueryCondition]) -> QueryCondition:
         """Combine multiple domain conditions into single EXISTS subquery.
@@ -489,6 +503,13 @@ class GroupConditions:
             return GroupConditions._exists_user(cond)
 
         return inner
+
+    by_user_username_in = staticmethod(
+        make_nested_string_in_factory(UserRow.username, lambda c: GroupConditions._exists_user(c))
+    )
+    by_user_email_in = staticmethod(
+        make_nested_string_in_factory(UserRow.email, lambda c: GroupConditions._exists_user(c))
+    )
 
     @staticmethod
     def by_user_is_active(is_active: bool) -> QueryCondition:

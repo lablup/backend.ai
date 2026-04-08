@@ -148,6 +148,7 @@ class ResourceSlotAdapter(BaseAdapter):
             equals_factory=ResourceSlotTypeConditions.by_slot_name_equals,
             starts_with_factory=ResourceSlotTypeConditions.by_slot_name_starts_with,
             ends_with_factory=ResourceSlotTypeConditions.by_slot_name_ends_with,
+            in_factory=ResourceSlotTypeConditions.by_slot_name_in,
         )
 
     @staticmethod
@@ -245,6 +246,7 @@ class ResourceSlotAdapter(BaseAdapter):
             equals_factory=AgentResourceConditions.by_slot_name_equals,
             starts_with_factory=AgentResourceConditions.by_slot_name_starts_with,
             ends_with_factory=AgentResourceConditions.by_slot_name_ends_with,
+            in_factory=AgentResourceConditions.by_slot_name_in,
         )
 
     def _convert_agent_id_filter(self, sf: StringFilter) -> QueryCondition | None:
@@ -254,6 +256,7 @@ class ResourceSlotAdapter(BaseAdapter):
             equals_factory=AgentResourceConditions.by_agent_id_equals,
             starts_with_factory=AgentResourceConditions.by_agent_id_starts_with,
             ends_with_factory=AgentResourceConditions.by_agent_id_ends_with,
+            in_factory=AgentResourceConditions.by_agent_id_in,
         )
 
     @staticmethod
@@ -346,6 +349,7 @@ class ResourceSlotAdapter(BaseAdapter):
             equals_factory=ResourceAllocationConditions.by_slot_name_equals,
             starts_with_factory=ResourceAllocationConditions.by_slot_name_starts_with,
             ends_with_factory=ResourceAllocationConditions.by_slot_name_ends_with,
+            in_factory=ResourceAllocationConditions.by_slot_name_in,
         )
 
     def _convert_kernel_id_filter(self, uf: UUIDFilter) -> QueryCondition | None:

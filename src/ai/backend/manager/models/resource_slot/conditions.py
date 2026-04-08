@@ -7,6 +7,7 @@ import uuid
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     DeploymentRevisionResourceSlotRow,
@@ -71,6 +72,9 @@ class ResourceSlotTypeConditions:
             return condition
 
         return inner
+
+    by_slot_name_in = staticmethod(make_string_in_factory(ResourceSlotTypeRow.slot_name))
+    by_slot_type_in = staticmethod(make_string_in_factory(ResourceSlotTypeRow.slot_type))
 
     @staticmethod
     def by_slot_type_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -175,6 +179,8 @@ class ResourceSlotTypeConditions:
             return condition
 
         return inner
+
+    by_display_name_in = staticmethod(make_string_in_factory(ResourceSlotTypeRow.display_name))
 
     @staticmethod
     def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
@@ -309,6 +315,9 @@ class AgentResourceConditions:
 
         return inner
 
+    by_agent_id_in = staticmethod(make_string_in_factory(AgentResourceRow.agent_id))
+    by_slot_name_in = staticmethod(make_string_in_factory(AgentResourceRow.slot_name))
+
     @staticmethod
     def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -385,6 +394,8 @@ class ResourceAllocationConditions:
             return condition
 
         return inner
+
+    by_slot_name_in = staticmethod(make_string_in_factory(ResourceAllocationRow.slot_name))
 
     @staticmethod
     def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
@@ -483,6 +494,10 @@ class RevisionResourceSlotConditions:
 
         return inner
 
+    by_slot_name_in = staticmethod(
+        make_string_in_factory(DeploymentRevisionResourceSlotRow.slot_name)
+    )
+
     @staticmethod
     def by_cursor_forward(cursor_rank: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -559,6 +574,8 @@ class PresetResourceSlotConditions:
             return condition
 
         return inner
+
+    by_slot_name_in = staticmethod(make_string_in_factory(PresetResourceSlotRow.slot_name))
 
     @staticmethod
     def by_cursor_forward(cursor_rank: str) -> QueryCondition:

@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 from graphql_relay.utils import base64
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
 from ai.backend.manager.api.adapters.cursor import CURSOR_VERSION
 from ai.backend.manager.api.gql.base import (
@@ -158,23 +158,26 @@ class TestStringFilter:
     def make_factory(
         name: str,
     ) -> tuple[
-        list[tuple[str, StringMatchSpec]],
+        list[tuple[str, StringMatchSpec | StringInMatchSpec]],
         tuple[
             Callable[[StringMatchSpec], QueryCondition],
             Callable[[StringMatchSpec], QueryCondition],
             Callable[[StringMatchSpec], QueryCondition],
             Callable[[StringMatchSpec], QueryCondition],
+            Callable[[StringInMatchSpec], QueryCondition],
         ],
     ]:
         """Create mock factory functions that record their calls.
 
         Returns a tuple of (call_record, factories) where:
         - call_record: list to record (factory_name, spec) tuples
-        - factories: tuple of (contains, equals, starts_with, ends_with) factory functions
+        - factories: tuple of (contains, equals, starts_with, ends_with, in_) factory functions
         """
-        calls: list[tuple[str, StringMatchSpec]] = []
+        calls: list[tuple[str, StringMatchSpec | StringInMatchSpec]] = []
 
-        def make_query_condition(factory_name: str, spec: StringMatchSpec) -> QueryCondition:
+        def make_query_condition(
+            factory_name: str, spec: StringMatchSpec | StringInMatchSpec
+        ) -> QueryCondition:
             calls.append((factory_name, spec))
             return lambda: sa.literal(True)
 
@@ -182,18 +185,26 @@ class TestStringFilter:
         equals_factory = lambda spec: make_query_condition("equals", spec)
         starts_with_factory = lambda spec: make_query_condition("starts_with", spec)
         ends_with_factory = lambda spec: make_query_condition("ends_with", spec)
+        in_factory = lambda spec: make_query_condition("in", spec)
 
-        return calls, (contains_factory, equals_factory, starts_with_factory, ends_with_factory)
+        return calls, (
+            contains_factory,
+            equals_factory,
+            starts_with_factory,
+            ends_with_factory,
+            in_factory,
+        )
 
     def test_equals_filter(self) -> None:
         """Test that equals filter produces correct StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(equals="test-value")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -204,13 +215,14 @@ class TestStringFilter:
 
     def test_i_equals_filter(self) -> None:
         """Test that i_equals filter produces case-insensitive StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(i_equals="test-value")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -221,13 +233,14 @@ class TestStringFilter:
 
     def test_not_equals_filter(self) -> None:
         """Test that not_equals filter produces negated StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(not_equals="test-value")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -238,13 +251,14 @@ class TestStringFilter:
 
     def test_i_not_equals_filter(self) -> None:
         """Test that i_not_equals produces case-insensitive negated StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(i_not_equals="test-value")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -255,13 +269,14 @@ class TestStringFilter:
 
     def test_contains_filter(self) -> None:
         """Test that contains filter produces correct StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(contains="substring")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -272,13 +287,14 @@ class TestStringFilter:
 
     def test_i_contains_filter(self) -> None:
         """Test that i_contains filter produces case-insensitive StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(i_contains="substring")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -289,13 +305,14 @@ class TestStringFilter:
 
     def test_starts_with_filter(self) -> None:
         """Test that starts_with filter produces correct StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(starts_with="prefix")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -306,13 +323,14 @@ class TestStringFilter:
 
     def test_i_starts_with_filter(self) -> None:
         """Test that i_starts_with produces case-insensitive StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(i_starts_with="prefix")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -323,13 +341,14 @@ class TestStringFilter:
 
     def test_ends_with_filter(self) -> None:
         """Test that ends_with filter produces correct StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(ends_with="suffix")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -340,13 +359,14 @@ class TestStringFilter:
 
     def test_i_ends_with_filter(self) -> None:
         """Test that i_ends_with produces case-insensitive StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(i_ends_with="suffix")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -357,20 +377,21 @@ class TestStringFilter:
 
     def test_empty_filter_returns_none(self) -> None:
         """Test that an empty filter returns None."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO()
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is None
         assert len(calls) == 0
 
     def test_filter_priority_equals_first(self) -> None:
         """Test that equals has priority over contains when both set."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         # When multiple filters are set, equals should take priority
         filter_ = StringFilterDTO(equals="exact", contains="substring")
         result = filter_.build_query_condition(
@@ -378,6 +399,7 @@ class TestStringFilter:
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -386,13 +408,14 @@ class TestStringFilter:
 
     def test_filter_priority_contains_over_starts_with(self) -> None:
         """Test that contains has priority over starts_with when both set."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(contains="substring", starts_with="prefix")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -401,13 +424,14 @@ class TestStringFilter:
 
     def test_filter_priority_starts_with_over_ends_with(self) -> None:
         """Test that starts_with has priority over ends_with when both set."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(starts_with="prefix", ends_with="suffix")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -416,13 +440,14 @@ class TestStringFilter:
 
     def test_not_contains_filter(self) -> None:
         """Test that not_contains filter produces negated StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(not_contains="substring")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -433,13 +458,14 @@ class TestStringFilter:
 
     def test_i_not_contains_filter(self) -> None:
         """Test that i_not_contains produces case-insensitive negated StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(i_not_contains="substring")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -450,13 +476,14 @@ class TestStringFilter:
 
     def test_not_starts_with_filter(self) -> None:
         """Test that not_starts_with filter produces negated StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(not_starts_with="prefix")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -467,13 +494,14 @@ class TestStringFilter:
 
     def test_i_not_starts_with_filter(self) -> None:
         """Test that i_not_starts_with produces case-insensitive negated StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(i_not_starts_with="prefix")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -484,13 +512,14 @@ class TestStringFilter:
 
     def test_not_ends_with_filter(self) -> None:
         """Test that not_ends_with filter produces negated StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(not_ends_with="suffix")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1
@@ -501,13 +530,14 @@ class TestStringFilter:
 
     def test_i_not_ends_with_filter(self) -> None:
         """Test that i_not_ends_with produces case-insensitive negated StringMatchSpec."""
-        calls, (contains_f, equals_f, starts_with_f, ends_with_f) = self.make_factory("test")
+        calls, (contains_f, equals_f, starts_with_f, ends_with_f, in_f) = self.make_factory("test")
         filter_ = StringFilterDTO(i_not_ends_with="suffix")
         result = filter_.build_query_condition(
             contains_factory=contains_f,
             equals_factory=equals_f,
             starts_with_factory=starts_with_f,
             ends_with_factory=ends_with_f,
+            in_factory=in_f,
         )
         assert result is not None
         assert len(calls) == 1

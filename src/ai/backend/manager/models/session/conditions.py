@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.repositories.base import QueryCondition
 
@@ -99,6 +100,8 @@ class SessionConditions:
 
         return inner
 
+    by_name_in = staticmethod(make_string_in_factory(SessionRow.name))
+
     @staticmethod
     def by_access_key_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -151,6 +154,8 @@ class SessionConditions:
 
         return inner
 
+    by_access_key_in = staticmethod(make_string_in_factory(SessionRow.access_key))
+
     @staticmethod
     def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -202,6 +207,9 @@ class SessionConditions:
             return condition
 
         return inner
+
+    by_domain_name_in = staticmethod(make_string_in_factory(SessionRow.domain_name))
+    by_scaling_group_in = staticmethod(make_string_in_factory(SessionRow.scaling_group_name))
 
     @staticmethod
     def by_scaling_group_contains(spec: StringMatchSpec) -> QueryCondition:

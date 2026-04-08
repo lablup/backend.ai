@@ -150,6 +150,7 @@ class LoginSessionAdapter(BaseAdapter):
                 equals_factory=LoginSessionConditions.by_access_key_equals,
                 starts_with_factory=LoginSessionConditions.by_access_key_starts_with,
                 ends_with_factory=LoginSessionConditions.by_access_key_ends_with,
+                in_factory=LoginSessionConditions.by_access_key_in,
             )
             if condition is not None:
                 conditions.append(condition)
