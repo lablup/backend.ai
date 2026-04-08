@@ -582,7 +582,7 @@ class Context(metaclass=ABCMeta):
         manager_port = self.install_info.service_config.manager_addr.bind.port
         self.sed_in_place(
             toml_path,
-            re.compile(r'^internal-addr = .*$', flags=re.MULTILINE),
+            re.compile(r"^internal-addr = .*$", flags=re.MULTILINE),
             f'internal-addr = {{ host = "0.0.0.0", port = 18080 }}\n'
             f'announce-addr = {{ host = "{public_addr}", port = {manager_port} }}\n'
             f'announce-internal-addr = {{ host = "{public_addr}", port = 18080 }}',
@@ -646,7 +646,9 @@ class Context(metaclass=ABCMeta):
         public_addr = self.install_variable.public_facing_address
         self.sed_in_place(
             toml_path,
-            re.compile(r'^service-addr = \{ host = "0\.0\.0\.0", port = 6003 \}', flags=re.MULTILINE),
+            re.compile(
+                r'^service-addr = \{ host = "0\.0\.0\.0", port = 6003 \}', flags=re.MULTILINE
+            ),
             f'service-addr = {{ host = "0.0.0.0", port = 6003 }}\n'
             f'announce-addr = {{ host = "{public_addr}", port = 6003 }}',
         )

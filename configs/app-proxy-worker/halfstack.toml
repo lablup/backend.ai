@@ -36,6 +36,11 @@ drivers = ["console"]
 colored = true
 format = "verbose"
 
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "http://127.0.0.1:4317"
+
 [debug]
 enabled = true
 log-events = true
