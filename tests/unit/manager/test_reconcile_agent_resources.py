@@ -740,19 +740,19 @@ class TestOrphanedAllocationCleanup:
             row = (
                 await db_sess.execute(sa.select(ra.c.free_at).where(ra.c.kernel_id == kernel))
             ).one()
-            assert row.free_at is not None
-            assert abs((row.free_at - original_free_at).total_seconds()) < 2
+            assert row.free_at == original_free_at
 
-    async def test_orphan_cleanup_runs_before_drift_correction(
+    @pytest.fixture
+    async def orphan_with_drift(
         self,
         db: ExtendedAsyncSAEngine,
-        registry: AgentRegistry,
         infra: tuple[str, uuid.UUID, str],
-    ) -> None:
-        """Inconsistent: orphan + stale agent_resources.used → both fixed atomically."""
+    ) -> tuple[uuid.UUID, str]:
+        """RUNNING kernel(cpu=2) + CANCELLED orphan(cpu=4) + agent used=6 (stale).
+
+        Returns (orphan_kernel_id, agent_id).
+        """
         domain_name, project_id, agent_id = infra
-        ra = ResourceAllocationRow.__table__
-        ar = AgentResourceRow.__table__
         empty_slots = ResourceSlot({})
 
         # RUNNING kernel: legitimate cpu=2
@@ -848,6 +848,19 @@ class TestOrphanedAllocationCleanup:
                     used=Decimal("6"),
                 )
             )
+
+        return orphan_kid, agent_id
+
+    async def test_orphan_cleanup_runs_before_drift_correction(
+        self,
+        db: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        orphan_with_drift: tuple[uuid.UUID, str],
+    ) -> None:
+        """Inconsistent: orphan + stale agent_resources.used → both fixed atomically."""
+        orphan_kid, agent_id = orphan_with_drift
+        ra = ResourceAllocationRow.__table__
+        ar = AgentResourceRow.__table__
 
         await registry._reconcile_agent_resources()
 
