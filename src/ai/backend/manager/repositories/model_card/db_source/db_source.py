@@ -21,7 +21,11 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.group.types import ProjectType
-from ai.backend.manager.data.model_card.types import ModelCardData, VFolderScanData
+from ai.backend.manager.data.model_card.types import (
+    ModelCardData,
+    ResourceRequirementEntry,
+    VFolderScanData,
+)
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import (
     InvalidProjectTypeForModelCard,
@@ -52,7 +56,9 @@ from ai.backend.manager.repositories.model_card.types import (
     ModelCardSearchResult,
     ProjectModelCardSearchScope,
 )
+from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
+from ai.backend.manager.types import TriState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -79,9 +85,83 @@ class ModelCardDBSource:
     async def update(self, updater: Updater[ModelCardRow]) -> ModelCardData:
         async with self._db.begin_session() as session:
             result = await execute_updater(session, updater)
+            # execute_updater returns None either because the row is missing
+            # OR because build_values() produced an empty dict (e.g., the
+            # caller only wants to sync normalized child rows like
+            # model_card_resource_requirements, which are not plain columns
+            # on the model_cards table). Disambiguate by re-reading the row:
+            # if it exists, this was a child-only update and we continue on
+            # to the child sync step below.
             if result is None:
-                raise ModelCardNotFound(f"Model card with ID {updater.pk_value} not found.")
-            return result.row.to_data()
+                row = (
+                    await session.execute(
+                        sa.select(ModelCardRow).where(ModelCardRow.id == updater.pk_value)
+                    )
+                ).scalar_one_or_none()
+                if row is None:
+                    raise ModelCardNotFound(f"Model card with ID {updater.pk_value} not found.")
+            else:
+                row = result.row
+
+            # Sync the normalized model_card_resource_requirements table when
+            # the updater spec requests a change. Plain column UPDATE cannot
+            # touch this child table, so we delete-then-insert explicitly.
+            if isinstance(updater.spec, ModelCardUpdaterSpec):
+                await self._apply_min_resource_change(session, row.id, updater.spec.min_resource)
+                if updater.spec.min_resource.is_update() or updater.spec.min_resource.is_nullify():
+                    # Re-read so to_data() reflects the new child rows via
+                    # the resource_requirement_rows relationship.
+                    await session.refresh(row)
+
+            return row.to_data()
+
+    async def _apply_min_resource_change(
+        self,
+        session: SASession,
+        card_id: UUID,
+        min_resource: TriState[list[ResourceRequirementEntry]],
+    ) -> None:
+        """Replace normalized requirement rows for the card when requested.
+
+        NOP  → leave existing rows alone.
+        NULLIFY → delete every requirement for the card.
+        UPDATE → delete-then-insert with the provided list.
+        """
+        if min_resource.is_nop():
+            return
+
+        await session.execute(
+            sa.delete(ModelCardResourceRequirementRow).where(
+                ModelCardResourceRequirementRow.model_card_id == card_id
+            )
+        )
+
+        if min_resource.is_nullify():
+            return
+
+        entries = min_resource.value()
+        if not entries:
+            return
+
+        rows: list[dict[str, object]] = []
+        for entry in entries:
+            try:
+                quantity = Decimal(entry.min_quantity)
+            except (InvalidOperation, ValueError):
+                log.warning(
+                    "model card update: skipping invalid min_quantity {!r} for card {} slot {}",
+                    entry.min_quantity,
+                    card_id,
+                    entry.slot_name,
+                )
+                continue
+            rows.append({
+                "model_card_id": card_id,
+                "slot_name": entry.slot_name,
+                "min_quantity": quantity,
+            })
+        if rows:
+            await session.execute(sa.insert(ModelCardResourceRequirementRow).values(rows))
 
     async def delete(self, card_id: UUID) -> ModelCardData:
         async with self._db.begin_session() as session:

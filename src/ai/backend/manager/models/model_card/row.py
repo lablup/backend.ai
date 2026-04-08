@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -15,6 +16,28 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 
 __all__ = ("ModelCardRow",)
+
+
+def _format_min_quantity(value: Decimal | str) -> str:
+    """Format a Numeric column value as a canonical string.
+
+    The underlying ``model_card_resource_requirements.min_quantity`` column
+    is ``sa.Numeric(precision=24, scale=6)``, so freshly-read rows come
+    back as ``Decimal("2.000000")``. ``str()`` of that keeps the trailing
+    zeros, which then drifts from the string the caller supplied on create
+    (e.g. ``"2"``) and from the "2" stored in ``to_data()`` before the
+    session was flushed. Collapse integer-equivalent values to ``"2"`` and
+    strip trailing zeros from genuinely fractional values so that
+    ``to_data()`` is stable across create / refetch / update paths.
+
+    The ORM attribute is typed ``Decimal`` but before flush it may still
+    be the raw string the creator handed in (e.g. ``"2"``); normalize
+    into ``Decimal`` first so both pre- and post-flush paths converge.
+    """
+    decimal_value = value if isinstance(value, Decimal) else Decimal(value)
+    if decimal_value == decimal_value.to_integral_value():
+        return str(int(decimal_value))
+    return format(decimal_value.normalize(), "f")
 
 
 class ModelCardRow(Base):  # type: ignore[misc]
@@ -97,7 +120,10 @@ class ModelCardRow(Base):  # type: ignore[misc]
 
     def to_data(self) -> ModelCardData:
         min_resource = [
-            ResourceRequirementEntry(slot_name=r.slot_name, min_quantity=str(r.min_quantity))
+            ResourceRequirementEntry(
+                slot_name=r.slot_name,
+                min_quantity=_format_min_quantity(r.min_quantity),
+            )
             for r in self.resource_requirement_rows
         ]
         return ModelCardData(

@@ -197,10 +197,22 @@ class DeploymentExecutor:
                 )
 
         successes: list[DeploymentWithHistory] = []
+        skipped: list[DeploymentWithHistory] = []
         errors: list[DeploymentExecutionError] = []
 
         # Phase 2: Verify replicas (per-deployment)
         for deployment in deployments:
+            # A deployment without a current_revision is either a brand new
+            # endpoint that never completed its first rollout or one whose
+            # rollout was rolled back. In either case there is nothing to
+            # "scale" — there is no revision to create sessions against.
+            # Treat it as skipped so no lifecycle transition fires; leaving
+            # the handler to attempt scaling would permanently wedge the
+            # deployment in SCALING because scale_deployment() would then
+            # refuse to act on a None revision id.
+            if deployment.deployment_info.current_revision_id is None:
+                skipped.append(deployment)
+                continue
             try:
                 self._verify_deployment_replicas(deployment.deployment_info, route_map)
                 successes.append(deployment)
@@ -221,6 +233,7 @@ class DeploymentExecutor:
 
         return DeploymentExecutionResult(
             successes=successes,
+            skipped=skipped,
             failures=errors,
         )
 
@@ -320,16 +333,31 @@ class DeploymentExecutor:
         errors: list[DeploymentExecutionError] = []
         desired_replicas_map: dict[UUID, int] = {}
 
-        # Phase 2: Calculate replicas (per-deployment via asyncio.gather)
+        # Phase 2: Calculate replicas (per-deployment via asyncio.gather).
+        # Deployments without a current_revision must be skipped before any
+        # desired-replica calculation — otherwise the manual-scaling branch
+        # of _calculate_deployment_replicas returns replica_count as "desired"
+        # which flips the deployment into SCALING. Once in SCALING,
+        # scale_deployment() skips the same deployment because it also has
+        # no current_revision to provision sessions against, leaving it
+        # permanently wedged. Matching the behaviour of scale_deployment() so
+        # the two stay in lock-step.
+        deployments_to_calculate: list[DeploymentWithHistory] = []
+        for deployment in deployments:
+            if deployment.deployment_info.current_revision_id is None:
+                skipped.append(deployment)
+                continue
+            deployments_to_calculate.append(deployment)
+
         calculation_tasks = [
             self._calculate_deployment_replicas(
                 deployment.deployment_info, auto_scaling_rules, metrics_data
             )
-            for deployment in deployments
+            for deployment in deployments_to_calculate
         ]
         results = await asyncio.gather(*calculation_tasks, return_exceptions=True)
 
-        for deployment, result in zip(deployments, results, strict=True):
+        for deployment, result in zip(deployments_to_calculate, results, strict=True):
             dep_id = deployment.deployment_info.id
             if isinstance(result, BaseException):
                 log.warning(

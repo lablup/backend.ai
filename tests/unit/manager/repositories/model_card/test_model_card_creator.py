@@ -38,8 +38,11 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
+from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
+from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -331,3 +334,117 @@ class TestModelCardCreatorResourceRequirements:
         quantities = {r.slot_name: r.min_quantity for r in rows}
         assert quantities["cpu"] == Decimal("2")
         assert quantities["mem"] == Decimal("4096")
+
+    async def test_update_replaces_min_resource(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ModelCardDBSource,
+        creator_with_min_resource: RBACEntityCreator[ModelCardRow],
+    ) -> None:
+        """Regression: update() must sync model_card_resource_requirements.
+
+        Previously ModelCardUpdaterSpec.build_values ignored min_resource, so
+        a min_resource-only update produced an empty UPDATE payload and
+        db_source.update raised ModelCardNotFound. After the fix the child
+        rows must be rewritten and the returned ModelCardData must reflect
+        the new requirements.
+        """
+        # Seed the card with the original (cpu=2, mem=4096) requirements.
+        created = await db_source.create(creator_with_min_resource)
+
+        # Swap in a completely different requirement set via update().
+        # Reuse only slot_types seeded by the fixture (cpu, mem) so the
+        # FK into resource_slot_types holds.
+        spec = ModelCardUpdaterSpec(
+            min_resource=TriState.update([
+                ResourceRequirementEntry(slot_name="cpu", min_quantity="8"),
+                ResourceRequirementEntry(slot_name="mem", min_quantity="16384"),
+            ]),
+        )
+        updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
+        updated = await db_source.update(updater)
+
+        assert {(r.slot_name, r.min_quantity) for r in updated.min_resource} == {
+            ("cpu", "8"),
+            ("mem", "16384"),
+        }
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            rows = (
+                (
+                    await session.execute(
+                        sa.select(ModelCardResourceRequirementRow).where(
+                            ModelCardResourceRequirementRow.model_card_id == created.id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert {(r.slot_name, r.min_quantity) for r in rows} == {
+            ("cpu", Decimal("8")),
+            ("mem", Decimal("16384")),
+        }
+
+    async def test_update_nullify_clears_min_resource(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ModelCardDBSource,
+        creator_with_min_resource: RBACEntityCreator[ModelCardRow],
+    ) -> None:
+        """TriState.nullify() on min_resource must drop every child row."""
+        created = await db_source.create(creator_with_min_resource)
+
+        spec = ModelCardUpdaterSpec(min_resource=TriState.nullify())
+        updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
+        updated = await db_source.update(updater)
+
+        assert updated.min_resource == []
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            rows = (
+                (
+                    await session.execute(
+                        sa.select(ModelCardResourceRequirementRow).where(
+                            ModelCardResourceRequirementRow.model_card_id == created.id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert rows == []
+
+    async def test_update_nop_min_resource_preserves_existing(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ModelCardDBSource,
+        creator_with_min_resource: RBACEntityCreator[ModelCardRow],
+    ) -> None:
+        """Default NOP updater must leave child rows untouched and not 404.
+
+        Previously an all-NOP updater (no field changes) returned None from
+        execute_updater and db_source raised ModelCardNotFound. The fix must
+        re-read the row instead and pass through without touching the
+        normalized requirements.
+        """
+        created = await db_source.create(creator_with_min_resource)
+
+        spec = ModelCardUpdaterSpec()  # every field defaults to nop
+        updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
+        updated = await db_source.update(updater)
+
+        assert {(r.slot_name, r.min_quantity) for r in updated.min_resource} == {
+            ("cpu", "2"),
+            ("mem", "4096"),
+        }
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            count = (
+                await session.execute(
+                    sa.select(sa.func.count())
+                    .select_from(ModelCardResourceRequirementRow)
+                    .where(ModelCardResourceRequirementRow.model_card_id == created.id)
+                )
+            ).scalar_one()
+        assert count == 2

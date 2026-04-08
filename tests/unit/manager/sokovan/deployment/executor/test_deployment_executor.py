@@ -253,6 +253,39 @@ class TestCheckReadyDeployments:
         assert len(result.successes) == 0
         assert len(result.failures) == 0
 
+    async def test_current_revision_none_is_skipped(
+        self,
+        deployment_executor: DeploymentExecutor,
+        mock_deployment_repo: AsyncMock,
+        ready_deployment_no_current_revision: DeploymentWithHistory,
+    ) -> None:
+        """Regression: revisionless deployments must not trigger scaling.
+
+        Given: READY deployment with current_revision_id = None
+        When: check_ready_deployments_that_need_scaling runs
+        Then: the deployment is placed in ``skipped`` (no success → no
+              SCALING transition → no wedge). ``scale_deployment`` already
+              skips the same shape; the two must stay in lock-step.
+        """
+        # Routes count does not matter: the skip happens before the
+        # replica-count check.
+        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
+            ready_deployment_no_current_revision.deployment_info.id: []
+        }
+        entity_ids = [ready_deployment_no_current_revision.deployment_info.id]
+        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
+            result = await deployment_executor.check_ready_deployments_that_need_scaling([
+                ready_deployment_no_current_revision
+            ])
+
+        assert len(result.successes) == 0
+        assert len(result.failures) == 0
+        assert len(result.skipped) == 1
+        assert (
+            result.skipped[0].deployment_info.id
+            == ready_deployment_no_current_revision.deployment_info.id
+        )
+
 
 # =============================================================================
 # TestScaleDeployment (SC-001 ~ SC-004)
@@ -619,3 +652,44 @@ class TestCalculateDesiredReplicas:
             # Act / Assert - Should handle exception
             with pytest.raises(RuntimeError):
                 await deployment_executor.calculate_desired_replicas([ready_deployment])
+
+    async def test_current_revision_none_is_skipped_before_calculation(
+        self,
+        deployment_executor: DeploymentExecutor,
+        mock_deployment_repo: AsyncMock,
+        ready_deployment_no_current_revision: DeploymentWithHistory,
+    ) -> None:
+        """Regression: calculate_desired_replicas must not promote revisionless
+        deployments into SCALING.
+
+        Given: READY deployment with current_revision_id = None
+        When: calculate_desired_replicas runs
+        Then: the deployment is skipped (no desired-replicas write, no
+              SCALING transition). Without this guard the manual-scaling
+              branch would return replica_count as "desired" and the
+              coordinator would flip the deployment into SCALING — where
+              ``scale_deployment`` would then skip it forever because it
+              also refuses to act on a None revision id.
+        """
+        mock_deployment_repo.fetch_auto_scaling_rules_by_endpoint_ids.return_value = {}
+        mock_metrics = MagicMock()
+        mock_metrics.routes_by_endpoint = {
+            ready_deployment_no_current_revision.deployment_info.id: []
+        }
+        mock_deployment_repo.fetch_metrics_for_autoscaling.return_value = mock_metrics
+
+        entity_ids = [ready_deployment_no_current_revision.deployment_info.id]
+        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
+            result = await deployment_executor.calculate_desired_replicas([
+                ready_deployment_no_current_revision
+            ])
+
+        assert len(result.successes) == 0
+        assert len(result.skipped) == 1
+        assert (
+            result.skipped[0].deployment_info.id
+            == ready_deployment_no_current_revision.deployment_info.id
+        )
+        # Critical: no desired-replica write. That is what was previously
+        # flipping the deployment into SCALING and wedging it.
+        mock_deployment_repo.update_desired_replicas_bulk.assert_not_awaited()

@@ -138,6 +138,18 @@ class TriState[TVal]:
             raise ValueError("TriState value is not set when state is UPDATE")
         return self._value
 
+    def is_nop(self) -> bool:
+        """Return True when the attribute must be left unchanged."""
+        return self._state == _TriStateEnum.NOP
+
+    def is_nullify(self) -> bool:
+        """Return True when the attribute must be set to None / cleared."""
+        return self._state == _TriStateEnum.NULLIFY
+
+    def is_update(self) -> bool:
+        """Return True when the attribute must be replaced with a new value."""
+        return self._state == _TriStateEnum.UPDATE
+
     def optional_value(self) -> TVal | None:
         """
         Returns the value of the TriState object.

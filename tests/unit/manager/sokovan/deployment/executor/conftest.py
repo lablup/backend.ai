@@ -244,6 +244,24 @@ def destroying_deployment() -> DeploymentWithHistory:
 
 
 @pytest.fixture
+def ready_deployment_no_current_revision() -> DeploymentWithHistory:
+    """READY deployment whose current_revision was never set / was cleared.
+
+    Exercises the guard that keeps check_ready / calculate_desired_replicas
+    from transitioning a revisionless deployment into SCALING (where it
+    would then get wedged because scale_deployment() also skips it).
+    """
+    return DeploymentWithHistory(
+        deployment_info=_create_deployment_info(
+            lifecycle=EndpointLifecycle.READY,
+            desired_replica_count=2,
+            replica_count=2,
+            has_revision=False,
+        ),
+    )
+
+
+@pytest.fixture
 def destroying_deployments_multiple() -> list[DeploymentWithHistory]:
     """Multiple DESTROYING deployments."""
     return [
