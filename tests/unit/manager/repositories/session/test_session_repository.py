@@ -26,10 +26,12 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
@@ -40,6 +42,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, batch_populate_session_occupied_slots
+from ai.backend.manager.models.session_template import TemplateType, session_templates
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -709,3 +712,183 @@ class TestBatchPopulateSessionOccupiedSlots:
         assert slots is not None
         assert slots["cpu"] == Decimal("1.500000")
         assert slots["mem"] == Decimal("2147483648")
+
+
+class TestGetTemplateInfoById:
+    """Regression tests for get_template_info_by_id (BA-5623).
+
+    Verifies that the SQLAlchemy Row -> dict conversion works correctly.
+    The bug was: dict(row) raises TypeError; fix is dict(row._mapping).
+    """
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                AgentRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                GroupRow,
+                session_templates,
+                KeyPairRow,
+                SessionRow,
+                KernelRow,
+                ResourceSlotTypeRow,
+                ResourceAllocationRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> SessionRepository:
+        return SessionRepository(db_with_cleanup)
+
+    @pytest.fixture
+    async def active_template(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> tuple[uuid.UUID, str]:
+        """Insert an active session_template. Returns (template_id, name)."""
+        return await self._create_template(db_with_cleanup, is_active=True, name="test-template")
+
+    @pytest.fixture
+    async def inactive_template(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> tuple[uuid.UUID, str]:
+        """Insert an inactive session_template. Returns (template_id, name)."""
+        return await self._create_template(
+            db_with_cleanup, is_active=False, name="inactive-template"
+        )
+
+    async def _create_template(
+        self,
+        db: ExtendedAsyncSAEngine,
+        *,
+        is_active: bool,
+        name: str,
+    ) -> tuple[uuid.UUID, str]:
+        """Create prerequisite rows and insert a session_template.
+
+        Returns (template_id, name).
+        """
+        template_id = uuid.uuid4()
+        domain_name = f"test-domain-{template_id.hex[:8]}"
+        user_uuid = uuid.uuid4()
+        policy_name = f"policy-{template_id.hex[:8]}"
+
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="Test domain",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                    integration_id=None,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=10,
+                    max_customized_image_count=10,
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"user-{template_id.hex[:8]}",
+                    email=f"user-{template_id.hex[:8]}@example.com",
+                    password=PasswordInfo(
+                        password="test",
+                        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                        rounds=100_000,
+                        salt_size=32,
+                    ),
+                    need_password_change=False,
+                    full_name="Test User",
+                    description="",
+                    status=UserStatus.ACTIVE,
+                    status_info="active",
+                    domain_name=domain_name,
+                    role=UserRole.USER,
+                    resource_policy=policy_name,
+                )
+            )
+            await db_sess.flush()
+
+            await db_sess.execute(
+                sa.insert(session_templates).values(
+                    id=template_id,
+                    is_active=is_active,
+                    domain_name=domain_name,
+                    group_id=None,
+                    user_uuid=user_uuid,
+                    type=TemplateType.TASK,
+                    name=name,
+                    template={
+                        "api_version": "v1",
+                        "kind": "taskTemplate",
+                        "metadata": {"name": name},
+                        "spec": {
+                            "kernel": {
+                                "image": "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+                                "architecture": "x86_64",
+                            },
+                        },
+                    },
+                )
+            )
+            await db_sess.commit()
+
+        return template_id, name
+
+    async def test_returns_dict_with_correct_keys(
+        self,
+        repository: SessionRepository,
+        active_template: tuple[uuid.UUID, str],
+    ) -> None:
+        """BA-5623 regression: dict(row) must not raise TypeError."""
+        template_id, name = active_template
+        result = await repository.get_template_info_by_id(template_id)
+
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result["id"] == template_id
+        assert result["name"] == name
+        assert result["is_active"] is True
+        assert result["type"] == TemplateType.TASK
+        assert (
+            result["template"]["spec"]["kernel"]["image"]
+            == "cr.backend.ai/stable/python:3.9-ubuntu20.04"
+        )
+
+    async def test_returns_none_for_nonexistent_id(
+        self,
+        repository: SessionRepository,
+    ) -> None:
+        result = await repository.get_template_info_by_id(uuid.uuid4())
+        assert result is None
+
+    async def test_returns_none_for_inactive_template(
+        self,
+        repository: SessionRepository,
+        inactive_template: tuple[uuid.UUID, str],
+    ) -> None:
+        """Inactive templates should not be returned."""
+        template_id, _ = inactive_template
+        result = await repository.get_template_info_by_id(template_id)
+        assert result is None
