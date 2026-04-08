@@ -12,6 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.dto.manager.session.request import CreateFromParamsRequest
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.session.repository import SessionRepository
@@ -98,24 +100,28 @@ class TestDelegatedSessionCreation:
         ``AgentRegistry.create_session`` with a ``UserScope`` carrying the
         regular user's uuid — not the admin's.
         """
-        body = {
-            "session_name": "deleg-session-component",
-            "image": "python:latest",
-            "architecture": "x86_64",
-            "domain": domain_fixture,
-            "group": group_name_for_fixture,
-            "owner_access_key": regular_user_fixture.keypair.access_key,
-            "config": {},
+        request = CreateFromParamsRequest(
+            session_name="deleg-session-component",
+            image="python:latest",
+            architecture="x86_64",
+            session_type=SessionTypes.INTERACTIVE,
+            domain=domain_fixture,
+            group=group_name_for_fixture,
+            owner_access_key=regular_user_fixture.keypair.access_key,
             # ``reuse=False`` skips the existing-session lookup branch in
             # ``AgentRegistry.create_session`` so we exercise the new
             # session creation path.
-            "reuse": False,
-            "enqueue_only": True,
-        }
+            reuse=False,
+            enqueue_only=True,
+        )
 
         # Reuse the v2 client's signed transport for a v1 endpoint
         # (same pattern as ``tests/component/user/test_keypair_ops.py``).
-        await admin_registry._client._request("POST", "/session", json=body)
+        await admin_registry._client._request(
+            "POST",
+            "/session",
+            json=request.model_dump(mode="json", exclude_none=True),
+        )
 
         # Stubbed ``resolve_image`` having been called confirms we reached the
         # image lookup, i.e. ``query_userinfo`` + scope resolution succeeded
