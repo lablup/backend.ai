@@ -811,17 +811,16 @@ class ScheduleDBSource:
                 skipped_sessions=skipped_sessions,
             )
 
-    async def _free_pre_running_kernel_allocations(
+    async def _free_kernel_allocations(
         self,
         db_sess: SASession,
         kernel_ids: Sequence[UUID],
         now: datetime,
     ) -> None:
-        """Set ``free_at`` for the given kernels' active allocations.
-
-        Only safe for pre-RUNNING source statuses where ``used`` is NULL;
-        for RUNNING/TERMINATING use ``update_kernel_status_terminated``
-        which also decrements ``agent_resources.used``. Idempotent.
+        """Set ``free_at`` on the given kernels' active allocations. Only sets
+        ``free_at`` and does not adjust ``agent_resources.used`` -- callers
+        whose source statuses can include RUNNING/TERMINATING must use
+        ``update_kernel_status_terminated`` instead. Idempotent.
         """
         if not kernel_ids:
             return
@@ -878,7 +877,7 @@ class ScheduleDBSource:
                 .returning(KernelRow.id)
             )
             cancelled_kernel_ids = [row.id for row in kernel_update_result]
-            await self._free_pre_running_kernel_allocations(db_sess, cancelled_kernel_ids, now)
+            await self._free_kernel_allocations(db_sess, cancelled_kernel_ids, now)
 
         return cancelled_sessions
 
@@ -2651,7 +2650,7 @@ class ScheduleDBSource:
             cancelled_rows = result.all()
             cancelled_kernel_ids = [row.id for row in cancelled_rows]
 
-            await self._free_pre_running_kernel_allocations(db_sess, cancelled_kernel_ids, now)
+            await self._free_kernel_allocations(db_sess, cancelled_kernel_ids, now)
 
             return {row.session_id for row in cancelled_rows}
 
