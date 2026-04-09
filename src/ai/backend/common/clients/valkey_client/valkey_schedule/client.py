@@ -1158,7 +1158,6 @@ class ValkeyScheduleClient:
         if not members:
             return []
 
-        members = cast(set[bytes], members)
         return [SessionId(UUID(member.decode())) for member in members]
 
     @valkey_schedule_resilience.apply()
