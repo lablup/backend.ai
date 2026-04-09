@@ -1,7 +1,6 @@
 import uuid
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.types import KernelId
@@ -16,10 +15,6 @@ class GetContainerLogsAction(SessionAction):
     session_name: str
     owner_id: uuid.UUID
     kernel_id: KernelId | None
-    owner_id: UUID | None = None
-    """Delegated owner user UUID. When set, the service resolves it to the
-    target user's main access key and overrides ``owner_access_key``.
-    """
 
     @override
     @classmethod
