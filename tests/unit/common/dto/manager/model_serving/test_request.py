@@ -102,6 +102,32 @@ class TestServiceConfigModel:
         assert model.resources == {"cpu": 4, "mem": "32g"}
         assert model.resource_opts == {"shmem": "2g"}
 
+    def test_with_fractional_cuda_shares(self) -> None:
+        model = ServiceConfigModel(
+            model="test-model",
+            scaling_group="default",
+            resources={"cpu": 4, "mem": "32g", "cuda.shares": 2.5},
+        )
+        assert model.resources == {"cpu": 4, "mem": "32g", "cuda.shares": 2.5}
+
+    def test_float_rejected_for_non_cuda_shares_key(self) -> None:
+        with pytest.raises(
+            ValidationError, match=r"Float values are only allowed for 'cuda\.shares'"
+        ):
+            ServiceConfigModel(
+                model="test-model",
+                scaling_group="default",
+                resources={"cpu": 4.0, "mem": "32g"},
+            )
+
+    def test_negative_cuda_shares_rejected(self) -> None:
+        with pytest.raises(ValidationError, match=r"cuda\.shares must be a positive number"):
+            ServiceConfigModel(
+                model="test-model",
+                scaling_group="default",
+                resources={"cuda.shares": -1.0},
+            )
+
 
 class TestNewServiceRequestModel:
     def test_minimal_creation(self) -> None:

@@ -47,7 +47,7 @@ class ServiceConfigInput(BaseRequestModel):
     scaling_group: str = Field(
         description="Name of the resource group to spawn inference sessions",
     )
-    resources: dict[str, str | int] | None = Field(
+    resources: dict[str, str | int | float] | None = Field(
         default=None,
         description="Resource requirements for the inference session",
     )
@@ -55,6 +55,23 @@ class ServiceConfigInput(BaseRequestModel):
         default_factory=dict,
         description="Optional resource options",
     )
+
+    @field_validator("resources")
+    @classmethod
+    def validate_resource_values(
+        cls, v: dict[str, str | int | float] | None
+    ) -> dict[str, str | int | float] | None:
+        if v is None:
+            return v
+        for key, value in v.items():
+            if isinstance(value, float):
+                if key != "cuda.shares":
+                    raise ValueError(
+                        f"Float values are only allowed for 'cuda.shares', not '{key}'"
+                    )
+                if value <= 0:
+                    raise ValueError("cuda.shares must be a positive number")
+        return v
 
 
 class CreateServiceInput(BaseRequestModel):
