@@ -893,7 +893,6 @@ class SessionAdapter(BaseAdapter):
             session_name=str(session_id),
             owner_id=self._require_user_id(),
             service_name=input.service,
-            owner_id=input.owner_id,
         )
         await self._processors.session.shutdown_service.wait_for_complete(action)
 
