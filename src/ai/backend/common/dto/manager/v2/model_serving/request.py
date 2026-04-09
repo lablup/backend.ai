@@ -56,18 +56,6 @@ class ServiceConfigInput(BaseRequestModel):
         description="Optional resource options",
     )
 
-    @field_validator("resources")
-    @classmethod
-    def validate_resource_values(
-        cls, v: dict[str, str | int | NonNegativeFloat] | None
-    ) -> dict[str, str | int | NonNegativeFloat] | None:
-        if v is None:
-            return v
-        for key, value in v.items():
-            if isinstance(value, float) and key != "cuda.shares":
-                raise ValueError(f"Float values are only allowed for 'cuda.shares', not '{key}'")
-        return v
-
 
 class CreateServiceInput(BaseRequestModel):
     """Input for creating a model service."""

@@ -80,23 +80,12 @@ class TestServiceConfigInput:
         assert config.resources is not None
         assert config.resources["cpu"] == "2"
 
-    def test_with_fractional_cuda_shares(self) -> None:
+    def test_with_fractional_resource_values(self) -> None:
         config = _make_service_config(resources={"cpu": 4, "mem": "32g", "cuda.shares": 2.5})
         assert config.resources is not None
         assert config.resources["cuda.shares"] == 2.5
 
-    def test_float_rejected_for_non_cuda_shares_key(self) -> None:
-        with pytest.raises(
-            ValidationError, match=r"Float values are only allowed for 'cuda\.shares'"
-        ):
-            _make_service_config(resources={"cpu": 4.0, "mem": "32g"})
-
-    def test_zero_cuda_shares_accepted(self) -> None:
-        config = _make_service_config(resources={"cuda.shares": 0.0})
-        assert config.resources is not None
-        assert config.resources["cuda.shares"] == 0
-
-    def test_negative_cuda_shares_rejected(self) -> None:
+    def test_negative_float_resource_rejected(self) -> None:
         with pytest.raises(ValidationError, match=r"greater than or equal to 0"):
             _make_service_config(resources={"cuda.shares": -0.5})
 
