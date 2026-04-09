@@ -650,6 +650,10 @@ class EventDispatcher(EventDispatcherGroup):
                 return
             try:
                 msg = cast(BroadcastMessage, msg)
+                # Check the event name before full deserialization (ref: BA-5659)
+                event_name = msg.payload["name"]
+                if not self._subscribers[event_name]:
+                    continue
                 msg_payload = MessagePayload.from_broadcast(msg.payload)
                 await self.dispatch_subscribers(
                     msg_payload.name,
