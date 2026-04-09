@@ -616,6 +616,12 @@ class EventDispatcher(EventDispatcherGroup):
                 return
             try:
                 mq_msg = cast(MQMessage, msg)
+                # Check the event name before full deserialization to avoid
+                # deserializing messages that have no registered consumer.
+                event_name = mq_msg.payload[b"name"].decode("utf-8")
+                if not self._consumers[event_name]:
+                    await self._msg_queue.done(mq_msg.msg_id)
+                    continue
                 msg_payload = MessagePayload.from_anycast(mq_msg.payload)
                 post_callback = _ConsumerPostCallback(
                     mq_msg.msg_id,
