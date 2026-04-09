@@ -7,9 +7,9 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId
+from ai.backend.common.types import AccessKey, AgentId, KernelId, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus, SessionTypes
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.scheduler.types.session import (
     TerminatingKernelData,
     TerminatingSessionData,
@@ -56,7 +56,7 @@ def handler(
 def _make_terminating_session_data(session_id: SessionId) -> TerminatingSessionData:
     return TerminatingSessionData(
         session_id=session_id,
-        access_key="test-access-key",
+        access_key=AccessKey("test-access-key"),
         creation_id="test-creation-id",
         status=SessionStatus.TERMINATED,
         status_info="FORCE_TERMINATED",
