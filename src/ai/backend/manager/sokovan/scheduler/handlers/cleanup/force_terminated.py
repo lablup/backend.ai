@@ -6,8 +6,10 @@ import logging
 from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.handlers.cleanup.base import CleanupHandler
 
 if TYPE_CHECKING:
@@ -54,10 +56,14 @@ class CleanupForceTerminatedHandler(CleanupHandler):
             )
             return
 
+        terminating_session_ids = [s.session_id for s in terminating_sessions]
         try:
-            await self._terminator.terminate_sessions_for_handler(terminating_sessions)
+            with RecorderContext[SessionId].scope(
+                "cleanup_force_terminated", entity_ids=terminating_session_ids
+            ):
+                await self._terminator.terminate_sessions_for_handler(terminating_sessions)
         except Exception:
             log.exception(
                 "Error sending cleanup RPCs for force-terminated sessions: {}",
-                [s.session_id for s in terminating_sessions],
+                terminating_session_ids,
             )
