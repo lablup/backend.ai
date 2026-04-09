@@ -25,11 +25,9 @@ with history logged), and skipped (no change — waiting).
 
 from __future__ import annotations
 
-import asyncio
-import dataclasses
 import logging
-from collections.abc import Coroutine, Sequence
-from typing import Any, override
+from collections.abc import Sequence
+from typing import override
 from uuid import UUID
 
 from ai.backend.logging import BraceStyleAdapter
@@ -61,12 +59,6 @@ from ai.backend.manager.sokovan.deployment.types import (
 from .base import DeploymentHandler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-@dataclasses.dataclass(frozen=True)
-class _EndpointRegistrationBatch:
-    deployments: list[DeploymentWithHistory]
-    coroutines: list[Coroutine[Any, Any, str]]
 
 
 # ---------------------------------------------------------------------------
@@ -143,79 +135,35 @@ class DeployingProvisioningHandler(DeploymentHandler):
 
     async def _ensure_endpoints_registered(
         self, deployments: Sequence[DeploymentWithHistory]
-    ) -> None:
+    ) -> set[UUID]:
         """Register endpoints in appproxy for deployments that have no URL yet.
 
         Deployments that entered DEPLOYING via ActivateRevision skip
         check_pending (which normally registers them), so this method
         ensures they are registered before route provisioning begins.
+
+        Delegates to ``DeploymentExecutor.register_endpoints_bulk`` so the
+        register-and-persist flow stays atomic per deployment (and on
+        persistence failure the endpoint is unregistered from appproxy).
+
+        Returns the set of deployment IDs for which registration failed,
+        so the caller can skip route provisioning for them in the same
+        tick and let them retry on the next coordinator cycle.
         """
-        unregistered = [
-            d
-            for d in deployments
-            if not d.deployment_info.network.url and d.deployment_info.deploying_revision_id
-        ]
-        if not unregistered:
-            return
-
-        batch = await self._build_registration_batch(unregistered)
-        if not batch.coroutines:
-            return
-
-        url_updates = await self._execute_registration_batch(batch)
-        if url_updates:
-            await self._deployment_repo.update_endpoint_urls_bulk(url_updates)
-
-    async def _build_registration_batch(
-        self, deployments: Sequence[DeploymentWithHistory]
-    ) -> _EndpointRegistrationBatch:
-        """Build registration coroutines for deployments with valid proxy targets."""
-        scaling_groups = {d.deployment_info.metadata.resource_group for d in deployments}
-        scaling_group_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
-            scaling_groups
-        )
-
-        valid_deployments: list[DeploymentWithHistory] = []
-        coroutines: list[Coroutine[Any, Any, str]] = []
+        entries: list[tuple[DeploymentWithHistory, UUID]] = []
         for deployment in deployments:
             info = deployment.deployment_info
-            target = scaling_group_targets.get(info.metadata.resource_group)
-            if not target:
-                log.warning(
-                    "No proxy target for scaling group {}, skipping endpoint registration for {}",
-                    info.metadata.resource_group,
-                    info.id,
-                )
+            if info.network.url:
                 continue
             if info.deploying_revision_id is None:
-                # May have been cleared between handler start and registration.
                 continue
-            coroutines.append(
-                self._deployment_executor.register_endpoint(
-                    info, target, info.deploying_revision_id
-                )
-            )
-            valid_deployments.append(deployment)
-        return _EndpointRegistrationBatch(valid_deployments, coroutines)
+            entries.append((deployment, info.deploying_revision_id))
 
-    @staticmethod
-    async def _execute_registration_batch(
-        batch: _EndpointRegistrationBatch,
-    ) -> dict[UUID, str]:
-        """Execute registration batch and collect successful URL updates."""
-        results = await asyncio.gather(*batch.coroutines, return_exceptions=True)
+        if not entries:
+            return set()
 
-        url_updates: dict[UUID, str] = {}
-        for deployment, result in zip(batch.deployments, results, strict=True):
-            if isinstance(result, BaseException):
-                log.error(
-                    "Failed to register endpoint for deployment {}: {}",
-                    deployment.deployment_info.id,
-                    result,
-                )
-            else:
-                url_updates[deployment.deployment_info.id] = result
-        return url_updates
+        result = await self._deployment_executor.register_endpoints_bulk(entries)
+        return {error.deployment_info.deployment_info.id for error in result.failures}
 
     @override
     async def execute(
@@ -223,7 +171,13 @@ class DeployingProvisioningHandler(DeploymentHandler):
     ) -> DeploymentExecutionResult:
         # Register endpoints in appproxy for deployments that entered DEPLOYING
         # via ActivateRevision without passing through check_pending.
-        await self._ensure_endpoints_registered(deployments)
+        # Deployments whose registration failed are excluded from this tick's
+        # route provisioning and will be retried on the next coordinator cycle.
+        failed_registration_ids = await self._ensure_endpoints_registered(deployments)
+        if failed_registration_ids:
+            deployments = [
+                d for d in deployments if d.deployment_info.id not in failed_registration_ids
+            ]
 
         deployment_infos = [d.deployment_info for d in deployments]
         deployment_map = {d.deployment_info.id: d for d in deployments}

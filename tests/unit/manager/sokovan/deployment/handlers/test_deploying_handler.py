@@ -16,7 +16,6 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
@@ -31,7 +30,10 @@ from ai.backend.manager.sokovan.deployment.handlers.deploying import (
 )
 from ai.backend.manager.sokovan.deployment.strategy.applier import StrategyApplyResult
 from ai.backend.manager.sokovan.deployment.strategy.types import StrategyEvaluationSummary
-from ai.backend.manager.sokovan.deployment.types import DeploymentWithHistory
+from ai.backend.manager.sokovan.deployment.types import (
+    DeploymentExecutionResult,
+    DeploymentWithHistory,
+)
 
 
 class TestDeployingProvisioningHandler:
@@ -39,17 +41,16 @@ class TestDeployingProvisioningHandler:
 
     @pytest.fixture
     def mock_deployment_repo(self) -> AsyncMock:
-        repo = AsyncMock()
-        repo.fetch_scaling_group_proxy_targets = AsyncMock(return_value={})
-        repo.update_endpoint_urls_bulk = AsyncMock(return_value=None)
-        return repo
+        return AsyncMock()
 
     @pytest.fixture
     def mock_deployment_executor(self) -> AsyncMock:
         executor = AsyncMock()
-        mock_revision_spec = MagicMock()
-        mock_revision_spec.execution.runtime_variant = RuntimeVariant.CUSTOM
-        executor.register_endpoint = AsyncMock(return_value="http://endpoint.test/v1")
+        executor.register_endpoints_bulk = AsyncMock(
+            side_effect=lambda entries: DeploymentExecutionResult(
+                successes=[dep for dep, _ in entries],
+            )
+        )
         return executor
 
     @pytest.fixture
@@ -134,21 +135,22 @@ class TestDeployingProvisioningHandler:
     async def test_registers_endpoint_for_deployment_created_without_revision(
         self,
         handler: DeployingProvisioningHandler,
-        mock_deployment_repo: AsyncMock,
         mock_deployment_executor: AsyncMock,
         deployment_created_without_revision: DeploymentWithHistory,
-        proxy_target: ScalingGroupProxyTarget,
     ) -> None:
         """BA-5557: execute() registers appproxy endpoint for a deployment that
-        was created without a revision and later ActivateRevision'd into DEPLOYING."""
-        mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = {
-            "default": proxy_target,
-        }
+        was created without a revision and later ActivateRevision'd into DEPLOYING.
 
+        The handler delegates to DeploymentExecutor.register_endpoints_bulk,
+        which owns the atomic register-and-persist flow (including compensating
+        unregister on persistence failure).
+        """
         await handler.execute([deployment_created_without_revision])
 
+        mock_deployment_executor.register_endpoints_bulk.assert_awaited_once()
+        (call_args,) = mock_deployment_executor.register_endpoints_bulk.await_args.args
+        assert len(call_args) == 1
+        dep, revision_id = call_args[0]
         info = deployment_created_without_revision.deployment_info
-        mock_deployment_executor.register_endpoint.assert_awaited_once_with(
-            info, proxy_target, info.deploying_revision_id
-        )
-        mock_deployment_repo.update_endpoint_urls_bulk.assert_awaited_once()
+        assert dep is deployment_created_without_revision
+        assert revision_id == info.deploying_revision_id
