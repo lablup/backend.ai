@@ -103,10 +103,10 @@ class ServiceConfigModel(BaseRequestModel):
         examples=["nvidia-H100"],
         alias="scalingGroup",
     )
-    resources: dict[str, str | int] | None = Field(
+    resources: dict[str, str | int | float] | None = Field(
         default=None, examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}]
     )
-    resource_opts: dict[str, str | int | bool] | None = Field(
+    resource_opts: dict[str, str | int | float | bool] | None = Field(
         examples=[{"shmem": "2g"}], default=None
     )
 
