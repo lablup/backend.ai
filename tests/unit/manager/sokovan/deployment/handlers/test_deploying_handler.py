@@ -205,16 +205,14 @@ class TestDeployingProvisioningHandler:
         be retried on the next coordinator cycle."""
         dep_id = deployment_created_without_revision.deployment_info.id
         mock_deployment_executor.register_endpoints_bulk.side_effect = None
-        mock_deployment_executor.register_endpoints_bulk.return_value = (
-            DeploymentExecutionResult(
-                failures=[
-                    DeploymentExecutionError(
-                        deployment_info=deployment_created_without_revision,
-                        reason="boom",
-                        error_detail="Failed to register endpoint",
-                    )
-                ],
-            )
+        mock_deployment_executor.register_endpoints_bulk.return_value = DeploymentExecutionResult(
+            failures=[
+                DeploymentExecutionError(
+                    deployment_info=deployment_created_without_revision,
+                    reason="boom",
+                    error_detail="Failed to register endpoint",
+                )
+            ],
         )
 
         await handler.execute([deployment_created_without_revision])
