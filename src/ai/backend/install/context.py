@@ -26,6 +26,7 @@ import aiotools
 import asyncpg
 import tomlkit
 from dateutil.tz import tzutc
+from etcd_client import GRPCStatusError
 from rich.text import Text
 from textual.app import App
 from textual.containers import Vertical
@@ -254,9 +255,22 @@ class Context(metaclass=ABCMeta):
         ) as etcd:
             yield etcd
 
-    async def etcd_put_json(self, key: str, value: Any) -> None:
-        async with self.etcd_ctx() as etcd:
-            await etcd.put_prefix(key, value, scope=ConfigScopes.GLOBAL)
+    async def etcd_put_json(
+        self, key: str, value: Any, *, max_retries: int = 30, retry_interval: float = 2.0
+    ) -> None:
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with self.etcd_ctx() as etcd:
+                    await etcd.put_prefix(key, value, scope=ConfigScopes.GLOBAL)
+                return
+            except (GRPCStatusError, ConnectionError, OSError) as e:
+                if attempt == max_retries:
+                    raise
+                self.log.write(
+                    f"etcd connection failed ({type(e).__name__}: {e}), "
+                    f"retrying ({attempt}/{max_retries})..."
+                )
+                await asyncio.sleep(retry_interval)
 
     async def etcd_get_json(self, key: str) -> Any:
         async with self.etcd_ctx() as etcd:
