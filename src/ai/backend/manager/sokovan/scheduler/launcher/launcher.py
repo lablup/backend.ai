@@ -262,7 +262,7 @@ class SessionLauncher:
             }
             environ: dict[str, str] = {
                 **session.environ,
-                "BACKENDAI_USER_UUID": str(session.user_uuid),
+                "BACKENDAI_USER_UUID": str(session.owner_id),
                 "BACKENDAI_USER_EMAIL": session.user_email,
                 "BACKENDAI_USER_NAME": session.user_name,
                 "BACKENDAI_SESSION_ID": str(session.session_id),
@@ -335,7 +335,7 @@ class SessionLauncher:
                         "image": kernel_image_config,
                         "kernel_id": kernel_id_str,
                         "session_id": str(session.session_id),
-                        "owner_user_id": str(session.user_uuid),
+                        "owner_user_id": str(session.owner_id),
                         "owner_project_id": None,  # TODO: Implement project-owned sessions
                         "network_id": str(session.session_id),
                         "session_type": session.session_type,

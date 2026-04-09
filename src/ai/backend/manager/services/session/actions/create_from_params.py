@@ -30,7 +30,7 @@ class CreateFromParamsActionParams:
     tag: str
     priority: int
     is_preemptible: bool
-    owner_access_key: AccessKey
+    owner_id: uuid.UUID
     enqueue_only: bool
     max_wait_seconds: int
     starts_at: str | None

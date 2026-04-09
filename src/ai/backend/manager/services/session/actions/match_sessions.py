@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -20,7 +19,7 @@ class MatchSessionsAction(SessionScopeAction):
     """
 
     id_or_name_prefix: str
-    owner_access_key: AccessKey
+    owner_id: uuid.UUID
     user_id: uuid.UUID
 
     @override

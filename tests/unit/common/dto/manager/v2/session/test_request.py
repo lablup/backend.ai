@@ -107,21 +107,8 @@ class TestSearchSessionsInput:
 class TestRestartSessionInput:
     """Tests for RestartSessionInput model."""
 
-    def test_default_owner_id_is_none(self) -> None:
-        inp = RestartSessionInput()
-        assert inp.owner_id is None
-
-    def test_with_owner_id(self) -> None:
-        owner = uuid.uuid4()
-        inp = RestartSessionInput(owner_id=owner)
-        assert inp.owner_id == owner
-
-    def test_round_trip(self) -> None:
-        owner = uuid.uuid4()
-        inp = RestartSessionInput(owner_id=owner)
-        json_str = inp.model_dump_json()
-        restored = RestartSessionInput.model_validate_json(json_str)
-        assert restored.owner_id == owner
+    def test_instantiable(self) -> None:
+        RestartSessionInput()
 
 
 class TestDestroySessionInput:
@@ -131,7 +118,6 @@ class TestDestroySessionInput:
         inp = DestroySessionInput()
         assert inp.forced is False
         assert inp.recursive is False
-        assert inp.owner_id is None
 
     def test_forced_true(self) -> None:
         inp = DestroySessionInput(forced=True)
@@ -143,19 +129,12 @@ class TestDestroySessionInput:
         assert inp.forced is True
         assert inp.recursive is True
 
-    def test_with_owner_id(self) -> None:
-        owner = uuid.uuid4()
-        inp = DestroySessionInput(owner_id=owner)
-        assert inp.owner_id == owner
-
     def test_round_trip(self) -> None:
-        owner = uuid.uuid4()
-        inp = DestroySessionInput(forced=True, recursive=True, owner_id=owner)
+        inp = DestroySessionInput(forced=True, recursive=True)
         json_str = inp.model_dump_json()
         restored = DestroySessionInput.model_validate_json(json_str)
         assert restored.forced is True
         assert restored.recursive is True
-        assert restored.owner_id == owner
 
 
 class TestCommitSessionInput:
@@ -335,7 +314,6 @@ class TestGetContainerLogsInput:
 
     def test_all_none_defaults(self) -> None:
         inp = GetContainerLogsInput()
-        assert inp.owner_id is None
         assert inp.kernel_id is None
 
     def test_with_kernel_id(self) -> None:

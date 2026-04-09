@@ -17,7 +17,7 @@ from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.types import AccessKey, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import (
@@ -665,13 +665,10 @@ class UserDBSource:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_main_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
         async with self._db.begin_session() as session:
-            await EndpointRow.delegate_endpoint_ownership(
-                session, user_uuid, target_user_uuid, target_main_access_key
-            )
+            await EndpointRow.delegate_endpoint_ownership(session, user_uuid, target_user_uuid)
 
     async def delete_endpoints(
         self,
@@ -706,7 +703,7 @@ class UserDBSource:
                 .order_by(sa.asc(kernels.c.created_at))
             )
             if user_uuid is not None:
-                query = query.where(kernels.c.user_uuid == user_uuid)
+                query = query.where(kernels.c.owner_id == user_uuid)
             result = await conn.execute(query)
             return result.fetchall()
 

@@ -288,7 +288,7 @@ class SessionService:
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         filename = action.filename
 
         myself = asyncio.current_task()
@@ -297,7 +297,7 @@ class SessionService:
 
         session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
@@ -314,13 +314,13 @@ class SessionService:
 
     async def complete(self, action: CompleteAction) -> CompleteActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         code = action.code
         options = action.options or {}
 
         session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         try:
@@ -337,7 +337,7 @@ class SessionService:
         self, action: ConvertSessionToImageAction
     ) -> ConvertSessionToImageActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         image_name = action.image_name
         image_visibility = action.image_visibility
         image_owner_id = action.image_owner_id
@@ -368,7 +368,7 @@ class SessionService:
 
         session = await self._session_repository.get_session_with_group(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
@@ -423,7 +423,7 @@ class SessionService:
         sudo_session_enabled = action.sudo_session_enabled
         keypair_resource_policy = action.keypair_resource_policy
         requester_access_key = action.requester_access_key
-        owner_access_key = action.owner_access_key
+        owner_access_key = await self._resolve_owner_main_access_key(action.owner_id)
         domain_name = action.domain_name
         group_name = action.group_name
         scaling_group_name = action.scaling_group_name
@@ -492,7 +492,7 @@ class SessionService:
         keypair_resource_policy = action.keypair_resource_policy
         requester_access_key = action.requester_access_key
 
-        owner_access_key = action.params.owner_access_key
+        owner_access_key = await self._resolve_owner_main_access_key(action.params.owner_id)
         domain_name = action.params.domain_name
         group_name = action.params.group_name
         config = action.params.config
@@ -544,7 +544,7 @@ class SessionService:
                     user_uuid=user_info.owner_uuid,
                     user_role=user_info.owner_role.value,
                 ),
-                owner_access_key,
+                owner_access_key if owner_access_key is not None else requester_access_key,
                 user_info.resource_policy,
                 session_type,
                 config,
@@ -697,7 +697,10 @@ class SessionService:
             bootstrap += cmd_builder
             params["bootstrap_script"] = base64.b64encode(bootstrap.encode()).decode()
 
-        owner_access_key = params["owner_access_key"]
+        owner_id_param = params["owner_id"]
+        owner_access_key: AccessKey | None = None
+        if owner_id_param is not None and owner_id_param is not undefined:
+            owner_access_key = await self._resolve_owner_main_access_key(owner_id_param)
         config = params["config"]
         cluster_size = params["cluster_size"]
         cluster_mode = params["cluster_mode"]
@@ -727,7 +730,7 @@ class SessionService:
             keypair_resource_policy,
             domain_name,
             params["group_name"],
-            query_on_behalf_of=(None if owner_access_key is undefined else owner_access_key),
+            query_on_behalf_of=owner_access_key,
         )
 
         try:
@@ -748,7 +751,7 @@ class SessionService:
                     user_uuid=user_info.owner_uuid,
                     user_role=user_info.owner_role.value,
                 ),
-                owner_access_key,
+                owner_access_key if owner_access_key is not None else requester_access_key,
                 user_info.resource_policy,
                 session_type,
                 config,
@@ -780,19 +783,15 @@ class SessionService:
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
         session_name = action.session_name
-        if action.owner_id is not None:
-            owner_access_key = await self._resolve_owner_main_access_key(action.owner_id)
-        else:
-            owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         forced = action.forced
         recursive = action.recursive
 
         # Get session IDs to terminate (based on recursive flag)
         session_ids = await self._session_repository.get_target_session_ids(
             session_name,
-            owner_access_key,
+            owner_id,
             recursive=recursive,
-            owner_user_uuid=action.owner_id,
         )
 
         # Determine termination reason based on forced flag
@@ -868,13 +867,14 @@ class SessionService:
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
+        owner_access_key = await self._resolve_owner_main_access_key(owner_id)
         user_id = action.user_id
         file = action.file
         try:
             session = await self._session_repository.get_session_validated(
                 session_name,
-                owner_access_key,
+                owner_id,
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
             await self._agent_registry.increment_session_usage(session)
@@ -894,12 +894,12 @@ class SessionService:
 
     async def download_files(self, action: DownloadFilesAction) -> DownloadFilesActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         user_id = action.user_id
         files = action.files
         session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         try:
@@ -937,13 +937,13 @@ class SessionService:
 
     async def execute_session(self, action: ExecuteSessionAction) -> ExecuteSessionActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         api_version = action.api_version
 
         resp = {}
         session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         try:
@@ -1020,10 +1020,10 @@ class SessionService:
         self, action: GetAbusingReportAction
     ) -> GetAbusingReportActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         kernel = session.main_kernel
@@ -1034,11 +1034,11 @@ class SessionService:
 
     async def get_commit_status(self, action: GetCommitStatusAction) -> GetCommitStatusActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
 
         session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         statuses = await self._agent_registry.get_commit_status([session.main_kernel.id])
@@ -1055,22 +1055,18 @@ class SessionService:
     ) -> GetContainerLogsActionResult:
         resp = {"result": {"logs": ""}}
         session_name = action.session_name
-        if action.owner_id is not None:
-            owner_access_key = await self._resolve_owner_main_access_key(action.owner_id)
-        else:
-            owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         kernel_id = action.kernel_id
 
         compute_session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             allow_stale=True,
             kernel_loading_strategy=(
                 KernelLoadingStrategy.MAIN_KERNEL_ONLY
                 if kernel_id is None
                 else KernelLoadingStrategy.ALL_KERNELS
             ),
-            owner_user_uuid=action.owner_id,
         )
 
         if compute_session.status in DEAD_SESSION_STATUSES:
@@ -1105,10 +1101,10 @@ class SessionService:
         self, action: GetDependencyGraphAction
     ) -> GetDependencyGraphActionResult:
         root_session_name = action.root_session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
 
         dependency_graph = await self._session_repository.find_dependency_sessions(
-            root_session_name, owner_access_key
+            root_session_name, owner_id
         )
 
         session_id = (
@@ -1131,11 +1127,11 @@ class SessionService:
         self, action: GetDirectAccessInfoAction
     ) -> GetDirectAccessInfoActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
 
         sess = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         resp = {}
@@ -1168,11 +1164,11 @@ class SessionService:
 
     async def get_session_info(self, action: GetSessionInfoAction) -> GetSessionInfoActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
 
         sess = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         await self._agent_registry.increment_session_usage(sess)
@@ -1182,7 +1178,7 @@ class SessionService:
         session_info = LegacySessionInfo(
             domain_name=sess.domain_name,
             group_id=sess.group_id,
-            user_id=sess.user_uuid,
+            user_id=sess.owner_id,
             lang=sess.main_kernel.image or "",  # legacy
             image=sess.main_kernel.image or "",
             architecture=sess.main_kernel.architecture or "",
@@ -1218,11 +1214,11 @@ class SessionService:
         self, action: GetStatusHistoryAction
     ) -> GetStatusHistoryActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
 
         session_row = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.NONE,
         )
         result = session_row.status_history or {}
@@ -1231,11 +1227,11 @@ class SessionService:
 
     async def interrupt(self, action: InterruptSessionAction) -> InterruptSessionActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
 
         session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         await self._agent_registry.increment_session_usage(session)
@@ -1245,13 +1241,13 @@ class SessionService:
 
     async def list_files(self, action: ListFilesAction) -> ListFilesActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         user_id = action.user_id
         path = action.path
 
         session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
@@ -1274,12 +1270,12 @@ class SessionService:
 
     async def match_sessions(self, action: MatchSessionsAction) -> MatchSessionsActionResult:
         id_or_name_prefix = action.id_or_name_prefix
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
 
         matches: list[dict[str, Any]] = []
         sessions = await self._session_repository.match_sessions(
             id_or_name_prefix,
-            owner_access_key,
+            owner_id,
         )
         if sessions:
             matches.extend(
@@ -1294,12 +1290,12 @@ class SessionService:
 
     async def rename_session(self, action: RenameSessionAction) -> RenameSessionActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         new_name = action.new_name
 
         try:
             compute_session = await self._session_repository.update_session_name(
-                session_name, new_name, owner_access_key
+                session_name, new_name, owner_id
             )
             if compute_session.status != SessionStatus.RUNNING:
                 raise InvalidAPIParameters("Can't change name of not running session")
@@ -1312,16 +1308,12 @@ class SessionService:
 
     async def restart_session(self, action: RestartSessionAction) -> RestartSessionActionResult:
         session_name = action.session_name
-        if action.owner_id is not None:
-            owner_access_key = await self._resolve_owner_main_access_key(action.owner_id)
-        else:
-            owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
 
         session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-            owner_user_uuid=action.owner_id,
         )
         await self._agent_registry.increment_session_usage(session)
         await self._agent_registry.restart_session(session)
@@ -1329,12 +1321,12 @@ class SessionService:
 
     async def shutdown_service(self, action: ShutdownServiceAction) -> ShutdownServiceActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         service_name = action.service_name
 
         session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         await self._agent_registry.shutdown_service(session, service_name)
@@ -1350,11 +1342,12 @@ class SessionService:
         envs = action.envs
         login_session_token = action.login_session_token
 
+        keypair = await self._user_repository.admin_get_keypair(access_key)
         session = await asyncio.shield(
             self._database_ptask_group.create_task(
                 self._session_repository.get_session_with_routing_minimal(
                     session_name,
-                    access_key,
+                    keypair.user_id,
                 )
             )
         )
@@ -1428,15 +1421,16 @@ class SessionService:
                 "Failed to launch the app service", extra_data=result["error"]
             )
 
+        resolved_access_key = await self._resolve_owner_main_access_key(session.owner_id)
         body = {
             "login_session_token": login_session_token,
             "kernel_host": kernel_host,
             "kernel_port": host_port,
             "session": {
                 "id": str(session.id),
-                "user_uuid": str(session.user_uuid),
+                "user_uuid": str(session.owner_id),
                 "group_id": str(session.group_id),
-                "access_key": session.access_key,
+                "access_key": resolved_access_key,
                 "domain_name": session.domain_name,
             },
         }
@@ -1459,12 +1453,12 @@ class SessionService:
 
     async def upload_files(self, action: UploadFilesAction) -> UploadFilesActionResult:
         session_name = action.session_name
-        owner_access_key = action.owner_access_key
+        owner_id = action.owner_id
         reader = action.reader
 
         session = await self._session_repository.get_session_validated(
             session_name,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
@@ -1527,7 +1521,7 @@ class SessionService:
 
         # Regular users can only transit their own sessions
         if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
-            if session_row.user_uuid != user_id:
+            if session_row.owner_id != user_id:
                 log.warning(
                     f"You are not allowed to transit other user's session status, skip (s:{session_id})"
                 )
@@ -1565,7 +1559,7 @@ class SessionService:
                     session_row = await self._session_repository.get_session_to_determine_status(
                         sid
                     )
-                    if session_row.user_uuid == user_id:
+                    if session_row.owner_id == user_id:
                         accessible_session_ids.append(sid)
                     else:
                         log.warning(

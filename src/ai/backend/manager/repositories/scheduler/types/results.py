@@ -13,5 +13,6 @@ class ScheduledSessionData:
 
     session_id: SessionId
     creation_id: str
+    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
     access_key: AccessKey
     reason: str

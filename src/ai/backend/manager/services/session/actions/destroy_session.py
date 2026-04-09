@@ -1,8 +1,7 @@
+import uuid
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import UUID
 
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
@@ -16,11 +15,7 @@ class DestroySessionAction(SessionAction):
     session_name: str
     forced: bool
     recursive: bool
-    owner_access_key: AccessKey
-    owner_id: UUID | None = None
-    """Delegated owner user UUID. When set, the service resolves it to the
-    target user's main access key and overrides ``owner_access_key``.
-    """
+    owner_id: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:

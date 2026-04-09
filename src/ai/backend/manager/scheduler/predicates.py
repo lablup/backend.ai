@@ -29,6 +29,12 @@ from .types import PredicateResult, SchedulingContext
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 
+async def _resolve_main_access_key(db_sess: SASession, sess_ctx: SessionRow) -> str | None:
+    """Resolve the owner's main access key via UserRow join (post owner_id refactor)."""
+    stmt = sa.select(UserRow.main_access_key).where(UserRow.uuid == sess_ctx.owner_id)
+    return await db_sess.scalar(stmt)
+
+
 async def check_reserved_batch_session(
     db_sess: SASession,
     _sched_ctx: SchedulingContext,
@@ -53,9 +59,11 @@ async def check_concurrency(
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
+    main_ak = await _resolve_main_access_key(db_sess, sess_ctx)
+
     async def _get_max_concurrent_sessions() -> int:
         resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(
-            KeyPairRow.access_key == sess_ctx.access_key
+            KeyPairRow.access_key == main_ak
         )
         if sess_ctx.is_private:
             concurrent_session_column = KeyPairResourcePolicyRow.max_concurrent_sftp_sessions
@@ -69,9 +77,9 @@ async def check_concurrency(
 
     max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions) or 0
     if sess_ctx.is_private:
-        redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
+        redis_key = f"keypair.sftp_concurrency_used.{main_ak}"
     else:
-        redis_key = f"keypair.concurrency_used.{sess_ctx.access_key}"
+        redis_key = f"keypair.concurrency_used.{main_ak}"
     ok, concurrency_used = await sched_ctx.registry.valkey_stat.check_keypair_concurrency(
         redis_key,
         max_concurrent_sessions,
@@ -83,7 +91,7 @@ async def check_concurrency(
         )
     log.debug(
         "number of concurrent sessions of ak:{0} = {1} / {2}",
-        sess_ctx.access_key,
+        main_ak,
         concurrency_used,
         max_concurrent_sessions,
     )
@@ -135,9 +143,8 @@ async def check_keypair_resource_limit(
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
-    resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(
-        KeyPairRow.access_key == sess_ctx.access_key
-    )
+    main_ak = await _resolve_main_access_key(db_sess, sess_ctx)
+    resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(KeyPairRow.access_key == main_ak)
     select_query = sa.select(KeyPairResourcePolicyRow).where(
         KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
     )
@@ -146,7 +153,7 @@ async def check_keypair_resource_limit(
     if resource_policy is None:
         return PredicateResult(
             False,
-            f"Resource policy not found for keypair (ak: {sess_ctx.access_key})",
+            f"Resource policy not found for keypair (ak: {main_ak})",
         )
     resource_policy_map = {
         "total_resource_slots": resource_policy.total_resource_slots,
@@ -156,13 +163,13 @@ async def check_keypair_resource_limit(
         resource_policy_map, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
 
-    if sess_ctx.access_key is None:
+    if main_ak is None:
         return PredicateResult(False, "Session has no access key")
     key_occupied = await sched_ctx.registry.get_keypair_occupancy(
-        AccessKey(sess_ctx.access_key), db_sess=db_sess
+        AccessKey(main_ak), db_sess=db_sess
     )
-    log.debug("keypair:{} current-occupancy: {}", sess_ctx.access_key, key_occupied)
-    log.debug("keypair:{} total-allowed: {}", sess_ctx.access_key, total_keypair_allowed)
+    log.debug("keypair:{} current-occupancy: {}", main_ak, key_occupied)
+    log.debug("keypair:{} total-allowed: {}", main_ak, total_keypair_allowed)
     if not (key_occupied + sess_ctx.requested_slots <= total_keypair_allowed):
         return PredicateResult(
             False,
@@ -185,7 +192,7 @@ async def check_user_resource_limit(
 ) -> PredicateResult:
     main_ak = (
         sa.select(UserRow.main_access_key)
-        .where(UserRow.uuid == sess_ctx.user_uuid)
+        .where(UserRow.uuid == sess_ctx.owner_id)
         .scalar_subquery()
     )
     resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(KeyPairRow.access_key == main_ak)
@@ -196,7 +203,7 @@ async def check_user_resource_limit(
     if resource_policy is None:
         return PredicateResult(
             False,
-            f"User has no main-keypair or the main-keypair has no keypair resource policy (uid: {sess_ctx.user_uuid})",
+            f"User has no main-keypair or the main-keypair has no keypair resource policy (uid: {sess_ctx.owner_id})",
         )
 
     resource_policy_map = {
@@ -206,9 +213,9 @@ async def check_user_resource_limit(
     total_main_keypair_allowed = ResourceSlot.from_policy(
         resource_policy_map, cast(Mapping[str, Any], sched_ctx.known_slot_types)
     )
-    user_occupied = await sched_ctx.registry.get_user_occupancy(sess_ctx.user_uuid, db_sess=db_sess)
-    log.debug("user:{} current-occupancy: {}", sess_ctx.user_uuid, user_occupied)
-    log.debug("user:{} total-allowed: {}", sess_ctx.user_uuid, total_main_keypair_allowed)
+    user_occupied = await sched_ctx.registry.get_user_occupancy(sess_ctx.owner_id, db_sess=db_sess)
+    log.debug("user:{} current-occupancy: {}", sess_ctx.owner_id, user_occupied)
+    log.debug("user:{} total-allowed: {}", sess_ctx.owner_id, total_main_keypair_allowed)
     if not (user_occupied + sess_ctx.requested_slots <= total_main_keypair_allowed):
         return PredicateResult(
             False,
@@ -300,10 +307,11 @@ async def check_pending_session_count_limit(
     result = True
     failure_msgs = []
 
+    main_ak = await _resolve_main_access_key(db_sess, sess_ctx)
     query = (
         sa.select(SessionRow)
         .where(
-            (SessionRow.access_key == sess_ctx.access_key)
+            (SessionRow.owner_id == sess_ctx.owner_id)
             & (SessionRow.status == SessionStatus.PENDING)
         )
         .options(noload("*"), load_only(SessionRow.requested_slots))
@@ -319,7 +327,7 @@ async def check_pending_session_count_limit(
     policy_stmt = (
         sa.select(KeyPairResourcePolicyRow)
         .select_from(j)
-        .where(KeyPairRow.access_key == sess_ctx.access_key)
+        .where(KeyPairRow.access_key == main_ak)
         .options(
             noload("*"),
             load_only(
@@ -331,7 +339,7 @@ async def check_pending_session_count_limit(
     if policy is None:
         return PredicateResult(
             False,
-            f"Resource policy not found for keypair (ak: {sess_ctx.access_key})",
+            f"Resource policy not found for keypair (ak: {main_ak})",
         )
 
     pending_count_limit: int | None = policy.max_pending_session_count
@@ -344,7 +352,7 @@ async def check_pending_session_count_limit(
 
     log.debug(
         "access key:{} number of pending sessions: {} / {}",
-        sess_ctx.access_key,
+        main_ak,
         len(pending_sessions),
         pending_count_limit,
     )
@@ -361,10 +369,11 @@ async def check_pending_session_resource_limit(
     result = True
     failure_msgs = []
 
+    main_ak = await _resolve_main_access_key(db_sess, sess_ctx)
     query = (
         sa.select(SessionRow)
         .where(
-            (SessionRow.access_key == sess_ctx.access_key)
+            (SessionRow.owner_id == sess_ctx.owner_id)
             & (SessionRow.status == SessionStatus.PENDING)
         )
         .options(noload("*"), load_only(SessionRow.requested_slots))
@@ -380,7 +389,7 @@ async def check_pending_session_resource_limit(
     policy_stmt = (
         sa.select(KeyPairResourcePolicyRow)
         .select_from(j)
-        .where(KeyPairRow.access_key == sess_ctx.access_key)
+        .where(KeyPairRow.access_key == main_ak)
         .options(
             noload("*"),
             load_only(
@@ -392,7 +401,7 @@ async def check_pending_session_resource_limit(
     if policy is None:
         return PredicateResult(
             False,
-            f"Resource policy not found for keypair (ak: {sess_ctx.access_key})",
+            f"Resource policy not found for keypair (ak: {main_ak})",
         )
 
     pending_resource_limit: ResourceSlot | None = policy.max_pending_session_resource_slots
@@ -413,12 +422,12 @@ async def check_pending_session_resource_limit(
             failure_msgs.append(msg)
         log.debug(
             "access key:{} current-occupancy of pending sessions: {}",
-            sess_ctx.access_key,
+            main_ak,
             current_pending_session_slots,
         )
         log.debug(
             "access key:{} total-allowed of pending sessions: {}",
-            sess_ctx.access_key,
+            main_ak,
             pending_resource_limit,
         )
     if not result:

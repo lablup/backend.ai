@@ -6,7 +6,6 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
@@ -123,6 +122,9 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
             sessions_data.image_configs,
         )
 
+        # BA-5609: source resolved main_access_key from SessionDataForStart.
+        access_key_by_id = {s.session_id: s.access_key for s in sessions_data.sessions}
+
         # Mark all sessions as success for status transition
         for session in sessions:
             session_info = session.session_info
@@ -132,7 +134,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
                     from_status=session_info.lifecycle.status,
                     reason="triggered-by-scheduler",
                     creation_id=session_info.identity.creation_id,
-                    access_key=AccessKey(session_info.metadata.access_key),
+                    access_key=access_key_by_id.get(session_info.identity.id),
                 )
             )
 

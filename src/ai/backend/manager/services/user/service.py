@@ -234,7 +234,6 @@ class UserService:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=action.user_info_ctx.uuid,
-                target_main_access_key=action.user_info_ctx.main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -307,7 +306,6 @@ class UserService:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=user_info_ctx.uuid,
-                target_main_access_key=user_info_ctx.main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,

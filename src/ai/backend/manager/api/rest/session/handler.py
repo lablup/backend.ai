@@ -348,7 +348,7 @@ class SessionHandler:
                     batch_timeout=(
                         timedelta(seconds=params.batch_timeout) if params.batch_timeout else None
                     ),
-                    owner_access_key=owner_access_key,
+                    owner_id=request["user"]["uuid"],
                 ),
                 user_id=request["user"]["uuid"],
                 user_role=request["user"]["role"],
@@ -436,7 +436,7 @@ class SessionHandler:
                     batch_timeout=(
                         timedelta(seconds=params.batch_timeout) if params.batch_timeout else None
                     ),
-                    owner_access_key=owner_access_key,
+                    owner_id=request["user"]["uuid"],
                 ),
                 user_id=request["user"]["uuid"],
                 user_role=request["user"]["role"],
@@ -484,7 +484,7 @@ class SessionHandler:
                 domain_name=domain_name,
                 group_name=params.group,
                 requester_access_key=requester_access_key,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
                 scaling_group_name=params.scaling_group or "",
                 tag=params.tag or "",
                 session_type=params.session_type,
@@ -529,7 +529,7 @@ class SessionHandler:
         result = await self._session.match_sessions.wait_for_complete(
             MatchSessionsAction(
                 id_or_name_prefix=params.id,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
                 user_id=user.user_id,
             )
         )
@@ -638,7 +638,7 @@ class SessionHandler:
             result = await self._session.get_session_info.wait_for_complete(
                 GetSessionInfoAction(
                     session_name=session_name,
-                    owner_access_key=owner_access_key,
+                    owner_id=request["user"]["uuid"],
                 )
             )
         except BackendAIError:
@@ -681,7 +681,7 @@ class SessionHandler:
             await self._session.restart_session.wait_for_complete(
                 RestartSessionAction(
                     session_name=session_name,
-                    owner_access_key=owner_access_key,
+                    owner_id=request["user"]["uuid"],
                 )
             )
         except BackendAIError:
@@ -729,7 +729,7 @@ class SessionHandler:
         result = await self._session.destroy_session.wait_for_complete(
             DestroySessionAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
                 user_role=user_role,
                 forced=params.forced,
                 recursive=params.recursive,
@@ -768,7 +768,7 @@ class SessionHandler:
         result = await self._session.execute_session.wait_for_complete(
             ExecuteSessionAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
                 api_version=request["api_version"],
                 params=ExecuteSessionActionParams(
                     mode=params.mode,
@@ -806,7 +806,7 @@ class SessionHandler:
             await self._session.interrupt.wait_for_complete(
                 InterruptSessionAction(
                     session_name=session_name,
-                    owner_access_key=owner_access_key,
+                    owner_id=request["user"]["uuid"],
                 )
             )
         except BackendAIError:
@@ -845,7 +845,7 @@ class SessionHandler:
         action_result = await self._session.complete.wait_for_complete(
             CompleteAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
                 code=params.code or "",
                 options=params.options or {},
             )
@@ -918,7 +918,7 @@ class SessionHandler:
             await self._session.shutdown_service.wait_for_complete(
                 ShutdownServiceAction(
                     session_name=session_name,
-                    owner_access_key=owner_access_key,
+                    owner_id=request["user"]["uuid"],
                     service_name=params.service_name,
                 )
             )
@@ -954,7 +954,7 @@ class SessionHandler:
             await self._session.upload_files.wait_for_complete(
                 UploadFilesAction(
                     session_name=session_name,
-                    owner_access_key=owner_access_key,
+                    owner_id=request["user"]["uuid"],
                     reader=reader,
                 )
             )
@@ -994,7 +994,7 @@ class SessionHandler:
         result = await self._session.download_files.wait_for_complete(
             DownloadFilesAction(
                 user_id=request["user"]["uuid"],
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
                 session_name=session_name,
                 files=params.files,
             )
@@ -1033,7 +1033,7 @@ class SessionHandler:
             DownloadFileAction(
                 user_id=request["user"]["uuid"],
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
                 file=params.file,
             )
         )
@@ -1072,7 +1072,7 @@ class SessionHandler:
                 user_id=request["user"]["uuid"],
                 path=params.path,
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
             )
         )
         return APIResponse.build(HTTPStatus.OK, ListFilesResponse(dict(result.result)))
@@ -1110,7 +1110,7 @@ class SessionHandler:
             RenameSessionAction(
                 session_name=session_name,
                 new_name=new_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
             )
         )
         return web.Response(status=HTTPStatus.NO_CONTENT)
@@ -1145,7 +1145,7 @@ class SessionHandler:
         action_result = await self._session.commit_session.wait_for_complete(
             CommitSessionAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
                 filename=params.filename,
             )
         )
@@ -1184,7 +1184,7 @@ class SessionHandler:
         result = await self._session.convert_session_to_image.wait_for_complete(
             ConvertSessionToImageAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
                 image_name=params.image_name,
                 image_visibility=params.image_visibility,
                 image_owner_id=request["user"]["uuid"],
@@ -1231,7 +1231,7 @@ class SessionHandler:
         result = await self._session.get_commit_status.wait_for_complete(
             GetCommitStatusAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
             )
         )
         return APIResponse.build(
@@ -1268,7 +1268,7 @@ class SessionHandler:
         result = await self._session.get_abusing_report.wait_for_complete(
             GetAbusingReportAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
             )
         )
         return APIResponse.build(
@@ -1308,7 +1308,7 @@ class SessionHandler:
         result = await self._session.get_status_history.wait_for_complete(
             GetStatusHistoryAction(
                 session_name=session_name,
-                owner_access_key=request["keypair"]["access_key"],
+                owner_id=request["user"]["uuid"],
             )
         )
         return APIResponse.build(
@@ -1331,11 +1331,11 @@ class SessionHandler:
                 owner_access_key=None,
             )
         )
-        owner_access_key = scope.owner_access_key
+        _ = scope.owner_access_key
         result = await self._session.get_direct_access_info.wait_for_complete(
             GetDirectAccessInfoAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
             )
         )
         return APIResponse.build(
@@ -1376,7 +1376,7 @@ class SessionHandler:
             result = await self._session.get_container_logs.wait_for_complete(
                 GetContainerLogsAction(
                     session_name=session_name,
-                    owner_access_key=owner_access_key,
+                    owner_id=request["user"]["uuid"],
                     kernel_id=kernel_id,
                 )
             )
@@ -1451,7 +1451,7 @@ class SessionHandler:
         result = await self._session.get_dependency_graph.wait_for_complete(
             GetDependencyGraphAction(
                 root_session_name=root_session_name,
-                owner_access_key=owner_access_key,
+                owner_id=request["user"]["uuid"],
             )
         )
         return APIResponse.build(

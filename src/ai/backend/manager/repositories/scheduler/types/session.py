@@ -44,9 +44,10 @@ class PendingSessionData:
     """Pending session data for scheduling."""
 
     id: SessionId
+    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
     access_key: AccessKey
     requested_slots: ResourceSlot
-    user_uuid: UUID
+    owner_id: UUID
     group_id: UUID
     domain_name: str
     scaling_group_name: str
@@ -66,7 +67,7 @@ class PendingSessionData:
             session_id=self.id,
             access_key=self.access_key,
             requested_slots=self.requested_slots,
-            user_uuid=self.user_uuid,
+            owner_id=self.owner_id,
             group_id=self.group_id,
             domain_name=self.domain_name,
             scaling_group=self.scaling_group_name,
@@ -93,9 +94,9 @@ class PendingSessions:
         return {s.access_key for s in self.sessions}
 
     @cached_property
-    def user_uuids(self) -> set[UUID]:
-        """Extract unique user UUIDs from pending sessions."""
-        return {s.user_uuid for s in self.sessions}
+    def owner_ids(self) -> set[UUID]:
+        """Extract unique owner (user) UUIDs from pending sessions."""
+        return {s.owner_id for s in self.sessions}
 
     @cached_property
     def group_ids(self) -> set[UUID]:
@@ -125,6 +126,7 @@ class TerminatingSessionData:
     """Data for a session that needs to be terminated."""
 
     session_id: SessionId
+    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
     access_key: AccessKey
     creation_id: str
     status: SessionStatus
@@ -161,6 +163,7 @@ class SweptSessionInfo:
 
     session_id: SessionId
     creation_id: str
+    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
     access_key: AccessKey
 
 
