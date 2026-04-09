@@ -8217,9 +8217,6 @@ type ModelCardV2 implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """The unique database identifier of this model card."""
-  rowId: UUID!
-
   """Display name of the registered model."""
   name: String!
 
