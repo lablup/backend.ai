@@ -85,7 +85,8 @@ class TestSyncInstalledImagesIntegration:
         )
 
         try:
-            await client._client.client.flushdb()
+            async with client._client.client() as conn:
+                await conn.flushdb()
             yield client
         finally:
             await client.close()
@@ -305,10 +306,11 @@ class TestSyncInstalledImagesIntegration:
 
             # Store in Redis (simulating agent's heartbeat)
             images_json = json.dumps([img.model_dump() for img in installed_images])
-            await valkey_image_client._client.client.set(
-                key=f"installed_image:{agent_id}",
-                value=images_json,
-            )
+            async with valkey_image_client._client.client() as conn:
+                await conn.set(
+                    key=f"installed_image:{agent_id}",
+                    value=images_json,
+                )
 
             # When: sync_installed_images is called
             await agent_repository.sync_installed_images(agent_id)
@@ -394,10 +396,11 @@ class TestSyncInstalledImagesIntegration:
             ]
 
             images_json = json.dumps([img.model_dump() for img in installed_images])
-            await valkey_image_client._client.client.set(
-                key=f"installed_image:{agent_id}",
-                value=images_json,
-            )
+            async with valkey_image_client._client.client() as conn:
+                await conn.set(
+                    key=f"installed_image:{agent_id}",
+                    value=images_json,
+                )
 
             # When: sync_installed_images is called
             await agent_repository.sync_installed_images(agent_id)
@@ -450,10 +453,11 @@ class TestSyncInstalledImagesIntegration:
             ]
 
             images_json = json.dumps([img.model_dump() for img in installed_images])
-            await valkey_image_client._client.client.set(
-                key=f"installed_image:{agent_id}",
-                value=images_json,
-            )
+            async with valkey_image_client._client.client() as conn:
+                await conn.set(
+                    key=f"installed_image:{agent_id}",
+                    value=images_json,
+                )
 
             # When: sync_installed_images is called
             await agent_repository.sync_installed_images(agent_id)
@@ -509,10 +513,11 @@ class TestSyncInstalledImagesIntegration:
             ]
 
             images_json = json.dumps([img.model_dump() for img in installed_images])
-            await valkey_image_client._client.client.set(
-                key=f"installed_image:{agent_id}",
-                value=images_json,
-            )
+            async with valkey_image_client._client.client() as conn:
+                await conn.set(
+                    key=f"installed_image:{agent_id}",
+                    value=images_json,
+                )
 
             # When: sync_installed_images is called
             await agent_repository.sync_installed_images(agent_id)

@@ -273,3 +273,84 @@ class AdminGetKeypairActionResult(BaseActionResult):
     @override
     def entity_id(self) -> str | None:
         return str(self.keypair.access_key)
+
+
+# ------------------------------------------------------------------ admin SSH keypair actions
+
+
+@dataclass
+class AdminRegisterSSHKeypairAction(UserAction):
+    """Admin action to register (overwrite) a user's SSH keypair."""
+
+    access_key: str
+    ssh_public_key: str
+    ssh_private_key: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+@dataclass
+class AdminRegisterSSHKeypairActionResult(BaseActionResult):
+    access_key: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key
+
+
+@dataclass
+class AdminDeleteSSHKeypairAction(UserAction):
+    """Admin action to clear a user's SSH keypair."""
+
+    access_key: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+@dataclass
+class AdminDeleteSSHKeypairActionResult(BaseActionResult):
+    access_key: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key
+
+
+@dataclass
+class AdminGetSSHKeypairAction(UserAction):
+    """Admin action to look up a user's SSH public key."""
+
+    access_key: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+@dataclass
+class AdminGetSSHKeypairActionResult(BaseActionResult):
+    access_key: str
+    ssh_public_key: str | None
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key

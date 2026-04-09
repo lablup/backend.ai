@@ -92,7 +92,6 @@ from ai.backend.common.types import (
     KernelEnqueueingConfig,
     KernelId,
     ResourceSlot,
-    RuntimeVariant,
     SessionEnqueueingConfig,
     SessionId,
     SessionTypes,
@@ -1262,13 +1261,20 @@ class AgentRegistry:
         await self._reconcile_agent_resources()
 
     async def _reconcile_agent_resources(self) -> None:
-        """Reconcile agent_resources.used against actual resource_allocations.
+        """Clean up orphaned allocations and reconcile agent_resources.
 
-        Delegates to ResourceSlotRepository for DB operations and logs any drift found.
+        Delegates to ResourceSlotRepository which runs both steps in a single
+        transaction: orphan cleanup first, then drift correction.
         """
         repo = ResourceSlotRepository(self.db)
-        drifts = await repo.reconcile_agent_resources()
-        for d in drifts:
+        result = await repo.reconcile_agent_resources()
+        for o in result.orphaned_allocations:
+            log.warning(
+                "freed orphaned resource allocation: kernel={}, slot={}",
+                o.kernel_id,
+                o.slot_name,
+            )
+        for d in result.agent_resource_drifts:
             log.warning(
                 "agent_resources drift detected for {}:{}: tracked={}, actual={}",
                 d.agent_id,
@@ -2390,7 +2396,7 @@ class AgentRegistry:
         if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
             _info = ModelHealthCheck(path=_path)
 
-        if endpoint.runtime_variant == RuntimeVariant.CUSTOM:
+        if endpoint.runtime_variant == "custom":
             # CUSTOM: full validation required
             model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self.storage_manager,
@@ -2498,7 +2504,7 @@ class AgentRegistry:
                 ),
                 endpoint=EndpointTagsModel(
                     id=str(endpoint.id),
-                    runtime_variant=endpoint.runtime_variant.value,
+                    runtime_variant=endpoint.runtime_variant,
                     existing_url=str(endpoint.url) if endpoint.url else None,
                 ),
             ),

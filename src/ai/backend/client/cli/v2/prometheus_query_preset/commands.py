@@ -1,8 +1,15 @@
-"""CLI commands for prometheus query definition management."""
+"""User-facing CLI commands for prometheus query presets.
+
+Read operations (search, get, execute) are available to any authenticated
+user since prometheus query presets are a shared catalog of metric query
+templates. Write operations (create, update, delete) live under
+``admin/prometheus_query_preset.py``.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -57,7 +64,6 @@ def search(
         QueryDefinitionOrderField,
     )
 
-    # Build filter only if any filter option is provided
     filter_dto: QueryDefinitionFilter | None = None
     if name_contains is not None:
         from ai.backend.common.dto.manager.query import StringFilter
@@ -66,7 +72,6 @@ def search(
             name=StringFilter(contains=name_contains),
         )
 
-    # Build order only if --order-by is provided
     orders = (
         parse_order_options(order_by, QueryDefinitionOrderField, QueryDefinitionOrder)
         if order_by
@@ -100,79 +105,6 @@ def get(preset_id: UUID) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.get(preset_id)
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@prometheus_query_preset.command()
-@click.option("--name", required=True, help="Human-readable name.")
-@click.option("--metric-name", required=True, help="Prometheus metric name.")
-@click.option("--query-template", required=True, help="PromQL template with placeholders.")
-@click.option("--time-window", default=None, help="Default time window (e.g. '5m', '1h').")
-def create(
-    name: str,
-    metric_name: str,
-    query_template: str,
-    time_window: str | None,
-) -> None:
-    """Create a new prometheus query definition."""
-    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
-        CreateQueryDefinitionInput,
-        CreateQueryDefinitionOptionsInput,
-    )
-
-    async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
-        try:
-            result = await registry.prometheus_query_preset.create(
-                CreateQueryDefinitionInput(
-                    name=name,
-                    metric_name=metric_name,
-                    query_template=query_template,
-                    time_window=time_window,
-                    options=CreateQueryDefinitionOptionsInput(
-                        filter_labels=[],
-                        group_labels=[],
-                    ),
-                ),
-            )
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@prometheus_query_preset.command()
-@click.argument("preset_id", type=click.UUID)
-@click.argument("body", type=str)
-def update(preset_id: UUID, body: str) -> None:
-    """Update a prometheus query definition.
-
-    BODY is a JSON string with fields to update.
-    """
-    import json
-    import sys
-
-    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
-        ModifyQueryDefinitionInput,
-    )
-
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError as e:
-        click.echo(f"Invalid JSON: {e}", err=True)
-        sys.exit(1)
-
-    async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
-        try:
-            result = await registry.prometheus_query_preset.update(
-                preset_id, ModifyQueryDefinitionInput(**data)
-            )
             print_result(result)
         finally:
             await registry.close()
@@ -233,8 +165,6 @@ def execute(
     time_window: str | None,
 ) -> None:
     """Execute a prometheus query definition."""
-    import json
-
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
         ExecuteQueryDefinitionInput,
         ExecuteQueryDefinitionOptionsInput,
@@ -272,27 +202,6 @@ def execute(
         try:
             result = await registry.prometheus_query_preset.execute(preset_id, request)
             print(json.dumps(result.model_dump(mode="json"), indent=2, default=str))
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@prometheus_query_preset.command()
-@click.argument("preset_id", type=click.UUID)
-def delete(preset_id: UUID) -> None:
-    """Delete a query definition by ID."""
-    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
-        DeleteQueryDefinitionInput,
-    )
-
-    async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
-        try:
-            result = await registry.prometheus_query_preset.delete(
-                DeleteQueryDefinitionInput(id=preset_id),
-            )
-            print_result(result)
         finally:
             await registry.close()
 

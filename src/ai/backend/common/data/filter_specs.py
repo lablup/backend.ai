@@ -14,6 +14,15 @@ class StringMatchSpec:
 
 
 @dataclass(frozen=True)
+class StringInMatchSpec:
+    """Specification for string IN operations (IN, NOT IN)."""
+
+    values: list[str]
+    case_insensitive: bool
+    negated: bool
+
+
+@dataclass(frozen=True)
 class UUIDEqualMatchSpec:
     """Specification for UUID equality operations (=, !=)."""
 

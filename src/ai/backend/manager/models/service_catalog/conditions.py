@@ -8,6 +8,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import ServiceCatalogStatus
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import ServiceCatalogRow
@@ -61,6 +62,8 @@ class ServiceCatalogConditions:
             return ~condition if spec.negated else condition
 
         return inner
+
+    by_service_group_in = staticmethod(make_string_in_factory(ServiceCatalogRow.service_group))
 
     # --- status enum conditions ---
 

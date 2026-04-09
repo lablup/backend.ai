@@ -268,6 +268,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 equals_factory=ScalingGroupConditions.by_name_equals,
                 starts_with_factory=ScalingGroupConditions.by_name_starts_with,
                 ends_with_factory=ScalingGroupConditions.by_name_ends_with,
+                in_factory=ScalingGroupConditions.by_name_in,
             )
             if cond:
                 conditions.append(cond)
@@ -278,6 +279,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 equals_factory=ScalingGroupConditions.by_description_equals,
                 starts_with_factory=ScalingGroupConditions.by_description_starts_with,
                 ends_with_factory=ScalingGroupConditions.by_description_ends_with,
+                in_factory=ScalingGroupConditions.by_description_in,
             )
             if cond:
                 conditions.append(cond)
@@ -783,7 +785,7 @@ class ResourceGroupAdapter(BaseAdapter):
             is_active=data.status.is_active,
             total_resource_slots={},
             allowed_vfolder_hosts={},
-            integration_id=None,
+            integration_name=None,
             resource_policy=None,
             created_at=data.metadata.created_at,
             modified_at=datetime.fromtimestamp(0, tz=UTC),

@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Sequence
+from typing import cast
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -8,6 +9,9 @@ from ai.backend.manager.actions.action.rbac import (
     RBACActionName,
     RBACRequiredPermission,
 )
+from ai.backend.manager.data.permission.role import UserRoleRevocationData
+from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     CreateRoleInput,
 )
@@ -80,6 +84,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_roles impor
     SearchRolesAction,
     SearchRolesActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
+    SearchRolesInScopeAction,
+    SearchRolesInScopeActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_scopes import (
     SearchScopesAction,
     SearchScopesActionResult,
@@ -106,14 +114,17 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class PermissionControllerService:
     _repository: PermissionControllerRepository
+    _group_repository: GroupRepository
     _rbac_action_registry: Sequence[type[BaseRBACAction]]
 
     def __init__(
         self,
         repository: PermissionControllerRepository,
+        group_repository: GroupRepository,
         rbac_action_registry: Sequence[type[BaseRBACAction]],
     ) -> None:
         self._repository = repository
+        self._group_repository = group_repository
         self._rbac_action_registry = rbac_action_registry
 
     async def create_role(self, action: CreateRoleAction) -> CreateRoleActionResult:
@@ -123,6 +134,7 @@ class PermissionControllerService:
         input_data = CreateRoleInput(
             creator=action.creator,
             object_permissions=action.object_permissions,
+            scope_refs=action.scope_refs,
         )
         result = await self._repository.create_role(input_data)
         return CreateRoleActionResult(
@@ -180,23 +192,48 @@ class PermissionControllerService:
         return PurgeRoleActionResult(data=result)
 
     async def assign_role(self, action: AssignRoleAction) -> AssignRoleActionResult:
-        """
-        Assigns a role to a user.
-        """
-        data = await self._repository.assign_role(action.input)
+        """Assigns a role to a user.
 
+        When project_id is provided, also binds the user to the project.
+        """
+        if action.input.project_id is not None:
+            await self._group_repository.bind_user_to_project(
+                action.input.user_id, action.input.project_id
+            )
+        data = await self._repository.assign_role(action.input)
         return AssignRoleActionResult(data=data)
 
     async def revoke_role(self, action: RevokeRoleAction) -> RevokeRoleActionResult:
-        """
-        Revokes a role from a user.
-        """
-        data = await self._repository.revoke_role(action.input)
+        """Revokes a role from a user.
 
-        return RevokeRoleActionResult(data=data)
+        If the role was project-scoped and no remaining roles exist in that
+        project, the user is also removed from the project.
+        """
+        result = await self._repository.revoke_role(action.input)
+        for prc in result.project_remaining_roles:
+            if prc.remaining_count == 0:
+                await self._group_repository.unbind_user_from_project(
+                    action.input.user_id, prc.project_id
+                )
+        return RevokeRoleActionResult(
+            data=UserRoleRevocationData(
+                user_role_id=result.user_role_id,
+                user_id=action.input.user_id,
+                role_id=action.input.role_id,
+            )
+        )
 
     async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
-        """Assigns a role to multiple users with partial failure support."""
+        """Assigns a role to multiple users with partial failure support.
+
+        When project_id is provided, also binds each user to the project.
+        """
+        if action.project_id is not None:
+            for spec in action.bulk_creator.specs:
+                user_role_spec = cast(UserRoleCreatorSpec, spec)
+                await self._group_repository.bind_user_to_project(
+                    user_role_spec.user_id, action.project_id
+                )
         data = await self._repository.bulk_assign_role(action.bulk_creator)
         return BulkAssignRoleActionResult(data=data)
 
@@ -214,6 +251,17 @@ class PermissionControllerService:
         """Search roles with pagination and filtering."""
         result = await self._repository.search_roles(action.querier)
         return SearchRolesActionResult(result=result)
+
+    async def search_roles_in_scope(
+        self, action: SearchRolesInScopeAction
+    ) -> SearchRolesInScopeActionResult:
+        """Search roles registered in a given scope."""
+        result = await self._repository.search_roles_in_scope(action.querier, action.scope)
+        return SearchRolesInScopeActionResult(
+            result=result,
+            _scope_type=action.scope.element_type.to_scope_type(),
+            _scope_id=action.scope.scope_id,
+        )
 
     async def search_permissions(
         self, action: SearchPermissionsAction

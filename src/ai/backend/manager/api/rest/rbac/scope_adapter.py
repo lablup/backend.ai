@@ -87,6 +87,7 @@ class ScopeAdapter(BaseFilterAdapter):
                 equals_factory=DomainScopeConditions.by_name_equals,
                 starts_with_factory=DomainScopeConditions.by_name_starts_with,
                 ends_with_factory=DomainScopeConditions.by_name_ends_with,
+                in_factory=DomainScopeConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -104,6 +105,7 @@ class ScopeAdapter(BaseFilterAdapter):
                 equals_factory=ProjectScopeConditions.by_name_equals,
                 starts_with_factory=ProjectScopeConditions.by_name_starts_with,
                 ends_with_factory=ProjectScopeConditions.by_name_ends_with,
+                in_factory=ProjectScopeConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -121,6 +123,7 @@ class ScopeAdapter(BaseFilterAdapter):
                 equals_factory=UserScopeConditions.by_name_equals,
                 starts_with_factory=UserScopeConditions.by_name_starts_with,
                 ends_with_factory=UserScopeConditions.by_name_ends_with,
+                in_factory=UserScopeConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

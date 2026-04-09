@@ -214,7 +214,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     ]:
         from strawberry.relay import PageInfo
 
-        from ai.backend.common.dto.manager.v2.group.request import AdminSearchGroupsInput
+        from ai.backend.common.dto.manager.v2.group.request import AdminSearchProjectsInput
         from ai.backend.manager.api.gql.base import encode_cursor
         from ai.backend.manager.api.gql.project_v2.types.node import (
             ProjectV2Connection,
@@ -226,7 +226,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         scope = DomainProjectSearchScope(domain_name=str(self.id))
         payload = await info.context.adapters.project.search_by_domain(
             scope=scope,
-            input=AdminSearchGroupsInput(
+            input=AdminSearchProjectsInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
                 first=first,

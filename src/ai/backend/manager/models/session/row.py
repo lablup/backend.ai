@@ -658,7 +658,9 @@ class SessionRow(Base):  # type: ignore[misc]
     creation_id: Mapped[str | None] = mapped_column(
         "creation_id", sa.String(length=32), unique=False, index=False
     )
-    name: Mapped[str | None] = mapped_column("name", sa.String(length=64), unique=False, index=True)
+    name: Mapped[str | None] = mapped_column(
+        "name", sa.String(length=128), unique=False, index=True
+    )
     session_type: Mapped[SessionTypes] = mapped_column(
         "session_type",
         StrEnumType(SessionTypes, use_name=True),

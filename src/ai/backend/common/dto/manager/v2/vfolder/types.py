@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, OrderDirecti
 from ai.backend.common.types import VFolderUsageMode
 
 __all__ = (
+    "FileEntryType",
     "OrderDirection",
     "VFolderInvitationState",
     "VFolderMetadataInfo",
@@ -32,6 +33,14 @@ __all__ = (
     "VFolderUsageMode",
     "VFolderUsageModeFilter",
 )
+
+
+class FileEntryType(StrEnum):
+    """Type of a file entry in a virtual folder."""
+
+    FILE = "FILE"
+    DIRECTORY = "DIRECTORY"
+    SYMLINK = "SYMLINK"
 
 
 class VFolderOrderField(StrEnum):

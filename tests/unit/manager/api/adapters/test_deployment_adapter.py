@@ -33,7 +33,7 @@ class TestRevisionDataToDTO:
                 resource_slot=ResourceSlot({"cpu": "2"}),
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant=RuntimeVariant("custom"),
             ),
             model_mount_config=ModelMountConfigData(
                 vfolder_id=uuid4(),

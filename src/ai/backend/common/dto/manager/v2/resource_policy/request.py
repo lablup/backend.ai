@@ -157,6 +157,15 @@ class CreateUserResourcePolicyInput(BaseRequestModel):
     max_vfolder_count: int = Field(
         description="Maximum number of vfolders a user can create.",
     )
+    max_concurrent_logins: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "Maximum number of concurrent authenticated login sessions per user."
+            " Null means unlimited. Must be >= 1 when set."
+            " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
+        ),
+    )
     max_quota_scope_size: BinarySizeInput = Field(
         description="Maximum quota scope size (e.g., '1g', '536870912').",
     )
@@ -183,6 +192,15 @@ class UpdateUserResourcePolicyInput(BaseRequestModel):
     max_vfolder_count: int | Sentinel | None = Field(
         default=SENTINEL,
         description="Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+    )
+    max_concurrent_logins: int | Sentinel | None = Field(
+        default=SENTINEL,
+        ge=1,
+        description=(
+            "Updated maximum number of concurrent authenticated login sessions per user."
+            " Set to null to clear (unlimited). Must be >= 1 when set."
+            " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
+        ),
     )
     max_quota_scope_size: BinarySizeInput | Sentinel | None = Field(
         default=SENTINEL,
@@ -288,6 +306,9 @@ class UserResourcePolicyFilter(BaseRequestModel):
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
     max_vfolder_count: IntFilter | None = Field(
         default=None, description="Filter by max vfolder count."
+    )
+    max_concurrent_logins: IntFilter | None = Field(
+        default=None, description="Filter by max concurrent logins."
     )
     max_quota_scope_size: IntFilter | None = Field(
         default=None, description="Filter by max quota scope size."

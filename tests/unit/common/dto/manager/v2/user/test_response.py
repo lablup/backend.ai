@@ -74,6 +74,7 @@ class TestUserBasicInfo:
         assert info.username is None
         assert info.full_name is None
         assert info.description is None
+        assert info.integration_name is None
 
     def test_creation_with_all_fields(self) -> None:
         info = UserBasicInfo(
@@ -81,10 +82,12 @@ class TestUserBasicInfo:
             email="user@example.com",
             full_name="Full Name",
             description="A user",
+            integration_name="ext-123",
         )
         assert info.username == "user"
         assert info.full_name == "Full Name"
         assert info.description == "A user"
+        assert info.integration_name == "ext-123"
 
     def test_round_trip(self) -> None:
         info = UserBasicInfo(username="u", email="u@e.com", full_name="U")

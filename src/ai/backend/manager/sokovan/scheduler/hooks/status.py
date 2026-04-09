@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.model_serving.anycast import (
@@ -17,21 +16,14 @@ from ai.backend.common.events.event_types.model_serving.anycast import (
 )
 from ai.backend.common.types import (
     AgentId,
-    KernelId,
-    ResourceSlot,
     SessionId,
     SessionTypes,
-    SlotQuantity,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
-from ai.backend.manager.sokovan.data import SessionRunningData, SessionWithKernels
+from ai.backend.manager.sokovan.data import SessionWithKernels
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
-
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -57,7 +49,6 @@ class StatusTransitionHook(ABC):
 class RunningHookDependencies:
     """Dependencies for RunningTransitionHook."""
 
-    scheduler_repository: SchedulerRepository
     agent_client_pool: AgentClientPool
     deployment_repository: DeploymentRepository
     event_producer: EventProducer
@@ -67,9 +58,11 @@ class RunningTransitionHook(StatusTransitionHook):
     """Hook executed when sessions transition to RUNNING status.
 
     Handles:
-    - Common: Update agent occupied_slots
     - BATCH: Trigger batch execution
     - INFERENCE: Update route info and notify app proxy
+
+    Note: Resource allocation (occupied_slots) is handled per-kernel at
+    kernel RUNNING transition time, not here at session level.
     """
 
     _deps: RunningHookDependencies
@@ -78,11 +71,13 @@ class RunningTransitionHook(StatusTransitionHook):
         self._deps = deps
 
     async def execute(self, session: SessionWithKernels) -> None:
-        """Execute RUNNING transition hook."""
-        # 1. Common: Update occupied_slots for all session types
-        await self._update_occupied_slots(session)
+        """Execute RUNNING transition hook.
 
-        # 2. Session-type specific logic
+        Note: Resource allocation is now handled per-kernel at kernel RUNNING
+        transition time (in update_kernel_status_running), not here at
+        session RUNNING transition time.
+        """
+        # Session-type specific logic
         session_type = session.session_info.metadata.session_type
         match session_type:
             case SessionTypes.BATCH:
@@ -94,39 +89,6 @@ class RunningTransitionHook(StatusTransitionHook):
                     "No specific RUNNING hook for session type {}",
                     session_type,
                 )
-
-    async def _update_occupied_slots(self, session: SessionWithKernels) -> None:
-        """Calculate and update occupied_slots for a session transitioning to RUNNING."""
-        total_occupied_slots = ResourceSlot()
-        for kernel_info in session.kernel_infos:
-            if kernel_info.resource.occupied_slots:
-                total_occupied_slots += kernel_info.resource.occupied_slots
-
-        running_data = [
-            SessionRunningData(
-                session_id=session.session_info.identity.id,
-                occupying_slots=total_occupied_slots,
-            )
-        ]
-
-        # Record allocations in normalized resource_allocations / agent_resources tables.
-        allocations: list[tuple[KernelId, str, list[SlotQuantity]]] = []
-        for kernel_info in session.kernel_infos:
-            agent_id = kernel_info.resource.agent
-            if agent_id and kernel_info.resource.occupied_slots:
-                quantities = resource_slot_to_quantities(kernel_info.resource.occupied_slots)
-                if quantities:
-                    allocations.append((kernel_info.id, agent_id, quantities))
-
-        # Single transaction: session update + resource allocation are atomic.
-        await self._deps.scheduler_repository.update_running_and_allocate_resources(
-            running_data, allocations
-        )
-
-        log.debug(
-            "Updated occupied_slots for session {} transitioning to RUNNING",
-            session.session_info.identity.id,
-        )
 
     async def _execute_batch(self, session: SessionWithKernels) -> None:
         """Trigger batch execution for BATCH sessions."""

@@ -70,6 +70,7 @@ class ResourceSlotAdapter(BaseFilterAdapter):
                 equals_factory=ResourceSlotTypeConditions.by_slot_name_equals,
                 starts_with_factory=ResourceSlotTypeConditions.by_slot_name_starts_with,
                 ends_with_factory=ResourceSlotTypeConditions.by_slot_name_ends_with,
+                in_factory=ResourceSlotTypeConditions.by_slot_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -81,6 +82,7 @@ class ResourceSlotAdapter(BaseFilterAdapter):
                 equals_factory=ResourceSlotTypeConditions.by_slot_type_equals,
                 starts_with_factory=ResourceSlotTypeConditions.by_slot_type_starts_with,
                 ends_with_factory=ResourceSlotTypeConditions.by_slot_type_ends_with,
+                in_factory=ResourceSlotTypeConditions.by_slot_type_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -92,6 +94,7 @@ class ResourceSlotAdapter(BaseFilterAdapter):
                 equals_factory=ResourceSlotTypeConditions.by_display_name_equals,
                 starts_with_factory=ResourceSlotTypeConditions.by_display_name_starts_with,
                 ends_with_factory=ResourceSlotTypeConditions.by_display_name_ends_with,
+                in_factory=ResourceSlotTypeConditions.by_display_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

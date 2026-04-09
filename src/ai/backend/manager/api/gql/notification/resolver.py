@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, cast
 
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge
+from strawberry.scalars import JSON
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.notification.request import (
@@ -349,7 +350,7 @@ async def notification_rule_type_schema(
     from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 
     internal_type = NotificationRuleType(rule_type.value)  # type: ignore[attr-defined]
-    return NotifiableMessage.get_message_schema(internal_type)
+    return cast(JSON, NotifiableMessage.get_message_schema(internal_type))
 
 
 # Mutation fields

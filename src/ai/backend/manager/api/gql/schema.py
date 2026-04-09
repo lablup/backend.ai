@@ -60,24 +60,27 @@ from .deployment import (
     # Revision
     activate_deployment_revision,
     add_model_revision,
+    # Revision Preset
+    admin_create_deployment_revision_preset,
+    admin_delete_deployment_revision_preset,
+    admin_deployments,
+    admin_update_deployment_revision_preset,
     # Access Token
     create_access_token,
     # Auto Scaling
     create_auto_scaling_rule,
-    # Revision Preset
-    create_deployment_revision_preset,
     # Deployment
     create_model_deployment,
     delete_auto_scaling_rule,
-    delete_deployment_revision_preset,
     delete_model_deployment,
     deployment,
     deployment_revision_preset,
     deployment_revision_presets,
     deployment_status_changed,
-    deployments,
     inference_runtime_config,
     inference_runtime_configs,
+    my_deployments,
+    project_deployments,
     # Replica
     replica,
     replica_status_changed,
@@ -90,7 +93,6 @@ from .deployment import (
     sync_replicas,
     update_auto_scaling_rule,
     update_deployment_policy,
-    update_deployment_revision_preset,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -154,8 +156,11 @@ from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .keypair import (
     admin_create_keypair_v2,
     admin_delete_keypair_v2,
+    admin_delete_ssh_keypair_v2,
     admin_keypair_v2,
     admin_keypairs_v2,
+    admin_register_ssh_keypair_v2,
+    admin_ssh_keypair_v2,
     admin_update_keypair_v2,
     issue_my_keypair,
     my_keypairs,
@@ -173,9 +178,14 @@ from .login_session import (
 from .model_card import (
     admin_create_model_card_v2,
     admin_delete_model_card_v2,
+    admin_delete_model_cards_v2,
+    admin_model_cards_v2,
     admin_update_model_card_v2,
+    deploy_model_card_v2,
+    model_card_available_presets,
     model_card_v2,
-    model_cards_v2,
+    project_model_cards_v2,
+    scan_project_model_cards_v2,
 )
 from .notification import (
     admin_create_notification_channel,
@@ -197,6 +207,7 @@ from .notification import (
     notification_channel,
     notification_channels,
     notification_rule,
+    notification_rule_type_schema,
     notification_rule_types,
     notification_rules,
     update_notification_channel,
@@ -228,9 +239,9 @@ from .prometheus_query_preset import (
     admin_create_prometheus_query_preset,
     admin_delete_prometheus_query_preset,
     admin_modify_prometheus_query_preset,
-    admin_prometheus_query_preset,
-    admin_prometheus_query_preset_result,
-    admin_prometheus_query_presets,
+    prometheus_query_preset,
+    prometheus_query_preset_result,
+    prometheus_query_presets,
 )
 from .rbac import (
     admin_assign_role,
@@ -250,6 +261,7 @@ from .rbac import (
     admin_update_permission,
     admin_update_role,
     my_roles,
+    project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
@@ -329,6 +341,7 @@ from .resource_usage import (
 from .runtime_variant import (
     admin_create_runtime_variant,
     admin_delete_runtime_variant,
+    admin_delete_runtime_variants,
     admin_update_runtime_variant,
     runtime_variant,
     runtime_variants,
@@ -357,9 +370,11 @@ from .scheduling_history import (
 from .service_catalog import admin_service_catalogs
 from .session.resolver import (
     admin_sessions_v2,
+    enqueue_session,
     project_sessions_v2,
     terminate_project_sessions_v2,
 )
+from .storage_host import my_storage_host_permissions
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -384,7 +399,25 @@ from .user import (
     update_my_allowed_client_ip,
     update_user_v2,
 )
-from .vfolder_v2 import my_vfolders, project_vfolders
+from .vfolder_v2 import (
+    admin_vfolders_v2,
+    bulk_delete_vfolders_v2,
+    bulk_purge_vfolders_v2,
+    clone_vfolder_v2,
+    create_vfolder_v2,
+    delete_vfolder_v2,
+    deploy_vfolder_v2,
+    my_vfolders,
+    project_vfolders,
+    purge_vfolder_v2,
+    vfolder_create_download_session_v2,
+    vfolder_create_upload_session_v2,
+    vfolder_delete_files_v2,
+    vfolder_list_files_v2,
+    vfolder_mkdir_v2,
+    vfolder_move_file_v2,
+    vfolder_v2,
+)
 from .vfs_storage import (
     create_vfs_storage,
     delete_vfs_storage,
@@ -404,13 +437,13 @@ class Query:
     artifact_revisions = artifact_revisions
     user_app_config = user_app_config
     merged_app_config = merged_app_config
-    deployments = deployments
     deployment = deployment
     revisions = revisions
     revision = revision
     replicas = replicas
     replica = replica
     notification_rule_types = notification_rule_types
+    notification_rule_type_schema = notification_rule_type_schema
     object_storage = object_storage
     object_storages = object_storages
     vfs_storage = vfs_storage
@@ -431,6 +464,7 @@ class Query:
     admin_allowed_projects_for_resource_group_v2 = admin_allowed_projects_for_resource_group_v2
     admin_service_catalogs = admin_service_catalogs
     admin_session_scheduling_histories = admin_session_scheduling_histories
+    admin_deployments = admin_deployments
     admin_deployment_histories = admin_deployment_histories
     admin_route_histories = admin_route_histories
     admin_notification_channel = admin_notification_channel
@@ -455,13 +489,15 @@ class Query:
     admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
     project_sessions_v2 = project_sessions_v2
+    project_deployments = project_deployments
+    my_deployments = my_deployments
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases
-    # Prometheus Query Preset Admin APIs
-    admin_prometheus_query_preset = admin_prometheus_query_preset
-    admin_prometheus_query_presets = admin_prometheus_query_presets
-    admin_prometheus_query_preset_result = admin_prometheus_query_preset_result
+    # Prometheus Query Preset APIs (read available to any authenticated user)
+    prometheus_query_preset = prometheus_query_preset
+    prometheus_query_presets = prometheus_query_presets
+    prometheus_query_preset_result = prometheus_query_preset_result
     # RBAC Admin APIs
     admin_role = admin_role
     admin_roles = admin_roles
@@ -473,11 +509,14 @@ class Query:
     # Keypair admin queries
     admin_keypair_v2 = admin_keypair_v2
     admin_keypairs_v2 = admin_keypairs_v2
+    admin_ssh_keypair_v2 = admin_ssh_keypair_v2
     # Login session/history self-service queries
     my_login_sessions_v2 = my_login_sessions_v2
     my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
+    # RBAC Scoped APIs
+    project_roles = project_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
     rbac_entity_operation_combinations = rbac_entity_operation_combinations
     rbac_permission_matrix = rbac_permission_matrix
@@ -550,6 +589,8 @@ class Query:
     admin_project_resource_policies_v2 = admin_project_resource_policies_v2
     my_keypair_resource_policy_v2 = my_keypair_resource_policy_v2
     my_user_resource_policy_v2 = my_user_resource_policy_v2
+    # Storage Host APIs
+    my_storage_host_permissions = my_storage_host_permissions
     # Resource Preset V2 APIs
     admin_resource_presets_v2 = admin_resource_presets_v2
     admin_resource_preset_v2 = admin_resource_preset_v2
@@ -563,8 +604,10 @@ class Query:
     deployment_revision_presets = deployment_revision_presets
     deployment_revision_preset = deployment_revision_preset
     # Model Card APIs
-    model_cards_v2 = model_cards_v2
+    admin_model_cards_v2 = admin_model_cards_v2
+    project_model_cards_v2 = project_model_cards_v2
     model_card_v2 = model_card_v2
+    model_card_available_presets = model_card_available_presets
     # Resource Allocation V2 APIs
     my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
     project_resource_allocation_v2 = project_resource_allocation_v2
@@ -574,6 +617,8 @@ class Query:
     admin_effective_resource_allocation_v2 = admin_effective_resource_allocation_v2
     check_preset_availability_v2 = check_preset_availability_v2
     # VFolder APIs
+    admin_vfolders_v2 = admin_vfolders_v2
+    vfolder_v2 = vfolder_v2
     project_vfolders = project_vfolders
     my_vfolders = my_vfolders
 
@@ -713,6 +758,8 @@ class Mutation:
     admin_create_keypair_v2 = admin_create_keypair_v2
     admin_update_keypair_v2 = admin_update_keypair_v2
     admin_delete_keypair_v2 = admin_delete_keypair_v2
+    admin_register_ssh_keypair_v2 = admin_register_ssh_keypair_v2
+    admin_delete_ssh_keypair_v2 = admin_delete_ssh_keypair_v2
     # Login session mutations
     admin_revoke_login_session = admin_revoke_login_session
     my_revoke_login_session = my_revoke_login_session
@@ -752,19 +799,38 @@ class Mutation:
     admin_create_runtime_variant = admin_create_runtime_variant
     admin_update_runtime_variant = admin_update_runtime_variant
     admin_delete_runtime_variant = admin_delete_runtime_variant
+    admin_delete_runtime_variants = admin_delete_runtime_variants
     # Runtime Variant Preset mutations
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
     admin_delete_runtime_variant_preset = admin_delete_runtime_variant_preset
     # Deployment Revision Preset mutations
-    create_deployment_revision_preset = create_deployment_revision_preset
-    update_deployment_revision_preset = update_deployment_revision_preset
-    delete_deployment_revision_preset = delete_deployment_revision_preset
+    admin_create_deployment_revision_preset = admin_create_deployment_revision_preset
+    admin_update_deployment_revision_preset = admin_update_deployment_revision_preset
+    admin_delete_deployment_revision_preset = admin_delete_deployment_revision_preset
     # Model Card mutations
     admin_create_model_card_v2 = admin_create_model_card_v2
     admin_update_model_card_v2 = admin_update_model_card_v2
     admin_delete_model_card_v2 = admin_delete_model_card_v2
+    admin_delete_model_cards_v2 = admin_delete_model_cards_v2
+    scan_project_model_cards_v2 = scan_project_model_cards_v2
+    deploy_model_card_v2 = deploy_model_card_v2
+    # VFolder V2 mutations
+    create_vfolder_v2 = create_vfolder_v2
+    delete_vfolder_v2 = delete_vfolder_v2
+    purge_vfolder_v2 = purge_vfolder_v2
+    deploy_vfolder_v2 = deploy_vfolder_v2
+    bulk_delete_vfolders_v2 = bulk_delete_vfolders_v2
+    bulk_purge_vfolders_v2 = bulk_purge_vfolders_v2
+    clone_vfolder_v2 = clone_vfolder_v2
+    vfolder_list_files_v2 = vfolder_list_files_v2
+    vfolder_mkdir_v2 = vfolder_mkdir_v2
+    vfolder_move_file_v2 = vfolder_move_file_v2
+    vfolder_delete_files_v2 = vfolder_delete_files_v2
+    vfolder_create_upload_session_v2 = vfolder_create_upload_session_v2
+    vfolder_create_download_session_v2 = vfolder_create_download_session_v2
     # Session V2 mutations
+    enqueue_session = enqueue_session
     terminate_project_sessions_v2 = terminate_project_sessions_v2
 
 

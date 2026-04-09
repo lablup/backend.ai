@@ -20,6 +20,10 @@ from ai.backend.manager.services.deployment_revision_preset.actions.search impor
     SearchDeploymentRevisionPresetsAction,
     SearchDeploymentRevisionPresetsActionResult,
 )
+from ai.backend.manager.services.deployment_revision_preset.actions.search_resource_slots import (
+    SearchPresetResourceSlotsAction,
+    SearchPresetResourceSlotsActionResult,
+)
 from ai.backend.manager.services.deployment_revision_preset.actions.update import (
     UpdateDeploymentRevisionPresetAction,
     UpdateDeploymentRevisionPresetActionResult,
@@ -64,6 +68,23 @@ class DeploymentRevisionPresetService:
             action.querier
         )
         return SearchDeploymentRevisionPresetsActionResult(
+            items=items,
+            total_count=total_count,
+            has_next_page=has_next_page,
+            has_previous_page=has_previous_page,
+        )
+
+    async def search_resource_slots(
+        self, action: SearchPresetResourceSlotsAction
+    ) -> SearchPresetResourceSlotsActionResult:
+        """Search resource slots allocated to a deployment revision preset."""
+        (
+            items,
+            total_count,
+            has_next_page,
+            has_previous_page,
+        ) = await self._repository.search_resource_slots(action.preset_id, action.querier)
+        return SearchPresetResourceSlotsActionResult(
             items=items,
             total_count=total_count,
             has_next_page=has_next_page,

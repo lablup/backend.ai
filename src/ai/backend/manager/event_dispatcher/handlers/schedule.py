@@ -1,6 +1,9 @@
 import logging
 
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
+from ai.backend.common.events.event_types.model_serving.anycast import (
+    DoSyncRouteInfoToAppProxyEvent,
+)
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleEvent,
     DoDeploymentLifecycleIfNeededEvent,
@@ -117,3 +120,13 @@ class ScheduleEventHandler:
         """Handle route lifecycle event (unconditional)."""
         lifecycle_type = RouteLifecycleType(ev.lifecycle_type)
         await self._route_coordinator.process_route_lifecycle(lifecycle_type)
+
+    async def handle_do_sync_route_info_to_appproxy(
+        self, _context: None, _agent_id: str, _ev: DoSyncRouteInfoToAppProxyEvent
+    ) -> None:
+        """Periodic reconcile trigger: push every active endpoint's route
+        info into Redis and re-fire EndpointRouteListUpdatedEvent so the
+        app proxy coordinator converges on the manager's DB state even if
+        individual hook invocations were missed.
+        """
+        await self._deployment_coordinator.sync_route_info_to_appproxy()

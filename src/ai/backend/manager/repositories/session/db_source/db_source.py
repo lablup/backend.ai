@@ -15,7 +15,7 @@ from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
 from ai.backend.manager.data.session.types import SessionData, SessionListResult
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
@@ -23,6 +23,8 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
     KernelLoadingStrategy,
@@ -123,7 +125,7 @@ class SessionDBSource:
             )
             result = await conn.execute(query)
             template_info = result.fetchone()
-            return dict(template_info) if template_info else None
+            return dict(template_info._mapping) if template_info else None
 
     async def update_session_name(
         self,
@@ -348,7 +350,7 @@ class SessionDBSource:
         query_domain_name: str,
         group_name: str | None,
         query_on_behalf_of: AccessKey | None = None,
-    ) -> tuple[uuid.UUID, uuid.UUID, dict[str, Any]]:
+    ) -> SessionOwnerContext:
         if group_name is None:
             raise GenericBadRequest("group_name cannot be None")
         async with self._db.begin_readonly() as conn:
@@ -623,6 +625,27 @@ class SessionDBSource:
             if row is None:
                 raise ImageNotFound(f"Image not found: {image_id}")
             return row
+
+    async def get_keypair_resource_policy(
+        self,
+        access_key: AccessKey,
+    ) -> dict[str, Any]:
+        """Fetch the keypair resource policy dict for the given access key."""
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(KeyPairResourcePolicyRow)
+                .join(
+                    KeyPairRow,
+                    KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
+                )
+                .where(KeyPairRow.access_key == access_key)
+            )
+            row = await db_sess.scalar(query)
+            if row is None:
+                return {}
+            return {
+                "allowed_vfolder_hosts": row.allowed_vfolder_hosts,
+            }
 
     async def get_session_data_by_id(
         self,

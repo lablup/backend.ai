@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import AccessKey
 
+from .data.user.types import SessionOwnerContext
+from .errors.common import InternalServerError
 from .models.domain import domains
 from .models.group import association_groups_users as agus
 from .models.group import groups
@@ -101,7 +103,7 @@ async def query_userinfo(
     requesting_domain: str,
     requesting_group: str | UUID,
     query_on_behalf_of: AccessKey | None = None,
-) -> tuple[UUID, UUID, dict[str, Any]]:
+) -> SessionOwnerContext:
     if query_on_behalf_of is not None and query_on_behalf_of != requester_access_key:
         await check_if_requester_is_eligible_to_act_as_target_access_key(
             conn,
@@ -134,9 +136,13 @@ async def query_userinfo(
         row = result.first()
         if row is None:
             raise ValueError("Unknown owner access key")
+        if row.role is None:
+            raise InternalServerError(f"Owner user has no role assigned (owner_uuid={row.user})")
         owner_domain = row.domain_name
         owner_uuid = row.user
-        owner_role = row.role
+        actual_owner_role: UserRole = row.role
+        # For delegated sessions, the owner's actual role determines group access.
+        role_for_group_resolution: UserRole = actual_owner_role
         query = (
             sa.select(keypair_resource_policies)
             .select_from(keypair_resource_policies)
@@ -149,7 +155,11 @@ async def query_userinfo(
         # Normal case when the user is creating her/his own session.
         owner_domain = requester_domain
         owner_uuid = requester_uuid
-        owner_role = UserRole.USER
+        actual_owner_role = requester_role
+        # Own-session creation always goes through the USER path to enforce
+        # explicit project membership via the agus table, regardless of the
+        # requester's actual role.
+        role_for_group_resolution = UserRole.USER
         resource_policy = keypair_resource_policy or {}
 
     query = (
@@ -168,7 +178,7 @@ async def query_userinfo(
         group_match_query = groups.c.name == requesting_group
     else:
         group_match_query = groups.c.id == requesting_group
-    if owner_role == UserRole.SUPERADMIN:
+    if role_for_group_resolution == UserRole.SUPERADMIN:
         # superadmin can spawn container in any designated domain/group.
         query = (
             sa.select(groups.c.id)
@@ -181,7 +191,7 @@ async def query_userinfo(
         )
         qresult = await conn.execute(query)
         group_id = qresult.scalar()
-    elif owner_role == UserRole.ADMIN:
+    elif role_for_group_resolution == UserRole.ADMIN:
         # domain-admin can spawn container in any group in the same domain.
         if requesting_domain != owner_domain:
             raise ValueError("You can only set the domain to the owner's domain.")
@@ -213,9 +223,15 @@ async def query_userinfo(
     if group_id is None:
         raise ValueError("Invalid group")
 
-    return owner_uuid, group_id, resource_policy
+    return SessionOwnerContext(
+        owner_uuid=owner_uuid,
+        group_id=group_id,
+        resource_policy=resource_policy,
+        owner_role=actual_owner_role,
+    )
 
 
+# TODO: Replace this with query_userinfo() by obtaining the underlying connection
 async def query_userinfo_from_session(
     db_sess: SASession,
     requester_uuid: UUID,
@@ -226,7 +242,7 @@ async def query_userinfo_from_session(
     requesting_domain: str,
     requesting_group: str | UUID,
     query_on_behalf_of: AccessKey | None = None,
-) -> tuple[UUID, UUID, dict[str, Any]]:
+) -> SessionOwnerContext:
     """Version of query_userinfo that accepts SASession instead of SAConnection."""
     if query_on_behalf_of is not None and query_on_behalf_of != requester_access_key:
         # Need to check privileges - convert session operations
@@ -272,9 +288,13 @@ async def query_userinfo_from_session(
         row = result.first()
         if row is None:
             raise ValueError("Unknown owner access key")
+        if row.role is None:
+            raise InternalServerError(f"Owner user has no role assigned (owner_uuid={row.user})")
         owner_domain = row.domain_name
         owner_uuid = row.user
-        owner_role = row.role
+        actual_owner_role: UserRole = row.role
+        # For delegated sessions, the owner's actual role determines group access.
+        role_for_group_resolution: UserRole = actual_owner_role
         query = (
             sa.select(keypair_resource_policies)
             .select_from(keypair_resource_policies)
@@ -287,7 +307,11 @@ async def query_userinfo_from_session(
         # Normal case when the user is creating her/his own session.
         owner_domain = requester_domain
         owner_uuid = requester_uuid
-        owner_role = UserRole.USER
+        actual_owner_role = requester_role
+        # Own-session creation always goes through the USER path to enforce
+        # explicit project membership via the agus table, regardless of the
+        # requester's actual role.
+        role_for_group_resolution = UserRole.USER
         resource_policy = keypair_resource_policy or {}
 
     query = (
@@ -306,7 +330,7 @@ async def query_userinfo_from_session(
         group_match_query = groups.c.name == requesting_group
     else:
         group_match_query = groups.c.id == requesting_group
-    if owner_role == UserRole.SUPERADMIN:
+    if role_for_group_resolution == UserRole.SUPERADMIN:
         # superadmin can spawn container in any designated domain/group.
         query = (
             sa.select(groups.c.id)
@@ -319,7 +343,7 @@ async def query_userinfo_from_session(
         )
         qresult = await db_sess.execute(query)
         group_id = qresult.scalar()
-    elif owner_role == UserRole.ADMIN:
+    elif role_for_group_resolution == UserRole.ADMIN:
         # domain-admin can spawn container in any group in the same domain.
         if requesting_domain != owner_domain:
             raise ValueError("You can only set the domain to the owner's domain.")
@@ -351,4 +375,9 @@ async def query_userinfo_from_session(
     if group_id is None:
         raise ValueError("Invalid group")
 
-    return owner_uuid, group_id, resource_policy
+    return SessionOwnerContext(
+        owner_uuid=owner_uuid,
+        group_id=group_id,
+        resource_policy=resource_policy,
+        owner_role=actual_owner_role,
+    )

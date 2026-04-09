@@ -2586,6 +2586,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         )
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_session_pending_queue(
         root: Any,
         info: graphene.ResolveInfo,

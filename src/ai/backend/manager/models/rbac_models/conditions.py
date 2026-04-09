@@ -8,7 +8,7 @@ from datetime import datetime
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -18,6 +18,7 @@ from ai.backend.manager.data.permission.types import (
     RoleSource,
     ScopeType,
 )
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -87,6 +88,8 @@ class RoleConditions:
             return condition
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(RoleRow.name))
 
     @staticmethod
     def by_sources(sources: list[RoleSource]) -> QueryCondition:
@@ -356,6 +359,9 @@ class AssignedUserConditions:
 
         return inner
 
+    by_username_in = staticmethod(make_string_in_factory(UserRow.username))
+    by_email_in = staticmethod(make_string_in_factory(UserRow.email))
+
     @staticmethod
     def by_granted_by_equals(granted_by: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -454,6 +460,8 @@ class AssignedUserConditions:
 class DomainScopeConditions:
     """Query conditions for domain scope IDs."""
 
+    by_name_in = staticmethod(make_string_in_factory(DomainRow.name))
+
     @staticmethod
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -510,6 +518,8 @@ class DomainScopeConditions:
 class ProjectScopeConditions:
     """Query conditions for project (group) scope IDs."""
 
+    by_name_in = staticmethod(make_string_in_factory(GroupRow.name))
+
     @staticmethod
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -565,6 +575,25 @@ class ProjectScopeConditions:
 
 class UserScopeConditions:
     """Query conditions for user scope IDs."""
+
+    @staticmethod
+    def by_name_in(spec: StringInMatchSpec) -> QueryCondition:
+        """Match list of usernames or emails."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                lowered = [v.lower() for v in spec.values]
+                username_cond = sa.func.lower(UserRow.username).in_(lowered)
+                email_cond = sa.func.lower(UserRow.email).in_(lowered)
+            else:
+                username_cond = UserRow.username.in_(spec.values)
+                email_cond = UserRow.email.in_(spec.values)
+            condition = sa.or_(username_cond, email_cond)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
 
     @staticmethod
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -728,6 +757,8 @@ class EntityScopeConditions:
             return condition
 
         return inner
+
+    by_entity_id_in = staticmethod(make_string_in_factory(AssociationScopesEntitiesRow.entity_id))
 
     @staticmethod
     def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:

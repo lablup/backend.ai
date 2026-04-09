@@ -216,7 +216,7 @@ class ServiceConfig:
     extra_mounts: dict[uuid.UUID, MountOption]
     environ: dict[str, str] | None
     scaling_group: str
-    resources: dict[str, str | int] | None
+    resources: dict[str, str | int | float] | None
     resource_opts: dict[str, str | int | bool] | None
 
     def to_dict(self) -> dict[str, Any]:

@@ -36,7 +36,7 @@ def mock_deployment_repo() -> AsyncMock:
     repo = AsyncMock()
     repo.fetch_scaling_group_proxy_targets = AsyncMock(return_value={})
     repo.fetch_active_routes_by_endpoint_ids = AsyncMock(return_value={})
-    repo.update_endpoint_urls_bulk = AsyncMock(return_value=None)
+    repo.update_endpoint_url = AsyncMock(return_value=None)
     repo.update_desired_replicas_bulk = AsyncMock(return_value=None)
     repo.mark_terminating_route_status_bulk = AsyncMock(return_value=None)
     repo.scale_routes = AsyncMock(return_value=None)
@@ -44,7 +44,7 @@ def mock_deployment_repo() -> AsyncMock:
     repo.fetch_metrics_for_autoscaling = AsyncMock(return_value=MagicMock())
     repo.calculate_desired_replicas_for_deployment = AsyncMock(return_value=None)
     mock_revision_spec = MagicMock()
-    mock_revision_spec.execution.runtime_variant = RuntimeVariant.CUSTOM
+    mock_revision_spec.execution.runtime_variant = RuntimeVariant("custom")
     repo.get_revision_spec_from_endpoint = AsyncMock(return_value=mock_revision_spec)
     return repo
 
@@ -240,6 +240,24 @@ def destroying_deployment() -> DeploymentWithHistory:
     """DESTROYING deployment for termination tests."""
     return DeploymentWithHistory(
         deployment_info=_create_deployment_info(lifecycle=EndpointLifecycle.DESTROYING),
+    )
+
+
+@pytest.fixture
+def ready_deployment_no_current_revision() -> DeploymentWithHistory:
+    """READY deployment whose current_revision was never set / was cleared.
+
+    Exercises the guard that keeps check_ready / calculate_desired_replicas
+    from transitioning a revisionless deployment into SCALING (where it
+    would then get wedged because scale_deployment() also skips it).
+    """
+    return DeploymentWithHistory(
+        deployment_info=_create_deployment_info(
+            lifecycle=EndpointLifecycle.READY,
+            desired_replica_count=2,
+            replica_count=2,
+            has_revision=False,
+        ),
     )
 
 

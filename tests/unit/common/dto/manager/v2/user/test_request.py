@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.user.request import (
     CreateUserInput,
     DeleteUserInput,
@@ -68,6 +69,7 @@ class TestCreateUserInput:
         assert req.container_uid is None
         assert req.container_main_gid is None
         assert req.container_gids is None
+        assert req.integration_name is None
 
     def test_valid_creation_with_all_fields(self) -> None:
         group_id = uuid.uuid4()
@@ -89,6 +91,7 @@ class TestCreateUserInput:
             container_uid=1000,
             container_main_gid=1000,
             container_gids=[100, 200],
+            integration_name="ext-abc",
         )
         assert req.full_name == "Admin User"
         assert req.description == "An admin account"
@@ -97,6 +100,7 @@ class TestCreateUserInput:
         assert req.container_uid == 1000
         assert req.container_main_gid == 1000
         assert req.container_gids == [100, 200]
+        assert req.integration_name == "ext-abc"
 
     def test_missing_required_email_raises(self) -> None:
         with pytest.raises(ValidationError):
@@ -172,6 +176,7 @@ class TestUpdateUserInput:
         assert req.container_uid is SENTINEL
         assert req.container_main_gid is SENTINEL
         assert req.container_gids is SENTINEL
+        assert req.integration_name is SENTINEL
 
     def test_non_sentinel_fields_default_to_none(self) -> None:
         req = UpdateUserInput()
@@ -228,6 +233,26 @@ class TestUpdateUserInput:
     def test_container_uid_with_value(self) -> None:
         req = UpdateUserInput(container_uid=1000)
         assert req.container_uid == 1000
+
+    def test_integration_name_sentinel_default(self) -> None:
+        req = UpdateUserInput()
+        assert req.integration_name is SENTINEL
+
+    def test_integration_name_none_clears(self) -> None:
+        req = UpdateUserInput(integration_name=None)
+        assert req.integration_name is None
+
+    def test_integration_name_with_value(self) -> None:
+        req = UpdateUserInput(integration_name="ext-system")
+        assert req.integration_name == "ext-system"
+
+    def test_integration_name_max_length_rejects_over_512(self) -> None:
+        with pytest.raises(ValidationError, match="integration_name"):
+            UpdateUserInput(integration_name="x" * 513)
+
+    def test_integration_name_max_length_accepts_exactly_512(self) -> None:
+        req = UpdateUserInput(integration_name="x" * 512)
+        assert req.integration_name == "x" * 512
 
     def test_round_trip_with_none_fields(self) -> None:
         req = UpdateUserInput(
@@ -437,8 +462,20 @@ class TestUserFilter:
         assert f.email is None
         assert f.username is None
         assert f.domain_name is None
+        assert f.integration_name is None
         assert f.status is None
         assert f.role is None
+
+    def test_integration_name_filter(self) -> None:
+        f = UserFilter(
+            integration_name=StringFilter(equals="k8s-user"),
+        )
+        assert f.integration_name is not None
+        assert f.integration_name.equals == "k8s-user"
+
+    def test_integration_name_filter_defaults_to_none(self) -> None:
+        f = UserFilter(email=StringFilter(contains="test"))
+        assert f.integration_name is None
 
     def test_status_filter(self) -> None:
         f = UserFilter(status=UserStatusFilter(in_=[UserStatus.ACTIVE, UserStatus.INACTIVE]))

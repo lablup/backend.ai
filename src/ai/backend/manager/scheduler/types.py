@@ -61,6 +61,9 @@ class ScheduleType(StrEnum):
         "detect_kernel_termination"  # Detect active sessions with any kernel TERMINATED/CANCELLED
     )
     OBSERVE_FAIR_SHARE = "observe_fair_share"  # Observe RUNNING kernels for fair share calculation
+    CLEANUP_FORCE_TERMINATED = (
+        "cleanup_force_terminated"  # Cleanup containers for force-terminated sessions
+    )
 
 
 def merge_resource(

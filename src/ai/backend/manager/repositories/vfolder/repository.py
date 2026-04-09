@@ -51,6 +51,7 @@ from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
+    InsufficientStoragePermission,
     VFolderDeletionNotAllowed,
     VFolderFilterStatusFailed,
     VFolderInvalidParameter,
@@ -105,6 +106,7 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
+from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
@@ -198,6 +200,24 @@ class VfolderRepository:
             if not vfolder_row:
                 raise VFolderNotFound()
             return self._vfolder_row_to_data(vfolder_row)
+
+    @vfolder_repository_resilience.apply()
+    async def batch_load_by_ids(self, ids: Sequence[uuid.UUID]) -> list[VFolderData | None]:
+        """
+        Batch fetch vfolders by IDs without permission validation.
+
+        Returns a list with the same length and order as the input ids;
+        entries that are not found are ``None``. Intended for GraphQL
+        DataLoader use where the caller has already authorized access to a
+        parent entity that references these vfolder IDs.
+        """
+        if not ids:
+            return []
+        async with self._db.begin_readonly_session() as session:
+            query = sa.select(VFolderRow).where(VFolderConditions.by_ids(ids)())
+            result = await session.execute(query)
+            rows_by_id = {row.id: self._vfolder_row_to_data(row) for row in result.scalars().all()}
+            return [rows_by_id.get(vfolder_id) for vfolder_id in ids]
 
     @vfolder_repository_resilience.apply()
     async def get_allowed_vfolder_hosts(
@@ -846,7 +866,7 @@ class VfolderRepository:
         )
         result = await session.scalar(stmt)
         if result is None:
-            raise ObjectNotFound(object_name="user system role", object_id=str(user_id))
+            raise ObjectNotFound(object_name="user system role", extra_msg=str(user_id))
         return result
 
     def _get_vfolder_scope(self, vfolder: VFolderData) -> ScopeId:
@@ -1234,6 +1254,22 @@ class VfolderRepository:
                 resource_policy=resource_policy,
                 domain_name=domain_name,
                 group_id=group_id,
+            )
+
+    @vfolder_repository_resilience.apply()
+    async def ensure_host_permission_allowed_by_user(
+        self,
+        folder_host: str,
+        *,
+        permission: VFolderHostPermission,
+        user_uuid: uuid.UUID,
+        group_id: uuid.UUID | None = None,
+    ) -> None:
+        """Check host permission by looking up the user's resource policy from DB."""
+        allowed_hosts = await self.get_allowed_vfolder_hosts(user_uuid, group_id)
+        if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
+            raise InsufficientStoragePermission(
+                f"`{permission}` Not allowed in vfolder host(`{folder_host}`)"
             )
 
     @vfolder_repository_resilience.apply()
@@ -1691,6 +1727,47 @@ class VfolderRepository:
                 raise VFolderOperationFailed(
                     f"Failed to update vfolder quota: expected 1 row, got {db_result.rowcount}"
                 )
+
+    @vfolder_repository_resilience.apply()
+    async def get_user_storage_host_permissions(
+        self,
+        user_uuid: uuid.UUID,
+        domain_name: str,
+    ) -> VFolderHostPermissionMap:
+        """
+        Resolve all storage hosts and per-host permissions accessible to a user.
+
+        Internally fetches the user's main keypair resource policy and unions
+        domain/group/keypair allowed vfolder hosts. Returns the host permission
+        map without filtering against currently mountable volumes — callers that
+        depend on volume availability must intersect with ``StorageSessionManager``.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            user_row: UserRow | None = await db_session.scalar(
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_uuid)
+                .options(
+                    selectinload(UserRow.main_keypair).selectinload(KeyPairRow.resource_policy_row)
+                )
+            )
+            if user_row is None:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
+            if user_row.main_keypair is None or user_row.main_keypair.resource_policy_row is None:
+                resource_policy: Mapping[str, Any] = {
+                    "allowed_vfolder_hosts": VFolderHostPermissionMap(),
+                }
+            else:
+                resource_policy = {
+                    "allowed_vfolder_hosts": user_row.main_keypair.resource_policy_row.allowed_vfolder_hosts,
+                }
+            conn = await db_session.connection()
+            return await get_allowed_vfolder_hosts_by_user(
+                conn=conn,
+                resource_policy=resource_policy,
+                domain_name=domain_name,
+                user_uuid=user_uuid,
+                group_id=None,
+            )
 
     @vfolder_repository_resilience.apply()
     async def get_allowed_hosts_for_listing(

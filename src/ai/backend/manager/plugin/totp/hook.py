@@ -25,6 +25,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class TOTPHook(HookPlugin):
+    require_explicit_allow = True
+
     _plugin_config: TOTPConfig
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:

@@ -48,6 +48,16 @@ class RuntimeVariantPresetDBSource:
                 raise RuntimeVariantPresetNotFound()
             return row.to_data()
 
+    async def get_by_ids(self, preset_ids: list[UUID]) -> list[RuntimeVariantPresetData]:
+        if not preset_ids:
+            return []
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = sa.select(RuntimeVariantPresetRow).where(
+                RuntimeVariantPresetRow.id.in_(preset_ids)
+            )
+            rows = (await session.execute(stmt)).scalars().all()
+            return [row.to_data() for row in rows]
+
     async def update(self, updater: Updater[RuntimeVariantPresetRow]) -> RuntimeVariantPresetData:
         async with self._db.begin_session() as session:
             result = await execute_updater(session, updater)

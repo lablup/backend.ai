@@ -31,6 +31,26 @@ def register_v2_keypair_routes(
     reg.add("POST", "/my/switch-main", handler.switch_main, middlewares=[auth_required])
     # Admin routes
     reg.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])
+    # Admin SSH keypair routes must be registered before /{access_key} to avoid
+    # capturing "ssh" as an access_key path parameter.
+    reg.add(
+        "POST",
+        "/ssh",
+        handler.admin_register_ssh_keypair,
+        middlewares=[superadmin_required],
+    )
+    reg.add(
+        "GET",
+        "/{access_key}/ssh",
+        handler.admin_get_ssh_keypair,
+        middlewares=[superadmin_required],
+    )
+    reg.add(
+        "DELETE",
+        "/{access_key}/ssh",
+        handler.admin_delete_ssh_keypair,
+        middlewares=[superadmin_required],
+    )
     reg.add("GET", "/{access_key}", handler.admin_get, middlewares=[superadmin_required])
     reg.add("POST", "", handler.admin_create, middlewares=[superadmin_required])
     reg.add("PATCH", "", handler.admin_update, middlewares=[superadmin_required])

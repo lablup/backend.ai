@@ -1,6 +1,10 @@
 import logging
 from typing import cast
 
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    PresetTarget,
+    PresetValueType,
+)
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.runtime_variant_preset.creators import (
@@ -8,6 +12,9 @@ from ai.backend.manager.repositories.runtime_variant_preset.creators import (
 )
 from ai.backend.manager.repositories.runtime_variant_preset.repository import (
     RuntimeVariantPresetRepository,
+)
+from ai.backend.manager.repositories.runtime_variant_preset.updaters import (
+    RuntimeVariantPresetUpdaterSpec,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
@@ -28,36 +35,6 @@ from ai.backend.manager.services.runtime_variant_preset.actions.update import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-VALID_PRESET_TARGETS = {"env", "args"}
-VALID_VALUE_TYPES = {"str", "int", "float", "bool"}
-
-VALUE_TYPE_VALIDATORS: dict[str, type] = {
-    "str": str,
-    "int": int,
-    "float": float,
-    "bool": bool,
-}
-
-
-def _validate_default_value(default_value: str | None, value_type: str) -> None:
-    if default_value is None:
-        return
-    validator = VALUE_TYPE_VALIDATORS.get(value_type)
-    if validator is None:
-        return
-    if validator is bool:
-        if default_value.lower() not in ("true", "false", "1", "0"):
-            raise InvalidAPIParameters(
-                f"default_value '{default_value}' is not a valid {value_type}"
-            )
-    else:
-        try:
-            validator(default_value)
-        except (ValueError, TypeError) as e:
-            raise InvalidAPIParameters(
-                f"default_value '{default_value}' is not a valid {value_type}: {e}"
-            ) from e
-
 
 class RuntimeVariantPresetService:
     _repository: RuntimeVariantPresetRepository
@@ -69,17 +46,6 @@ class RuntimeVariantPresetService:
         self, action: CreateRuntimeVariantPresetAction
     ) -> CreateRuntimeVariantPresetActionResult:
         spec = cast(RuntimeVariantPresetCreatorSpec, action.creator.spec)
-
-        if spec.preset_target not in VALID_PRESET_TARGETS:
-            raise InvalidAPIParameters(
-                f"preset_target must be one of {VALID_PRESET_TARGETS}, got '{spec.preset_target}'"
-            )
-        if spec.value_type not in VALID_VALUE_TYPES:
-            raise InvalidAPIParameters(
-                f"value_type must be one of {VALID_VALUE_TYPES}, got '{spec.value_type}'"
-            )
-        _validate_default_value(spec.default_value, spec.value_type)
-
         next_rank = await self._repository.get_next_rank(spec.runtime_variant_id)
         spec.rank = next_rank
 
@@ -89,6 +55,16 @@ class RuntimeVariantPresetService:
     async def update(
         self, action: UpdateRuntimeVariantPresetAction
     ) -> UpdateRuntimeVariantPresetActionResult:
+        spec = cast(RuntimeVariantPresetUpdaterSpec, action.updater.spec)
+        current = await self._repository.get_by_id(action.id)
+        effective_value_type = spec.value_type.optional_value() or current.value_type
+        effective_preset_target = spec.preset_target.optional_value() or current.preset_target
+        if (
+            effective_value_type == PresetValueType.FLAG
+            and effective_preset_target != PresetTarget.ARGS
+        ):
+            raise InvalidAPIParameters("value_type 'flag' is only valid with preset_target 'args'.")
+
         action.updater.pk_value = action.id
         data = await self._repository.update(action.updater)
         return UpdateRuntimeVariantPresetActionResult(preset=data)

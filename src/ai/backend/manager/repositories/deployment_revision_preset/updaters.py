@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.config import ModelDefinition
-from ai.backend.manager.models.base import ResourceOptsEntry, ResourceSlotEntry
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
+from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
@@ -16,12 +19,12 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    image: TriState[str] = field(default_factory=TriState[str].nop)
+    image_id: TriState[uuid.UUID] = field(default_factory=TriState[uuid.UUID].nop)
     model_definition: TriState[ModelDefinition] = field(
         default_factory=TriState[ModelDefinition].nop
     )
-    resource_slots: OptionalState[list[ResourceSlotEntry]] = field(
-        default_factory=OptionalState[list[ResourceSlotEntry]].nop
+    resource_slots: OptionalState[list[ResourceSlotEntryData]] = field(
+        default_factory=OptionalState[list[ResourceSlotEntryData]].nop
     )
     resource_opts: OptionalState[list[ResourceOptsEntry]] = field(
         default_factory=OptionalState[list[ResourceOptsEntry]].nop
@@ -36,6 +39,15 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     preset_values: OptionalState[list[PresetValueEntry]] = field(
         default_factory=OptionalState[list[PresetValueEntry]].nop
     )
+    open_to_public: TriState[bool] = field(default_factory=TriState[bool].nop)
+    replica_count: TriState[int] = field(default_factory=TriState[int].nop)
+    revision_history_limit: TriState[int] = field(default_factory=TriState[int].nop)
+    deployment_strategy: TriState[DeploymentStrategy] = field(
+        default_factory=TriState[DeploymentStrategy].nop
+    )
+    deployment_strategy_spec: TriState[dict[str, Any]] = field(
+        default_factory=TriState[dict[str, Any]].nop
+    )
 
     @property
     @override
@@ -48,9 +60,8 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
         self.name.update_dict(to_update, "name")
         self.description.update_dict(to_update, "description")
         self.rank.update_dict(to_update, "rank")
-        self.image.update_dict(to_update, "image")
+        self.image_id.update_dict(to_update, "image_id")
         self.model_definition.update_dict(to_update, "model_definition")
-        self.resource_slots.update_dict(to_update, "resource_slots")
         self.resource_opts.update_dict(to_update, "resource_opts")
         self.cluster_mode.update_dict(to_update, "cluster_mode")
         self.cluster_size.update_dict(to_update, "cluster_size")
@@ -58,4 +69,9 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
         self.bootstrap_script.update_dict(to_update, "bootstrap_script")
         self.environ.update_dict(to_update, "environ")
         self.preset_values.update_dict(to_update, "preset_values")
+        self.open_to_public.update_dict(to_update, "open_to_public")
+        self.replica_count.update_dict(to_update, "replica_count")
+        self.revision_history_limit.update_dict(to_update, "revision_history_limit")
+        self.deployment_strategy.update_dict(to_update, "deployment_strategy")
+        self.deployment_strategy_spec.update_dict(to_update, "deployment_strategy_spec")
         return to_update

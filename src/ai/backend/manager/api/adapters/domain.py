@@ -165,7 +165,7 @@ class DomainAdapter(BaseAdapter):
             description=input.description,
             is_active=input.is_active,
             allowed_docker_registries=input.allowed_docker_registries,
-            integration_id=input.integration_id,
+            integration_name=input.integration_name,
         )
         result = await self._processors.domain.create_domain_node.wait_for_complete(
             CreateDomainNodeAction(
@@ -202,12 +202,12 @@ class DomainAdapter(BaseAdapter):
                 if input.allowed_docker_registries is not None
                 else OptionalState.nop()
             ),
-            integration_id=(
+            integration_name=(
                 TriState.nop()
-                if isinstance(input.integration_id, Sentinel)
+                if isinstance(input.integration_name, Sentinel)
                 else TriState.nullify()
-                if input.integration_id is None
-                else TriState.update(input.integration_id)
+                if input.integration_name is None
+                else TriState.update(input.integration_name)
             ),
         )
         updater: Updater[DomainRow] = Updater(spec=spec, pk_value=domain_name)
@@ -282,6 +282,7 @@ class DomainAdapter(BaseAdapter):
                     equals_factory=DomainConditions.by_project_name_equals,
                     starts_with_factory=DomainConditions.by_project_name_starts_with,
                     ends_with_factory=DomainConditions.by_project_name_ends_with,
+                    in_factory=DomainConditions.by_project_name_in,
                 )
                 if condition is not None:
                     conditions.append(condition)
@@ -295,6 +296,7 @@ class DomainAdapter(BaseAdapter):
                     equals_factory=DomainConditions.by_user_username_equals,
                     starts_with_factory=DomainConditions.by_user_username_starts_with,
                     ends_with_factory=DomainConditions.by_user_username_ends_with,
+                    in_factory=DomainConditions.by_user_username_in,
                 )
                 if condition is not None:
                     conditions.append(condition)
@@ -304,6 +306,7 @@ class DomainAdapter(BaseAdapter):
                     equals_factory=DomainConditions.by_user_email_equals,
                     starts_with_factory=DomainConditions.by_user_email_starts_with,
                     ends_with_factory=DomainConditions.by_user_email_ends_with,
+                    in_factory=DomainConditions.by_user_email_in,
                 )
                 if condition is not None:
                     conditions.append(condition)
@@ -337,6 +340,7 @@ class DomainAdapter(BaseAdapter):
             equals_factory=DomainConditions.by_name_equals,
             starts_with_factory=DomainConditions.by_name_starts_with,
             ends_with_factory=DomainConditions.by_name_ends_with,
+            in_factory=DomainConditions.by_name_in,
         )
 
     def _convert_description_filter(self, sf: StringFilter) -> QueryCondition | None:
@@ -346,6 +350,7 @@ class DomainAdapter(BaseAdapter):
             equals_factory=DomainConditions.by_description_equals,
             starts_with_factory=DomainConditions.by_description_starts_with,
             ends_with_factory=DomainConditions.by_description_ends_with,
+            in_factory=DomainConditions.by_description_in,
         )
 
     @staticmethod
@@ -360,7 +365,7 @@ class DomainAdapter(BaseAdapter):
             basic_info=DomainBasicInfo(
                 name=data.name,
                 description=data.description,
-                integration_id=data.integration_id,
+                integration_name=data.integration_name,
             ),
             registry=DomainRegistryInfo(
                 allowed_docker_registries=data.allowed_docker_registries,

@@ -18,6 +18,9 @@ from ai.backend.common.dto.manager.v2.keypair.types import KeypairOrderField
 __all__ = (
     "AdminCreateKeypairInput",
     "AdminDeleteKeypairInput",
+    "AdminDeleteSSHKeypairInput",
+    "AdminGetSSHKeypairInput",
+    "AdminRegisterSSHKeypairInput",
     "AdminSearchKeypairsInput",
     "AdminUpdateKeypairInput",
     "KeypairFilter",
@@ -119,6 +122,26 @@ class AdminDeleteKeypairInput(BaseRequestModel):
     """Admin request to delete a keypair."""
 
     access_key: str = Field(description="Access key of the keypair to delete.")
+
+
+class AdminRegisterSSHKeypairInput(BaseRequestModel):
+    """Admin request to register (overwrite) a user's SSH keypair."""
+
+    access_key: str = Field(description="Access key whose SSH keypair will be replaced.")
+    ssh_public_key: str = Field(description="PEM-encoded SSH public key.")
+    ssh_private_key: str = Field(description="PEM-encoded SSH private key.")
+
+
+class AdminDeleteSSHKeypairInput(BaseRequestModel):
+    """Admin request to clear a user's SSH keypair."""
+
+    access_key: str = Field(description="Access key whose SSH keypair will be cleared.")
+
+
+class AdminGetSSHKeypairInput(BaseRequestModel):
+    """Admin request to look up a user's SSH keypair (public key only)."""
+
+    access_key: str = Field(description="Access key whose SSH public key will be returned.")
 
 
 class AdminSearchKeypairsInput(BaseRequestModel):

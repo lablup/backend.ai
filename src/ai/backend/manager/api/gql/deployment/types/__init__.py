@@ -8,6 +8,8 @@ from .access_token import (
     AccessTokenOrderBy,
     CreateAccessTokenInput,
     CreateAccessTokenPayload,
+    DeleteAccessTokenInput,
+    DeleteAccessTokenPayload,
 )
 from .auto_scaling import (
     AutoScalingMetricSource,
@@ -42,6 +44,7 @@ from .deployment import (
     ModelDeploymentMetadataInput,
     ModelDeploymentNetworkAccess,
     ModelDeploymentNetworkAccessInput,
+    ProjectDeploymentScopeGQL,
     ReplicaState,
     SyncReplicaInput,
     SyncReplicaPayload,
@@ -73,6 +76,14 @@ from .replica import (
     ReplicaStatusFilter,
     TrafficStatus,
     TrafficStatusFilter,
+)
+from .resource_slot import (
+    AllocatedResourceSlotConnection,
+    AllocatedResourceSlotEdge,
+    AllocatedResourceSlotFilterGQL,
+    AllocatedResourceSlotNodeGQL,
+    AllocatedResourceSlotOrderByGQL,
+    AllocatedResourceSlotOrderFieldGQL,
 )
 from .revision import (
     ActivateRevisionInputGQL,
@@ -108,6 +119,8 @@ from .revision_preset import (
     DeploymentRevisionPresetGQL,
     DeploymentRevisionPresetOrderByGQL,
     DeploymentRevisionPresetOrderFieldGQL,
+    PresetDeploymentDefaultsGQL,
+    PresetDeploymentStrategyInputGQL,
     UpdateDeploymentRevisionPresetInputGQL,
     UpdateDeploymentRevisionPresetPayloadGQL,
 )
@@ -134,6 +147,8 @@ __all__ = [
     "AccessTokenOrderBy",
     "CreateAccessTokenInput",
     "CreateAccessTokenPayload",
+    "DeleteAccessTokenInput",
+    "DeleteAccessTokenPayload",
     # Auto Scaling
     "AutoScalingMetricSource",
     "AutoScalingRule",
@@ -164,6 +179,7 @@ __all__ = [
     "ModelDeploymentEdge",
     "ModelDeploymentMetadata",
     "ModelDeploymentMetadataInput",
+    "ProjectDeploymentScopeGQL",
     "ModelDeploymentNetworkAccess",
     "ModelDeploymentNetworkAccessInput",
     "ReplicaState",
@@ -218,6 +234,13 @@ __all__ = [
     "ResourceConfig",
     "ResourceConfigInput",
     "ResourceGroupInput",
+    # Allocated Resource Slot
+    "AllocatedResourceSlotConnection",
+    "AllocatedResourceSlotEdge",
+    "AllocatedResourceSlotFilterGQL",
+    "AllocatedResourceSlotNodeGQL",
+    "AllocatedResourceSlotOrderByGQL",
+    "AllocatedResourceSlotOrderFieldGQL",
     # Route
     "Route",
     "RouteConnection",
@@ -240,6 +263,8 @@ __all__ = [
     "DeploymentRevisionPresetGQL",
     "DeploymentRevisionPresetOrderByGQL",
     "DeploymentRevisionPresetOrderFieldGQL",
+    "PresetDeploymentDefaultsGQL",
+    "PresetDeploymentStrategyInputGQL",
     "UpdateDeploymentRevisionPresetInputGQL",
     "UpdateDeploymentRevisionPresetPayloadGQL",
 ]

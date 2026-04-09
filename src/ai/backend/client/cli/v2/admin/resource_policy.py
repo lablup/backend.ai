@@ -446,6 +446,15 @@ def user_get(name: str) -> None:
     "--max-session-count-per-model-session", type=int, help="Maximum sessions per model session."
 )
 @click.option("--max-customized-image-count", type=int, help="Maximum customized images.")
+@click.option(
+    "--max-concurrent-logins",
+    type=int,
+    default=None,
+    help=(
+        "Maximum concurrent authenticated login sessions per user (NULL = unlimited)."
+        " Distinct from --max-concurrent-sessions which limits compute sessions."
+    ),
+)
 @click.option("--json", "json_str", default=None, help="Full input as JSON string.")
 @click.option(
     "--file",
@@ -460,6 +469,7 @@ def user_create(
     max_quota_scope_size: int | None,
     max_session_count_per_model_session: int | None,
     max_customized_image_count: int | None,
+    max_concurrent_logins: int | None,
     json_str: str | None,
     file_path: str | None,
 ) -> None:
@@ -484,6 +494,7 @@ def user_create(
         max_quota_scope_size=max_quota_scope_size,
         max_session_count_per_model_session=max_session_count_per_model_session,
         max_customized_image_count=max_customized_image_count,
+        max_concurrent_logins=max_concurrent_logins,
     )
     dto = _build_dto(CreateUserResourcePolicyInput, data)
 
@@ -513,6 +524,15 @@ def user_create(
 @click.option(
     "--max-customized-image-count", type=int, default=None, help="Updated max customized images."
 )
+@click.option(
+    "--max-concurrent-logins",
+    type=int,
+    default=None,
+    help=(
+        "Maximum concurrent authenticated login sessions per user (NULL = unlimited)."
+        " Distinct from --max-concurrent-sessions which limits compute sessions."
+    ),
+)
 @click.option("--json", "json_str", default=None, help="Full update input as JSON string.")
 @click.option(
     "--file",
@@ -527,6 +547,7 @@ def user_update(
     max_quota_scope_size: int | None,
     max_session_count_per_model_session: int | None,
     max_customized_image_count: int | None,
+    max_concurrent_logins: int | None,
     json_str: str | None,
     file_path: str | None,
 ) -> None:
@@ -542,6 +563,7 @@ def user_update(
         max_quota_scope_size=max_quota_scope_size,
         max_session_count_per_model_session=max_session_count_per_model_session,
         max_customized_image_count=max_customized_image_count,
+        max_concurrent_logins=max_concurrent_logins,
     )
 
     dto = _build_dto(UpdateUserResourcePolicyInput, data)

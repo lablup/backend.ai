@@ -83,6 +83,7 @@ class AssignedUserAdapter(BaseFilterAdapter):
                 equals_factory=AssignedUserConditions.by_username_equals,
                 starts_with_factory=AssignedUserConditions.by_username_starts_with,
                 ends_with_factory=AssignedUserConditions.by_username_ends_with,
+                in_factory=AssignedUserConditions.by_username_in,
             )
             if condition is not None:
                 user_conditions.append(condition)
@@ -94,6 +95,7 @@ class AssignedUserAdapter(BaseFilterAdapter):
                 equals_factory=AssignedUserConditions.by_email_equals,
                 starts_with_factory=AssignedUserConditions.by_email_starts_with,
                 ends_with_factory=AssignedUserConditions.by_email_ends_with,
+                in_factory=AssignedUserConditions.by_email_in,
             )
             if condition is not None:
                 user_conditions.append(condition)

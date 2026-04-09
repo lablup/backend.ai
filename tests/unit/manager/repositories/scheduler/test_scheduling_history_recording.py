@@ -427,6 +427,8 @@ class TestMarkTerminatingSchedulingHistory:
                 AgentRow,
                 SessionRow,
                 KernelRow,
+                ResourceSlotTypeRow,
+                ResourceAllocationRow,
                 SessionSchedulingHistoryRow,
             ],
         ):
@@ -802,6 +804,46 @@ class TestMarkTerminatingSchedulingHistory:
             assert history_record.phase == "force_terminate"
             assert history_record.result == str(SchedulingResult.SUCCESS)
             assert history_record.from_status == str(SessionStatus.RUNNING)
+            assert history_record.to_status == str(SessionStatus.TERMINATED)
+            assert history_record.message == "force_terminate success"
+
+    async def test_force_terminate_from_terminating_creates_scheduling_history(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+    ) -> None:
+        """Forced termination should record history for TERMINATING sessions too."""
+        db_source = ScheduleDBSource(db_with_cleanup)
+
+        session_id = await self._create_session_with_kernel(
+            db_with_cleanup,
+            session_status=SessionStatus.TERMINATING,
+            kernel_status=KernelStatus.TERMINATING,
+            domain_name=test_domain_name,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            agent_id=test_agent_id,
+        )
+
+        result = await db_source.mark_sessions_terminating([session_id], forced=True)
+        assert session_id in result.force_terminated_sessions
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            history_stmt = sa.select(SessionSchedulingHistoryRow).where(
+                SessionSchedulingHistoryRow.session_id == session_id
+            )
+            history_record = await db_sess.scalar(history_stmt)
+            assert history_record is not None
+            assert history_record.phase == "force_terminate"
+            assert history_record.result == str(SchedulingResult.SUCCESS)
+            assert history_record.from_status == str(SessionStatus.TERMINATING)
             assert history_record.to_status == str(SessionStatus.TERMINATED)
             assert history_record.message == "force_terminate success"
 

@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.keypair.types.filters import KeypairFilterGQL, KeypairOrderByGQL
 from ai.backend.manager.api.gql.keypair.types.node import KeyPairConnection, KeyPairEdge, KeyPairGQL
+from ai.backend.manager.api.gql.keypair.types.payloads import AdminGetSSHKeypairPayloadGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
@@ -121,3 +122,18 @@ async def admin_keypair_v2(
     check_admin_only()
     node = await info.context.adapters.user.admin_get_keypair(access_key)
     return KeyPairGQL.from_pydantic(node)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get a user's SSH public key (admin only). The private key is never returned.",
+    )
+)  # type: ignore[misc]
+async def admin_ssh_keypair_v2(
+    info: Info[StrawberryGQLContext],
+    access_key: str,
+) -> AdminGetSSHKeypairPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.user.admin_get_ssh_keypair(access_key)
+    return AdminGetSSHKeypairPayloadGQL.from_pydantic(payload)

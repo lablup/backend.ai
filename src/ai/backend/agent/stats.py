@@ -500,7 +500,7 @@ class StatContext:
             instance: AbstractComputePlugin,
         ) -> tuple[list[SlotName], Sequence[NodeMeasurement]]:
             result = await instance.gather_node_measures(self)
-            return [slot_name for slot_name, _ in instance.slot_types], result
+            return [SlotName(slot_name) for slot_name, _ in instance.slot_types], result
 
         _tasks = [
             asyncio.create_task(gather_node_measures_with_slots(computer.instance))

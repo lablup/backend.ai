@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.notification import NotificationChannelType, NotificationRuleType
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base import QueryCondition
 
@@ -74,6 +75,8 @@ class NotificationChannelConditions:
             return condition
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(NotificationChannelRow.name))
 
     @staticmethod
     def by_channel_types(channel_types: list[NotificationChannelType]) -> QueryCondition:
@@ -210,6 +213,8 @@ class NotificationRuleConditions:
             return condition
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(NotificationRuleRow.name))
 
     @staticmethod
     def by_rule_types(rule_types: list[NotificationRuleType]) -> QueryCondition:

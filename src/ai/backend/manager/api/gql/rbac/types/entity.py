@@ -33,7 +33,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
-from ai.backend.manager.api.gql.rbac.types.permission import RBACElementTypeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 # ==================== Enums ====================

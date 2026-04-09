@@ -8,6 +8,7 @@ from collections.abc import Collection
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.repositories.base import QueryCondition
 
@@ -74,6 +75,8 @@ class ObjectStorageConditions:
 
         return inner
 
+    by_name_in = staticmethod(make_string_in_factory(ObjectStorageRow.name))
+
     @staticmethod
     def by_host_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.ColumnElement[bool]:
@@ -125,3 +128,5 @@ class ObjectStorageConditions:
             return condition
 
         return inner
+
+    by_host_in = staticmethod(make_string_in_factory(ObjectStorageRow.host))

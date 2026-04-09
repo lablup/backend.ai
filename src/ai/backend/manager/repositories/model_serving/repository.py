@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from decimal import Decimal
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -39,7 +40,6 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
-from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -57,6 +57,7 @@ from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
@@ -637,12 +638,22 @@ class ModelServingRepository:
             if endpoint.lifecycle_stage in EndpointLifecycle.inactive_states():
                 return None
 
+            # Convert legacy threshold+comparator to min/max_threshold
+            min_threshold_val: Decimal | None = None
+            max_threshold_val: Decimal | None = None
+            if comparator in (
+                AutoScalingMetricComparator.GREATER_THAN,
+                AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL,
+            ):
+                max_threshold_val = Decimal(str(threshold))
+            else:
+                min_threshold_val = Decimal(str(threshold))
             rule = await endpoint.create_auto_scaling_rule(
                 session,
                 metric_source,
                 metric_name,
-                threshold,
-                comparator,
+                min_threshold_val,
+                max_threshold_val,
                 step_size,
                 cooldown_seconds=cooldown_seconds,
                 min_replicas=min_replicas,
@@ -829,6 +840,14 @@ class ModelServingRepository:
                         )
                         image_id = resolved_image.id
 
+                    # Merge resource_slots: spec overrides current revision
+                    merged_slots: ResourceSlot = (
+                        spec.resource_slots.optional_value()
+                        or ResourceSlot({
+                            r.slot_name: r.quantity for r in current_rev.resource_slot_rows
+                        })
+                    )
+
                     # Merge revision fields: current revision as base, spec overrides
                     new_revision = DeploymentRevisionRow(
                         endpoint=endpoint_row.id,
@@ -842,9 +861,6 @@ class ModelServingRepository:
                             else current_rev.model_definition_path
                         ),
                         resource_group=endpoint_row.resource_group,
-                        resource_slots=(
-                            spec.resource_slots.optional_value() or current_rev.resource_slots
-                        ),
                         resource_opts=(
                             spec.resource_opts.optional_value()
                             if spec.resource_opts.optional_value() is not None
@@ -881,6 +897,17 @@ class ModelServingRepository:
                     new_revision.revision_number = (latest or 0) + 1
 
                     db_session.add(new_revision)
+                    await db_session.flush()
+
+                    # Write normalized resource slot rows
+                    for slot_name, quantity in merged_slots.items():
+                        db_session.add(
+                            DeploymentRevisionResourceSlotRow(
+                                revision_id=new_revision.id,
+                                slot_name=str(slot_name),
+                                quantity=quantity,
+                            )
+                        )
                     await db_session.flush()
 
                     # Activate: set as current revision
@@ -1037,7 +1064,7 @@ class ModelServingRepository:
             )
 
             try:
-                owner_uuid, group_id, resource_policy = await query_userinfo(
+                user_info = await query_userinfo(
                     conn,
                     requester_uuid,
                     requester_access_key,
@@ -1050,11 +1077,10 @@ class ModelServingRepository:
                 )
             except ValueError as e:
                 raise InvalidAPIParameters(str(e)) from e
-
-            owner_role_query = sa.select(UserRow.role).where(UserRow.uuid == owner_uuid)
-            owner_role = (await conn.execute(owner_role_query)).scalar()
-            if not owner_role:
-                raise InvalidAuthParameters("Owner role is required to create a model service")
+            owner_uuid = user_info.owner_uuid
+            group_id = user_info.group_id
+            resource_policy = user_info.resource_policy
+            owner_role = user_info.owner_role
 
             allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
             try:

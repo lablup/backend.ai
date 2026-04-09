@@ -1,6 +1,7 @@
 import logging
 import uuid
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from typing import Protocol, cast
 
 import sqlalchemy as sa
@@ -16,8 +17,11 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
+    EntityType,
     OperationType,
+    RBACElementRef,
     RoleSource,
+    ScopeType,
 )
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -28,6 +32,10 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
     ObjectPermissionCreatorSpec,
@@ -47,6 +55,27 @@ class ScopeSystemRoleData(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class UserSystemRoleSpec:
+    """Minimal implementation of ScopeSystemRoleData for user system role creation."""
+
+    user_id: uuid.UUID
+
+    def scope_id(self) -> ScopeId:
+        return ScopeId(scope_type=ScopeType.USER, scope_id=str(self.user_id))
+
+    def role_name(self) -> str:
+        return f"user-{str(self.user_id)[:8]}"
+
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
+        resource_entity_permissions = {
+            entity.to_element(): OperationType.owner_operations()
+            for entity in EntityType.owner_accessible_entity_types_in_user()
+        }
+        user_permissions = OperationType.owner_operations() - {OperationType.CREATE}
+        return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
+
+
 class RoleManager:
     def __init__(self) -> None:
         pass
@@ -61,14 +90,20 @@ class RoleManager:
     async def _create_system_role(
         self, db_session: SASession, data: ScopeSystemRoleData
     ) -> RoleData:
-        creator = Creator(
+        scope_id = data.scope_id()
+        rbac_creator = RBACEntityCreator(
             spec=RoleCreatorSpec(
                 name=data.role_name(),
                 source=RoleSource.SYSTEM,
                 status=RoleStatus.ACTIVE,
-            )
+            ),
+            element_type=RBACElementType.ROLE,
+            scope_ref=RBACElementRef(
+                element_type=scope_id.scope_type.to_element(),
+                element_id=scope_id.scope_id,
+            ),
         )
-        result = await execute_creator(db_session, creator)
+        result = await execute_rbac_entity_creator(db_session, rbac_creator)
         return result.row.to_data()
 
     async def _create_permissions(

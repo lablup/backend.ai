@@ -37,6 +37,8 @@ from ai.backend.common.types import (
     SlotQuantity,
     SlotTypes,
     VFolderMount,
+    VFolderMountOptions,
+    VFolderMountRequest,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -809,11 +811,34 @@ class ScheduleDBSource:
                 skipped_sessions=skipped_sessions,
             )
 
+    async def _free_kernel_allocations(
+        self,
+        db_sess: SASession,
+        kernel_ids: Sequence[UUID],
+        now: datetime,
+    ) -> None:
+        """Set ``free_at`` on the given kernels' active allocations. Only sets
+        ``free_at`` and does not adjust ``agent_resources.used`` -- callers
+        whose source statuses can include RUNNING/TERMINATING must use
+        ``update_kernel_status_terminated`` instead. Idempotent.
+        """
+        if not kernel_ids:
+            return
+        await db_sess.execute(
+            sa.update(ResourceAllocationRow)
+            .where(
+                ResourceAllocationRow.kernel_id.in_(kernel_ids),
+                ResourceAllocationRow.free_at.is_(None),
+            )
+            .values(free_at=now)
+        )
+
     async def _cancel_pending_sessions(
         self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
     ) -> list[SessionId]:
-        """Cancel pending sessions and their kernels."""
-        # Cancel pending sessions
+        """Cancel PENDING sessions and their kernels, and free the kernels'
+        ``resource_allocations`` rows in the same transaction.
+        """
         cancel_stmt = (
             sa.update(SessionRow)
             .values(
@@ -834,9 +859,8 @@ class ScheduleDBSource:
         cancelled_result = await db_sess.execute(cancel_stmt)
         cancelled_sessions = [cast(SessionId, row.id) for row in cancelled_result]
 
-        # Cancel kernels for cancelled sessions
         if cancelled_sessions:
-            await db_sess.execute(
+            kernel_update_result = await db_sess.execute(
                 sa.update(KernelRow)
                 .values(
                     status=KernelStatus.CANCELLED,
@@ -850,7 +874,10 @@ class ScheduleDBSource:
                     ),
                 )
                 .where(KernelRow.session_id.in_(cancelled_sessions))
+                .returning(KernelRow.id)
             )
+            cancelled_kernel_ids = [row.id for row in kernel_update_result]
+            await self._free_kernel_allocations(db_sess, cancelled_kernel_ids, now)
 
         return cancelled_sessions
 
@@ -939,7 +966,7 @@ class ScheduleDBSource:
         status_query = sa.select(SessionRow.id, SessionRow.status).where(
             sa.and_(
                 SessionRow.id.in_(session_ids),
-                SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+                SessionRow.status.in_(SessionStatus.force_terminatable_statuses()),
             )
         )
         status_result = await db_sess.execute(status_query)
@@ -965,7 +992,7 @@ class ScheduleDBSource:
             .where(
                 sa.and_(
                     SessionRow.id.in_(session_ids),
-                    SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+                    SessionRow.status.in_(SessionStatus.force_terminatable_statuses()),
                 )
             )
             .returning(SessionRow.id)
@@ -979,7 +1006,7 @@ class ScheduleDBSource:
             kernel_agent_query = sa.select(KernelRow.id, KernelRow.agent).where(
                 sa.and_(
                     KernelRow.session_id.in_(force_terminated_sessions),
-                    KernelRow.status.in_(KernelStatus.terminatable_statuses()),
+                    KernelRow.status.in_(KernelStatus.force_terminatable_statuses()),
                 )
             )
             kernel_agent_rows = (await db_sess.execute(kernel_agent_query)).all()
@@ -1003,7 +1030,7 @@ class ScheduleDBSource:
                 .where(
                     sa.and_(
                         KernelRow.session_id.in_(force_terminated_sessions),
-                        KernelRow.status.in_(KernelStatus.terminatable_statuses()),
+                        KernelRow.status.in_(KernelStatus.force_terminatable_statuses()),
                     )
                 )
             )
@@ -1061,6 +1088,13 @@ class ScheduleDBSource:
             )
             result = await session.execute(query)
             return [row.scaling_group for row in result.fetchall()]
+
+    async def get_all_scaling_groups(self) -> list[str]:
+        """Get all defined scaling groups."""
+        async with self._begin_readonly_session_read_committed() as session:
+            query = sa.select(ScalingGroupRow.name)
+            result = await session.execute(query)
+            return [row.name for row in result.fetchall()]
 
     async def get_terminating_sessions_by_ids(
         self,
@@ -1456,15 +1490,8 @@ class ScheduleDBSource:
             )
             image_infos = await self._resolve_image_info(db_sess, image_refs)
 
-            # Prepare mount-related data
-            requested_mounts = spec.creation_spec.get("mounts") or []
-            requested_mount_ids = spec.creation_spec.get("mount_ids") or []
-            requested_mount_map = spec.creation_spec.get("mount_map") or {}
-            requested_mount_id_map = spec.creation_spec.get("mount_id_map") or {}
-            requested_mount_options = spec.creation_spec.get("mount_options") or {}
-
-            combined_mounts = requested_mounts + requested_mount_ids
-            combined_mount_map = {**requested_mount_map, **requested_mount_id_map}
+            # Build typed mount requests from creation_spec
+            mount_requests = self._build_mount_requests_from_spec(spec.creation_spec)
 
             # Fetch vfolder mounts
             vfolder_mounts = await self._fetch_vfolder_mounts(
@@ -1473,9 +1500,7 @@ class ScheduleDBSource:
                 allowed_vfolder_types,
                 spec.user_scope,
                 spec.resource_policy,
-                combined_mounts,
-                combined_mount_map,
-                requested_mount_options,
+                mount_requests,
             )
 
             # Fetch dotfile data
@@ -1609,6 +1634,44 @@ class ScheduleDBSource:
                 db_sess, domain_name, group_id, access_key
             )
 
+    @staticmethod
+    def _build_mount_requests_from_spec(
+        creation_spec: dict[str, Any],
+    ) -> list[VFolderMountRequest]:
+        """Convert legacy creation_spec dict into typed VFolderMountRequest list."""
+        requested_mounts: list[str] = creation_spec.get("mounts") or []
+        requested_mount_ids: list[UUID] = creation_spec.get("mount_ids") or []
+        requested_mount_map: dict[str, str] = creation_spec.get("mount_map") or {}
+        requested_mount_id_map: dict[UUID, str] = creation_spec.get("mount_id_map") or {}
+        requested_mount_options: dict[str | UUID, dict[str, Any]] = (
+            creation_spec.get("mount_options") or {}
+        )
+
+        requests: list[VFolderMountRequest] = []
+        for name in requested_mounts:
+            raw_opts = requested_mount_options.get(name, {})
+            requests.append(
+                VFolderMountRequest(
+                    ref=name,
+                    dst_path=requested_mount_map.get(name),
+                    options=VFolderMountOptions(
+                        permission=raw_opts.get("permission"),
+                    ),
+                )
+            )
+        for vfid in requested_mount_ids:
+            raw_opts = requested_mount_options.get(vfid, {})
+            requests.append(
+                VFolderMountRequest(
+                    ref=vfid,
+                    dst_path=requested_mount_id_map.get(vfid),
+                    options=VFolderMountOptions(
+                        permission=raw_opts.get("permission"),
+                    ),
+                )
+            )
+        return requests
+
     async def _fetch_vfolder_mounts(
         self,
         db_sess: SASession,
@@ -1616,14 +1679,11 @@ class ScheduleDBSource:
         allowed_vfolder_types: list[str],
         user_scope: UserScope,
         resource_policy: dict[str, Any],
-        combined_mounts: list[str],
-        combined_mount_map: dict[str | UUID, str],
-        requested_mount_options: dict[str | UUID, Any],
+        mount_requests: list[VFolderMountRequest],
     ) -> list[VFolderMount]:
         """
         Fetch vfolder mounts for the session using existing DB session.
         """
-        # Convert the async session to sync connection for legacy code
         conn = cast(SAConnection, db_sess.bind)
 
         vfolder_mounts = await prepare_vfolder_mounts(
@@ -1632,9 +1692,7 @@ class ScheduleDBSource:
             allowed_vfolder_types,
             user_scope,
             resource_policy,
-            combined_mounts,
-            combined_mount_map,
-            requested_mount_options,
+            mount_requests,
         )
         return list(vfolder_mounts)
 
@@ -1684,9 +1742,7 @@ class ScheduleDBSource:
         allowed_vfolder_types: list[str],
         user_scope: UserScope,
         resource_policy: dict[str, Any],
-        combined_mounts: list[str],
-        combined_mount_map: dict[str | UUID, str],
-        requested_mount_options: dict[str | UUID, Any],
+        mount_requests: list[VFolderMountRequest],
     ) -> list[VFolderMount]:
         """
         Prepare vfolder mounts for the session.
@@ -1698,9 +1754,7 @@ class ScheduleDBSource:
                 allowed_vfolder_types,
                 user_scope,
                 resource_policy,
-                combined_mounts,
-                combined_mount_map,
-                requested_mount_options,
+                mount_requests,
             )
         return list(vfolder_mounts)
 
@@ -2080,8 +2134,8 @@ class ScheduleDBSource:
             reason,
         )
         async with self._begin_session_read_committed() as db_sess:
-            # Check current kernel status before update
-            check_stmt = sa.select(KernelRow.status, KernelRow.starts_at).where(
+            # Check current kernel status and fetch agent_id before update
+            check_stmt = sa.select(KernelRow.status, KernelRow.starts_at, KernelRow.agent).where(
                 KernelRow.id == kernel_id
             )
             check_result = await db_sess.execute(check_stmt)
@@ -2097,6 +2151,7 @@ class ScheduleDBSource:
                 log.debug("[DBSource] Kernel {} not found!", kernel_id)
 
             now = await self._get_db_now_in_session(db_sess)
+            occupied_slots = creation_info.get_resource_allocations()
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -2110,7 +2165,7 @@ class ScheduleDBSource:
                     status_info=reason,
                     status_changed=now,
                     starts_at=now,
-                    occupied_slots=creation_info.get_resource_allocations(),
+                    occupied_slots=occupied_slots,
                     container_id=creation_info.container_id,
                     attached_devices=creation_info.attached_devices,
                     repl_in_port=creation_info.repl_in_port,
@@ -2135,7 +2190,70 @@ class ScheduleDBSource:
                 rowcount,
                 now,
             )
-            return rowcount > 0
+            if rowcount == 0:
+                return False
+
+            # Allocate kernel resources in the same transaction.
+            # This ensures resource allocation happens atomically with the
+            # kernel status transition to RUNNING, rather than waiting for
+            # the session-level RUNNING transition.
+            agent_id = current.agent if current else None
+            await self._allocate_kernel_resources(
+                db_sess, KernelId(kernel_id), agent_id, occupied_slots
+            )
+            return True
+
+    async def _allocate_kernel_resources(
+        self,
+        db_sess: SASession,
+        kernel_id: KernelId,
+        agent_id: AgentId | None,
+        occupied_slots: ResourceSlot,
+    ) -> None:
+        """Activate resource allocations and increment agent resource usage.
+
+        Must be called within an existing DB session/transaction.
+        Idempotent: rows where used_at is already set are skipped.
+        No-op if agent_id is None or occupied_slots is empty.
+
+        Raises:
+            AgentResourceCapacityExceeded: If any slot would exceed agent capacity.
+        """
+        if not agent_id or not occupied_slots:
+            return
+        slots = resource_slot_to_quantities(occupied_slots)
+        for s in slots:
+            alloc_result = await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(
+                    ResourceAllocationRow.kernel_id == kernel_id,
+                    ResourceAllocationRow.slot_name == s.slot_name,
+                    ResourceAllocationRow.free_at.is_(None),
+                    ResourceAllocationRow.used_at.is_(None),
+                )
+                .values(used=s.quantity, used_at=sa.func.now())
+            )
+            if cast(CursorResult[Any], alloc_result).rowcount == 0:
+                continue
+            new_used = AgentResourceRow.used + s.quantity
+            agent_result = await db_sess.execute(
+                sa.update(AgentResourceRow)
+                .where(
+                    AgentResourceRow.agent_id == agent_id,
+                    AgentResourceRow.slot_name == s.slot_name,
+                    new_used <= AgentResourceRow.capacity,
+                )
+                .values(used=new_used)
+            )
+            if cast(CursorResult[Any], agent_result).rowcount == 0:
+                raise AgentResourceCapacityExceeded(
+                    f"Agent {agent_id}: capacity exceeded for slot '{s.slot_name}'"
+                )
+        log.debug(
+            "[DBSource] Allocated resources for kernel {} on agent {}",
+            kernel_id,
+            agent_id,
+        )
 
     async def update_kernel_status_preparing(self, kernel_id: UUID) -> bool:
         """
@@ -2568,23 +2686,15 @@ class ScheduleDBSource:
     async def cancel_kernels_for_failed_image(
         self, agent_id: AgentId, image: str, error_msg: str, image_ref: str | None = None
     ) -> set[SessionId]:
-        """
-        Cancel kernels for an image that failed to be available on an agent.
-        Returns session IDs that may need to be checked for full cancellation.
-
-        :param agent_id: The agent ID where the image is unavailable
-        :param image: The image name that failed
-        :param error_msg: The error message to include in status
-        :param image_ref: Optional image reference (canonical format)
-        :return: Set of affected session IDs
+        """Cancel SCHEDULED/PULLING/PREPARING kernels of a failed-to-pull
+        image on an agent and free their ``resource_allocations`` rows in
+        the same transaction. Returns affected session IDs.
         """
         async with self._begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
-            # Use image_ref if provided (canonical format), otherwise use image
             image_to_match = image_ref if image_ref else image
-            # Find and cancel kernels on this agent with this image in SCHEDULED, PULLING
-            # or PREPARING state. SCHEDULED is included because image pull failure can
-            # occur before kernel transitions to PREPARING.
+            # SCHEDULED is included because image pull failure can occur
+            # before the kernel transitions to PREPARING.
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -2607,10 +2717,15 @@ class ScheduleDBSource:
                         {KernelStatus.CANCELLED.name: now.isoformat()},
                     ),
                 )
-                .returning(KernelRow.session_id)
+                .returning(KernelRow.id, KernelRow.session_id)
             )
             result = await db_sess.execute(stmt)
-            return {row.session_id for row in result}
+            cancelled_rows = result.all()
+            cancelled_kernel_ids = [row.id for row in cancelled_rows]
+
+            await self._free_kernel_allocations(db_sess, cancelled_kernel_ids, now)
+
+            return {row.session_id for row in cancelled_rows}
 
     async def check_and_cancel_session_if_needed(self, session_id: SessionId) -> bool:
         """

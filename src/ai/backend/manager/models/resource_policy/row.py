@@ -131,6 +131,9 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
     max_customized_image_count: Mapped[int] = mapped_column(
         "max_customized_image_count", sa.Integer(), nullable=False, default=3
     )
+    max_concurrent_logins: Mapped[int | None] = mapped_column(
+        "max_concurrent_logins", sa.Integer(), nullable=True, default=None
+    )
 
     users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="resource_policy_row")
 
@@ -141,12 +144,14 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
         max_quota_scope_size: int,
         max_session_count_per_model_session: int,
         max_customized_image_count: int,
+        max_concurrent_logins: int | None = None,
     ) -> None:
         self.name = name
         self.max_vfolder_count = max_vfolder_count
         self.max_quota_scope_size = max_quota_scope_size
         self.max_session_count_per_model_session = max_session_count_per_model_session
         self.max_customized_image_count = max_customized_image_count
+        self.max_concurrent_logins = max_concurrent_logins
 
     @classmethod
     def from_dataclass(cls, data: UserResourcePolicyData) -> Self:
@@ -156,6 +161,7 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
             max_quota_scope_size=data.max_quota_scope_size,
             max_session_count_per_model_session=data.max_session_count_per_model_session,
             max_customized_image_count=data.max_customized_image_count,
+            max_concurrent_logins=data.max_concurrent_logins,
         )
 
     def to_dataclass(self) -> UserResourcePolicyData:
@@ -165,6 +171,7 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
             max_quota_scope_size=self.max_quota_scope_size,
             max_session_count_per_model_session=self.max_session_count_per_model_session,
             max_customized_image_count=self.max_customized_image_count,
+            max_concurrent_logins=self.max_concurrent_logins,
         )
 
 

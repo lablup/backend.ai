@@ -63,6 +63,16 @@ class UserInfoContext:
     main_access_key: AccessKey
 
 
+@dataclass(frozen=True)
+class SessionOwnerContext:
+    """Resolved owner context for session creation."""
+
+    owner_uuid: UUID
+    group_id: UUID
+    resource_policy: dict[str, Any]
+    owner_role: UserRole
+
+
 @dataclass
 class UserData:
     id: UUID = field(compare=False)
@@ -88,6 +98,7 @@ class UserData:
     container_uid: int | None = field(compare=False)
     container_main_gid: int | None = field(compare=False)
     container_gids: list[int] | None = field(compare=False)
+    integration_name: str | None = None
 
     def scope_id(self) -> ScopeId:
         return ScopeId(
@@ -137,6 +148,7 @@ class UserData:
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
+            integration_name=row.integration_id,  # DB column is integration_id
         )
 
 

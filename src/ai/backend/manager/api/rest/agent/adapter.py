@@ -94,6 +94,7 @@ class AgentAdapter(BaseFilterAdapter):
                 equals_factory=QueryConditions.by_resource_group_equals,
                 starts_with_factory=QueryConditions.by_resource_group_starts_with,
                 ends_with_factory=QueryConditions.by_resource_group_ends_with,
+                in_factory=QueryConditions.by_resource_group_in,
             )
             if condition is not None:
                 conditions.append(condition)

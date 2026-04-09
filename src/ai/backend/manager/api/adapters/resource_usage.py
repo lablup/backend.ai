@@ -663,6 +663,7 @@ class ResourceUsageAdapter(BaseAdapter):
                 equals_factory=DomainUsageBucketConditions.by_resource_group_equals,
                 starts_with_factory=DomainUsageBucketConditions.by_resource_group_starts_with,
                 ends_with_factory=DomainUsageBucketConditions.by_resource_group_ends_with,
+                in_factory=DomainUsageBucketConditions.by_resource_group_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -674,6 +675,7 @@ class ResourceUsageAdapter(BaseAdapter):
                 equals_factory=DomainUsageBucketConditions.by_domain_name_equals,
                 starts_with_factory=DomainUsageBucketConditions.by_domain_name_starts_with,
                 ends_with_factory=DomainUsageBucketConditions.by_domain_name_ends_with,
+                in_factory=DomainUsageBucketConditions.by_domain_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -744,6 +746,7 @@ class ResourceUsageAdapter(BaseAdapter):
                 equals_factory=ProjectUsageBucketConditions.by_resource_group_equals,
                 starts_with_factory=ProjectUsageBucketConditions.by_resource_group_starts_with,
                 ends_with_factory=ProjectUsageBucketConditions.by_resource_group_ends_with,
+                in_factory=ProjectUsageBucketConditions.by_resource_group_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -764,6 +767,7 @@ class ResourceUsageAdapter(BaseAdapter):
                 equals_factory=ProjectUsageBucketConditions.by_domain_name_equals,
                 starts_with_factory=ProjectUsageBucketConditions.by_domain_name_starts_with,
                 ends_with_factory=ProjectUsageBucketConditions.by_domain_name_ends_with,
+                in_factory=ProjectUsageBucketConditions.by_domain_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -834,6 +838,7 @@ class ResourceUsageAdapter(BaseAdapter):
                 equals_factory=UserUsageBucketConditions.by_resource_group_equals,
                 starts_with_factory=UserUsageBucketConditions.by_resource_group_starts_with,
                 ends_with_factory=UserUsageBucketConditions.by_resource_group_ends_with,
+                in_factory=UserUsageBucketConditions.by_resource_group_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -863,6 +868,7 @@ class ResourceUsageAdapter(BaseAdapter):
                 equals_factory=UserUsageBucketConditions.by_domain_name_equals,
                 starts_with_factory=UserUsageBucketConditions.by_domain_name_starts_with,
                 ends_with_factory=UserUsageBucketConditions.by_domain_name_ends_with,
+                in_factory=UserUsageBucketConditions.by_domain_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

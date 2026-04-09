@@ -17,6 +17,9 @@ from ai.backend.manager.api.gql.keypair.types import (
     AdminCreateKeypairInputGQL,
     AdminCreateKeypairPayloadGQL,
     AdminDeleteKeypairPayloadGQL,
+    AdminDeleteSSHKeypairPayloadGQL,
+    AdminRegisterSSHKeypairInputGQL,
+    AdminRegisterSSHKeypairPayloadGQL,
     AdminUpdateKeypairInputGQL,
     AdminUpdateKeypairPayloadGQL,
     IssueMyKeypairPayloadGQL,
@@ -145,3 +148,36 @@ async def admin_delete_keypair_v2(
     check_admin_only()
     payload = await info.context.adapters.user.admin_delete_keypair(access_key)
     return AdminDeleteKeypairPayloadGQL.from_pydantic(payload)
+
+
+# ------------------------------------------------------------------ admin SSH keypair mutations
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Admin registers (overwrites) a user's SSH keypair.",
+    )
+)  # type: ignore[misc]
+async def admin_register_ssh_keypair_v2(
+    info: Info[StrawberryGQLContext],
+    input: AdminRegisterSSHKeypairInputGQL,
+) -> AdminRegisterSSHKeypairPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.user.admin_register_ssh_keypair(input.to_pydantic())
+    return AdminRegisterSSHKeypairPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Admin clears a user's SSH keypair.",
+    )
+)  # type: ignore[misc]
+async def admin_delete_ssh_keypair_v2(
+    info: Info[StrawberryGQLContext],
+    access_key: str,
+) -> AdminDeleteSSHKeypairPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.user.admin_delete_ssh_keypair(access_key)
+    return AdminDeleteSSHKeypairPayloadGQL.from_pydantic(payload)

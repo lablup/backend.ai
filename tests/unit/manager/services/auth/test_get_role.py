@@ -6,6 +6,9 @@ import pytest
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
 from ai.backend.manager.services.auth.service import AuthService
 
@@ -26,6 +29,7 @@ def auth_service(
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
         valkey_session_client=AsyncMock(),
+        user_resource_policy_repository=AsyncMock(spec=UserResourcePolicyRepository),
     )
 
 

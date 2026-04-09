@@ -10,6 +10,10 @@ import sqlalchemy as sa
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.condition_utils import (
+    make_nested_string_in_factory,
+    make_string_in_factory,
+)
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.user import UserRow
@@ -129,6 +133,60 @@ class UserConditions:
 
         return inner
 
+    # ==================== Integration Name Filters ====================
+
+    @staticmethod
+    def by_integration_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.integration_id.ilike(f"%{spec.value}%")
+            else:
+                condition = UserRow.integration_id.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_integration_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserRow.integration_id) == spec.value.lower()
+            else:
+                condition = UserRow.integration_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_integration_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.integration_id.ilike(f"{spec.value}%")
+            else:
+                condition = UserRow.integration_id.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_integration_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.integration_id.ilike(f"%{spec.value}")
+            else:
+                condition = UserRow.integration_id.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
     # ==================== Domain Name Filters ====================
 
     @staticmethod
@@ -182,6 +240,11 @@ class UserConditions:
             return condition
 
         return inner
+
+    by_email_in = staticmethod(make_string_in_factory(UserRow.email))
+    by_username_in = staticmethod(make_string_in_factory(UserRow.username))
+    by_integration_name_in = staticmethod(make_string_in_factory(UserRow.integration_id))
+    by_domain_name_in = staticmethod(make_string_in_factory(UserRow.domain_name))
 
     # ==================== Status Filters ====================
 
@@ -368,6 +431,12 @@ class UserConditions:
 
         return inner
 
+    by_domain_description_in = staticmethod(
+        make_nested_string_in_factory(
+            DomainRow.description, lambda c: UserConditions._exists_domain(c)
+        )
+    )
+
     @staticmethod
     def exists_domain_combined(domain_conditions: list[QueryCondition]) -> QueryCondition:
         """Combine multiple domain conditions into single EXISTS subquery."""
@@ -434,6 +503,10 @@ class UserConditions:
             return UserConditions._exists_project(GroupRow.is_active == is_active)
 
         return inner
+
+    by_project_name_in = staticmethod(
+        make_nested_string_in_factory(GroupRow.name, lambda c: UserConditions._exists_project(c))
+    )
 
     @staticmethod
     def exists_project_combined(project_conditions: list[QueryCondition]) -> QueryCondition:

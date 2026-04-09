@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
+    MountPermission,
     ResourceSlot,
     RuntimeVariant,
     SessionId,
@@ -275,7 +276,9 @@ class DeploymentMetadata:
     created_user: UUID
     session_owner: UUID
     created_at: datetime | None
-    revision_history_limit: int
+    # `None` means "caller did not specify"; the service resolves it against
+    # the revision preset default (if any) and ultimately the system default.
+    revision_history_limit: int | None = None
     tag: str | None = None
 
 
@@ -314,7 +317,10 @@ class MountMetadata:
             self.model_vfolder_id: self.model_mount_destination,
             **{m.vfid.folder_id: m.kernel_path.as_posix() for m in self.extra_mounts},
         }
-        mount_options = {m.vfid.folder_id: {"permission": m.mount_perm} for m in self.extra_mounts}
+        mount_options: dict[UUID, dict[str, MountPermission]] = {
+            self.model_vfolder_id: {"permission": MountPermission.READ_ONLY},
+            **{m.vfid.folder_id: {"permission": m.mount_perm} for m in self.extra_mounts},
+        }
         return MountSpec(mounts=mounts, mount_map=mount_map, mount_options=mount_options)
 
 
@@ -345,9 +351,16 @@ class ExecutionSpec(ConfiguredModel):
     startup_command: str | None = None
     bootstrap_script: str | None = None
     environ: dict[str, str] | None = None
-    runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
+    runtime_variant: RuntimeVariant
     callback_url: yarl.URL | None = None
     inference_runtime_config: Mapping[str, Any] | None = None
+
+
+class PresetValueSpec(ConfiguredModel):
+    """A runtime variant preset value binding stored in a deployment revision."""
+
+    preset_id: UUID
+    value: str
 
 
 class ModelRevisionSpec(ConfiguredModel):
@@ -358,6 +371,7 @@ class ModelRevisionSpec(ConfiguredModel):
     mounts: MountMetadata
     execution: ExecutionSpec
     model_definition: ModelDefinition | None = None
+    preset_values: list[PresetValueSpec] = Field(default_factory=list)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -599,7 +613,7 @@ class ModelDeploymentAutoScalingRuleData:
 class ModelDeploymentAccessTokenData:
     id: UUID
     token: str
-    valid_until: datetime
+    expires_at: datetime | None
     created_at: datetime
 
 
@@ -611,7 +625,6 @@ class ModelReplicaData:
     readiness_status: ReadinessStatus
     liveness_status: LivenessStatus
     activeness_status: ActivenessStatus
-    weight: int
     detail: dict[str, Any]
     created_at: datetime
 

@@ -1289,8 +1289,15 @@ class UserDBSource:
                 user_id=user_uuid,
                 email=user_row.email,
             )
-            kp_creator = Creator(spec=kp_spec)
-            result = await execute_creator(session, kp_creator)
+            rbac_kp_creator = RBACEntityCreator(
+                spec=kp_spec,
+                element_type=RBACElementType.KEYPAIR,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.USER,
+                    element_id=str(user_uuid),
+                ),
+            )
+            result = await execute_rbac_entity_creator(session, rbac_kp_creator)
             return GeneratedKeyPairData(keypair=result.row.to_data())
 
     async def revoke_my_keypair(self, user_uuid: UUID, access_key: str) -> None:
@@ -1421,8 +1428,15 @@ class UserDBSource:
                 user_id=user_id,
                 email=user_row.email,
             )
-            kp_creator = Creator(spec=kp_spec)
-            result = await execute_creator(session, kp_creator)
+            rbac_kp_creator = RBACEntityCreator(
+                spec=kp_spec,
+                element_type=RBACElementType.KEYPAIR,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.USER,
+                    element_id=str(user_id),
+                ),
+            )
+            result = await execute_rbac_entity_creator(session, rbac_kp_creator)
             return GeneratedKeyPairData(keypair=result.row.to_data())
 
     async def admin_update_keypair(self, updater: Updater[KeyPairRow]) -> KeyPairData:
@@ -1489,3 +1503,63 @@ class UserDBSource:
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
             return kp_row.to_data()
+
+    async def admin_update_ssh_keypair(
+        self,
+        access_key: str,
+        ssh_public_key: str,
+        ssh_private_key: str,
+    ) -> None:
+        """Admin registers (overwrites) a user's SSH keypair."""
+        async with self._db.begin_session() as session:
+            exists = (
+                await session.scalars(
+                    sa.select(KeyPairRow.access_key).where(KeyPairRow.access_key == access_key)
+                )
+            ).first()
+            if exists is None:
+                raise KeyPairNotFound(f"Keypair {access_key} not found")
+            await session.execute(
+                sa.update(keypairs)
+                .where(keypairs.c.access_key == access_key)
+                .values(
+                    ssh_public_key=ssh_public_key,
+                    ssh_private_key=ssh_private_key,
+                )
+            )
+
+    async def admin_clear_ssh_keypair(self, access_key: str) -> None:
+        """Admin clears a user's SSH keypair."""
+        async with self._db.begin_session() as session:
+            exists = (
+                await session.scalars(
+                    sa.select(KeyPairRow.access_key).where(KeyPairRow.access_key == access_key)
+                )
+            ).first()
+            if exists is None:
+                raise KeyPairNotFound(f"Keypair {access_key} not found")
+            await session.execute(
+                sa.update(keypairs)
+                .where(keypairs.c.access_key == access_key)
+                .values(
+                    ssh_public_key=None,
+                    ssh_private_key=None,
+                )
+            )
+
+    async def admin_get_ssh_public_key(self, access_key: str) -> str | None:
+        """Admin retrieves a user's SSH public key."""
+        async with self._db.begin_readonly_session() as db_session:
+            exists = (
+                await db_session.scalars(
+                    sa.select(KeyPairRow.access_key).where(KeyPairRow.access_key == access_key)
+                )
+            ).first()
+            if exists is None:
+                raise KeyPairNotFound(f"Keypair {access_key} not found")
+            ssh_public_key: str | None = (
+                await db_session.scalars(
+                    sa.select(KeyPairRow.ssh_public_key).where(KeyPairRow.access_key == access_key)
+                )
+            ).first()
+            return ssh_public_key

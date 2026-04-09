@@ -220,6 +220,7 @@ class ContainerRegistryAdapter(BaseAdapter):
             equals_factory=ContainerRegistryConditions.by_registry_name_equals,
             starts_with_factory=ContainerRegistryConditions.by_registry_name_starts_with,
             ends_with_factory=ContainerRegistryConditions.by_registry_name_ends_with,
+            in_factory=ContainerRegistryConditions.by_registry_name_in,
         )
 
     @staticmethod

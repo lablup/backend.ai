@@ -103,6 +103,7 @@ class ObjectStorageAdapter(BaseAdapter):
                 equals_factory=ObjectStorageConditions.by_name_equals,
                 starts_with_factory=ObjectStorageConditions.by_name_starts_with,
                 ends_with_factory=ObjectStorageConditions.by_name_ends_with,
+                in_factory=ObjectStorageConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -114,6 +115,7 @@ class ObjectStorageAdapter(BaseAdapter):
                 equals_factory=ObjectStorageConditions.by_host_equals,
                 starts_with_factory=ObjectStorageConditions.by_host_starts_with,
                 ends_with_factory=ObjectStorageConditions.by_host_ends_with,
+                in_factory=ObjectStorageConditions.by_host_in,
             )
             if condition is not None:
                 conditions.append(condition)

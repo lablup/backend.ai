@@ -5,6 +5,7 @@ Tests the service layer with mocked repositories.
 
 from __future__ import annotations
 
+import inspect
 import uuid
 from datetime import datetime
 from typing import Any
@@ -27,6 +28,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.data.user.types import SessionOwnerContext
 from ai.backend.manager.errors.common import ServiceUnavailable
 from ai.backend.manager.errors.image import UnknownImageReferenceError
 from ai.backend.manager.errors.kernel import (
@@ -40,6 +42,7 @@ from ai.backend.manager.errors.kernel import (
 from ai.backend.manager.errors.resource import AppNotFound, TaskTemplateNotFound
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusBatchAction,
@@ -84,6 +87,7 @@ from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.types import UserScope
 
 # ==================== Shared Fixtures ====================
 
@@ -692,6 +696,59 @@ class TestExecuteSession:
 
 
 class TestCreateFromParams:
+    @pytest.fixture
+    def delegated_owner_id(self) -> UUID:
+        """UUID of the user who will own the delegated session (different from requester)."""
+        return uuid4()
+
+    @pytest.fixture
+    def delegated_owner_access_key(self) -> AccessKey:
+        """Access key of the delegation target (the actual session owner)."""
+        return AccessKey("AKIAOWNEREXAMPLE0000")
+
+    @pytest.fixture
+    def delegated_session_action(
+        self,
+        sample_access_key: AccessKey,
+        sample_user_id: UUID,
+        delegated_owner_access_key: AccessKey,
+    ) -> CreateFromParamsAction:
+        """
+        CreateFromParamsAction representing an admin (sample_user_id) creating
+        a session on behalf of another user via owner_access_key.
+        """
+        return CreateFromParamsAction(
+            params=CreateFromParamsActionParams(
+                session_name="delegated-session",
+                image="python:latest",
+                architecture="x86_64",
+                session_type=SessionTypes.INTERACTIVE,
+                group_name="default",
+                domain_name="default",
+                cluster_size=1,
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                config={},
+                tag="",
+                priority=0,
+                is_preemptible=True,
+                owner_access_key=delegated_owner_access_key,
+                enqueue_only=False,
+                max_wait_seconds=0,
+                starts_at=None,
+                reuse_if_exists=False,
+                startup_command=None,
+                batch_timeout=None,
+                bootstrap_script=None,
+                dependencies=None,
+                callback_url=None,
+            ),
+            user_id=sample_user_id,  # requester (admin)
+            user_role=UserRole.SUPERADMIN,
+            sudo_session_enabled=False,
+            requester_access_key=sample_access_key,
+            keypair_resource_policy=None,
+        )
+
     async def test_image_resolve_failure_raises(
         self,
         session_service: SessionService,
@@ -701,7 +758,12 @@ class TestCreateFromParams:
         sample_group_id: UUID,
     ) -> None:
         mock_session_repository.query_userinfo = AsyncMock(
-            return_value=(sample_user_id, sample_group_id, {})
+            return_value=SessionOwnerContext(
+                owner_uuid=sample_user_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
         )
         mock_session_repository.resolve_image = AsyncMock(
             side_effect=UnknownImageReference("unknown image")
@@ -799,7 +861,12 @@ class TestCreateFromParams:
     ) -> None:
         new_session_id = str(uuid4())
         mock_session_repository.query_userinfo = AsyncMock(
-            return_value=(sample_user_id, sample_group_id, {})
+            return_value=SessionOwnerContext(
+                owner_uuid=sample_user_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
         )
         mock_image_row = MagicMock()
         mock_image_row.image_ref = MagicMock()
@@ -855,7 +922,12 @@ class TestCreateFromParams:
     ) -> None:
         existing_session_id = str(uuid4())
         mock_session_repository.query_userinfo = AsyncMock(
-            return_value=(sample_user_id, sample_group_id, {})
+            return_value=SessionOwnerContext(
+                owner_uuid=sample_user_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
         )
         mock_image_row = MagicMock()
         mock_image_row.image_ref = MagicMock()
@@ -912,7 +984,12 @@ class TestCreateFromParams:
         sample_group_id: UUID,
     ) -> None:
         mock_session_repository.query_userinfo = AsyncMock(
-            return_value=(sample_user_id, sample_group_id, {})
+            return_value=SessionOwnerContext(
+                owner_uuid=sample_user_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
         )
         mock_image_row = MagicMock()
         mock_image_row.image_ref = MagicMock()
@@ -953,6 +1030,58 @@ class TestCreateFromParams:
 
         with pytest.raises(QuotaExceeded):
             await session_service.create_from_params(action)
+
+    async def test_owner_access_key_uses_owner_user_scope(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_user_id: UUID,
+        sample_group_id: UUID,
+        delegated_owner_id: UUID,
+        delegated_owner_access_key: AccessKey,
+        delegated_session_action: CreateFromParamsAction,
+    ) -> None:
+        """
+        Regression test for BA-5608.
+
+        When an admin creates a session on behalf of another user via
+        ``owner_access_key``, the ``UserScope`` passed to
+        ``agent_registry.create_session`` must carry the OWNER's ``user_uuid``
+        and ``user_role`` — not the requester's. Previously the requester's
+        identity leaked into the session row, causing scaling group access
+        checks and container UID/GID lookups to use the wrong user.
+        """
+        new_session_id = str(uuid4())
+        mock_session_repository.query_userinfo = AsyncMock(
+            return_value=SessionOwnerContext(
+                owner_uuid=delegated_owner_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
+        )
+        mock_image_row = MagicMock()
+        mock_image_row.image_ref = MagicMock()
+        mock_session_repository.resolve_image = AsyncMock(return_value=mock_image_row)
+        mock_agent_registry.create_session = AsyncMock(return_value={"sessionId": new_session_id})
+
+        await session_service.create_from_params(delegated_session_action)
+
+        mock_agent_registry.create_session.assert_called_once()
+        call_args = mock_agent_registry.create_session.call_args
+        bound = inspect.signature(AgentRegistry.create_session).bind(
+            None, *call_args.args, **call_args.kwargs
+        )
+        passed_user_scope: UserScope = bound.arguments["user_scope"]
+        assert passed_user_scope.user_uuid == delegated_owner_id, (
+            "UserScope.user_uuid must be the owner's UUID, not the requester's"
+        )
+        assert passed_user_scope.user_uuid != sample_user_id
+        assert passed_user_scope.user_role == UserRole.USER.value, (
+            "UserScope.user_role must be the owner's role, not the requester's"
+        )
+        assert bound.arguments["owner_access_key"] == delegated_owner_access_key
 
 
 # ==================== CreateFromTemplate Tests ====================
@@ -1002,7 +1131,12 @@ class TestCreateFromTemplate:
         )
         mock_session_repository.get_group_name_by_domain_and_id = AsyncMock(return_value="default")
         mock_session_repository.query_userinfo = AsyncMock(
-            return_value=(sample_user_id, sample_group_id, {})
+            return_value=SessionOwnerContext(
+                owner_uuid=sample_user_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
         )
         mock_image_row = MagicMock()
         mock_image_row.image_ref = MagicMock()
@@ -1111,7 +1245,12 @@ class TestCreateCluster:
             return_value={"template": "some-template"}
         )
         mock_session_repository.query_userinfo = AsyncMock(
-            return_value=(sample_user_id, sample_group_id, {})
+            return_value=SessionOwnerContext(
+                owner_uuid=sample_user_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
         )
         mock_agent_registry.create_cluster = AsyncMock(return_value={"kernelId": kernel_id})
 
@@ -1181,7 +1320,12 @@ class TestCreateCluster:
             return_value={"template": "some-template"}
         )
         mock_session_repository.query_userinfo = AsyncMock(
-            return_value=(sample_user_id, sample_group_id, {})
+            return_value=SessionOwnerContext(
+                owner_uuid=sample_user_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
         )
         mock_agent_registry.create_cluster = AsyncMock(
             side_effect=TooManySessionsMatched("too many")

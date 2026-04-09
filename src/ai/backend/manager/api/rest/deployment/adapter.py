@@ -171,6 +171,7 @@ class DeploymentAdapter(BaseFilterAdapter):
                 equals_factory=DeploymentConditions.by_name_equals,
                 starts_with_factory=DeploymentConditions.by_name_starts_with,
                 ends_with_factory=DeploymentConditions.by_name_ends_with,
+                in_factory=DeploymentConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -183,6 +184,7 @@ class DeploymentAdapter(BaseFilterAdapter):
                 equals_factory=DeploymentConditions.by_domain_name_equals,
                 starts_with_factory=DeploymentConditions.by_domain_name_starts_with,
                 ends_with_factory=DeploymentConditions.by_domain_name_ends_with,
+                in_factory=DeploymentConditions.by_domain_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -267,6 +269,7 @@ class RevisionAdapter(BaseFilterAdapter):
                 equals_factory=RevisionConditions.by_name_equals,
                 starts_with_factory=RevisionConditions.by_name_starts_with,
                 ends_with_factory=RevisionConditions.by_name_ends_with,
+                in_factory=RevisionConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

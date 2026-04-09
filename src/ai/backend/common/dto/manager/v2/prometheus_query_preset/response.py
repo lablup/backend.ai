@@ -22,7 +22,6 @@ __all__ = (
     "DeleteQueryDefinitionPayload",
     "GetQueryDefinitionPayload",
     # Search payloads
-    "AdminSearchQueryDefinitionsPayload",
     "SearchQueryDefinitionsPayload",
     # Execute payloads
     "QueryDefinitionMetricResultInfo",
@@ -72,20 +71,13 @@ class GetQueryDefinitionPayload(BaseResponseModel):
     item: QueryDefinitionNode | None = Field(default=None, description="Query definition data")
 
 
-class AdminSearchQueryDefinitionsPayload(BaseResponseModel):
-    """Payload for admin-scoped paginated query definition search results."""
+class SearchQueryDefinitionsPayload(BaseResponseModel):
+    """Payload for paginated query definition search results."""
 
     items: list[QueryDefinitionNode] = Field(description="List of query definition nodes.")
     total_count: int = Field(description="Total number of query definitions matching the filter.")
-    has_next_page: bool = Field(description="Whether there is a next page.")
-    has_previous_page: bool = Field(description="Whether there is a previous page.")
-
-
-class SearchQueryDefinitionsPayload(BaseResponseModel):
-    """Payload for searching query definitions."""
-
-    items: list[QueryDefinitionNode] = Field(description="List of query definitions")
-    total_count: int = Field(description="Total count of matching records")
+    has_next_page: bool = Field(default=False, description="Whether there is a next page.")
+    has_previous_page: bool = Field(default=False, description="Whether there is a previous page.")
 
 
 class QueryDefinitionMetricResultInfo(BaseResponseModel):

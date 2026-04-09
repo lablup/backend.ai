@@ -11,7 +11,10 @@
       "colorSuccess": "#00BD9B",
       "screenXLMax": 1919,
       "screenXXLMin": 1920,
-      "screenXXL": 1920
+      "screenXXL": 1920,
+      "screenXXLMax": 2047,
+      "screenXXXLMin": 2048,
+      "screenXXXL": 2048
     },
     "components": {
       "Tag": {
@@ -42,7 +45,10 @@
       "colorFillSecondary": "#262626",
       "screenXLMax": 1919,
       "screenXXLMin": 1920,
-      "screenXXL": 1920
+      "screenXXL": 1920,
+      "screenXXLMax": 2047,
+      "screenXXXLMin": 2048,
+      "screenXXXL": 2048
     },
     "components": {
       "Tag": {
@@ -70,7 +76,7 @@
       "width": 34,
       "height": 34
     },
-    "aboutModalSize": {
+    "aboutLogoSize": {
       "width": 159,
       "height": 24
     }

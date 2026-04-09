@@ -161,6 +161,7 @@ class NotificationChannelAdapter(BaseFilterAdapter):
                 equals_factory=NotificationChannelConditions.by_name_equals,
                 starts_with_factory=NotificationChannelConditions.by_name_starts_with,
                 ends_with_factory=NotificationChannelConditions.by_name_ends_with,
+                in_factory=NotificationChannelConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -267,6 +268,7 @@ class NotificationRuleAdapter(BaseFilterAdapter):
                 equals_factory=NotificationRuleConditions.by_name_equals,
                 starts_with_factory=NotificationRuleConditions.by_name_starts_with,
                 ends_with_factory=NotificationRuleConditions.by_name_ends_with,
+                in_factory=NotificationRuleConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

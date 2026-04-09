@@ -44,6 +44,7 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 
@@ -252,6 +253,8 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         last: int | None = None,
     ) -> ConnectionResolverResult[AgentNode]:
         graph_ctx: GraphQueryContext = info.context
+        if graph_ctx.user["role"] != UserRole.SUPERADMIN:
+            return ConnectionResolverResult([], None, None, None, 0)
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
             if filter_expr is not None
@@ -743,7 +746,11 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         query = (
             sa.select(AgentRow)
             .where(AgentRow.id.in_(agent_ids))
-            .options(sa.orm.selectinload(AgentRow.agent_resource_rows))
+            .options(
+                sa.orm.selectinload(AgentRow.agent_resource_rows).joinedload(
+                    AgentResourceRow.slot_type_row
+                )
+            )
             .order_by(
                 AgentRow.id,
             )

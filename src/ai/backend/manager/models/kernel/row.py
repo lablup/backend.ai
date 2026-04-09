@@ -386,7 +386,7 @@ class KernelRow(Base):  # type: ignore[misc]
         "session_creation_id", sa.String(length=32), unique=False, index=False, nullable=True
     )
     session_name: Mapped[str | None] = mapped_column(
-        "session_name", sa.String(length=64), unique=False, index=True, nullable=True
+        "session_name", sa.String(length=128), unique=False, index=True, nullable=True
     )  # previously sess_id
     session_type: Mapped[SessionTypes] = mapped_column(
         "session_type",

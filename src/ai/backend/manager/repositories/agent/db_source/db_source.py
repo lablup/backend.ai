@@ -80,7 +80,11 @@ class AgentDBSource:
             agent_row: AgentRow | None = await db_session.scalar(
                 sa.select(AgentRow)
                 .where(AgentRow.id == agent_id)
-                .options(selectinload(AgentRow.agent_resource_rows))
+                .options(
+                    selectinload(AgentRow.agent_resource_rows).joinedload(
+                        AgentResourceRow.slot_type_row
+                    )
+                )
             )
             if agent_row is None:
                 log.error("Agent with id {} not found", agent_id)
@@ -150,7 +154,9 @@ class AgentDBSource:
 
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(AgentRow).options(
-                selectinload(AgentRow.agent_resource_rows),
+                selectinload(AgentRow.agent_resource_rows).joinedload(
+                    AgentResourceRow.slot_type_row
+                ),
             )
 
             result = await execute_batch_querier(

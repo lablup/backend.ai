@@ -26,10 +26,7 @@ class VFolderMountResult:
 
 
 class VFolderMountProvisioner(Provisioner[VFolderMountSpec, VFolderMountResult]):
-    """
-    Provisioner for the kernel creation setup stage.
-    This is a no-op provisioner as it does not create any resources.
-    """
+    """Provisioner for regular vfolder bind mounts."""
 
     @property
     @override

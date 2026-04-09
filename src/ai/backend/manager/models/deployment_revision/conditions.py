@@ -8,7 +8,7 @@ from typing import cast
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.repositories.base import QueryCondition
 
@@ -76,6 +76,21 @@ class RevisionConditions:
                 condition = DeploymentRevisionRow.name.ilike(f"%{spec.value}")
             else:
                 condition = DeploymentRevisionRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return cast(sa.sql.expression.ColumnElement[bool], condition)
+
+        return inner
+
+    @staticmethod
+    def by_name_in(spec: StringInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(DeploymentRevisionRow.name).in_([
+                    v.lower() for v in spec.values
+                ])
+            else:
+                condition = DeploymentRevisionRow.name.in_(spec.values)
             if spec.negated:
                 condition = sa.not_(condition)
             return cast(sa.sql.expression.ColumnElement[bool], condition)

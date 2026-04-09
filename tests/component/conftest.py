@@ -133,6 +133,9 @@ from ai.backend.manager.notification.notification_center import NotificationCent
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.testutils.bootstrap import (  # noqa: F401
@@ -1197,11 +1200,13 @@ def auth_processors(
 ) -> AuthProcessors:
     """Real AuthProcessors wired with real AuthService and AuthRepository."""
     repo = AuthRepository(database_engine)
+    user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
     service = AuthService(
         hook_plugin_ctx=hook_plugin_ctx,
         auth_repository=repo,
         config_provider=config_provider,
         valkey_session_client=valkey_clients.session,
+        user_resource_policy_repository=user_resource_policy_repository,
     )
     return AuthProcessors(
         service=service,

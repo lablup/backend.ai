@@ -33,6 +33,7 @@ __all__ = (
     "RoleStatus",
     "RoleStatusDTO",
     "RoleStatusFilter",
+    "ScopeInputDTO",
 )
 
 
@@ -92,6 +93,7 @@ class RBACElementTypeDTO(StrEnum):
     ARTIFACT_REGISTRY = "artifact_registry"
     SESSION_TEMPLATE = "session_template"
     APP_CONFIG = "app_config"
+    MODEL_CARD = "model_card"
 
     # Root-query-enabled entities (superadmin-only)
     RESOURCE_PRESET = "resource_preset"
@@ -172,6 +174,13 @@ class EntityTypeFilter(BaseRequestModel):
 
     equals: str | None = None
     in_: list[str] | None = None
+
+
+class ScopeInputDTO(BaseRequestModel):
+    """Scope reference for associating an entity with a scope."""
+
+    scope_type: RBACElementTypeDTO
+    scope_id: str
 
 
 class PermissionSummary(BaseResponseModel):

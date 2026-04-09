@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -23,9 +22,6 @@ from .status import (
     TerminatedTransitionHook,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
@@ -33,7 +29,6 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 class HookRegistryArgs:
     """Arguments for creating HookRegistry."""
 
-    scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
     agent_client_pool: AgentClientPool
     event_producer: EventProducer
@@ -56,7 +51,6 @@ class HookRegistry:
         """Initialize status-based hooks."""
         # RUNNING transition hook
         running_deps = RunningHookDependencies(
-            scheduler_repository=args.scheduler_repository,
             agent_client_pool=args.agent_client_pool,
             deployment_repository=args.deployment_repository,
             event_producer=args.event_producer,

@@ -5,13 +5,13 @@ from __future__ import annotations
 import uuid
 from collections.abc import Collection
 from datetime import datetime
-from typing import cast
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
@@ -81,6 +81,9 @@ class DeploymentConditions:
             return condition
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(EndpointRow.name))
+    by_domain_name_in = staticmethod(make_string_in_factory(EndpointRow.domain))
 
     @staticmethod
     def by_project_id(project_id: uuid.UUID) -> QueryCondition:
@@ -342,25 +345,25 @@ class AccessTokenConditions:
 
         return inner
 
-    # valid_until datetime conditions
+    # expires_at datetime conditions
     @staticmethod
-    def by_valid_until_before(dt: datetime) -> QueryCondition:
+    def by_expires_at_before(dt: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(sa.sql.expression.ColumnElement[bool], EndpointTokenRow.valid_until < dt)
+            return EndpointTokenRow.expires_at < dt
 
         return inner
 
     @staticmethod
-    def by_valid_until_after(dt: datetime) -> QueryCondition:
+    def by_expires_at_after(dt: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(sa.sql.expression.ColumnElement[bool], EndpointTokenRow.valid_until > dt)
+            return EndpointTokenRow.expires_at > dt
 
         return inner
 
     @staticmethod
-    def by_valid_until_equals(dt: datetime) -> QueryCondition:
+    def by_expires_at_equals(dt: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(sa.sql.expression.ColumnElement[bool], EndpointTokenRow.valid_until == dt)
+            return EndpointTokenRow.expires_at == dt
 
         return inner
 

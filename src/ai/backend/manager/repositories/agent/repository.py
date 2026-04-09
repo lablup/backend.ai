@@ -24,6 +24,7 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
@@ -193,7 +194,9 @@ class AgentRepository:
         order_by: Sequence[QueryOrder] = tuple(),
     ) -> list[AgentData]:
         stmt: sa.sql.Select[Any] = sa.select(AgentRow).options(
-            sa.orm.selectinload(AgentRow.agent_resource_rows),
+            sa.orm.selectinload(AgentRow.agent_resource_rows).joinedload(
+                AgentResourceRow.slot_type_row
+            ),
         )
         for cond in conditions:
             stmt = stmt.where(cond())

@@ -16,6 +16,7 @@ class UserResourcePolicyCreatorSpec(CreatorSpec["UserResourcePolicyRow"]):
     max_quota_scope_size: int
     max_session_count_per_model_session: int
     max_customized_image_count: int
+    max_concurrent_logins: int | None = None
 
     @override
     def build_row(self) -> UserResourcePolicyRow:
@@ -25,4 +26,5 @@ class UserResourcePolicyCreatorSpec(CreatorSpec["UserResourcePolicyRow"]):
             max_quota_scope_size=self.max_quota_scope_size,
             max_session_count_per_model_session=self.max_session_count_per_model_session,
             max_customized_image_count=self.max_customized_image_count,
+            max_concurrent_logins=self.max_concurrent_logins,
         )

@@ -1642,7 +1642,7 @@ class VFolderHandler:
             cloneable=params.cloneable,
             bgtask_id=str(result.bgtask_id),
         )
-        resp = VFolderCloneResponse(item=dto)
+        resp = VFolderCloneResponse(dto)
         return APIResponse.build(HTTPStatus.CREATED, resp)
 
     # ------------------------------------------------------------------

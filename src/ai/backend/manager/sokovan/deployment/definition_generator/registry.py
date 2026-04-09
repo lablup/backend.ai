@@ -53,15 +53,17 @@ class ModelDefinitionGeneratorRegistry:
         self._deployment_repository = args.deployment_repository
         self._enable_model_definition_override = args.enable_model_definition_override
         self._generators: dict[RuntimeVariant, ModelDefinitionGenerator] = {}
-        self._generators[RuntimeVariant.CUSTOM] = CustomModelDefinitionGenerator(
+        self._generators[RuntimeVariant("custom")] = CustomModelDefinitionGenerator(
             args.deployment_repository
         )
-        self._generators[RuntimeVariant.VLLM] = VLLMModelDefinitionGenerator()
-        self._generators[RuntimeVariant.HUGGINGFACE_TGI] = HuggingFaceTGIModelDefinitionGenerator()
-        self._generators[RuntimeVariant.NIM] = NIMModelDefinitionGenerator()
-        self._generators[RuntimeVariant.SGLANG] = SGLangModelDefinitionGenerator()
-        self._generators[RuntimeVariant.MODULAR_MAX] = ModularMAXModelDefinitionGenerator()
-        self._generators[RuntimeVariant.CMD] = CMDModelDefinitionGenerator()
+        self._generators[RuntimeVariant("vllm")] = VLLMModelDefinitionGenerator()
+        self._generators[RuntimeVariant("huggingface-tgi")] = (
+            HuggingFaceTGIModelDefinitionGenerator()
+        )
+        self._generators[RuntimeVariant("nim")] = NIMModelDefinitionGenerator()
+        self._generators[RuntimeVariant("sglang")] = SGLangModelDefinitionGenerator()
+        self._generators[RuntimeVariant("modular-max")] = ModularMAXModelDefinitionGenerator()
+        self._generators[RuntimeVariant("cmd")] = CMDModelDefinitionGenerator()
 
     def get(self, runtime_variant: RuntimeVariant) -> ModelDefinitionGenerator:
         generator = self._generators.get(runtime_variant)
@@ -97,7 +99,7 @@ class ModelDefinitionGeneratorRegistry:
         """For non-CUSTOM variants, optionally merge the vfolder file on top of
         the generator-produced definition. CUSTOM variants already read from
         vfolder in the generator, so this step is skipped to avoid redundancy."""
-        if runtime_variant == RuntimeVariant.CUSTOM or not self._enable_model_definition_override:
+        if runtime_variant == "custom" or not self._enable_model_definition_override:
             return base_definition
         model_definition_path = context.mounts.model_definition_path
         if not model_definition_path:

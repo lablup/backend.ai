@@ -8,6 +8,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput,
+    DeleteRuntimeVariantsInput,
     SearchRuntimeVariantsInput,
     UpdateRuntimeVariantInput,
 )
@@ -57,4 +58,11 @@ class V2RuntimeVariantHandler:
         path: PathParam[VariantIdPathParam],
     ) -> APIResponse:
         result = await self._adapter.delete(path.parsed.variant_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def bulk_delete(
+        self,
+        body: BodyParam[DeleteRuntimeVariantsInput],
+    ) -> APIResponse:
+        result = await self._adapter.bulk_delete(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

@@ -33,6 +33,24 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.response import (
     UpdateRuntimeVariantPresetPayload as UpdatePayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    ChoiceItem as ChoiceItemDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    ChoiceOption as ChoiceOptionDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    NumberOption as NumberOptionDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    SliderOption as SliderOptionDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    TextOption as TextOptionDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    UIOption as UIOptionDTO,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -51,6 +69,33 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 @gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description="Target for applying a preset value: environment variable or command-line argument.",
+    ),
+    name="PresetTarget",
+)
+class PresetTargetGQL(StrEnum):
+    ENV = "env"
+    ARGS = "args"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Data type for preset value validation.",
+    ),
+    name="PresetValueType",
+)
+class PresetValueTypeGQL(StrEnum):
+    STR = "str"
+    INT = "int"
+    FLOAT = "float"
+    BOOL = "bool"
+    FLAG = "flag"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description="Order fields for runtime variant presets.",
     ),
     name="RuntimeVariantPresetOrderField",
@@ -62,6 +107,68 @@ class RuntimeVariantPresetOrderFieldGQL(StrEnum):
 
 
 @gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Slider UI config."),
+    model=SliderOptionDTO,
+    name="SliderOption",
+)
+class SliderOptionGQL(PydanticOutputMixin[SliderOptionDTO]):
+    min: float = gql_field(description="Minimum value.")
+    max: float = gql_field(description="Maximum value.")
+    step: float = gql_field(description="Increment step.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Number input UI config."),
+    model=NumberOptionDTO,
+    name="NumberOption",
+)
+class NumberOptionGQL(PydanticOutputMixin[NumberOptionDTO]):
+    min: float | None = gql_field(description="Minimum value.")
+    max: float | None = gql_field(description="Maximum value.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Choice item."),
+    model=ChoiceItemDTO,
+    name="ChoiceItem",
+)
+class ChoiceItemGQL(PydanticOutputMixin[ChoiceItemDTO]):
+    value: str = gql_field(description="Option value.")
+    label: str = gql_field(description="Display label.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Select/radio UI config."),
+    model=ChoiceOptionDTO,
+    name="ChoiceOption",
+)
+class ChoiceOptionGQL(PydanticOutputMixin[ChoiceOptionDTO]):
+    items: list[ChoiceItemGQL] = gql_field(description="List of choices.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Text input UI config."),
+    model=TextOptionDTO,
+    name="TextOption",
+)
+class TextOptionGQL(PydanticOutputMixin[TextOptionDTO]):
+    placeholder: str | None = gql_field(description="Placeholder text.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="UI rendering options."),
+    model=UIOptionDTO,
+    name="UIOption",
+)
+class UIOptionGQL(PydanticOutputMixin[UIOptionDTO]):
+    ui_type: str = gql_field(description="UI render type.")
+    slider: SliderOptionGQL | None = gql_field(description="Slider config.")
+    number: NumberOptionGQL | None = gql_field(description="Number input config.")
+    choices: ChoiceOptionGQL | None = gql_field(description="Select/radio config.")
+    text: TextOptionGQL | None = gql_field(description="Text input config.")
+
+
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description="Specifies how a runtime variant preset value is applied to the inference container, either as an environment variable or a command-line argument.",
@@ -70,11 +177,11 @@ class RuntimeVariantPresetOrderFieldGQL(StrEnum):
     name="PresetTargetSpec",
 )
 class PresetTargetSpecGQL(PydanticOutputMixin[PresetTargetSpecDTO]):
-    preset_target: str = gql_field(
+    preset_target: PresetTargetGQL = gql_field(
         description="How the value is applied to the container: 'env' sets it as an environment variable, 'args' appends it as a command-line argument."
     )
-    value_type: str = gql_field(
-        description="Data type used for input validation (e.g., 'str', 'int', 'float', 'bool')."
+    value_type: PresetValueTypeGQL = gql_field(
+        description="Data type used for input validation (e.g., 'str', 'int', 'float', 'bool', 'flag')."
     )
     default_value: str | None = gql_field(
         description="The default value shown to users when they create a deployment using this preset."
@@ -107,6 +214,9 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     target_spec: PresetTargetSpecGQL = gql_field(
         description="Specification defining how the user-provided value is applied to the inference container."
     )
+    category: str | None = gql_field(description="UI category group for organizing parameters.")
+    display_name: str | None = gql_field(description="Human-readable display label for the UI.")
+    ui_option: UIOptionGQL | None = gql_field(description="UI rendering options.")
     created_at: datetime = gql_field(description="Timestamp when this preset was created.")
     updated_at: datetime | None = gql_field(
         description="Timestamp of the last modification to this preset."
@@ -158,11 +268,11 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
     description: str | None = gql_field(
         default=None, description="Detailed explanation of what this parameter controls."
     )
-    preset_target: str = gql_field(
+    preset_target: PresetTargetGQL = gql_field(
         description="How the value is applied: 'env' for environment variable, 'args' for command-line argument."
     )
-    value_type: str = gql_field(
-        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool')."
+    value_type: PresetValueTypeGQL = gql_field(
+        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag')."
     )
     default_value: str | None = gql_field(
         default=None, description="The default value shown to users when creating a deployment."
@@ -181,8 +291,8 @@ class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     name: str | None = gql_field(default=None, description="New name.")
     description: str | None = gql_field(default=None, description="New description.")
     rank: int | None = gql_field(default=None, description="New rank.")
-    preset_target: str | None = gql_field(default=None, description="New target.")
-    value_type: str | None = gql_field(default=None, description="New value type.")
+    preset_target: PresetTargetGQL | None = gql_field(default=None, description="New target.")
+    value_type: PresetValueTypeGQL | None = gql_field(default=None, description="New value type.")
     default_value: str | None = gql_field(default=None, description="New default value.")
     key: str | None = gql_field(default=None, description="New key.")
 

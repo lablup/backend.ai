@@ -167,7 +167,6 @@ def gql_pydantic_interface[PydanticModel: BaseModel](
     meta: BackendAIGQLMeta,
     *,
     model: type[PydanticModel],
-    fields: list[str] | None = None,
     name: str | None = None,
     directives: Sequence[object] = (),
     use_pydantic_alias: bool = True,
@@ -181,7 +180,6 @@ def gql_pydantic_interface[PydanticModel: BaseModel](
     """
     return strawberry.experimental.pydantic.interface(
         model=model,
-        fields=fields,
         name=name,
         description=_build_description(meta),
         directives=directives,
@@ -198,7 +196,6 @@ def gql_pydantic_type[PydanticModel: BaseModel](
     meta: BackendAIGQLMeta,
     *,
     model: type[PydanticModel],
-    fields: list[str] | None = None,
     name: str | None = None,
     all_fields: bool = False,
     directives: Sequence[object] = (),
@@ -212,7 +209,6 @@ def gql_pydantic_type[PydanticModel: BaseModel](
     """
     return strawberry.experimental.pydantic.type(
         model=model,
-        fields=fields,
         name=name,
         description=_build_description(meta),
         directives=directives,

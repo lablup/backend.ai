@@ -38,6 +38,7 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
     container_uid: int | None = None
     container_main_gid: int | None = None
     container_gids: list[int] | None = None
+    integration_name: str | None = None
 
     @property
     @override
@@ -83,4 +84,5 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,
+            integration_id=self.integration_name,  # DB column is integration_id
         )

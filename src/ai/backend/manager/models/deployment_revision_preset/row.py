@@ -2,18 +2,19 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.common.config import ModelDefinition
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
     EnvironEntryData,
     PresetValueData,
     ResourceOptsEntryData,
-    ResourceSlotEntryData,
 )
 from ai.backend.manager.models.base import (
     GUID,
@@ -21,9 +22,12 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
     PydanticListColumn,
     ResourceOptsEntry,
-    ResourceSlotEntry,
+    StrEnumType,
 )
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 
 __all__ = ("DeploymentRevisionPresetRow",)
 
@@ -46,12 +50,9 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
     rank: Mapped[int] = mapped_column("rank", sa.Integer, nullable=False)
 
-    image: Mapped[str | None] = mapped_column("image", sa.String(length=512), nullable=True)
+    image_id: Mapped[uuid.UUID] = mapped_column("image_id", GUID, nullable=False)
     model_definition: Mapped[ModelDefinition | None] = mapped_column(
         "model_definition", PydanticColumn(ModelDefinition), nullable=True
-    )
-    resource_slots: Mapped[list[ResourceSlotEntry]] = mapped_column(
-        "resource_slots", PydanticListColumn(ResourceSlotEntry), nullable=False, server_default="[]"
     )
     resource_opts: Mapped[list[ResourceOptsEntry]] = mapped_column(
         "resource_opts", PydanticListColumn(ResourceOptsEntry), nullable=False, server_default="[]"
@@ -71,6 +72,26 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
         "preset_values", PydanticListColumn(PresetValueEntry), nullable=False, server_default="[]"
     )
 
+    # Deployment-level preset fields (nullable: None means "preset does not specify,
+    # fall back to user input or system default").
+    open_to_public: Mapped[bool | None] = mapped_column(
+        "open_to_public", sa.Boolean(), nullable=True
+    )
+    replica_count: Mapped[int | None] = mapped_column("replica_count", sa.Integer(), nullable=True)
+    revision_history_limit: Mapped[int | None] = mapped_column(
+        "revision_history_limit", sa.Integer(), nullable=True
+    )
+    deployment_strategy: Mapped[DeploymentStrategy | None] = mapped_column(
+        "deployment_strategy",
+        StrEnumType(DeploymentStrategy, use_name=False),
+        nullable=True,
+    )
+    deployment_strategy_spec: Mapped[dict[str, object] | None] = mapped_column(
+        "deployment_strategy_spec",
+        pgsql.JSONB(),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -84,6 +105,12 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
         onupdate=sa.func.now(),
     )
 
+    resource_slot_rows: Mapped[list[PresetResourceSlotRow]] = relationship(
+        "PresetResourceSlotRow",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
     def to_data(self) -> DeploymentRevisionPresetData:
         return DeploymentRevisionPresetData(
             id=self.id,
@@ -91,16 +118,12 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
             name=self.name,
             description=self.description,
             rank=self.rank,
-            image=self.image,
+            image_id=self.image_id,
             model_definition=(
                 self.model_definition.model_dump(by_alias=True, exclude_none=True)
                 if self.model_definition
                 else None
             ),
-            resource_slots=[
-                ResourceSlotEntryData(resource_type=e.resource_type, quantity=e.quantity)
-                for e in (self.resource_slots or [])
-            ],
             resource_opts=[
                 ResourceOptsEntryData(name=e.name, value=e.value)
                 for e in (self.resource_opts or [])
@@ -114,6 +137,11 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
                 PresetValueData(preset_id=pv.preset_id, value=pv.value)
                 for pv in (self.preset_values or [])
             ],
+            open_to_public=self.open_to_public,
+            replica_count=self.replica_count,
+            revision_history_limit=self.revision_history_limit,
+            deployment_strategy=self.deployment_strategy,
+            deployment_strategy_spec=self.deployment_strategy_spec,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

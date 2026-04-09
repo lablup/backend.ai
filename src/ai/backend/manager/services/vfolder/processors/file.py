@@ -24,6 +24,18 @@ from ai.backend.manager.services.vfolder.actions.file import (
     RenameFileAction,
     RenameFileActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.file_v2 import (
+    CreateDownloadSessionV2Action,
+    CreateDownloadSessionV2ActionResult,
+    DeleteFilesV2Action,
+    DeleteFilesV2ActionResult,
+    ListFilesV2Action,
+    ListFilesV2ActionResult,
+    MkdirV2Action,
+    MkdirV2ActionResult,
+    MoveFileV2Action,
+    MoveFileV2ActionResult,
+)
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 
 
@@ -39,6 +51,14 @@ class VFolderFileProcessors(AbstractProcessorPackage):
     delete_files_async: ActionProcessor[DeleteFilesAsyncAction, DeleteFilesAsyncActionResult]
     mkdir: ActionProcessor[MkdirAction, MkdirActionResult]
     move_file: ActionProcessor[MoveFileAction, MoveFileActionResult]
+    # V2 processors
+    list_files_v2: ActionProcessor[ListFilesV2Action, ListFilesV2ActionResult]
+    mkdir_v2: ActionProcessor[MkdirV2Action, MkdirV2ActionResult]
+    move_file_v2: ActionProcessor[MoveFileV2Action, MoveFileV2ActionResult]
+    delete_files_v2: ActionProcessor[DeleteFilesV2Action, DeleteFilesV2ActionResult]
+    download_file_v2: ActionProcessor[
+        CreateDownloadSessionV2Action, CreateDownloadSessionV2ActionResult
+    ]
 
     def __init__(
         self,
@@ -57,6 +77,12 @@ class VFolderFileProcessors(AbstractProcessorPackage):
         self.delete_files_async = ActionProcessor(service.delete_files_async, action_monitors)
         self.mkdir = ActionProcessor(service.mkdir, action_monitors)
         self.move_file = ActionProcessor(service.move_file, action_monitors)
+        # V2
+        self.list_files_v2 = ActionProcessor(service.list_files_v2, action_monitors)
+        self.mkdir_v2 = ActionProcessor(service.mkdir_v2, action_monitors)
+        self.move_file_v2 = ActionProcessor(service.move_file_v2, action_monitors)
+        self.delete_files_v2 = ActionProcessor(service.delete_files_v2, action_monitors)
+        self.download_file_v2 = ActionProcessor(service.download_file_v2, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -70,4 +96,9 @@ class VFolderFileProcessors(AbstractProcessorPackage):
             DeleteFilesAsyncAction.spec(),
             MkdirAction.spec(),
             MoveFileAction.spec(),
+            ListFilesV2Action.spec(),
+            MkdirV2Action.spec(),
+            MoveFileV2Action.spec(),
+            DeleteFilesV2Action.spec(),
+            CreateDownloadSessionV2Action.spec(),
         ]

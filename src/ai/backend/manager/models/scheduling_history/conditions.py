@@ -14,6 +14,7 @@ from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import (
@@ -317,6 +318,10 @@ class SessionSchedulingHistoryConditions:
             return ~expr if spec.negated else expr
 
         return inner
+
+    by_phase_in = staticmethod(make_string_in_factory(SessionSchedulingHistoryRow.phase))
+    by_error_code_in = staticmethod(make_string_in_factory(SessionSchedulingHistoryRow.error_code))
+    by_message_in = staticmethod(make_string_in_factory(SessionSchedulingHistoryRow.message))
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
@@ -753,6 +758,10 @@ class DeploymentHistoryConditions:
 
         return inner
 
+    by_phase_in = staticmethod(make_string_in_factory(DeploymentHistoryRow.phase))
+    by_error_code_in = staticmethod(make_string_in_factory(DeploymentHistoryRow.error_code))
+    by_message_in = staticmethod(make_string_in_factory(DeploymentHistoryRow.message))
+
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor)."""
@@ -1149,6 +1158,10 @@ class RouteHistoryConditions:
             return ~expr if spec.negated else expr
 
         return inner
+
+    by_phase_in = staticmethod(make_string_in_factory(RouteHistoryRow.phase))
+    by_error_code_in = staticmethod(make_string_in_factory(RouteHistoryRow.error_code))
+    by_message_in = staticmethod(make_string_in_factory(RouteHistoryRow.message))
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:

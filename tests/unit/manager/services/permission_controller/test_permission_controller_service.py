@@ -36,12 +36,13 @@ from ai.backend.manager.data.permission.role import (
     RoleData,
     RoleDetailData,
     RolePermissionsUpdateInput,
+    RoleRevocationResult,
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
-    UserRoleRevocationData,
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import PermissionStatus, RoleStatus
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
@@ -145,7 +146,11 @@ class TestCreateRole:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_create_role_returns_role_data(
         self,
@@ -203,6 +208,43 @@ class TestCreateRole:
         assert result.data.updated_at is not None
         assert result.data.created_at <= now or result.data.created_at >= now
 
+    async def test_create_role_forwards_scope_refs(
+        self,
+        service: PermissionControllerService,
+        mock_repository: MagicMock,
+    ) -> None:
+        role_data = _make_role_data()
+        mock_repository.create_role.return_value = role_data
+
+        scope_refs = [
+            RBACElementRef(element_type=RBACElementType.DOMAIN, element_id="domain-1"),
+            RBACElementRef(element_type=RBACElementType.PROJECT, element_id="project-1"),
+        ]
+        creator = MagicMock()
+        action = CreateRoleAction(creator=creator, scope_refs=scope_refs)
+
+        await service.create_role(action)
+
+        call_args = mock_repository.create_role.call_args[0][0]
+        assert len(call_args.scope_refs) == 2
+        assert call_args.scope_refs[0] == scope_refs[0]
+        assert call_args.scope_refs[1] == scope_refs[1]
+
+    async def test_create_role_without_scope_refs_defaults_to_empty(
+        self,
+        service: PermissionControllerService,
+        mock_repository: MagicMock,
+    ) -> None:
+        role_data = _make_role_data()
+        mock_repository.create_role.return_value = role_data
+
+        action = CreateRoleAction(creator=MagicMock())
+
+        await service.create_role(action)
+
+        call_args = mock_repository.create_role.call_args[0][0]
+        assert len(call_args.scope_refs) == 0
+
 
 class TestGetRoleDetail:
     @pytest.fixture
@@ -215,7 +257,11 @@ class TestGetRoleDetail:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_get_role_detail_returns_full_detail(
         self,
@@ -265,7 +311,11 @@ class TestUpdateRole:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_update_role_delegates_to_repository(
         self,
@@ -295,7 +345,11 @@ class TestDeleteRole:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_soft_delete_sets_deleted_at(
         self,
@@ -328,7 +382,11 @@ class TestPurgeRole:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_purge_role_hard_deletes(
         self,
@@ -357,7 +415,11 @@ class TestAssignRole:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_assign_role_creates_assignment(
         self,
@@ -419,7 +481,11 @@ class TestRevokeRole:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_revoke_role_returns_revocation_data(
         self,
@@ -428,12 +494,9 @@ class TestRevokeRole:
     ) -> None:
         user_id = uuid.uuid4()
         role_id = uuid.uuid4()
-        revocation_data = UserRoleRevocationData(
+        mock_repository.revoke_role.return_value = RoleRevocationResult(
             user_role_id=uuid.uuid4(),
-            user_id=user_id,
-            role_id=role_id,
         )
-        mock_repository.revoke_role.return_value = revocation_data
 
         input_data = UserRoleRevocationInput(user_id=user_id, role_id=role_id)
         action = RevokeRoleAction(input=input_data)
@@ -455,7 +518,11 @@ class TestSearchRoles:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_search_roles_delegates_querier(
         self,
@@ -530,7 +597,11 @@ class TestSearchUsersAssignedToRole:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_search_users_returns_assigned_users(
         self,
@@ -592,7 +663,11 @@ class TestCreatePermission:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_create_permission_with_scope(
         self,
@@ -650,7 +725,11 @@ class TestDeletePermission:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_delete_permission_delegates_to_repository(
         self,
@@ -687,7 +766,11 @@ class TestSearchPermissions:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_search_permissions_delegates_querier(
         self,
@@ -749,7 +832,11 @@ class TestUpdateRolePermissions:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_update_role_permissions(
         self,
@@ -783,7 +870,11 @@ class TestGetEntityTypes:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_get_entity_types_returns_all(
         self,
@@ -809,7 +900,11 @@ class TestSearchEntities:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_search_entities_delegates_querier(
         self,
@@ -864,7 +959,11 @@ class TestSearchElementAssociations:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_search_element_associations_delegates_querier(
         self,

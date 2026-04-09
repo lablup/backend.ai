@@ -222,6 +222,7 @@ class ResourcePresetAdapter(BaseAdapter):
                 equals_factory=ResourcePresetConditions.by_name_equals,
                 starts_with_factory=ResourcePresetConditions.by_name_starts_with,
                 ends_with_factory=ResourcePresetConditions.by_name_ends_with,
+                in_factory=ResourcePresetConditions.by_name_in,
             )
             if cond:
                 conditions.append(cond)
@@ -232,6 +233,7 @@ class ResourcePresetAdapter(BaseAdapter):
                 equals_factory=ResourcePresetConditions.by_resource_group_name_equals,
                 starts_with_factory=ResourcePresetConditions.by_resource_group_name_starts_with,
                 ends_with_factory=ResourcePresetConditions.by_resource_group_name_ends_with,
+                in_factory=ResourcePresetConditions.by_resource_group_name_in,
             )
             if cond:
                 conditions.append(cond)

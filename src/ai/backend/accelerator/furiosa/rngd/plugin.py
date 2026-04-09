@@ -1,6 +1,7 @@
 import asyncio
 import glob
 import logging
+import re
 from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from pathlib import Path
@@ -11,7 +12,7 @@ import aiodocker
 
 from ai.backend.accelerator.furiosa import __version__
 
-from .rngd_api import RngdAPI
+from .rngd_api import LibraryError, RngdAPI
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
@@ -27,6 +28,9 @@ from ai.backend.agent.resources import (
 )
 from ai.backend.agent.stats import (
     ContainerMeasurement,
+    Measurement,
+    MetricKey,
+    MetricTypes,
     NodeMeasurement,
     ProcessMeasurement,
     StatContext,
@@ -44,6 +48,7 @@ from ai.backend.common.types import (
 )
 
 PREFIX = "rngd"
+_NPU_INDEX_RE = re.compile(r"/dev/rngd/npu(\d+)")
 
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.rngd"))
@@ -100,20 +105,18 @@ class RngdPlugin(AbstractComputePlugin):
         if self._all_devices is not None:
             return self._all_devices
         devices: list[RngdDevice] = []
-        cnt = 0
-        async for device_info in RngdAPI.list_devices():
+        for device_info in await RngdAPI.list_devices():
             devices.append(
                 RngdDevice(
-                    model_name=device_info["model"],
-                    serial=device_info["device_sn"],
-                    device_id=str(cnt),
-                    hw_location=device_info["pci_bus_id"],
-                    memory_size=0,
-                    processing_units=0,
-                    numa_node=device_info["numa_node"],
+                    model_name=device_info.arch,
+                    serial=device_info.device_serial,
+                    device_id=str(device_info.device_index),
+                    hw_location=device_info.pci_bus_id,
+                    memory_size=device_info.memory_size,
+                    processing_units=device_info.num_cores,
+                    numa_node=device_info.numa_node,
                 )
             )
-            cnt += 1
 
         self._all_devices = devices
         return devices
@@ -135,14 +138,136 @@ class RngdPlugin(AbstractComputePlugin):
         return {}
 
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
-        # TODO: Implement
-        return []
+        dev_count = 0
+        mem_total_agg = 0
+        mem_used_agg = 0
+        mem_stats: dict[DeviceId, Measurement] = {}
+        util_total = 0.0
+        util_stats: dict[DeviceId, Measurement] = {}
+        if self.enabled:
+            try:
+                for device in await self.list_devices():
+                    if device.device_id in self.device_mask:
+                        continue
+                    dev_count += 1
+                    metrics = await RngdAPI.get_device_metrics(int(device.device_id))
+                    mem_total_agg += metrics.memory_total
+                    mem_used_agg += metrics.memory_used
+                    mem_stats[device.device_id] = Measurement(
+                        Decimal(metrics.memory_used), Decimal(metrics.memory_total)
+                    )
+                    avg_util = (
+                        sum(metrics.core_utilizations) / len(metrics.core_utilizations)
+                        if metrics.core_utilizations
+                        else 0.0
+                    )
+                    util_total += avg_util
+                    util_stats[device.device_id] = Measurement(Decimal(avg_util), Decimal(100))
+            except (LibraryError, OSError) as e:
+                log.warning("failed to gather RNGD node measures: {}", e)
+        return [
+            NodeMeasurement(
+                MetricKey("rngd_mem"),
+                MetricTypes.GAUGE,
+                unit_hint="bytes",
+                stats_filter=frozenset({"max"}),
+                per_node=Measurement(Decimal(mem_used_agg), Decimal(mem_total_agg)),
+                per_device=mem_stats,
+            ),
+            NodeMeasurement(
+                MetricKey("rngd_util"),
+                MetricTypes.UTILIZATION,
+                unit_hint="percent",
+                stats_filter=frozenset({"avg", "max"}),
+                per_node=Measurement(Decimal(util_total), Decimal(dev_count * 100)),
+                per_device=util_stats,
+            ),
+        ]
 
     async def gather_container_measures(
         self, ctx: StatContext, container_ids: Sequence[str]
     ) -> Sequence[ContainerMeasurement]:
-        # TODO: Implement
-        return []
+        mem_stats: dict[str, int] = {}
+        mem_sizes: dict[str, int] = {}
+        util_stats: dict[str, Decimal] = {}
+        num_devices_per_container: dict[str, int] = {}
+
+        if not self.enabled:
+            return []
+
+        # Step 1: Collect per-device metrics
+        device_metrics: dict[int, tuple[int, int, float]] = {}  # idx -> (used, total, util%)
+        try:
+            for device in await self.list_devices():
+                if device.device_id in self.device_mask:
+                    continue
+                dev_idx = int(device.device_id)
+                metrics = await RngdAPI.get_device_metrics(dev_idx)
+                avg_util = (
+                    sum(metrics.core_utilizations) / len(metrics.core_utilizations)
+                    if metrics.core_utilizations
+                    else 0.0
+                )
+                device_metrics[dev_idx] = (
+                    metrics.memory_used,
+                    metrics.memory_total,
+                    avg_util,
+                )
+        except (LibraryError, OSError) as e:
+            log.warning("failed to gather RNGD device metrics: {}", e)
+            return []
+
+        # Step 2: For each container, find allocated devices via Docker inspection
+        for cid in container_ids:
+            mem_stats[cid] = 0
+            mem_sizes[cid] = 0
+            util_stats[cid] = Decimal("0")
+            num_devices_per_container[cid] = 0
+            try:
+                async with aiodocker.Docker() as docker:
+                    container_info = await docker.containers.get(cid)
+                seen_indices: set[int] = set()
+                for dev_entry in container_info["HostConfig"].get("Devices", []):
+                    m = _NPU_INDEX_RE.match(dev_entry["PathOnHost"])
+                    if m is None:
+                        continue
+                    dev_idx = int(m.group(1))
+                    if dev_idx in seen_indices:
+                        continue
+                    seen_indices.add(dev_idx)
+                    dev_metric = device_metrics.get(dev_idx)
+                    if dev_metric is None:
+                        continue
+                    mem_used, mem_total, avg_util = dev_metric
+                    mem_stats[cid] += mem_used
+                    mem_sizes[cid] += mem_total
+                    util_stats[cid] += Decimal(str(avg_util))
+                    num_devices_per_container[cid] += 1
+            except Exception:
+                log.warning("failed to inspect container {} for RNGD measures", cid)
+
+        return [
+            ContainerMeasurement(
+                MetricKey("rngd_mem"),
+                MetricTypes.GAUGE,
+                unit_hint="bytes",
+                stats_filter=frozenset({"max"}),
+                per_container={
+                    cid: Measurement(Decimal(usage), Decimal(mem_sizes[cid]))
+                    for cid, usage in mem_stats.items()
+                },
+            ),
+            ContainerMeasurement(
+                MetricKey("rngd_util"),
+                MetricTypes.UTILIZATION,
+                unit_hint="percent",
+                stats_filter=frozenset({"avg", "max"}),
+                per_container={
+                    cid: Measurement(util, Decimal(num_devices_per_container[cid] * 100))
+                    for cid, util in util_stats.items()
+                },
+            ),
+        ]
 
     async def create_alloc_map(self) -> DiscretePropertyAllocMap:
         devices = await self.list_devices()
@@ -174,7 +299,7 @@ class RngdPlugin(AbstractComputePlugin):
         devices: dict[str, str] = {}
         for alloc_idx, device_id in enumerate(device_ids):
             source_paths = await asyncio.get_running_loop().run_in_executor(
-                None, glob.glob, f"/dev/rngd/npu{device_id}"
+                None, glob.glob, f"/dev/rngd/npu{device_id}*"
             )
             for source_path in source_paths:
                 devices[str(source_path)] = str(source_path).replace(
@@ -184,6 +309,7 @@ class RngdPlugin(AbstractComputePlugin):
         return {
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
+                "SecurityOpt": ["seccomp=unconfined"],
                 "IpcMode": "host",
                 "Ulimits": [{"Name": "memlock", "Hard": -1, "Soft": -1}],
                 "Sysctls": {"net.ipv6.conf.all.disable_ipv6": "0"},
@@ -300,7 +426,7 @@ class RngdPlugin(AbstractComputePlugin):
             "slot_name": "rngd.device",
             "description": "RNGD",
             "human_readable_name": "Furiosa RNGD Device",
-            "display_unit": "Core",
+            "display_unit": "NPU",
             "number_format": {"binary": False, "round_length": 0},
             "display_icon": "npu3",
         }

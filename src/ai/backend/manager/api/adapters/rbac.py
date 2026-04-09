@@ -10,6 +10,7 @@ from functools import lru_cache
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.rbac import (
@@ -51,7 +52,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
     AdminSearchRoleAssignmentsGQLInput,
-    AdminSearchRolesGQLInput,
+    SearchRolesInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AssignRoleInput as AssignRoleInputDTO,
@@ -132,6 +133,7 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -170,6 +172,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     RoleCreatorSpec,
     UserRoleCreatorSpec,
 )
+from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
 from ai.backend.manager.repositories.permission_controller.updaters import (
     PermissionUpdaterSpec,
     RoleUpdaterSpec,
@@ -210,6 +213,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_permissions
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
     SearchRolesActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_roles_in_scope import (
+    SearchRolesInScopeAction,
+    SearchRolesInScopeActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
@@ -520,6 +527,13 @@ class RBACAdapter(BaseAdapter):
 
     async def create(self, input: CreateRoleInput) -> CreateRolePayload:
         """Create a new role."""
+        scope_refs = [
+            RBACElementRef(
+                element_type=RBACElementType(s.scope_type),
+                element_id=s.scope_id,
+            )
+            for s in (input.scopes or [])
+        ]
         creator = Creator(
             spec=RoleCreatorSpec(
                 name=input.name,
@@ -529,7 +543,7 @@ class RBACAdapter(BaseAdapter):
             )
         )
         action_result = await self._processors.permission_controller.create_role.wait_for_complete(
-            CreateRoleAction(creator=creator)
+            CreateRoleAction(creator=creator, scope_refs=scope_refs)
         )
         return CreateRolePayload(role=self._role_data_to_node(action_result.data))
 
@@ -588,8 +602,7 @@ class RBACAdapter(BaseAdapter):
 
     async def admin_search_roles_gql(
         self,
-        input: AdminSearchRolesGQLInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
+        input: SearchRolesInput,
     ) -> SearchResult[RoleNode]:
         """Search roles with cursor/offset pagination."""
         conditions = self._convert_role_filter_gql(input.filter) if input.filter else []
@@ -604,11 +617,42 @@ class RBACAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=base_conditions,
         )
         action_result: SearchRolesActionResult = (
             await self._processors.permission_controller.search_roles.wait_for_complete(
                 SearchRolesAction(querier=querier)
+            )
+        )
+        raw = action_result.result
+        return SearchResult(
+            items=[self._role_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
+        )
+
+    async def search_roles_in_scope(
+        self,
+        scope: ScopedRoleSearchScope,
+        input: SearchRolesInput,
+    ) -> SearchResult[RoleNode]:
+        """Search roles registered in a given scope."""
+        conditions = self._convert_role_filter_gql(input.filter) if input.filter else []
+        orders = self._convert_role_orders_gql(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_role_gql_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result: SearchRolesInScopeActionResult = (
+            await self._processors.permission_controller.search_roles_in_scope.wait_for_complete(
+                SearchRolesInScopeAction(scope=scope, querier=querier)
             )
         )
         raw = action_result.result
@@ -680,6 +724,20 @@ class RBACAdapter(BaseAdapter):
             has_next_page=raw.has_next_page,
             has_previous_page=raw.has_previous_page,
         )
+
+    async def search_role_scopes(
+        self,
+        role_id: UUID,
+        input: AdminSearchEntitiesGQLInput,
+    ) -> SearchResult[AssociationScopesEntitiesNode]:
+        """Search scope associations for a specific role with pagination."""
+        base_conditions: list[QueryCondition] = [
+            EntityScopeConditions.by_entity_type(RBACElementType.ROLE),
+            EntityScopeConditions.by_entity_id_equals(
+                StringMatchSpec(value=str(role_id), case_insensitive=False, negated=False)
+            ),
+        ]
+        return await self.admin_search_entities_gql(input, base_conditions=base_conditions)
 
     # ------------------------------------------------------------------ get
 
@@ -790,7 +848,11 @@ class RBACAdapter(BaseAdapter):
         """Assign a role to a user."""
         action_result = await self._processors.permission_controller.assign_role.wait_for_complete(
             AssignRoleAction(
-                input=UserRoleAssignmentInput(user_id=input.user_id, role_id=input.role_id)
+                input=UserRoleAssignmentInput(
+                    user_id=input.user_id,
+                    role_id=input.role_id,
+                    project_id=input.project_id,
+                )
             )
         )
         data: UserRoleAssignmentData = action_result.data
@@ -825,7 +887,10 @@ class RBACAdapter(BaseAdapter):
         specs = [UserRoleCreatorSpec(user_id=uid, role_id=input.role_id) for uid in input.user_ids]
         action_result = (
             await self._processors.permission_controller.bulk_assign_role.wait_for_complete(
-                BulkAssignRoleAction(bulk_creator=BulkCreator(specs=specs))
+                BulkAssignRoleAction(
+                    bulk_creator=BulkCreator(specs=specs),
+                    project_id=input.project_id,
+                )
             )
         )
         result: BulkRoleAssignmentResultData = action_result.data
@@ -898,6 +963,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=RoleConditions.by_name_equals,
                 starts_with_factory=RoleConditions.by_name_starts_with,
                 ends_with_factory=RoleConditions.by_name_ends_with,
+                in_factory=RoleConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -982,6 +1048,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=RoleConditions.by_name_equals,
                 starts_with_factory=RoleConditions.by_name_starts_with,
                 ends_with_factory=RoleConditions.by_name_ends_with,
+                in_factory=RoleConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1056,6 +1123,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=RoleConditions.by_name_equals,
                 starts_with_factory=RoleConditions.by_name_starts_with,
                 ends_with_factory=RoleConditions.by_name_ends_with,
+                in_factory=RoleConditions.by_name_in,
             )
             if condition is not None:
                 raw_conditions.append(condition)
@@ -1165,6 +1233,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=AssignedUserConditions.by_username_equals,
                 starts_with_factory=AssignedUserConditions.by_username_starts_with,
                 ends_with_factory=AssignedUserConditions.by_username_ends_with,
+                in_factory=AssignedUserConditions.by_username_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1175,6 +1244,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=AssignedUserConditions.by_email_equals,
                 starts_with_factory=AssignedUserConditions.by_email_starts_with,
                 ends_with_factory=AssignedUserConditions.by_email_ends_with,
+                in_factory=AssignedUserConditions.by_email_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1219,6 +1289,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=EntityScopeConditions.by_entity_id_equals,
                 starts_with_factory=EntityScopeConditions.by_entity_id_starts_with,
                 ends_with_factory=EntityScopeConditions.by_entity_id_ends_with,
+                in_factory=EntityScopeConditions.by_entity_id_in,
             )
             if condition is not None:
                 conditions.append(condition)

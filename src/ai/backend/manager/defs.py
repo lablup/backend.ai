@@ -116,6 +116,7 @@ class LockID(enum.IntEnum):
     LOCKID_SOKOVAN_TARGET_PREPARING = 231  # For operations targeting PREPARING/PULLING sessions
     LOCKID_SOKOVAN_TARGET_CREATING = 232  # For operations targeting CREATING/PREPARED sessions
     LOCKID_SOKOVAN_TARGET_TERMINATING = 233  # For operations targeting TERMINATING sessions
+    LOCKID_SOKOVAN_CLEANUP_FORCE_TERMINATED_TIMER = 234  # Timer for force-terminated cleanup
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable

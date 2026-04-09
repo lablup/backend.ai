@@ -9,12 +9,15 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     AgentResourceOrderField,
+    AllocatedResourceSlotOrderField,
     OrderDirection,
     ResourceAllocationOrderField,
     ResourceSlotTypeOrderField,
 )
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
+    DeploymentRevisionResourceSlotRow,
+    PresetResourceSlotRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
@@ -150,6 +153,44 @@ def resolve_resource_allocation_order(
 ) -> QueryOrder:
     """Resolve a DTO order field + direction to a SQLAlchemy order expression."""
     col = RESOURCE_ALLOCATION_ORDER_FIELD_MAP[field]
+    if direction == OrderDirection.DESC:
+        return col.desc()
+    return col.asc()
+
+
+# ========== AllocatedResourceSlot orders (revision/preset shared via joined rank) ==========
+
+ALLOCATED_SLOT_REVISION_ORDER_FIELD_MAP: dict[AllocatedResourceSlotOrderField, _OrderColumn] = {
+    AllocatedResourceSlotOrderField.SLOT_NAME: DeploymentRevisionResourceSlotRow.slot_name,
+    AllocatedResourceSlotOrderField.QUANTITY: DeploymentRevisionResourceSlotRow.quantity,
+    AllocatedResourceSlotOrderField.RANK: ResourceSlotTypeRow.rank,
+}
+
+ALLOCATED_SLOT_PRESET_ORDER_FIELD_MAP: dict[AllocatedResourceSlotOrderField, _OrderColumn] = {
+    AllocatedResourceSlotOrderField.SLOT_NAME: PresetResourceSlotRow.slot_name,
+    AllocatedResourceSlotOrderField.QUANTITY: PresetResourceSlotRow.quantity,
+    AllocatedResourceSlotOrderField.RANK: ResourceSlotTypeRow.rank,
+}
+
+ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER: QueryOrder = ResourceSlotTypeRow.rank.asc()
+ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER: QueryOrder = ResourceSlotTypeRow.rank.desc()
+ALLOCATED_SLOT_REVISION_TIEBREAKER: QueryOrder = DeploymentRevisionResourceSlotRow.slot_name.asc()
+ALLOCATED_SLOT_PRESET_TIEBREAKER: QueryOrder = PresetResourceSlotRow.slot_name.asc()
+
+
+def resolve_allocated_slot_revision_order(
+    field: AllocatedResourceSlotOrderField, direction: OrderDirection
+) -> QueryOrder:
+    col = ALLOCATED_SLOT_REVISION_ORDER_FIELD_MAP[field]
+    if direction == OrderDirection.DESC:
+        return col.desc()
+    return col.asc()
+
+
+def resolve_allocated_slot_preset_order(
+    field: AllocatedResourceSlotOrderField, direction: OrderDirection
+) -> QueryOrder:
+    col = ALLOCATED_SLOT_PRESET_ORDER_FIELD_MAP[field]
     if direction == OrderDirection.DESC:
         return col.desc()
     return col.asc()

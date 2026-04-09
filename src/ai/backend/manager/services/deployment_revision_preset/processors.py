@@ -16,6 +16,10 @@ from ai.backend.manager.services.deployment_revision_preset.actions.search impor
     SearchDeploymentRevisionPresetsAction,
     SearchDeploymentRevisionPresetsActionResult,
 )
+from ai.backend.manager.services.deployment_revision_preset.actions.search_resource_slots import (
+    SearchPresetResourceSlotsAction,
+    SearchPresetResourceSlotsActionResult,
+)
 from ai.backend.manager.services.deployment_revision_preset.actions.update import (
     UpdateDeploymentRevisionPresetAction,
     UpdateDeploymentRevisionPresetActionResult,
@@ -38,6 +42,9 @@ class DeploymentRevisionPresetProcessors(AbstractProcessorPackage):
     search: ActionProcessor[
         SearchDeploymentRevisionPresetsAction, SearchDeploymentRevisionPresetsActionResult
     ]
+    search_resource_slots: ActionProcessor[
+        SearchPresetResourceSlotsAction, SearchPresetResourceSlotsActionResult
+    ]
 
     def __init__(
         self,
@@ -49,6 +56,7 @@ class DeploymentRevisionPresetProcessors(AbstractProcessorPackage):
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
+        self.search_resource_slots = ActionProcessor(service.search_resource_slots, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -57,4 +65,5 @@ class DeploymentRevisionPresetProcessors(AbstractProcessorPackage):
             UpdateDeploymentRevisionPresetAction.spec(),
             DeleteDeploymentRevisionPresetAction.spec(),
             SearchDeploymentRevisionPresetsAction.spec(),
+            SearchPresetResourceSlotsAction.spec(),
         ]

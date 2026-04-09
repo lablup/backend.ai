@@ -74,6 +74,9 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentStrategyInfoDTO,
     ReplicaStateInfo,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    ProjectDeploymentScope as ProjectDeploymentScopeDTO,
+)
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -444,6 +447,17 @@ class DeploymentStatusFilter(PydanticInputMixin[DeploymentStatusFilterDTO]):
         description="The in  field.", name="in", default=None
     )
     equals: DeploymentStatusGQL | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for project-level deployment operations.",
+        added_version="25.19.0",
+    ),
+    name="ProjectDeploymentScope",
+)
+class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
+    project_id: UUID = gql_field(description="Project UUID to scope the deployment operation.")
 
 
 @gql_pydantic_input(

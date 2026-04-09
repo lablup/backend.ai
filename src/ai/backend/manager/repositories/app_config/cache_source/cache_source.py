@@ -57,7 +57,8 @@ class AppConfigCacheSource:
         """
         with suppress_with_log([Exception], "Failed to get merged config from cache"):
             cache_key = self._get_merged_config_cache_key(user_id)
-            cached_value = await self._valkey_cache.client.get(cache_key)
+            async with self._valkey_cache.client() as conn:
+                cached_value = await conn.get(cache_key)
             global count
             count += 1
             if cached_value:
@@ -95,7 +96,8 @@ class AppConfigCacheSource:
             batch.sadd(domain_users_key, [merged_config.user_id])
             batch.expire(domain_users_key, self._cache_ttl)
 
-            await self._valkey_cache.client.exec(batch, raise_on_error=True)
+            async with self._valkey_cache.client() as conn:
+                await conn.exec(batch, raise_on_error=True)
 
             log.trace(
                 "Cached merged config for user {} in domain {}",
@@ -119,7 +121,8 @@ class AppConfigCacheSource:
             match scope_type:
                 case AppConfigScopeType.DOMAIN:
                     domain_users_key = self._get_domain_users_set_key(scope_id)
-                    user_ids = await self._valkey_cache.client.smembers(domain_users_key)
+                    async with self._valkey_cache.client() as conn:
+                        user_ids = await conn.smembers(domain_users_key)
                     if not user_ids:
                         log.debug(
                             "No users found for domain: {}, skipping cache invalidation", scope_id
@@ -129,7 +132,8 @@ class AppConfigCacheSource:
                         self._get_merged_config_cache_key(user_id.decode()) for user_id in user_ids
                     ]
                     keys_to_delete.append(domain_users_key)
-                    remove_count = await self._valkey_cache.client.delete(keys_to_delete)
+                    async with self._valkey_cache.client() as conn:
+                        remove_count = await conn.delete(keys_to_delete)
                     log.debug(
                         "Invalidated {} merged config caches for domain: {}",
                         remove_count,
@@ -138,7 +142,8 @@ class AppConfigCacheSource:
                 case AppConfigScopeType.USER:
                     # For user-level config, only invalidate that user's merged config
                     cache_key = self._get_merged_config_cache_key(scope_id)
-                    await self._valkey_cache.client.delete([cache_key])
+                    async with self._valkey_cache.client() as conn:
+                        await conn.delete([cache_key])
                     log.debug("Invalidated merged config for user: {}", scope_id)
 
                 case _:

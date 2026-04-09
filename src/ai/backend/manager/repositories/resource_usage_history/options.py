@@ -8,6 +8,7 @@ from datetime import date, datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
@@ -195,6 +196,9 @@ class DomainUsageBucketConditions:
             return condition
 
         return inner
+
+    by_resource_group_in = staticmethod(make_string_in_factory(DomainUsageBucketRow.resource_group))
+    by_domain_name_in = staticmethod(make_string_in_factory(DomainUsageBucketRow.domain_name))
 
     @staticmethod
     def by_period_range(start: date, end: date) -> QueryCondition:
@@ -438,6 +442,11 @@ class ProjectUsageBucketConditions:
             return condition
 
         return inner
+
+    by_resource_group_in = staticmethod(
+        make_string_in_factory(ProjectUsageBucketRow.resource_group)
+    )
+    by_domain_name_in = staticmethod(make_string_in_factory(ProjectUsageBucketRow.domain_name))
 
     @staticmethod
     def by_project_id(spec: UUIDEqualMatchSpec) -> QueryCondition:
@@ -699,6 +708,9 @@ class UserUsageBucketConditions:
             return condition
 
         return inner
+
+    by_resource_group_in = staticmethod(make_string_in_factory(UserUsageBucketRow.resource_group))
+    by_domain_name_in = staticmethod(make_string_in_factory(UserUsageBucketRow.domain_name))
 
     @staticmethod
     def by_user_uuid(spec: UUIDEqualMatchSpec) -> QueryCondition:

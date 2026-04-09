@@ -276,8 +276,11 @@ def info(ctx: CLIContext, service_name_or_id: str) -> None:
 @click.option(
     "--runtime-variant",
     metavar="RUNTIME_VARIANT",
-    type=click.Choice([*RuntimeVariant], case_sensitive=False),
-    default=RuntimeVariant.CUSTOM,
+    type=click.Choice(
+        ["custom", "vllm", "nim", "huggingface-tgi", "sglang", "modular-max", "cmd"],
+        case_sensitive=False,
+    ),
+    default="custom",
     help=(
         "Runtime variant of the service. "
         "Control which runtime environment is used for the service. Default is `custom`."

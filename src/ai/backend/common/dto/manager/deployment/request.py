@@ -245,7 +245,7 @@ class ModelRuntimeConfigInput(BaseRequestModel):
     """Model runtime configuration input."""
 
     runtime_variant: RuntimeVariant = Field(
-        default=RuntimeVariant.CUSTOM, description="Runtime variant"
+        default=RuntimeVariant("custom"), description="Runtime variant"
     )
     inference_runtime_config: Mapping[str, Any] | None = Field(
         default=None, description="Inference runtime configuration"

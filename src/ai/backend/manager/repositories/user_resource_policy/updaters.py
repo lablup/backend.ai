@@ -5,7 +5,7 @@ from typing import Any, override
 
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
@@ -18,6 +18,7 @@ class UserResourcePolicyUpdaterSpec(UpdaterSpec[UserResourcePolicyRow]):
         default_factory=OptionalState.nop
     )
     max_customized_image_count: OptionalState[int] = field(default_factory=OptionalState.nop)
+    max_concurrent_logins: TriState[int] = field(default_factory=TriState.nop)
 
     @property
     @override
@@ -33,4 +34,5 @@ class UserResourcePolicyUpdaterSpec(UpdaterSpec[UserResourcePolicyRow]):
             to_update, "max_session_count_per_model_session"
         )
         self.max_customized_image_count.update_dict(to_update, "max_customized_image_count")
+        self.max_concurrent_logins.update_dict(to_update, "max_concurrent_logins")
         return to_update
