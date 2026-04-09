@@ -1953,7 +1953,7 @@ input CreateModelCardV2Input {
   readme: String = null
 
   """Access level (public or internal)."""
-  accessLevel: ModelCardV2AccessLevel = null
+  accessLevel: ModelCardV2AccessLevel! = INTERNAL
 }
 
 """Added in 24.09.0. Input for creating a notification channel"""
