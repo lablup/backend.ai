@@ -168,6 +168,13 @@ from .keypair import (
     switch_my_main_access_key,
     update_my_keypair,
 )
+from .login_client_type import (
+    create_login_client_type,
+    delete_login_client_type,
+    login_client_type,
+    login_client_types,
+    update_login_client_type,
+)
 from .login_history import admin_login_history_v2, my_login_history_v2
 from .login_session import (
     admin_login_sessions_v2,
@@ -594,6 +601,8 @@ class Query:
     # Resource Preset V2 APIs
     admin_resource_presets_v2 = admin_resource_presets_v2
     admin_resource_preset_v2 = admin_resource_preset_v2
+    login_client_type = login_client_type
+    login_client_types = login_client_types
     # Runtime Variant APIs
     runtime_variants = runtime_variants
     runtime_variant = runtime_variant
@@ -795,6 +804,9 @@ class Mutation:
     admin_create_resource_preset_v2 = admin_create_resource_preset_v2
     admin_update_resource_preset_v2 = admin_update_resource_preset_v2
     admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
+    create_login_client_type = create_login_client_type
+    update_login_client_type = update_login_client_type
+    delete_login_client_type = delete_login_client_type
     # Runtime Variant mutations
     admin_create_runtime_variant = admin_create_runtime_variant
     admin_update_runtime_variant = admin_update_runtime_variant

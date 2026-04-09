@@ -1936,6 +1936,21 @@ type CreateKeypairResourcePolicyPayloadGQL {
   keypairResourcePolicy: KeypairResourcePolicyV2!
 }
 
+"""Added in 26.4.0rc1. Input for creating a new login client type."""
+input CreateLoginClientTypeInput {
+  """Unique login client type name."""
+  name: String!
+
+  """Optional description shown to administrators."""
+  description: String = null
+}
+
+"""Added in 26.4.0rc1. Payload for login client type creation."""
+type CreateLoginClientTypePayload {
+  """Created login client type."""
+  loginClientType: LoginClientType!
+}
+
 """Added in 26.4.1. Create model card payload."""
 type CreateModelCardPayloadGQL {
   """The created model card."""
@@ -2616,6 +2631,12 @@ type DeleteHuggingFaceRegistryPayload {
 type DeleteKeypairResourcePolicyPayloadGQL {
   """Name of the deleted keypair resource policy."""
   name: String!
+}
+
+"""Added in 26.4.0rc1. Payload for login client type deletion."""
+type DeleteLoginClientTypePayload {
+  """UUID of the deleted login client type."""
+  id: String!
 }
 
 """Added in 26.4.1. Delete model card payload."""
@@ -4924,6 +4945,20 @@ enum LoginAttemptResult {
   FAILED_SESSION_ALREADY_EXISTS
 }
 
+"""
+Added in 26.4.0rc1. A registered login client type that the auth flow can attribute sessions to.
+"""
+type LoginClientType implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Unique login client type name (e.g. 'core', 'webui')."""
+  name: String!
+
+  """Optional administrator-facing description."""
+  description: String
+}
+
 """Added in 26.4.1. Filter criteria for querying login history."""
 input LoginHistoryFilter {
   domainName: StringFilter = null
@@ -6397,6 +6432,15 @@ type Mutation {
 
   """Added in 26.4.1. Delete a resource preset (admin only)."""
   adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL!
+
+  """Added in 26.4.0rc1. Create a new login client type (super admin only)."""
+  createLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload!
+
+  """Added in 26.4.0rc1. Update a login client type (super admin only)."""
+  updateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload!
+
+  """Added in 26.4.0rc1. Delete a login client type (super admin only)."""
+  deleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload!
 
   """Added in 26.4.1. Create a new runtime variant (superadmin only)."""
   adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayloadGQL!
@@ -8333,6 +8377,9 @@ type Query {
 
   """Added in 26.4.1. Get a single resource preset by ID (admin only)."""
   adminResourcePresetV2(id: UUID!): ResourcePresetV2
+
+  """Added in 26.4.0rc1. Get a single login client type by id."""
+  loginClientType(id: UUID!): LoginClientType
 
   """Added in 26.4.1. Search runtime variants."""
   runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection
@@ -11140,6 +11187,23 @@ input UpdateKeypairResourcePolicyInputGQL {
 type UpdateKeypairResourcePolicyPayloadGQL {
   """Updated keypair resource policy."""
   keypairResourcePolicy: KeypairResourcePolicyV2!
+}
+
+"""
+Added in 26.4.0rc1. Input for updating a login client type. Both fields are optional for partial update.
+"""
+input UpdateLoginClientTypeInput {
+  """Updated name."""
+  name: String = null
+
+  """Updated description. Pass null to clear, omit to leave unchanged."""
+  description: String = null
+}
+
+"""Added in 26.4.0rc1. Payload for login client type update."""
+type UpdateLoginClientTypePayload {
+  """Updated login client type."""
+  loginClientType: LoginClientType!
 }
 
 """Added in 26.4.1. Update model card payload."""
