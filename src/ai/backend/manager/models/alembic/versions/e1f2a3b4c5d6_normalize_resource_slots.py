@@ -93,8 +93,52 @@ def upgrade() -> None:
         ["slot_name"],
     )
 
-    # 4. Register unknown slot names from existing JSONB data
+    # 4. Create a temporary helper to parse BinarySize-suffixed strings
+    #    (e.g. "32g" → 34359738368, "4m" → 4194304, plain "1" → 1).
     conn = op.get_bind()
+    conn.execute(
+        sa.text("""
+        CREATE OR REPLACE FUNCTION _tmp_parse_binary_size(val text)
+        RETURNS numeric(24, 6) AS $$
+        DECLARE
+            cleaned text;
+            suffix  char;
+            num_part text;
+            multiplier numeric;
+        BEGIN
+            cleaned := lower(trim(val));
+            -- Fast path: try direct numeric cast
+            BEGIN
+                RETURN cleaned::numeric(24, 6);
+            EXCEPTION WHEN OTHERS THEN
+                NULL;
+            END;
+            -- Strip known binary-size endings (order matters: longest first)
+            cleaned := regexp_replace(cleaned, '(ibytes|ibyte|ib|bytes|byte|b)$', '');
+            -- If trailing letter is a known suffix, split
+            IF cleaned ~ '[a-z]$' THEN
+                suffix   := right(cleaned, 1);
+                num_part := left(cleaned, length(cleaned) - 1);
+            ELSE
+                RETURN cleaned::numeric(24, 6);
+            END IF;
+            multiplier := CASE suffix
+                WHEN 'k' THEN 1024                    -- 2^10
+                WHEN 'm' THEN 1048576                  -- 2^20
+                WHEN 'g' THEN 1073741824               -- 2^30
+                WHEN 't' THEN 1099511627776            -- 2^40
+                WHEN 'p' THEN 1125899906842624         -- 2^50
+                WHEN 'e' THEN 1152921504606846976      -- 2^60
+                ELSE NULL
+            END;
+            IF multiplier IS NULL THEN
+                RAISE EXCEPTION 'Unknown BinarySize suffix in value: %', val;
+            END IF;
+            RETURN (num_part::numeric * multiplier)::numeric(24, 6);
+        END;
+        $$ LANGUAGE plpgsql IMMUTABLE;
+    """)
+    )
 
     # From model_cards.min_resource
     conn.execute(
@@ -138,7 +182,7 @@ def upgrade() -> None:
     conn.execute(
         sa.text("""
         INSERT INTO model_card_resource_requirements (model_card_id, slot_name, min_quantity)
-        SELECT mc.id, kv.key, kv.value::numeric(24, 6)
+        SELECT mc.id, kv.key, _tmp_parse_binary_size(kv.value)
         FROM model_cards mc, jsonb_each_text(mc.min_resource -> 'slots') AS kv(key, value)
         WHERE mc.min_resource IS NOT NULL
         ON CONFLICT DO NOTHING
@@ -149,7 +193,7 @@ def upgrade() -> None:
     conn.execute(
         sa.text("""
         INSERT INTO preset_resource_slots (preset_id, slot_name, quantity)
-        SELECT p.id, elem ->> 'resource_type', (elem ->> 'quantity')::numeric(24, 6)
+        SELECT p.id, elem ->> 'resource_type', _tmp_parse_binary_size(elem ->> 'quantity')
         FROM deployment_revision_presets p,
              jsonb_array_elements(p.resource_slots) AS elem
         WHERE p.resource_slots IS NOT NULL
@@ -162,14 +206,17 @@ def upgrade() -> None:
     conn.execute(
         sa.text("""
         INSERT INTO deployment_revision_resource_slots (revision_id, slot_name, quantity)
-        SELECT dr.id, kv.key, kv.value::numeric(24, 6)
+        SELECT dr.id, kv.key, _tmp_parse_binary_size(kv.value)
         FROM deployment_revisions dr, jsonb_each_text(dr.resource_slots) AS kv(key, value)
         WHERE dr.resource_slots IS NOT NULL
         ON CONFLICT DO NOTHING
     """)
     )
 
-    # 8. Drop JSONB columns
+    # 8. Clean up the temporary helper function
+    conn.execute(sa.text("DROP FUNCTION IF EXISTS _tmp_parse_binary_size(text)"))
+
+    # 9. Drop JSONB columns
     op.drop_column("model_cards", "min_resource")
     op.drop_column("deployment_revision_presets", "resource_slots")
     op.drop_column("deployment_revisions", "resource_slots")
