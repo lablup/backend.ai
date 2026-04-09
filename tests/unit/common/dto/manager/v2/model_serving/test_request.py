@@ -95,6 +95,10 @@ class TestServiceConfigInput:
         with pytest.raises(ValidationError, match=r"cuda\.shares must be a positive number"):
             _make_service_config(resources={"cuda.shares": -1.0})
 
+    def test_zero_cuda_shares_rejected(self) -> None:
+        with pytest.raises(ValidationError, match=r"cuda\.shares must be a positive number"):
+            _make_service_config(resources={"cuda.shares": 0.0})
+
     def test_missing_model_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
             ServiceConfigInput.model_validate({"scaling_group": "default"})

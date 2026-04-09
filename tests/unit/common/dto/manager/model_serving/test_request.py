@@ -128,6 +128,14 @@ class TestServiceConfigModel:
                 resources={"cuda.shares": -1.0},
             )
 
+    def test_zero_cuda_shares_rejected(self) -> None:
+        with pytest.raises(ValidationError, match=r"cuda\.shares must be a positive number"):
+            ServiceConfigModel(
+                model="test-model",
+                scaling_group="default",
+                resources={"cuda.shares": 0.0},
+            )
+
 
 class TestNewServiceRequestModel:
     def test_minimal_creation(self) -> None:
