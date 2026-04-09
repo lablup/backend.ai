@@ -140,13 +140,8 @@ class TestDeployingProvisioningHandler:
         mock_deployment_executor: AsyncMock,
         deployment_created_without_revision: DeploymentWithHistory,
     ) -> None:
-        """BA-5557: execute() registers appproxy endpoint for a deployment that
-        was created without a revision and later ActivateRevision'd into DEPLOYING.
-
-        The handler delegates to DeploymentExecutor.register_endpoints_bulk,
-        which owns the atomic register-and-persist flow (including compensating
-        unregister on persistence failure).
-        """
+        """BA-5557: execute() delegates appproxy registration for a deployment
+        that was created without a revision and later ActivateRevision'd."""
         await handler.execute([deployment_created_without_revision])
 
         mock_deployment_executor.register_endpoints_bulk.assert_awaited_once()
@@ -163,8 +158,7 @@ class TestDeployingProvisioningHandler:
         mock_deployment_executor: AsyncMock,
         deployment_created_without_revision: DeploymentWithHistory,
     ) -> None:
-        """Deployments that already have a URL must be skipped so we don't
-        double-register them on every DEPLOYING tick."""
+        """Already-registered deployments must not be re-registered."""
         info = deployment_created_without_revision.deployment_info
         info_with_url = dataclasses.replace(
             info,
@@ -182,9 +176,7 @@ class TestDeployingProvisioningHandler:
         mock_deployment_executor: AsyncMock,
         deployment_created_without_revision: DeploymentWithHistory,
     ) -> None:
-        """A deployment whose deploying_revision_id was cleared between
-        handler start and the registration step must be filtered out —
-        we have nothing to resolve for it."""
+        """Deployments with no deploying_revision_id must be filtered out."""
         info = deployment_created_without_revision.deployment_info
         info_no_rev = dataclasses.replace(info, deploying_revision_id=None)
         deployment = DeploymentWithHistory(deployment_info=info_no_rev)
@@ -200,9 +192,7 @@ class TestDeployingProvisioningHandler:
         mock_evaluator: AsyncMock,
         deployment_created_without_revision: DeploymentWithHistory,
     ) -> None:
-        """When register_endpoints_bulk reports a failure, that deployment
-        must not flow into route provisioning on the same tick — it will
-        be retried on the next coordinator cycle."""
+        """Failed registrations must not flow into this tick's route provisioning."""
         dep_id = deployment_created_without_revision.deployment_info.id
         mock_deployment_executor.register_endpoints_bulk.side_effect = None
         mock_deployment_executor.register_endpoints_bulk.return_value = DeploymentExecutionResult(
@@ -217,7 +207,5 @@ class TestDeployingProvisioningHandler:
 
         await handler.execute([deployment_created_without_revision])
 
-        # Evaluator must see an empty deployment list since the only
-        # deployment failed registration.
         evaluated_infos = mock_evaluator.evaluate.await_args.args[0]
         assert all(info.id != dep_id for info in evaluated_infos)

@@ -136,19 +136,11 @@ class DeployingProvisioningHandler(DeploymentHandler):
     async def _ensure_endpoints_registered(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> set[UUID]:
-        """Register endpoints in appproxy for deployments that have no URL yet.
+        """Register endpoints for deployments that entered DEPLOYING via
+        ActivateRevision and therefore skipped ``check_pending``.
 
-        Deployments that entered DEPLOYING via ActivateRevision skip
-        check_pending (which normally registers them), so this method
-        ensures they are registered before route provisioning begins.
-
-        Delegates to ``DeploymentExecutor.register_endpoints_bulk`` so the
-        register-and-persist flow stays atomic per deployment (and on
-        persistence failure the endpoint is unregistered from appproxy).
-
-        Returns the set of deployment IDs for which registration failed,
-        so the caller can skip route provisioning for them in the same
-        tick and let them retry on the next coordinator cycle.
+        Returns IDs whose registration failed so the caller can exclude
+        them from this tick's route provisioning.
         """
         entries: list[tuple[DeploymentWithHistory, UUID]] = []
         for deployment in deployments:
@@ -169,22 +161,14 @@ class DeployingProvisioningHandler(DeploymentHandler):
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        # Register endpoints in appproxy for deployments that entered DEPLOYING
-        # via ActivateRevision without passing through check_pending.
-        # Deployments whose registration failed are excluded from this tick's
-        # route provisioning and will be retried on the next coordinator cycle.
-        # If the pre-registration step itself raises (e.g. proxy target lookup
-        # failed), isolate the failure here: every deployment that needed
-        # registration is treated as failed-for-this-tick, but route
-        # provisioning for deployments that already had URLs still proceeds.
+        # BA-5557: pre-register endpoints for deployments that bypassed
+        # check_pending via ActivateRevision. On failure, drop them from
+        # this tick so they retry next cycle; pre-registered deployments
+        # keep flowing into route provisioning.
         try:
             failed_registration_ids = await self._ensure_endpoints_registered(deployments)
         except Exception as exc:
-            log.exception(
-                "Pre-registration step failed for DEPLOYING batch (affected {} deployments): {}",
-                len(deployments),
-                exc,
-            )
+            log.exception("Pre-registration step failed: {}", exc)
             failed_registration_ids = {
                 d.deployment_info.id
                 for d in deployments

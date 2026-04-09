@@ -167,14 +167,9 @@ class TestCheckPendingDeployments:
         pending_deployment: DeploymentWithHistory,
         proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
     ) -> None:
-        """BA-5557 H1: If URL persistence fails after a successful appproxy
-        registration, the deployment is recorded as a failure for this tick.
-
-        No compensating unregister is issued — appproxy's
-        ``create_or_update_endpoint`` is idempotent on ``endpoint_id``,
-        so the next coordinator tick will call ``register_endpoint`` again
-        and receive the same URL (no duplicate circuit is created).
-        """
+        """BA-5557: URL persist failure is recorded as failure, and no
+        compensating unregister is issued — we rely on appproxy idempotency
+        on retry instead."""
         # Arrange
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group

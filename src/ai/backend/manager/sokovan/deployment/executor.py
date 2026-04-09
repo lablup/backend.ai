@@ -128,18 +128,10 @@ class DeploymentExecutor:
     ) -> DeploymentExecutionResult:
         """Register appproxy endpoints and persist their URLs.
 
-        For each ``(deployment, revision_id)`` entry, calls
-        ``register_endpoint`` in appproxy, then on success persists the
-        returned URL. Entries whose scaling group has no proxy target are
-        reported as ``skipped``.
-
-        Retry safety: appproxy's ``create_or_update_endpoint`` is
-        idempotent on ``endpoint_id`` — a second call with the same
-        ``endpoint_id`` returns the existing circuit's URL rather than
-        creating a duplicate — so if URL persistence fails after a
-        successful registration, the next coordinator tick will call
-        ``register_endpoint`` again, receive the same URL, and recover.
-        No compensating unregister is needed.
+        Entries without a proxy target are reported as ``skipped``.
+        Retry-safe: appproxy's endpoint create is idempotent on
+        ``endpoint_id``, so a failed URL persist is recovered on the
+        next tick.
         """
         if not entries:
             return DeploymentExecutionResult()
@@ -155,7 +147,7 @@ class DeploymentExecutor:
         failures: list[DeploymentExecutionError] = []
         skipped: list[DeploymentWithHistory] = []
 
-        async def _run(
+        async def _register_and_persist(
             deployment: DeploymentWithHistory,
             revision_id: UUID,
             target: ScalingGroupProxyTarget,
@@ -185,7 +177,9 @@ class DeploymentExecutor:
         if not tasks:
             return DeploymentExecutionResult(skipped=skipped)
 
-        results = await asyncio.gather(*(_run(dep, rev, tgt) for dep, rev, tgt in tasks))
+        results = await asyncio.gather(
+            *(_register_and_persist(dep, rev, tgt) for dep, rev, tgt in tasks)
+        )
 
         for deployment, url, error in results:
             dep_id = deployment.deployment_info.id
@@ -495,26 +489,11 @@ class DeploymentExecutor:
         scaling_group_target: ScalingGroupProxyTarget,
         revision_id: UUID,
     ) -> str:
-        """Resolve the target revision's model definition and register the
-        endpoint in appproxy.
+        """Register the deployment's endpoint in appproxy and return its URL.
 
-        Side effects:
-            Creates or updates an endpoint in appproxy (WSProxy). The
-            underlying ``POST /v2/endpoints/{endpoint_id}`` handler is
-            idempotent on ``endpoint_id``: if an endpoint/circuit already
-            exists, the existing URL is returned instead of a new circuit
-            being created. The caller is expected to persist the returned
-            URL to the ``endpoints`` table; if persistence fails, the
-            next coordinator tick can safely call this method again and
-            will receive the same URL.
-
-        Preconditions:
-            - ``revision_id`` must resolve to a revision on ``deployment``.
-            - ``scaling_group_target`` must be a valid proxy target for
-              ``deployment.metadata.resource_group``.
-
-        Returns:
-            The registered endpoint URL.
+        Idempotent on ``deployment.id``: repeated calls return the same URL
+        without creating a duplicate circuit. The caller is expected to
+        persist the returned URL to the ``endpoints`` table.
         """
         pool = DeploymentRecorderContext.current_pool()
         recorder = pool.recorder(deployment.id)
