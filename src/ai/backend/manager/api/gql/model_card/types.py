@@ -348,8 +348,9 @@ class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
     label: list[str] | None = gql_field(default=None, description="Labels.")
     license: str | None = gql_field(default=None, description="License.")
     readme: str | None = gql_field(default=None, description="README content.")
-    access_level: ModelCardAccessLevelGQL | None = gql_field(
-        default=None, description="Access level (public or internal)."
+    access_level: ModelCardAccessLevelGQL = gql_field(
+        default=ModelCardAccessLevelGQL.INTERNAL,
+        description="Access level (public or internal).",
     )
 
 

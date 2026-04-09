@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
@@ -43,6 +43,11 @@ class CreateModelCardInput(BaseRequestModel):
     access_level: ModelCardAccessLevel = Field(
         default=ModelCardAccessLevel.INTERNAL, description="Access level."
     )
+
+    @field_validator("framework", "label", mode="before")
+    @classmethod
+    def _coerce_null_list(cls, v: list[str] | None) -> list[str]:
+        return v if v is not None else []
 
 
 class UpdateModelCardInput(BaseRequestModel):
