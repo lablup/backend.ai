@@ -103,8 +103,8 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
 @click.option(
     "--metric-access-cidr",
     type=str,
-    default="10.122.0.0/16",
-    help="CIDR for metric access allowed hosts (default: 10.122.0.0/16).",
+    default="0.0.0.0/0",
+    help="CIDR for metric access allowed hosts (default: 0.0.0.0/0).",
 )
 @click.version_option(version=__version__)
 @click.pass_context
