@@ -31,6 +31,7 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.services.auth.processors import AuthProcessors
 
@@ -57,6 +58,51 @@ def server_module_registries(
     return [
         register_auth_routes(AuthHandler(auth=auth_processors), route_deps),
     ]
+
+
+@pytest.fixture(autouse=True)
+async def _seed_login_client_types(db_engine: SAEngine) -> AsyncIterator[None]:
+    """Seed the login_client_types table for auth tests.
+
+    The oneshot schema setup uses metadata.create_all() + stamp (no alembic
+    upgrade()), so migration seed data is not inserted. This fixture inserts
+    the well-known rows and cleans up afterwards.
+    """
+    async with db_engine.begin() as conn:
+        existing = await conn.scalar(
+            sa.select(sa.func.count()).select_from(LoginClientTypeRow.__table__)
+        )
+        if existing == 0:
+            await conn.execute(
+                sa.insert(LoginClientTypeRow.__table__).values([
+                    {
+                        "id": uuid.UUID("00000000-0000-0000-0000-00000000c02e"),
+                        "name": "core",
+                        "description": "Backend.AI CLI / core SDK clients.",
+                    },
+                    {
+                        "id": uuid.UUID("00000000-0000-0000-0000-0000000000eb"),
+                        "name": "webui",
+                        "description": "Backend.AI web console.",
+                    },
+                    {
+                        "id": uuid.UUID("00000000-0000-0000-0000-00000000fa57"),
+                        "name": "fasttrack",
+                        "description": "Backend.AI FastTrack workflow client.",
+                    },
+                ])
+            )
+    yield
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.delete(LoginClientTypeRow.__table__).where(
+                LoginClientTypeRow.__table__.c.id.in_([
+                    uuid.UUID("00000000-0000-0000-0000-00000000c02e"),
+                    uuid.UUID("00000000-0000-0000-0000-0000000000eb"),
+                    uuid.UUID("00000000-0000-0000-0000-00000000fa57"),
+                ])
+            )
+        )
 
 
 @pytest.fixture()

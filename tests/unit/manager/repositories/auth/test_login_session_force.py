@@ -15,6 +15,7 @@ from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.login_session.enums import (
     LoginAttemptResult,
     LoginSessionStatus,
@@ -54,6 +55,7 @@ class TestLoginSessionForce:
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
+                LoginClientTypeRow,
                 LoginSessionRow,
                 LoginHistoryRow,
             ],
