@@ -56,6 +56,9 @@ class RoleCreateInput:
 
 @dataclass
 class PermissionGroupCreateInput:
+    """DEPRECATED: The ``permission_groups`` table was dropped by migration
+    ``f41bbe0c0f12``. Retained only for old migration imports."""
+
     role_id: uuid.UUID
     scope_type: ScopeType
     scope_id: str
@@ -70,6 +73,9 @@ class PermissionGroupCreateInput:
 
 @dataclass
 class PermissionCreateInput:
+    """DEPRECATED: Uses the pre-``f41bbe0c0f12`` schema with
+    ``permission_group_id``. Retained only for old migration imports."""
+
     permission_group_id: uuid.UUID
     entity_type: str
     operation: str
@@ -84,6 +90,9 @@ class PermissionCreateInput:
 
 @dataclass
 class ObjectPermissionCreateInput:
+    """DEPRECATED: Uses a legacy schema. Retained only for old migration
+    imports. Use ``data.permission.object_permission`` types for current code."""
+
     role_id: uuid.UUID
     entity_id: str
     entity_type: str

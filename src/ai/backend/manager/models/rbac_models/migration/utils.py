@@ -59,9 +59,8 @@ def query_role_rows_by_name(db_conn: Connection, role_names: Collection[str]) ->
 def query_permission_groups_by_scope_ids(
     db_conn: Connection, scope_ids: Collection[str]
 ) -> list[uuid.UUID]:
-    """
-    Query permission groups by scope IDs.
-    """
+    """DEPRECATED: The ``permission_groups`` table was dropped by migration
+    ``f41bbe0c0f12``. Retained only for old migration imports."""
     permission_groups_table = get_permission_groups_table()
     query = sa.select(permission_groups_table.c.id).where(
         permission_groups_table.c.scope_id.in_(scope_ids)
@@ -95,10 +94,8 @@ class PermissionUpdateUtil:
     def get_or_create_global_permission_group(
         db_conn: Connection, role_id: uuid.UUID
     ) -> tuple[uuid.UUID, bool]:
-        """
-        Get or create a global permission group for the given role ID.
-        Returns a tuple of (permission_group_id, already_exists).
-        """
+        """DEPRECATED: References the ``permission_groups`` table dropped by
+        ``f41bbe0c0f12``. Retained only for old migration imports."""
         permission_groups_table = get_permission_groups_table()
         result = db_conn.execute(
             sa.select(permission_groups_table.c.id).where(
@@ -132,6 +129,8 @@ class PermissionUpdateUtil:
         entity_types: Collection[EntityType],
         operations: Collection[OperationType],
     ) -> None:
+        """DEPRECATED: Uses the pre-``f41bbe0c0f12`` ``permission_group_id``
+        schema. Retained only for old migration imports."""
         permissions_table = get_permissions_table()
         permission_inputs: list[dict[str, Any]] = []
         for entity_type in entity_types:
