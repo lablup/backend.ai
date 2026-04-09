@@ -184,7 +184,6 @@ class ModelCardMetadataGQL(PydanticOutputMixin[ModelCardMetadataDTO]):
 )
 class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
-    row_id: UUID = gql_field(description="The unique database identifier of this model card.")
     name: str = gql_field(description="Display name of the registered model.")
     vfolder_id: UUID = gql_field(
         description="The VFolder that stores the actual model files, weights, and configuration."
@@ -264,7 +263,9 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
             limit=limit,
             offset=offset,
         )
-        result = await info.context.adapters.model_card.available_presets(self.row_id, search_input)
+        result = await info.context.adapters.model_card.available_presets(
+            UUID(self.id), search_input
+        )
         return build_preset_connection(result)
 
 

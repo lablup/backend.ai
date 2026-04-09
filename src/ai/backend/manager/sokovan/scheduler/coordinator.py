@@ -62,6 +62,7 @@ from ai.backend.manager.types import DistributedLockFactory
 
 from .factory import CoordinatorHandlers
 from .handlers import SessionLifecycleHandler
+from .handlers.cleanup import CleanupHandler
 from .handlers.kernel import KernelLifecycleHandler
 from .handlers.observer import KernelObserver
 from .hooks.registry import HookRegistry
@@ -257,6 +258,10 @@ class ScheduleCoordinator:
         lifecycle_handler = self._handlers.lifecycle_handlers.get(schedule_type)
         if lifecycle_handler:
             return await self._process_lifecycle_handler_schedule(schedule_type, lifecycle_handler)
+
+        cleanup_handler = self._handlers.cleanup_handlers.get(schedule_type)
+        if cleanup_handler:
+            return await self._process_cleanup_schedule(schedule_type, cleanup_handler)
 
         log.warning("No handler for schedule type: {}", schedule_type.value)
         return False
@@ -478,6 +483,41 @@ class ScheduleCoordinator:
         except Exception as e:
             log.exception(
                 "Error processing observer schedule type {}: {}",
+                schedule_type.value,
+                e,
+            )
+            raise
+
+    async def _process_cleanup_schedule(
+        self,
+        schedule_type: ScheduleType,
+        handler: CleanupHandler,
+    ) -> bool:
+        """Process a cleanup handler schedule type.
+
+        Cleanup handlers read work items from Valkey and perform cleanup operations
+        directly. Unlike other handler types, they do not query DB sessions by status,
+        do not iterate over scaling groups, and do not apply status transitions.
+
+        The coordinator sets up RecorderContext so that downstream components
+        (e.g., SessionTerminator) can use shared_phase/shared_step as usual.
+        """
+        try:
+            log.debug("Processing cleanup schedule type: {}", schedule_type.value)
+
+            with self._operation_metrics.measure_operation(handler.name()):
+                session_ids = await handler.fetch_session_ids()
+                if not session_ids:
+                    return True
+
+                recorder_scope = f"{schedule_type.value}:cleanup"
+                with SessionRecorderContext.scope(recorder_scope, entity_ids=list(session_ids)):
+                    await handler.execute(session_ids)
+
+            return True
+        except Exception as e:
+            log.exception(
+                "Error processing cleanup schedule type {}: {}",
                 schedule_type.value,
                 e,
             )
@@ -1659,6 +1699,13 @@ class ScheduleCoordinator:
                 short_interval=None,  # No short-cycle task for observation
                 long_interval=300.0,  # 5 minutes
                 initial_delay=60.0,  # Start 1 minute after manager starts
+            ),
+            # Cleanup containers for force-terminated sessions
+            SchedulerTaskSpec(
+                ScheduleType.CLEANUP_FORCE_TERMINATED,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
             ),
         ]
 

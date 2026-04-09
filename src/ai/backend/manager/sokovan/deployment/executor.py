@@ -2,8 +2,8 @@
 
 import asyncio
 import logging
-from collections.abc import Coroutine, Mapping, Sequence
-from typing import Any, cast
+from collections.abc import Mapping, Sequence
+from typing import cast
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import (
@@ -103,86 +103,112 @@ class DeploymentExecutor:
     async def check_pending_deployments(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        # Phase 1: Load configuration
+        """Register endpoints in appproxy for deployments that need it."""
+        entries: list[tuple[DeploymentWithHistory, UUID]] = []
+        pre_skipped: list[DeploymentWithHistory] = []
+        for deployment in deployments:
+            revision_id = deployment.deployment_info.current_revision_id
+            if revision_id is None:
+                pre_skipped.append(deployment)
+                continue
+            entries.append((deployment, revision_id))
+
+        result = await self.register_endpoints_bulk(entries)
+        if pre_skipped:
+            result = DeploymentExecutionResult(
+                successes=result.successes,
+                failures=result.failures,
+                skipped=[*pre_skipped, *result.skipped],
+            )
+        return result
+
+    async def register_endpoints_bulk(
+        self,
+        entries: Sequence[tuple[DeploymentWithHistory, UUID]],
+    ) -> DeploymentExecutionResult:
+        """Register appproxy endpoints and persist their URLs.
+
+        Entries without a proxy target are reported as ``skipped``.
+        Retry-safe: appproxy's endpoint create is idempotent on
+        ``endpoint_id``, so a failed URL persist is recovered on the
+        next tick.
+        """
+        if not entries:
+            return DeploymentExecutionResult()
+
         with DeploymentRecorderContext.shared_phase("load_configuration"):
             with DeploymentRecorderContext.shared_step("load_proxy_targets"):
-                scaling_groups = {
-                    dep.deployment_info.metadata.resource_group for dep in deployments
-                }
+                scaling_groups = {dep.deployment_info.metadata.resource_group for dep, _ in entries}
                 scaling_group_targets = (
                     await self._deployment_repo.fetch_scaling_group_proxy_targets(scaling_groups)
                 )
 
-        # Collect registration tasks
-        registration_tasks: list[Coroutine[Any, Any, str]] = []
-        valid_deployments: list[DeploymentWithHistory] = []
-        skipped_deployments: list[DeploymentWithHistory] = []
-        for deployment in deployments:
+        successes: list[DeploymentWithHistory] = []
+        failures: list[DeploymentExecutionError] = []
+        skipped: list[DeploymentWithHistory] = []
+
+        async def _register_and_persist(
+            deployment: DeploymentWithHistory,
+            revision_id: UUID,
+            target: ScalingGroupProxyTarget,
+        ) -> tuple[DeploymentWithHistory, str | None, BaseException | None]:
             info = deployment.deployment_info
-            targets = scaling_group_targets[info.metadata.resource_group]
-            if not targets:
+            try:
+                url = await self.register_endpoint(info, target, revision_id)
+                await self._deployment_repo.update_endpoint_url(info.id, url)
+            except BaseException as exc:
+                return deployment, None, exc
+            return deployment, url, None
+
+        tasks: list[tuple[DeploymentWithHistory, UUID, ScalingGroupProxyTarget]] = []
+        for deployment, revision_id in entries:
+            info = deployment.deployment_info
+            target = scaling_group_targets.get(info.metadata.resource_group)
+            if not target:
                 log.warning(
                     "No proxy target found for scaling group {}, skipping deployment {}",
                     info.metadata.resource_group,
                     info.id,
                 )
-                skipped_deployments.append(deployment)
+                skipped.append(deployment)
                 continue
-            if info.current_revision_id is None:
-                skipped_deployments.append(deployment)
-                continue
-            registration_tasks.append(
-                self._register_endpoint(info, targets, info.current_revision_id)
-            )
-            valid_deployments.append(deployment)
+            tasks.append((deployment, revision_id, target))
 
-        # Wait for all tasks to complete
-        successful_deployments: list[DeploymentWithHistory] = []
-        errors: list[DeploymentExecutionError] = []
-        url_updates: dict[UUID, str] = {}
+        if not tasks:
+            return DeploymentExecutionResult(skipped=skipped)
 
-        # Phase 2: Register endpoints (per-deployment phase/step in _register_endpoint)
-        if registration_tasks:
-            results = await asyncio.gather(*registration_tasks, return_exceptions=True)
+        results = await asyncio.gather(
+            *(_register_and_persist(dep, rev, tgt) for dep, rev, tgt in tasks)
+        )
 
-            for deployment, result in zip(valid_deployments, results, strict=True):
-                dep_id = deployment.deployment_info.id
-                if isinstance(result, BaseException):
-                    log.error(
-                        "Failed to register endpoint for deployment {}: {}",
-                        dep_id,
-                        result,
+        for deployment, url, error in results:
+            dep_id = deployment.deployment_info.id
+            if error is not None:
+                log.error(
+                    "Failed to register endpoint for deployment {}: {}",
+                    dep_id,
+                    error,
+                )
+                failures.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason=str(error),
+                        error_detail="Failed to register endpoint",
+                        error_code=_extract_error_code(error),
                     )
-                    errors.append(
-                        DeploymentExecutionError(
-                            deployment_info=deployment,
-                            reason=str(result),
-                            error_detail="Failed to register endpoint",
-                            error_code=_extract_error_code(result),
-                        )
-                    )
-                else:
-                    # Result is the endpoint URL string returned from _register_endpoint
-                    url_updates[dep_id] = result
-                    successful_deployments.append(deployment)
-                    log.info(
-                        "Successfully registered endpoint for deployment {} with URL: {}",
-                        dep_id,
-                        result,
-                    )
-
-        # Phase 3: Update endpoint URLs (only for successful deployments)
-        if url_updates:
-            with DeploymentRecorderContext.shared_phase(
-                "update_endpoint_urls", entity_ids=set(url_updates.keys())
-            ):
-                with DeploymentRecorderContext.shared_step("sync_endpoint_url"):
-                    await self._deployment_repo.update_endpoint_urls_bulk(url_updates)
+                )
+            else:
+                successes.append(deployment)
+                log.info(
+                    "Successfully registered endpoint for deployment {} with URL: {}",
+                    dep_id,
+                    url,
+                )
 
         return DeploymentExecutionResult(
-            successes=successful_deployments,
-            failures=errors,
-            skipped=skipped_deployments,
+            successes=successes,
+            failures=failures,
+            skipped=skipped,
         )
 
     async def check_ready_deployments_that_need_scaling(
@@ -457,15 +483,17 @@ class DeploymentExecutor:
 
     # Private helper methods
 
-    async def _register_endpoint(
+    async def register_endpoint(
         self,
         deployment: DeploymentInfo,
         scaling_group_target: ScalingGroupProxyTarget,
         revision_id: UUID,
     ) -> str:
-        """Resolve the target revision's model definition and register the endpoint to the app proxy.
+        """Register the deployment's endpoint in appproxy and return its URL.
 
-        Returns the registered endpoint URL.
+        Idempotent on ``deployment.id``: repeated calls return the same URL
+        without creating a duplicate circuit. The caller is expected to
+        persist the returned URL to the ``endpoints`` table.
         """
         pool = DeploymentRecorderContext.current_pool()
         recorder = pool.recorder(deployment.id)

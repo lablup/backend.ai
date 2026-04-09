@@ -721,16 +721,18 @@ class DeploymentRepository:
         await self._db_source.update_desired_replicas_bulk(replica_updates)
 
     @deployment_repository_resilience.apply()
-    async def update_endpoint_urls_bulk(
+    async def update_endpoint_url(
         self,
-        url_updates: Mapping[uuid.UUID, str],
+        endpoint_id: uuid.UUID,
+        url: str,
     ) -> None:
-        """Update endpoint URLs for multiple endpoints.
+        """Update a single endpoint's registered URL.
 
         Args:
-            url_updates: Mapping of endpoint IDs to their registered URLs
+            endpoint_id: Endpoint UUID
+            url: The registered endpoint URL
         """
-        await self._db_source.update_endpoint_urls_bulk(url_updates)
+        await self._db_source.update_endpoint_url(endpoint_id, url)
 
     @deployment_repository_resilience.apply()
     async def update_route_sessions(

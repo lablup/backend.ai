@@ -50,10 +50,10 @@ class TestCheckPendingDeployments:
             proxy_targets_by_scaling_group
         )
 
-        # Mock _register_endpoint via patching
+        # Mock register_endpoint via patching
         expected_url = "http://endpoint.test/v1"
         with patch.object(
-            deployment_executor, "_register_endpoint", return_value=expected_url
+            deployment_executor, "register_endpoint", return_value=expected_url
         ) as mock_register:
             entity_ids = [pending_deployment.deployment_info.id]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -64,13 +64,9 @@ class TestCheckPendingDeployments:
         assert len(result.successes) == 1
         assert len(result.failures) == 0
         mock_register.assert_awaited_once()
-        mock_deployment_repo.update_endpoint_urls_bulk.assert_awaited_once()
-
-        # Verify URL update contains the deployment id and expected URL
-        call_args = mock_deployment_repo.update_endpoint_urls_bulk.call_args
-        url_updates = call_args[0][0]
-        assert pending_deployment.deployment_info.id in url_updates
-        assert url_updates[pending_deployment.deployment_info.id] == expected_url
+        mock_deployment_repo.update_endpoint_url.assert_awaited_once_with(
+            pending_deployment.deployment_info.id, expected_url
+        )
 
     async def test_deployment_without_revision_is_skipped(
         self,
@@ -91,7 +87,7 @@ class TestCheckPendingDeployments:
         )
 
         expected_url = "http://endpoint.test/v1"
-        with patch.object(deployment_executor, "_register_endpoint", return_value=expected_url):
+        with patch.object(deployment_executor, "register_endpoint", return_value=expected_url):
             entity_ids = [pending_deployment_no_revision.deployment_info.id]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
                 # Act
@@ -151,7 +147,7 @@ class TestCheckPendingDeployments:
 
         with patch.object(
             deployment_executor,
-            "_register_endpoint",
+            "register_endpoint",
             side_effect=RuntimeError("Registration failed"),
         ):
             entity_ids = [pending_deployment.deployment_info.id]
@@ -163,6 +159,39 @@ class TestCheckPendingDeployments:
         assert len(result.successes) == 0
         assert len(result.failures) == 1
         assert "Registration failed" in result.failures[0].reason
+
+    async def test_persist_failure_is_captured_as_failure(
+        self,
+        deployment_executor: DeploymentExecutor,
+        mock_deployment_repo: AsyncMock,
+        pending_deployment: DeploymentWithHistory,
+        proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
+    ) -> None:
+        """BA-5557: URL persist failure is recorded as failure, and no
+        compensating unregister is issued — we rely on appproxy idempotency
+        on retry instead."""
+        # Arrange
+        mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
+            proxy_targets_by_scaling_group
+        )
+        mock_deployment_repo.update_endpoint_url.side_effect = RuntimeError("DB write failed")
+
+        expected_url = "http://endpoint.test/v1"
+        with (
+            patch.object(deployment_executor, "register_endpoint", return_value=expected_url),
+            patch.object(
+                deployment_executor, "_delete_endpoint_from_wsproxy", return_value=None
+            ) as mock_unregister,
+        ):
+            entity_ids = [pending_deployment.deployment_info.id]
+            with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
+                result = await deployment_executor.check_pending_deployments([pending_deployment])
+
+        assert len(result.successes) == 0
+        assert len(result.failures) == 1
+        assert "DB write failed" in result.failures[0].reason
+        # We rely on appproxy idempotency, not compensation.
+        mock_unregister.assert_not_awaited()
 
 
 # =============================================================================

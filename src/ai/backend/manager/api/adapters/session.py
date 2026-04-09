@@ -65,7 +65,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     TerminateSessionsPayload,
     UpdateSessionPayload,
 )
-from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
+from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -576,6 +576,18 @@ class SessionAdapter(BaseAdapter):
             )
             if c is not None:
                 conditions.append(c)
+        if f.status is not None:
+            c = self._convert_session_status_filter(f.status)
+            if c is not None:
+                conditions.append(c)
+        if f.created_at is not None:
+            c = f.created_at.build_query_condition(
+                before_factory=SessionConditions.by_created_at_before,
+                after_factory=SessionConditions.by_created_at_after,
+                equals_factory=SessionConditions.by_created_at_equals,
+            )
+            if c is not None:
+                conditions.append(c)
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_session_filter(sub))
@@ -592,6 +604,14 @@ class SessionAdapter(BaseAdapter):
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
+
+    @staticmethod
+    def _convert_session_status_filter(f: SessionStatusFilter) -> QueryCondition | None:
+        if f.in_:
+            return SessionConditions.by_status_in([SessionStatus(s.value) for s in f.in_])
+        if f.not_in:
+            return SessionConditions.by_status_not_in([SessionStatus(s.value) for s in f.not_in])
+        return None
 
     @staticmethod
     def _convert_session_orders(orders: list[SessionOrder]) -> list[QueryOrder]:

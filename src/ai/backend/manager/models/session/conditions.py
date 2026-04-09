@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -409,6 +410,33 @@ class SessionConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return SessionRow.status.notin_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        """Factory for created_at < dt filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        """Factory for created_at > dt filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        """Factory for created_at == dt filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.created_at == dt
 
         return inner
 

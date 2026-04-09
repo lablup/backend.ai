@@ -40,8 +40,14 @@ from ai.backend.manager.models.user import (
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.types import SearchScope
+from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    RoleManager,
+    UserSystemRoleSpec,
+)
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -85,6 +91,7 @@ class AuthDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._role_manager = RoleManager()
 
     @auth_db_source_resilience.apply()
     async def fetch_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
@@ -124,7 +131,9 @@ class AuthDBSource:
         domain_name: str,
     ) -> UserData:
         """Insert a new user with keypair and add to default group in database."""
-        async with self._db.begin() as conn:
+        async with self._db.begin_session_read_committed() as db_session:
+            conn = await db_session.connection()
+
             # Create user
             query = users.insert().values(user_data)
             result = await conn.execute(query)
@@ -155,6 +164,14 @@ class AuthDBSource:
                 values = [{"user_id": user_row.uuid, "group_id": grp.id}]
                 assoc_query = association_groups_users.insert().values(values)
                 await conn.execute(assoc_query)
+
+            # Create RBAC system role and map user to role
+            role_spec = UserSystemRoleSpec(user_id=user_row.uuid)
+            role = await self._role_manager.create_system_role(db_session, role_spec)
+            user_role_creator = Creator(
+                spec=UserRoleCreatorSpec(user_id=user_row.uuid, role_id=role.id)
+            )
+            await execute_creator(db_session, user_role_creator)
 
             return self._user_row_to_data(user_row)
 
