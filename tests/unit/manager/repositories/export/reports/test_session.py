@@ -174,9 +174,7 @@ class TestFieldJoinAssignments:
             field = fields_by_key[key]
             assert field.joins is None
 
-    def test_access_key_field_has_user_join(
-        self, fields_by_key: dict[str, ExportFieldDef]
-    ) -> None:
+    def test_access_key_field_has_user_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
         """access_key is now sourced from users.main_access_key via USER_JOIN."""
         field = fields_by_key["access_key"]
         assert field.joins is not None
