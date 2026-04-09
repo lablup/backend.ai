@@ -532,7 +532,7 @@
     # Password for authenticating with Redis Sentinel nodes. If None, falls back
     # to the master password. Set explicitly when Sentinel nodes use a different
     # password than the master.
-    # Added in 26.4.0rc1
+    # Added in 26.4.0
     ## sentinel-password = "REDIS_SENTINEL_PASSWORD"
     # Timeout in milliseconds for Redis requests. Controls how long operations
     # wait before timing out. If None, uses the default timeout configured in

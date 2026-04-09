@@ -16,6 +16,19 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.0 (2026-04-09)
+
+### Fixes
+* Fix deployments created via `ActivateRevision` getting stuck in `DEGRADED`. Such deployments bypass `check_pending` (where the appproxy endpoint is normally registered), so the DEPLOYING provisioning handler now registers them itself before route provisioning. Registration is retry-safe because appproxy's endpoint creation is idempotent on `endpoint_id`, so any transient failure is recovered on the next coordinator tick. ([#10728](https://github.com/lablup/backend.ai/issues/10728))
+* Add RBAC system role creation to signup and OpenID user flows that were missed when the RBAC system was introduced, and add a backfill migration for existing users without system roles. ([#10888](https://github.com/lablup/backend.ai/issues/10888))
+* Fix `AttributeError` on `slot_name.device_name` when accelerator plugins provide plain strings in `slot_types`. ([#10896](https://github.com/lablup/backend.ai/issues/10896))
+* Fix `KeyError` crash in `vfolder invitations` CLI command by using the correct API response key (`inviter` instead of `inviter_user_email`). ([#10897](https://github.com/lablup/backend.ai/issues/10897))
+* Fix `availablePresets` GraphQL query crash caused by uninitialized `row_id` field on `ModelCardGQL` type ([#10907](https://github.com/lablup/backend.ai/issues/10907))
+* Fix missing `status` and `created_at` filters in v2 session search adapter. ([#10908](https://github.com/lablup/backend.ai/issues/10908))
+* Send container cleanup RPC to agents when sessions are force-terminated, preventing orphaned containers. ([#10910](https://github.com/lablup/backend.ai/issues/10910))
+* Fix `createModelDeployment` (with `initialRevision`) and `addModelRevision` GraphQL mutations failing with `'FieldInfo' object is not iterable` when `extra_mounts` was omitted. ([#10915](https://github.com/lablup/backend.ai/issues/10915))
+
+
 ## 26.4.0rc1 (2026-04-08)
 
 ### Features
