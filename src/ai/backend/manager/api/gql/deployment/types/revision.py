@@ -835,11 +835,8 @@ class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
         ),
         default=None,
     )
-    extra_mounts: list[ExtraVFolderMountInput] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="Extra vfolder mounts",
-        ),
+    extra_mounts: list[ExtraVFolderMountInput] | None = gql_field(
+        description="Extra vfolder mounts",
         default=None,
     )
 
@@ -869,11 +866,8 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
         ),
         default=None,
     )
-    extra_mounts: list[ExtraVFolderMountInput] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="Extra vfolder mounts",
-        ),
+    extra_mounts: list[ExtraVFolderMountInput] | None = gql_field(
+        description="Extra vfolder mounts",
         default=None,
     )
 
