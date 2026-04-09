@@ -25,6 +25,9 @@ class CleanupForceTerminatedHandler(CleanupHandler):
     bypassing the normal terminate handler that sends destroy RPCs to agents.
     This handler reads force-terminated session IDs from Valkey, fetches kernel/agent
     info from DB, and sends destroy RPCs to ensure containers are cleaned up.
+
+    Only successfully cleaned-up session IDs are removed from Valkey; failed ones
+    remain for retry on the next cycle.
     """
 
     def __init__(
@@ -42,7 +45,7 @@ class CleanupForceTerminatedHandler(CleanupHandler):
         return "cleanup-force-terminated"
 
     async def fetch_session_ids(self) -> Sequence[SessionId]:
-        return await self._valkey_schedule.pop_force_terminated_sessions()
+        return await self._valkey_schedule.get_force_terminated_sessions()
 
     async def execute(self, session_ids: Sequence[SessionId]) -> None:
         log.info("Processing {} force-terminated sessions for container cleanup", len(session_ids))
@@ -55,12 +58,25 @@ class CleanupForceTerminatedHandler(CleanupHandler):
                 "No session data found for force-terminated sessions: {}",
                 session_ids,
             )
+            # Sessions no longer exist in DB — remove from Valkey to avoid infinite retry
+            await self._valkey_schedule.remove_force_terminated_sessions(session_ids)
             return
 
-        try:
-            await self._terminator.terminate_sessions_for_handler(terminating_sessions)
-        except Exception:
-            log.exception(
-                "Error sending cleanup RPCs for force-terminated sessions: {}",
-                [s.session_id for s in terminating_sessions],
+        succeeded_ids: list[SessionId] = []
+        for session_data in terminating_sessions:
+            try:
+                await self._terminator.terminate_sessions_for_handler([session_data])
+                succeeded_ids.append(session_data.session_id)
+            except Exception:
+                log.exception(
+                    "Failed to send cleanup RPC for force-terminated session {}",
+                    session_data.session_id,
+                )
+
+        if succeeded_ids:
+            await self._valkey_schedule.remove_force_terminated_sessions(succeeded_ids)
+            log.info(
+                "Cleaned up {} force-terminated sessions ({} failed)",
+                len(succeeded_ids),
+                len(terminating_sessions) - len(succeeded_ids),
             )

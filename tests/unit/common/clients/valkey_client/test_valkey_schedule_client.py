@@ -863,25 +863,38 @@ class TestForceTerminatedCleanupQueue:
         finally:
             await client.close()
 
-    async def test_add_and_pop_returns_session_ids(
+    async def test_add_and_get_returns_session_ids(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
-        """Stored session IDs are returned as list[SessionId] by pop."""
+        """Stored session IDs are returned as list[SessionId] by get."""
         session_ids = [SessionId(uuid4()) for _ in range(3)]
 
         await valkey_schedule_client.add_force_terminated_sessions(session_ids)
-        result = await valkey_schedule_client.pop_force_terminated_sessions()
+        result = await valkey_schedule_client.get_force_terminated_sessions()
 
         assert isinstance(result, list)
         assert set(result) == set(session_ids)
         for item in result:
             assert isinstance(item, UUID)
 
-    async def test_pop_empty_queue_returns_empty_list(
+    async def test_get_empty_queue_returns_empty_list(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
-        """Pop from empty queue returns empty list."""
-        result = await valkey_schedule_client.pop_force_terminated_sessions()
+        """Get from empty queue returns empty list."""
+        result = await valkey_schedule_client.get_force_terminated_sessions()
 
         assert isinstance(result, list)
         assert result == []
+
+    async def test_remove_deletes_only_specified_sessions(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        """remove_force_terminated_sessions removes only specified IDs."""
+        sid_keep = SessionId(uuid4())
+        sid_remove = SessionId(uuid4())
+
+        await valkey_schedule_client.add_force_terminated_sessions([sid_keep, sid_remove])
+        await valkey_schedule_client.remove_force_terminated_sessions([sid_remove])
+        result = await valkey_schedule_client.get_force_terminated_sessions()
+
+        assert result == [sid_keep]

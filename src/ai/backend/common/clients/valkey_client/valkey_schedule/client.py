@@ -1145,22 +1145,35 @@ class ValkeyScheduleClient:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_schedule_resilience.apply()
-    async def pop_force_terminated_sessions(self) -> list[SessionId]:
+    async def get_force_terminated_sessions(self) -> list[SessionId]:
         """
-        Atomically read and delete all force-terminated session IDs from the cleanup queue.
+        Read all force-terminated session IDs from the cleanup queue (non-destructive).
 
         :return: List of session IDs that need container cleanup
         """
         key = self._get_force_terminated_cleanup_key()
-        batch = Batch(is_atomic=True)
-        batch.smembers(key)
-        batch.delete([key])
         async with self._client.client() as conn:
-            results = await conn.exec(batch, raise_on_error=True)
+            members = await conn.smembers(key)
 
-        if not results or not results[0]:
+        if not members:
             return []
 
-        members = results[0]
         members = cast(set[bytes], members)
         return [SessionId(UUID(member.decode())) for member in members]
+
+    @valkey_schedule_resilience.apply()
+    async def remove_force_terminated_sessions(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> None:
+        """
+        Remove specific session IDs from the cleanup queue after successful cleanup.
+
+        :param session_ids: Session IDs to remove
+        """
+        if not session_ids:
+            return
+        key = self._get_force_terminated_cleanup_key()
+        members: list[str] = [str(sid) for sid in session_ids]
+        async with self._client.client() as conn:
+            await conn.srem(key, members)
