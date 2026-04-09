@@ -522,9 +522,13 @@ async def parse_resource_usage_groups(
             used_time=kern.used_time,
             used_days=kern.get_used_days(local_tz),
             last_stat=stat_map.get(kern.id),
-            user_id=kern.session.user_uuid,
+            user_id=kern.session.owner_id,
             user_email=kern.session.user.email if kern.session.user is not None else None,
-            access_key=kern.session.access_key,
+            # TODO(BA-5609 phase D): resolve access_key from owner via
+            # users.main_access_key. SessionRow.access_key has been removed.
+            access_key=(
+                kern.session.user.main_access_key if kern.session.user is not None else None
+            ),
             project_id=kern.session.group.id if kern.session.group is not None else None,
             project_name=kern.session.group.name if kern.session.group is not None else None,
             kernel_id=kern.id,
@@ -548,12 +552,13 @@ async def parse_resource_usage_groups(
 
 SESSION_RESOURCE_SELECT_COLS = (
     SessionRow.created_at,
-    SessionRow.user_uuid,
+    SessionRow.owner_id,
     SessionRow.name,
     SessionRow.domain_name,
     SessionRow.id,
     SessionRow.group_id,
-    SessionRow.access_key,
+    # TODO(BA-5609 phase D): SessionRow.access_key removed. Callers should
+    # join UserRow and read users.main_access_key when an access_key is needed.
     SessionRow.images,
     SessionRow.cluster_mode,
     SessionRow.status_history,

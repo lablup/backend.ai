@@ -172,7 +172,7 @@ async def get_user_email(
     db_session: SASession,
     kernel: KernelRow,
 ) -> str:
-    query = sa.select(users.c.email).select_from(users).where(users.c.uuid == kernel["user_uuid"])
+    query = sa.select(users.c.email).select_from(users).where(users.c.uuid == kernel["owner_id"])
     result = await db_session.execute(query)
     user_email = str(result.scalar())
     return user_email.replace("@", "_")
@@ -351,7 +351,7 @@ async def handle_kernel_exception(
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
-    return UserRow.uuid == foreign(KernelRow.user_uuid)
+    return UserRow.uuid == foreign(KernelRow.owner_id)
 
 
 def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
@@ -438,10 +438,7 @@ class KernelRow(Base):  # type: ignore[misc]
     group_id: Mapped[uuid.UUID] = mapped_column(
         "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
     )
-    user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False)
-    access_key: Mapped[str | None] = mapped_column(
-        "access_key", sa.String(length=20), nullable=True
-    )
+    owner_id: Mapped[uuid.UUID] = mapped_column("owner_id", GUID, nullable=False)
     # `image` is a string representing canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE_NAME>:<TAG>".
     image: Mapped[str | None] = mapped_column("image", sa.String(length=512), nullable=True)
     # ForeignKeyIDColumn("image_id", "images.id")
@@ -655,7 +652,7 @@ class KernelRow(Base):  # type: ignore[misc]
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
         back_populates="kernels",
-        foreign_keys="KernelRow.user_uuid",
+        foreign_keys="KernelRow.owner_id",
     )
 
     @property
@@ -820,9 +817,8 @@ class KernelRow(Base):  # type: ignore[misc]
             else:
                 self.status_data = dict(status_data)
 
-    def delegate_ownership(self, user_uuid: uuid.UUID, access_key: AccessKey) -> None:
-        self.user_uuid = user_uuid
-        self.access_key = access_key
+    def delegate_ownership(self, owner_id: uuid.UUID) -> None:
+        self.owner_id = owner_id
 
     @classmethod
     async def set_kernel_status(
@@ -945,8 +941,7 @@ class KernelRow(Base):  # type: ignore[misc]
             agent_addr=info.resource.agent_addr,
             domain_name=info.user_permission.domain_name,
             group_id=info.user_permission.group_id,
-            user_uuid=info.user_permission.user_uuid,
-            access_key=info.user_permission.access_key,
+            owner_id=info.user_permission.owner_id,
             image=info.image.identifier.canonical if info.image.identifier else None,
             architecture=info.image.identifier.architecture if info.image.identifier else None,
             registry=info.image.registry,
@@ -1002,8 +997,7 @@ class KernelRow(Base):  # type: ignore[misc]
                 session_type=self.session_type,
             ),
             user_permission=UserPermission(
-                user_uuid=self.user_uuid,
-                access_key=self.access_key or "",
+                owner_id=self.owner_id,
                 domain_name=self.domain_name,
                 group_id=self.group_id,
                 uid=self.uid,
@@ -1113,12 +1107,19 @@ async def recalc_concurrency_used(
 ) -> None:
     from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
 
+    # TODO(BA-5609 phase D): kernels.access_key is removed. Resolve the
+    # owner_id for this access_key (via users.main_access_key) and filter by
+    # KernelRow.owner_id instead. The join below is a temporary shim that
+    # selects kernels whose owning user has main_access_key == access_key.
+    owner_id_subq = (
+        sa.select(users.c.uuid).where(users.c.main_access_key == access_key).scalar_subquery()
+    )
     async with db_sess.begin_nested():
         result = await db_sess.execute(
             sa.select(sa.func.count())
             .select_from(KernelRow)
             .where(
-                (KernelRow.access_key == access_key)
+                (KernelRow.owner_id == owner_id_subq)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                 & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
             ),
@@ -1128,7 +1129,7 @@ async def recalc_concurrency_used(
             sa.select(sa.func.count())
             .select_from(KernelRow)
             .where(
-                (KernelRow.access_key == access_key)
+                (KernelRow.owner_id == owner_id_subq)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                 & (KernelRow.session_type.in_(PRIVATE_SESSION_TYPES))
             ),
