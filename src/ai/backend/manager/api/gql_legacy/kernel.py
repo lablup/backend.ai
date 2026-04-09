@@ -387,7 +387,16 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         if group_id is not None:
             query = query.where(KernelRow.group_id == group_id)
         if access_key is not None:
-            query = query.where(KernelRow.access_key == access_key)
+            # NOTE(BA-5609): kernels.access_key column dropped — resolve owner_id
+            # via users.main_access_key subquery.
+            from ai.backend.manager.models.user import UserRow
+
+            _owner_subq = (
+                sa.select(UserRow.uuid)
+                .where(UserRow.main_access_key == access_key)
+                .scalar_subquery()
+            )
+            query = query.where(KernelRow.owner_id.in_(_owner_subq))
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -424,7 +433,14 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         if group_id is not None:
             query = query.where(KernelRow.group_id == group_id)
         if access_key is not None:
-            query = query.where(KernelRow.access_key == access_key)
+            from ai.backend.manager.models.user import UserRow
+
+            _owner_subq = (
+                sa.select(UserRow.uuid)
+                .where(UserRow.main_access_key == access_key)
+                .scalar_subquery()
+            )
+            query = query.where(KernelRow.owner_id.in_(_owner_subq))
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -511,7 +527,14 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         if domain_name is not None:
             query = query.where(KernelRow.domain_name == domain_name)
         if access_key is not None:
-            query = query.where(KernelRow.access_key == access_key)
+            from ai.backend.manager.models.user import UserRow
+
+            _owner_subq = (
+                sa.select(UserRow.uuid)
+                .where(UserRow.main_access_key == access_key)
+                .scalar_subquery()
+            )
+            query = query.where(KernelRow.owner_id.in_(_owner_subq))
         async with ctx.db.begin_readonly_session() as conn:
             return await batch_result(
                 ctx,
@@ -703,8 +726,10 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             "group_name": row.name,  # group.name (group is omitted since use_labels=True is not used)
             "group_id": row.group_id,
             "scaling_group": row.scaling_group,
-            "user_uuid": row.user_uuid,
-            "access_key": row.access_key,
+            # NOTE(BA-5609): kernels.user_uuid/access_key columns dropped;
+            # source from kernels.owner_id and users.main_access_key (joined).
+            "user_uuid": row.owner_id,
+            "access_key": getattr(row, "main_access_key", None),
             "status": row.status.name,
             "status_changed": row.status_changed,
             "status_info": row.status_info,
@@ -775,7 +800,12 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         if group_id is not None:
             query = query.where(kernels.c.group_id == group_id)
         if access_key is not None:
-            query = query.where(kernels.c.access_key == access_key)
+            _owner_subq = (
+                sa.select(users.c.uuid)
+                .where(users.c.main_access_key == access_key)
+                .scalar_subquery()
+            )
+            query = query.where(kernels.c.owner_id.in_(_owner_subq))
         if status_list:
             query = query.where(kernels.c.status.in_(status_list))
         async with ctx.db.begin_readonly() as conn:
@@ -807,10 +837,10 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             _order_func = sa.asc if order_asc else sa.desc
             _ordering = [_order_func(getattr(kernels.c, order_key))]
         j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
-            users, users.c.uuid == kernels.c.user_uuid
+            users, users.c.uuid == kernels.c.owner_id
         )
         query = (
-            sa.select(kernels, groups.c.name, users.c.email)
+            sa.select(kernels, groups.c.name, users.c.email, users.c.main_access_key)
             .select_from(j)
             .where(kernels.c.cluster_role == DEFAULT_ROLE)
             .order_by(*_ordering)
@@ -822,7 +852,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         if group_id is not None:
             query = query.where(kernels.c.group_id == group_id)
         if access_key is not None:
-            query = query.where(kernels.c.access_key == access_key)
+            query = query.where(users.c.main_access_key == access_key)
         if status_list:
             query = query.where(kernels.c.status.in_(status_list))
         async with ctx.db.begin_readonly() as conn:
@@ -842,14 +872,17 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         group_id: uuid.UUID | None = None,
         status: str | None = None,
     ) -> Sequence[LegacyComputeSession | None]:
+        # NOTE(BA-5609): batch-load by access_keys now joins users to resolve
+        # owner_ids whose main_access_key matches one of the requested keys.
         j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
-            users, users.c.uuid == kernels.c.user_uuid
+            users, users.c.uuid == kernels.c.owner_id
         )
         query = (
-            sa.select(kernels, groups.c.name, users.c.email)
+            sa.select(kernels, groups.c.name, users.c.email, users.c.main_access_key)
             .select_from(j)
             .where(
-                (kernels.c.access_key.in_(access_keys)) & (kernels.c.cluster_role == DEFAULT_ROLE),
+                (users.c.main_access_key.in_(access_keys))
+                & (kernels.c.cluster_role == DEFAULT_ROLE),
             )
             .order_by(
                 sa.desc(
@@ -875,7 +908,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
                 query,
                 cls,
                 access_keys,
-                lambda row: row.access_key,
+                lambda row: row.main_access_key,
             )
 
     @classmethod
@@ -896,17 +929,17 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         elif status is None:
             status_list = [KernelStatus["RUNNING"]]
         j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
-            users, users.c.uuid == kernels.c.user_uuid
+            users, users.c.uuid == kernels.c.owner_id
         )
         query = (
-            sa.select(kernels, groups.c.name, users.c.email)
+            sa.select(kernels, groups.c.name, users.c.email, users.c.main_access_key)
             .select_from(j)
             .where((kernels.c.cluster_role == DEFAULT_ROLE) & (kernels.c.session_id.in_(sess_ids)))
         )
         if domain_name is not None:
             query = query.where(kernels.c.domain_name == domain_name)
         if access_key is not None:
-            query = query.where(kernels.c.access_key == access_key)
+            query = query.where(users.c.main_access_key == access_key)
         if status_list:
             query = query.where(kernels.c.status.in_(status_list))
         async with ctx.db.begin_readonly() as conn:

@@ -39,7 +39,7 @@ def _create_session_data(
         cluster_size=1,
         domain_name="default",
         group_id=uuid4(),
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         occupying_slots={},
         requested_slots={"cpu": Decimal("1"), "mem": Decimal("1073741824")},
         use_host_network=False,
@@ -49,7 +49,6 @@ def _create_session_data(
         num_queries=0,
         creation_id="test-creation-id",
         name=name,
-        access_key=None,
         scaling_group_name="default",
         target_sgroup_names=None,
         agent_ids=None,
@@ -75,13 +74,18 @@ def _create_session_data(
     )
 
 
+@pytest.fixture
+def _node_adapter() -> SessionAdapter:
+    return SessionAdapter(MagicMock(), MagicMock())
+
+
 class TestSessionDataToNode:
     """Tests for _session_data_to_node conversion."""
 
-    def test_basic_conversion(self) -> None:
+    def test_basic_conversion(self, _node_adapter: SessionAdapter) -> None:
         """SessionData should convert to SessionNode with correct fields."""
         data = _create_session_data(name="my-session")
-        node = SessionAdapter._session_data_to_node(data)
+        node = _node_adapter._session_data_to_node(data)
 
         assert node.metadata.name == "my-session"
         assert node.metadata.session_type == "interactive"
@@ -89,10 +93,10 @@ class TestSessionDataToNode:
         assert node.metadata.cluster_size == 1
         assert node.metadata.priority == 10
 
-    def test_resource_allocation_conversion(self) -> None:
+    def test_resource_allocation_conversion(self, _node_adapter: SessionAdapter) -> None:
         """Resource slots should be converted to ResourceSlotInfo entries."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = _node_adapter._session_data_to_node(data)
 
         requested = node.resource.allocation.requested
         assert len(requested.entries) == 2
@@ -100,42 +104,42 @@ class TestSessionDataToNode:
         assert "cpu" in types
         assert "mem" in types
 
-    def test_lifecycle_running_status(self) -> None:
+    def test_lifecycle_running_status(self, _node_adapter: SessionAdapter) -> None:
         """RUNNING status should be preserved as RUNNING."""
         data = _create_session_data(status=SessionStatus.RUNNING)
-        node = SessionAdapter._session_data_to_node(data)
+        node = _node_adapter._session_data_to_node(data)
         assert node.lifecycle.status == "RUNNING"
 
-    def test_lifecycle_pending_status(self) -> None:
+    def test_lifecycle_pending_status(self, _node_adapter: SessionAdapter) -> None:
         """PENDING status should be preserved as PENDING."""
         data = _create_session_data(status=SessionStatus.PENDING)
-        node = SessionAdapter._session_data_to_node(data)
+        node = _node_adapter._session_data_to_node(data)
         assert node.lifecycle.status == "PENDING"
 
-    def test_lifecycle_result(self) -> None:
+    def test_lifecycle_result(self, _node_adapter: SessionAdapter) -> None:
         """Result should be passed through as string value."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = _node_adapter._session_data_to_node(data)
         assert node.lifecycle.result == "undefined"
 
-    def test_domain_and_user_fields(self) -> None:
+    def test_domain_and_user_fields(self, _node_adapter: SessionAdapter) -> None:
         """Domain name and user/project IDs should be mapped."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = _node_adapter._session_data_to_node(data)
         assert node.domain_name == "default"
-        assert node.user_id == data.user_uuid
+        assert node.user_id == data.owner_id
         assert node.project_id == data.group_id
 
-    def test_network_host_network_false(self) -> None:
+    def test_network_host_network_false(self, _node_adapter: SessionAdapter) -> None:
         """Network info should reflect use_host_network."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = _node_adapter._session_data_to_node(data)
         assert node.network.use_host_network is False
 
-    def test_empty_occupying_slots(self) -> None:
+    def test_empty_occupying_slots(self, _node_adapter: SessionAdapter) -> None:
         """Empty occupying slots should produce empty entries list."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data)
+        node = _node_adapter._session_data_to_node(data)
         assert len(node.resource.allocation.used.entries) == 0
 
 
@@ -152,7 +156,7 @@ class TestEnqueueActionBuilding:
 
     @pytest.fixture
     def adapter(self, mock_processors: MagicMock) -> SessionAdapter:
-        return SessionAdapter(mock_processors)
+        return SessionAdapter(mock_processors, MagicMock())
 
     async def test_enqueue_interactive(
         self,
@@ -257,7 +261,7 @@ class TestTerminateActionBuilding:
 
     @pytest.fixture
     def adapter(self, mock_processors: MagicMock) -> SessionAdapter:
-        return SessionAdapter(mock_processors)
+        return SessionAdapter(mock_processors, MagicMock())
 
     async def test_terminate_single(
         self,

@@ -123,10 +123,10 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
         if filter.access_key is not None:
             condition = self.convert_string_filter(
                 filter.access_key,
-                contains_factory=SessionConditions.by_access_key_contains,
-                equals_factory=SessionConditions.by_access_key_equals,
-                starts_with_factory=SessionConditions.by_access_key_starts_with,
-                ends_with_factory=SessionConditions.by_access_key_ends_with,
+                contains_factory=SessionConditions.by_main_access_key_contains,
+                equals_factory=SessionConditions.by_main_access_key_equals,
+                starts_with_factory=SessionConditions.by_main_access_key_starts_with,
+                ends_with_factory=SessionConditions.by_main_access_key_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)

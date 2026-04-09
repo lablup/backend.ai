@@ -46,6 +46,7 @@ from ai.backend.manager.api.adapters.vfs_storage import VFSStorageAdapter
 if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.config.unified import AuthConfig
+    from ai.backend.manager.repositories.repositories import Repositories
     from ai.backend.manager.services.processors import Processors
 
 
@@ -138,6 +139,7 @@ class Adapters:
         cls,
         processors: Processors,
         auth_config: AuthConfig,
+        repositories: Repositories,
         config_provider: ManagerConfigProvider | None = None,
     ) -> Adapters:
         """Factory that wires up all adapters from the shared Processors."""
@@ -173,7 +175,10 @@ class Adapters:
             resource_usage=ResourceUsageAdapter(processors),
             scheduling_history=SchedulingHistoryAdapter(processors),
             service_catalog=ServiceCatalogAdapter(processors),
-            session=SessionAdapter(processors),
+            session=SessionAdapter(
+                processors,
+                user_repository=repositories.user.repository,
+            ),
             storage_namespace=StorageNamespaceAdapter(processors),
             user=UserAdapter(processors, auth_config),
             vfolder=VFolderAdapter(processors),

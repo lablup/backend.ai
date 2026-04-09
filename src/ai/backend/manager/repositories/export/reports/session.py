@@ -60,7 +60,7 @@ PROJECT_POLICY_JOINS = (PROJECT_JOIN, PROJECT_RESOURCE_POLICY_JOIN)
 # User JOIN (N:1, no duplication)
 USER_JOIN = JoinDef(
     table=UserRow.__table__,
-    condition=SessionRow.user_uuid == UserRow.uuid,
+    condition=SessionRow.owner_id == UserRow.uuid,
 )
 
 # All Kernels JOIN (1:N, causes duplication)
@@ -109,9 +109,10 @@ SESSION_FIELDS: list[ExportFieldDef] = [
     ExportFieldDef(
         key="access_key",
         name="Access Key",
-        description="Owning access key",
+        description="Owning access key (resolved from owner's main_access_key)",
         field_type=ExportFieldType.STRING,
-        column=SessionRow.access_key,
+        column=UserRow.main_access_key,
+        joins=frozenset({USER_JOIN}),
     ),
     ExportFieldDef(
         key="status",

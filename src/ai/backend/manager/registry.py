@@ -1230,20 +1230,24 @@ class AgentRegistry:
                 # Query running containers and calculate concurrency_used per AK.
                 # Agent occupied slots are now managed by the normalized
                 # agent_resources table, so only concurrency tracking remains here.
+                # BA-5609: resolve main_access_key via users.main_access_key
+                # (the sessions.access_key column has been removed).
                 session_query = (
-                    sa.select(SessionRow)
+                    sa.select(SessionRow, UserRow.main_access_key)
+                    .join(UserRow, UserRow.uuid == SessionRow.owner_id)
                     .where(SessionRow.status.in_(USER_RESOURCE_OCCUPYING_SESSION_STATUSES))
                     .options(
                         load_only(
                             SessionRow.id,
-                            SessionRow.access_key,
+                            SessionRow.owner_id,
                             SessionRow.status,
                             SessionRow.session_type,
                         ),
                     )
                 )
-                async for session_row in await db_sess.stream_scalars(session_query):
-                    access_key = cast(AccessKey, session_row.access_key)
+                async for row in await db_sess.stream(session_query):
+                    session_row = row[0]
+                    access_key = cast(AccessKey, row[1])
                     if access_key not in access_key_to_concurrency_used:
                         access_key_to_concurrency_used[access_key] = ConcurrencyUsed(access_key)
                     if session_row.session_type in PRIVATE_SESSION_TYPES:
@@ -1357,6 +1361,21 @@ class AgentRegistry:
                 rpc_coros.append(destroy_kernel())
             await asyncio.gather(*rpc_coros)
 
+    async def _resolve_main_access_key(self, owner_id: uuid.UUID) -> AccessKey:
+        """BA-5609: Resolve a user's main_access_key from owner_id.
+
+        Used at call sites where the legacy ``SessionRow.access_key`` /
+        ``KernelRow.access_key`` column has been removed but the resolved
+        main access key is still required (hook payloads, agent RPC args,
+        Redis concurrency keys, etc.).
+        """
+        async with self.db.begin_readonly() as db_conn:
+            result = await db_conn.execute(
+                sa.select(UserRow.main_access_key).where(UserRow.uuid == owner_id)
+            )
+            ak = result.scalar()
+            return cast(AccessKey, ak) if ak is not None else AccessKey("")
+
     async def destroy_session(
         self,
         session: SessionRow,
@@ -1380,9 +1399,12 @@ class AgentRegistry:
                 if forced
                 else KernelLifecycleEventReason.USER_REQUESTED
             )
+        # BA-5609: resolve main_access_key from owner_id; hook payload
+        # shape is kept stable for external plugin consumers.
+        session_main_access_key = await self._resolve_main_access_key(session.owner_id)
         hook_result = await self.hook_plugin_ctx.dispatch(
             "PRE_DESTROY_SESSION",
-            (session_id, session.name, session.access_key),
+            (session_id, session.name, session_main_access_key),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -1446,14 +1468,14 @@ class AgentRegistry:
                     load_only(
                         SessionRow.creation_id,
                         SessionRow.status,
-                        SessionRow.access_key,
+                        SessionRow.owner_id,
                         SessionRow.session_type,
                     ),
                     selectinload(SessionRow.kernels).options(
                         noload("*"),
                         load_only(
                             KernelRow.id,
-                            KernelRow.access_key,
+                            KernelRow.owner_id,
                             KernelRow.status,
                             KernelRow.container_id,
                             KernelRow.cluster_role,
@@ -1499,9 +1521,7 @@ class AgentRegistry:
                         target_session.status,
                     )
                     await _decrease_concurrency_used(
-                        AccessKey(target_session.access_key)
-                        if target_session.access_key
-                        else AccessKey(""),
+                        session_main_access_key,
                         target_session.is_private,
                     )
                     if user_role == UserRole.SUPERADMIN:
@@ -1526,9 +1546,7 @@ class AgentRegistry:
                     )
                 case _:
                     await _decrease_concurrency_used(
-                        AccessKey(target_session.access_key)
-                        if target_session.access_key
-                        else AccessKey(""),
+                        session_main_access_key,
                         target_session.is_private,
                     )
                     await SessionRow.set_session_status(
@@ -1756,7 +1774,7 @@ class AgentRegistry:
                 )
             await self.hook_plugin_ctx.notify(
                 "POST_DESTROY_SESSION",
-                (session_id, session.name, session.access_key),
+                (session_id, session.name, session_main_access_key),
             )
             if forced:
                 await self.recalc_resource_usage()
@@ -2242,7 +2260,7 @@ class AgentRegistry:
         kernel: KernelRow,
     ) -> str:
         async with self.db.begin_readonly() as db_conn:
-            query = sa.select(UserRow.email).where(UserRow.uuid == kernel.user_uuid)
+            query = sa.select(UserRow.email).where(UserRow.uuid == kernel.owner_id)
             result = await db_conn.execute(query)
             user_email = str(result.scalar())
             return user_email.replace("@", "_")

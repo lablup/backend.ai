@@ -123,11 +123,11 @@ _queryfilter_fieldspec: FieldSpecType = {
     "agent_ids": (ArrayFieldItem("agent_ids"), None),
     "domain_name": ("domain_name", None),
     "project_id": ("group_id", None),
-    "user_id": ("user_uuid", None),
+    "user_id": ("owner_id", None),
     "full_name": (ORMFieldItem(UserRow.full_name), None),
     "group_name": (ORMFieldItem(GroupRow.name), None),
     "user_email": (ORMFieldItem(UserRow.email), None),
-    "access_key": ("access_key", None),
+    "access_key": (ORMFieldItem(UserRow.main_access_key), None),
     "scaling_group": ("scaling_group_name", None),
     "cluster_mode": ("cluster_mode", lambda s: ClusterMode(s)),
     "cluster_size": ("cluster_size", None),
@@ -154,8 +154,10 @@ _queryorder_colmap: ColumnMapType = {
     "agent_ids": ("agent_ids", None),
     "domain_name": ("domain_name", None),
     "project_id": ("group_id", None),
-    "user_id": ("user_uuid", None),
-    "access_key": ("access_key", None),
+    "user_id": ("owner_id", None),
+    # NOTE(BA-5609): ordering by access_key is no longer supported — fall
+    # back to ordering by owner_id to preserve schema stability.
+    "access_key": ("owner_id", None),
     "scaling_group": ("scaling_group_name", None),
     "cluster_mode": ("cluster_mode", None),
     "cluster_size": ("cluster_size", None),
@@ -358,8 +360,8 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=row.domain_name,
             project_id=row.group_id,
-            user_id=row.user_uuid,
-            access_key=row.access_key,
+            user_id=row.owner_id,
+            access_key=(row.user.main_access_key if row.user is not None else None),
             owner=UserNode.from_row(ctx, row.user),
             # status
             status=row.status.name,
@@ -422,8 +424,10 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=session_data.domain_name,
             project_id=session_data.group_id,
-            user_id=session_data.user_uuid,
-            access_key=session_data.access_key,
+            user_id=session_data.owner_id,
+            access_key=(
+                session_data.owner.main_access_key if session_data.owner is not None else None
+            ),
             owner=UserNode.from_dataclass(ctx, session_data.owner),
             # status
             status=session_data.status.name,
@@ -1056,6 +1060,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         email = row.email
         full_name = row.full_name
         group_name = row.group_name
+        main_access_key = getattr(row, "main_access_key", None)
         row = row.SessionRow
         status_history = row.status_history or {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
@@ -1090,8 +1095,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             "group_id": row.group_id,
             "user_email": email,
             "full_name": full_name,
-            "user_id": row.user_uuid,
-            "access_key": row.access_key,
+            "user_id": row.owner_id,
+            "access_key": main_access_key,
             "created_user_email": None,  # TODO: implement
             "created_user_id": None,  # TODO: implement
             # status
@@ -1198,9 +1203,9 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
         "user_email": ("users_email", None),
-        "user_id": ("sessions_user_uuid", None),
+        "user_id": ("sessions_owner_id", None),
         "full_name": ("users_full_name", None),
-        "access_key": ("sessions_access_key", None),
+        "access_key": ("users_main_access_key", None),
         "scaling_group": ("sessions_scaling_group_name", None),
         "cluster_mode": ("sessions_cluster_mode", ClusterMode),
         "cluster_size": ("sessions_cluster_size", None),
@@ -1229,9 +1234,9 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
         "user_email": ("users_email", None),
-        "user_id": ("sessions_user_uuid", None),
+        "user_id": ("sessions_owner_id", None),
         "full_name": ("users_full_name", None),
-        "access_key": ("sessions_access_key", None),
+        "access_key": ("users_main_access_key", None),
         "scaling_group": ("sessions_scaling_group_name", None),
         "cluster_mode": ("sessions_cluster_mode", None),
         # "cluster_template": "cluster_template",
@@ -1267,7 +1272,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         j = (
             # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
             sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
-            .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
+            .join(UserRow, SessionRow.owner_id == UserRow.uuid)
             .join(KernelRow, SessionRow.id == KernelRow.session_id)
         )
         query = sa.select(sa.func.count(sa.distinct(SessionRow.id))).select_from(j)
@@ -1276,7 +1281,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         if group_id is not None:
             query = query.where(SessionRow.group_id == group_id)
         if access_key is not None:
-            query = query.where(SessionRow.access_key == access_key)
+            # NOTE(BA-5609): filter via owning user's main_access_key.
+            query = query.where(UserRow.main_access_key == access_key)
         if status_list is not None:
             query = query.where(SessionRow.status.in_(status_list))
         if filter is not None:
@@ -1308,7 +1314,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         j = (
             # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
             sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-                UserRow, SessionRow.user_uuid == UserRow.uuid
+                UserRow, SessionRow.owner_id == UserRow.uuid
             )
         )
         query = (
@@ -1317,10 +1323,11 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
                 agg_to_array(GroupRow.name).label("group_name"),
                 UserRow.email,
                 UserRow.full_name,
+                UserRow.main_access_key,
             )
             .select_from(j)
             .options(selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)))
-            .group_by(SessionRow, UserRow.email, UserRow.full_name)
+            .group_by(SessionRow, UserRow.email, UserRow.full_name, UserRow.main_access_key)
             .limit(limit)
             .offset(offset)
         )
@@ -1329,7 +1336,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         if group_id is not None:
             query = query.where(SessionRow.group_id == group_id)
         if access_key is not None:
-            query = query.where(SessionRow.access_key == access_key)
+            # NOTE(BA-5609): filter via owning user's main_access_key.
+            query = query.where(UserRow.main_access_key == access_key)
         if status_list is not None:
             query = query.where(SessionRow.status.in_(status_list))
         if filter is not None:
@@ -1356,7 +1364,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         access_key: str | None = None,
     ) -> Sequence[ComputeSession | None]:
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-            UserRow, SessionRow.user_uuid == UserRow.uuid
+            UserRow, SessionRow.owner_id == UserRow.uuid
         )
         query = (
             sa.select(
@@ -1364,6 +1372,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
                 GroupRow.name.label("group_name"),
                 UserRow.email,
                 UserRow.full_name,
+                UserRow.main_access_key,
             )
             .select_from(j)
             .where(SessionRow.id.in_(session_ids))
@@ -1372,7 +1381,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         if domain_name is not None:
             query = query.where(SessionRow.domain_name == domain_name)
         if access_key is not None:
-            query = query.where(SessionRow.access_key == access_key)
+            # NOTE(BA-5609): filter via owning user's main_access_key.
+            query = query.where(UserRow.main_access_key == access_key)
         async with ctx.db.begin_readonly_session() as db_sess:
             rows = (await db_sess.execute(query)).all()
             sr_list = [r.SessionRow for r in rows]

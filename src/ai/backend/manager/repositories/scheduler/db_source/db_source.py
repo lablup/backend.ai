@@ -314,9 +314,9 @@ class ScheduleDBSource:
         query = (
             sa.select(
                 SessionRow.id,
-                SessionRow.access_key,
+                UserRow.main_access_key.label("access_key"),
                 SessionRow.requested_slots,
-                SessionRow.user_uuid,
+                SessionRow.owner_id,
                 SessionRow.group_id,
                 SessionRow.domain_name,
                 SessionRow.scaling_group_name,
@@ -333,6 +333,7 @@ class ScheduleDBSource:
                 KernelRow.agent.label("kernel_agent"),
             )
             .select_from(SessionRow)
+            .join(UserRow, SessionRow.owner_id == UserRow.uuid)
             .outerjoin(KernelRow, SessionRow.id == KernelRow.session_id)
             .order_by(SessionRow.created_at.asc())
             .where(
@@ -351,9 +352,9 @@ class ScheduleDBSource:
             if session_id not in sessions_map:
                 sessions_map[session_id] = PendingSessionData(
                     id=session_id,
-                    access_key=row.access_key,
+                    access_key=AccessKey(row.access_key) if row.access_key else AccessKey(""),
                     requested_slots=row.requested_slots,
-                    owner_id=row.user_uuid,
+                    owner_id=row.owner_id,
                     group_id=row.group_id,
                     domain_name=row.domain_name,
                     scaling_group_name=row.scaling_group_name,
@@ -443,6 +444,7 @@ class ScheduleDBSource:
         """Fetch kernel occupancy data from normalized resource_allocations table."""
         ra = ResourceAllocationRow.__table__
         k = KernelRow.__table__
+        u = UserRow.__table__
         rst = ResourceSlotTypeRow.__table__
         all_resource_statuses = (
             KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
@@ -451,8 +453,8 @@ class ScheduleDBSource:
         occ_stmt = (
             sa.select(
                 k.c.session_id,
-                k.c.access_key,
-                k.c.user_uuid,
+                u.c.main_access_key.label("access_key"),
+                k.c.owner_id,
                 k.c.group_id,
                 k.c.domain_name,
                 k.c.agent,
@@ -463,7 +465,9 @@ class ScheduleDBSource:
                 rst.c.rank,
             )
             .select_from(
-                ra.join(k, ra.c.kernel_id == k.c.id).join(rst, ra.c.slot_name == rst.c.slot_name)
+                ra.join(k, ra.c.kernel_id == k.c.id)
+                .join(u, k.c.owner_id == u.c.uuid)
+                .join(rst, ra.c.slot_name == rst.c.slot_name)
             )
             .where(
                 k.c.scaling_group == scaling_group,
@@ -500,7 +504,7 @@ class ScheduleDBSource:
             # Only accumulate resource slots for non-private sessions
             if not session_type.is_private():
                 _accum_add(_keypair_accum[row.access_key], row.slot_name, row.effective_amount)
-                _accum_add(_user_accum[row.user_uuid], row.slot_name, row.effective_amount)
+                _accum_add(_user_accum[row.owner_id], row.slot_name, row.effective_amount)
                 _accum_add(_group_accum[row.group_id], row.slot_name, row.effective_amount)
                 _accum_add(_domain_accum[row.domain_name], row.slot_name, row.effective_amount)
 
@@ -1094,7 +1098,8 @@ class ScheduleDBSource:
                             KernelRow.agent_addr,
                             KernelRow.occupied_slots,
                         )
-                    )
+                    ),
+                    selectinload(SessionRow.user),
                 )
             )
             result = await session.execute(query)
@@ -1117,8 +1122,8 @@ class ScheduleDBSource:
                 terminating_sessions.append(
                     TerminatingSessionData(
                         session_id=session_row.id,
-                        access_key=AccessKey(session_row.access_key)
-                        if session_row.access_key
+                        access_key=AccessKey(session_row.user.main_access_key)
+                        if session_row.user and session_row.user.main_access_key
                         else AccessKey(""),
                         creation_id=session_row.creation_id or "",
                         status=session_row.status,
@@ -1151,11 +1156,12 @@ class ScheduleDBSource:
                 sa.select(
                     SessionRow.id,
                     SessionRow.creation_id,
-                    SessionRow.access_key,
+                    UserRow.main_access_key.label("access_key"),
                     SessionRow.created_at,
                     ScalingGroupRow.scheduler_opts,
                 )
                 .select_from(SessionRow)
+                .join(UserRow, SessionRow.owner_id == UserRow.uuid)
                 .join(ScalingGroupRow, SessionRow.scaling_group_name == ScalingGroupRow.name)
                 .where(
                     SessionRow.id.in_(session_ids),
@@ -1181,7 +1187,9 @@ class ScheduleDBSource:
                         SweptSessionInfo(
                             session_id=row.id,
                             creation_id=row.creation_id,
-                            access_key=row.access_key,
+                            access_key=AccessKey(row.access_key)
+                            if row.access_key
+                            else AccessKey(""),
                         )
                     )
 
@@ -1270,8 +1278,7 @@ class ScheduleDBSource:
                 id=session_data.id,
                 creation_id=session_data.creation_id,
                 name=session_data.name,
-                access_key=session_data.access_key,
-                user_uuid=session_data.owner_id,
+                owner_id=session_data.owner_id,
                 group_id=session_data.group_id,
                 domain_name=session_data.domain_name,
                 scaling_group_name=session_data.scaling_group_name,
@@ -1317,8 +1324,7 @@ class ScheduleDBSource:
                     scaling_group=kernel.scaling_group,
                     domain_name=kernel.domain_name,
                     group_id=kernel.group_id,
-                    user_uuid=kernel.owner_id,
-                    access_key=kernel.access_key,
+                    owner_id=kernel.owner_id,
                     image=kernel.image,
                     architecture=kernel.architecture,
                     registry=kernel.registry,
@@ -1808,12 +1814,19 @@ class ScheduleDBSource:
 
         async with self._begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
-            # First, fetch session data to get creation_id and access_key
+            # First, fetch session data to get creation_id and resolved main_access_key
             session_ids = {alloc.session_id for alloc in allocation_batch.allocations}
             if session_ids:
-                query = sa.select(
-                    SessionRow.id, SessionRow.creation_id, SessionRow.access_key
-                ).where(SessionRow.id.in_(session_ids))
+                query = (
+                    sa.select(
+                        SessionRow.id,
+                        SessionRow.creation_id,
+                        UserRow.main_access_key.label("access_key"),
+                    )
+                    .select_from(SessionRow)
+                    .join(UserRow, SessionRow.owner_id == UserRow.uuid)
+                    .where(SessionRow.id.in_(session_ids))
+                )
                 result = await db_sess.execute(query)
                 session_data_map = {row.id: (row.creation_id, row.access_key) for row in result}
 
@@ -2796,7 +2809,8 @@ class ScheduleDBSource:
                         KernelRow.status,
                         KernelRow.status_changed,
                     )
-                )
+                ),
+                selectinload(SessionRow.user),
             )
         )
         result = await db_sess.execute(stmt)
@@ -2824,7 +2838,9 @@ class ScheduleDBSource:
             scheduled_session = ScheduledSessionData(
                 session_id=session.id,
                 creation_id=session.creation_id or "",
-                access_key=AccessKey(session.access_key) if session.access_key else AccessKey(""),
+                access_key=AccessKey(session.user.main_access_key)
+                if session.user and session.user.main_access_key
+                else AccessKey(""),
                 reason="triggered-by-scheduler",
             )
             scheduled_sessions.append(scheduled_session)
@@ -2854,10 +2870,11 @@ class ScheduleDBSource:
                 load_only(
                     SessionRow.id,
                     SessionRow.creation_id,
-                    SessionRow.access_key,
+                    SessionRow.owner_id,
                     SessionRow.session_type,
                     SessionRow.name,
                 ),
+                selectinload(SessionRow.user),
             )
         )
         result = await db_sess.execute(stmt)
@@ -2869,8 +2886,8 @@ class ScheduleDBSource:
                 ScheduledSessionData(
                     session_id=session.id,
                     creation_id=session.creation_id or "",
-                    access_key=AccessKey(session.access_key)
-                    if session.access_key
+                    access_key=AccessKey(session.user.main_access_key)
+                    if session.user and session.user.main_access_key
                     else AccessKey(""),
                     reason="triggered-by-scheduler",
                 )
@@ -2960,7 +2977,7 @@ class ScheduleDBSource:
             sa.select(
                 SessionRow.id,
                 SessionRow.creation_id,
-                SessionRow.access_key,
+                UserRow.main_access_key.label("access_key"),
                 SessionRow.status,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.agent,
@@ -2986,6 +3003,7 @@ class ScheduleDBSource:
                 KernelRow.status_changed,
             )
             .select_from(SessionRow)
+            .join(UserRow, SessionRow.owner_id == UserRow.uuid)
             .outerjoin(KernelRow, SessionRow.id == KernelRow.session_id)
             .where(
                 sa.and_(
@@ -3009,7 +3027,7 @@ class ScheduleDBSource:
                 sessions_map[session_id] = SessionDataForPull(
                     session_id=session_id,
                     creation_id=row.creation_id,
-                    access_key=row.access_key,
+                    access_key=AccessKey(row.access_key) if row.access_key else AccessKey(""),
                     kernels=[],
                 )
 
@@ -3058,12 +3076,12 @@ class ScheduleDBSource:
             sa.select(
                 SessionRow.id,
                 SessionRow.creation_id,
-                SessionRow.access_key,
+                UserRow.main_access_key.label("access_key"),
                 SessionRow.session_type,
                 SessionRow.name,
                 SessionRow.environ,
                 SessionRow.cluster_mode,
-                SessionRow.user_uuid,
+                SessionRow.owner_id,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.agent,
                 KernelRow.agent_addr,
@@ -3088,6 +3106,7 @@ class ScheduleDBSource:
                 KernelRow.status_changed,
             )
             .select_from(SessionRow)
+            .join(UserRow, SessionRow.owner_id == UserRow.uuid)
             .outerjoin(KernelRow, SessionRow.id == KernelRow.session_id)
             .where(
                 sa.and_(
@@ -3102,7 +3121,7 @@ class ScheduleDBSource:
 
         # Group rows by session
         session_data: dict[SessionId, dict[str, Any]] = defaultdict(lambda: {"kernels": []})
-        user_uuids = set()
+        owner_ids: set[UUID] = set()
 
         for row in rows:
             session_id = row.id
@@ -3115,10 +3134,10 @@ class ScheduleDBSource:
                     "name": row.name,
                     "environ": row.environ,
                     "cluster_mode": row.cluster_mode,
-                    "user_uuid": row.user_uuid,
+                    "owner_id": row.owner_id,
                 }
-                if row.user_uuid:
-                    user_uuids.add(row.user_uuid)
+                if row.owner_id:
+                    owner_ids.add(row.owner_id)
 
             if row.kernel_id:  # Only add kernel if it exists
                 session_data[session_id]["kernels"].append({
@@ -3148,12 +3167,12 @@ class ScheduleDBSource:
 
         # Load user info for sessions
         user_map = {}
-        if user_uuids:
+        if owner_ids:
             user_query = sa.select(
                 UserRow.uuid,
                 UserRow.email,
                 UserRow.username,
-            ).where(UserRow.uuid.in_(user_uuids))
+            ).where(UserRow.uuid.in_(owner_ids))
             user_result = await db_sess.execute(user_query)
             user_map = {row.uuid: row for row in user_result.fetchall()}
 
@@ -3163,7 +3182,7 @@ class ScheduleDBSource:
             session_info = data["info"]
 
             # Get user info
-            user_info = user_map.get(session_info["user_uuid"])
+            user_info = user_map.get(session_info["owner_id"])
             if not user_info:
                 log.warning(f"User info not found for session {session_id}")
                 continue
@@ -3201,13 +3220,15 @@ class ScheduleDBSource:
                 SessionDataForStart(
                     session_id=session_info["id"],
                     creation_id=session_info["creation_id"],
-                    access_key=session_info["access_key"],
+                    access_key=AccessKey(session_info["access_key"])
+                    if session_info["access_key"]
+                    else AccessKey(""),
                     session_type=session_info["session_type"],
                     name=session_info["name"],
                     cluster_mode=session_info["cluster_mode"],
                     kernels=kernel_bindings,
                     environ=session_info.get("environ", {}),
-                    owner_id=session_info["user_uuid"],
+                    owner_id=session_info["owner_id"],
                     user_email=user_info.email,
                     user_name=user_info.username,
                 )
@@ -3333,12 +3354,15 @@ class ScheduleDBSource:
         :return: KeypairConcurrencyData with both regular and sftp counts
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            # Base query for active kernels
+            # Base query for active kernels.
+            # KernelRow.access_key column was dropped; resolve owner via
+            # UserRow.main_access_key join (sessions are keypair-scoped by owner).
             base_query = (
                 sa.select(sa.func.count())
                 .select_from(KernelRow)
+                .join(UserRow, KernelRow.owner_id == UserRow.uuid)
                 .where(
-                    (KernelRow.access_key == access_key)
+                    (UserRow.main_access_key == access_key)
                     & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                 )
             )
@@ -3937,7 +3961,7 @@ class ScheduleDBSource:
             sa.select(
                 SessionRow.id,
                 SessionRow.creation_id,
-                SessionRow.access_key,
+                UserRow.main_access_key.label("access_key"),
                 SessionRow.status,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.agent,
@@ -3963,6 +3987,7 @@ class ScheduleDBSource:
                 KernelRow.status_changed,
             )
             .select_from(SessionRow)
+            .join(UserRow, SessionRow.owner_id == UserRow.uuid)
             .outerjoin(KernelRow, SessionRow.id == KernelRow.session_id)
             .where(SessionRow.id.in_(session_ids))
             .order_by(SessionRow.created_at, SessionRow.id, KernelRow.cluster_idx)
@@ -3981,7 +4006,7 @@ class ScheduleDBSource:
                 sessions_map[session_id] = SessionDataForPull(
                     session_id=session_id,
                     creation_id=row.creation_id,
-                    access_key=row.access_key,
+                    access_key=AccessKey(row.access_key) if row.access_key else AccessKey(""),
                     kernels=[],
                 )
 
@@ -4062,12 +4087,12 @@ class ScheduleDBSource:
             sa.select(
                 SessionRow.id,
                 SessionRow.creation_id,
-                SessionRow.access_key,
+                UserRow.main_access_key.label("access_key"),
                 SessionRow.session_type,
                 SessionRow.name,
                 SessionRow.environ,
                 SessionRow.cluster_mode,
-                SessionRow.user_uuid,
+                SessionRow.owner_id,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.agent,
                 KernelRow.agent_addr,
@@ -4092,6 +4117,7 @@ class ScheduleDBSource:
                 KernelRow.status_changed,
             )
             .select_from(SessionRow)
+            .join(UserRow, SessionRow.owner_id == UserRow.uuid)
             .outerjoin(KernelRow, SessionRow.id == KernelRow.session_id)
             .where(SessionRow.id.in_(session_ids))
             .order_by(SessionRow.created_at, SessionRow.id, KernelRow.cluster_idx)
@@ -4101,7 +4127,7 @@ class ScheduleDBSource:
 
         # Group rows by session
         session_data: dict[SessionId, dict[str, Any]] = defaultdict(lambda: {"kernels": []})
-        user_uuids = set()
+        owner_ids: set[UUID] = set()
 
         for row in rows:
             session_id = row.id
@@ -4114,10 +4140,10 @@ class ScheduleDBSource:
                     "name": row.name,
                     "environ": row.environ,
                     "cluster_mode": row.cluster_mode,
-                    "user_uuid": row.user_uuid,
+                    "owner_id": row.owner_id,
                 }
-                if row.user_uuid:
-                    user_uuids.add(row.user_uuid)
+                if row.owner_id:
+                    owner_ids.add(row.owner_id)
 
             if row.kernel_id:  # Only add kernel if it exists
                 session_data[session_id]["kernels"].append({
@@ -4147,12 +4173,12 @@ class ScheduleDBSource:
 
         # Load user info for sessions
         user_map = {}
-        if user_uuids:
+        if owner_ids:
             user_query = sa.select(
                 UserRow.uuid,
                 UserRow.email,
                 UserRow.username,
-            ).where(UserRow.uuid.in_(user_uuids))
+            ).where(UserRow.uuid.in_(owner_ids))
             user_result = await db_sess.execute(user_query)
             user_map = {row.uuid: row for row in user_result.fetchall()}
 
@@ -4162,7 +4188,7 @@ class ScheduleDBSource:
             session_info = data["info"]
 
             # Get user info
-            user_info = user_map.get(session_info["user_uuid"])
+            user_info = user_map.get(session_info["owner_id"])
             if not user_info:
                 log.warning(f"User info not found for session {session_id}")
                 continue
@@ -4200,13 +4226,15 @@ class ScheduleDBSource:
                 SessionDataForStart(
                     session_id=session_info["id"],
                     creation_id=session_info["creation_id"],
-                    access_key=session_info["access_key"],
+                    access_key=AccessKey(session_info["access_key"])
+                    if session_info["access_key"]
+                    else AccessKey(""),
                     session_type=session_info["session_type"],
                     name=session_info["name"],
                     cluster_mode=session_info["cluster_mode"],
                     kernels=kernel_bindings,
                     environ=session_info.get("environ", {}),
-                    owner_id=session_info["user_uuid"],
+                    owner_id=session_info["owner_id"],
                     user_email=user_info.email,
                     user_name=user_info.username,
                 )
@@ -4250,12 +4278,16 @@ class ScheduleDBSource:
             result = await db_source.search_sessions_with_kernels(querier)
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            # 1. Query sessions
-            session_query = sa.select(
-                SessionRow.id,
-                SessionRow.creation_id,
-                SessionRow.access_key,
-                SessionRow.status,
+            # 1. Query sessions (join UserRow to resolve owner's main_access_key)
+            session_query = (
+                sa.select(
+                    SessionRow.id,
+                    SessionRow.creation_id,
+                    UserRow.main_access_key.label("access_key"),
+                    SessionRow.status,
+                )
+                .select_from(SessionRow)
+                .join(UserRow, SessionRow.owner_id == UserRow.uuid)
             )
             session_result = await execute_batch_querier(db_sess, session_query, querier)
 
@@ -4276,7 +4308,7 @@ class ScheduleDBSource:
                 sessions_map[row.id] = SessionDataForPull(
                     session_id=row.id,
                     creation_id=row.creation_id,
-                    access_key=row.access_key,
+                    access_key=AccessKey(row.access_key) if row.access_key else AccessKey(""),
                     kernels=[],
                 )
 
@@ -4393,16 +4425,20 @@ class ScheduleDBSource:
             result = await db_source.search_sessions_with_kernels_and_user(querier)
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            # 1. Query sessions
-            session_query = sa.select(
-                SessionRow.id,
-                SessionRow.creation_id,
-                SessionRow.access_key,
-                SessionRow.session_type,
-                SessionRow.name,
-                SessionRow.environ,
-                SessionRow.cluster_mode,
-                SessionRow.user_uuid,
+            # 1. Query sessions (join UserRow to resolve owner's main_access_key)
+            session_query = (
+                sa.select(
+                    SessionRow.id,
+                    SessionRow.creation_id,
+                    UserRow.main_access_key.label("access_key"),
+                    SessionRow.session_type,
+                    SessionRow.name,
+                    SessionRow.environ,
+                    SessionRow.cluster_mode,
+                    SessionRow.owner_id,
+                )
+                .select_from(SessionRow)
+                .join(UserRow, SessionRow.owner_id == UserRow.uuid)
             )
             session_result = await execute_batch_querier(db_sess, session_query, querier)
 
@@ -4415,10 +4451,10 @@ class ScheduleDBSource:
                     has_previous_page=False,
                 )
 
-            # Build session info map and collect user UUIDs
+            # Build session info map and collect owner IDs
             session_ids: list[SessionId] = []
             session_info_map: dict[SessionId, dict[str, Any]] = {}
-            user_uuids: set[UUID] = set()
+            owner_ids: set[UUID] = set()
 
             for row in session_result.rows:
                 session_ids.append(row.id)
@@ -4430,11 +4466,11 @@ class ScheduleDBSource:
                     "name": row.name,
                     "environ": row.environ,
                     "cluster_mode": row.cluster_mode,
-                    "user_uuid": row.user_uuid,
+                    "owner_id": row.owner_id,
                     "kernels": [],
                 }
-                if row.user_uuid:
-                    user_uuids.add(row.user_uuid)
+                if row.owner_id:
+                    owner_ids.add(row.owner_id)
 
             # 2. Query kernels for these sessions
             kernel_query = (
@@ -4507,12 +4543,12 @@ class ScheduleDBSource:
 
             # 3. Query users
             user_map: dict[UUID, Any] = {}
-            if user_uuids:
+            if owner_ids:
                 user_query = sa.select(
                     UserRow.uuid,
                     UserRow.email,
                     UserRow.username,
-                ).where(UserRow.uuid.in_(user_uuids))
+                ).where(UserRow.uuid.in_(owner_ids))
                 user_result = await db_sess.execute(user_query)
                 user_map = {row.uuid: row for row in user_result.fetchall()}
 
@@ -4523,7 +4559,7 @@ class ScheduleDBSource:
             sessions_for_start: list[SessionDataForStart] = []
             for session_id in session_ids:
                 session_info = session_info_map[session_id]
-                user_info = user_map.get(session_info["user_uuid"])
+                user_info = user_map.get(session_info["owner_id"])
                 if not user_info:
                     log.warning(f"User info not found for session {session_id}")
                     continue
@@ -4532,13 +4568,15 @@ class ScheduleDBSource:
                     SessionDataForStart(
                         session_id=session_info["id"],
                         creation_id=session_info["creation_id"],
-                        access_key=session_info["access_key"],
+                        access_key=AccessKey(session_info["access_key"])
+                        if session_info["access_key"]
+                        else AccessKey(""),
                         session_type=session_info["session_type"],
                         name=session_info["name"],
                         cluster_mode=session_info["cluster_mode"],
                         kernels=session_info["kernels"],
                         environ=session_info.get("environ") or {},
-                        user_uuid=session_info["user_uuid"],
+                        owner_id=session_info["owner_id"],
                         user_email=user_info.email,
                         user_name=user_info.username,
                     )
@@ -4632,6 +4670,27 @@ class ScheduleDBSource:
                 .values(priority=new_priority)
             )
             await db_sess.execute(update_stmt)
+
+    async def resolve_main_access_keys(
+        self,
+        session_ids: list[SessionId],
+    ) -> dict[SessionId, AccessKey]:
+        """BA-5609: resolve session_id -> owner's main_access_key via users.main_access_key."""
+        if not session_ids:
+            return {}
+
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.select(SessionRow.id, UserRow.main_access_key)
+                .join(UserRow, UserRow.uuid == SessionRow.owner_id)
+                .where(SessionRow.id.in_(session_ids))
+            )
+            result = await db_sess.execute(stmt)
+            return {
+                row.id: cast(AccessKey, row.main_access_key)
+                for row in result.all()
+                if row.main_access_key is not None
+            }
 
     async def update_kernels_last_observed_at(
         self,
