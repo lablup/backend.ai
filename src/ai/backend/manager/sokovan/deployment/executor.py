@@ -126,20 +126,20 @@ class DeploymentExecutor:
         self,
         entries: Sequence[tuple[DeploymentWithHistory, UUID]],
     ) -> DeploymentExecutionResult:
-        """Register appproxy endpoints with per-deployment atomicity.
+        """Register appproxy endpoints and persist their URLs.
 
-        For each ``(deployment, revision_id)`` entry, performs:
+        For each ``(deployment, revision_id)`` entry, calls
+        ``register_endpoint`` in appproxy, then on success persists the
+        returned URL. Entries whose scaling group has no proxy target are
+        reported as ``skipped``.
 
-        1. ``register_endpoint`` in appproxy.
-        2. Persist the returned URL immediately for that single deployment.
-        3. If persistence fails after a successful registration, best-effort
-           unregister the endpoint from appproxy so the next coordinator
-           tick re-registers cleanly instead of leaking proxy state while
-           the DB still shows an empty URL (which previously caused
-           duplicate registrations on retry).
-
-        Entries whose scaling group has no proxy target are reported as
-        ``skipped`` — the caller decides how to handle them.
+        Retry safety: appproxy's ``create_or_update_endpoint`` is
+        idempotent on ``endpoint_id`` — a second call with the same
+        ``endpoint_id`` returns the existing circuit's URL rather than
+        creating a duplicate — so if URL persistence fails after a
+        successful registration, the next coordinator tick will call
+        ``register_endpoint`` again, receive the same URL, and recover.
+        No compensating unregister is needed.
         """
         if not entries:
             return DeploymentExecutionResult()
@@ -151,8 +151,24 @@ class DeploymentExecutor:
                     await self._deployment_repo.fetch_scaling_group_proxy_targets(scaling_groups)
                 )
 
-        valid_entries: list[tuple[DeploymentWithHistory, UUID, ScalingGroupProxyTarget]] = []
+        successes: list[DeploymentWithHistory] = []
+        failures: list[DeploymentExecutionError] = []
         skipped: list[DeploymentWithHistory] = []
+
+        async def _run(
+            deployment: DeploymentWithHistory,
+            revision_id: UUID,
+            target: ScalingGroupProxyTarget,
+        ) -> tuple[DeploymentWithHistory, str | None, BaseException | None]:
+            info = deployment.deployment_info
+            try:
+                url = await self.register_endpoint(info, target, revision_id)
+                await self._deployment_repo.update_endpoint_url(info.id, url)
+            except BaseException as exc:
+                return deployment, None, exc
+            return deployment, url, None
+
+        tasks: list[tuple[DeploymentWithHistory, UUID, ScalingGroupProxyTarget]] = []
         for deployment, revision_id in entries:
             info = deployment.deployment_info
             target = scaling_group_targets.get(info.metadata.resource_group)
@@ -164,20 +180,13 @@ class DeploymentExecutor:
                 )
                 skipped.append(deployment)
                 continue
-            valid_entries.append((deployment, revision_id, target))
+            tasks.append((deployment, revision_id, target))
 
-        if not valid_entries:
+        if not tasks:
             return DeploymentExecutionResult(skipped=skipped)
 
-        results = await asyncio.gather(
-            *(
-                self._register_and_persist_endpoint(dep, rev_id, tgt)
-                for dep, rev_id, tgt in valid_entries
-            ),
-        )
+        results = await asyncio.gather(*(_run(dep, rev, tgt) for dep, rev, tgt in tasks))
 
-        successes: list[DeploymentWithHistory] = []
-        failures: list[DeploymentExecutionError] = []
         for deployment, url, error in results:
             dep_id = deployment.deployment_info.id
             if error is not None:
@@ -207,48 +216,6 @@ class DeploymentExecutor:
             failures=failures,
             skipped=skipped,
         )
-
-    async def _register_and_persist_endpoint(
-        self,
-        deployment: DeploymentWithHistory,
-        revision_id: UUID,
-        target: ScalingGroupProxyTarget,
-    ) -> tuple[DeploymentWithHistory, str | None, BaseException | None]:
-        """Register a single endpoint and persist its URL atomically.
-
-        On persistence failure after a successful registration, issues a
-        best-effort unregister so that appproxy state and the DB do not
-        diverge. Returns ``(deployment, url, error)`` where exactly one
-        of ``url`` / ``error`` is set.
-        """
-        info = deployment.deployment_info
-        try:
-            url = await self.register_endpoint(info, target, revision_id)
-        except BaseException as exc:
-            return deployment, None, exc
-
-        try:
-            await self._deployment_repo.update_endpoint_url(info.id, url)
-        except BaseException as exc:
-            # Compensating unregister: without this, appproxy would hold
-            # an orphaned endpoint while the DB still has url=None, so the
-            # next tick would re-register and leak a second endpoint.
-            try:
-                await self._delete_endpoint_from_wsproxy(
-                    endpoint_id=info.id,
-                    app_proxy_addr=target.addr,
-                    app_proxy_api_token=target.api_token,
-                )
-            except BaseException as unregister_exc:
-                log.warning(
-                    "Compensating unregister failed for deployment {} "
-                    "after URL persistence error: {}",
-                    info.id,
-                    unregister_exc,
-                )
-            return deployment, None, exc
-
-        return deployment, url, None
 
     async def check_ready_deployments_that_need_scaling(
         self, deployments: Sequence[DeploymentWithHistory]
@@ -532,13 +499,14 @@ class DeploymentExecutor:
         endpoint in appproxy.
 
         Side effects:
-            Creates an endpoint in appproxy (WSProxy). The caller is
-            responsible for persisting the returned URL to the ``endpoints``
-            table before the next coordinator tick — otherwise that tick
-            will observe ``url=None`` and re-register, leaking a second
-            appproxy endpoint. For callers that need the register-and-persist
-            flow with automatic compensation on persistence failure, prefer
-            :meth:`register_endpoints_bulk` over calling this directly.
+            Creates or updates an endpoint in appproxy (WSProxy). The
+            underlying ``POST /v2/endpoints/{endpoint_id}`` handler is
+            idempotent on ``endpoint_id``: if an endpoint/circuit already
+            exists, the existing URL is returned instead of a new circuit
+            being created. The caller is expected to persist the returned
+            URL to the ``endpoints`` table; if persistence fails, the
+            next coordinator tick can safely call this method again and
+            will receive the same URL.
 
         Preconditions:
             - ``revision_id`` must resolve to a revision on ``deployment``.
