@@ -53,6 +53,7 @@ class Platform(enum.StrEnum):
 class FrontendMode(enum.StrEnum):
     PORT = "port"
     WILDCARD = "wildcard"
+    TRAEFIK = "traefik"
 
 
 class EndpointProtocol(enum.StrEnum):

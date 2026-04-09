@@ -35,6 +35,16 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
 
 from .common import detect_os
+from .config_gen.agent import AgentParams, apply_agent_config
+from .config_gen.appproxy import (
+    CoordinatorParams,
+    WorkerParams,
+    apply_coordinator_config,
+    apply_worker_config,
+)
+from .config_gen.manager import ManagerParams, apply_manager_config
+from .config_gen.storage_proxy import StorageProxyParams, apply_storage_proxy_config
+from .config_gen.webserver import WebserverParams, apply_webserver_config
 from .dev import (
     bootstrap_pants,
     install_editable_webui,
@@ -452,7 +462,11 @@ class Context(metaclass=ABCMeta):
         self.os_info = await detect_os()
         text = Text()
         text.append("Detetced OS info: ")
-        text.append(self.os_info.__rich__())  # type: ignore
+        os_info_text = self.os_info.__rich__()
+        if isinstance(os_info_text, Text):
+            text.append_text(os_info_text)
+        else:
+            text.append(str(os_info_text))
         self.log.write(text)
         if "LiveCD" in self.os_info.distro_variants:
             self.log.write(
@@ -498,26 +512,28 @@ class Context(metaclass=ABCMeta):
         base_path = self.install_info.base_path
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
-        toml_path = self.copy_config("manager.toml")
-        alembic_path = self.copy_config("alembic.ini")
+
+        # Generate RPC keypair (stays in context.py)
         (base_path / "fixtures" / "manager").mkdir(parents=True, exist_ok=True)
         await self.run_manager_cli(["mgr", "generate-rpc-keypair", "fixtures/manager", "manager"])
-        self.sed_in_place_multi(
-            toml_path,
-            [
-                (re.compile("^num-proc = .*", flags=re.MULTILINE), "num-proc = 1"),
-                ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
-                ("port = 8100", f"port = {halfstack.postgres_addr.face.port}"),
-                (
-                    "port = 8081",
-                    f"port = {self.install_info.service_config.manager_addr.bind.port}",
-                ),
-                (
-                    re.compile("^(# )?ipc-base-path =.*", flags=re.MULTILINE),
-                    f'ipc-base-path = "{self.install_info.service_config.manager_ipc_base_path}"',
-                ),
-            ],
+
+        # Apply manager TOML config using shared module
+        params = ManagerParams(
+            etcd_port=halfstack.etcd_addr[0].face.port,
+            db_port=halfstack.postgres_addr.face.port,
+            manager_port=service.manager_addr.bind.port,
+            num_proc=1,
+            ipc_base_path=service.manager_ipc_base_path,
         )
+        toml_path = self.copy_config("manager.toml")
+        with toml_path.open("r") as fp:
+            doc = tomlkit.load(fp)
+        apply_manager_config(doc, params)
+        with toml_path.open("w") as fp:
+            tomlkit.dump(doc, fp)
+
+        # Alembic config
+        alembic_path = self.copy_config("alembic.ini")
         self.sed_in_place(
             alembic_path,
             "localhost:8100",
@@ -583,63 +599,48 @@ class Context(metaclass=ABCMeta):
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         accelerator = self.install_info.accelerator
-        toml_path = self.copy_config("agent.toml")
-        self.sed_in_place_multi(
-            toml_path,
-            [
-                ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
-                ("port = 6001", f"port = {service.agent_rpc_addr.bind.port}"),
-                ("port = 6009", f"port = {service.agent_watcher_addr.bind.port}"),
-                (
-                    re.compile("^(# )?ipc-base-path = .*", flags=re.MULTILINE),
-                    f'ipc-base-path = "{service.agent_ipc_base_path}"',
-                ),
-                (
-                    re.compile("^(# )?var-base-path = .*", flags=re.MULTILINE),
-                    f'var-base-path = "{service.agent_var_base_path}"',
-                ),
-                (
-                    re.compile("(# )?mount_path = .*", flags=re.MULTILINE),
-                    f'"{self.install_info.base_path / service.vfolder_relpath}"',
-                ),
-            ],
-        )
-        Path(self.install_info.service_config.agent_var_base_path).mkdir(
-            parents=True, exist_ok=True
-        )
+
+        # Determine accelerator plugins
+        plugin_list: list[str] = []
         if accelerator is not None:
             if accelerator == Accelerator.CUDA:
-                plugin_list = ['"ai.backend.accelerator.cuda_open"']
+                plugin_list = ["ai.backend.accelerator.cuda_open"]
             elif accelerator in (
                 Accelerator.CUDA_MOCK,
                 Accelerator.CUDA_MIG_MOCK,
                 Accelerator.ROCM_MOCK,
             ):
-                plugin_list = ['"ai.backend.accelerator.mock"']
-            else:
-                plugin_list = []
-
+                plugin_list = ["ai.backend.accelerator.mock"]
             await self._configure_mock_accelerator(accelerator)
-        else:
-            plugin_list = []
 
-        self.sed_in_place(
-            toml_path,
-            re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.MULTILINE),
-            f"allow-compute-plugins = [{', '.join(plugin_list)}]",
+        # Apply config using shared module
+        params = AgentParams(
+            etcd_port=halfstack.etcd_addr[0].face.port,
+            rpc_port=service.agent_rpc_addr.bind.port,
+            watcher_port=service.agent_watcher_addr.bind.port,
+            ipc_base_path=service.agent_ipc_base_path,
+            var_base_path=service.agent_var_base_path,
+            mount_path=str(self.install_info.base_path / service.vfolder_relpath),
+            compute_plugins=plugin_list,
         )
+        toml_path = self.copy_config("agent.toml")
+        with toml_path.open("r") as fp:
+            doc = tomlkit.load(fp)
+        apply_agent_config(doc, params)
+        with toml_path.open("w") as fp:
+            tomlkit.dump(doc, fp)
+
+        Path(service.agent_var_base_path).mkdir(parents=True, exist_ok=True)
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
-        toml_path = self.copy_config("storage-proxy.toml")
 
+        # Generate self-signed SSL certificate (stays in context.py — not config generation)
         ssl_dir = self.install_info.base_path / "configs" / "storage-proxy" / "ssl"
         ssl_dir.mkdir(parents=True, exist_ok=True)
         cert_path = ssl_dir / "manager-api-selfsigned.cert.pem"
         key_path = ssl_dir / "manager-api-selfsigned.key.pem"
-
-        # TODO: If the user disables SSL in the configuration, skip creating the PEM files.
         self.log_header("Generating self-signed SSL certificate for storage-proxy (manager API)...")
         public_addr = self.install_variable.public_facing_address
         subj = f"/C=KR/ST=Seoul/L=Seoul/O=BackendAI/OU=StorageProxy/CN={public_addr}"
@@ -661,40 +662,29 @@ class Context(metaclass=ABCMeta):
         )
         self.log.write(Text.from_markup(f"Created SSL cert/key under {ssl_dir}"))
 
+        # Apply config using shared module
+        params = StorageProxyParams(
+            etcd_host=halfstack.etcd_addr[0].face.host,
+            etcd_port=halfstack.etcd_addr[0].face.port,
+            etcd_user=halfstack.etcd_user,
+            etcd_password=halfstack.etcd_password,
+            secret=service.storage_proxy_random,
+            ipc_base_path=service.storage_proxy_ipc_base_path,
+            client_host=service.storage_proxy_client_facing_addr.bind.host,
+            client_port=service.storage_proxy_client_facing_addr.bind.port,
+            manager_host=service.storage_proxy_manager_facing_addr.bind.host,
+            manager_port=service.storage_proxy_manager_facing_addr.bind.port,
+            manager_secret=service.storage_proxy_manager_auth_key,
+            volume_path=service.vfolder_relpath,
+        )
+        toml_path = self.copy_config("storage-proxy.toml")
         with toml_path.open("r") as fp:
-            data = tomlkit.load(fp)
-            etcd_table = tomlkit.table()
-            etcd_addr_table = tomlkit.inline_table()
-            etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
-            etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
-            etcd_table["addr"] = etcd_addr_table
-            etcd_table["namespace"] = "local"
-            if halfstack.etcd_user:
-                etcd_table["user"] = halfstack.etcd_user
-            else:
-                etcd_table.pop("user", None)
-            if halfstack.etcd_password:
-                etcd_table["password"] = halfstack.etcd_password
-            else:
-                etcd_table.pop("password", None)
-            data["etcd"] = etcd_table
-            data["storage-proxy"]["secret"] = service.storage_proxy_random  # type: ignore
-            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path  # type: ignore
-            client_facing_addr_table = tomlkit.inline_table()
-            client_facing_addr_table["host"] = service.storage_proxy_client_facing_addr.bind.host
-            client_facing_addr_table["port"] = service.storage_proxy_client_facing_addr.bind.port
-            data["api"]["client"]["service-addr"] = client_facing_addr_table  # type: ignore
-            manager_facing_addr_table = tomlkit.inline_table()
-            manager_facing_addr_table["host"] = service.storage_proxy_manager_facing_addr.bind.host
-            manager_facing_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
-            data["api"]["manager"]["service-addr"] = manager_facing_addr_table  # type: ignore
-            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key  # type: ignore
-            data["volume"]["volume1"]["path"] = service.vfolder_relpath  # type: ignore
+            doc = tomlkit.load(fp)
+        apply_storage_proxy_config(doc, params)
         with toml_path.open("w") as fp:
-            tomlkit.dump(data, fp)
+            tomlkit.dump(doc, fp)
 
     async def configure_webserver(self) -> None:
-        conf_path = self.copy_config("webserver.conf")
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         endpoint_protocol = self.install_variable.endpoint_protocol
@@ -704,57 +694,48 @@ class Context(metaclass=ABCMeta):
         if halfstack.redis_addr is None:
             raise RuntimeError("redis_addr must be configured")
 
-        # use FQDN if provided, otherwise use public_facing_address
+        # Determine wsproxy URL based on FQDN
         if fqdn_prefix is not None:
-            # With FQDN prefix, use public storage address with https
             wsproxy_url = f"https://{storage_public_address}:5050"
         else:
-            # Without FQDN prefix, use public_facing_address with http
             wsproxy_url = f"http://{public_facing_address}:5050"
-        # Use sed_in_place for dotted key wsproxy.url
+
+        # Determine Redis config
+        redis_addr: str | None = None
+        redis_sentinel: str | None = None
+        if halfstack.ha_setup:
+            if not halfstack.redis_sentinel_addrs:
+                raise ValueError("Redis sentinel addresses must be configured for HA setup")
+            redis_sentinel = ",".join(
+                f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
+            )
+        else:
+            redis_addr = f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
+
+        params = WebserverParams(
+            manager_host=service.manager_addr.face.host,
+            manager_port=service.manager_addr.face.port,
+            wsproxy_url=wsproxy_url,
+            force_endpoint_protocol=endpoint_protocol.value if endpoint_protocol else None,
+            redis_addr=redis_addr,
+            redis_sentinel=redis_sentinel,
+            redis_password=halfstack.redis_password,
+            menu_blocklist=service.webui_menu_blocklist,
+            menu_inactivelist=service.webui_menu_inactivelist,
+        )
+
+        conf_path = self.copy_config("webserver.conf")
+        # Use sed for dotted key wsproxy.url (tomlkit treats it as nested table)
         self.sed_in_place(
             conf_path,
             re.compile(r'^wsproxy\.url\s*=\s*".*"', flags=re.MULTILINE),
             f'wsproxy.url = "{wsproxy_url}"',
         )
-
         with conf_path.open("r") as fp:
-            data = tomlkit.load(fp)
-            if endpoint_protocol is not None:
-                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value  # type: ignore
-            data["api"][  # type: ignore
-                "endpoint"
-            ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
-            helper_table = tomlkit.table()
-            helper_table["socket_timeout"] = 5.0
-            helper_table["socket_connect_timeout"] = 2.0
-            helper_table["reconnect_poll_timeout"] = 0.3
-            if halfstack.ha_setup:
-                if not halfstack.redis_sentinel_addrs:
-                    raise ValueError("Redis sentinel addresses must be configured for HA setup")
-                redis_table = tomlkit.table()
-                redis_table["sentinel"] = ",".join(
-                    f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
-                )
-                redis_table["service_name"] = "mymaster"
-                redis_table["redis_helper_config"] = helper_table
-                if halfstack.redis_password:
-                    redis_table["password"] = halfstack.redis_password
-            else:
-                if not halfstack.redis_addr:
-                    raise RuntimeError("redis_addr must be configured")
-                redis_table = tomlkit.table()
-                redis_table["addr"] = (
-                    f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
-                )
-                redis_table["redis_helper_config"] = helper_table
-                if halfstack.redis_password:
-                    redis_table["password"] = halfstack.redis_password
-            data["session"]["redis"] = redis_table  # type: ignore
-            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)  # type: ignore
-            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
+            doc = tomlkit.load(fp)
+        apply_webserver_config(doc, params)
         with conf_path.open("w") as fp:
-            tomlkit.dump(data, fp)
+            tomlkit.dump(doc, fp)
 
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
@@ -845,13 +826,6 @@ class Context(metaclass=ABCMeta):
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
 
-        # Coordinator
-        coord_conf = self.copy_config("app-proxy-coordinator.toml")
-
-        self.log.write(f"DB HOST = {halfstack.postgres_addr.face.host}")
-        self.log.write(f"DB PORT = {halfstack.postgres_addr.face.port}")
-        self.log.write(f"API SECRET = {service.appproxy_api_secret}")
-
         tls_advertised = self.install_variable.tls_advertised
         advertised_port = self.install_variable.advertised_port
         wildcard_domain = self.install_variable.wildcard_domain
@@ -860,102 +834,67 @@ class Context(metaclass=ABCMeta):
         app_address = self.install_variable.app_address
         frontend_mode = self.install_variable.frontend_mode
 
-        with coord_conf.open("r") as fp:
-            data = tomlkit.load(fp)
-            data["db"]["type"] = "postgresql"  # type: ignore[index]
-            data["db"]["name"] = "appproxy"  # type: ignore[index]
-            data["db"]["user"] = "appproxy"  # type: ignore[index]
-            data["db"]["password"] = "develove"  # type: ignore[index]
-            data["db"]["pool_size"] = 8  # type: ignore[index]
-            data["db"]["max_overflow"] = 64  # type: ignore[index]
-            data["db"]["addr"]["host"] = halfstack.postgres_addr.face.host  # type: ignore[index]
-            data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port  # type: ignore[index]
-            redis_addr_table = tomlkit.inline_table()
-            redis_addr_table["host"] = halfstack.redis_addr.face.host
-            redis_addr_table["port"] = halfstack.redis_addr.face.port
-            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
-            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
-            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
-            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
-            data["proxy_coordinator"]["bind_addr"]["host"] = "0.0.0.0"  # type: ignore[index]
-            data["proxy_coordinator"]["bind_addr"]["port"] = (  # type: ignore[index]
-                service.appproxy_coordinator_addr.bind.port
-            )
-            data["proxy_coordinator"]["advertised_addr"]["host"] = apphub_address  # type: ignore[index]
-            data["proxy_coordinator"]["advertised_addr"]["port"] = (  # type: ignore[index]
-                service.appproxy_coordinator_addr.bind.port
-            )
-            if tls_advertised:
-                data["proxy_coordinator"]["tls_advertised"] = True  # type: ignore[index]
-                data["proxy_coordinator"]["advertised_addr"]["port"] = advertised_port  # type: ignore[index]
-        with coord_conf.open("w") as fp:
-            tomlkit.dump(data, fp)
+        self.log.write(f"DB HOST = {halfstack.postgres_addr.face.host}")
+        self.log.write(f"DB PORT = {halfstack.postgres_addr.face.port}")
+        self.log.write(f"API SECRET = {service.appproxy_api_secret}")
 
-        # Worker
+        # Generate coordinator config using shared module
+        coord_params = CoordinatorParams(
+            db_host=halfstack.postgres_addr.face.host,
+            db_port=halfstack.postgres_addr.face.port,
+            redis_host=halfstack.redis_addr.face.host,
+            redis_port=halfstack.redis_addr.face.port,
+            api_secret=service.appproxy_api_secret or "",
+            jwt_secret=service.appproxy_jwt_secret or "",
+            permit_hash_secret=service.appproxy_permit_hash_secret or "",
+            bind_port=service.appproxy_coordinator_addr.bind.port,
+            advertised_host=apphub_address,
+            advertised_port=advertised_port
+            if tls_advertised
+            else service.appproxy_coordinator_addr.bind.port,
+            tls_advertised=tls_advertised,
+            enable_traefik=frontend_mode == FrontendMode.TRAEFIK,
+            etcd_host=halfstack.etcd_addr[0].face.host,
+            etcd_port=halfstack.etcd_addr[0].face.port,
+        )
+        coord_conf = self.copy_config("app-proxy-coordinator.toml")
+        with coord_conf.open("r") as fp:
+            coord_doc = tomlkit.load(fp)
+        apply_coordinator_config(coord_doc, coord_params)
+        with coord_conf.open("w") as fp:
+            tomlkit.dump(coord_doc, fp)
+
+        # Apply worker config to sample toml using shared module
+        worker_params = WorkerParams(
+            redis_host=halfstack.redis_addr.face.host,
+            redis_port=halfstack.redis_addr.face.port,
+            coordinator_host=service.appproxy_coordinator_addr.bind.host,
+            coordinator_port=service.appproxy_coordinator_addr.bind.port,
+            api_bind_host=service.appproxy_worker_addr.bind.host,
+            api_bind_port=service.appproxy_worker_addr.bind.port,
+            api_advertised_host=app_address
+            if frontend_mode == FrontendMode.WILDCARD
+            else public_facing_address,
+            api_advertised_port=advertised_port
+            if frontend_mode == FrontendMode.WILDCARD
+            else service.appproxy_worker_addr.bind.port,
+            api_secret=service.appproxy_api_secret or "",
+            jwt_secret=service.appproxy_jwt_secret or "",
+            permit_hash_secret=service.appproxy_permit_hash_secret or "",
+            tls_advertised=tls_advertised,
+            frontend_mode=frontend_mode,
+            port_proxy_advertised_host=public_facing_address,
+            wildcard_domain=wildcard_domain,
+            wildcard_advertised_port=advertised_port,
+            traefik_etcd_host=halfstack.etcd_addr[0].face.host,
+            traefik_etcd_port=halfstack.etcd_addr[0].face.port,
+        )
         worker_conf = self.copy_config("app-proxy-worker.toml")
         with worker_conf.open("r") as fp:
-            data = tomlkit.load(fp)
-            # Update redis addr inline table
-            redis_addr_table = tomlkit.inline_table()
-            redis_addr_table["host"] = halfstack.redis_addr.face.host
-            redis_addr_table["port"] = halfstack.redis_addr.face.port
-            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
-
-            data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
-                f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
-            )
-
-            # api_bind_addr as inline table
-            api_bind_addr_table = tomlkit.inline_table()
-            api_bind_addr_table["host"] = service.appproxy_worker_addr.bind.host
-            api_bind_addr_table["port"] = service.appproxy_worker_addr.bind.port
-            data["proxy_worker"]["api_bind_addr"] = api_bind_addr_table  # type: ignore[index]
-
-            # api_advertised_addr as inline table
-            api_advertised_addr_table = tomlkit.inline_table()
-            api_advertised_addr_table["host"] = public_facing_address
-            api_advertised_addr_table["port"] = service.appproxy_worker_addr.bind.port
-            data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
-
-            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
-            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
-            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
-
-            # advertise TLS to external clients
-            if tls_advertised:
-                data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
-
-            # set frontend mode (port or wildcard)
-            data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
-
-            # configure based on frontend_mode
-            if frontend_mode == FrontendMode.WILDCARD:
-                # Remove port_proxy section for wildcard mode
-                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
-                    del data["proxy_worker"]["port_proxy"]
-
-                # Override api_advertised_addr with app_address and advertised_port
-                api_advertised_addr_table = tomlkit.inline_table()
-                api_advertised_addr_table["host"] = app_address
-                api_advertised_addr_table["port"] = advertised_port
-                data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
-
-                # Add wildcard_domain section
-                if wildcard_domain:
-                    wildcard_table = tomlkit.table()
-                    wildcard_table["domain"] = wildcard_domain
-                    bind_addr_table = tomlkit.inline_table()
-                    bind_addr_table["host"] = "0.0.0.0"
-                    bind_addr_table["port"] = 10250
-                    wildcard_table["bind_addr"] = bind_addr_table
-                    wildcard_table["advertised_port"] = advertised_port
-                    wildcard_table.add(tomlkit.nl())  # Add newline before next section
-                    data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
-            else:
-                # update port_proxy.advertised_host
-                data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
+            worker_doc = tomlkit.load(fp)
+        apply_worker_config(worker_doc, worker_params)
         with worker_conf.open("w") as fp:
-            tomlkit.dump(data, fp)
+            tomlkit.dump(worker_doc, fp)
 
         # Alembic migration config
         alembic_cfg = self.copy_config("alembic-appproxy.ini")
