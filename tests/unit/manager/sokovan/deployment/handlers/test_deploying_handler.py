@@ -8,6 +8,7 @@ execute() must register the endpoint before route provisioning begins.
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -31,6 +32,7 @@ from ai.backend.manager.sokovan.deployment.handlers.deploying import (
 from ai.backend.manager.sokovan.deployment.strategy.applier import StrategyApplyResult
 from ai.backend.manager.sokovan.deployment.strategy.types import StrategyEvaluationSummary
 from ai.backend.manager.sokovan.deployment.types import (
+    DeploymentExecutionError,
     DeploymentExecutionResult,
     DeploymentWithHistory,
 )
@@ -154,3 +156,70 @@ class TestDeployingProvisioningHandler:
         info = deployment_created_without_revision.deployment_info
         assert dep is deployment_created_without_revision
         assert revision_id == info.deploying_revision_id
+
+    async def test_deployment_already_with_url_is_not_reregistered(
+        self,
+        handler: DeployingProvisioningHandler,
+        mock_deployment_executor: AsyncMock,
+        deployment_created_without_revision: DeploymentWithHistory,
+    ) -> None:
+        """Deployments that already have a URL must be skipped so we don't
+        double-register them on every DEPLOYING tick."""
+        info = deployment_created_without_revision.deployment_info
+        info_with_url = dataclasses.replace(
+            info,
+            network=dataclasses.replace(info.network, url="http://already-registered/v1"),
+        )
+        deployment = DeploymentWithHistory(deployment_info=info_with_url)
+
+        await handler.execute([deployment])
+
+        mock_deployment_executor.register_endpoints_bulk.assert_not_awaited()
+
+    async def test_deployment_without_deploying_revision_is_filtered(
+        self,
+        handler: DeployingProvisioningHandler,
+        mock_deployment_executor: AsyncMock,
+        deployment_created_without_revision: DeploymentWithHistory,
+    ) -> None:
+        """A deployment whose deploying_revision_id was cleared between
+        handler start and the registration step must be filtered out —
+        we have nothing to resolve for it."""
+        info = deployment_created_without_revision.deployment_info
+        info_no_rev = dataclasses.replace(info, deploying_revision_id=None)
+        deployment = DeploymentWithHistory(deployment_info=info_no_rev)
+
+        await handler.execute([deployment])
+
+        mock_deployment_executor.register_endpoints_bulk.assert_not_awaited()
+
+    async def test_failed_registration_is_excluded_from_route_provisioning(
+        self,
+        handler: DeployingProvisioningHandler,
+        mock_deployment_executor: AsyncMock,
+        mock_evaluator: AsyncMock,
+        deployment_created_without_revision: DeploymentWithHistory,
+    ) -> None:
+        """When register_endpoints_bulk reports a failure, that deployment
+        must not flow into route provisioning on the same tick — it will
+        be retried on the next coordinator cycle."""
+        dep_id = deployment_created_without_revision.deployment_info.id
+        mock_deployment_executor.register_endpoints_bulk.side_effect = None
+        mock_deployment_executor.register_endpoints_bulk.return_value = (
+            DeploymentExecutionResult(
+                failures=[
+                    DeploymentExecutionError(
+                        deployment_info=deployment_created_without_revision,
+                        reason="boom",
+                        error_detail="Failed to register endpoint",
+                    )
+                ],
+            )
+        )
+
+        await handler.execute([deployment_created_without_revision])
+
+        # Evaluator must see an empty deployment list since the only
+        # deployment failed registration.
+        evaluated_infos = mock_evaluator.evaluate.await_args.args[0]
+        assert all(info.id != dep_id for info in evaluated_infos)

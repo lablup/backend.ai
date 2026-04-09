@@ -160,6 +160,50 @@ class TestCheckPendingDeployments:
         assert len(result.failures) == 1
         assert "Registration failed" in result.failures[0].reason
 
+    async def test_persist_failure_triggers_compensating_unregister(
+        self,
+        deployment_executor: DeploymentExecutor,
+        mock_deployment_repo: AsyncMock,
+        pending_deployment: DeploymentWithHistory,
+        proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
+    ) -> None:
+        """BA-5557 H1: If URL persistence fails after a successful appproxy
+        registration, the executor must best-effort unregister the endpoint
+        from appproxy so the next tick does not observe an orphaned
+        endpoint and double-register it.
+        """
+        # Arrange
+        mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
+            proxy_targets_by_scaling_group
+        )
+        mock_deployment_repo.update_endpoint_url.side_effect = RuntimeError(
+            "DB write failed"
+        )
+
+        expected_url = "http://endpoint.test/v1"
+        with (
+            patch.object(
+                deployment_executor, "register_endpoint", return_value=expected_url
+            ),
+            patch.object(
+                deployment_executor, "_delete_endpoint_from_wsproxy", return_value=None
+            ) as mock_unregister,
+        ):
+            entity_ids = [pending_deployment.deployment_info.id]
+            with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
+                result = await deployment_executor.check_pending_deployments([
+                    pending_deployment
+                ])
+
+        # Assert: recorded as failure, and compensating unregister was invoked
+        # with the same endpoint_id (so appproxy state is cleaned up).
+        assert len(result.successes) == 0
+        assert len(result.failures) == 1
+        assert "DB write failed" in result.failures[0].reason
+        mock_unregister.assert_awaited_once()
+        kwargs = mock_unregister.await_args.kwargs
+        assert kwargs["endpoint_id"] == pending_deployment.deployment_info.id
+
 
 # =============================================================================
 # TestCheckReadyDeployments (CR-001 ~ CR-004)

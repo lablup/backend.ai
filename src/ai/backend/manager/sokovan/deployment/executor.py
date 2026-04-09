@@ -528,9 +528,25 @@ class DeploymentExecutor:
         scaling_group_target: ScalingGroupProxyTarget,
         revision_id: UUID,
     ) -> str:
-        """Resolve the target revision's model definition and register the endpoint to the app proxy.
+        """Resolve the target revision's model definition and register the
+        endpoint in appproxy.
 
-        Returns the registered endpoint URL.
+        Side effects:
+            Creates an endpoint in appproxy (WSProxy). The caller is
+            responsible for persisting the returned URL to the ``endpoints``
+            table before the next coordinator tick — otherwise that tick
+            will observe ``url=None`` and re-register, leaking a second
+            appproxy endpoint. For callers that need the register-and-persist
+            flow with automatic compensation on persistence failure, prefer
+            :meth:`register_endpoints_bulk` over calling this directly.
+
+        Preconditions:
+            - ``revision_id`` must resolve to a revision on ``deployment``.
+            - ``scaling_group_target`` must be a valid proxy target for
+              ``deployment.metadata.resource_group``.
+
+        Returns:
+            The registered endpoint URL.
         """
         pool = DeploymentRecorderContext.current_pool()
         recorder = pool.recorder(deployment.id)

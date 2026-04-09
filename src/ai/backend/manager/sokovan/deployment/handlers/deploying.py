@@ -173,7 +173,24 @@ class DeployingProvisioningHandler(DeploymentHandler):
         # via ActivateRevision without passing through check_pending.
         # Deployments whose registration failed are excluded from this tick's
         # route provisioning and will be retried on the next coordinator cycle.
-        failed_registration_ids = await self._ensure_endpoints_registered(deployments)
+        # If the pre-registration step itself raises (e.g. proxy target lookup
+        # failed), isolate the failure here: every deployment that needed
+        # registration is treated as failed-for-this-tick, but route
+        # provisioning for deployments that already had URLs still proceeds.
+        try:
+            failed_registration_ids = await self._ensure_endpoints_registered(deployments)
+        except Exception as exc:
+            log.exception(
+                "Pre-registration step failed for DEPLOYING batch (affected {} deployments): {}",
+                len(deployments),
+                exc,
+            )
+            failed_registration_ids = {
+                d.deployment_info.id
+                for d in deployments
+                if not d.deployment_info.network.url
+                and d.deployment_info.deploying_revision_id is not None
+            }
         if failed_registration_ids:
             deployments = [
                 d for d in deployments if d.deployment_info.id not in failed_registration_ids
