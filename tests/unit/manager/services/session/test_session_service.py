@@ -509,7 +509,7 @@ class TestDestroySession:
 
         assert result.result == {"stats": {"status": "cancelled"}}
         mock_session_repository.get_target_session_ids.assert_called_once_with(
-            "test-session", sample_access_key, recursive=False, owner_user_uuid=None
+            "test-session", sample_access_key, recursive=False
         )
         mock_scheduling_controller.mark_sessions_for_termination.assert_called_once()
 
@@ -612,7 +612,7 @@ class TestDestroySession:
         result = await session_service.destroy_session(action)
 
         mock_session_repository.get_target_session_ids.assert_called_once_with(
-            "test-session", sample_access_key, recursive=True, owner_user_uuid=None
+            "test-session", sample_access_key, recursive=True
         )
         assert result.result == {"stats": {"status": "cancelled"}}
 

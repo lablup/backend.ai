@@ -780,10 +780,7 @@ class SessionService:
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
         session_name = action.session_name
-        if action.owner_id is not None:
-            owner_access_key = await self._resolve_owner_main_access_key(action.owner_id)
-        else:
-            owner_access_key = action.owner_access_key
+        owner_access_key = action.owner_access_key
         forced = action.forced
         recursive = action.recursive
 
@@ -792,7 +789,6 @@ class SessionService:
             session_name,
             owner_access_key,
             recursive=recursive,
-            owner_user_uuid=action.owner_id,
         )
 
         # Determine termination reason based on forced flag
@@ -1055,10 +1051,7 @@ class SessionService:
     ) -> GetContainerLogsActionResult:
         resp = {"result": {"logs": ""}}
         session_name = action.session_name
-        if action.owner_id is not None:
-            owner_access_key = await self._resolve_owner_main_access_key(action.owner_id)
-        else:
-            owner_access_key = action.owner_access_key
+        owner_access_key = action.owner_access_key
         kernel_id = action.kernel_id
 
         compute_session = await self._session_repository.get_session_validated(
@@ -1070,7 +1063,6 @@ class SessionService:
                 if kernel_id is None
                 else KernelLoadingStrategy.ALL_KERNELS
             ),
-            owner_user_uuid=action.owner_id,
         )
 
         if compute_session.status in DEAD_SESSION_STATUSES:
@@ -1312,16 +1304,12 @@ class SessionService:
 
     async def restart_session(self, action: RestartSessionAction) -> RestartSessionActionResult:
         session_name = action.session_name
-        if action.owner_id is not None:
-            owner_access_key = await self._resolve_owner_main_access_key(action.owner_id)
-        else:
-            owner_access_key = action.owner_access_key
+        owner_access_key = action.owner_access_key
 
         session = await self._session_repository.get_session_validated(
             session_name,
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-            owner_user_uuid=action.owner_id,
         )
         await self._agent_registry.increment_session_usage(session)
         await self._agent_registry.restart_session(session)

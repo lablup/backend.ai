@@ -67,20 +67,13 @@ class SessionDBSource:
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
         eager_loading_op: Sequence[_AbstractLoad] | None = None,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> SessionRow:
-        """Look up a session by name or ID.
-
-        When ``owner_user_uuid`` is set, the session is matched against that
-        user's UUID instead of ``owner_access_key``. This is the canonical
-        scope for the v2 ``owner_id`` delegation path.
-        """
+        """Look up a session by name or ID."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await SessionRow.get_session(
                 db_sess,
                 session_name_or_id,
                 owner_access_key,
-                user_uuid=owner_user_uuid,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
                 eager_loading_op=list(eager_loading_op) if eager_loading_op else None,
@@ -380,7 +373,6 @@ class SessionDBSource:
         root_session_name_or_id: str | uuid.UUID,
         access_key: AccessKey,
         allow_stale: bool = False,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> tuple[uuid.UUID, set[uuid.UUID]]:
         """
         Find the root session and all sessions that depend on it (recursively).
@@ -410,7 +402,6 @@ class SessionDBSource:
             db_sess,
             root_session_name_or_id,
             access_key=access_key,
-            user_uuid=owner_user_uuid,
             allow_stale=allow_stale,
         )
         root_session_id = cast(uuid.UUID, root_session.id)
@@ -423,15 +414,13 @@ class SessionDBSource:
         session_name_or_id: str | uuid.UUID,
         access_key: AccessKey,
         recursive: bool = False,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> list[SessionId]:
         """
         Get list of session IDs including dependent sessions if recursive.
 
         :param session_name_or_id: Name or ID of the primary session
-        :param access_key: Access key of the session owner (legacy scope)
+        :param access_key: Access key of the session owner
         :param recursive: If True, include dependent sessions
-        :param owner_user_uuid: When set, scope by user UUID instead of access key.
         :return: List of session IDs
         """
         async with self._db.begin_readonly_session() as db_sess:
@@ -443,7 +432,6 @@ class SessionDBSource:
                         session_name_or_id,
                         access_key,
                         allow_stale=True,
-                        owner_user_uuid=owner_user_uuid,
                     )
                     # Return dependent sessions first, then root session
                     session_ids = [cast(SessionId, sid) for sid in dependent_ids]
@@ -454,7 +442,6 @@ class SessionDBSource:
                         db_sess,
                         session_name_or_id,
                         access_key,
-                        user_uuid=owner_user_uuid,
                         kernel_loading_strategy=KernelLoadingStrategy.NONE,
                         allow_stale=True,
                     )

@@ -496,7 +496,6 @@ def _build_session_fetch_query(
     base_cond: Any,
     access_key: AccessKey | None = None,
     *,
-    user_uuid: UUID | None = None,
     allow_stale: bool = True,
     for_update: bool = False,
     do_ordering: bool = False,
@@ -504,12 +503,7 @@ def _build_session_fetch_query(
     eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> sa.sql.Select[Any]:
     cond = base_cond
-    if user_uuid is not None:
-        # user_uuid scope is the canonical owner key for delegation paths.
-        # When set, it takes precedence over access_key (which is left for the
-        # legacy v1 surface).
-        cond = cond & (SessionRow.user_uuid == user_uuid)
-    elif access_key:
+    if access_key:
         cond = cond & (SessionRow.access_key == access_key)
     if not allow_stale:
         cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
@@ -536,7 +530,6 @@ async def _match_sessions_by_id(
     session_id_or_list: SessionId | list[SessionId],
     access_key: AccessKey | None = None,
     *,
-    user_uuid: UUID | None = None,
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
@@ -554,7 +547,6 @@ async def _match_sessions_by_id(
     query = _build_session_fetch_query(
         cond,
         access_key,
-        user_uuid=user_uuid,
         max_matches=max_matches,
         allow_stale=allow_stale,
         for_update=for_update,
@@ -568,9 +560,8 @@ async def _match_sessions_by_id(
 async def _match_sessions_by_name(
     db_session: SASession,
     session_name: str,
-    access_key: AccessKey | None,
+    access_key: AccessKey,
     *,
-    user_uuid: UUID | None = None,
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
@@ -585,7 +576,6 @@ async def _match_sessions_by_name(
     query = _build_session_fetch_query(
         cond,
         access_key,
-        user_uuid=user_uuid,
         max_matches=max_matches,
         allow_stale=allow_stale,
         for_update=for_update,
@@ -668,7 +658,9 @@ class SessionRow(Base):  # type: ignore[misc]
     creation_id: Mapped[str | None] = mapped_column(
         "creation_id", sa.String(length=32), unique=False, index=False
     )
-    name: Mapped[str | None] = mapped_column("name", sa.String(length=64), unique=False, index=True)
+    name: Mapped[str | None] = mapped_column(
+        "name", sa.String(length=128), unique=False, index=True
+    )
     session_type: Mapped[SessionTypes] = mapped_column(
         "session_type",
         StrEnumType(SessionTypes, use_name=True),
@@ -1367,7 +1359,6 @@ class SessionRow(Base):  # type: ignore[misc]
         session_reference: str | UUID | list[UUID],
         access_key: AccessKey | None,
         *,
-        user_uuid: UUID | None = None,
         allow_prefix: bool = False,
         allow_stale: bool = True,
         for_update: bool = False,
@@ -1422,7 +1413,6 @@ class SessionRow(Base):  # type: ignore[misc]
             rows = await fetch_func(
                 db_session,
                 access_key=access_key,
-                user_uuid=user_uuid,
                 allow_stale=allow_stale,
                 for_update=for_update,
                 max_matches=max_matches,
@@ -1440,7 +1430,6 @@ class SessionRow(Base):  # type: ignore[misc]
         session_name_or_id: str | UUID,
         access_key: AccessKey | None = None,
         *,
-        user_uuid: UUID | None = None,
         allow_stale: bool = False,
         for_update: bool = False,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
@@ -1486,7 +1475,6 @@ class SessionRow(Base):  # type: ignore[misc]
             db_session,
             session_name_or_id,
             access_key,
-            user_uuid=user_uuid,
             allow_stale=allow_stale,
             for_update=for_update,
             eager_loading_op=_eager_loading_op,

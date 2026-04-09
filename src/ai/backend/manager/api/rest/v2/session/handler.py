@@ -174,7 +174,6 @@ class V2SessionHandler:
             path.parsed.session_id,
             access_key=user_ctx.access_key,
             kernel_id=query.parsed.kernel_id,
-            owner_id=query.parsed.owner_id,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

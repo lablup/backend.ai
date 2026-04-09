@@ -61,7 +61,6 @@ class SessionRepository:
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
         eager_loading_op: Sequence[_AbstractLoad] | None = None,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> SessionRow:
         return await self._db_source.get_session_validated(
             session_name_or_id,
@@ -69,7 +68,6 @@ class SessionRepository:
             kernel_loading_strategy,
             allow_stale,
             eager_loading_op,
-            owner_user_uuid=owner_user_uuid,
         )
 
     @session_repository_resilience.apply()
@@ -214,19 +212,17 @@ class SessionRepository:
         session_name_or_id: str | uuid.UUID,
         access_key: AccessKey,
         recursive: bool = False,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> list[SessionId]:
         """
         Get list of session IDs including dependent sessions if recursive.
 
         :param session_name_or_id: Name or ID of the primary session
-        :param access_key: Access key of the session owner (legacy scope)
+        :param access_key: Access key of the session owner
         :param recursive: If True, include dependent sessions
-        :param owner_user_uuid: When set, scope by user UUID instead of access key.
         :return: List of session IDs
         """
         return await self._db_source.get_target_session_ids(
-            session_name_or_id, access_key, recursive, owner_user_uuid=owner_user_uuid
+            session_name_or_id, access_key, recursive
         )
 
     @session_repository_resilience.apply()
