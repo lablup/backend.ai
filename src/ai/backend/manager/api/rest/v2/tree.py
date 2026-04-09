@@ -54,6 +54,8 @@ def build_v2_routes(
     from .image.registry import register_v2_image_routes
     from .keypair.handler import V2KeypairHandler
     from .keypair.registry import register_v2_keypair_routes
+    from .login_client_type.handler import V2LoginClientTypeHandler
+    from .login_client_type.registry import register_v2_login_client_type_routes
     from .login_history.handler import V2LoginHistoryHandler
     from .login_history.registry import register_v2_login_history_routes
     from .login_session.handler import V2LoginSessionHandler
@@ -120,6 +122,7 @@ def build_v2_routes(
     )
     image_handler = V2ImageHandler(adapter=adapters.image)
     keypair_handler = V2KeypairHandler(adapter=adapters.user)
+    login_client_type_handler = V2LoginClientTypeHandler(adapter=adapters.login_client_type)
     login_history_handler = V2LoginHistoryHandler(adapter=adapters.login_history)
     login_session_handler = V2LoginSessionHandler(adapter=adapters.login_session)
     notification_handler = V2NotificationHandler(adapter=adapters.notification)
@@ -180,6 +183,9 @@ def build_v2_routes(
     )
     v2_reg.add_subregistry(register_v2_image_routes(image_handler, route_deps))
     v2_reg.add_subregistry(register_v2_keypair_routes(keypair_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_login_client_type_routes(login_client_type_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_login_history_routes(login_history_handler, route_deps))
     v2_reg.add_subregistry(register_v2_login_session_routes(login_session_handler, route_deps))
     v2_reg.add_subregistry(register_v2_notification_routes(notification_handler, route_deps))

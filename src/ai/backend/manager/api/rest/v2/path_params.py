@@ -77,6 +77,10 @@ class PresetIdPathParam(BaseRequestModel):
     preset_id: UUID = Field(description="Preset UUID")
 
 
+class LoginClientTypeIdPathParam(BaseRequestModel):
+    login_client_type_id: UUID = Field(description="Login client type UUID")
+
+
 class ReplicaIdPathParam(BaseRequestModel):
     replica_id: UUID = Field(description="Replica UUID")
 
