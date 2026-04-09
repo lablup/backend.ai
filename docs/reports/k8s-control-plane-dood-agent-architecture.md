@@ -15,6 +15,10 @@
 
 1. [Executive Summary](#1-executive-summary)
 2. [Introduction and Motivation](#2-introduction-and-motivation)
+   - 2.1 [Background](#21-background)
+   - 2.2 [Goals](#22-goals)
+   - 2.3 [Scope](#23-scope)
+   - 2.4 [Assumptions and Prerequisites](#24-assumptions-and-prerequisites)
 3. [Current Architecture Overview](#3-current-architecture-overview)
    - 3.1 [Component Topology](#31-component-topology)
    - 3.2 [Agent-Kernel Relationship](#32-agent-kernel-relationship)
@@ -27,6 +31,15 @@
    - 4.5 [Networking Architecture](#45-networking-architecture)
    - 4.6 [Storage Architecture](#46-storage-architecture)
    - 4.7 [GPU and Accelerator Passthrough](#47-gpu-and-accelerator-passthrough)
+     - 4.7.1 [Two-Layer GPU Management](#471-two-layer-gpu-management)
+     - 4.7.2 [NVIDIA Driver and Container Toolkit (Host-Level Prerequisite)](#472-nvidia-driver-and-container-toolkit-host-level-prerequisite)
+     - 4.7.3 [Agent Pod GPU Access](#473-agent-pod-gpu-access)
+     - 4.7.4 [Kernel Container GPU Allocation](#474-kernel-container-gpu-allocation)
+     - 4.7.5 [Fractional GPU Hook Library Distribution](#475-fractional-gpu-hook-library-distribution)
+     - 4.7.6 [MIG Partitioning](#476-mig-partitioning)
+     - 4.7.7 [GPU Health Monitoring and Failure Handling](#477-gpu-health-monitoring-and-failure-handling)
+     - 4.7.8 [Compute Plugin Image Strategy](#478-compute-plugin-image-strategy)
+     - 4.7.9 [VM-Based Isolation Alternatives (External Document)](#479-vm-based-isolation-alternatives-external-document)
 5. [Container Runtime Analysis: Docker vs containerd](#5-container-runtime-analysis-docker-vs-containerd)
    - 5.1 [DooD with Docker (docker.sock)](#51-dood-with-docker-dockersock)
    - 5.2 [DooD with containerd (containerd.sock)](#52-dood-with-containerd-containerdsock)
@@ -44,6 +57,9 @@
    - 6.5 [Component Environment Variable Injection](#65-component-environment-variable-injection)
    - 6.6 [Boot Sequence and Init Containers](#66-boot-sequence-and-init-containers)
    - 6.7 [Installation Commands](#67-installation-commands)
+   - 6.8 [Container Image Management](#68-container-image-management)
+   - 6.9 [Database Migration Strategy (Alembic)](#69-database-migration-strategy-alembic)
+   - 6.10 [Redis High Availability](#610-redis-high-availability)
 7. [Detailed Component Design](#7-detailed-component-design)
    - 7.1 [Control Plane Pod Specifications](#71-control-plane-pod-specifications)
    - 7.2 [Agent DaemonSet Design](#72-agent-daemonset-design)
@@ -117,6 +133,103 @@ This document covers:
 - Container runtime selection (Docker daemon vs containerd) for kernel management
 - Migration path and required code changes
 - Risk analysis and alternative approaches
+
+### 2.4 Assumptions and Prerequisites
+
+This architecture is based on the following explicit assumptions. These must hold true for the design to work as described, and they define the boundary between Kubernetes's management domain and Backend.AI's management domain.
+
+#### 2.4.1 GPU Resources Are Not Managed by Kubernetes
+
+Kubernetes does **not** schedule, allocate, or track GPU resources on Backend.AI agent nodes. Specifically:
+
+- The NVIDIA device plugin (`nvidia-device-plugin-daemonset`) is **not deployed** on agent nodes.
+- `nvidia.com/gpu` resource requests in K8s Pod specs have no meaning on these nodes.
+- GPU allocation is handled entirely by Backend.AI's own scheduler (Sokovan) via etcd.
+- Kubernetes has no visibility into which GPU is used by which kernel container.
+
+Attempting to share GPU management between K8s device plugin and Backend.AI Agent would cause dual-allocation conflicts (the same GPU assigned to a K8s Pod and a Backend.AI kernel simultaneously) and would require rewriting Backend.AI's accelerator plugin system to integrate with the K8s device plugin API. This integration is explicitly **out of scope**.
+
+#### 2.4.2 GPU Nodes Are Isolated via Taints
+
+All Backend.AI agent nodes are marked with a dedicated taint:
+
+```bash
+kubectl taint nodes <gpu-node> backendai.io/dedicated=agent:NoSchedule
+```
+
+This has the following effects:
+
+- Generic K8s workloads cannot schedule onto these nodes (no toleration for the taint).
+- Only Backend.AI's DaemonSets (Agent, NFS Mounter) tolerate this taint and can run on these nodes.
+- Kernel containers (DooD) are unaffected by taints since they are not K8s resources — they bypass the K8s scheduler entirely.
+
+This isolation guarantees that node resources (CPU, memory, GPU) are reserved exclusively for Backend.AI workloads, preventing noisy-neighbor scenarios with unrelated K8s Pods.
+
+#### 2.4.3 Kernel Containers Operate Outside Kubernetes Control
+
+Kernel containers are created via Docker/containerd API (DooD), not as K8s Pods. Therefore:
+
+- K8s has no knowledge of kernel container lifecycle, resource usage, labels, or networking.
+- `kubectl get pods` does not show kernel containers.
+- K8s NetworkPolicy, PodSecurityPolicy, LimitRange, and ResourceQuota do not apply to kernel containers.
+- Kernel container metrics are collected by Backend.AI's own monitoring (not K8s Prometheus stack by default).
+
+All kernel-level operations — creation, bind mounts, GPU allocation, health monitoring, cleanup — are the responsibility of the Backend.AI Agent.
+
+#### 2.4.4 Dedicated Node Pools
+
+A clear separation between node pools is required:
+
+| Node Pool | Taint | Purpose | Workloads |
+|---|---|---|---|
+| **Control plane pool** | None | Run K8s-managed Backend.AI services | Manager, PostgreSQL, Redis, etcd, AppProxy, WebServer |
+| **Agent pool** | `backendai.io/dedicated=agent:NoSchedule` | Run Backend.AI Agent and kernel containers | Agent DaemonSet, NFS Mounter DaemonSet, kernel containers (via DooD) |
+
+Mixing control plane workloads and agent workloads on the same node is **not supported** and will result in resource contention.
+
+#### 2.4.5 NVIDIA Driver and Container Toolkit Are Host-Level Prerequisites
+
+NVIDIA GPU drivers and the NVIDIA Container Toolkit are treated as **host-level prerequisites**, equivalent to Docker, containerd, and kubelet. They must be installed on each agent node before Backend.AI is deployed, and Kubernetes/Helm does not manage their installation.
+
+**Rationale:**
+
+- NVIDIA drivers are kernel modules, tightly coupled to the host kernel version.
+- Drivers must be available immediately on node boot, not after a DaemonSet reconciles.
+- Container runtime (Docker/containerd) must have `nvidia-container-runtime` configured at daemon level, which is a host-level configuration.
+- Debugging GPU issues is significantly easier with host-level drivers than with containerized driver installers.
+
+**Installation methods** (choose one):
+
+| Environment | Recommended Method |
+|---|---|
+| Bare-metal / on-premises | Node OS image with drivers pre-baked (Packer, Ansible) |
+| Cloud (AWS/GCP/Azure) | GPU-enabled base image (Deep Learning AMI, etc.) or cloud-init |
+| Kubernetes distributions | K3s/RKE2 GPU setup, or RHEL/OpenShift GPU node provisioning |
+
+**Required state before Backend.AI deployment:**
+
+1. `nvidia-smi` runs successfully on the host
+2. NVIDIA Container Toolkit is installed and configured in Docker/containerd
+3. `docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi` works on the host
+
+Backend.AI Agent will fail to enumerate GPUs if any of these are missing.
+
+**Note on NVIDIA GPU Operator**: The Operator's driver installation feature (containerized driver DaemonSet) is **not recommended** as the primary installation method. See Section 4.7.2 for details on optional Operator usage limited to GPU Feature Discovery and DCGM metrics.
+
+#### 2.4.6 Management Domain Boundary
+
+The assumptions above establish a clear boundary between what Kubernetes manages and what Backend.AI manages:
+
+| Domain | Managed by | Scope |
+|---|---|---|
+| Control plane lifecycle | Kubernetes | Manager/DB/Redis/etcd/AppProxy Pod scheduling, health, rolling updates |
+| Agent DaemonSet lifecycle | Kubernetes | Agent Pod scheduling, health, rolling updates |
+| GPU device allocation | **Backend.AI** | Physical GPU to kernel container assignment, fractional sharing, MIG partitioning |
+| Kernel container lifecycle | **Backend.AI** | Container creation, bind mounts, REPL communication, service port mapping |
+| Kernel networking | **Backend.AI + Docker/containerd** | Bridge/overlay networks, inter-kernel communication |
+| Storage mount orchestration | **Backend.AI + host/CSI** | vfolder paths, scratch space |
+
+This separation is intentional and preserves the full feature set of Backend.AI's existing accelerator plugin system (fractional GPU via CUDA hook libraries, multi-GPU allocation, MIG support, etc.) without requiring re-architecture. Sections 4.7 (GPU and Accelerator Passthrough) and later sections assume these prerequisites are in place.
 
 ---
 
@@ -403,6 +516,55 @@ Kernel containers use Docker/containerd networking directly (not K8s CNI):
 
 **Network performance note**: Docker Swarm overlay is the same networking mechanism used in Backend.AI's current bare-metal production deployments for multi-node sessions. Migrating the agent to a K8s DaemonSet (DooD) does not change the kernel container networking path — the Swarm overlay continues to operate identically. Therefore, there is **no network performance regression** compared to the current deployment model.
 
+#### 4.5.3 Kernel Communication Model
+
+Kernel containers are **infrastructure-agnostic** — they have no knowledge of etcd, Redis, PostgreSQL, or the Manager. The kernel codebase (`src/ai/backend/kernel/`, `src/ai/backend/runner/`) contains zero references to any infrastructure service. All external communication is mediated by the Agent.
+
+**Communication channels:**
+
+```
+┌─── Node A ──────────────────────────────┐    ┌─── Node B ──────────────────────────────┐
+│                                          │    │                                          │
+│  ┌── Agent A (hostNetwork) ───────────┐  │    │  ┌── Agent B (hostNetwork) ───────────┐  │
+│  │  ZeroMQ      ZeroMQ                │  │    │  │  ZeroMQ      ZeroMQ                │  │
+│  │  ▲              ▲                   │  │    │  │  ▲              ▲                   │  │
+│  └──┼──────────────┼──────────────────┘  │    │  └──┼──────────────┼──────────────────┘  │
+│     │              │                      │    │     │              │                      │
+│     ▼              ▼                      │    │     ▼              ▼                      │
+│  ┌────────┐  ┌────────┐                  │    │  ┌────────┐  ┌────────┐                  │
+│  │Kernel 1│  │Kernel 2│                  │    │  │Kernel 3│  │Kernel 4│                  │
+│  └───┬────┘  └───┬────┘                  │    │  └───┬────┘  └───┬────┘                  │
+│      └─────┬─────┘                        │    │      └─────┬─────┘                        │
+│            │ Docker Swarm Overlay          │    │            │ Docker Swarm Overlay          │
+└────────────┼──────────────────────────────┘    └────────────┼──────────────────────────────┘
+             └──────────── Swarm Overlay ─────────────────────┘
+                  (inter-kernel: SSH, MPI, NCCL)
+```
+
+Each kernel container has exactly two communication paths:
+
+| Path | Protocol | Network | Purpose |
+|---|---|---|---|
+| Kernel → **local Agent** | ZeroMQ TCP (`127.0.0.1:{mapped_port}`) | Host loopback via Docker port mapping | Code execution (REPL in/out on ports 2000/2001), autocomplete, interrupt |
+| Kernel ↔ **other kernels** (multi-node) | SSH, MPI, NCCL | Docker Swarm Overlay | Distributed training, cluster session inter-process communication |
+
+**What kernels do NOT communicate with:**
+
+| Component | Direct communication? | How it's handled |
+|---|---|---|
+| etcd | No | Agent reads/writes etcd on behalf of kernels |
+| Redis | No | Agent publishes events and metrics to Redis |
+| PostgreSQL | No | Manager handles all DB operations |
+| Manager | No | Agent relays session state, events, and lifecycle operations |
+
+**Why this matters for DooD**: Since kernels only need (1) host loopback for Agent REPL communication and (2) Docker Swarm overlay for inter-kernel communication, they require no access to K8s Service DNS, K8s CNI, or any cluster-internal networking. The kernel container images are completely unchanged when migrating from bare-metal to K8s DooD deployment.
+
+**ZeroMQ REPL detail**: The Agent creates a `DockerCodeRunner` that connects to the kernel via ZeroMQ TCP:
+- `repl_in` (container port 2000): Agent sends code to kernel
+- `repl_out` (container port 2001): Kernel sends execution results to Agent
+
+These ports are mapped to `127.0.0.1:{host_port}` by Docker. Because the Agent pod uses `hostNetwork: true`, it shares the host's loopback interface and can reach these mapped ports directly — identical to bare-metal behavior.
+
 ### 4.6 Storage Architecture
 
 #### 4.6.1 vfolder Mount Path
@@ -433,21 +595,488 @@ Kernel containers use Docker/containerd networking directly (not K8s CNI):
 
 Kernel scratch directories (`/home/work` inside kernels) are backed by host-local storage (SSD/NVMe). The agent pod and kernel containers both access `/var/cache/backendai/scratches` on the host.
 
+#### 4.6.3 NFS Mount Considerations in DooD
+
+In the current bare-metal deployment, NFS storage is mounted at the host OS level (via `fstab` or `systemd`). The Agent process simply reads the pre-mounted path (`mount-path` in `agent.toml`) and passes it as a Docker bind mount parameter to kernel containers. The Agent does **not** mount or unmount NFS — it is purely a consumer of an already-mounted path.
+
+In a K8s DooD deployment, this creates a control gap: the Helm chart manages all Backend.AI components, but the host-level NFS mount is outside K8s control. Requiring infrastructure teams to pre-configure NFS mounts on each node defeats the self-contained deployment goal.
+
+**Option A: Host Pre-Mount (simple, but external dependency)**
+
+NFS is mounted on each node before Backend.AI is deployed, identical to bare-metal:
+
+| Aspect | Description |
+|---|---|
+| Mount method | `fstab`, `systemd`, `cloud-init`, or node image |
+| Controlled by | Infrastructure team (outside Helm) |
+| Agent restart impact | None — mount is OS-level |
+| Node scaling | Manual mount setup required on new nodes |
+| `helm install` self-contained? | No |
+
+**Option B: NFS Mounter DaemonSet (recommended for K8s-native deployment)**
+
+A dedicated DaemonSet handles NFS mounting on each agent node, fully managed by the Helm chart:
+
+```
+┌─── Helm chart deploys both ───────────────────────────────────┐
+│                                                                │
+│  ┌── nfs-mounter DaemonSet ────────────────────────────────┐  │
+│  │  - Mounts NFS on each node via mountPropagation         │  │
+│  │  - Independent lifecycle from Agent                      │  │
+│  │  - Health check: periodic mountpoint verification        │  │
+│  │  - Auto-remount on failure                               │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                │
+│  ┌── Agent DaemonSet ──────────────────────────────────────┐  │
+│  │  - init container waits for NFS mount                    │  │
+│  │  - Accesses /mnt/vfolder via hostPath (already mounted)  │  │
+│  │  - Restart does NOT affect NFS mount                     │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                │
+│  ┌── Kernel containers (DooD) ─────────────────────────────┐  │
+│  │  - Docker bind mount from host /mnt/vfolder/...          │  │
+│  └──────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────┘
+```
+
+The NFS Mounter DaemonSet:
+
+```yaml
+# templates/daemonset-nfs-mounter.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Release.Name }}-nfs-mounter
+spec:
+  selector:
+    matchLabels:
+      app: backendai-nfs-mounter
+  template:
+    spec:
+      nodeSelector:
+        backendai.io/role: agent
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: backendai-nfs-mounter-critical
+      containers:
+        - name: nfs-mounter
+          image: busybox:1.36
+          securityContext:
+            privileged: true
+          command: ['sh', '-c', |
+            if ! mountpoint -q /mnt/vfolder; then
+              echo "Mounting NFS..."
+              mount -t nfs -o {{ .Values.global.storage.nfs.mountOptions }} \
+                {{ .Values.global.storage.nfs.server }}:{{ .Values.global.storage.nfs.export }} \
+                /mnt/vfolder
+            fi
+            # Stay alive and periodically verify mount
+            while true; do
+              if ! mountpoint -q /mnt/vfolder; then
+                echo "NFS mount lost, remounting..."
+                mount -t nfs -o {{ .Values.global.storage.nfs.mountOptions }} \
+                  {{ .Values.global.storage.nfs.server }}:{{ .Values.global.storage.nfs.export }} \
+                  /mnt/vfolder
+              fi
+              sleep 30
+            done
+          ]
+          volumeMounts:
+            - name: vfolder-mount
+              mountPath: /mnt/vfolder
+              mountPropagation: Bidirectional
+          livenessProbe:
+            exec:
+              command: ['mountpoint', '-q', '/mnt/vfolder']
+            periodSeconds: 30
+            failureThreshold: 3
+      volumes:
+        - name: vfolder-mount
+          hostPath:
+            path: /mnt/vfolder
+            type: DirectoryOrCreate
+```
+
+The Agent DaemonSet adds an init container to wait for the NFS mount:
+
+```yaml
+# Added to Agent DaemonSet init containers
+- name: wait-for-nfs
+  image: busybox:1.36
+  command: ['sh', '-c',
+    'until mountpoint -q /mnt/vfolder; do echo "waiting for NFS mount..."; sleep 3; done']
+  volumeMounts:
+    - name: vfolder-storage
+      mountPath: /mnt/vfolder
+```
+
+**How `mountPropagation: Bidirectional` works**: The NFS Mounter Pod mounts NFS at `/mnt/vfolder` inside its mount namespace. With `Bidirectional` propagation, this mount is propagated back to the host's mount namespace. The Agent Pod and Docker daemon then see the NFS content at the host's `/mnt/vfolder`. When the NFS Mounter Pod restarts, it re-mounts and re-propagates.
+
+Helm values for storage configuration:
+
+```yaml
+global:
+  storage:
+    nfsMounter:
+      enabled: true           # false = host pre-mount (Option A)
+    nfs:
+      server: "nfs-server.internal"
+      export: "/export/vfolder"
+      mountPath: "/mnt/vfolder"
+      mountOptions: "vers=4.1,hard,timeo=600,retrans=2,noresvport"
+```
+
+**Option comparison:**
+
+| Aspect | Option A (host pre-mount) | Option B (NFS Mounter DaemonSet) |
+|---|---|---|
+| Controlled by | Infrastructure team | Helm chart |
+| Node scaling | Manual NFS setup on new nodes | Automatic (DaemonSet deploys to new nodes) |
+| Configuration change | SSH to each node | `helm upgrade` |
+| Mount monitoring | Separate setup needed | Built-in livenessProbe + auto-remount |
+| Agent restart impact | None (OS-level mount) | None (separate DaemonSet) |
+| `helm install` self-contained? | No | **Yes** |
+| NFS Mounter Pod restart | N/A | Remounts and propagates; kernel I/O briefly blocks if `hard` mount option is used (auto-recovers) |
+
 ### 4.7 GPU and Accelerator Passthrough
 
-DooD kernel containers access GPUs identically to the current bare-metal model:
+This section describes how GPU and accelerator passthrough works in a K8s DooD deployment, building on the assumptions established in Section 2.4 — Kubernetes does not manage GPU resources, and GPU nodes are isolated via taints.
 
-| Feature | DooD Support | Mechanism |
+#### 4.7.1 Two-Layer GPU Management
+
+GPU management is split between two layers with clearly defined responsibilities:
+
+```
+┌─── K8s Layer (GPU-unaware) ───────────────────────────────────┐
+│                                                                │
+│  ❌ NVIDIA device plugin         — not deployed                │
+│  ❌ nvidia.com/gpu resource      — meaningless on agent nodes  │
+│  ✅ GPU Feature Discovery (GFD)  — node labeling only          │
+│  ✅ NVIDIA driver installation   — via Operator (optional)     │
+│  ✅ DCGM Exporter                — Prometheus metrics          │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+         │
+         │ nodeSelector: backendai.io/role=agent
+         │ toleration: backendai.io/dedicated=agent:NoSchedule
+         ▼
+┌─── Backend.AI Layer (full GPU control) ──────────────────────┐
+│                                                                │
+│  Agent DaemonSet                                               │
+│    ├── GPU device discovery (reads /dev/nvidia* directly)      │
+│    ├── Driver library mount (/usr/lib/.../nvidia/*)            │
+│    ├── GPU slot calculation → etcd registration                │
+│    ├── Kernel container creation with GPU allocation           │
+│    ├── CUDA hook library injection (fractional GPU)            │
+│    └── GPU health monitoring (nvidia-smi, XID errors)          │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+```
+
+K8s is responsible for infrastructure prerequisites (driver install, node labeling, metrics export), but **never touches GPU allocation logic**. All GPU-related decisions are made by the Backend.AI Agent.
+
+#### 4.7.2 NVIDIA Driver and Container Toolkit (Host-Level Prerequisite)
+
+As established in Section 2.4.5, NVIDIA drivers and NVIDIA Container Toolkit are host-level prerequisites — not managed by K8s or Helm. This section clarifies the installation approach and explains the limited role of the NVIDIA GPU Operator.
+
+##### 4.7.2.1 Host-Level Installation (Primary Approach)
+
+Install NVIDIA drivers and Container Toolkit directly on each agent node before deploying Backend.AI:
+
+```bash
+# Ubuntu example
+apt install nvidia-driver-535
+apt install nvidia-container-toolkit
+systemctl restart docker    # or containerd
+
+# Verification
+nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi
+```
+
+This approach has the following advantages over the GPU Operator's containerized driver installer:
+
+| Aspect | Host installation | GPU Operator driver DaemonSet |
 |---|---|---|
-| Single GPU allocation | Full | `--device /dev/nvidia0` via Docker API |
-| Multi-GPU allocation | Full | Multiple `--device` flags |
-| Fractional GPU (cuda.shares) | Full | CUDA hook library injection via `generate_hooks()` |
-| NVIDIA Container Toolkit | Full | `--gpus` flag or CDI device mapping |
-| MIG (Multi-Instance GPU) | Full | MIG device UUID mapping |
-| NUMA-aware placement | Full | CPU pinning + GPU affinity via Docker API |
-| ROCm, Habana, IPU | Full | Device passthrough via compute plugins |
+| Installation location | `/usr/lib/x86_64-linux-gnu/` (persistent disk) | `/run/nvidia/driver/` (tmpfs, memory) |
+| After reboot | Immediately available | Reinstalled by DaemonSet (5-10 min delay) |
+| Memory overhead | None | 500MB-1GB tmpfs per node |
+| Debugging | Standard Linux tools | Requires inspecting DaemonSet Pod logs |
+| Linux distro support | Any | Only officially supported distros |
+| Secure Boot | Standard MOK enrollment | Additional operator configuration |
+| Driver version control | Infrastructure team owns | Helm values + Operator reconciliation |
+| Coupling to K8s | None | K8s Pod lifecycle affects driver state |
 
-**This is the primary advantage of DooD over VM-based approaches (Kata) and pure K8s-native approaches**: the agent retains full control over container creation parameters, enabling the complete accelerator plugin system including fractional GPU allocation via CUDA hook libraries.
+**Recommended deployment workflows:**
+
+| Environment | Method | Artifacts |
+|---|---|---|
+| Bare-metal / on-premises | Packer + Ansible to build node images with drivers pre-installed | Custom OS image |
+| AWS | AWS Deep Learning AMI (has drivers + toolkit pre-installed) | Amazon Linux 2 or Ubuntu DLAMI |
+| GCP | GCP Deep Learning VM image or NVIDIA GPU-optimized COS | COS with pre-installed drivers |
+| Azure | Azure N-series with NVIDIA drivers | N-series Ubuntu image |
+| K3s/RKE2 | Use distribution's GPU-enabled installer | Native integration |
+
+##### 4.7.2.2 NVIDIA GPU Operator (Optional Supplementary Tool)
+
+NVIDIA GPU Operator can still be useful in a Backend.AI K8s deployment, but **only for supplementary components** — not for driver or toolkit installation. Use the Operator with most components disabled:
+
+```yaml
+# values.yaml (NVIDIA GPU Operator)
+gpu-operator:
+  driver:
+    enabled: false          # ❌ Use host-level installation instead
+  toolkit:
+    enabled: false          # ❌ Use host-level installation instead
+  devicePlugin:
+    enabled: false          # ❌ Conflicts with Section 2.4.1 (Backend.AI manages GPUs)
+  migManager:
+    enabled: false          # ❌ Backend.AI handles MIG if needed
+  gfd:
+    enabled: true           # ✅ GPU Feature Discovery — auto-labels nodes with GPU info
+  dcgmExporter:
+    enabled: true           # ✅ Prometheus metrics for observability
+  nodeStatusExporter:
+    enabled: true           # ✅ Node health reporting
+```
+
+In this configuration, the Operator provides:
+
+| Component | Purpose | Benefit |
+|---|---|---|
+| GPU Feature Discovery (GFD) | Labels nodes with `nvidia.com/gpu.product`, `nvidia.com/gpu.count`, `nvidia.com/gpu.memory` | Agent DaemonSet can use nodeSelector based on GPU model |
+| DCGM Exporter | Exposes GPU metrics to Prometheus (utilization, temperature, memory, ECC errors) | Cluster-wide observability dashboards |
+| Node Status Exporter | Reports GPU-related node conditions | Integration with K8s monitoring stack |
+
+The Operator is **not required**. If GFD and DCGM metrics are not needed, the Operator can be skipped entirely — Backend.AI functions normally with only host-level drivers and toolkit.
+
+##### 4.7.2.3 Why Not Use GPU Operator for Drivers?
+
+The GPU Operator's driver installation is a clever but complex approach: it runs a privileged DaemonSet that compiles kernel modules inside a container and installs them to a host tmpfs path. While this works, it has significant operational drawbacks for production Backend.AI deployments:
+
+1. **Reboot recovery is slow**: After a node reboot, the driver DaemonSet must reschedule, pull the driver image, compile modules, and install them. This takes 5-10 minutes, during which the node has no GPU access.
+2. **Memory overhead**: Driver files stored in `/run/nvidia/driver` (tmpfs) consume 500MB-1GB of RAM per node permanently.
+3. **Fragile dependency on kernel**: Any kernel upgrade requires the driver container to recompile. If the container's kernel source package is unavailable or incompatible, drivers fail to install.
+4. **Unusual debugging path**: GPU issues must be diagnosed via `kubectl logs` on the driver Pod rather than standard host tools.
+5. **Limited distro support**: Officially supported only on specific Ubuntu, RHEL, and SLES versions. Other distros (Arch, Debian minor versions, custom kernels) are not supported.
+6. **Secure Boot complications**: Additional MOK (Machine Owner Key) management required for signed modules in containerized environments.
+7. **Operator lifecycle coupling**: If the GPU Operator deployment is deleted or upgraded, driver state may become inconsistent.
+
+For these reasons, Backend.AI deployments should treat NVIDIA drivers like any other host-level system software (kernel, Docker daemon, kubelet) — installed and managed at the node provisioning layer, not via K8s.
+
+#### 4.7.3 Agent Pod GPU Access
+
+The Backend.AI Agent Pod must access GPU devices and driver libraries for:
+
+1. **GPU discovery at startup** — enumerate GPUs, read model and memory
+2. **Health monitoring** — periodic `nvidia-smi` queries
+3. **Resource slot calculation** — report GPU slots to etcd
+4. **Allocation decisions** — determine which GPU to assign to each kernel container
+
+Agent DaemonSet configuration with GPU access:
+
+```yaml
+spec:
+  template:
+    spec:
+      nodeSelector:
+        backendai.io/role: agent
+        nvidia.com/gpu.present: "true"      # GFD-provided label
+      tolerations:
+        - key: backendai.io/dedicated
+          operator: Equal
+          value: agent
+          effect: NoSchedule
+      containers:
+        - name: agent
+          securityContext:
+            privileged: true
+          env:
+            - name: LD_LIBRARY_PATH
+              value: "/usr/local/nvidia/lib64:/usr/local/nvidia/lib"
+            - name: PATH
+              value: "/usr/local/nvidia/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          volumeMounts:
+            # GPU device files (privileged grants access to all /dev/nvidia*)
+            - name: dev
+              mountPath: /dev
+            # NVIDIA driver libraries from host
+            - name: nvidia-driver
+              mountPath: /usr/local/nvidia
+              readOnly: true
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: nvidia-driver
+          hostPath:
+            path: /run/nvidia/driver        # GPU Operator mount point
+            type: Directory
+```
+
+**Alternative: NVIDIA CUDA base image for Agent**. Build the Agent image from `nvidia/cuda:12.x-base` and use NVIDIA Container Runtime. When the Agent Pod is created, the NVIDIA runtime automatically mounts driver libraries and devices into the container. This simplifies the Pod spec but requires the Agent image to match the host driver version at the CUDA level.
+
+#### 4.7.4 Kernel Container GPU Allocation
+
+Once the Agent is running with GPU access, kernel container GPU allocation works identically to the current bare-metal model. The Agent uses the Docker/containerd API directly to attach GPU devices, libraries, and environment variables to each kernel container.
+
+| Feature | Mechanism | Compatibility |
+|---|---|---|
+| Single GPU allocation | `--device /dev/nvidia0` via Docker API | Identical to bare-metal |
+| Multi-GPU allocation | Multiple `--device` flags or `--gpus '"device=0,1"'` | Identical to bare-metal |
+| Fractional GPU (cuda.shares) | CUDA hook library injected via `generate_hooks()` + `LD_PRELOAD` | Requires hook library on host (see 4.7.5) |
+| NVIDIA Container Toolkit | `--gpus all` flag or CDI device spec | Toolkit installed on host |
+| MIG (Multi-Instance GPU) | MIG UUID injected as device | Requires host-level MIG partitioning (see 4.7.6) |
+| NUMA-aware placement | CPU pinning + GPU affinity hint | Uses NUMA topology from host `/sys` |
+| ROCm (AMD) | `/dev/kfd`, `/dev/dri/*` device files | Compute plugin determines devices |
+| Habana, IPU, Rebellions, XPU | Plugin-specific device paths | Handled by respective compute plugins |
+
+Because the Agent uses the same Docker/containerd API code path as bare-metal, **no changes are required to the accelerator plugin system**. The DooD architecture preserves the full feature set of Backend.AI's GPU management.
+
+#### 4.7.5 Fractional GPU Hook Library Distribution
+
+Backend.AI's fractional GPU sharing relies on a CUDA hook library (`libbaicuda.so`) injected via `LD_PRELOAD`. The Agent's `generate_hooks()` method returns the host path of this library, which is then bind-mounted into the kernel container.
+
+In a K8s DooD deployment, the hook library must be available at a known path on the **host** filesystem. Three distribution options:
+
+| Option | Description | Complexity | Version Management |
+|---|---|---|---|
+| **A. Agent image bundled** | Agent image contains the `.so` file; init container copies to hostPath | Low | Automatic with Agent upgrade |
+| **B. Dedicated installer DaemonSet** | Separate DaemonSet distributes the library to the host | Medium | Independent of Agent version |
+| **C. Node image pre-installed** | Library baked into node OS image | Medium | Requires node reprovisioning |
+
+**Recommended: Option A (Agent image bundled).** The library version is automatically in sync with the Agent version, and Helm upgrades handle distribution:
+
+```yaml
+# Agent DaemonSet init container
+initContainers:
+  - name: install-cuda-hook
+    image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /host/opt/backendai/hooks
+        cp /opt/backendai/hooks/libbaicuda.so /host/opt/backendai/hooks/
+        chmod 755 /host/opt/backendai/hooks/libbaicuda.so
+    volumeMounts:
+      - name: host-backendai-hooks
+        mountPath: /host/opt/backendai/hooks
+volumes:
+  - name: host-backendai-hooks
+    hostPath:
+      path: /opt/backendai/hooks
+      type: DirectoryOrCreate
+```
+
+The Agent's `generate_hooks()` returns `/opt/backendai/hooks/libbaicuda.so`, which Docker bind-mounts into each kernel container. The kernel's `LD_PRELOAD` environment variable is set to load this library at startup.
+
+#### 4.7.6 MIG Partitioning
+
+Multi-Instance GPU (MIG) partitioning on NVIDIA H100/A100 requires host-level configuration that must happen **before** the Agent enumerates GPUs. Options for managing MIG partitions:
+
+| Option | Description | Trade-off |
+|---|---|---|
+| **Node provisioning time** | MIG partitions set via cloud-init or Ansible during node bootstrap | Static — requires reprovisioning to change partition layout |
+| **NVIDIA GPU Operator MIG Manager** | Operator's MIG Manager component | **Disabled** per Section 4.7.2 — couples with device plugin |
+| **Manual nvidia-smi** | Cluster admin runs `nvidia-smi mig -cgi ...` per node | Operational burden |
+| **Future: Backend.AI Agent dynamic MIG** | Agent partitions MIG based on allocation requests | Not currently implemented |
+
+**Current recommendation**: Set MIG partitions statically at node provisioning time. The Agent detects MIG instances via `nvidia-smi -L` and registers each MIG UUID as a separate GPU slot in etcd. Kernel containers receive specific MIG UUIDs via the `NVIDIA_VISIBLE_DEVICES` environment variable.
+
+#### 4.7.7 GPU Health Monitoring and Failure Handling
+
+Unlike K8s-managed Pods, kernel container GPU failures are invisible to the K8s scheduler (by design — Section 2.4.1). The Backend.AI Agent is solely responsible for GPU health monitoring and recovery.
+
+**Agent's GPU health loop:**
+
+```
+Every N seconds (configurable):
+  1. Run `nvidia-smi -q` to query all GPUs
+  2. Parse XID error counts, ECC errors, temperature, power state
+  3. For each GPU:
+     - If XID fatal error → mark slot as unavailable in etcd
+     - If ECC uncorrectable error count growing → mark slot as degraded
+     - If temperature > threshold → log warning, do not fail
+  4. If all GPUs on node are unavailable:
+     - Report zero GPU slots to Manager
+     - Optionally call K8s API to cordon the node (requires RBAC)
+     - Manager stops scheduling new sessions to this node
+  5. Publish health events to Redis for Manager notification
+```
+
+**Interaction with K8s:**
+
+- **DCGM Exporter** (from GPU Operator) publishes GPU metrics to Prometheus independently of the Agent's own monitoring. Cluster operators can use these metrics for dashboards, but the Agent does not consume them.
+- **Node Problem Detector** (optional) can be configured to detect NVIDIA driver crashes and mark the K8s node as NotReady. This would evict the Agent Pod, but not kernel containers (they run via DooD).
+- **Cordoning via K8s API** is optional. If the Agent has RBAC permission, it can call `kubectl cordon` equivalent to prevent new Pods (other Backend.AI DaemonSets, if any) from scheduling. This does NOT affect existing kernel containers.
+
+**Recovery**: Manual driver reset (`nvidia-smi --gpu-reset`) or node reboot. The Agent re-enumerates GPUs on restart and rejoins the healthy GPU pool. Kernel containers holding a failed GPU must be terminated and rescheduled by the Manager.
+
+#### 4.7.8 Compute Plugin Image Strategy
+
+Backend.AI's accelerator plugins (`backendai_accelerator_cuda`, `backendai_accelerator_rocm`, `backendai_accelerator_xpu`, `backendai_accelerator_habana`, etc.) are loaded into the Agent process at startup. In a K8s deployment, there are two strategies for distributing these plugins via Agent images:
+
+| Strategy | Description | Pros | Cons |
+|---|---|---|---|
+| **Single unified image** | One Agent image contains all plugins; runtime detects hardware and activates the appropriate plugin | Single image to manage; simpler Helm values | Larger image size; unused plugins loaded |
+| **Per-vendor images** | Separate images: `backendai-agent-cuda`, `backendai-agent-rocm`, `backendai-agent-xpu` | Smaller images; clearer dependencies | Image matrix management overhead; requires node-type-specific DaemonSet selection |
+
+**Recommended: Single unified image**. The size overhead is minimal (plugin code is small compared to CUDA/ROCm libraries), and the simpler deployment model reduces operational complexity. The Agent detects available hardware at startup via:
+
+1. Node labels (`nvidia.com/gpu.product`, `amd.com/gpu.family`) if GFD or similar is deployed
+2. Direct hardware probing (`lspci`, `/dev/nvidia*`, `/dev/kfd`)
+3. Configuration in `agent.toml` or environment variables
+
+For heterogeneous clusters (e.g., NVIDIA H100 nodes + AMD MI300 nodes), per-vendor DaemonSets with nodeSelectors can be used if strict image separation is required:
+
+```yaml
+# values.yaml
+agent:
+  daemonsets:
+    - name: agent-nvidia
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      image:
+        tag: "25.12.0-cuda"
+    - name: agent-amd
+      nodeSelector:
+        amd.com/gpu.present: "true"
+      image:
+        tag: "25.12.0-rocm"
+```
+
+This approach requires Helm templating to generate multiple DaemonSets from a single values configuration.
+
+#### 4.7.9 VM-Based Isolation Alternatives (External Document)
+
+For environments requiring stronger isolation than DooD containers provide — multi-tenant scenarios with untrusted code, regulatory compliance, confidential computing — VM-based isolation runtimes (Kata Containers, KubeVirt) must be supported alongside the default DooD architecture.
+
+Because VM runtime support involves substantial architectural considerations, GPU constraints, operational strategies, and a 12-layer system-wide change set, it is documented in a **dedicated companion document**:
+
+**📄 [Backend.AI VM Runtime Support: Kata Containers and KubeVirt](./support_vm_kata.md)**
+
+That document covers:
+
+- **Background**: Why VM isolation must be supported alongside DooD (security, compliance, confidential computing)
+- **Runtime options**: Kata Containers vs KubeVirt vs DooD comparison
+- **GPU + VM constraints**: Why Firecracker cannot be used, why VM pooling fails for GPUs, GPU cold start reality (30 seconds to several minutes)
+- **Operational strategies**: Runtime class selection per session, dedicated GPU pools, NVIDIA vGPU/MIG integration, per-GPU driver binding for hybrid nodes
+- **Hybrid runtime architecture**: Multi-runtime cluster design with taint-based pool separation
+- **System-wide changes**: 55 required changes across 12 architectural layers (Agent core, kernel communication, GPU allocation, storage, networking, image management, scheduler, node infrastructure, monitoring, Helm, API/CLI/UI, test infrastructure)
+- **Phased implementation roadmap**: 4-phase approach over 12-18 months
+- **Decision gate**: Criteria to evaluate before committing to VM runtime support
+
+**Key takeaways for this document's context:**
+
+| Aspect | Status |
+|---|---|
+| VM runtime support required | Yes (for security/compliance scenarios) |
+| Default runtime | DooD (preserved for general workloads) |
+| Implementation impact | 12-18 months, 2-3 engineers, 12-layer changes |
+| Compatible with current 4.7.1-4.7.8 design | Yes (DooD remains primary, VM runtimes are opt-in) |
 
 ---
 
@@ -1266,6 +1895,486 @@ helm upgrade backendai ./backendai \
 
 # Agent rolling update is handled by DaemonSet update strategy
 # Kernel containers are NOT affected (DooD — they run on the host)
+```
+
+### 6.8 Container Image Management
+
+In the DooD architecture, there are **two independent image pull paths** that must be configured separately:
+
+```
+┌─── Image Registry (e.g., Harbor) ────────────────────────────┐
+│                                                               │
+│  backendai/manager:25.12.0        ← kubelet pulls            │
+│  backendai/agent:25.12.0          ← kubelet pulls            │
+│  backendai/webserver:25.12.0      ← kubelet pulls            │
+│  backendai/kernel-python:3.11     ← Agent pulls (Docker API) │
+│  backendai/kernel-pytorch:2.1     ← Agent pulls (Docker API) │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
+         ▲                                    ▲
+         │                                    │
+   K8s imagePullSecrets              etcd registry config
+   (Helm values)                    (Manager API / etcd)
+```
+
+#### 6.8.1 Dual Image Pull Architecture
+
+| Aspect | Control Plane Images | Kernel Images |
+|---|---|---|
+| **Examples** | `manager`, `agent`, `webserver`, `app-proxy` | `kernel-python:3.11`, `kernel-pytorch:2.1` |
+| **Pull agent** | kubelet | Backend.AI Agent (via Docker/containerd API) |
+| **Authentication** | K8s `imagePullSecrets` | etcd `registry_conf` (username/password) |
+| **Configuration** | Helm `values.yaml` | Backend.AI Manager API or etcd |
+| **Lifecycle** | Updated via `helm upgrade` | Updated via Backend.AI image management |
+
+The Agent pull implementation (`src/ai/backend/agent/docker/agent.py`) reads registry credentials from etcd and passes them directly to the Docker API:
+
+```python
+reg_user = registry_conf.get("username")
+reg_passwd = registry_conf.get("password")
+auth_config = {"auth": base64.b64encode(f"{reg_user}:{reg_passwd}".encode()).decode("ascii")}
+await docker.images.pull(image_ref.canonical, auth=auth_config)
+```
+
+This means K8s `imagePullSecrets` have **no effect** on kernel image pulls — the Agent bypasses kubelet entirely.
+
+#### 6.8.2 Registry Credential Synchronization
+
+When using a private registry (e.g., Harbor) for both control plane and kernel images, credentials must be configured in **two places**:
+
+1. **K8s Secret** (for kubelet): `imagePullSecrets` in Helm values
+2. **etcd** (for Agent): Registry username/password via Manager API
+
+To avoid managing credentials in two places, use a **Helm post-install/post-upgrade hook** to synchronize K8s Secret credentials into etcd automatically:
+
+```yaml
+# templates/jobs/sync-registry-creds.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-sync-registry-creds
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: hook-succeeded
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: sync
+          image: bitnami/etcd:3.5
+          command: ['sh', '-c', |
+            etcdctl --endpoints={{ .Values.global.etcd.host }}:{{ .Values.global.etcd.port }} \
+              put /{{ .Values.global.etcd.namespace }}/config/docker/registry/{{ .Values.global.imageRegistry.host }}/username "$REG_USER"
+            etcdctl --endpoints={{ .Values.global.etcd.host }}:{{ .Values.global.etcd.port }} \
+              put /{{ .Values.global.etcd.namespace }}/config/docker/registry/{{ .Values.global.imageRegistry.host }}/password "$REG_PASS"
+          ]
+          env:
+            - name: REG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.imageRegistry.existingSecret }}
+                  key: username
+            - name: REG_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.imageRegistry.existingSecret }}
+                  key: password
+```
+
+Add the corresponding values to `values.yaml`:
+
+```yaml
+global:
+  imageRegistry:
+    host: "harbor.internal"
+    existingSecret: "harbor-credentials"   # K8s Secret with username/password keys
+  imagePullSecrets:
+    - harbor-credentials                   # For kubelet (control plane images)
+```
+
+This way, registry credentials are managed in a **single K8s Secret**, and the Helm hook synchronizes them to etcd for the Agent on every install/upgrade.
+
+#### 6.8.3 Air-Gapped Deployment
+
+In air-gapped environments without external registry access:
+
+| Image Type | Pre-loading Strategy |
+|---|---|
+| Control Plane | `docker load` or `ctr image import` on each node, set `imagePullPolicy: IfNotPresent` |
+| Kernel | `docker load` on each agent node (loaded into host Docker daemon for DooD access) |
+
+For kernel images in air-gapped mode, set `auto_pull` to `NONE` in Backend.AI configuration to prevent the Agent from attempting to pull images from an unreachable registry. All kernel images must be pre-loaded on each agent node's Docker daemon.
+
+#### 6.8.4 Credential Rotation Procedure
+
+When registry credentials change:
+
+1. Update the K8s Secret:
+   ```bash
+   kubectl create secret docker-registry harbor-credentials \
+     --docker-server=harbor.internal \
+     --docker-username=NEW_USER \
+     --docker-password=NEW_PASS \
+     -n backendai-system --dry-run=client -o yaml | kubectl apply -f -
+   ```
+2. Run Helm upgrade to trigger the sync hook:
+   ```bash
+   helm upgrade backendai ./backendai -n backendai-system
+   ```
+3. Verify etcd has updated credentials:
+   ```bash
+   kubectl exec -n backendai-system backendai-etcd-0 -- \
+     etcdctl get /backend/config/docker/registry/harbor.internal/username
+   ```
+
+---
+
+### 6.9 Database Migration Strategy (Alembic)
+
+Backend.AI uses Alembic for database schema migrations. In a K8s deployment where image updates trigger Pod recreation, migrations must run **before** the new Manager Pod starts. Otherwise, the new code references columns or tables that don't exist yet, causing immediate startup failure.
+
+#### 6.9.1 The Problem
+
+```
+helm upgrade (manager image 25.12.0 → 25.13.0)
+    │
+    ├── New Manager Pod created (25.13.0 code)
+    │     → DB schema is still at 25.12.0
+    │     → New code references missing columns/tables
+    │     → CRASH
+    │
+    └── Migration must run BEFORE new Pod starts
+```
+
+#### 6.9.2 Solution: Helm Pre-Upgrade Hook
+
+A Kubernetes Job runs the Alembic migration using the **new** Manager image before the Manager Deployment is updated:
+
+```yaml
+# templates/jobs/db-migrate.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-db-migrate
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-db
+          image: postgres:16-alpine
+          command: ['sh', '-c',
+            'until pg_isready -h {{ .Values.global.db.host }} -p {{ .Values.global.db.port }} -U {{ .Values.global.db.auth.user }}; do echo "db not ready..."; sleep 3; done']
+      containers:
+        - name: migrate
+          image: "{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+          command: ["python", "-m", "ai.backend.manager.cli", "schema", "oneshot"]
+          env:
+            - name: BACKEND_DB_ADDR
+              value: "{{ .Values.global.db.host }}:{{ .Values.global.db.port }}"
+            - name: BACKEND_DB_NAME
+              value: "{{ .Values.global.db.name }}"
+            - name: BACKEND_DB_USER
+              value: "{{ .Values.global.db.auth.user }}"
+            - name: BACKEND_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.global.db.auth.existingSecret }}"
+                  key: "{{ .Values.global.db.auth.secretKey }}"
+            - name: BACKEND_ETCD_ADDR
+              value: "{{ .Values.global.etcd.host }}:{{ .Values.global.etcd.port }}"
+```
+
+AppProxy Coordinator also has its own database and Alembic migrations:
+
+```yaml
+# templates/jobs/db-migrate-appproxy.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-db-migrate-appproxy
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-db
+          image: postgres:16-alpine
+          command: ['sh', '-c',
+            'until pg_isready -h {{ .Values.global.db.host }} -p {{ .Values.global.db.port }} -U {{ .Values.global.db.auth.user }}; do echo "db not ready..."; sleep 3; done']
+      containers:
+        - name: migrate
+          image: "{{ .Values.appProxy.coordinator.image.repository }}:{{ .Values.appProxy.coordinator.image.tag }}"
+          command: ["python", "-m", "ai.backend.app_proxy.coordinator.cli", "schema", "oneshot"]
+          env:
+            - name: BACKEND_DB_ADDR
+              value: "{{ .Values.global.db.host }}:{{ .Values.global.db.port }}"
+            - name: BACKEND_DB_NAME
+              value: "appproxy"
+            - name: BACKEND_DB_USER
+              value: "{{ .Values.global.db.auth.user }}"
+            - name: BACKEND_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.global.db.auth.existingSecret }}"
+                  key: "{{ .Values.global.db.auth.secretKey }}"
+```
+
+#### 6.9.3 Helm Hook Execution Order
+
+All Helm hooks execute in `hook-weight` order before the main resources are updated:
+
+```
+helm install/upgrade
+    │
+    │  hook-weight: -5
+    ├── sync-registry-creds Job       (K8s Secret → etcd sync)
+    │
+    │  hook-weight: 0
+    ├── db-migrate Job                (Manager DB: alembic upgrade head)
+    │
+    │  hook-weight: 1
+    ├── db-migrate-appproxy Job       (AppProxy DB: alembic upgrade head)
+    │
+    │  hook-weight: 5
+    ├── init-etcd-volumes Job         (etcd vfolder config initialization)
+    │
+    │  (all hooks completed successfully)
+    ├── Manager Deployment updated    (new image, schema already current)
+    ├── AppProxy Deployment updated
+    ├── Agent DaemonSet updated
+    └── Other components updated
+```
+
+If any hook Job fails (e.g., migration error), Helm aborts the upgrade and no Deployments are updated. This prevents deploying new code against an incompatible schema.
+
+#### 6.9.4 Rollback Considerations
+
+```
+helm rollback backendai 1
+    │
+    ├── Manager image rolls back: 25.13.0 → 25.12.0
+    │
+    └── DB schema remains at 25.13.0 (Helm rollback does NOT run migrations)
+```
+
+Alembic migrations in Backend.AI are **forward-only** by default. Rollback behavior depends on the migration type:
+
+| Migration Type | Rollback Safety | Action Required |
+|---|---|---|
+| Column additions | **Safe** — old code ignores unknown columns | No action needed |
+| New tables | **Safe** — old code doesn't reference them | No action needed |
+| Column renames | **Unsafe** — old code references old column name | Manual `alembic downgrade` required |
+| Column deletions | **Unsafe** — old code references deleted column | Manual `alembic downgrade` required |
+| Data transformations | **Unsafe** — data format may be incompatible | Manual assessment + downgrade required |
+
+**Rollback procedure for unsafe migrations:**
+
+```bash
+# 1. Identify the target Alembic revision for the old version
+kubectl exec -n backendai-system deploy/backendai-manager -- \
+  python -m ai.backend.manager.cli schema show-revision
+
+# 2. Run manual downgrade (use the OLD image)
+kubectl run db-downgrade --rm -it \
+  --image=backendai/manager:25.12.0 \
+  -n backendai-system -- \
+  python -m ai.backend.manager.cli schema downgrade <target-revision>
+
+# 3. Then perform Helm rollback
+helm rollback backendai 1 -n backendai-system
+```
+
+> **Best practice**: Before any upgrade, record the current Alembic revision. This enables targeted downgrade if rollback is needed. Consider adding a pre-upgrade hook that saves the current revision to a ConfigMap for reference.
+
+### 6.10 Redis High Availability
+
+Backend.AI already supports Redis Sentinel for high availability. The K8s deployment must provide a Redis HA setup that is compatible with the existing Sentinel-based client code.
+
+#### 6.10.1 Options Comparison
+
+| Option | Pod Count | Failover | Backend.AI Compatible | Operational Complexity | Best For |
+|---|---|---|---|---|---|
+| **Bitnami Helm (Sentinel)** | **3** (master+replica+sentinel in each Pod) | Sentinel auto-failover | Full (existing Sentinel support) | Low | On-premises, single cluster |
+| **Redis Operator (Spotahome)** | **7** (1 operator + 3 Redis + 3 Sentinel) | Operator + Sentinel | Full | Medium | Multi-cluster, platform teams |
+| **Managed Redis** | 0 (cloud-managed) | Cloud provider managed | Full (single endpoint or Sentinel) | Lowest | Cloud deployments (AWS, GCP, Azure) |
+| **Redis Cluster** | 6+ (3 masters + 3 replicas) | Built-in cluster failover | **Not supported** (requires client changes) | High | Not recommended |
+
+#### 6.10.2 Recommended: Bitnami Helm Chart (Sentinel Mode)
+
+The simplest option with full Backend.AI compatibility. Sentinel runs as a sidecar in each Redis Pod, requiring only **3 Pods** total:
+
+```
+┌─── Redis StatefulSet (Bitnami Helm) ──────────────────────┐
+│                                                            │
+│  backendai-redis-node-0  (master + sentinel sidecar)       │
+│  backendai-redis-node-1  (replica + sentinel sidecar)      │
+│  backendai-redis-node-2  (replica + sentinel sidecar)      │
+│                                                            │
+│  K8s Services:                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ backendai-redis.svc:6379       → master (read-write) │  │
+│  │ backendai-redis-headless.svc   → all nodes           │  │
+│  │ backendai-redis.svc:26379      → sentinel port       │  │
+│  └──────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────┘
+```
+
+Helm values:
+
+```yaml
+redis:
+  enabled: true
+  architecture: replication
+
+  sentinel:
+    enabled: true
+    quorum: 2
+
+  master:
+    persistence:
+      size: 8Gi
+      storageClass: fast-ssd
+
+  replica:
+    replicaCount: 2
+
+  auth:
+    existingSecret: backendai-redis-credentials
+    existingSecretPasswordKey: password
+```
+
+#### 6.10.3 Alternative: Redis Operator (Spotahome)
+
+For organizations that prefer operator-managed infrastructure. The operator watches a `RedisFailover` CRD and automatically manages Redis topology, rolling upgrades, and recovery:
+
+```
+┌─── Redis Operator Deployment ─────────────────────────────┐
+│                                                            │
+│  Operator Pod (1)          ← watches RedisFailover CRD     │
+│                                                            │
+│  Redis Pods:                                               │
+│    redis-0 (master)                                        │
+│    redis-1 (replica)                                       │
+│    redis-2 (replica)                                       │
+│                                                            │
+│  Sentinel Pods:                                            │
+│    sentinel-0                                              │
+│    sentinel-1                                              │
+│    sentinel-2                                              │
+│                                                            │
+│  Total: 7 Pods                                             │
+└────────────────────────────────────────────────────────────┘
+```
+
+```yaml
+apiVersion: databases.spotahome.com/v1
+kind: RedisFailover
+metadata:
+  name: backendai-redis
+  namespace: backendai-system
+spec:
+  sentinel:
+    replicas: 3
+  redis:
+    replicas: 3
+    storage:
+      persistentVolumeClaim:
+        metadata:
+          name: redis-data
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 8Gi
+```
+
+**Operator advantages over Bitnami Helm:**
+
+| Scenario | Bitnami Helm | Redis Operator |
+|---|---|---|
+| Pod deleted by K8s | Sentinel handles failover; manual topology check may be needed | Operator automatically reconciles to desired state |
+| Redis version upgrade | `helm upgrade` with manual validation | Operator manages rolling update |
+| Persistent storage issue | Manual intervention | Operator detects and recreates |
+| Configuration drift | Possible after manual changes | Operator continuously reconciles |
+
+#### 6.10.4 Alternative: Managed Redis (Cloud)
+
+For cloud deployments, managed Redis eliminates all operational overhead:
+
+| Cloud Provider | Service | Sentinel Compatible | Configuration |
+|---|---|---|---|
+| AWS | ElastiCache for Redis | Yes (cluster mode disabled) | Single primary endpoint |
+| GCP | Memorystore for Redis | Yes (Standard tier) | Single endpoint with auto-failover |
+| Azure | Azure Cache for Redis | Yes (Premium tier) | Single endpoint with auto-failover |
+
+With managed Redis, set `redis.enabled=false` in Helm values and configure the external endpoint:
+
+```yaml
+redis:
+  enabled: false
+
+global:
+  redis:
+    host: "my-redis.xxxx.cache.amazonaws.com"
+    port: 6379
+    # No sentinel config needed — managed Redis handles failover internally
+```
+
+#### 6.10.5 Backend.AI Sentinel Configuration
+
+Regardless of the Redis HA option chosen (Bitnami or Operator), the Backend.AI Manager and Agent need Sentinel connection details. Since Sentinel requires multiple host entries (`[[redis.sentinel]]` TOML array), this is best provided via a ConfigMap rather than environment variables:
+
+```yaml
+# ConfigMap for Manager
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backendai-manager-redis-config
+data:
+  redis.toml: |
+    [redis]
+    service-name = "mymaster"
+
+    [[redis.sentinel]]
+    host = "backendai-redis-node-0.backendai-redis-headless.backendai-system.svc"
+    port = 26379
+
+    [[redis.sentinel]]
+    host = "backendai-redis-node-1.backendai-redis-headless.backendai-system.svc"
+    port = 26379
+
+    [[redis.sentinel]]
+    host = "backendai-redis-node-2.backendai-redis-headless.backendai-system.svc"
+    port = 26379
+```
+
+**Failover behavior:**
+
+```
+Normal:
+  Client → Sentinel (query master addr) → connect to master
+
+Master failure:
+  1. Sentinels detect master down (quorum: 2/3 agree)
+  2. One replica promoted to new master
+  3. Other replicas follow new master
+  4. Client re-queries Sentinel → connects to new master
+
+  → Backend.AI redis_helper already supports Sentinel protocol
+    — automatic master discovery and reconnection on failover
 ```
 
 ---

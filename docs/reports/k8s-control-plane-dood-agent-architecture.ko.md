@@ -15,6 +15,10 @@
 
 1. [요약](#1-요약)
 2. [서론 및 동기](#2-서론-및-동기)
+   - 2.1 [배경](#21-배경)
+   - 2.2 [목표](#22-목표)
+   - 2.3 [범위](#23-범위)
+   - 2.4 [전제 조건 및 가정](#24-전제-조건-및-가정)
 3. [현재 아키텍처 개요](#3-현재-아키텍처-개요)
    - 3.1 [컴포넌트 토폴로지](#31-컴포넌트-토폴로지)
    - 3.2 [에이전트-커널 관계](#32-에이전트-커널-관계)
@@ -27,6 +31,15 @@
    - 4.5 [네트워킹 아키텍처](#45-네트워킹-아키텍처)
    - 4.6 [스토리지 아키텍처](#46-스토리지-아키텍처)
    - 4.7 [GPU 및 가속기 패스스루](#47-gpu-및-가속기-패스스루)
+     - 4.7.1 [이중 레이어 GPU 관리](#471-이중-레이어-gpu-관리)
+     - 4.7.2 [NVIDIA 드라이버 및 Container Toolkit (호스트 레벨 전제)](#472-nvidia-드라이버-및-container-toolkit-호스트-레벨-전제)
+     - 4.7.3 [Agent Pod의 GPU 접근](#473-agent-pod의-gpu-접근)
+     - 4.7.4 [커널 컨테이너 GPU 할당](#474-커널-컨테이너-gpu-할당)
+     - 4.7.5 [분할 GPU Hook Library 배포](#475-분할-gpu-hook-library-배포)
+     - 4.7.6 [MIG 파티셔닝](#476-mig-파티셔닝)
+     - 4.7.7 [GPU 헬스 모니터링 및 장애 처리](#477-gpu-헬스-모니터링-및-장애-처리)
+     - 4.7.8 [컴퓨트 플러그인 이미지 전략](#478-컴퓨트-플러그인-이미지-전략)
+     - 4.7.9 [VM 기반 격리 대안 (외부 문서)](#479-vm-기반-격리-대안-외부-문서)
 5. [컨테이너 런타임 분석: Docker vs containerd](#5-컨테이너-런타임-분석-docker-vs-containerd)
    - 5.1 [Docker를 이용한 DooD (docker.sock)](#51-docker를-이용한-dood-dockersock)
    - 5.2 [containerd를 이용한 DooD (containerd.sock)](#52-containerd를-이용한-dood-containerdsock)
@@ -43,6 +56,9 @@
    - 6.5 [컴포넌트 환경 변수 주입](#65-컴포넌트-환경-변수-주입)
    - 6.6 [부팅 순서 및 Init 컨테이너](#66-부팅-순서-및-init-컨테이너)
    - 6.7 [설치 명령](#67-설치-명령)
+   - 6.8 [컨테이너 이미지 관리](#68-컨테이너-이미지-관리)
+   - 6.9 [데이터베이스 마이그레이션 전략 (Alembic)](#69-데이터베이스-마이그레이션-전략-alembic)
+   - 6.10 [Redis 고가용성](#610-redis-고가용성)
 7. [상세 컴포넌트 설계](#7-상세-컴포넌트-설계)
    - 7.1 [컨트롤 플레인 Pod 사양](#71-컨트롤-플레인-pod-사양)
    - 7.2 [에이전트 DaemonSet 설계](#72-에이전트-daemonset-설계)
@@ -116,6 +132,103 @@ Backend.AI는 현재 두 가지 에이전트 백엔드를 지원한다: `docker`
 - 커널 관리를 위한 컨테이너 런타임 선택 (Docker 데몬 vs containerd)
 - 마이그레이션 경로 및 필요한 코드 변경
 - 리스크 분석 및 대안적 접근 방식
+
+### 2.4 전제 조건 및 가정
+
+이 아키텍처는 다음 명시적 가정을 기반으로 한다. 이 설계가 설명된 대로 동작하려면 이 가정들이 참이어야 하며, 이는 Kubernetes 관리 도메인과 Backend.AI 관리 도메인 간의 경계를 정의한다.
+
+#### 2.4.1 GPU 리소스는 Kubernetes가 관리하지 않는다
+
+Kubernetes는 Backend.AI 에이전트 노드에서 GPU 리소스를 스케줄링, 할당, 추적하지 **않는다**. 구체적으로:
+
+- NVIDIA device plugin(`nvidia-device-plugin-daemonset`)은 에이전트 노드에 **배포되지 않는다**.
+- K8s Pod 스펙의 `nvidia.com/gpu` 리소스 요청은 이 노드에서 의미가 없다.
+- GPU 할당은 Backend.AI 자체 스케줄러(Sokovan)가 etcd를 통해 전적으로 처리한다.
+- Kubernetes는 어떤 GPU가 어떤 커널 컨테이너에 사용되는지 알지 못한다.
+
+K8s device plugin과 Backend.AI Agent 간에 GPU 관리를 공유하려고 하면 이중 할당 충돌(동일 GPU가 K8s Pod과 Backend.AI 커널에 동시에 할당됨)이 발생하며, Backend.AI의 가속기 플러그인 시스템을 K8s device plugin API에 통합하기 위해 재작성해야 한다. 이 통합은 명시적으로 **범위 외**이다.
+
+#### 2.4.2 GPU 노드는 Taint로 격리된다
+
+모든 Backend.AI 에이전트 노드는 전용 taint로 표시된다:
+
+```bash
+kubectl taint nodes <gpu-node> backendai.io/dedicated=agent:NoSchedule
+```
+
+이는 다음 효과를 가진다:
+
+- 일반 K8s 워크로드는 이 노드에 스케줄될 수 없다 (taint에 대한 toleration 없음).
+- Backend.AI의 DaemonSet(Agent, NFS Mounter)만 이 taint를 tolerate하여 이 노드에서 실행 가능하다.
+- 커널 컨테이너(DooD)는 K8s 리소스가 아니므로 taint의 영향을 받지 않는다 — K8s 스케줄러를 완전히 우회한다.
+
+이 격리는 노드 리소스(CPU, 메모리, GPU)가 Backend.AI 워크로드 전용으로 예약됨을 보장하며, 관련 없는 K8s Pod과의 노이지 네이버(noisy neighbor) 시나리오를 방지한다.
+
+#### 2.4.3 커널 컨테이너는 Kubernetes 제어 밖에서 동작한다
+
+커널 컨테이너는 K8s Pod이 아닌 Docker/containerd API(DooD)를 통해 생성된다. 따라서:
+
+- K8s는 커널 컨테이너의 라이프사이클, 리소스 사용량, 라벨, 네트워킹에 대해 알지 못한다.
+- `kubectl get pods`는 커널 컨테이너를 표시하지 않는다.
+- K8s NetworkPolicy, PodSecurityPolicy, LimitRange, ResourceQuota는 커널 컨테이너에 적용되지 않는다.
+- 커널 컨테이너 메트릭은 Backend.AI 자체 모니터링이 수집한다 (기본적으로 K8s Prometheus 스택이 아님).
+
+모든 커널 레벨 작업 — 생성, 바인드 마운트, GPU 할당, 헬스 모니터링, 정리 — 은 Backend.AI Agent의 책임이다.
+
+#### 2.4.4 전용 노드 풀
+
+노드 풀 간의 명확한 분리가 필요하다:
+
+| 노드 풀 | Taint | 목적 | 워크로드 |
+|---|---|---|---|
+| **컨트롤 플레인 풀** | 없음 | K8s 관리 Backend.AI 서비스 실행 | Manager, PostgreSQL, Redis, etcd, AppProxy, WebServer |
+| **에이전트 풀** | `backendai.io/dedicated=agent:NoSchedule` | Backend.AI Agent와 커널 컨테이너 실행 | Agent DaemonSet, NFS Mounter DaemonSet, 커널 컨테이너 (DooD 경유) |
+
+동일 노드에 컨트롤 플레인 워크로드와 에이전트 워크로드를 혼합하는 것은 **지원되지 않으며** 리소스 경합을 초래한다.
+
+#### 2.4.5 NVIDIA 드라이버와 Container Toolkit은 호스트 레벨 전제이다
+
+NVIDIA GPU 드라이버와 NVIDIA Container Toolkit은 Docker, containerd, kubelet과 동일한 범주의 **호스트 레벨 전제 조건**으로 취급된다. Backend.AI 배포 전에 각 에이전트 노드에 설치되어야 하며, Kubernetes/Helm이 이들의 설치를 관리하지 않는다.
+
+**근거:**
+
+- NVIDIA 드라이버는 커널 모듈이므로 호스트 커널 버전과 긴밀히 결합됨
+- 드라이버는 DaemonSet이 reconcile한 후가 아닌 노드 부팅 직후에 즉시 사용 가능해야 함
+- 컨테이너 런타임(Docker/containerd)은 데몬 레벨에서 `nvidia-container-runtime`을 구성해야 하며, 이는 호스트 레벨 설정임
+- GPU 문제 디버깅은 컨테이너화된 드라이버 설치기보다 호스트 레벨 드라이버로 훨씬 쉬움
+
+**설치 방법** (하나 선택):
+
+| 환경 | 권장 방법 |
+|---|---|
+| 베어메탈 / 온프레미스 | 드라이버가 사전 설치된 노드 OS 이미지 (Packer, Ansible) |
+| 클라우드 (AWS/GCP/Azure) | GPU 지원 베이스 이미지 (Deep Learning AMI 등) 또는 cloud-init |
+| Kubernetes 배포판 | K3s/RKE2 GPU 설정, 또는 RHEL/OpenShift GPU 노드 프로비저닝 |
+
+**Backend.AI 배포 전 필요 상태:**
+
+1. 호스트에서 `nvidia-smi`가 정상 동작
+2. NVIDIA Container Toolkit이 Docker/containerd에 설치 및 구성됨
+3. 호스트에서 `docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi`가 동작
+
+이 중 하나라도 누락되면 Backend.AI Agent가 GPU 열거에 실패한다.
+
+**NVIDIA GPU Operator에 관한 참고**: Operator의 드라이버 설치 기능(컨테이너화된 드라이버 DaemonSet)은 주 설치 방법으로 **권장하지 않는다**. GPU Feature Discovery와 DCGM 메트릭에 제한된 선택적 Operator 사용에 대해서는 섹션 4.7.2를 참조.
+
+#### 2.4.6 관리 도메인 경계
+
+위 가정들은 Kubernetes가 관리하는 것과 Backend.AI가 관리하는 것 사이의 명확한 경계를 확립한다:
+
+| 도메인 | 관리 주체 | 범위 |
+|---|---|---|
+| 컨트롤 플레인 라이프사이클 | Kubernetes | Manager/DB/Redis/etcd/AppProxy Pod 스케줄링, 헬스, 롤링 업데이트 |
+| Agent DaemonSet 라이프사이클 | Kubernetes | Agent Pod 스케줄링, 헬스, 롤링 업데이트 |
+| GPU 디바이스 할당 | **Backend.AI** | 물리 GPU의 커널 컨테이너 할당, 분할 공유, MIG 파티셔닝 |
+| 커널 컨테이너 라이프사이클 | **Backend.AI** | 컨테이너 생성, 바인드 마운트, REPL 통신, 서비스 포트 매핑 |
+| 커널 네트워킹 | **Backend.AI + Docker/containerd** | 브릿지/오버레이 네트워크, 커널 간 통신 |
+| 스토리지 마운트 오케스트레이션 | **Backend.AI + 호스트/CSI** | vfolder 경로, 스크래치 공간 |
+
+이 분리는 의도된 것이며, Backend.AI의 기존 가속기 플러그인 시스템의 전체 기능 세트(CUDA 훅 라이브러리를 통한 분할 GPU, 멀티 GPU 할당, MIG 지원 등)를 재구조화 없이 보존한다. 섹션 4.7 (GPU 및 가속기 패스스루) 이후 섹션들은 이 전제 조건이 충족되었다고 가정한다.
 
 ---
 
@@ -399,6 +512,55 @@ DooD 모델에서 커널 컨테이너는 마운트된 런타임 소켓을 통해
 
 **네트워크 성능 참고**: Docker Swarm 오버레이는 Backend.AI의 현재 베어메탈 프로덕션 배포에서 멀티 노드 세션에 사용되는 것과 동일한 네트워킹 메커니즘이다. 에이전트를 K8s DaemonSet(DooD)으로 이전해도 커널 컨테이너 네트워킹 경로는 변경되지 않는다 — Swarm 오버레이가 동일하게 계속 동작한다. 따라서 현재 배포 모델 대비 **네트워크 성능 저하가 없다.**
 
+#### 4.5.3 커널 통신 모델
+
+커널 컨테이너는 **인프라에 대해 완전히 무지(agnostic)**하다 — etcd, Redis, PostgreSQL, Manager의 존재를 전혀 알지 못한다. 커널 코드베이스(`src/ai/backend/kernel/`, `src/ai/backend/runner/`)에는 어떤 인프라 서비스에 대한 참조도 없다. 모든 외부 통신은 Agent가 중개한다.
+
+**통신 채널:**
+
+```
+┌─── Node A ──────────────────────────────┐    ┌─── Node B ──────────────────────────────┐
+│                                          │    │                                          │
+│  ┌── Agent A (hostNetwork) ───────────┐  │    │  ┌── Agent B (hostNetwork) ───────────┐  │
+│  │  ZeroMQ      ZeroMQ                │  │    │  │  ZeroMQ      ZeroMQ                │  │
+│  │  ▲              ▲                   │  │    │  │  ▲              ▲                   │  │
+│  └──┼──────────────┼──────────────────┘  │    │  └──┼──────────────┼──────────────────┘  │
+│     │              │                      │    │     │              │                      │
+│     ▼              ▼                      │    │     ▼              ▼                      │
+│  ┌────────┐  ┌────────┐                  │    │  ┌────────┐  ┌────────┐                  │
+│  │Kernel 1│  │Kernel 2│                  │    │  │Kernel 3│  │Kernel 4│                  │
+│  └───┬────┘  └───┬────┘                  │    │  └───┬────┘  └───┬────┘                  │
+│      └─────┬─────┘                        │    │      └─────┬─────┘                        │
+│            │ Docker Swarm Overlay          │    │            │ Docker Swarm Overlay          │
+└────────────┼──────────────────────────────┘    └────────────┼──────────────────────────────┘
+             └──────────── Swarm Overlay ─────────────────────┘
+                  (커널 간: SSH, MPI, NCCL)
+```
+
+각 커널 컨테이너는 정확히 두 가지 통신 경로만 가진다:
+
+| 경로 | 프로토콜 | 네트워크 | 용도 |
+|---|---|---|---|
+| 커널 → **로컬 Agent** | ZeroMQ TCP (`127.0.0.1:{mapped_port}`) | Docker 포트 매핑을 통한 호스트 loopback | 코드 실행 (포트 2000/2001의 REPL in/out), 자동완성, 인터럽트 |
+| 커널 ↔ **다른 커널** (멀티 노드) | SSH, MPI, NCCL | Docker Swarm Overlay | 분산 학습, 클러스터 세션 프로세스 간 통신 |
+
+**커널이 직접 통신하지 않는 컴포넌트:**
+
+| 컴포넌트 | 직접 통신? | 처리 방식 |
+|---|---|---|
+| etcd | 아니오 | Agent가 커널을 대신하여 etcd를 읽기/쓰기 |
+| Redis | 아니오 | Agent가 이벤트와 메트릭을 Redis에 발행 |
+| PostgreSQL | 아니오 | Manager가 모든 DB 작업을 처리 |
+| Manager | 아니오 | Agent가 세션 상태, 이벤트, 라이프사이클 작업을 중계 |
+
+**DooD에서 이것이 중요한 이유**: 커널은 (1) Agent REPL 통신을 위한 호스트 loopback과 (2) 커널 간 통신을 위한 Docker Swarm 오버레이만 필요하므로, K8s Service DNS, K8s CNI, 또는 어떤 클러스터 내부 네트워킹에도 접근할 필요가 없다. 베어메탈에서 K8s DooD 배포로 마이그레이션할 때 커널 컨테이너 이미지는 **완전히 변경 없이** 사용할 수 있다.
+
+**ZeroMQ REPL 상세**: Agent는 ZeroMQ TCP를 통해 커널에 연결하는 `DockerCodeRunner`를 생성한다:
+- `repl_in` (컨테이너 포트 2000): Agent가 커널에 코드 전송
+- `repl_out` (컨테이너 포트 2001): 커널이 Agent에 실행 결과 반환
+
+이 포트들은 Docker에 의해 `127.0.0.1:{host_port}`로 매핑된다. Agent Pod이 `hostNetwork: true`를 사용하므로, 호스트의 loopback 인터페이스를 공유하여 이 매핑된 포트에 직접 접근할 수 있다 — 베어메탈 동작과 동일하다.
+
 ### 4.6 스토리지 아키텍처
 
 #### 4.6.1 vfolder 마운트 경로
@@ -429,21 +591,488 @@ DooD 모델에서 커널 컨테이너는 마운트된 런타임 소켓을 통해
 
 커널 스크래치 디렉터리(커널 내부의 `/home/work`)는 호스트 로컬 스토리지(SSD/NVMe)가 지원한다. 에이전트 Pod과 커널 컨테이너 모두 호스트의 `/var/cache/backendai/scratches`에 접근한다.
 
+#### 4.6.3 DooD 환경에서의 NFS 마운트 고려사항
+
+현재 베어메탈 배포에서 NFS 스토리지는 호스트 OS 레벨(`fstab` 또는 `systemd`)에서 마운트된다. Agent 프로세스는 이미 마운트된 경로(`agent.toml`의 `mount-path`)를 읽고 Docker 바인드 마운트 파라미터로 커널 컨테이너에 전달할 뿐이다. Agent는 NFS를 마운트하거나 언마운트하지 **않는다** — 이미 마운트된 경로의 순수한 소비자일 뿐이다.
+
+K8s DooD 배포에서 이는 제어 격차를 만든다: Helm 차트가 모든 Backend.AI 컴포넌트를 관리하지만, 호스트 레벨 NFS 마운트는 K8s 제어 밖에 있다. 인프라팀에게 각 노드에 NFS 마운트를 사전 구성하도록 요구하는 것은 자체 완결형 배포 목표에 어긋난다.
+
+**옵션 A: 호스트 사전 마운트 (단순, 외부 의존성)**
+
+NFS가 Backend.AI 배포 전에 각 노드에 마운트되며, 베어메탈과 동일하다:
+
+| 항목 | 설명 |
+|---|---|
+| 마운트 방법 | `fstab`, `systemd`, `cloud-init`, 또는 노드 이미지 |
+| 제어 주체 | 인프라팀 (Helm 외부) |
+| Agent 재시작 영향 | 없음 — OS 레벨 마운트 |
+| 노드 확장 | 새 노드에 수동 마운트 설정 필요 |
+| `helm install`만으로 완료? | 아니오 |
+
+**옵션 B: NFS Mounter DaemonSet (K8s 네이티브 배포 권장)**
+
+전용 DaemonSet이 각 에이전트 노드에서 NFS 마운트를 처리하며, Helm 차트로 완전히 관리된다:
+
+```
+┌─── Helm 차트가 둘 다 배포 ────────────────────────────────────┐
+│                                                                │
+│  ┌── nfs-mounter DaemonSet ────────────────────────────────┐  │
+│  │  - mountPropagation으로 각 노드에 NFS 마운트            │  │
+│  │  - Agent와 독립적인 라이프사이클                        │  │
+│  │  - 헬스 체크: 주기적 마운트 포인트 확인                 │  │
+│  │  - 실패 시 자동 재마운트                                │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                │
+│  ┌── Agent DaemonSet ──────────────────────────────────────┐  │
+│  │  - init container가 NFS 마운트 대기                     │  │
+│  │  - hostPath로 /mnt/vfolder 접근 (이미 마운트됨)        │  │
+│  │  - 재시작해도 NFS 마운트에 영향 없음                    │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                │
+│  ┌── 커널 컨테이너 (DooD) ─────────────────────────────────┐  │
+│  │  - 호스트 /mnt/vfolder/...에서 Docker 바인드 마운트     │  │
+│  └──────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────┘
+```
+
+NFS Mounter DaemonSet:
+
+```yaml
+# templates/daemonset-nfs-mounter.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Release.Name }}-nfs-mounter
+spec:
+  selector:
+    matchLabels:
+      app: backendai-nfs-mounter
+  template:
+    spec:
+      nodeSelector:
+        backendai.io/role: agent
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: backendai-nfs-mounter-critical
+      containers:
+        - name: nfs-mounter
+          image: busybox:1.36
+          securityContext:
+            privileged: true
+          command: ['sh', '-c', |
+            if ! mountpoint -q /mnt/vfolder; then
+              echo "Mounting NFS..."
+              mount -t nfs -o {{ .Values.global.storage.nfs.mountOptions }} \
+                {{ .Values.global.storage.nfs.server }}:{{ .Values.global.storage.nfs.export }} \
+                /mnt/vfolder
+            fi
+            # 상주하면서 마운트 상태 주기적 확인
+            while true; do
+              if ! mountpoint -q /mnt/vfolder; then
+                echo "NFS mount lost, remounting..."
+                mount -t nfs -o {{ .Values.global.storage.nfs.mountOptions }} \
+                  {{ .Values.global.storage.nfs.server }}:{{ .Values.global.storage.nfs.export }} \
+                  /mnt/vfolder
+              fi
+              sleep 30
+            done
+          ]
+          volumeMounts:
+            - name: vfolder-mount
+              mountPath: /mnt/vfolder
+              mountPropagation: Bidirectional
+          livenessProbe:
+            exec:
+              command: ['mountpoint', '-q', '/mnt/vfolder']
+            periodSeconds: 30
+            failureThreshold: 3
+      volumes:
+        - name: vfolder-mount
+          hostPath:
+            path: /mnt/vfolder
+            type: DirectoryOrCreate
+```
+
+Agent DaemonSet에 NFS 마운트 대기 init container 추가:
+
+```yaml
+# Agent DaemonSet init containers에 추가
+- name: wait-for-nfs
+  image: busybox:1.36
+  command: ['sh', '-c',
+    'until mountpoint -q /mnt/vfolder; do echo "waiting for NFS mount..."; sleep 3; done']
+  volumeMounts:
+    - name: vfolder-storage
+      mountPath: /mnt/vfolder
+```
+
+**`mountPropagation: Bidirectional` 동작 원리**: NFS Mounter Pod이 자신의 마운트 네임스페이스 안에서 `/mnt/vfolder`에 NFS를 마운트한다. `Bidirectional` 전파로 인해 이 마운트가 호스트의 마운트 네임스페이스로 전파된다. Agent Pod과 Docker 데몬은 호스트의 `/mnt/vfolder`에서 NFS 내용을 볼 수 있다. NFS Mounter Pod이 재시작되면 재마운트하고 다시 전파한다.
+
+스토리지 설정을 위한 Helm values:
+
+```yaml
+global:
+  storage:
+    nfsMounter:
+      enabled: true           # false = 호스트 사전 마운트 (옵션 A)
+    nfs:
+      server: "nfs-server.internal"
+      export: "/export/vfolder"
+      mountPath: "/mnt/vfolder"
+      mountOptions: "vers=4.1,hard,timeo=600,retrans=2,noresvport"
+```
+
+**옵션 비교:**
+
+| 항목 | 옵션 A (호스트 사전 마운트) | 옵션 B (NFS Mounter DaemonSet) |
+|---|---|---|
+| 제어 주체 | 인프라팀 | Helm 차트 |
+| 노드 확장 | 새 노드에 수동 NFS 설정 | 자동 (DaemonSet이 새 노드에 배포) |
+| 설정 변경 | 각 노드에 SSH | `helm upgrade` |
+| 마운트 모니터링 | 별도 구성 필요 | 내장 livenessProbe + 자동 재마운트 |
+| Agent 재시작 영향 | 없음 (OS 레벨 마운트) | 없음 (별도 DaemonSet) |
+| `helm install`만으로 완료? | 아니오 | **예** |
+| NFS Mounter Pod 재시작 | 해당 없음 | 재마운트 및 전파; `hard` 마운트 옵션 사용 시 커널 I/O가 잠시 블로킹됨 (자동 복구) |
+
 ### 4.7 GPU 및 가속기 패스스루
 
-DooD 커널 컨테이너는 현재 베어메탈 모델과 동일하게 GPU에 접근한다:
+이 섹션은 K8s DooD 배포에서 GPU 및 가속기 패스스루가 어떻게 동작하는지 설명한다. 섹션 2.4에서 확립된 전제 — Kubernetes가 GPU 리소스를 관리하지 않으며 GPU 노드가 taint로 격리됨 — 을 기반으로 한다.
 
-| 기능 | DooD 지원 | 메커니즘 |
+#### 4.7.1 이중 레이어 GPU 관리
+
+GPU 관리는 명확히 정의된 책임을 가진 두 레이어로 나뉜다:
+
+```
+┌─── K8s 레이어 (GPU 미인식) ──────────────────────────────────┐
+│                                                                │
+│  ❌ NVIDIA device plugin         — 미배포                      │
+│  ❌ nvidia.com/gpu 리소스         — 에이전트 노드에서 무의미   │
+│  ✅ GPU Feature Discovery (GFD)  — 노드 라벨링만 사용          │
+│  ✅ NVIDIA 드라이버 설치          — Operator로 자동화 (선택)   │
+│  ✅ DCGM Exporter                — Prometheus 메트릭           │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+         │
+         │ nodeSelector: backendai.io/role=agent
+         │ toleration: backendai.io/dedicated=agent:NoSchedule
+         ▼
+┌─── Backend.AI 레이어 (완전한 GPU 제어) ───────────────────────┐
+│                                                                │
+│  Agent DaemonSet                                               │
+│    ├── GPU 디바이스 발견 (/dev/nvidia* 직접 읽기)              │
+│    ├── 드라이버 라이브러리 마운트 (/usr/lib/.../nvidia/*)      │
+│    ├── GPU 슬롯 계산 → etcd 등록                               │
+│    ├── GPU 할당과 함께 커널 컨테이너 생성                      │
+│    ├── CUDA 훅 라이브러리 주입 (분할 GPU)                      │
+│    └── GPU 헬스 모니터링 (nvidia-smi, XID 에러)                │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+```
+
+K8s는 인프라 전제 조건(드라이버 설치, 노드 라벨링, 메트릭 수집)을 담당하지만 **GPU 할당 로직에는 절대 관여하지 않는다**. 모든 GPU 관련 결정은 Backend.AI Agent가 수행한다.
+
+#### 4.7.2 NVIDIA 드라이버 및 Container Toolkit (호스트 레벨 전제)
+
+섹션 2.4.5에서 확립된 바와 같이, NVIDIA 드라이버와 NVIDIA Container Toolkit은 호스트 레벨 전제 조건이며 K8s나 Helm이 관리하지 않는다. 이 섹션은 설치 접근법을 명확히 하고 NVIDIA GPU Operator의 제한된 역할을 설명한다.
+
+##### 4.7.2.1 호스트 레벨 설치 (주 접근법)
+
+Backend.AI를 배포하기 전에 각 에이전트 노드에 NVIDIA 드라이버와 Container Toolkit을 직접 설치한다:
+
+```bash
+# Ubuntu 예시
+apt install nvidia-driver-535
+apt install nvidia-container-toolkit
+systemctl restart docker    # 또는 containerd
+
+# 검증
+nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi
+```
+
+이 접근법은 GPU Operator의 컨테이너화된 드라이버 설치기 대비 다음과 같은 장점을 가진다:
+
+| 항목 | 호스트 설치 | GPU Operator 드라이버 DaemonSet |
 |---|---|---|
-| 단일 GPU 할당 | 완전 지원 | Docker API를 통한 `--device /dev/nvidia0` |
-| 멀티 GPU 할당 | 완전 지원 | 다중 `--device` 플래그 |
-| 분할 GPU (cuda.shares) | 완전 지원 | `generate_hooks()`를 통한 CUDA 훅 라이브러리 주입 |
-| NVIDIA Container Toolkit | 완전 지원 | `--gpus` 플래그 또는 CDI 디바이스 매핑 |
-| MIG (Multi-Instance GPU) | 완전 지원 | MIG 디바이스 UUID 매핑 |
-| NUMA 인식 배치 | 완전 지원 | Docker API를 통한 CPU 피닝 + GPU 어피니티 |
-| ROCm, Habana, IPU | 완전 지원 | 컴퓨트 플러그인을 통한 디바이스 패스스루 |
+| 설치 위치 | `/usr/lib/x86_64-linux-gnu/` (영구 디스크) | `/run/nvidia/driver/` (tmpfs, 메모리) |
+| 재부팅 후 | 즉시 사용 가능 | DaemonSet이 재설치 (5-10분 지연) |
+| 메모리 오버헤드 | 없음 | 노드당 500MB-1GB tmpfs |
+| 디버깅 | 표준 Linux 도구 | DaemonSet Pod 로그 조사 필요 |
+| Linux 배포판 지원 | 모든 배포판 | 공식 지원 배포판만 |
+| Secure Boot | 표준 MOK enrollment | 추가 operator 구성 필요 |
+| 드라이버 버전 제어 | 인프라팀 소유 | Helm values + Operator reconciliation |
+| K8s와의 결합 | 없음 | K8s Pod 라이프사이클이 드라이버 상태에 영향 |
 
-**이것이 VM 기반 접근(Kata)과 순수 K8s 네이티브 접근 대비 DooD의 주요 이점이다**: 에이전트가 컨테이너 생성 파라미터에 대한 완전한 제어권을 유지하여, CUDA 훅 라이브러리를 통한 분할 GPU 할당을 포함한 전체 가속기 플러그인 시스템을 활용할 수 있다.
+**권장 배포 워크플로:**
+
+| 환경 | 방법 | 아티팩트 |
+|---|---|---|
+| 베어메탈 / 온프레미스 | Packer + Ansible로 드라이버가 사전 설치된 노드 이미지 빌드 | 커스텀 OS 이미지 |
+| AWS | AWS Deep Learning AMI (드라이버 + 툴킷 사전 설치) | Amazon Linux 2 또는 Ubuntu DLAMI |
+| GCP | GCP Deep Learning VM 이미지 또는 NVIDIA GPU 최적화 COS | 드라이버 사전 설치된 COS |
+| Azure | NVIDIA 드라이버가 포함된 Azure N-series | N-series Ubuntu 이미지 |
+| K3s/RKE2 | 배포판의 GPU 지원 설치기 사용 | 네이티브 통합 |
+
+##### 4.7.2.2 NVIDIA GPU Operator (선택적 보조 도구)
+
+NVIDIA GPU Operator는 Backend.AI K8s 배포에서 여전히 유용할 수 있지만, **드라이버나 툴킷 설치가 아닌 보조 컴포넌트에만** 사용한다. 대부분의 컴포넌트를 비활성화한 상태로 Operator를 사용한다:
+
+```yaml
+# values.yaml (NVIDIA GPU Operator)
+gpu-operator:
+  driver:
+    enabled: false          # ❌ 호스트 레벨 설치 사용
+  toolkit:
+    enabled: false          # ❌ 호스트 레벨 설치 사용
+  devicePlugin:
+    enabled: false          # ❌ 섹션 2.4.1과 충돌 (Backend.AI가 GPU 관리)
+  migManager:
+    enabled: false          # ❌ 필요 시 Backend.AI가 MIG 처리
+  gfd:
+    enabled: true           # ✅ GPU Feature Discovery — GPU 정보로 노드 자동 라벨링
+  dcgmExporter:
+    enabled: true           # ✅ 관측성을 위한 Prometheus 메트릭
+  nodeStatusExporter:
+    enabled: true           # ✅ 노드 헬스 리포팅
+```
+
+이 구성에서 Operator가 제공하는 것:
+
+| 컴포넌트 | 목적 | 이점 |
+|---|---|---|
+| GPU Feature Discovery (GFD) | `nvidia.com/gpu.product`, `nvidia.com/gpu.count`, `nvidia.com/gpu.memory`로 노드 라벨링 | Agent DaemonSet이 GPU 모델 기반 nodeSelector 사용 가능 |
+| DCGM Exporter | GPU 메트릭(활용률, 온도, 메모리, ECC 에러)을 Prometheus에 노출 | 클러스터 전체 관측성 대시보드 |
+| Node Status Exporter | GPU 관련 노드 조건 보고 | K8s 모니터링 스택과 통합 |
+
+Operator는 **필수가 아니다**. GFD와 DCGM 메트릭이 필요하지 않으면 Operator를 완전히 건너뛸 수 있다 — Backend.AI는 호스트 레벨 드라이버와 툴킷만으로 정상 동작한다.
+
+##### 4.7.2.3 왜 GPU Operator로 드라이버를 설치하지 않는가?
+
+GPU Operator의 드라이버 설치는 교묘하지만 복잡한 접근이다: privileged DaemonSet이 컨테이너 내부에서 커널 모듈을 컴파일하고 호스트 tmpfs 경로에 설치한다. 이 방식은 동작하지만, 프로덕션 Backend.AI 배포에 대해 상당한 운영상 단점이 있다:
+
+1. **재부팅 복구가 느림**: 노드 재부팅 후 드라이버 DaemonSet이 재스케줄되고, 드라이버 이미지를 pull하고, 모듈을 컴파일하고, 설치해야 한다. 5-10분이 소요되며, 이 동안 노드는 GPU 접근이 불가능하다.
+2. **메모리 오버헤드**: `/run/nvidia/driver`(tmpfs)에 저장된 드라이버 파일이 노드당 500MB-1GB RAM을 영구적으로 소비한다.
+3. **커널에 대한 취약한 의존성**: 커널 업그레이드 시 드라이버 컨테이너가 재컴파일해야 한다. 컨테이너의 커널 소스 패키지가 사용 불가하거나 호환되지 않으면 드라이버 설치 실패.
+4. **비정상적인 디버깅 경로**: GPU 이슈를 표준 호스트 도구 대신 드라이버 Pod의 `kubectl logs`로 진단해야 한다.
+5. **제한된 배포판 지원**: 특정 Ubuntu, RHEL, SLES 버전만 공식 지원. 다른 배포판(Arch, Debian minor 버전, 커스텀 커널)은 미지원.
+6. **Secure Boot 복잡성**: 컨테이너화된 환경에서 서명된 모듈을 위한 추가 MOK(Machine Owner Key) 관리 필요.
+7. **Operator 라이프사이클 결합**: GPU Operator 배포가 삭제되거나 업그레이드되면 드라이버 상태가 불일치해질 수 있음.
+
+이러한 이유로, Backend.AI 배포는 NVIDIA 드라이버를 다른 호스트 레벨 시스템 소프트웨어(커널, Docker daemon, kubelet)와 동일하게 취급해야 한다 — K8s가 아닌 노드 프로비저닝 레이어에서 설치 및 관리.
+
+#### 4.7.3 Agent Pod의 GPU 접근
+
+Backend.AI Agent Pod은 다음 용도로 GPU 디바이스와 드라이버 라이브러리에 접근해야 한다:
+
+1. **시작 시 GPU 발견** — GPU 열거, 모델/메모리 조회
+2. **헬스 모니터링** — 주기적 `nvidia-smi` 쿼리
+3. **리소스 슬롯 계산** — etcd에 GPU 슬롯 보고
+4. **할당 결정** — 각 커널 컨테이너에 할당할 GPU 결정
+
+GPU 접근이 가능한 Agent DaemonSet 구성:
+
+```yaml
+spec:
+  template:
+    spec:
+      nodeSelector:
+        backendai.io/role: agent
+        nvidia.com/gpu.present: "true"      # GFD가 제공하는 라벨
+      tolerations:
+        - key: backendai.io/dedicated
+          operator: Equal
+          value: agent
+          effect: NoSchedule
+      containers:
+        - name: agent
+          securityContext:
+            privileged: true
+          env:
+            - name: LD_LIBRARY_PATH
+              value: "/usr/local/nvidia/lib64:/usr/local/nvidia/lib"
+            - name: PATH
+              value: "/usr/local/nvidia/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          volumeMounts:
+            # GPU 디바이스 파일 (privileged로 모든 /dev/nvidia* 접근 가능)
+            - name: dev
+              mountPath: /dev
+            # 호스트에서 NVIDIA 드라이버 라이브러리
+            - name: nvidia-driver
+              mountPath: /usr/local/nvidia
+              readOnly: true
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: nvidia-driver
+          hostPath:
+            path: /run/nvidia/driver        # GPU Operator 마운트 포인트
+            type: Directory
+```
+
+**대안: Agent 이미지를 NVIDIA CUDA 베이스로 빌드**. Agent 이미지를 `nvidia/cuda:12.x-base`에서 빌드하고 NVIDIA Container Runtime을 사용한다. Agent Pod이 생성될 때 NVIDIA 런타임이 드라이버 라이브러리와 디바이스를 자동으로 컨테이너에 마운트한다. Pod 스펙이 단순해지지만 Agent 이미지의 CUDA 버전이 호스트 드라이버 버전과 일치해야 한다.
+
+#### 4.7.4 커널 컨테이너 GPU 할당
+
+Agent가 GPU 접근으로 실행되면, 커널 컨테이너 GPU 할당은 현재 베어메탈 모델과 동일하게 동작한다. Agent는 Docker/containerd API를 직접 사용하여 각 커널 컨테이너에 GPU 디바이스, 라이브러리, 환경변수를 연결한다.
+
+| 기능 | 메커니즘 | 호환성 |
+|---|---|---|
+| 단일 GPU 할당 | Docker API의 `--device /dev/nvidia0` | 베어메탈과 동일 |
+| 멀티 GPU 할당 | 다중 `--device` 플래그 또는 `--gpus '"device=0,1"'` | 베어메탈과 동일 |
+| 분할 GPU (cuda.shares) | `generate_hooks()` + `LD_PRELOAD`로 CUDA 훅 라이브러리 주입 | 호스트에 훅 라이브러리 필요 (4.7.5 참조) |
+| NVIDIA Container Toolkit | `--gpus all` 플래그 또는 CDI 디바이스 스펙 | 호스트에 툴킷 설치 필요 |
+| MIG (Multi-Instance GPU) | MIG UUID를 디바이스로 주입 | 호스트 레벨 MIG 파티셔닝 필요 (4.7.6 참조) |
+| NUMA 인식 배치 | CPU 피닝 + GPU 어피니티 힌트 | 호스트 `/sys`의 NUMA 토폴로지 사용 |
+| ROCm (AMD) | `/dev/kfd`, `/dev/dri/*` 디바이스 파일 | 컴퓨트 플러그인이 디바이스 결정 |
+| Habana, IPU, Rebellions, XPU | 플러그인별 디바이스 경로 | 각 컴퓨트 플러그인이 처리 |
+
+Agent가 베어메탈과 동일한 Docker/containerd API 코드 경로를 사용하므로, **가속기 플러그인 시스템에 변경이 필요 없다**. DooD 아키텍처는 Backend.AI의 GPU 관리 전체 기능 세트를 보존한다.
+
+#### 4.7.5 분할 GPU Hook Library 배포
+
+Backend.AI의 분할 GPU 공유는 `LD_PRELOAD`로 주입되는 CUDA 훅 라이브러리(`libbaicuda.so`)에 의존한다. Agent의 `generate_hooks()` 메서드가 이 라이브러리의 호스트 경로를 반환하며, 커널 컨테이너에 바인드 마운트된다.
+
+K8s DooD 배포에서는 훅 라이브러리가 **호스트** 파일시스템의 알려진 경로에 있어야 한다. 세 가지 배포 옵션:
+
+| 옵션 | 설명 | 복잡도 | 버전 관리 |
+|---|---|---|---|
+| **A. Agent 이미지 번들** | Agent 이미지에 `.so` 파일 포함; init container가 hostPath에 복사 | 낮음 | Agent 업그레이드 시 자동 |
+| **B. 전용 installer DaemonSet** | 별도 DaemonSet이 호스트에 라이브러리 배포 | 중간 | Agent 버전과 독립 |
+| **C. 노드 이미지 사전 설치** | 노드 OS 이미지에 라이브러리 포함 | 중간 | 노드 재프로비저닝 필요 |
+
+**권고: 옵션 A (Agent 이미지 번들)**. 라이브러리 버전이 Agent 버전과 자동으로 동기화되며, Helm 업그레이드가 배포를 처리한다:
+
+```yaml
+# Agent DaemonSet init container
+initContainers:
+  - name: install-cuda-hook
+    image: "{{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}"
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /host/opt/backendai/hooks
+        cp /opt/backendai/hooks/libbaicuda.so /host/opt/backendai/hooks/
+        chmod 755 /host/opt/backendai/hooks/libbaicuda.so
+    volumeMounts:
+      - name: host-backendai-hooks
+        mountPath: /host/opt/backendai/hooks
+volumes:
+  - name: host-backendai-hooks
+    hostPath:
+      path: /opt/backendai/hooks
+      type: DirectoryOrCreate
+```
+
+Agent의 `generate_hooks()`가 `/opt/backendai/hooks/libbaicuda.so`를 반환하며, Docker가 이를 각 커널 컨테이너에 바인드 마운트한다. 커널의 `LD_PRELOAD` 환경변수가 시작 시 이 라이브러리를 로드하도록 설정된다.
+
+#### 4.7.6 MIG 파티셔닝
+
+NVIDIA H100/A100의 Multi-Instance GPU (MIG) 파티셔닝은 Agent가 GPU를 열거하기 **전에** 호스트 레벨 구성이 완료되어야 한다. MIG 파티션 관리 옵션:
+
+| 옵션 | 설명 | 트레이드오프 |
+|---|---|---|
+| **노드 프로비저닝 시** | cloud-init 또는 Ansible로 노드 부트스트랩 중 MIG 파티션 설정 | 정적 — 파티션 레이아웃 변경 시 재프로비저닝 필요 |
+| **NVIDIA GPU Operator MIG Manager** | Operator의 MIG Manager 컴포넌트 | 섹션 4.7.2에 따라 **비활성화** — device plugin과 결합됨 |
+| **수동 nvidia-smi** | 클러스터 관리자가 노드별로 `nvidia-smi mig -cgi ...` 실행 | 운영 부담 |
+| **향후: Backend.AI Agent 동적 MIG** | Agent가 할당 요청에 따라 MIG 파티셔닝 | 현재 미구현 |
+
+**현재 권고**: 노드 프로비저닝 시 정적으로 MIG 파티션을 설정한다. Agent가 `nvidia-smi -L`로 MIG 인스턴스를 감지하고 각 MIG UUID를 별도 GPU 슬롯으로 etcd에 등록한다. 커널 컨테이너는 `NVIDIA_VISIBLE_DEVICES` 환경변수를 통해 특정 MIG UUID를 받는다.
+
+#### 4.7.7 GPU 헬스 모니터링 및 장애 처리
+
+K8s 관리 Pod과 달리, 커널 컨테이너 GPU 장애는 K8s 스케줄러에 보이지 않는다 (설계 의도 — 섹션 2.4.1). Backend.AI Agent가 GPU 헬스 모니터링과 복구를 단독으로 책임진다.
+
+**Agent의 GPU 헬스 루프:**
+
+```
+N초마다 (설정 가능):
+  1. 모든 GPU에 대해 `nvidia-smi -q` 실행
+  2. XID 에러 카운트, ECC 에러, 온도, 파워 상태 파싱
+  3. 각 GPU에 대해:
+     - XID 치명적 에러 → 슬롯을 etcd에서 unavailable로 마킹
+     - ECC 복구 불가 에러 카운트 증가 → 슬롯을 degraded로 마킹
+     - 온도 > 임계값 → 경고 로그, 실패 처리하지 않음
+  4. 노드의 모든 GPU가 unavailable이면:
+     - Manager에 GPU 슬롯 0 보고
+     - 선택적으로 K8s API를 호출하여 노드 cordon (RBAC 필요)
+     - Manager가 이 노드에 새 세션 스케줄링 중단
+  5. Manager 알림을 위해 Redis에 헬스 이벤트 발행
+```
+
+**K8s와의 상호작용:**
+
+- **DCGM Exporter** (GPU Operator 제공)는 Agent 자체 모니터링과 독립적으로 GPU 메트릭을 Prometheus에 발행한다. 클러스터 운영자는 이 메트릭으로 대시보드를 구성할 수 있지만 Agent는 이를 소비하지 않는다.
+- **Node Problem Detector** (선택)는 NVIDIA 드라이버 크래시를 감지하여 K8s 노드를 NotReady로 마킹하도록 구성할 수 있다. 이는 Agent Pod을 축출하지만 커널 컨테이너에는 영향 없음 (DooD로 실행되므로).
+- **K8s API를 통한 Cordon**은 선택 사항. Agent에 RBAC 권한이 있으면 `kubectl cordon`과 동등한 호출로 새 Pod(다른 Backend.AI DaemonSet이 있다면) 스케줄링을 방지할 수 있다. 기존 커널 컨테이너에는 영향 없음.
+
+**복구**: 수동 드라이버 리셋(`nvidia-smi --gpu-reset`) 또는 노드 재부팅. Agent가 재시작 시 GPU를 재열거하고 정상 GPU 풀에 다시 참여한다. 실패한 GPU를 사용 중인 커널 컨테이너는 종료되고 Manager가 재스케줄해야 한다.
+
+#### 4.7.8 컴퓨트 플러그인 이미지 전략
+
+Backend.AI의 가속기 플러그인(`backendai_accelerator_cuda`, `backendai_accelerator_rocm`, `backendai_accelerator_xpu`, `backendai_accelerator_habana` 등)은 Agent 프로세스 시작 시 로드된다. K8s 배포에서 이 플러그인을 Agent 이미지로 배포하는 두 가지 전략이 있다:
+
+| 전략 | 설명 | 장점 | 단점 |
+|---|---|---|---|
+| **단일 통합 이미지** | 하나의 Agent 이미지에 모든 플러그인 포함; 런타임에 하드웨어 감지 후 적절한 플러그인 활성화 | 단일 이미지 관리; 단순한 Helm values | 이미지 크기 증가; 미사용 플러그인 로드 |
+| **벤더별 이미지** | 별도 이미지: `backendai-agent-cuda`, `backendai-agent-rocm`, `backendai-agent-xpu` | 작은 이미지; 명확한 의존성 | 이미지 매트릭스 관리 부담; 노드 타입별 DaemonSet 선택 필요 |
+
+**권고: 단일 통합 이미지**. 크기 오버헤드는 미미하며(플러그인 코드는 CUDA/ROCm 라이브러리에 비해 작음), 더 단순한 배포 모델이 운영 복잡도를 줄인다. Agent는 시작 시 다음을 통해 사용 가능한 하드웨어를 감지한다:
+
+1. 노드 라벨 (`nvidia.com/gpu.product`, `amd.com/gpu.family`) — GFD 또는 유사한 것이 배포된 경우
+2. 직접 하드웨어 프로빙 (`lspci`, `/dev/nvidia*`, `/dev/kfd`)
+3. `agent.toml` 또는 환경변수 설정
+
+이종 클러스터(예: NVIDIA H100 노드 + AMD MI300 노드)의 경우, 엄격한 이미지 분리가 필요하면 nodeSelector를 가진 벤더별 DaemonSet을 사용할 수 있다:
+
+```yaml
+# values.yaml
+agent:
+  daemonsets:
+    - name: agent-nvidia
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      image:
+        tag: "25.12.0-cuda"
+    - name: agent-amd
+      nodeSelector:
+        amd.com/gpu.present: "true"
+      image:
+        tag: "25.12.0-rocm"
+```
+
+이 방식은 단일 values 구성에서 여러 DaemonSet을 생성하기 위해 Helm 템플릿이 필요하다.
+
+#### 4.7.9 VM 기반 격리 대안 (외부 문서)
+
+DooD 컨테이너가 제공하는 격리보다 더 강한 격리가 필요한 환경 — 신뢰할 수 없는 코드의 멀티테넌시, 규제 준수, 기밀 컴퓨팅 — 에서는 기본 DooD 아키텍처와 함께 VM 기반 격리 런타임(Kata Containers, KubeVirt)이 지원되어야 한다.
+
+VM 런타임 지원은 상당한 아키텍처 고려사항, GPU 제약, 운영 전략, 12개 레이어에 걸친 시스템 전반 변경 사항을 포함하므로, **별도의 동반 문서**로 분리되어 있다:
+
+**📄 [Backend.AI VM 런타임 지원: Kata Containers와 KubeVirt](./support_vm_kata.ko.md)**
+
+해당 문서가 다루는 내용:
+
+- **배경**: DooD와 함께 VM 격리가 지원되어야 하는 이유 (보안, 규제 준수, 기밀 컴퓨팅)
+- **런타임 옵션**: Kata Containers vs KubeVirt vs DooD 비교
+- **GPU + VM 제약**: Firecracker를 사용할 수 없는 이유, VM 풀링이 GPU에서 실패하는 이유, GPU cold start 현실 (30초~수 분)
+- **운영 전략**: 세션별 runtime class 선택, 전용 GPU 풀, NVIDIA vGPU/MIG 통합, 하이브리드 노드를 위한 GPU별 드라이버 바인딩
+- **하이브리드 런타임 아키텍처**: taint 기반 풀 분리를 가진 멀티 런타임 클러스터 설계
+- **시스템 전반 변경 사항**: 12개 아키텍처 레이어에 걸친 55개 필요 변경 (Agent 코어, 커널 통신, GPU 할당, 스토리지, 네트워킹, 이미지 관리, 스케줄러, 노드 인프라, 모니터링, Helm, API/CLI/UI, 테스트 인프라)
+- **점진적 구현 로드맵**: 12-18개월에 걸친 4단계 접근
+- **결정 게이트**: VM 런타임 지원에 착수하기 전 평가 기준
+
+**이 문서 맥락에서의 핵심 시사점:**
+
+| 측면 | 상태 |
+|---|---|
+| VM 런타임 지원 필요성 | 예 (보안/규제 시나리오) |
+| 기본 런타임 | DooD (일반 워크로드용으로 유지) |
+| 구현 영향 | 12-18개월, 2-3명 엔지니어, 12 레이어 변경 |
+| 현재 4.7.1-4.7.8 설계와의 호환성 | 예 (DooD 주력, VM 런타임은 옵트인) |
 
 ---
 
@@ -1278,6 +1907,484 @@ helm upgrade backendai ./backendai \
 
 # Agent 롤링 업데이트는 DaemonSet 업데이트 전략으로 처리됨
 # 커널 컨테이너는 영향받지 않음 (DooD — 호스트에서 실행)
+```
+
+### 6.8 컨테이너 이미지 관리
+
+DooD 아키텍처에서는 **두 개의 독립적인 이미지 pull 경로**가 있으며, 각각 별도로 설정해야 한다:
+
+```
+┌─── 이미지 레지스트리 (예: Harbor) ────────────────────────────┐
+│                                                               │
+│  backendai/manager:25.12.0        ← kubelet이 pull           │
+│  backendai/agent:25.12.0          ← kubelet이 pull           │
+│  backendai/webserver:25.12.0      ← kubelet이 pull           │
+│  backendai/kernel-python:3.11     ← Agent가 pull (Docker API)│
+│  backendai/kernel-pytorch:2.1     ← Agent가 pull (Docker API)│
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
+         ▲                                    ▲
+         │                                    │
+   K8s imagePullSecrets              etcd registry 설정
+   (Helm values)                    (Manager API / etcd)
+```
+
+#### 6.8.1 이중 이미지 Pull 아키텍처
+
+| 구분 | 컨트롤 플레인 이미지 | 커널 이미지 |
+|---|---|---|
+| **예시** | `manager`, `agent`, `webserver`, `app-proxy` | `kernel-python:3.11`, `kernel-pytorch:2.1` |
+| **pull 주체** | kubelet | Backend.AI Agent (Docker/containerd API 경유) |
+| **인증** | K8s `imagePullSecrets` | etcd `registry_conf` (username/password) |
+| **설정 위치** | Helm `values.yaml` | Backend.AI Manager API 또는 etcd |
+| **라이프사이클** | `helm upgrade`로 업데이트 | Backend.AI 이미지 관리 기능으로 업데이트 |
+
+Agent의 pull 구현(`src/ai/backend/agent/docker/agent.py`)은 etcd에서 레지스트리 인증 정보를 읽어 Docker API에 직접 전달한다:
+
+```python
+reg_user = registry_conf.get("username")
+reg_passwd = registry_conf.get("password")
+auth_config = {"auth": base64.b64encode(f"{reg_user}:{reg_passwd}".encode()).decode("ascii")}
+await docker.images.pull(image_ref.canonical, auth=auth_config)
+```
+
+이는 K8s `imagePullSecrets`가 커널 이미지 pull에 **전혀 영향을 미치지 않음**을 의미한다 — Agent는 kubelet을 완전히 우회한다.
+
+#### 6.8.2 레지스트리 인증 정보 동기화
+
+프라이빗 레지스트리(예: Harbor)를 컨트롤 플레인과 커널 이미지 모두에 사용하는 경우, 인증 정보를 **두 곳에** 설정해야 한다:
+
+1. **K8s Secret** (kubelet용): Helm values의 `imagePullSecrets`
+2. **etcd** (Agent용): Manager API를 통한 레지스트리 username/password
+
+인증 정보를 두 곳에서 관리하는 것을 방지하기 위해, **Helm post-install/post-upgrade hook**을 사용하여 K8s Secret 인증 정보를 etcd에 자동 동기화한다:
+
+```yaml
+# templates/jobs/sync-registry-creds.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-sync-registry-creds
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: hook-succeeded
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: sync
+          image: bitnami/etcd:3.5
+          command: ['sh', '-c', |
+            etcdctl --endpoints={{ .Values.global.etcd.host }}:{{ .Values.global.etcd.port }} \
+              put /{{ .Values.global.etcd.namespace }}/config/docker/registry/{{ .Values.global.imageRegistry.host }}/username "$REG_USER"
+            etcdctl --endpoints={{ .Values.global.etcd.host }}:{{ .Values.global.etcd.port }} \
+              put /{{ .Values.global.etcd.namespace }}/config/docker/registry/{{ .Values.global.imageRegistry.host }}/password "$REG_PASS"
+          ]
+          env:
+            - name: REG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.imageRegistry.existingSecret }}
+                  key: username
+            - name: REG_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.imageRegistry.existingSecret }}
+                  key: password
+```
+
+`values.yaml`에 대응하는 값을 추가한다:
+
+```yaml
+global:
+  imageRegistry:
+    host: "harbor.internal"
+    existingSecret: "harbor-credentials"   # username/password 키를 가진 K8s Secret
+  imagePullSecrets:
+    - harbor-credentials                   # kubelet용 (컨트롤 플레인 이미지)
+```
+
+이렇게 하면 레지스트리 인증 정보를 **단일 K8s Secret에서만** 관리하고, Helm hook이 매 설치/업그레이드 시 Agent를 위해 etcd에 동기화한다.
+
+#### 6.8.3 에어갭 배포
+
+외부 레지스트리 접근이 없는 에어갭 환경에서:
+
+| 이미지 유형 | 사전 로딩 전략 |
+|---|---|
+| 컨트롤 플레인 | 각 노드에서 `docker load` 또는 `ctr image import`, `imagePullPolicy: IfNotPresent` 설정 |
+| 커널 | 각 에이전트 노드에서 `docker load` (DooD 접근을 위해 호스트 Docker 데몬에 로딩) |
+
+에어갭 모드의 커널 이미지의 경우, Backend.AI 설정에서 `auto_pull`을 `NONE`으로 설정하여 Agent가 도달 불가능한 레지스트리에서 이미지를 pull하려는 시도를 방지한다. 모든 커널 이미지는 각 에이전트 노드의 Docker 데몬에 사전 로딩되어야 한다.
+
+#### 6.8.4 인증 정보 로테이션 절차
+
+레지스트리 인증 정보가 변경될 때:
+
+1. K8s Secret 업데이트:
+   ```bash
+   kubectl create secret docker-registry harbor-credentials \
+     --docker-server=harbor.internal \
+     --docker-username=NEW_USER \
+     --docker-password=NEW_PASS \
+     -n backendai-system --dry-run=client -o yaml | kubectl apply -f -
+   ```
+2. Helm upgrade를 실행하여 동기화 hook 트리거:
+   ```bash
+   helm upgrade backendai ./backendai -n backendai-system
+   ```
+3. etcd에 인증 정보가 업데이트되었는지 확인:
+   ```bash
+   kubectl exec -n backendai-system backendai-etcd-0 -- \
+     etcdctl get /backend/config/docker/registry/harbor.internal/username
+   ```
+
+### 6.9 데이터베이스 마이그레이션 전략 (Alembic)
+
+Backend.AI는 데이터베이스 스키마 마이그레이션에 Alembic을 사용한다. 이미지 업데이트가 Pod 재생성을 트리거하는 K8s 배포에서, 마이그레이션은 새 Manager Pod이 시작되기 **전에** 실행되어야 한다. 그렇지 않으면 새 코드가 아직 존재하지 않는 컬럼이나 테이블을 참조하여 즉시 시작 실패가 발생한다.
+
+#### 6.9.1 문제
+
+```
+helm upgrade (manager 이미지 25.12.0 → 25.13.0)
+    │
+    ├── 새 Manager Pod 생성 (25.13.0 코드)
+    │     → DB 스키마는 아직 25.12.0 상태
+    │     → 새 코드가 없는 컬럼/테이블을 참조
+    │     → 크래시
+    │
+    └── 새 Pod 시작 전에 마이그레이션이 실행되어야 함
+```
+
+#### 6.9.2 해결: Helm Pre-Upgrade Hook
+
+Kubernetes Job이 Manager Deployment 업데이트 전에 **새** Manager 이미지를 사용하여 Alembic 마이그레이션을 실행한다:
+
+```yaml
+# templates/jobs/db-migrate.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-db-migrate
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-db
+          image: postgres:16-alpine
+          command: ['sh', '-c',
+            'until pg_isready -h {{ .Values.global.db.host }} -p {{ .Values.global.db.port }} -U {{ .Values.global.db.auth.user }}; do echo "db not ready..."; sleep 3; done']
+      containers:
+        - name: migrate
+          image: "{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag }}"
+          command: ["python", "-m", "ai.backend.manager.cli", "schema", "oneshot"]
+          env:
+            - name: BACKEND_DB_ADDR
+              value: "{{ .Values.global.db.host }}:{{ .Values.global.db.port }}"
+            - name: BACKEND_DB_NAME
+              value: "{{ .Values.global.db.name }}"
+            - name: BACKEND_DB_USER
+              value: "{{ .Values.global.db.auth.user }}"
+            - name: BACKEND_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.global.db.auth.existingSecret }}"
+                  key: "{{ .Values.global.db.auth.secretKey }}"
+            - name: BACKEND_ETCD_ADDR
+              value: "{{ .Values.global.etcd.host }}:{{ .Values.global.etcd.port }}"
+```
+
+AppProxy Coordinator도 자체 데이터베이스와 Alembic 마이그레이션이 있다:
+
+```yaml
+# templates/jobs/db-migrate-appproxy.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-db-migrate-appproxy
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-db
+          image: postgres:16-alpine
+          command: ['sh', '-c',
+            'until pg_isready -h {{ .Values.global.db.host }} -p {{ .Values.global.db.port }} -U {{ .Values.global.db.auth.user }}; do echo "db not ready..."; sleep 3; done']
+      containers:
+        - name: migrate
+          image: "{{ .Values.appProxy.coordinator.image.repository }}:{{ .Values.appProxy.coordinator.image.tag }}"
+          command: ["python", "-m", "ai.backend.app_proxy.coordinator.cli", "schema", "oneshot"]
+          env:
+            - name: BACKEND_DB_ADDR
+              value: "{{ .Values.global.db.host }}:{{ .Values.global.db.port }}"
+            - name: BACKEND_DB_NAME
+              value: "appproxy"
+            - name: BACKEND_DB_USER
+              value: "{{ .Values.global.db.auth.user }}"
+            - name: BACKEND_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.global.db.auth.existingSecret }}"
+                  key: "{{ .Values.global.db.auth.secretKey }}"
+```
+
+#### 6.9.3 Helm Hook 실행 순서
+
+모든 Helm hook은 메인 리소스가 업데이트되기 전에 `hook-weight` 순서로 실행된다:
+
+```
+helm install/upgrade
+    │
+    │  hook-weight: -5
+    ├── sync-registry-creds Job       (K8s Secret → etcd 동기화)
+    │
+    │  hook-weight: 0
+    ├── db-migrate Job                (Manager DB: alembic upgrade head)
+    │
+    │  hook-weight: 1
+    ├── db-migrate-appproxy Job       (AppProxy DB: alembic upgrade head)
+    │
+    │  hook-weight: 5
+    ├── init-etcd-volumes Job         (etcd vfolder 설정 초기화)
+    │
+    │  (모든 hook 성공적으로 완료)
+    ├── Manager Deployment 업데이트    (새 이미지, 스키마 이미 최신)
+    ├── AppProxy Deployment 업데이트
+    ├── Agent DaemonSet 업데이트
+    └── 기타 컴포넌트 업데이트
+```
+
+어떤 hook Job이라도 실패하면(예: 마이그레이션 오류), Helm이 업그레이드를 중단하고 Deployment가 업데이트되지 않는다. 이로써 호환되지 않는 스키마에 새 코드를 배포하는 것을 방지한다.
+
+#### 6.9.4 롤백 시 고려사항
+
+```
+helm rollback backendai 1
+    │
+    ├── Manager 이미지 롤백: 25.13.0 → 25.12.0
+    │
+    └── DB 스키마는 25.13.0 상태 유지 (Helm 롤백은 마이그레이션을 실행하지 않음)
+```
+
+Backend.AI의 Alembic 마이그레이션은 기본적으로 **순방향 전용(forward-only)**이다. 롤백 동작은 마이그레이션 유형에 따라 다르다:
+
+| 마이그레이션 유형 | 롤백 안전성 | 필요 조치 |
+|---|---|---|
+| 컬럼 추가 | **안전** — 이전 코드가 알려지지 않은 컬럼을 무시 | 조치 불필요 |
+| 새 테이블 | **안전** — 이전 코드가 참조하지 않음 | 조치 불필요 |
+| 컬럼 이름 변경 | **안전하지 않음** — 이전 코드가 이전 컬럼명을 참조 | 수동 `alembic downgrade` 필요 |
+| 컬럼 삭제 | **안전하지 않음** — 이전 코드가 삭제된 컬럼을 참조 | 수동 `alembic downgrade` 필요 |
+| 데이터 변환 | **안전하지 않음** — 데이터 형식이 호환되지 않을 수 있음 | 수동 평가 + downgrade 필요 |
+
+**안전하지 않은 마이그레이션의 롤백 절차:**
+
+```bash
+# 1. 이전 버전의 대상 Alembic 리비전 확인
+kubectl exec -n backendai-system deploy/backendai-manager -- \
+  python -m ai.backend.manager.cli schema show-revision
+
+# 2. 수동 downgrade 실행 (이전 이미지 사용)
+kubectl run db-downgrade --rm -it \
+  --image=backendai/manager:25.12.0 \
+  -n backendai-system -- \
+  python -m ai.backend.manager.cli schema downgrade <target-revision>
+
+# 3. Helm 롤백 수행
+helm rollback backendai 1 -n backendai-system
+```
+
+> **모범 사례**: 모든 업그레이드 전에 현재 Alembic 리비전을 기록한다. 이를 통해 롤백이 필요한 경우 대상 downgrade가 가능하다. 현재 리비전을 ConfigMap에 저장하는 pre-upgrade hook 추가를 고려한다.
+
+### 6.10 Redis 고가용성
+
+Backend.AI는 이미 고가용성을 위해 Redis Sentinel을 지원한다. K8s 배포는 기존 Sentinel 기반 클라이언트 코드와 호환되는 Redis HA 구성을 제공해야 한다.
+
+#### 6.10.1 옵션 비교
+
+| 옵션 | Pod 수 | Failover | Backend.AI 호환 | 운영 복잡도 | 적합한 환경 |
+|---|---|---|---|---|---|
+| **Bitnami Helm (Sentinel)** | **3** (각 Pod에 master+replica+sentinel) | Sentinel 자동 failover | 완전 (기존 Sentinel 지원) | 낮음 | 온프레미스, 단일 클러스터 |
+| **Redis Operator (Spotahome)** | **7** (operator 1 + Redis 3 + Sentinel 3) | Operator + Sentinel | 완전 | 중간 | 멀티 클러스터, 플랫폼 팀 |
+| **관리형 Redis** | 0 (클라우드 관리) | 클라우드 제공자 관리 | 완전 (단일 엔드포인트 또는 Sentinel) | 최저 | 클라우드 배포 (AWS, GCP, Azure) |
+| **Redis Cluster** | 6+ (master 3 + replica 3) | 클러스터 내장 failover | **미지원** (클라이언트 변경 필요) | 높음 | 비권장 |
+
+#### 6.10.2 권고: Bitnami Helm Chart (Sentinel 모드)
+
+Backend.AI와 완전히 호환되는 가장 단순한 옵션. Sentinel이 각 Redis Pod에 사이드카로 실행되어 총 **3개 Pod**만 필요하다:
+
+```
+┌─── Redis StatefulSet (Bitnami Helm) ──────────────────────┐
+│                                                            │
+│  backendai-redis-node-0  (master + sentinel 사이드카)      │
+│  backendai-redis-node-1  (replica + sentinel 사이드카)     │
+│  backendai-redis-node-2  (replica + sentinel 사이드카)     │
+│                                                            │
+│  K8s Services:                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ backendai-redis.svc:6379       → master (read-write) │  │
+│  │ backendai-redis-headless.svc   → 모든 노드           │  │
+│  │ backendai-redis.svc:26379      → sentinel 포트       │  │
+│  └──────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────┘
+```
+
+Helm values:
+
+```yaml
+redis:
+  enabled: true
+  architecture: replication
+
+  sentinel:
+    enabled: true
+    quorum: 2
+
+  master:
+    persistence:
+      size: 8Gi
+      storageClass: fast-ssd
+
+  replica:
+    replicaCount: 2
+
+  auth:
+    existingSecret: backendai-redis-credentials
+    existingSecretPasswordKey: password
+```
+
+#### 6.10.3 대안: Redis Operator (Spotahome)
+
+오퍼레이터 관리 인프라를 선호하는 조직을 위한 옵션. 오퍼레이터가 `RedisFailover` CRD를 감시하고 Redis 토폴로지, 롤링 업그레이드, 복구를 자동으로 관리한다:
+
+```
+┌─── Redis Operator Deployment ─────────────────────────────┐
+│                                                            │
+│  Operator Pod (1)          ← RedisFailover CRD 감시        │
+│                                                            │
+│  Redis Pods:                                               │
+│    redis-0 (master)                                        │
+│    redis-1 (replica)                                       │
+│    redis-2 (replica)                                       │
+│                                                            │
+│  Sentinel Pods:                                            │
+│    sentinel-0                                              │
+│    sentinel-1                                              │
+│    sentinel-2                                              │
+│                                                            │
+│  합계: 7 Pods                                              │
+└────────────────────────────────────────────────────────────┘
+```
+
+```yaml
+apiVersion: databases.spotahome.com/v1
+kind: RedisFailover
+metadata:
+  name: backendai-redis
+  namespace: backendai-system
+spec:
+  sentinel:
+    replicas: 3
+  redis:
+    replicas: 3
+    storage:
+      persistentVolumeClaim:
+        metadata:
+          name: redis-data
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 8Gi
+```
+
+**Bitnami Helm 대비 Operator의 이점:**
+
+| 시나리오 | Bitnami Helm | Redis Operator |
+|---|---|---|
+| K8s에 의한 Pod 삭제 | Sentinel이 failover 처리; 수동 토폴로지 확인 필요할 수 있음 | Operator가 자동으로 원하는 상태로 조정 |
+| Redis 버전 업그레이드 | `helm upgrade`로 수동 검증 | Operator가 롤링 업데이트 관리 |
+| 영속 스토리지 문제 | 수동 개입 | Operator가 감지하고 재생성 |
+| 설정 드리프트 | 수동 변경 후 가능 | Operator가 지속적으로 조정 |
+
+#### 6.10.4 대안: 관리형 Redis (클라우드)
+
+클라우드 배포에서 관리형 Redis는 모든 운영 부담을 제거한다:
+
+| 클라우드 제공자 | 서비스 | Sentinel 호환 | 설정 |
+|---|---|---|---|
+| AWS | ElastiCache for Redis | 예 (클러스터 모드 비활성화) | 단일 primary 엔드포인트 |
+| GCP | Memorystore for Redis | 예 (Standard 티어) | 단일 엔드포인트 + 자동 failover |
+| Azure | Azure Cache for Redis | 예 (Premium 티어) | 단일 엔드포인트 + 자동 failover |
+
+관리형 Redis 사용 시, Helm values에서 `redis.enabled=false`로 설정하고 외부 엔드포인트를 구성한다:
+
+```yaml
+redis:
+  enabled: false
+
+global:
+  redis:
+    host: "my-redis.xxxx.cache.amazonaws.com"
+    port: 6379
+    # Sentinel 설정 불필요 — 관리형 Redis가 내부적으로 failover 처리
+```
+
+#### 6.10.5 Backend.AI Sentinel 설정
+
+선택한 Redis HA 옵션(Bitnami 또는 Operator)과 관계없이, Backend.AI Manager와 Agent는 Sentinel 연결 정보가 필요하다. Sentinel은 여러 호스트 항목(`[[redis.sentinel]]` TOML 배열)이 필요하므로, 환경변수보다 ConfigMap을 통해 제공하는 것이 가장 적합하다:
+
+```yaml
+# Manager용 ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backendai-manager-redis-config
+data:
+  redis.toml: |
+    [redis]
+    service-name = "mymaster"
+
+    [[redis.sentinel]]
+    host = "backendai-redis-node-0.backendai-redis-headless.backendai-system.svc"
+    port = 26379
+
+    [[redis.sentinel]]
+    host = "backendai-redis-node-1.backendai-redis-headless.backendai-system.svc"
+    port = 26379
+
+    [[redis.sentinel]]
+    host = "backendai-redis-node-2.backendai-redis-headless.backendai-system.svc"
+    port = 26379
+```
+
+**Failover 동작:**
+
+```
+정상 상태:
+  Client → Sentinel (master 주소 질의) → master에 연결
+
+Master 장애:
+  1. Sentinel이 master 다운 감지 (쿼럼: 2/3 동의)
+  2. replica 중 하나를 새 master로 승격
+  3. 다른 replica가 새 master를 따름
+  4. Client가 Sentinel에 재질의 → 새 master에 연결
+
+  → Backend.AI redis_helper가 이미 Sentinel 프로토콜을 지원
+    — failover 시 자동 master 발견 및 재연결
 ```
 
 ---
