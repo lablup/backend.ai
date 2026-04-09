@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     UploadFilesInput,
 )
 from ai.backend.common.dto.manager.v2.session.types import (
+    CreateSessionTypeEnum,
     OrderDirection,
     SessionOrderField,
     SessionStatusEnum,
@@ -328,7 +329,7 @@ class TestEnqueueSessionInputOwnerDelegation:
         """owner_id should be optional and default to None."""
         inp = EnqueueSessionInput(
             session_name="s",
-            session_type="INTERACTIVE",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
             image_id=uuid.uuid4(),
             resource_entries=[],
             project_id=uuid.uuid4(),
@@ -339,7 +340,7 @@ class TestEnqueueSessionInputOwnerDelegation:
         owner = uuid.uuid4()
         inp = EnqueueSessionInput(
             session_name="s",
-            session_type="INTERACTIVE",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
             image_id=uuid.uuid4(),
             resource_entries=[],
             project_id=uuid.uuid4(),
@@ -351,7 +352,7 @@ class TestEnqueueSessionInputOwnerDelegation:
         owner = uuid.uuid4()
         inp = EnqueueSessionInput(
             session_name="s",
-            session_type="INTERACTIVE",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
             image_id=uuid.uuid4(),
             resource_entries=[],
             project_id=uuid.uuid4(),
