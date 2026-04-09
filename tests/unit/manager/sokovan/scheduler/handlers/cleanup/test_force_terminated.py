@@ -78,93 +78,92 @@ class TestCleanupForceTerminatedHandler:
     def test_name(self) -> None:
         assert CleanupForceTerminatedHandler.name() == "cleanup-force-terminated"
 
-    async def test_no_sessions_in_valkey_does_nothing(
+    async def test_fetch_session_ids_returns_valkey_data(
         self,
         handler: CleanupForceTerminatedHandler,
-        mock_terminator: AsyncMock,
-        mock_repository: AsyncMock,
         mock_valkey_schedule: AsyncMock,
     ) -> None:
-        """When Valkey has no force-terminated sessions, handler returns immediately."""
+        """fetch_session_ids delegates to Valkey pop."""
+        session_ids = [SessionId(uuid4())]
+        mock_valkey_schedule.pop_force_terminated_sessions.return_value = session_ids
+
+        result = await handler.fetch_session_ids()
+
+        assert list(result) == session_ids
+
+    async def test_fetch_session_ids_empty(
+        self,
+        handler: CleanupForceTerminatedHandler,
+        mock_valkey_schedule: AsyncMock,
+    ) -> None:
+        """fetch_session_ids returns empty when Valkey has no entries."""
         mock_valkey_schedule.pop_force_terminated_sessions.return_value = []
 
-        await handler.execute()
+        result = await handler.fetch_session_ids()
 
-        mock_repository.get_terminating_sessions_by_ids.assert_not_awaited()
-        mock_terminator.terminate_sessions_for_handler.assert_not_awaited()
+        assert list(result) == []
 
-    async def test_sessions_in_valkey_triggers_cleanup_rpc(
+    async def test_execute_triggers_cleanup_rpc(
         self,
         handler: CleanupForceTerminatedHandler,
         mock_terminator: AsyncMock,
         mock_repository: AsyncMock,
-        mock_valkey_schedule: AsyncMock,
     ) -> None:
-        """When Valkey has force-terminated sessions, handler fetches data and sends RPCs."""
+        """execute fetches data from DB and sends RPCs."""
         session_id = SessionId(uuid4())
         session_data = _make_terminating_session_data(session_id)
-
-        mock_valkey_schedule.pop_force_terminated_sessions.return_value = [session_id]
         mock_repository.get_terminating_sessions_by_ids.return_value = [session_data]
 
-        await handler.execute()
+        await handler.execute([session_id])
 
         mock_repository.get_terminating_sessions_by_ids.assert_awaited_once_with([session_id])
         mock_terminator.terminate_sessions_for_handler.assert_awaited_once_with([session_data])
 
-    async def test_no_session_data_in_db_skips_rpc(
+    async def test_execute_no_db_data_skips_rpc(
         self,
         handler: CleanupForceTerminatedHandler,
         mock_terminator: AsyncMock,
         mock_repository: AsyncMock,
-        mock_valkey_schedule: AsyncMock,
     ) -> None:
-        """When DB returns no data for the session IDs, handler skips RPC."""
+        """When DB returns no data, handler skips RPC."""
         session_id = SessionId(uuid4())
-        mock_valkey_schedule.pop_force_terminated_sessions.return_value = [session_id]
         mock_repository.get_terminating_sessions_by_ids.return_value = []
 
-        await handler.execute()
+        await handler.execute([session_id])
 
         mock_terminator.terminate_sessions_for_handler.assert_not_awaited()
 
-    async def test_terminator_exception_is_caught(
+    async def test_execute_terminator_exception_is_caught(
         self,
         handler: CleanupForceTerminatedHandler,
         mock_terminator: AsyncMock,
         mock_repository: AsyncMock,
-        mock_valkey_schedule: AsyncMock,
     ) -> None:
         """When terminator raises, handler catches the exception (best-effort cleanup)."""
         session_id = SessionId(uuid4())
         session_data = _make_terminating_session_data(session_id)
-
-        mock_valkey_schedule.pop_force_terminated_sessions.return_value = [session_id]
         mock_repository.get_terminating_sessions_by_ids.return_value = [session_data]
         mock_terminator.terminate_sessions_for_handler.side_effect = RuntimeError(
             "Agent unreachable"
         )
 
         # Should not raise — best-effort cleanup
-        await handler.execute()
+        await handler.execute([session_id])
 
         mock_terminator.terminate_sessions_for_handler.assert_awaited_once()
 
-    async def test_multiple_sessions_cleanup(
+    async def test_execute_multiple_sessions(
         self,
         handler: CleanupForceTerminatedHandler,
         mock_terminator: AsyncMock,
         mock_repository: AsyncMock,
-        mock_valkey_schedule: AsyncMock,
     ) -> None:
         """Handler processes multiple force-terminated sessions in a single batch."""
         session_ids = [SessionId(uuid4()) for _ in range(3)]
         session_data = [_make_terminating_session_data(sid) for sid in session_ids]
-
-        mock_valkey_schedule.pop_force_terminated_sessions.return_value = session_ids
         mock_repository.get_terminating_sessions_by_ids.return_value = session_data
 
-        await handler.execute()
+        await handler.execute(session_ids)
 
         mock_repository.get_terminating_sessions_by_ids.assert_awaited_once_with(session_ids)
         mock_terminator.terminate_sessions_for_handler.assert_awaited_once_with(session_data)

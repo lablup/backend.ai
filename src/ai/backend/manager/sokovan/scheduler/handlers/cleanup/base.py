@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
+
+from ai.backend.common.types import SessionId
 
 
 class CleanupHandler(ABC):
@@ -13,6 +16,10 @@ class CleanupHandler(ABC):
     read their work items from Valkey and perform cleanup operations directly.
 
     No status transitions are involved — the sessions are already in their final state.
+
+    The coordinator calls the handler in two phases:
+    1. ``fetch_session_ids()`` — read work items from Valkey (outside RecorderContext)
+    2. ``execute(session_ids)`` — perform cleanup (inside RecorderContext set by coordinator)
     """
 
     @classmethod
@@ -22,12 +29,17 @@ class CleanupHandler(ABC):
         raise NotImplementedError("Subclasses must implement name()")
 
     @abstractmethod
-    async def execute(self) -> None:
-        """Execute the cleanup operation.
+    async def fetch_session_ids(self) -> Sequence[SessionId]:
+        """Fetch session IDs that need cleanup from Valkey.
 
-        The handler is responsible for:
-        1. Reading work items from Valkey
-        2. Performing cleanup (e.g., sending RPC to agents)
-        3. Removing processed items from Valkey
+        Called by the coordinator before setting up RecorderContext.
+        """
+        raise NotImplementedError("Subclasses must implement fetch_session_ids()")
+
+    @abstractmethod
+    async def execute(self, session_ids: Sequence[SessionId]) -> None:
+        """Execute the cleanup operation for the given session IDs.
+
+        Called by the coordinator inside a RecorderContext scope.
         """
         raise NotImplementedError("Subclasses must implement execute()")

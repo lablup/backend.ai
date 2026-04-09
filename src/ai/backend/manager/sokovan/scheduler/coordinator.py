@@ -498,11 +498,22 @@ class ScheduleCoordinator:
         Cleanup handlers read work items from Valkey and perform cleanup operations
         directly. Unlike other handler types, they do not query DB sessions by status,
         do not iterate over scaling groups, and do not apply status transitions.
+
+        The coordinator sets up RecorderContext so that downstream components
+        (e.g., SessionTerminator) can use shared_phase/shared_step as usual.
         """
         try:
             log.debug("Processing cleanup schedule type: {}", schedule_type.value)
+
             with self._operation_metrics.measure_operation(handler.name()):
-                await handler.execute()
+                session_ids = await handler.fetch_session_ids()
+                if not session_ids:
+                    return True
+
+                recorder_scope = f"{schedule_type.value}:cleanup"
+                with SessionRecorderContext.scope(recorder_scope, entity_ids=list(session_ids)):
+                    await handler.execute(session_ids)
+
             return True
         except Exception as e:
             log.exception(

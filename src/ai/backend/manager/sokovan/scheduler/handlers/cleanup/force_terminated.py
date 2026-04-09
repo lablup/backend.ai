@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.handlers.cleanup.base import CleanupHandler
 
 if TYPE_CHECKING:
@@ -41,14 +41,15 @@ class CleanupForceTerminatedHandler(CleanupHandler):
     def name(cls) -> str:
         return "cleanup-force-terminated"
 
-    async def execute(self) -> None:
-        session_ids = await self._valkey_schedule.pop_force_terminated_sessions()
-        if not session_ids:
-            return
+    async def fetch_session_ids(self) -> Sequence[SessionId]:
+        return await self._valkey_schedule.pop_force_terminated_sessions()
 
+    async def execute(self, session_ids: Sequence[SessionId]) -> None:
         log.info("Processing {} force-terminated sessions for container cleanup", len(session_ids))
 
-        terminating_sessions = await self._repository.get_terminating_sessions_by_ids(session_ids)
+        terminating_sessions = await self._repository.get_terminating_sessions_by_ids(
+            list(session_ids)
+        )
         if not terminating_sessions:
             log.warning(
                 "No session data found for force-terminated sessions: {}",
@@ -56,14 +57,10 @@ class CleanupForceTerminatedHandler(CleanupHandler):
             )
             return
 
-        terminating_session_ids = [s.session_id for s in terminating_sessions]
         try:
-            with RecorderContext[SessionId].scope(
-                "cleanup_force_terminated", entity_ids=terminating_session_ids
-            ):
-                await self._terminator.terminate_sessions_for_handler(terminating_sessions)
+            await self._terminator.terminate_sessions_for_handler(terminating_sessions)
         except Exception:
             log.exception(
                 "Error sending cleanup RPCs for force-terminated sessions: {}",
-                terminating_session_ids,
+                [s.session_id for s in terminating_sessions],
             )
