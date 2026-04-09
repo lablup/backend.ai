@@ -50,6 +50,14 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
+from ai.backend.manager.services.login_client_type.admin_service import (
+    LoginClientTypeAdminService,
+)
+from ai.backend.manager.services.login_client_type.processors import (
+    LoginClientTypeAdminProcessors,
+    LoginClientTypeProcessors,
+)
+from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
 from ai.backend.manager.services.metric.processors.utilization_metric import (
@@ -314,6 +322,12 @@ def create_services(args: ServiceArgs) -> Services:
             valkey_session_client=args.valkey_session_client,
             user_resource_policy_repository=repositories.user_resource_policy.repository,
         ),
+        login_client_type=LoginClientTypeService(
+            repository=repositories.auth.login_client_type,
+        ),
+        login_client_type_admin=LoginClientTypeAdminService(
+            admin_repository=repositories.auth.login_client_type_admin,
+        ),
         notification=NotificationService(
             repository=repositories.notification.repository,
             notification_center=args.notification_center,
@@ -474,6 +488,10 @@ def create_processors(
             services.model_serving_auto_scaling, action_monitors, validators
         ),
         auth=AuthProcessors(services.auth, action_monitors, validators),
+        login_client_type=LoginClientTypeProcessors(services.login_client_type, action_monitors),
+        login_client_type_admin=LoginClientTypeAdminProcessors(
+            services.login_client_type_admin, action_monitors
+        ),
         notification=NotificationProcessors(services.notification, action_monitors, validators),
         object_storage=ObjectStorageProcessors(
             services.object_storage, action_monitors, validators
