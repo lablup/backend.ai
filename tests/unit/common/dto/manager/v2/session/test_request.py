@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     CommitSessionInput,
     DestroySessionInput,
     DownloadFilesInput,
+    EnqueueSessionInput,
     ExecuteInput,
     GetContainerLogsInput,
     ListFilesInput,
@@ -318,3 +319,43 @@ class TestGetContainerLogsInput:
         kernel_id = uuid.uuid4()
         inp = GetContainerLogsInput(kernel_id=kernel_id)
         assert inp.kernel_id == kernel_id
+
+
+class TestEnqueueSessionInputOwnerDelegation:
+    """Tests for owner_id delegation on EnqueueSessionInput."""
+
+    def test_owner_id_defaults_to_none(self) -> None:
+        """owner_id should be optional and default to None."""
+        inp = EnqueueSessionInput(
+            session_name="s",
+            session_type="INTERACTIVE",
+            image_id=uuid.uuid4(),
+            resource_entries=[],
+            project_id=uuid.uuid4(),
+        )
+        assert inp.owner_id is None
+
+    def test_owner_id_accepts_uuid(self) -> None:
+        owner = uuid.uuid4()
+        inp = EnqueueSessionInput(
+            session_name="s",
+            session_type="INTERACTIVE",
+            image_id=uuid.uuid4(),
+            resource_entries=[],
+            project_id=uuid.uuid4(),
+            owner_id=owner,
+        )
+        assert inp.owner_id == owner
+
+    def test_owner_id_round_trip(self) -> None:
+        owner = uuid.uuid4()
+        inp = EnqueueSessionInput(
+            session_name="s",
+            session_type="INTERACTIVE",
+            image_id=uuid.uuid4(),
+            resource_entries=[],
+            project_id=uuid.uuid4(),
+            owner_id=owner,
+        )
+        restored = EnqueueSessionInput.model_validate_json(inp.model_dump_json())
+        assert restored.owner_id == owner
