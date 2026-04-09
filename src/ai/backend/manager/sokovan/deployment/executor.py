@@ -228,7 +228,7 @@ class DeploymentExecutor:
             return deployment, None, exc
 
         try:
-            await self._deployment_repo.update_endpoint_urls_bulk({info.id: url})
+            await self._deployment_repo.update_endpoint_url(info.id, url)
         except BaseException as exc:
             # Compensating unregister: without this, appproxy would hold
             # an orphaned endpoint while the DB still has url=None, so the
