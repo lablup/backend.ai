@@ -132,21 +132,12 @@ class AdminSearchSessionsInput(BaseRequestModel):
 class RestartSessionInput(BaseRequestModel):
     """Input for restarting a session."""
 
-    owner_id: UUID | None = Field(
-        default=None,
-        description="Delegated owner user UUID. Defaults to the caller when omitted.",
-    )
-
 
 class DestroySessionInput(BaseRequestModel):
     """Input for destroying a session."""
 
     forced: bool = False
     recursive: bool = False
-    owner_id: UUID | None = Field(
-        default=None,
-        description="Delegated owner user UUID. Defaults to the caller when omitted.",
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -244,10 +235,6 @@ class ListFilesInput(BaseRequestModel):
 class GetContainerLogsInput(BaseRequestModel):
     """Input for retrieving container logs from a session."""
 
-    owner_id: UUID | None = Field(
-        default=None,
-        description="Delegated owner user UUID. Defaults to the caller when omitted.",
-    )
     kernel_id: UUID | None = None
 
 
@@ -431,10 +418,6 @@ class GetSessionLogsQuery(BaseRequestModel):
 
     kernel_id: UUID | None = Field(
         default=None, description="Specific kernel UUID. Main kernel if omitted."
-    )
-    owner_id: UUID | None = Field(
-        default=None,
-        description="Delegated owner user UUID. Defaults to the caller when omitted.",
     )
 
 

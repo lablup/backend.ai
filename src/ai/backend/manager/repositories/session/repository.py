@@ -57,28 +57,26 @@ class SessionRepository:
     async def get_session_validated(
         self,
         session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        owner_id: uuid.UUID,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
         eager_loading_op: Sequence[_AbstractLoad] | None = None,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> SessionRow:
         return await self._db_source.get_session_validated(
             session_name_or_id,
-            owner_access_key,
+            owner_id,
             kernel_loading_strategy,
             allow_stale,
             eager_loading_op,
-            owner_user_uuid=owner_user_uuid,
         )
 
     @session_repository_resilience.apply()
     async def match_sessions(
         self,
         id_or_name_prefix: str,
-        owner_access_key: AccessKey,
+        owner_id: uuid.UUID,
     ) -> list[SessionRow]:
-        return await self._db_source.match_sessions(id_or_name_prefix, owner_access_key)
+        return await self._db_source.match_sessions(id_or_name_prefix, owner_id)
 
     @session_repository_resilience.apply()
     async def get_session_to_determine_status(
@@ -106,11 +104,9 @@ class SessionRepository:
         self,
         session_name_or_id: str | SessionId,
         new_name: str,
-        owner_access_key: AccessKey,
+        owner_id: uuid.UUID,
     ) -> SessionRow:
-        return await self._db_source.update_session_name(
-            session_name_or_id, new_name, owner_access_key
-        )
+        return await self._db_source.update_session_name(session_name_or_id, new_name, owner_id)
 
     @session_repository_resilience.apply()
     async def get_container_registry(
@@ -212,54 +208,48 @@ class SessionRepository:
     async def get_target_session_ids(
         self,
         session_name_or_id: str | uuid.UUID,
-        access_key: AccessKey,
+        owner_id: uuid.UUID,
         recursive: bool = False,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> list[SessionId]:
         """
         Get list of session IDs including dependent sessions if recursive.
 
         :param session_name_or_id: Name or ID of the primary session
-        :param access_key: Access key of the session owner (legacy scope)
+        :param owner_id: User UUID of the session owner
         :param recursive: If True, include dependent sessions
-        :param owner_user_uuid: When set, scope by user UUID instead of access key.
         :return: List of session IDs
         """
-        return await self._db_source.get_target_session_ids(
-            session_name_or_id, access_key, recursive, owner_user_uuid=owner_user_uuid
-        )
+        return await self._db_source.get_target_session_ids(session_name_or_id, owner_id, recursive)
 
     @session_repository_resilience.apply()
     async def find_dependency_sessions(
         self,
         session_name_or_id: uuid.UUID | str,
-        access_key: AccessKey,
+        owner_id: uuid.UUID,
     ) -> dict[str, list[Any] | str]:
-        return await self._db_source.find_dependency_sessions(session_name_or_id, access_key)
+        return await self._db_source.find_dependency_sessions(session_name_or_id, owner_id)
 
     @session_repository_resilience.apply()
     async def get_session_with_group(
         self,
         session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        owner_id: uuid.UUID,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
         """Get session with group information eagerly loaded"""
         return await self._db_source.get_session_with_group(
-            session_name_or_id, owner_access_key, kernel_loading_strategy, allow_stale
+            session_name_or_id, owner_id, kernel_loading_strategy, allow_stale
         )
 
     @session_repository_resilience.apply()
     async def get_session_with_routing_minimal(
         self,
         session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        owner_id: uuid.UUID,
     ) -> SessionRow:
         """Get session with minimal routing information"""
-        return await self._db_source.get_session_with_routing_minimal(
-            session_name_or_id, owner_access_key
-        )
+        return await self._db_source.get_session_with_routing_minimal(session_name_or_id, owner_id)
 
     @session_repository_resilience.apply()
     async def search(

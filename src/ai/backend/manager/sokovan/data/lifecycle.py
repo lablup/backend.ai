@@ -64,6 +64,7 @@ class SessionDataForPull:
 
     session_id: SessionId
     creation_id: str
+    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
     access_key: AccessKey
     kernels: list[KernelBindingData]
 
@@ -74,12 +75,13 @@ class SessionDataForStart:
 
     session_id: SessionId
     creation_id: str
+    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
     access_key: AccessKey
     session_type: SessionTypes
     name: str
     cluster_mode: ClusterMode
     kernels: list[KernelBindingData]
-    user_uuid: UUID
+    owner_id: UUID
     user_email: str
     user_name: str
     environ: dict[str, str]
@@ -93,13 +95,14 @@ class ScheduledSessionData:
 
     session_id: SessionId
     creation_id: str
+    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
     access_key: AccessKey
     session_type: SessionTypes
     name: str
     kernels: list[KernelBindingData]
     # Additional fields for PREPARED sessions
     cluster_mode: ClusterMode | None = None
-    user_uuid: UUID | None = None
+    owner_id: UUID | None = None
     user_email: str | None = None
     user_name: str | None = None
     network_type: NetworkType | None = None
@@ -157,12 +160,13 @@ class PreparedSessionData:
 
     session_id: SessionId
     creation_id: str
+    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
     access_key: AccessKey
     session_type: SessionTypes
     name: str
     cluster_mode: ClusterMode
     kernels: list[KernelStartData]
-    user_uuid: UUID
+    owner_id: UUID
     user_email: str
     user_name: str
     network_type: NetworkType | None = None

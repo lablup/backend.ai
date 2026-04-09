@@ -12,7 +12,6 @@ from pydantic import BaseModel
 
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
-    AccessKey,
     CIStrEnum,
     ClusterMode,
     ResourceSlot,
@@ -142,7 +141,7 @@ class SessionData:
     cluster_size: int
     domain_name: str
     group_id: UUID
-    user_uuid: UUID
+    owner_id: UUID
     occupying_slots: Any  # TODO: ResourceSlot?
     requested_slots: Any
     use_host_network: bool
@@ -152,7 +151,6 @@ class SessionData:
     num_queries: int
     creation_id: str | None
     name: str | None
-    access_key: AccessKey | None
     agent_ids: list[str] | None
     images: list[str] | None
     tag: str | None
@@ -193,8 +191,7 @@ class SessionMetadata:
     name: str
     domain_name: str
     group_id: UUID
-    user_uuid: UUID
-    access_key: str
+    owner_id: UUID
     session_type: SessionTypes
     priority: int
     created_at: datetime | None

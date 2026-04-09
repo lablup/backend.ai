@@ -156,13 +156,7 @@ def shutdown_service(session_id: str, service: str) -> None:
 @session.command()
 @click.argument("session_id", type=str)
 @click.option("--kernel-id", type=str, default=None, help="Specific kernel UUID.")
-@click.option(
-    "--owner-id",
-    type=click.UUID,
-    default=None,
-    help="Delegated owner user UUID. Defaults to the caller when omitted.",
-)
-def logs(session_id: str, kernel_id: str | None, owner_id: UUID | None) -> None:
+def logs(session_id: str, kernel_id: str | None) -> None:
     """Get container logs for a session."""
 
     async def _run() -> None:
@@ -171,7 +165,6 @@ def logs(session_id: str, kernel_id: str | None, owner_id: UUID | None) -> None:
             result = await registry.session.get_logs(
                 UUID(session_id),
                 UUID(kernel_id) if kernel_id else None,
-                owner_id,
             )
             click.echo(result.logs)
         finally:

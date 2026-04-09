@@ -13,7 +13,6 @@ import aiotools
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.errors.kernel import InvalidSessionData, SessionNotFound
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
@@ -23,12 +22,12 @@ from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 async def _find_dependency_sessions(
     session_name_or_id: UUID | str,
     db_session: SASession,
-    access_key: AccessKey,
+    owner_id: UUID,
 ) -> dict[str, list[Any] | str]:
     sessions = await SessionRow.match_sessions(
         db_session,
         session_name_or_id,
-        access_key=access_key,
+        owner_id=owner_id,
     )
 
     if len(sessions) < 1:
@@ -66,7 +65,7 @@ async def _find_dependency_sessions(
         "status": str(kernel_query_result[0]),
         "status_changed": str(kernel_query_result[1]),
         "depends_on": [
-            await _find_dependency_sessions(dependency_session_id, db_session, access_key)
+            await _find_dependency_sessions(dependency_session_id, db_session, owner_id)
             for dependency_session_id in dependency_session_ids
         ],
     }
@@ -77,15 +76,15 @@ async def _find_dependency_sessions(
 async def find_dependency_sessions(
     session_name_or_id: UUID | str,
     db_session: SASession,
-    access_key: AccessKey,
+    owner_id: UUID,
 ) -> dict[str, list[Any] | str]:
-    return await _find_dependency_sessions(session_name_or_id, db_session, access_key)
+    return await _find_dependency_sessions(session_name_or_id, db_session, owner_id)
 
 
 async def find_dependent_sessions(
     root_session_name_or_id: str | UUID,
     db_session: SASession,
-    access_key: AccessKey,
+    owner_id: UUID,
     *,
     allow_stale: bool = False,
 ) -> set[UUID]:
@@ -108,7 +107,7 @@ async def find_dependent_sessions(
     root_session = await SessionRow.get_session(
         db_session,
         root_session_name_or_id,
-        access_key=access_key,
+        owner_id=owner_id,
         allow_stale=allow_stale,
     )
     return await _find_dependent_sessions(cast(UUID, root_session.id))

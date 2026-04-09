@@ -6,7 +6,6 @@ import logging
 from collections.abc import Sequence
 
 from ai.backend.common.defs.session import SESSION_PRIORITY_MIN
-from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
@@ -112,6 +111,9 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
             scaling_group,
         )
 
+        # BA-5609: resolve main_access_key for cache invalidation consumer.
+        access_key_by_id = await self._repository.resolve_main_access_keys(session_ids)
+
         # Mark all sessions as success for status transition to PENDING
         for session in sessions:
             session_info = session.session_info
@@ -121,7 +123,7 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
                     from_status=session_info.lifecycle.status,
                     reason="deprioritized-for-rescheduling",
                     creation_id=session_info.identity.creation_id,
-                    access_key=AccessKey(session_info.metadata.access_key),
+                    access_key=access_key_by_id.get(session_info.identity.id),
                 )
             )
 
