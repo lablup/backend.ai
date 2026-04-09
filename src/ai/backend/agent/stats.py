@@ -438,9 +438,16 @@ class StatContext:
         # Here we use asyncio.gather() instead of aiotools.TaskGroup
         # to keep methods of other plugins running when a plugin raises an error
         # instead of cancelling them.
-        _tasks: list[asyncio.Task[Sequence[NodeMeasurement]]] = []
-        for computer in self.agent.computers.values():
-            _tasks.append(asyncio.create_task(computer.instance.gather_node_measures(self)))
+        async def gather_node_measures_with_slots(
+            instance: AbstractComputePlugin,
+        ) -> tuple[list[SlotName], Sequence[NodeMeasurement]]:
+            result = await instance.gather_node_measures(self)
+            return [SlotName(slot_name) for slot_name, _ in instance.slot_types], result
+
+        _tasks = [
+            asyncio.create_task(gather_node_measures_with_slots(computer.instance))
+            for computer in self.agent.computers.values()
+        ]
         self._stage_observer.observe_stage(
             stage="before_gather_measures",
             upper_layer="collect_node_stat",
