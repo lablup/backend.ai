@@ -619,7 +619,7 @@ class EventDispatcher(EventDispatcherGroup):
                 # Check the event name before full deserialization to avoid
                 # deserializing messages that have no registered consumer.
                 event_name = mq_msg.payload[b"name"].decode("utf-8")
-                if not self._consumers[event_name]:
+                if event_name not in self._consumers:
                     await self._msg_queue.done(mq_msg.msg_id)
                     continue
                 msg_payload = MessagePayload.from_anycast(mq_msg.payload)
@@ -650,9 +650,10 @@ class EventDispatcher(EventDispatcherGroup):
                 return
             try:
                 msg = cast(BroadcastMessage, msg)
-                # Check the event name before full deserialization (ref: BA-5659)
+                # Check the event name before full deserialization to avoid
+                # deserializing messages that have no registered subscriber.
                 event_name = msg.payload["name"]
-                if not self._subscribers[event_name]:
+                if event_name not in self._subscribers:
                     continue
                 msg_payload = MessagePayload.from_broadcast(msg.payload)
                 await self.dispatch_subscribers(
