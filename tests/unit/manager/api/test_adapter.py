@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base import QueryCondition
@@ -29,16 +29,28 @@ class CapturedSpec:
     negated: bool
 
 
+@dataclass
+class CapturedInSpec:
+    """Captured StringInMatchSpec for verification."""
+
+    values: list[str]
+    case_insensitive: bool
+    negated: bool
+
+
 class TestBaseFilterAdapter:
     """Test cases for BaseFilterAdapter"""
 
     def _create_mock_factories(
-        self, called_with: dict[str, CapturedSpec]
+        self,
+        called_with: dict[str, CapturedSpec],
+        in_called_with: dict[str, CapturedInSpec] | None = None,
     ) -> tuple[
         Callable[[StringMatchSpec], QueryCondition],
         Callable[[StringMatchSpec], QueryCondition],
         Callable[[StringMatchSpec], QueryCondition],
         Callable[[StringMatchSpec], QueryCondition],
+        Callable[[StringInMatchSpec], QueryCondition],
     ]:
         """Create mock factory functions that capture the StringMatchSpec."""
 
@@ -76,7 +88,24 @@ class TestBaseFilterAdapter:
 
             return condition
 
-        return contains_factory, equals_factory, starts_with_factory, ends_with_factory
+        def in_factory(spec: StringInMatchSpec) -> QueryCondition:
+            if in_called_with is not None:
+                in_called_with["in"] = CapturedInSpec(
+                    list(spec.values), spec.case_insensitive, spec.negated
+                )
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
+
+        return (
+            contains_factory,
+            equals_factory,
+            starts_with_factory,
+            ends_with_factory,
+            in_factory,
+        )
 
     def test_convert_string_filter_equals(self) -> None:
         """Test string filter conversion with equals"""
@@ -273,3 +302,67 @@ class TestBaseFilterAdapter:
         assert called_with["equals"].case_insensitive is False
         assert called_with["equals"].negated is False
         assert "contains" not in called_with
+
+    def test_convert_string_filter_in(self) -> None:
+        """Test string filter conversion with IN operator"""
+        string_filter = StringFilter(in_=["a", "b", "c"])
+        adapter = BaseFilterAdapter()
+        called_with: dict[str, CapturedSpec] = {}
+        in_called_with: dict[str, CapturedInSpec] = {}
+        factories = self._create_mock_factories(called_with, in_called_with)
+
+        result = adapter.convert_string_filter(string_filter, *factories)
+
+        assert result is not None
+        assert "in" in in_called_with
+        assert in_called_with["in"].values == ["a", "b", "c"]
+        assert in_called_with["in"].case_insensitive is False
+        assert in_called_with["in"].negated is False
+
+    def test_convert_string_filter_not_in(self) -> None:
+        """Test string filter conversion with NOT IN operator"""
+        string_filter = StringFilter(not_in=["a", "b"])
+        adapter = BaseFilterAdapter()
+        called_with: dict[str, CapturedSpec] = {}
+        in_called_with: dict[str, CapturedInSpec] = {}
+        factories = self._create_mock_factories(called_with, in_called_with)
+
+        result = adapter.convert_string_filter(string_filter, *factories)
+
+        assert result is not None
+        assert "in" in in_called_with
+        assert in_called_with["in"].values == ["a", "b"]
+        assert in_called_with["in"].case_insensitive is False
+        assert in_called_with["in"].negated is True
+
+    def test_convert_string_filter_i_in(self) -> None:
+        """Test string filter conversion with case-insensitive IN operator"""
+        string_filter = StringFilter(i_in=["A", "B"])
+        adapter = BaseFilterAdapter()
+        called_with: dict[str, CapturedSpec] = {}
+        in_called_with: dict[str, CapturedInSpec] = {}
+        factories = self._create_mock_factories(called_with, in_called_with)
+
+        result = adapter.convert_string_filter(string_filter, *factories)
+
+        assert result is not None
+        assert "in" in in_called_with
+        assert in_called_with["in"].values == ["A", "B"]
+        assert in_called_with["in"].case_insensitive is True
+        assert in_called_with["in"].negated is False
+
+    def test_convert_string_filter_i_not_in(self) -> None:
+        """Test string filter conversion with case-insensitive NOT IN operator"""
+        string_filter = StringFilter(i_not_in=["A", "B"])
+        adapter = BaseFilterAdapter()
+        called_with: dict[str, CapturedSpec] = {}
+        in_called_with: dict[str, CapturedInSpec] = {}
+        factories = self._create_mock_factories(called_with, in_called_with)
+
+        result = adapter.convert_string_filter(string_filter, *factories)
+
+        assert result is not None
+        assert "in" in in_called_with
+        assert in_called_with["in"].values == ["A", "B"]
+        assert in_called_with["in"].case_insensitive is True
+        assert in_called_with["in"].negated is True

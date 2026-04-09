@@ -134,6 +134,7 @@ class FairShareAdapter:
                 equals_factory=DomainFairShareConditions.by_resource_group_equals,
                 starts_with_factory=DomainFairShareConditions.by_resource_group_starts_with,
                 ends_with_factory=DomainFairShareConditions.by_resource_group_ends_with,
+                in_factory=DomainFairShareConditions.by_resource_group_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -144,6 +145,7 @@ class FairShareAdapter:
                 equals_factory=DomainFairShareConditions.by_domain_name_equals,
                 starts_with_factory=DomainFairShareConditions.by_domain_name_starts_with,
                 ends_with_factory=DomainFairShareConditions.by_domain_name_ends_with,
+                in_factory=DomainFairShareConditions.by_domain_name_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -196,6 +198,7 @@ class FairShareAdapter:
                 equals_factory=RGDomainFairShareConditions.by_resource_group_equals,
                 starts_with_factory=RGDomainFairShareConditions.by_resource_group_starts_with,
                 ends_with_factory=RGDomainFairShareConditions.by_resource_group_ends_with,
+                in_factory=RGDomainFairShareConditions.by_resource_group_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -206,6 +209,7 @@ class FairShareAdapter:
                 equals_factory=RGDomainFairShareConditions.by_domain_name_equals,
                 starts_with_factory=RGDomainFairShareConditions.by_domain_name_starts_with,
                 ends_with_factory=RGDomainFairShareConditions.by_domain_name_ends_with,
+                in_factory=RGDomainFairShareConditions.by_domain_name_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -283,6 +287,7 @@ class FairShareAdapter:
                 equals_factory=ProjectFairShareConditions.by_resource_group_equals,
                 starts_with_factory=ProjectFairShareConditions.by_resource_group_starts_with,
                 ends_with_factory=ProjectFairShareConditions.by_resource_group_ends_with,
+                in_factory=ProjectFairShareConditions.by_resource_group_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -301,6 +306,7 @@ class FairShareAdapter:
                 equals_factory=ProjectFairShareConditions.by_domain_name_equals,
                 starts_with_factory=ProjectFairShareConditions.by_domain_name_starts_with,
                 ends_with_factory=ProjectFairShareConditions.by_domain_name_ends_with,
+                in_factory=ProjectFairShareConditions.by_domain_name_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -350,6 +356,7 @@ class FairShareAdapter:
                 equals_factory=RGProjectFairShareConditions.by_resource_group_equals,
                 starts_with_factory=RGProjectFairShareConditions.by_resource_group_starts_with,
                 ends_with_factory=RGProjectFairShareConditions.by_resource_group_ends_with,
+                in_factory=RGProjectFairShareConditions.by_resource_group_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -368,6 +375,7 @@ class FairShareAdapter:
                 equals_factory=RGProjectFairShareConditions.by_domain_name_equals,
                 starts_with_factory=RGProjectFairShareConditions.by_domain_name_starts_with,
                 ends_with_factory=RGProjectFairShareConditions.by_domain_name_ends_with,
+                in_factory=RGProjectFairShareConditions.by_domain_name_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -436,6 +444,7 @@ class FairShareAdapter:
                 equals_factory=UserFairShareConditions.by_resource_group_equals,
                 starts_with_factory=UserFairShareConditions.by_resource_group_starts_with,
                 ends_with_factory=UserFairShareConditions.by_resource_group_ends_with,
+                in_factory=UserFairShareConditions.by_resource_group_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -462,6 +471,7 @@ class FairShareAdapter:
                 equals_factory=UserFairShareConditions.by_domain_name_equals,
                 starts_with_factory=UserFairShareConditions.by_domain_name_starts_with,
                 ends_with_factory=UserFairShareConditions.by_domain_name_ends_with,
+                in_factory=UserFairShareConditions.by_domain_name_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -511,6 +521,7 @@ class FairShareAdapter:
                 equals_factory=RGUserFairShareConditions.by_resource_group_equals,
                 starts_with_factory=RGUserFairShareConditions.by_resource_group_starts_with,
                 ends_with_factory=RGUserFairShareConditions.by_resource_group_ends_with,
+                in_factory=RGUserFairShareConditions.by_resource_group_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -537,6 +548,7 @@ class FairShareAdapter:
                 equals_factory=RGUserFairShareConditions.by_domain_name_equals,
                 starts_with_factory=RGUserFairShareConditions.by_domain_name_starts_with,
                 ends_with_factory=RGUserFairShareConditions.by_domain_name_ends_with,
+                in_factory=RGUserFairShareConditions.by_domain_name_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -614,6 +626,7 @@ class FairShareAdapter:
                 equals_factory=DomainUsageBucketConditions.by_resource_group_equals,
                 starts_with_factory=DomainUsageBucketConditions.by_resource_group_starts_with,
                 ends_with_factory=DomainUsageBucketConditions.by_resource_group_ends_with,
+                in_factory=DomainUsageBucketConditions.by_resource_group_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -624,6 +637,7 @@ class FairShareAdapter:
                 equals_factory=DomainUsageBucketConditions.by_domain_name_equals,
                 starts_with_factory=DomainUsageBucketConditions.by_domain_name_starts_with,
                 ends_with_factory=DomainUsageBucketConditions.by_domain_name_ends_with,
+                in_factory=DomainUsageBucketConditions.by_domain_name_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -696,6 +710,7 @@ class FairShareAdapter:
                 equals_factory=ProjectUsageBucketConditions.by_resource_group_equals,
                 starts_with_factory=ProjectUsageBucketConditions.by_resource_group_starts_with,
                 ends_with_factory=ProjectUsageBucketConditions.by_resource_group_ends_with,
+                in_factory=ProjectUsageBucketConditions.by_resource_group_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -777,6 +792,7 @@ class FairShareAdapter:
                 equals_factory=UserUsageBucketConditions.by_resource_group_equals,
                 starts_with_factory=UserUsageBucketConditions.by_resource_group_starts_with,
                 ends_with_factory=UserUsageBucketConditions.by_resource_group_ends_with,
+                in_factory=UserUsageBucketConditions.by_resource_group_in,
             )
             if cond is not None:
                 conditions.append(cond)

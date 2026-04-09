@@ -156,8 +156,11 @@ from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .keypair import (
     admin_create_keypair_v2,
     admin_delete_keypair_v2,
+    admin_delete_ssh_keypair_v2,
     admin_keypair_v2,
     admin_keypairs_v2,
+    admin_register_ssh_keypair_v2,
+    admin_ssh_keypair_v2,
     admin_update_keypair_v2,
     issue_my_keypair,
     my_keypairs,
@@ -371,6 +374,7 @@ from .session.resolver import (
     project_sessions_v2,
     terminate_project_sessions_v2,
 )
+from .storage_host import my_storage_host_permissions
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -402,6 +406,7 @@ from .vfolder_v2 import (
     clone_vfolder_v2,
     create_vfolder_v2,
     delete_vfolder_v2,
+    deploy_vfolder_v2,
     my_vfolders,
     project_vfolders,
     purge_vfolder_v2,
@@ -504,6 +509,7 @@ class Query:
     # Keypair admin queries
     admin_keypair_v2 = admin_keypair_v2
     admin_keypairs_v2 = admin_keypairs_v2
+    admin_ssh_keypair_v2 = admin_ssh_keypair_v2
     # Login session/history self-service queries
     my_login_sessions_v2 = my_login_sessions_v2
     my_login_history_v2 = my_login_history_v2
@@ -583,6 +589,8 @@ class Query:
     admin_project_resource_policies_v2 = admin_project_resource_policies_v2
     my_keypair_resource_policy_v2 = my_keypair_resource_policy_v2
     my_user_resource_policy_v2 = my_user_resource_policy_v2
+    # Storage Host APIs
+    my_storage_host_permissions = my_storage_host_permissions
     # Resource Preset V2 APIs
     admin_resource_presets_v2 = admin_resource_presets_v2
     admin_resource_preset_v2 = admin_resource_preset_v2
@@ -750,6 +758,8 @@ class Mutation:
     admin_create_keypair_v2 = admin_create_keypair_v2
     admin_update_keypair_v2 = admin_update_keypair_v2
     admin_delete_keypair_v2 = admin_delete_keypair_v2
+    admin_register_ssh_keypair_v2 = admin_register_ssh_keypair_v2
+    admin_delete_ssh_keypair_v2 = admin_delete_ssh_keypair_v2
     # Login session mutations
     admin_revoke_login_session = admin_revoke_login_session
     my_revoke_login_session = my_revoke_login_session
@@ -809,6 +819,7 @@ class Mutation:
     create_vfolder_v2 = create_vfolder_v2
     delete_vfolder_v2 = delete_vfolder_v2
     purge_vfolder_v2 = purge_vfolder_v2
+    deploy_vfolder_v2 = deploy_vfolder_v2
     bulk_delete_vfolders_v2 = bulk_delete_vfolders_v2
     bulk_purge_vfolders_v2 = bulk_purge_vfolders_v2
     clone_vfolder_v2 = clone_vfolder_v2

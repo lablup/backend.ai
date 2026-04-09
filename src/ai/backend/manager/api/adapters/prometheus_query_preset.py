@@ -219,6 +219,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
                 equals_factory=PrometheusQueryPresetConditions.by_name_equals,
                 starts_with_factory=PrometheusQueryPresetConditions.by_name_starts_with,
                 ends_with_factory=PrometheusQueryPresetConditions.by_name_ends_with,
+                in_factory=PrometheusQueryPresetConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

@@ -116,6 +116,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
                 equals_factory=SessionConditions.by_name_equals,
                 starts_with_factory=SessionConditions.by_name_starts_with,
                 ends_with_factory=SessionConditions.by_name_ends_with,
+                in_factory=SessionConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -127,6 +128,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
                 equals_factory=SessionConditions.by_access_key_equals,
                 starts_with_factory=SessionConditions.by_access_key_starts_with,
                 ends_with_factory=SessionConditions.by_access_key_ends_with,
+                in_factory=SessionConditions.by_access_key_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -138,6 +140,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
                 equals_factory=SessionConditions.by_domain_name_equals,
                 starts_with_factory=SessionConditions.by_domain_name_starts_with,
                 ends_with_factory=SessionConditions.by_domain_name_ends_with,
+                in_factory=SessionConditions.by_domain_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -149,6 +152,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
                 equals_factory=SessionConditions.by_scaling_group_equals,
                 starts_with_factory=SessionConditions.by_scaling_group_starts_with,
                 ends_with_factory=SessionConditions.by_scaling_group_ends_with,
+                in_factory=SessionConditions.by_scaling_group_in,
             )
             if condition is not None:
                 conditions.append(condition)

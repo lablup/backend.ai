@@ -32,6 +32,12 @@ from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair, gene
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.webapp import WebappPlugin
+from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    RoleManager,
+    UserSystemRoleSpec,
+)
 
 from . import __version__
 from .config import OIDCPluginConfig
@@ -212,6 +218,16 @@ async def create_user_if_not_exists(
 
             # Add `main_access_key` value to new user column.
             user.main_access_key = keypair_data["access_key"]
+
+            # Create RBAC system role and map user to role
+            role_manager = RoleManager()
+            role_spec = UserSystemRoleSpec(user_id=user.uuid)
+            role = await role_manager.create_system_role(dbsess, role_spec)
+            user_role_creator = Creator(
+                spec=UserRoleCreatorSpec(user_id=user.uuid, role_id=role.id)
+            )
+            await execute_creator(dbsess, user_role_creator)
+
             log.info("OPENID.WEBAPP: new user created ({})", user.email)
         else:
             # There is an active Backend.AI user. Do nothing.

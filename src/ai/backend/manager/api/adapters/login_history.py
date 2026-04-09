@@ -119,6 +119,7 @@ class LoginHistoryAdapter(BaseAdapter):
                 equals_factory=LoginHistoryConditions.by_domain_name_equals,
                 starts_with_factory=LoginHistoryConditions.by_domain_name_starts_with,
                 ends_with_factory=LoginHistoryConditions.by_domain_name_ends_with,
+                in_factory=LoginHistoryConditions.by_domain_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

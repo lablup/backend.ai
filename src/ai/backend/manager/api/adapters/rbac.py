@@ -963,6 +963,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=RoleConditions.by_name_equals,
                 starts_with_factory=RoleConditions.by_name_starts_with,
                 ends_with_factory=RoleConditions.by_name_ends_with,
+                in_factory=RoleConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1047,6 +1048,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=RoleConditions.by_name_equals,
                 starts_with_factory=RoleConditions.by_name_starts_with,
                 ends_with_factory=RoleConditions.by_name_ends_with,
+                in_factory=RoleConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1121,6 +1123,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=RoleConditions.by_name_equals,
                 starts_with_factory=RoleConditions.by_name_starts_with,
                 ends_with_factory=RoleConditions.by_name_ends_with,
+                in_factory=RoleConditions.by_name_in,
             )
             if condition is not None:
                 raw_conditions.append(condition)
@@ -1230,6 +1233,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=AssignedUserConditions.by_username_equals,
                 starts_with_factory=AssignedUserConditions.by_username_starts_with,
                 ends_with_factory=AssignedUserConditions.by_username_ends_with,
+                in_factory=AssignedUserConditions.by_username_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1240,6 +1244,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=AssignedUserConditions.by_email_equals,
                 starts_with_factory=AssignedUserConditions.by_email_starts_with,
                 ends_with_factory=AssignedUserConditions.by_email_ends_with,
+                in_factory=AssignedUserConditions.by_email_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1284,6 +1289,7 @@ class RBACAdapter(BaseAdapter):
                 equals_factory=EntityScopeConditions.by_entity_id_equals,
                 starts_with_factory=EntityScopeConditions.by_entity_id_starts_with,
                 ends_with_factory=EntityScopeConditions.by_entity_id_ends_with,
+                in_factory=EntityScopeConditions.by_entity_id_in,
             )
             if condition is not None:
                 conditions.append(condition)

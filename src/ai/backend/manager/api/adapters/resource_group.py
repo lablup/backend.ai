@@ -268,6 +268,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 equals_factory=ScalingGroupConditions.by_name_equals,
                 starts_with_factory=ScalingGroupConditions.by_name_starts_with,
                 ends_with_factory=ScalingGroupConditions.by_name_ends_with,
+                in_factory=ScalingGroupConditions.by_name_in,
             )
             if cond:
                 conditions.append(cond)
@@ -278,6 +279,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 equals_factory=ScalingGroupConditions.by_description_equals,
                 starts_with_factory=ScalingGroupConditions.by_description_starts_with,
                 ends_with_factory=ScalingGroupConditions.by_description_ends_with,
+                in_factory=ScalingGroupConditions.by_description_in,
             )
             if cond:
                 conditions.append(cond)

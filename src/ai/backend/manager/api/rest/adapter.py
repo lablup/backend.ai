@@ -8,7 +8,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, final
 
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringInMatchSpec,
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.common.dto.manager.query import IntFilter, StringFilter, UUIDFilter
 from ai.backend.manager.repositories.base import QueryCondition
 
@@ -24,6 +29,7 @@ class BaseFilterAdapter:
         equals_factory: Callable[[StringMatchSpec], QueryCondition],
         starts_with_factory: Callable[[StringMatchSpec], QueryCondition],
         ends_with_factory: Callable[[StringMatchSpec], QueryCondition],
+        in_factory: Callable[[StringInMatchSpec], QueryCondition],
     ) -> QueryCondition | None:
         """
         Convert StringFilter to QueryCondition using provided factory callables.
@@ -36,6 +42,7 @@ class BaseFilterAdapter:
             equals_factory: Factory for exact match (=) operations
             starts_with_factory: Factory for LIKE 'value%' operations
             ends_with_factory: Factory for LIKE '%value' operations
+            in_factory: Factory for IN (list membership) operations
 
         Returns:
             QueryCondition if any filter field is set, None otherwise
@@ -112,6 +119,26 @@ class BaseFilterAdapter:
         if string_filter.i_not_ends_with is not None:
             return ends_with_factory(
                 StringMatchSpec(string_filter.i_not_ends_with, case_insensitive=True, negated=True)
+            )
+
+        # IN operations
+        if string_filter.in_ is not None:
+            return in_factory(
+                StringInMatchSpec(values=string_filter.in_, case_insensitive=False, negated=False)
+            )
+        if string_filter.not_in is not None:
+            return in_factory(
+                StringInMatchSpec(values=string_filter.not_in, case_insensitive=False, negated=True)
+            )
+        if string_filter.i_in is not None:
+            return in_factory(
+                StringInMatchSpec(values=string_filter.i_in, case_insensitive=True, negated=False)
+            )
+        if string_filter.i_not_in is not None:
+            return in_factory(
+                StringInMatchSpec(
+                    values=string_filter.i_not_in, case_insensitive=True, negated=True
+                )
             )
 
         return None

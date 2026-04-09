@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
@@ -101,6 +102,8 @@ class LoginSessionConditions:
             return condition
 
         return inner
+
+    by_access_key_in = staticmethod(make_string_in_factory(LoginSessionRow.access_key))
 
     # --- created_at datetime filters ---
 
@@ -283,6 +286,8 @@ class LoginHistoryConditions:
             return condition
 
         return inner
+
+    by_domain_name_in = staticmethod(make_string_in_factory(LoginHistoryRow.domain_name))
 
     # --- created_at datetime filters ---
 

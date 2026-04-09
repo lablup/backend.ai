@@ -68,3 +68,12 @@ def resource_allocation() -> None:
 )
 def resource_policy() -> None:
     """My resource policy commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.storage_host:storage_host",
+    name="storage-host",
+)
+def storage_host() -> None:
+    """My storage host commands."""

@@ -966,7 +966,7 @@ class ScheduleDBSource:
         status_query = sa.select(SessionRow.id, SessionRow.status).where(
             sa.and_(
                 SessionRow.id.in_(session_ids),
-                SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+                SessionRow.status.in_(SessionStatus.force_terminatable_statuses()),
             )
         )
         status_result = await db_sess.execute(status_query)
@@ -992,7 +992,7 @@ class ScheduleDBSource:
             .where(
                 sa.and_(
                     SessionRow.id.in_(session_ids),
-                    SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+                    SessionRow.status.in_(SessionStatus.force_terminatable_statuses()),
                 )
             )
             .returning(SessionRow.id)
@@ -1006,7 +1006,7 @@ class ScheduleDBSource:
             kernel_agent_query = sa.select(KernelRow.id, KernelRow.agent).where(
                 sa.and_(
                     KernelRow.session_id.in_(force_terminated_sessions),
-                    KernelRow.status.in_(KernelStatus.terminatable_statuses()),
+                    KernelRow.status.in_(KernelStatus.force_terminatable_statuses()),
                 )
             )
             kernel_agent_rows = (await db_sess.execute(kernel_agent_query)).all()
@@ -1030,7 +1030,7 @@ class ScheduleDBSource:
                 .where(
                     sa.and_(
                         KernelRow.session_id.in_(force_terminated_sessions),
-                        KernelRow.status.in_(KernelStatus.terminatable_statuses()),
+                        KernelRow.status.in_(KernelStatus.force_terminatable_statuses()),
                     )
                 )
             )
@@ -1088,6 +1088,13 @@ class ScheduleDBSource:
             )
             result = await session.execute(query)
             return [row.scaling_group for row in result.fetchall()]
+
+    async def get_all_scaling_groups(self) -> list[str]:
+        """Get all defined scaling groups."""
+        async with self._begin_readonly_session_read_committed() as session:
+            query = sa.select(ScalingGroupRow.name)
+            result = await session.execute(query)
+            return [row.name for row in result.fetchall()]
 
     async def get_terminating_sessions_by_ids(
         self,

@@ -42,8 +42,14 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairActionResult,
     AdminDeleteKeypairAction,
     AdminDeleteKeypairActionResult,
+    AdminDeleteSSHKeypairAction,
+    AdminDeleteSSHKeypairActionResult,
     AdminGetKeypairAction,
     AdminGetKeypairActionResult,
+    AdminGetSSHKeypairAction,
+    AdminGetSSHKeypairActionResult,
+    AdminRegisterSSHKeypairAction,
+    AdminRegisterSSHKeypairActionResult,
     AdminSearchKeypairsAction,
     AdminSearchKeypairsActionResult,
     AdminUpdateKeypairAction,
@@ -509,3 +515,35 @@ class UserService:
         """Admin retrieves a single keypair by access key."""
         keypair_data = await self._user_repository.admin_get_keypair(access_key=action.access_key)
         return AdminGetKeypairActionResult(keypair=keypair_data)
+
+    # ------------------------------------------------------------------ admin SSH keypair operations
+
+    async def admin_register_ssh_keypair(
+        self, action: AdminRegisterSSHKeypairAction
+    ) -> AdminRegisterSSHKeypairActionResult:
+        """Admin registers (overwrites) a user's SSH keypair."""
+        await self._user_repository.admin_update_ssh_keypair(
+            access_key=action.access_key,
+            ssh_public_key=action.ssh_public_key,
+            ssh_private_key=action.ssh_private_key,
+        )
+        return AdminRegisterSSHKeypairActionResult(access_key=action.access_key)
+
+    async def admin_delete_ssh_keypair(
+        self, action: AdminDeleteSSHKeypairAction
+    ) -> AdminDeleteSSHKeypairActionResult:
+        """Admin clears a user's SSH keypair."""
+        await self._user_repository.admin_clear_ssh_keypair(access_key=action.access_key)
+        return AdminDeleteSSHKeypairActionResult(access_key=action.access_key)
+
+    async def admin_get_ssh_keypair(
+        self, action: AdminGetSSHKeypairAction
+    ) -> AdminGetSSHKeypairActionResult:
+        """Admin retrieves a user's SSH public key (never the private key)."""
+        ssh_public_key = await self._user_repository.admin_get_ssh_public_key(
+            access_key=action.access_key
+        )
+        return AdminGetSSHKeypairActionResult(
+            access_key=action.access_key,
+            ssh_public_key=ssh_public_key,
+        )

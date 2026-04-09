@@ -184,7 +184,6 @@ class ModelCardMetadataGQL(PydanticOutputMixin[ModelCardMetadataDTO]):
 )
 class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
-    row_id: UUID = gql_field(description="The unique database identifier of this model card.")
     name: str = gql_field(description="Display name of the registered model.")
     vfolder_id: UUID = gql_field(
         description="The VFolder that stores the actual model files, weights, and configuration."
@@ -264,7 +263,9 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
             limit=limit,
             offset=offset,
         )
-        result = await info.context.adapters.model_card.available_presets(self.row_id, search_input)
+        result = await info.context.adapters.model_card.available_presets(
+            UUID(self.id), search_input
+        )
         return build_preset_connection(result)
 
 
@@ -317,6 +318,13 @@ class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
     domain_name: str | None = gql_field(default=None, description="Domain filter.")
     project_id: UUID | None = gql_field(default=None, description="Project filter.")
+    storage_host: StringFilterGQL | None = gql_field(
+        default=None,
+        description=(
+            "Filter by the storage host backing the model card's VFolder. "
+            "Matches via an EXISTS subquery against the VFolder host column."
+        ),
+    )
 
 
 @gql_pydantic_input(
@@ -335,7 +343,9 @@ class ModelCardOrderByGQL(PydanticInputMixin[OrderDTO]):
 class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
     name: str = gql_field(description="Model card name.")
     vfolder_id: UUID = gql_field(description="VFolder ID.")
-    project_id: UUID = gql_field(description="Project ID.")
+    model_store_project_id: UUID = gql_field(
+        description="MODEL_STORE project UUID where the model card belongs."
+    )
     domain_name: str | None = gql_field(default=None, description="Domain name.")
     author: str | None = gql_field(default=None, description="Author.")
     title: str | None = gql_field(default=None, description="Model title.")
@@ -348,8 +358,9 @@ class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
     label: list[str] | None = gql_field(default=None, description="Labels.")
     license: str | None = gql_field(default=None, description="License.")
     readme: str | None = gql_field(default=None, description="README content.")
-    access_level: ModelCardAccessLevelGQL | None = gql_field(
-        default=None, description="Access level (public or internal)."
+    access_level: ModelCardAccessLevelGQL = gql_field(
+        default=ModelCardAccessLevelGQL.INTERNAL,
+        description="Access level (public or internal).",
     )
 
 

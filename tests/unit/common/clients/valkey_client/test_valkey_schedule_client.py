@@ -9,7 +9,7 @@ import asyncio
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from time import time
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from glide import ExpirySet, ExpiryType
@@ -24,7 +24,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
 )
 from ai.backend.common.defs import REDIS_LIVE_DB
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import AgentId, KernelId, ValkeyTarget
+from ai.backend.common.types import AgentId, KernelId, SessionId, ValkeyTarget
 
 
 class TestValkeyScheduleClient:
@@ -838,3 +838,63 @@ class TestAgentLastCheck:
         statuses = await valkey_schedule_client.get_kernel_presence_batch([])
 
         assert statuses == {}
+
+
+class TestForceTerminatedCleanupQueue:
+    """Test cases for force-terminated session cleanup queue operations."""
+
+    @pytest.fixture
+    async def valkey_schedule_client(
+        self,
+        redis_container: tuple[str, HostPortPairModel],
+    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+        _, hostport_pair = redis_container
+        valkey_target = ValkeyTarget(addr=hostport_pair.address)
+        client = await ValkeyScheduleClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_LIVE_DB,
+            human_readable_name="test-force-terminated-cleanup",
+        )
+        try:
+            key = ValkeyScheduleClient._get_force_terminated_cleanup_key()
+            async with client._client.client() as conn:
+                await conn.delete([key])
+            yield client
+        finally:
+            await client.close()
+
+    async def test_add_and_get_returns_session_ids(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        """Stored session IDs are returned as list[SessionId] by get."""
+        session_ids = [SessionId(uuid4()) for _ in range(3)]
+
+        await valkey_schedule_client.add_force_terminated_sessions(session_ids)
+        result = await valkey_schedule_client.get_force_terminated_sessions()
+
+        assert isinstance(result, list)
+        assert set(result) == set(session_ids)
+        for item in result:
+            assert isinstance(item, UUID)
+
+    async def test_get_empty_queue_returns_empty_list(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        """Get from empty queue returns empty list."""
+        result = await valkey_schedule_client.get_force_terminated_sessions()
+
+        assert isinstance(result, list)
+        assert result == []
+
+    async def test_remove_deletes_only_specified_sessions(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        """remove_force_terminated_sessions removes only specified IDs."""
+        sid_keep = SessionId(uuid4())
+        sid_remove = SessionId(uuid4())
+
+        await valkey_schedule_client.add_force_terminated_sessions([sid_keep, sid_remove])
+        await valkey_schedule_client.remove_force_terminated_sessions([sid_remove])
+        result = await valkey_schedule_client.get_force_terminated_sessions()
+
+        assert result == [sid_keep]

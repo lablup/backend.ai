@@ -238,7 +238,7 @@ class ModelCardAdapter(BaseAdapter):
                 name=input.name,
                 vfolder_id=input.vfolder_id,
                 domain=input.domain_name or me.domain_name,
-                project_id=input.project_id,
+                project_id=input.model_store_project_id,
                 creator_id=me.user_id,
                 author=input.author,
                 title=input.title,
@@ -257,7 +257,7 @@ class ModelCardAdapter(BaseAdapter):
             element_type=RBACElementType.MODEL_CARD,
             scope_ref=RBACElementRef(
                 element_type=RBACElementType.PROJECT,
-                element_id=str(input.project_id),
+                element_id=str(input.model_store_project_id),
             ),
         )
         result = await self._processors.model_card.create.wait_for_complete(
@@ -525,6 +525,18 @@ class ModelCardAdapter(BaseAdapter):
                 equals_factory=ModelCardConditions.by_name_equals,
                 starts_with_factory=ModelCardConditions.by_name_starts_with,
                 ends_with_factory=ModelCardConditions.by_name_ends_with,
+                in_factory=ModelCardConditions.by_name_in,
+            )
+            if cond:
+                conditions.append(cond)
+        if filter_.storage_host:
+            cond = self.convert_string_filter(
+                filter_.storage_host,
+                contains_factory=ModelCardConditions.by_storage_host_contains,
+                equals_factory=ModelCardConditions.by_storage_host_equals,
+                starts_with_factory=ModelCardConditions.by_storage_host_starts_with,
+                ends_with_factory=ModelCardConditions.by_storage_host_ends_with,
+                in_factory=ModelCardConditions.by_storage_host_in,
             )
             if cond:
                 conditions.append(cond)

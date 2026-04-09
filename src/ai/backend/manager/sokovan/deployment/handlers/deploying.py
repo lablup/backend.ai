@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from typing import override
+from uuid import UUID
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -39,6 +40,7 @@ from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.strategy.applier import (
@@ -83,11 +85,15 @@ class DeployingProvisioningHandler(DeploymentHandler):
         route_controller: RouteController,
         evaluator: DeploymentStrategyEvaluator,
         applier: StrategyResultApplier,
+        deployment_executor: DeploymentExecutor,
+        deployment_repo: DeploymentRepository,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
         self._evaluator = evaluator
         self._applier = applier
+        self._deployment_executor = deployment_executor
+        self._deployment_repo = deployment_repo
 
     @classmethod
     @override
@@ -127,10 +133,53 @@ class DeployingProvisioningHandler(DeploymentHandler):
             ),
         )
 
+    async def _ensure_endpoints_registered(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> set[UUID]:
+        """Register endpoints for deployments that entered DEPLOYING via
+        ActivateRevision and therefore skipped ``check_pending``.
+
+        Returns IDs whose registration failed so the caller can exclude
+        them from this tick's route provisioning.
+        """
+        entries: list[tuple[DeploymentWithHistory, UUID]] = []
+        for deployment in deployments:
+            info = deployment.deployment_info
+            if info.network.url:
+                continue
+            if info.deploying_revision_id is None:
+                continue
+            entries.append((deployment, info.deploying_revision_id))
+
+        if not entries:
+            return set()
+
+        result = await self._deployment_executor.register_endpoints_bulk(entries)
+        return {error.deployment_info.deployment_info.id for error in result.failures}
+
     @override
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
+        # BA-5557: pre-register endpoints for deployments that bypassed
+        # check_pending via ActivateRevision. On failure, drop them from
+        # this tick so they retry next cycle; pre-registered deployments
+        # keep flowing into route provisioning.
+        try:
+            failed_registration_ids = await self._ensure_endpoints_registered(deployments)
+        except Exception as exc:
+            log.exception("Pre-registration step failed: {}", exc)
+            failed_registration_ids = {
+                d.deployment_info.id
+                for d in deployments
+                if not d.deployment_info.network.url
+                and d.deployment_info.deploying_revision_id is not None
+            }
+        if failed_registration_ids:
+            deployments = [
+                d for d in deployments if d.deployment_info.id not in failed_registration_ids
+            ]
+
         deployment_infos = [d.deployment_info for d in deployments]
         deployment_map = {d.deployment_info.id: d for d in deployments}
 

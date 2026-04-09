@@ -388,8 +388,16 @@ class SchedulingController:
                 count=result.processed_count(),
             )
             # Request termination scheduling for the next cycle
-            # For force-terminated sessions, agents still need cleanup RPCs
-            await self.mark_scheduling_needed([ScheduleType.TERMINATE])
+            schedule_types = [ScheduleType.TERMINATE]
+
+            # For force-terminated sessions, store session IDs in Valkey for container cleanup
+            if result.force_terminated_sessions:
+                await self._valkey_schedule.add_force_terminated_sessions(
+                    result.force_terminated_sessions
+                )
+                schedule_types.append(ScheduleType.CLEANUP_FORCE_TERMINATED)
+
+            await self.mark_scheduling_needed(schedule_types)
 
         return result
 

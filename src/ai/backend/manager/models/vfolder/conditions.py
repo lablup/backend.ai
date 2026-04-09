@@ -15,6 +15,7 @@ from uuid import UUID
 
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import VFolderRow
@@ -144,6 +145,9 @@ class VFolderConditions:
             return condition
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(VFolderRow.name))
+    by_host_in = staticmethod(make_string_in_factory(VFolderRow.host))
 
     # ── boolean filter factories ──
 

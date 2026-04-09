@@ -356,6 +356,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 equals_factory=PresetResourceSlotConditions.by_slot_name_equals,
                 starts_with_factory=PresetResourceSlotConditions.by_slot_name_starts_with,
                 ends_with_factory=PresetResourceSlotConditions.by_slot_name_ends_with,
+                in_factory=PresetResourceSlotConditions.by_slot_name_in,
             )
             if cond is not None:
                 conditions.append(cond)
@@ -383,6 +384,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 equals_factory=DeploymentRevisionPresetConditions.by_name_equals,
                 starts_with_factory=DeploymentRevisionPresetConditions.by_name_starts_with,
                 ends_with_factory=DeploymentRevisionPresetConditions.by_name_ends_with,
+                in_factory=DeploymentRevisionPresetConditions.by_name_in,
             )
             if cond:
                 conditions.append(cond)

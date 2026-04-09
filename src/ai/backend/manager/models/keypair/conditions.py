@@ -7,6 +7,7 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
 
@@ -182,6 +183,9 @@ class KeypairConditions:
             return cond
 
         return inner
+
+    by_access_key_in = staticmethod(make_string_in_factory(KeyPairRow.access_key))
+    by_resource_policy_in = staticmethod(make_string_in_factory(KeyPairRow.resource_policy))
 
     @staticmethod
     def by_created_at_before(dt: datetime) -> QueryCondition:

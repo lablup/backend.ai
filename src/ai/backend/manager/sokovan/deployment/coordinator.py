@@ -311,6 +311,8 @@ class DeploymentCoordinator:
                     route_controller=self._route_controller,
                     evaluator=evaluator,
                     applier=applier,
+                    deployment_executor=executor,
+                    deployment_repo=self._deployment_repository,
                 ),
             ),
             (

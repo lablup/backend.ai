@@ -32,8 +32,14 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairActionResult,
     AdminDeleteKeypairAction,
     AdminDeleteKeypairActionResult,
+    AdminDeleteSSHKeypairAction,
+    AdminDeleteSSHKeypairActionResult,
     AdminGetKeypairAction,
     AdminGetKeypairActionResult,
+    AdminGetSSHKeypairAction,
+    AdminGetSSHKeypairActionResult,
+    AdminRegisterSSHKeypairAction,
+    AdminRegisterSSHKeypairActionResult,
     AdminSearchKeypairsAction,
     AdminSearchKeypairsActionResult,
     AdminUpdateKeypairAction,
@@ -129,6 +135,14 @@ class UserProcessors(AbstractProcessorPackage):
         AdminSearchKeypairsAction, AdminSearchKeypairsActionResult
     ]
     admin_get_keypair: ActionProcessor[AdminGetKeypairAction, AdminGetKeypairActionResult]
+    # Admin SSH keypair operations
+    admin_register_ssh_keypair: ActionProcessor[
+        AdminRegisterSSHKeypairAction, AdminRegisterSSHKeypairActionResult
+    ]
+    admin_delete_ssh_keypair: ActionProcessor[
+        AdminDeleteSSHKeypairAction, AdminDeleteSSHKeypairActionResult
+    ]
+    admin_get_ssh_keypair: ActionProcessor[AdminGetSSHKeypairAction, AdminGetSSHKeypairActionResult]
 
     def __init__(
         self,
@@ -206,6 +220,16 @@ class UserProcessors(AbstractProcessorPackage):
             user_service.admin_search_keypairs, action_monitors
         )
         self.admin_get_keypair = ActionProcessor(user_service.admin_get_keypair, action_monitors)
+        # Admin SSH keypair operations
+        self.admin_register_ssh_keypair = ActionProcessor(
+            user_service.admin_register_ssh_keypair, action_monitors
+        )
+        self.admin_delete_ssh_keypair = ActionProcessor(
+            user_service.admin_delete_ssh_keypair, action_monitors
+        )
+        self.admin_get_ssh_keypair = ActionProcessor(
+            user_service.admin_get_ssh_keypair, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -237,4 +261,7 @@ class UserProcessors(AbstractProcessorPackage):
             AdminDeleteKeypairAction.spec(),
             AdminSearchKeypairsAction.spec(),
             AdminGetKeypairAction.spec(),
+            AdminRegisterSSHKeypairAction.spec(),
+            AdminDeleteSSHKeypairAction.spec(),
+            AdminGetSSHKeypairAction.spec(),
         ]

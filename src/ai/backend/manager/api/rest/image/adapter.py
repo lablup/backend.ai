@@ -116,6 +116,7 @@ class ImageAdapter(BaseFilterAdapter):
                 equals_factory=ImageConditions.by_name_equals,
                 starts_with_factory=ImageConditions.by_name_starts_with,
                 ends_with_factory=ImageConditions.by_name_ends_with,
+                in_factory=ImageConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -127,6 +128,7 @@ class ImageAdapter(BaseFilterAdapter):
                 equals_factory=ImageConditions.by_architecture_equals,
                 starts_with_factory=ImageConditions.by_architecture_starts_with,
                 ends_with_factory=ImageConditions.by_architecture_ends_with,
+                in_factory=ImageConditions.by_architecture_in,
             )
             if condition is not None:
                 conditions.append(condition)

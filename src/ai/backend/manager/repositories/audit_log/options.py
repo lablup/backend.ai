@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.models.audit_log import AuditLogRow
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 if TYPE_CHECKING:
@@ -79,6 +80,8 @@ class AuditLogConditions:
 
         return inner
 
+    by_entity_type_in = staticmethod(make_string_in_factory(AuditLogRow.entity_type))
+
     # --- operation string filters ---
 
     @staticmethod
@@ -132,6 +135,8 @@ class AuditLogConditions:
             return condition
 
         return inner
+
+    by_operation_in = staticmethod(make_string_in_factory(AuditLogRow.operation))
 
     # --- status enum filters ---
 
@@ -225,6 +230,8 @@ class AuditLogConditions:
             return condition
 
         return inner
+
+    by_triggered_by_in = staticmethod(make_string_in_factory(AuditLogRow.triggered_by))
 
     # --- cursor pagination conditions ---
 

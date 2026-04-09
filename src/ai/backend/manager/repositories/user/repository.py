@@ -357,6 +357,30 @@ class UserRepository:
         """Admin retrieves a single keypair by access key."""
         return await self._db_source.admin_get_keypair(access_key)
 
+    @user_repository_resilience.apply()
+    async def admin_update_ssh_keypair(
+        self,
+        access_key: str,
+        ssh_public_key: str,
+        ssh_private_key: str,
+    ) -> None:
+        """Admin registers (overwrites) a user's SSH keypair."""
+        await self._db_source.admin_update_ssh_keypair(
+            access_key=access_key,
+            ssh_public_key=ssh_public_key,
+            ssh_private_key=ssh_private_key,
+        )
+
+    @user_repository_resilience.apply()
+    async def admin_clear_ssh_keypair(self, access_key: str) -> None:
+        """Admin clears a user's SSH keypair."""
+        await self._db_source.admin_clear_ssh_keypair(access_key=access_key)
+
+    @user_repository_resilience.apply()
+    async def admin_get_ssh_public_key(self, access_key: str) -> str | None:
+        """Admin retrieves a user's SSH public key (never the private key)."""
+        return await self._db_source.admin_get_ssh_public_key(access_key=access_key)
+
     async def _get_time_binned_monthly_stats(
         self,
         user_uuid: UUID | None,

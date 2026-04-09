@@ -9,6 +9,10 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.condition_utils import (
+    make_nested_string_in_factory,
+    make_string_in_factory,
+)
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRow
@@ -83,6 +87,8 @@ class DomainConditions:
 
         return inner
 
+    by_name_in = staticmethod(make_string_in_factory(DomainRow.name))
+
     # ==================== Description Filters ====================
 
     @staticmethod
@@ -136,6 +142,8 @@ class DomainConditions:
             return condition
 
         return inner
+
+    by_description_in = staticmethod(make_string_in_factory(DomainRow.description))
 
     # ==================== Active Status Filters ====================
 
@@ -338,6 +346,10 @@ class DomainConditions:
 
         return inner
 
+    by_project_name_in = staticmethod(
+        make_nested_string_in_factory(GroupRow.name, lambda c: DomainConditions._exists_project(c))
+    )
+
     @staticmethod
     def by_project_is_active(is_active: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -472,6 +484,13 @@ class DomainConditions:
             return DomainConditions._exists_user(cond)
 
         return inner
+
+    by_user_username_in = staticmethod(
+        make_nested_string_in_factory(UserRow.username, lambda c: DomainConditions._exists_user(c))
+    )
+    by_user_email_in = staticmethod(
+        make_nested_string_in_factory(UserRow.email, lambda c: DomainConditions._exists_user(c))
+    )
 
     @staticmethod
     def by_user_is_active(is_active: bool) -> QueryCondition:

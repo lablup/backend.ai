@@ -177,6 +177,11 @@ class SchedulerRepository:
         return await self._db_source.get_schedulable_scaling_groups()
 
     @scheduler_repository_resilience.apply()
+    async def get_all_scaling_groups(self) -> list[str]:
+        """Get all defined scaling groups."""
+        return await self._db_source.get_all_scaling_groups()
+
+    @scheduler_repository_resilience.apply()
     async def get_terminating_sessions_by_ids(
         self,
         session_ids: list[SessionId],

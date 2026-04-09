@@ -7,6 +7,7 @@ from collections.abc import Collection
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForProjectRow,
     ScalingGroupRow,
@@ -122,6 +123,9 @@ class ScalingGroupConditions:
             return condition
 
         return inner
+
+    by_name_in = staticmethod(make_string_in_factory(ScalingGroupRow.name))
+    by_description_in = staticmethod(make_string_in_factory(ScalingGroupRow.description))
 
     @staticmethod
     def by_is_active(is_active: bool) -> QueryCondition:

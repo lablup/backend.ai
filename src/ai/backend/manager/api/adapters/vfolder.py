@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import secrets
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
+from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
     BulkPurgeVFoldersInput,
@@ -14,6 +17,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateUploadSessionInput,
     CreateVFolderInput,
     DeleteFilesInput,
+    DeployVFolderInput,
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
@@ -30,6 +34,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     CreateVFolderPayload,
     DeleteFilesPayload,
     DeleteVFolderPayload,
+    DeployVFolderPayload,
     FileEntryNode,
     ListFilesPayload,
     MkdirPayload,
@@ -48,13 +53,28 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.types import BinarySize, VFolderUsageMode
+from ai.backend.common.types import BinarySize, ClusterMode, RuntimeVariant, VFolderUsageMode
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
+from ai.backend.manager.data.deployment.creator import (
+    DeploymentPolicyConfig,
+    ModelRevisionCreator,
+    NewDeploymentCreator,
+    VFolderMountsCreator,
+)
+from ai.backend.manager.data.deployment.types import (
+    DeploymentMetadata,
+    DeploymentNetworkSpec,
+    ExecutionSpec,
+    ReplicaSpec,
+    ResourceSpec,
+)
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderOperationStatus,
 )
+from ai.backend.manager.errors.resource import NotAModelVFolder
 from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.orders import (
@@ -79,6 +99,7 @@ from ai.backend.manager.repositories.vfolder.types import (
     ProjectVFolderSearchScope,
     UserVFolderSearchScope,
 )
+from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     AdminSearchVFoldersAction,
 )
@@ -122,6 +143,42 @@ _VFOLDER_PAGINATION_SPEC = PaginationSpec(
 def _to_binary_size_info(value: int) -> BinarySizeInfo:
     """Convert bytes integer to BinarySizeInfo DTO."""
     return BinarySizeInfo(value=value, display=f"{BinarySize(value):s}")
+
+
+def _build_policy_from_strategy_input(
+    strategy_input: DeploymentStrategyInput | None,
+) -> DeploymentPolicyConfig | None:
+    """Convert a DeploymentStrategyInput DTO to DeploymentPolicyConfig.
+
+    Returns ``None`` when the caller did not provide a strategy. The deployment
+    service will then fall back to the preset's strategy default (if any).
+    """
+    if strategy_input is None:
+        return None
+    strategy_spec: RollingUpdateSpec | BlueGreenSpec
+    match strategy_input.type:
+        case DeploymentStrategy.ROLLING:
+            rolling = strategy_input.rolling_update
+            if rolling is not None:
+                strategy_spec = RollingUpdateSpec(
+                    max_surge=rolling.max_surge,
+                    max_unavailable=rolling.max_unavailable,
+                )
+            else:
+                strategy_spec = RollingUpdateSpec()
+        case DeploymentStrategy.BLUE_GREEN:
+            bg = strategy_input.blue_green
+            if bg is not None:
+                strategy_spec = BlueGreenSpec(
+                    auto_promote=bg.auto_promote,
+                    promote_delay_seconds=bg.promote_delay_seconds,
+                )
+            else:
+                strategy_spec = BlueGreenSpec()
+    return DeploymentPolicyConfig(
+        strategy=strategy_input.type,
+        strategy_spec=strategy_spec,
+    )
 
 
 class VFolderAdapter(BaseAdapter):
@@ -352,6 +409,86 @@ class VFolderAdapter(BaseAdapter):
         await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return PurgeVFolderPayload(id=vfolder_id)
 
+    async def deploy(
+        self,
+        vfolder_id: UUID,
+        input: DeployVFolderInput,
+    ) -> DeployVFolderPayload:
+        """Create a deployment directly from a model VFolder.
+
+        The VFolder must have ``usage_mode == VFolderUsageMode.MODEL``;
+        non-model vfolders are rejected with :class:`NotAModelVFolder`.
+        The revision preset supplies image, runtime variant, resource
+        slots, environ, startup command, and (optionally) deployment-
+        level defaults. Explicit overrides on ``DeployVFolderInput``
+        take precedence over the preset default.
+        """
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+
+        batch_result = await self._processors.vfolder.batch_load_vfolders_by_ids.wait_for_complete(
+            BatchLoadVFoldersByIdsAction(ids=[vfolder_id])
+        )
+        if not batch_result.data or batch_result.data[0] is None:
+            raise VFolderNotFound()
+        vfolder = batch_result.data[0]
+        if vfolder.usage_mode != VFolderUsageMode.MODEL:
+            raise NotAModelVFolder()
+
+        # Build optional override values; leaving them ``None`` lets the
+        # deployment service fall back to the preset default.
+        replica_spec: ReplicaSpec | None = None
+        if input.replica_count is not None:
+            replica_spec = ReplicaSpec(replica_count=input.replica_count)
+        elif input.desired_replica_count != 1:
+            replica_spec = ReplicaSpec(replica_count=input.desired_replica_count)
+
+        network_spec: DeploymentNetworkSpec | None = None
+        if input.open_to_public is not None:
+            network_spec = DeploymentNetworkSpec(open_to_public=input.open_to_public)
+
+        policy = _build_policy_from_strategy_input(input.deployment_strategy)
+
+        creator = NewDeploymentCreator(
+            metadata=DeploymentMetadata(
+                name=f"{vfolder.name}-{secrets.token_hex(4)}",
+                domain=vfolder.domain_name,
+                project=input.project_id,
+                resource_group=input.resource_group,
+                created_user=me.user_id,
+                session_owner=me.user_id,
+                created_at=None,
+                revision_history_limit=input.revision_history_limit,
+            ),
+            replica_spec=replica_spec,
+            network=network_spec,
+            model_revision=ModelRevisionCreator(
+                image_id=None,
+                resource_spec=ResourceSpec(
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                    resource_slots={},
+                ),
+                mounts=VFolderMountsCreator(
+                    model_vfolder_id=vfolder.id,
+                ),
+                execution=ExecutionSpec(runtime_variant=RuntimeVariant("custom")),
+                model_definition=None,
+                revision_preset_id=input.revision_preset_id,
+                auto_activate=True,
+            ),
+            policy=policy,
+        )
+
+        result = await self._processors.deployment.create_deployment.wait_for_complete(
+            CreateDeploymentAction(creator=creator)
+        )
+        return DeployVFolderPayload(
+            deployment_id=result.data.id,
+            deployment_name=result.data.metadata.name,
+        )
+
     async def bulk_delete(self, input: BulkDeleteVFoldersInput) -> BulkDeleteVFoldersPayload:
         """Soft-delete multiple vfolders."""
         me = current_user()
@@ -482,6 +619,7 @@ class VFolderAdapter(BaseAdapter):
                 equals_factory=VFolderConditions.by_name_equals,
                 starts_with_factory=VFolderConditions.by_name_starts_with,
                 ends_with_factory=VFolderConditions.by_name_ends_with,
+                in_factory=VFolderConditions.by_name_in,
             )
             if c is not None:
                 conditions.append(c)
@@ -492,6 +630,7 @@ class VFolderAdapter(BaseAdapter):
                 equals_factory=VFolderConditions.by_host_equals,
                 starts_with_factory=VFolderConditions.by_host_starts_with,
                 ends_with_factory=VFolderConditions.by_host_ends_with,
+                in_factory=VFolderConditions.by_host_in,
             )
             if c is not None:
                 conditions.append(c)

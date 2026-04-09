@@ -23,15 +23,20 @@ from ai.backend.common.dto.manager.v2.keypair import (
 )
 from ai.backend.common.dto.manager.v2.keypair.request import (
     AdminCreateKeypairInput,
+    AdminRegisterSSHKeypairInput,
     AdminUpdateKeypairInput,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
     AdminCreateKeypairPayload,
     AdminDeleteKeypairPayload,
+    AdminDeleteSSHKeypairPayload,
+    AdminGetSSHKeypairPayload,
+    AdminRegisterSSHKeypairPayload,
     AdminSearchKeypairsPayload,
     AdminUpdateKeypairPayload,
     IssueMyKeypairPayload,
     RevokeMyKeypairPayload,
+    SSHKeypairNode,
     SwitchMyMainAccessKeyPayload,
     UpdateMyKeypairPayload,
 )
@@ -125,7 +130,10 @@ from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairAction,
     AdminDeleteKeypairAction,
+    AdminDeleteSSHKeypairAction,
     AdminGetKeypairAction,
+    AdminGetSSHKeypairAction,
+    AdminRegisterSSHKeypairAction,
     AdminSearchKeypairsAction,
     AdminUpdateKeypairAction,
     IssueMyKeypairAction,
@@ -768,6 +776,38 @@ class UserAdapter(BaseAdapter):
         )
         return self._keypair_data_to_node(result.keypair)
 
+    async def admin_register_ssh_keypair(
+        self, input: AdminRegisterSSHKeypairInput
+    ) -> AdminRegisterSSHKeypairPayload:
+        """Admin registers (overwrites) a user's SSH keypair."""
+        result = await self._processors.user.admin_register_ssh_keypair.wait_for_complete(
+            AdminRegisterSSHKeypairAction(
+                access_key=input.access_key,
+                ssh_public_key=input.ssh_public_key,
+                ssh_private_key=input.ssh_private_key,
+            )
+        )
+        return AdminRegisterSSHKeypairPayload(access_key=result.access_key)
+
+    async def admin_delete_ssh_keypair(self, access_key: str) -> AdminDeleteSSHKeypairPayload:
+        """Admin clears a user's SSH keypair."""
+        result = await self._processors.user.admin_delete_ssh_keypair.wait_for_complete(
+            AdminDeleteSSHKeypairAction(access_key=access_key)
+        )
+        return AdminDeleteSSHKeypairPayload(access_key=result.access_key)
+
+    async def admin_get_ssh_keypair(self, access_key: str) -> AdminGetSSHKeypairPayload:
+        """Admin retrieves a user's SSH public key (never the private key)."""
+        result = await self._processors.user.admin_get_ssh_keypair.wait_for_complete(
+            AdminGetSSHKeypairAction(access_key=access_key)
+        )
+        return AdminGetSSHKeypairPayload(
+            keypair=SSHKeypairNode(
+                access_key=result.access_key,
+                ssh_public_key=result.ssh_public_key,
+            )
+        )
+
     async def admin_search_keypairs(
         self,
         input: AdminSearchKeypairsInput,
@@ -842,6 +882,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=KeypairConditions.by_access_key_equals,
                 starts_with_factory=KeypairConditions.by_access_key_starts_with,
                 ends_with_factory=KeypairConditions.by_access_key_ends_with,
+                in_factory=KeypairConditions.by_access_key_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -853,6 +894,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=KeypairConditions.by_resource_policy_equals,
                 starts_with_factory=KeypairConditions.by_resource_policy_starts_with,
                 ends_with_factory=KeypairConditions.by_resource_policy_ends_with,
+                in_factory=KeypairConditions.by_resource_policy_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -934,6 +976,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=UserConditions.by_username_equals,
                 starts_with_factory=UserConditions.by_username_starts_with,
                 ends_with_factory=UserConditions.by_username_ends_with,
+                in_factory=UserConditions.by_username_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -945,6 +988,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=UserConditions.by_email_equals,
                 starts_with_factory=UserConditions.by_email_starts_with,
                 ends_with_factory=UserConditions.by_email_ends_with,
+                in_factory=UserConditions.by_email_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -959,6 +1003,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=UserConditions.by_domain_name_equals,
                 starts_with_factory=UserConditions.by_domain_name_starts_with,
                 ends_with_factory=UserConditions.by_domain_name_ends_with,
+                in_factory=UserConditions.by_domain_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -970,6 +1015,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=UserConditions.by_integration_name_equals,
                 starts_with_factory=UserConditions.by_integration_name_starts_with,
                 ends_with_factory=UserConditions.by_integration_name_ends_with,
+                in_factory=UserConditions.by_integration_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1043,6 +1089,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=DomainConditions.by_name_equals,
                 starts_with_factory=DomainConditions.by_name_starts_with,
                 ends_with_factory=DomainConditions.by_name_ends_with,
+                in_factory=DomainConditions.by_name_in,
             )
             if condition is not None:
                 raw_conditions.append(condition)
@@ -1063,6 +1110,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=GroupConditions.by_name_equals,
                 starts_with_factory=GroupConditions.by_name_starts_with,
                 ends_with_factory=GroupConditions.by_name_ends_with,
+                in_factory=GroupConditions.by_name_in,
             )
             if condition is not None:
                 raw_conditions.append(condition)
@@ -1124,6 +1172,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=UserConditions.by_email_equals,
                 starts_with_factory=UserConditions.by_email_starts_with,
                 ends_with_factory=UserConditions.by_email_ends_with,
+                in_factory=UserConditions.by_email_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1135,6 +1184,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=UserConditions.by_username_equals,
                 starts_with_factory=UserConditions.by_username_starts_with,
                 ends_with_factory=UserConditions.by_username_ends_with,
+                in_factory=UserConditions.by_username_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1146,6 +1196,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=UserConditions.by_domain_name_equals,
                 starts_with_factory=UserConditions.by_domain_name_starts_with,
                 ends_with_factory=UserConditions.by_domain_name_ends_with,
+                in_factory=UserConditions.by_domain_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1157,6 +1208,7 @@ class UserAdapter(BaseAdapter):
                 equals_factory=UserConditions.by_integration_name_equals,
                 starts_with_factory=UserConditions.by_integration_name_starts_with,
                 ends_with_factory=UserConditions.by_integration_name_ends_with,
+                in_factory=UserConditions.by_integration_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

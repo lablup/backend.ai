@@ -15,7 +15,12 @@ from graphql_relay.utils import base64, unbase64
 from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringInMatchSpec,
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.common.dto.manager.query import DateFilter as DateFilterDTO
 from ai.backend.common.dto.manager.query import DateTimeFilter as DateTimeFilterDTO
 from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
@@ -104,12 +109,35 @@ class StringFilter(PydanticInputMixin[StringFilterDTO]):
         description="The i not equals field.", name="iNotEquals", default=None
     )
 
+    # IN operations
+    in_: list[str] | None = gql_field(
+        description="Value is in the provided list (case-sensitive).",
+        name="in",
+        default=None,
+    )
+    not_in: list[str] | None = gql_field(
+        description="Value is not in the provided list (case-sensitive).",
+        name="notIn",
+        default=None,
+    )
+    i_in: list[str] | None = gql_field(
+        description="Value is in the provided list (case-insensitive).",
+        name="iIn",
+        default=None,
+    )
+    i_not_in: list[str] | None = gql_field(
+        description="Value is not in the provided list (case-insensitive).",
+        name="iNotIn",
+        default=None,
+    )
+
     def build_query_condition(
         self,
         contains_factory: Callable[[StringMatchSpec], QueryCondition],
         equals_factory: Callable[[StringMatchSpec], QueryCondition],
         starts_with_factory: Callable[[StringMatchSpec], QueryCondition],
         ends_with_factory: Callable[[StringMatchSpec], QueryCondition],
+        in_factory: Callable[[StringInMatchSpec], QueryCondition],
     ) -> QueryCondition | None:
         """Build a query condition from this filter using the provided factory callables.
 
@@ -118,6 +146,7 @@ class StringFilter(PydanticInputMixin[StringFilterDTO]):
             equals_factory: Factory for exact match (=) operations
             starts_with_factory: Factory for LIKE 'value%' operations
             ends_with_factory: Factory for LIKE '%value' operations
+            in_factory: Factory for IN (list membership) operations
 
         Returns:
             QueryCondition if any filter field is set, None otherwise
@@ -192,6 +221,24 @@ class StringFilter(PydanticInputMixin[StringFilterDTO]):
         if self.i_not_ends_with:
             return ends_with_factory(
                 StringMatchSpec(self.i_not_ends_with, case_insensitive=True, negated=True)
+            )
+
+        # IN operations
+        if self.in_:
+            return in_factory(
+                StringInMatchSpec(values=self.in_, case_insensitive=False, negated=False)
+            )
+        if self.not_in:
+            return in_factory(
+                StringInMatchSpec(values=self.not_in, case_insensitive=False, negated=True)
+            )
+        if self.i_in:
+            return in_factory(
+                StringInMatchSpec(values=self.i_in, case_insensitive=True, negated=False)
+            )
+        if self.i_not_in:
+            return in_factory(
+                StringInMatchSpec(values=self.i_not_in, case_insensitive=True, negated=True)
             )
 
         return None

@@ -38,6 +38,7 @@ from ai.backend.manager.api.adapters.runtime_variant_preset import RuntimeVarian
 from ai.backend.manager.api.adapters.scheduling_history import SchedulingHistoryAdapter
 from ai.backend.manager.api.adapters.service_catalog import ServiceCatalogAdapter
 from ai.backend.manager.api.adapters.session import SessionAdapter
+from ai.backend.manager.api.adapters.storage_host import StorageHostAdapter
 from ai.backend.manager.api.adapters.storage_namespace import StorageNamespaceAdapter
 from ai.backend.manager.api.adapters.user import UserAdapter
 from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
@@ -91,6 +92,7 @@ class Adapters:
         scheduling_history: SchedulingHistoryAdapter,
         service_catalog: ServiceCatalogAdapter,
         session: SessionAdapter,
+        storage_host: StorageHostAdapter,
         storage_namespace: StorageNamespaceAdapter,
         user: UserAdapter,
         vfolder: VFolderAdapter,
@@ -128,6 +130,7 @@ class Adapters:
         self.scheduling_history = scheduling_history
         self.service_catalog = service_catalog
         self.session = session
+        self.storage_host = storage_host
         self.storage_namespace = storage_namespace
         self.user = user
         self.vfolder = vfolder
@@ -174,6 +177,7 @@ class Adapters:
             scheduling_history=SchedulingHistoryAdapter(processors),
             service_catalog=ServiceCatalogAdapter(processors),
             session=SessionAdapter(processors),
+            storage_host=StorageHostAdapter(processors),
             storage_namespace=StorageNamespaceAdapter(processors),
             user=UserAdapter(processors, auth_config),
             vfolder=VFolderAdapter(processors),

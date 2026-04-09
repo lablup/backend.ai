@@ -106,6 +106,11 @@ from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
     CloneVFolderV2ActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions import (
+    GetMyStorageHostPermissionsAction,
+    GetMyStorageHostPermissionsActionResult,
+    StorageHostPermissionEntry,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
@@ -996,6 +1001,35 @@ class VFolderService:
             default=default_host,
             allowed=sorted(allowed_hosts),
             volume_info=volume_info,
+        )
+
+    async def get_my_storage_host_permissions(
+        self, action: GetMyStorageHostPermissionsAction
+    ) -> GetMyStorageHostPermissionsActionResult:
+        """Resolve storage hosts and per-host permissions accessible to the user.
+
+        Restricts the result to hosts whose backing volume is currently registered
+        with the storage manager so callers see only mountable hosts.
+        """
+        allowed_hosts = await self._vfolder_repository.get_user_storage_host_permissions(
+            user_uuid=action.user_uuid,
+            domain_name=action.domain_name,
+        )
+        all_volumes = await self._storage_manager.get_all_volumes()
+        all_hosts = {
+            f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
+        }
+        items = [
+            StorageHostPermissionEntry(
+                host=host,
+                permissions=sorted(perms, key=lambda perm: perm.value),
+            )
+            for host, perms in sorted(allowed_hosts.items())
+            if host in all_hosts
+        ]
+        return GetMyStorageHostPermissionsActionResult(
+            user_uuid=action.user_uuid,
+            items=items,
         )
 
     async def _fetch_exposed_volume_fields(
