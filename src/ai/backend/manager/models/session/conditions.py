@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sqlalchemy as sa
 
@@ -115,8 +115,12 @@ class SessionConditions:
     @staticmethod
     def by_access_key_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition: sa.sql.expression.ColumnElement[bool]
             if spec.case_insensitive:
-                condition = sa.func.lower(SessionRow.access_key) == spec.value.lower()
+                condition = cast(
+                    sa.sql.expression.ColumnElement[bool],
+                    sa.func.lower(SessionRow.access_key) == spec.value.lower(),
+                )
             else:
                 condition = SessionRow.access_key == spec.value
             if spec.negated:
@@ -141,10 +145,17 @@ class SessionConditions:
     @staticmethod
     def by_access_key_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition: sa.sql.expression.ColumnElement[bool]
             if spec.case_insensitive:
-                condition = SessionRow.access_key.ilike(f"%{spec.value}")
+                condition = cast(
+                    sa.sql.expression.ColumnElement[bool],
+                    SessionRow.access_key.ilike(f"%{spec.value}"),
+                )
             else:
-                condition = SessionRow.access_key.like(f"%{spec.value}")
+                condition = cast(
+                    sa.sql.expression.ColumnElement[bool],
+                    SessionRow.access_key.like(f"%{spec.value}"),
+                )
             if spec.negated:
                 condition = sa.not_(condition)
             return condition

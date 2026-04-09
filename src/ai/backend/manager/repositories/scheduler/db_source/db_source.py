@@ -353,7 +353,7 @@ class ScheduleDBSource:
                     id=session_id,
                     access_key=row.access_key,
                     requested_slots=row.requested_slots,
-                    user_uuid=row.user_uuid,
+                    owner_id=row.user_uuid,
                     group_id=row.group_id,
                     domain_name=row.domain_name,
                     scaling_group_name=row.scaling_group_name,
@@ -700,7 +700,7 @@ class ScheduleDBSource:
         """Fetch user resource policies for users in pending sessions."""
         user_policies: dict[UUID, UserResourcePolicy] = {}
 
-        if not pending_sessions.user_uuids:
+        if not pending_sessions.owner_ids:
             return user_policies
 
         user_policy_result = await db_sess.execute(
@@ -716,7 +716,7 @@ class ScheduleDBSource:
                 KeyPairResourcePolicyRow,
                 KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
             )
-            .where(UserRow.uuid.in_(pending_sessions.user_uuids))
+            .where(UserRow.uuid.in_(pending_sessions.owner_ids))
         )
 
         for row in user_policy_result:
@@ -1271,7 +1271,7 @@ class ScheduleDBSource:
                 creation_id=session_data.creation_id,
                 name=session_data.name,
                 access_key=session_data.access_key,
-                user_uuid=session_data.user_uuid,
+                user_uuid=session_data.owner_id,
                 group_id=session_data.group_id,
                 domain_name=session_data.domain_name,
                 scaling_group_name=session_data.scaling_group_name,
@@ -1317,7 +1317,7 @@ class ScheduleDBSource:
                     scaling_group=kernel.scaling_group,
                     domain_name=kernel.domain_name,
                     group_id=kernel.group_id,
-                    user_uuid=kernel.user_uuid,
+                    user_uuid=kernel.owner_id,
                     access_key=kernel.access_key,
                     image=kernel.image,
                     architecture=kernel.architecture,
@@ -1355,7 +1355,7 @@ class ScheduleDBSource:
                 element_type=RBACElementType.SESSION,
                 scope_ref=RBACElementRef(
                     element_type=RBACElementType.USER,
-                    element_id=str(session_data.user_uuid),
+                    element_id=str(session_data.owner_id),
                 ),
                 additional_scope_refs=[
                     RBACElementRef(
@@ -3207,7 +3207,7 @@ class ScheduleDBSource:
                     cluster_mode=session_info["cluster_mode"],
                     kernels=kernel_bindings,
                     environ=session_info.get("environ", {}),
-                    user_uuid=session_info["user_uuid"],
+                    owner_id=session_info["user_uuid"],
                     user_email=user_info.email,
                     user_name=user_info.username,
                 )
@@ -4206,7 +4206,7 @@ class ScheduleDBSource:
                     cluster_mode=session_info["cluster_mode"],
                     kernels=kernel_bindings,
                     environ=session_info.get("environ", {}),
-                    user_uuid=session_info["user_uuid"],
+                    owner_id=session_info["user_uuid"],
                     user_email=user_info.email,
                     user_name=user_info.username,
                 )

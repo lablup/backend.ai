@@ -460,7 +460,7 @@ class AgentRegistry:
                 sess = await SessionRow.get_session(
                     db_session,
                     session_name,
-                    owner_access_key,
+                    owner_id=user_scope.user_uuid,
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
                 if sess.main_kernel.image is None:
@@ -687,7 +687,7 @@ class AgentRegistry:
                 await SessionRow.get_session(
                     db_sess,
                     session_name,
-                    owner_access_key,
+                    owner_id=user_scope.user_uuid,
                 )
         except SessionNotFound:
             pass
