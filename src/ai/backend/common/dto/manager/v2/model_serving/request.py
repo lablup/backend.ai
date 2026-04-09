@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from pydantic import ConfigDict, Field, PositiveFloat, field_validator
+from pydantic import ConfigDict, Field, NonNegativeFloat, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.types import RuntimeVariant
@@ -47,7 +47,7 @@ class ServiceConfigInput(BaseRequestModel):
     scaling_group: str = Field(
         description="Name of the resource group to spawn inference sessions",
     )
-    resources: dict[str, str | int | PositiveFloat] | None = Field(
+    resources: dict[str, str | int | NonNegativeFloat] | None = Field(
         default=None,
         description="Resource requirements for the inference session",
     )
@@ -59,15 +59,13 @@ class ServiceConfigInput(BaseRequestModel):
     @field_validator("resources")
     @classmethod
     def validate_resource_values(
-        cls, v: dict[str, str | int | PositiveFloat] | None
-    ) -> dict[str, str | int | PositiveFloat] | None:
+        cls, v: dict[str, str | int | NonNegativeFloat] | None
+    ) -> dict[str, str | int | NonNegativeFloat] | None:
         if v is None:
             return v
         for key, value in v.items():
             if isinstance(value, float) and key != "cuda.shares":
                 raise ValueError(f"Float values are only allowed for 'cuda.shares', not '{key}'")
-            if key == "cuda.shares" and isinstance(value, (int, float)) and value <= 0:
-                raise ValueError("cuda.shares must be a positive number")
         return v
 
 

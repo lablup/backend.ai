@@ -91,13 +91,14 @@ class TestServiceConfigInput:
         ):
             _make_service_config(resources={"cpu": 4.0, "mem": "32g"})
 
-    def test_negative_cuda_shares_rejected(self) -> None:
-        with pytest.raises(ValidationError, match=r"cuda\.shares must be a positive number"):
-            _make_service_config(resources={"cuda.shares": -1.0})
+    def test_zero_cuda_shares_accepted(self) -> None:
+        config = _make_service_config(resources={"cuda.shares": 0.0})
+        assert config.resources is not None
+        assert config.resources["cuda.shares"] == 0
 
-    def test_zero_cuda_shares_rejected(self) -> None:
-        with pytest.raises(ValidationError, match=r"cuda\.shares must be a positive number"):
-            _make_service_config(resources={"cuda.shares": 0.0})
+    def test_negative_cuda_shares_rejected(self) -> None:
+        with pytest.raises(ValidationError, match=r"greater than or equal to 0"):
+            _make_service_config(resources={"cuda.shares": -0.5})
 
     def test_missing_model_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):

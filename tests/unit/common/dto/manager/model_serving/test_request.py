@@ -120,20 +120,21 @@ class TestServiceConfigModel:
                 resources={"cpu": 4.0, "mem": "32g"},
             )
 
-    def test_negative_cuda_shares_rejected(self) -> None:
-        with pytest.raises(ValidationError, match=r"cuda\.shares must be a positive number"):
-            ServiceConfigModel(
-                model="test-model",
-                scaling_group="default",
-                resources={"cuda.shares": -1.0},
-            )
+    def test_zero_cuda_shares_accepted(self) -> None:
+        model = ServiceConfigModel(
+            model="test-model",
+            scaling_group="default",
+            resources={"cuda.shares": 0.0},
+        )
+        assert model.resources is not None
+        assert model.resources["cuda.shares"] == 0
 
-    def test_zero_cuda_shares_rejected(self) -> None:
-        with pytest.raises(ValidationError, match=r"cuda\.shares must be a positive number"):
+    def test_negative_cuda_shares_rejected(self) -> None:
+        with pytest.raises(ValidationError, match=r"greater than or equal to 0"):
             ServiceConfigModel(
                 model="test-model",
                 scaling_group="default",
-                resources={"cuda.shares": 0.0},
+                resources={"cuda.shares": -0.5},
             )
 
 
