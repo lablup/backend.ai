@@ -171,6 +171,29 @@ class LoginBlockedError(BackendAIError, web.HTTPTooManyRequests):
         )
 
 
+class LoginClientTypeNotFound(ObjectNotFound):
+    object_name = "login_client_type"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class LoginClientTypeConflict(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/login-client-type-conflict"
+    error_title = "A login client type with the same name already exists."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class TooManyConcurrentLoginSessions(BackendAIError, web.HTTPTooManyRequests):
     error_type = "https://api.backend.ai/probs/too-many-concurrent-logins"
     error_title = "Too many concurrent login sessions for this user."
