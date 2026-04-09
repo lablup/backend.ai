@@ -38,6 +38,10 @@ from ai.backend.manager.sokovan.scheduler.handlers import (
     SweepSessionsLifecycleHandler,
     TerminateSessionsLifecycleHandler,
 )
+from ai.backend.manager.sokovan.scheduler.handlers.cleanup import (
+    CleanupForceTerminatedHandler,
+    CleanupHandler,
+)
 from ai.backend.manager.sokovan.scheduler.handlers.kernel import (
     KernelLifecycleHandler,
     SweepStaleKernelsKernelHandler,
@@ -208,6 +212,7 @@ class CoordinatorHandlers:
     promotion_specs: Mapping[ScheduleType, PromotionSpec]
     kernel_handlers: Mapping[ScheduleType, KernelLifecycleHandler]
     kernel_observers: Mapping[ScheduleType, KernelObserver]
+    cleanup_handlers: Mapping[ScheduleType, CleanupHandler]
 
 
 @dataclass
@@ -236,12 +241,14 @@ def create_coordinator_handlers(args: CoordinatorHandlersArgs) -> CoordinatorHan
     promotion_specs = _create_promotion_specs()
     kernel_handlers = _create_kernel_handlers(args)
     kernel_observers = _create_kernel_observers(args)
+    cleanup_handlers = _create_cleanup_handlers(args)
 
     return CoordinatorHandlers(
         lifecycle_handlers=lifecycle_handlers,
         promotion_specs=promotion_specs,
         kernel_handlers=kernel_handlers,
         kernel_observers=kernel_observers,
+        cleanup_handlers=cleanup_handlers,
     )
 
 
@@ -366,5 +373,22 @@ def _create_kernel_observers(
             resource_usage_repository=args.resource_usage_repository,
             fair_share_repository=args.fair_share_repository,
             scheduler_repository=args.repository,
+        ),
+    }
+
+
+def _create_cleanup_handlers(
+    args: CoordinatorHandlersArgs,
+) -> Mapping[ScheduleType, CleanupHandler]:
+    """Create cleanup handlers mapping.
+
+    Cleanup handlers read work items from Valkey and perform cleanup operations.
+    Unlike lifecycle handlers, they do not rely on DB session status queries.
+    """
+    return {
+        ScheduleType.CLEANUP_FORCE_TERMINATED: CleanupForceTerminatedHandler(
+            terminator=args.terminator,
+            repository=args.repository,
+            valkey_schedule=args.valkey_schedule,
         ),
     }

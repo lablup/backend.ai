@@ -33,6 +33,7 @@ KERNEL_HEALTH_TTL_SEC = 300  # 5 minutes - TTL for kernel health status
 MAX_KERNEL_HEALTH_STALENESS_SEC = 120  # 2 minutes - threshold for kernel health staleness
 AGENT_LAST_CHECK_TTL_SEC = 1200  # 20 minutes - TTL for agent last check timestamp
 ORPHAN_KERNEL_THRESHOLD_SEC = 600  # 10 minutes - threshold for orphan kernel detection
+FORCE_TERMINATED_CLEANUP_TTL_SEC = 1200  # 20 minutes - TTL for force-terminated cleanup queue
 
 
 class HealthCheckStatus(enum.StrEnum):
@@ -1111,3 +1112,55 @@ class ValkeyScheduleClient:
                 created_at=int(data.get("created_at", "0")),
             )
         return result
+
+    # =========================================================================
+    # Force-terminated session cleanup queue
+    # =========================================================================
+
+    @staticmethod
+    def _get_force_terminated_cleanup_key() -> str:
+        return "force_terminated_cleanup"
+
+    @valkey_schedule_resilience.apply()
+    async def add_force_terminated_sessions(
+        self,
+        session_ids: Sequence[SessionId],
+        ttl_sec: int = FORCE_TERMINATED_CLEANUP_TTL_SEC,
+    ) -> None:
+        """
+        Add force-terminated session IDs to the cleanup queue.
+        Uses SADD to accumulate session IDs for container cleanup.
+
+        :param session_ids: Session IDs that were force-terminated
+        :param ttl_sec: TTL in seconds for auto-cleanup (default 20 minutes)
+        """
+        if not session_ids:
+            return
+        key = self._get_force_terminated_cleanup_key()
+        members: list[str] = [str(sid) for sid in session_ids]
+        batch = Batch(is_atomic=True)
+        batch.sadd(key, members)
+        batch.expire(key, ttl_sec)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
+
+    @valkey_schedule_resilience.apply()
+    async def pop_force_terminated_sessions(self) -> list[SessionId]:
+        """
+        Atomically read and delete all force-terminated session IDs from the cleanup queue.
+
+        :return: List of session IDs that need container cleanup
+        """
+        key = self._get_force_terminated_cleanup_key()
+        batch = Batch(is_atomic=True)
+        batch.smembers(key)
+        batch.delete([key])
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=True)
+
+        if not results or not results[0]:
+            return []
+
+        members = results[0]
+        members = cast(set[bytes], members)
+        return [SessionId(UUID(member.decode())) for member in members]
