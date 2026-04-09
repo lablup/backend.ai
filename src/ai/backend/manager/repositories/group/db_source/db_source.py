@@ -231,7 +231,7 @@ class GroupDBSource:
         """Get container statistics for groups within a time period."""
         async with self._db.begin_readonly() as conn:
             j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
-                users, users.c.uuid == kernels.c.user_uuid
+                users, users.c.uuid == kernels.c.owner_id
             )
             query = (
                 sa.select(
@@ -239,7 +239,8 @@ class GroupDBSource:
                     kernels.c.container_id,
                     kernels.c.session_id,
                     kernels.c.session_name,
-                    kernels.c.access_key,
+                    # kernels.access_key column was dropped; report owner's resolved main_access_key instead.
+                    users.c.main_access_key.label("access_key"),
                     kernels.c.agent,
                     kernels.c.domain_name,
                     kernels.c.group_id,

@@ -123,7 +123,6 @@ from ai.backend.manager.models.utils import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.keypair import KeyPairRow
     from ai.backend.manager.models.scaling_group import ScalingGroupRow
     from ai.backend.manager.models.user import UserRow
 
@@ -494,9 +493,8 @@ async def handle_session_exception(
 
 def _build_session_fetch_query(
     base_cond: Any,
-    access_key: AccessKey | None = None,
     *,
-    user_uuid: UUID | None = None,
+    owner_id: UUID | None = None,
     allow_stale: bool = True,
     for_update: bool = False,
     do_ordering: bool = False,
@@ -504,13 +502,8 @@ def _build_session_fetch_query(
     eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> sa.sql.Select[Any]:
     cond = base_cond
-    if user_uuid is not None:
-        # user_uuid scope is the canonical owner key for delegation paths.
-        # When set, it takes precedence over access_key (which is left for the
-        # legacy v1 surface).
-        cond = cond & (SessionRow.user_uuid == user_uuid)
-    elif access_key:
-        cond = cond & (SessionRow.access_key == access_key)
+    if owner_id is not None:
+        cond = cond & (SessionRow.owner_id == owner_id)
     if not allow_stale:
         cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
     query = (
@@ -534,9 +527,8 @@ def _build_session_fetch_query(
 async def _match_sessions_by_id(
     db_session: SASession,
     session_id_or_list: SessionId | list[SessionId],
-    access_key: AccessKey | None = None,
     *,
-    user_uuid: UUID | None = None,
+    owner_id: UUID | None = None,
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
@@ -553,8 +545,7 @@ async def _match_sessions_by_id(
             cond = SessionRow.id == session_id_or_list
     query = _build_session_fetch_query(
         cond,
-        access_key,
-        user_uuid=user_uuid,
+        owner_id=owner_id,
         max_matches=max_matches,
         allow_stale=allow_stale,
         for_update=for_update,
@@ -568,9 +559,8 @@ async def _match_sessions_by_id(
 async def _match_sessions_by_name(
     db_session: SASession,
     session_name: str,
-    access_key: AccessKey | None,
     *,
-    user_uuid: UUID | None = None,
+    owner_id: UUID | None = None,
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
@@ -584,8 +574,7 @@ async def _match_sessions_by_name(
         cond = SessionRow.name == session_name
     query = _build_session_fetch_query(
         cond,
-        access_key,
-        user_uuid=user_uuid,
+        owner_id=owner_id,
         max_matches=max_matches,
         allow_stale=allow_stale,
         for_update=for_update,
@@ -599,25 +588,13 @@ COMPUTE_CONCURRENCY_USED_KEY_PREFIX = "keypair.concurrency_used."
 SYSTEM_CONCURRENCY_USED_KEY_PREFIX = "keypair.sftp_concurrency_used."
 
 
+# compute/system concurrency key builders removed; callers must resolve
+# main_access_key from owner_id before building the Redis key.
 @dataclass
 class ConcurrencyUsed:
     access_key: AccessKey
     compute_session_ids: set[SessionId] = field(default_factory=set)
     system_session_ids: set[SessionId] = field(default_factory=set)
-
-    @property
-    def compute_concurrency_used_key(self) -> str:
-        return f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
-
-    @property
-    def system_concurrency_used_key(self) -> str:
-        return f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
-
-    def to_cnt_map(self) -> Mapping[str, int]:
-        return {
-            self.compute_concurrency_used_key: len(self.compute_session_ids),
-            self.system_concurrency_used_key: len(self.system_session_ids),
-        }
 
 
 class SessionOp(enum.StrEnum):
@@ -647,17 +624,10 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 }
 
 
-# Defined for avoiding circular import
-def _get_keypair_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.keypair import KeyPairRow
-
-    return KeyPairRow.access_key == foreign(SessionRow.access_key)
-
-
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
-    return UserRow.uuid == foreign(SessionRow.user_uuid)
+    return UserRow.uuid == foreign(SessionRow.owner_id)
 
 
 class SessionRow(Base):  # type: ignore[misc]
@@ -730,22 +700,14 @@ class SessionRow(Base):  # type: ignore[misc]
         "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
     )
     group: Mapped[GroupRow] = relationship("GroupRow", back_populates="sessions")
-    user_uuid: Mapped[UUID] = mapped_column(
-        "user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
+    owner_id: Mapped[UUID] = mapped_column(
+        "owner_id", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
     )
     user: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
         back_populates="sessions",
-        foreign_keys=[user_uuid],
-    )
-
-    access_key: Mapped[str | None] = mapped_column("access_key", sa.String(length=20))
-    access_key_row: Mapped[KeyPairRow | None] = relationship(
-        "KeyPairRow",
-        primaryjoin=_get_keypair_row_join_condition,
-        back_populates="sessions",
-        foreign_keys=[access_key],
+        foreign_keys=[owner_id],
     )
 
     # `image` column is identical to kernels `image` column.
@@ -892,9 +854,9 @@ class SessionRow(Base):  # type: ignore[misc]
         sa.Index("ix_session_status_with_priority", "status", "priority"),
         # Unique index for session names per user excluding terminal statuses
         sa.Index(
-            "ix_sessions_unique_name_per_user_nonterminal",
+            "ix_sessions_unique_name_per_owner_nonterminal",
             "name",
-            "user_uuid",
+            "owner_id",
             unique=True,
             postgresql_where=sa.text("status NOT IN ('ERROR', 'TERMINATED', 'CANCELLED')"),
         ),
@@ -931,8 +893,7 @@ class SessionRow(Base):  # type: ignore[misc]
             target_sgroup_names=session_data.target_sgroup_names,
             domain_name=session_data.domain_name,
             group_id=session_data.group_id,
-            user_uuid=session_data.user_uuid,
-            access_key=session_data.access_key,
+            owner_id=session_data.owner_id,
             images=session_data.images,
             tag=session_data.tag,
             occupying_slots=session_data.occupying_slots,
@@ -976,8 +937,7 @@ class SessionRow(Base):  # type: ignore[misc]
             target_sgroup_names=self.target_sgroup_names,
             domain_name=self.domain_name,
             group_id=self.group_id,
-            user_uuid=self.user_uuid,
-            access_key=AccessKey(self.access_key) if self.access_key else None,
+            owner_id=self.owner_id,
             images=self.images,
             tag=self.tag,
             occupying_slots=self.occupying_slots,
@@ -1025,8 +985,7 @@ class SessionRow(Base):  # type: ignore[misc]
             target_sgroup_names=info.resource.target_sgroup_names,
             domain_name=info.metadata.domain_name,
             group_id=info.metadata.group_id,
-            user_uuid=info.metadata.user_uuid,
-            access_key=info.metadata.access_key,
+            owner_id=info.metadata.owner_id,
             images=info.image.images,
             tag=info.image.tag or info.metadata.tag,
             occupying_slots=info.resource.occupying_slots,
@@ -1067,8 +1026,7 @@ class SessionRow(Base):  # type: ignore[misc]
                 name=self.name or "",
                 domain_name=self.domain_name,
                 group_id=self.group_id,
-                user_uuid=self.user_uuid,
-                access_key=self.access_key or "",
+                owner_id=self.owner_id,
                 session_type=self.session_type,
                 priority=self.priority,
                 created_at=self.created_at,
@@ -1292,16 +1250,15 @@ class SessionRow(Base):  # type: ignore[misc]
         if _status_info is not None:
             self.status_info = _status_info
 
-    def delegate_ownership(self, user_uuid: UUID, access_key: AccessKey) -> None:
-        self.user_uuid = user_uuid
-        self.access_key = access_key
+    def delegate_ownership(self, owner_id: UUID) -> None:
+        self.owner_id = owner_id
         for kernel_row in self.kernels:
-            kernel_row.delegate_ownership(user_uuid, access_key)
+            kernel_row.delegate_ownership(owner_id)
 
     @staticmethod
-    async def delete_by_user_id(user_uuid: UUID, *, db_session: SASession) -> None:
-        await db_session.execute(sa.delete(KernelRow).where(KernelRow.user_uuid == user_uuid))
-        await db_session.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == user_uuid))
+    async def delete_by_owner_id(owner_id: UUID, *, db_session: SASession) -> None:
+        await db_session.execute(sa.delete(KernelRow).where(KernelRow.owner_id == owner_id))
+        await db_session.execute(sa.delete(SessionRow).where(SessionRow.owner_id == owner_id))
 
     @staticmethod
     async def set_session_status(
@@ -1365,9 +1322,8 @@ class SessionRow(Base):  # type: ignore[misc]
         cls,
         db_session: SASession,
         session_reference: str | UUID | list[UUID],
-        access_key: AccessKey | None,
         *,
-        user_uuid: UUID | None = None,
+        owner_id: UUID | None = None,
         allow_prefix: bool = False,
         allow_stale: bool = True,
         for_update: bool = False,
@@ -1421,8 +1377,7 @@ class SessionRow(Base):  # type: ignore[misc]
         for fetch_func in query_list:
             rows = await fetch_func(
                 db_session,
-                access_key=access_key,
-                user_uuid=user_uuid,
+                owner_id=owner_id,
                 allow_stale=allow_stale,
                 for_update=for_update,
                 max_matches=max_matches,
@@ -1438,9 +1393,8 @@ class SessionRow(Base):  # type: ignore[misc]
         cls,
         db_session: SASession,
         session_name_or_id: str | UUID,
-        access_key: AccessKey | None = None,
         *,
-        user_uuid: UUID | None = None,
+        owner_id: UUID | None = None,
         allow_stale: bool = False,
         for_update: bool = False,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
@@ -1485,8 +1439,7 @@ class SessionRow(Base):  # type: ignore[misc]
         session_list = await cls.match_sessions(
             db_session,
             session_name_or_id,
-            access_key,
-            user_uuid=user_uuid,
+            owner_id=owner_id,
             allow_stale=allow_stale,
             for_update=for_update,
             eager_loading_op=_eager_loading_op,
@@ -1511,8 +1464,8 @@ class SessionRow(Base):  # type: ignore[misc]
         cls,
         db_session: SASession,
         session_ids: list[UUID],
-        access_key: AccessKey | None = None,
         *,
+        owner_id: UUID | None = None,
         allow_stale: bool = False,
         for_update: bool = False,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
@@ -1543,7 +1496,7 @@ class SessionRow(Base):  # type: ignore[misc]
         session_list = await cls.match_sessions(
             db_session,
             session_ids,
-            access_key,
+            owner_id=owner_id,
             allow_stale=allow_stale,
             for_update=for_update,
             eager_loading_op=_eager_loading_op,
@@ -1559,8 +1512,8 @@ class SessionRow(Base):  # type: ignore[misc]
         cls,
         db_session: SASession,
         session_id: SessionId,
-        access_key: AccessKey | None = None,
         *,
+        owner_id: UUID | None = None,
         max_matches: int | None = None,
         allow_stale: bool = True,
         for_update: bool = False,
@@ -1569,7 +1522,7 @@ class SessionRow(Base):  # type: ignore[misc]
         sessions = await _match_sessions_by_id(
             db_session,
             session_id,
-            access_key,
+            owner_id=owner_id,
             max_matches=max_matches,
             allow_stale=allow_stale,
             for_update=for_update,
@@ -1598,7 +1551,6 @@ class SessionRow(Base):  # type: ignore[misc]
                 noload("*"),
                 selectinload(SessionRow.group).options(noload("*")),
                 selectinload(SessionRow.domain).options(noload("*")),
-                selectinload(SessionRow.access_key_row).options(noload("*")),
                 selectinload(SessionRow.kernels).options(noload("*")),
             )
         )
@@ -1638,7 +1590,7 @@ def by_user_id(user_id: UUID) -> QueryCondition:
     def _by_user_id(
         query_stmt: sa.sql.Select[Any],
     ) -> sa.sql.Select[Any]:
-        return query_stmt.where(SessionRow.user_uuid == user_id)
+        return query_stmt.where(SessionRow.owner_id == user_id)
 
     return _by_user_id
 
@@ -1765,7 +1717,7 @@ class ComputeSessionPermissionContext(
 
         if self.user_id_to_permission_map:
             cond = _OR_coalesce(
-                cond, SessionRow.user_uuid.in_(self.user_id_to_permission_map.keys())
+                cond, SessionRow.owner_id.in_(self.user_id_to_permission_map.keys())
             )
         if self.project_id_to_permission_map:
             cond = _OR_coalesce(
@@ -1804,7 +1756,7 @@ class ComputeSessionPermissionContext(
             permissions = overriding_perm
         else:
             permissions |= self.object_id_to_additional_permission_map.get(session_id, set())
-            permissions |= self.user_id_to_permission_map.get(session_row.user_uuid, set())
+            permissions |= self.user_id_to_permission_map.get(session_row.owner_id, set())
             permissions |= self.project_id_to_permission_map.get(session_row.group_id, set())
             permissions |= self.domain_name_to_permission_map.get(session_row.domain_name, set())
         return permissions
@@ -1898,7 +1850,7 @@ class ComputeSessionPermissionContextBuilder(
 
         _vfolder_stmt = (
             sa.select(SessionRow)
-            .where((SessionRow.user_uuid == user_id) & (SessionRow.domain_name == domain_name))
+            .where((SessionRow.owner_id == user_id) & (SessionRow.domain_name == domain_name))
             .options(load_only(SessionRow.id))
         )
         own_folder_map = {
@@ -1918,7 +1870,7 @@ class ComputeSessionPermissionContextBuilder(
 
         _vfolder_stmt = (
             sa.select(SessionRow)
-            .where((SessionRow.user_uuid == user_id) & (SessionRow.group_id == project_id))
+            .where((SessionRow.owner_id == user_id) & (SessionRow.group_id == project_id))
             .options(load_only(SessionRow.id))
         )
         own_folder_map = {

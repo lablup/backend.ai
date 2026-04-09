@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-from sqlalchemy.orm import load_only
 
 from ai.backend.common.events.event_types.kernel.broadcast import (
     BaseKernelEvent,
@@ -35,7 +34,7 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user import UserRole, users
 
 if TYPE_CHECKING:
     from aiohttp_sse import EventSourceResponse
@@ -165,19 +164,22 @@ class SessionEventPropagator(EventPropagator):
         """Fetch kernel data from database."""
         try:
             async with self._db.begin_readonly(isolation_level="READ COMMITTED") as conn:
+                # BA-5609: kernels.access_key column removed; resolve
+                # via users.main_access_key. kernels.user_uuid renamed
+                # to kernels.owner_id. Payload keys are kept stable.
                 query = (
                     sa.select(
                         kernels.c.id,
                         kernels.c.session_id,
                         kernels.c.session_name,
-                        kernels.c.access_key,
+                        users.c.main_access_key.label("access_key"),
                         kernels.c.cluster_role,
                         kernels.c.cluster_idx,
                         kernels.c.domain_name,
                         kernels.c.group_id,
-                        kernels.c.user_uuid,
+                        kernels.c.owner_id.label("user_uuid"),
                     )
-                    .select_from(kernels)
+                    .select_from(kernels.join(users, users.c.uuid == kernels.c.owner_id))
                     .where(kernels.c.id == event.kernel_id)
                 )
                 result = await conn.execute(query)
@@ -203,21 +205,23 @@ class SessionEventPropagator(EventPropagator):
             async with self._db.begin_readonly_session(
                 isolation_level="READ COMMITTED"
             ) as db_session:
+                # BA-5609: sessions.access_key column removed; resolve
+                # via users.main_access_key. sessions.user_uuid renamed
+                # to sessions.owner_id. Payload keys are kept stable.
                 query = (
-                    sa.select(SessionRow)
-                    .where(SessionRow.id == event.session_id)
-                    .options(
-                        load_only(
-                            SessionRow.id,
-                            SessionRow.name,
-                            SessionRow.access_key,
-                            SessionRow.domain_name,
-                            SessionRow.group_id,
-                            SessionRow.user_uuid,
-                        )
+                    sa.select(
+                        SessionRow.id,
+                        SessionRow.name,
+                        users.c.main_access_key.label("access_key"),
+                        SessionRow.domain_name,
+                        SessionRow.group_id,
+                        SessionRow.owner_id,
                     )
+                    .select_from(sa.join(SessionRow, users, users.c.uuid == SessionRow.owner_id))
+                    .where(SessionRow.id == event.session_id)
                 )
-                row = await db_session.scalar(query)
+                result = await db_session.execute(query)
+                row = result.first()
                 if row is None:
                     return None
 
@@ -227,7 +231,7 @@ class SessionEventPropagator(EventPropagator):
                     "access_key": row.access_key,
                     "domain_name": row.domain_name,
                     "group_id": row.group_id,
-                    "user_uuid": row.user_uuid,
+                    "user_uuid": row.owner_id,
                 }
                 if isinstance(event, SchedulingBroadcastEvent):
                     data["status"] = event.status_transition

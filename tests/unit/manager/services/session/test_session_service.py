@@ -245,8 +245,7 @@ def sample_session_data(
         agent_ids=["i-ubuntu"],
         domain_name="default",
         group_id=sample_group_id,
-        user_uuid=sample_user_id,
-        access_key=sample_access_key,
+        owner_id=sample_user_id,
         images=["cr.backend.ai/stable/python:latest"],
         tag=None,
         occupying_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
@@ -297,7 +296,7 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="test",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
@@ -306,7 +305,7 @@ class TestMatchSessions:
         assert result.result[0]["id"] == str(sample_session_data.id)
         assert result.result[0]["name"] == sample_session_data.name
         assert result.result[0]["status"] == sample_session_data.status.name
-        mock_session_repository.match_sessions.assert_called_once_with("test", sample_access_key)
+        mock_session_repository.match_sessions.assert_called_once_with("test", sample_user_id)
 
     async def test_no_matches(
         self,
@@ -320,7 +319,7 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
@@ -349,8 +348,7 @@ class TestMatchSessions:
                 agent_ids=[],
                 domain_name="default",
                 group_id=sample_group_id,
-                user_uuid=sample_user_id,
-                access_key=sample_access_key,
+                owner_id=sample_user_id,
                 images=["python:latest"],
                 tag=None,
                 occupying_slots=ResourceSlot({}),
@@ -386,7 +384,7 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="test",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
@@ -408,6 +406,7 @@ class TestGetStatusHistory:
         mock_session_repository: MagicMock,
         sample_session_id: SessionId,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully getting status history"""
         status_history: dict[str, Any] = {
@@ -423,7 +422,7 @@ class TestGetStatusHistory:
 
         action = GetStatusHistoryAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.get_status_history(action)
 
@@ -436,6 +435,7 @@ class TestGetStatusHistory:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test getting status history for non-existent session"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -444,7 +444,7 @@ class TestGetStatusHistory:
 
         action = GetStatusHistoryAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -456,6 +456,7 @@ class TestGetStatusHistory:
         mock_session_repository: MagicMock,
         sample_session_id: SessionId,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test getting empty status history returns empty dict when None"""
         mock_session = MagicMock()
@@ -465,7 +466,7 @@ class TestGetStatusHistory:
 
         action = GetStatusHistoryAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.get_status_history(action)
 
@@ -486,6 +487,7 @@ class TestDestroySession:
         mock_scheduling_controller: MagicMock,
         sample_session_id: SessionId,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully destroying session (cancelled status)"""
         mock_session_repository.get_target_session_ids = AsyncMock(return_value=[sample_session_id])
@@ -503,13 +505,13 @@ class TestDestroySession:
             session_name="test-session",
             forced=False,
             recursive=False,
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.destroy_session(action)
 
         assert result.result == {"stats": {"status": "cancelled"}}
         mock_session_repository.get_target_session_ids.assert_called_once_with(
-            "test-session", sample_access_key, recursive=False, owner_user_uuid=None
+            "test-session", sample_user_id, recursive=False
         )
         mock_scheduling_controller.mark_sessions_for_termination.assert_called_once()
 
@@ -520,6 +522,7 @@ class TestDestroySession:
         mock_scheduling_controller: MagicMock,
         sample_session_id: SessionId,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully destroying session (terminated status via normal termination)"""
         mock_session_repository.get_target_session_ids = AsyncMock(return_value=[sample_session_id])
@@ -537,7 +540,7 @@ class TestDestroySession:
             session_name="test-session",
             forced=False,
             recursive=False,
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.destroy_session(action)
 
@@ -555,6 +558,7 @@ class TestDestroySession:
         mock_scheduling_controller: MagicMock,
         sample_session_id: SessionId,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test force-terminate skips TERMINATING and goes directly to TERMINATED"""
         mock_session_repository.get_target_session_ids = AsyncMock(return_value=[sample_session_id])
@@ -572,7 +576,7 @@ class TestDestroySession:
             session_name="test-session",
             forced=True,
             recursive=False,
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.destroy_session(action)
 
@@ -589,6 +593,7 @@ class TestDestroySession:
         mock_session_repository: MagicMock,
         mock_scheduling_controller: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test destroying sessions recursively"""
         session_ids = [SessionId(uuid4()) for _ in range(3)]
@@ -607,12 +612,12 @@ class TestDestroySession:
             session_name="test-session",
             forced=False,
             recursive=True,
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.destroy_session(action)
 
         mock_session_repository.get_target_session_ids.assert_called_once_with(
-            "test-session", sample_access_key, recursive=True, owner_user_uuid=None
+            "test-session", sample_user_id, recursive=True
         )
         assert result.result == {"stats": {"status": "cancelled"}}
 
@@ -622,6 +627,7 @@ class TestDestroySession:
         mock_session_repository: MagicMock,
         mock_scheduling_controller: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test destroying when no sessions found"""
         mock_session_repository.get_target_session_ids = AsyncMock(return_value=[])
@@ -639,7 +645,7 @@ class TestDestroySession:
             session_name="nonexistent",
             forced=False,
             recursive=False,
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.destroy_session(action)
 
@@ -659,6 +665,7 @@ class TestComplete:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully completing code"""
         expected_response = CodeCompletionResp(
@@ -676,7 +683,7 @@ class TestComplete:
 
         action = CompleteAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             code="print('Hello')",
             options=None,
         )
@@ -694,6 +701,7 @@ class TestComplete:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test completing code when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -702,7 +710,7 @@ class TestComplete:
 
         action = CompleteAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             code="print('Hello')",
             options=None,
         )
@@ -762,13 +770,14 @@ class TestGetSessionInfo:
         mock_running_session: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully getting session info"""
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_running_session)
 
         action = GetSessionInfoAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.get_session_info(action)
 
@@ -788,6 +797,7 @@ class TestGetSessionInfo:
         mock_session_repository: MagicMock,
         mock_running_session: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test getting session info when container_id is None (pre-RUNNING state)"""
         mock_running_session.main_kernel.container_id = None
@@ -796,7 +806,7 @@ class TestGetSessionInfo:
 
         action = GetSessionInfoAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.get_session_info(action)
 
@@ -808,6 +818,7 @@ class TestGetSessionInfo:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test getting session info when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -816,7 +827,7 @@ class TestGetSessionInfo:
 
         action = GetSessionInfoAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -847,7 +858,7 @@ class TestDownloadFiles:
         action = DownloadFilesAction(
             user_id=sample_user_id,
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             files=["test_file.txt"],
         )
         result = await session_service.download_files(action)
@@ -874,7 +885,7 @@ class TestDownloadFiles:
         action = DownloadFilesAction(
             user_id=sample_user_id,
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             files=["test_file.txt"],
         )
 
@@ -897,7 +908,7 @@ class TestDownloadFiles:
         action = DownloadFilesAction(
             user_id=sample_user_id,
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             files=["file1.txt", "file2.txt", "file3.txt", "file4.txt", "file5.txt", "file6.txt"],
         )
 
@@ -918,6 +929,7 @@ class TestGetDirectAccessInfo:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully getting direct access info"""
         mock_session = MagicMock()
@@ -927,7 +939,7 @@ class TestGetDirectAccessInfo:
 
         action = GetDirectAccessInfoAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.get_direct_access_info(action)
 
@@ -942,6 +954,7 @@ class TestGetDirectAccessInfo:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test getting direct access info when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -950,7 +963,7 @@ class TestGetDirectAccessInfo:
 
         action = GetDirectAccessInfoAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -969,6 +982,7 @@ class TestRenameSession:
         mock_session_repository: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully renaming session"""
         mock_session = MagicMock()
@@ -978,7 +992,7 @@ class TestRenameSession:
 
         action = RenameSessionAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             new_name="new-session-name",
         )
         result = await session_service.rename_session(action)
@@ -986,7 +1000,7 @@ class TestRenameSession:
         assert isinstance(result, RenameSessionActionResult)
         assert result.session_data == sample_session_data
         mock_session_repository.update_session_name.assert_called_once_with(
-            "test-session", "new-session-name", sample_access_key
+            "test-session", "new-session-name", sample_user_id
         )
 
     async def test_not_running_session(
@@ -995,6 +1009,7 @@ class TestRenameSession:
         mock_session_repository: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test renaming non-running session raises error"""
         mock_session = MagicMock()
@@ -1003,7 +1018,7 @@ class TestRenameSession:
 
         action = RenameSessionAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             new_name="new-session-name",
         )
 
@@ -1024,6 +1039,7 @@ class TestRestartSession:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully restarting session"""
         mock_session = MagicMock()
@@ -1033,7 +1049,7 @@ class TestRestartSession:
 
         action = RestartSessionAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.restart_session(action)
 
@@ -1049,6 +1065,7 @@ class TestRestartSession:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test restarting session when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -1057,7 +1074,7 @@ class TestRestartSession:
 
         action = RestartSessionAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -1077,6 +1094,7 @@ class TestShutdownService:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully shutting down service"""
         mock_session = MagicMock()
@@ -1086,7 +1104,7 @@ class TestShutdownService:
 
         action = ShutdownServiceAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             service_name="test-service",
         )
         result = await session_service.shutdown_service(action)
@@ -1102,6 +1120,7 @@ class TestShutdownService:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test shutting down service when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -1110,7 +1129,7 @@ class TestShutdownService:
 
         action = ShutdownServiceAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             service_name="test-service",
         )
 
@@ -1131,6 +1150,7 @@ class TestUploadFiles:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully uploading files"""
         # Create a mock reader
@@ -1157,7 +1177,7 @@ class TestUploadFiles:
 
         action = UploadFilesAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             reader=mock_reader,
         )
         result = await session_service.upload_files(action)
@@ -1172,6 +1192,7 @@ class TestUploadFiles:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test uploading files when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -1182,7 +1203,7 @@ class TestUploadFiles:
 
         action = UploadFilesAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             reader=mock_reader,
         )
 
@@ -1203,6 +1224,7 @@ class TestExecute:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully executing code"""
         expected_execute_response = {
@@ -1228,7 +1250,7 @@ class TestExecute:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(4, 0),
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             params=params,
         )
         result = await session_service.execute_session(action)
@@ -1246,6 +1268,7 @@ class TestExecute:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test executing code when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -1261,7 +1284,7 @@ class TestExecute:
         action = ExecuteSessionAction(
             session_name="nonexistent",
             api_version=(4, 0),
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             params=params,
         )
 
@@ -1282,6 +1305,7 @@ class TestInterrupt:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully interrupting session"""
         mock_session = MagicMock()
@@ -1291,7 +1315,7 @@ class TestInterrupt:
 
         action = InterruptSessionAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.interrupt(action)
 
@@ -1306,6 +1330,7 @@ class TestInterrupt:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test interrupting session when not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -1314,7 +1339,7 @@ class TestInterrupt:
 
         action = InterruptSessionAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -1348,7 +1373,7 @@ class TestListFiles:
             user_id=sample_user_id,
             path="/home/work",
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
         result = await session_service.list_files(action)
 
@@ -1374,7 +1399,7 @@ class TestListFiles:
             user_id=sample_user_id,
             path="/home/work",
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
         )
 
         with pytest.raises(SessionNotFound):
@@ -1394,6 +1419,7 @@ class TestGetContainerLogs:
         mock_agent_registry: MagicMock,
         sample_session_data: SessionData,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test successfully getting container logs"""
         # get_logs_from_agent returns the logs directly
@@ -1407,7 +1433,7 @@ class TestGetContainerLogs:
 
         action = GetContainerLogsAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             kernel_id=None,  # Optional - get logs from main kernel
         )
         result = await session_service.get_container_logs(action)
@@ -1424,6 +1450,7 @@ class TestGetContainerLogs:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         """Test getting logs when session not found"""
         mock_session_repository.get_session_validated = AsyncMock(
@@ -1432,7 +1459,7 @@ class TestGetContainerLogs:
 
         action = GetContainerLogsAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             kernel_id=None,
         )
 
@@ -1712,8 +1739,7 @@ class TestSearchKernels:
                 session_type=SessionTypes.INTERACTIVE,
             ),
             user_permission=UserPermission(
-                user_uuid=user_id,
-                access_key="TESTKEY",
+                owner_id=user_id,
                 domain_name="default",
                 group_id=group_id,
                 uid=1000,

@@ -237,7 +237,7 @@ def _create_session_for_start(
         access_key=AccessKey("test-key"),
         session_type=SessionTypes.INTERACTIVE,
         name="test-session",
-        user_uuid=uuid4(),
+        owner_id=uuid4(),
         user_email="test@example.com",
         user_name="testuser",
         cluster_mode=cluster_mode,

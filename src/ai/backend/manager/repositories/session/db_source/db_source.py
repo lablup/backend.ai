@@ -52,7 +52,7 @@ class SessionDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = (
                 sa.select(UserRow)
-                .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
+                .join(SessionRow, SessionRow.owner_id == UserRow.uuid)
                 .where(SessionRow.id == session_id)
             )
             user = await db_sess.scalar(query)
@@ -63,24 +63,17 @@ class SessionDBSource:
     async def get_session_validated(
         self,
         session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        owner_id: uuid.UUID,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
         eager_loading_op: Sequence[_AbstractLoad] | None = None,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> SessionRow:
-        """Look up a session by name or ID.
-
-        When ``owner_user_uuid`` is set, the session is matched against that
-        user's UUID instead of ``owner_access_key``. This is the canonical
-        scope for the v2 ``owner_id`` delegation path.
-        """
+        """Look up a session by name or ID."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await SessionRow.get_session(
                 db_sess,
                 session_name_or_id,
-                owner_access_key,
-                user_uuid=owner_user_uuid,
+                owner_id=owner_id,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
                 eager_loading_op=list(eager_loading_op) if eager_loading_op else None,
@@ -89,13 +82,13 @@ class SessionDBSource:
     async def match_sessions(
         self,
         id_or_name_prefix: str,
-        owner_access_key: AccessKey,
+        owner_id: uuid.UUID,
     ) -> list[SessionRow]:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await SessionRow.match_sessions(
                 db_sess,
                 id_or_name_prefix,
-                owner_access_key,
+                owner_id=owner_id,
             )
 
     async def get_session_to_determine_status(
@@ -139,7 +132,7 @@ class SessionDBSource:
         self,
         session_name_or_id: str | SessionId,
         new_name: str,
-        owner_access_key: AccessKey,
+        owner_id: uuid.UUID,
     ) -> SessionRow:
         async def _update(db_session: AsyncSession) -> SessionRow:
             # Check if new name already exists for this owner
@@ -147,7 +140,7 @@ class SessionDBSource:
                 await SessionRow.get_session(
                     db_session,
                     new_name,
-                    owner_access_key,
+                    owner_id=owner_id,
                     kernel_loading_strategy=KernelLoadingStrategy.NONE,
                 )
                 raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
@@ -158,7 +151,7 @@ class SessionDBSource:
             session_row = await SessionRow.get_session(
                 db_session,
                 session_name_or_id,
-                owner_access_key,
+                owner_id=owner_id,
                 kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
             )
 
@@ -312,13 +305,13 @@ class SessionDBSource:
             if session_row is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
-            if session_name and session_row.access_key is not None:
+            if session_name and session_row.owner_id is not None:
                 # Check the owner of the target session has any session with the same name
                 try:
                     sess = await SessionRow.get_session(
                         db_session,
                         session_name,
-                        AccessKey(session_row.access_key),
+                        owner_id=session_row.owner_id,
                     )
                 except SessionNotFound:
                     pass
@@ -378,9 +371,8 @@ class SessionDBSource:
         self,
         db_sess: AsyncSession,
         root_session_name_or_id: str | uuid.UUID,
-        access_key: AccessKey,
+        owner_id: uuid.UUID,
         allow_stale: bool = False,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> tuple[uuid.UUID, set[uuid.UUID]]:
         """
         Find the root session and all sessions that depend on it (recursively).
@@ -409,8 +401,7 @@ class SessionDBSource:
         root_session = await SessionRow.get_session(
             db_sess,
             root_session_name_or_id,
-            access_key=access_key,
-            user_uuid=owner_user_uuid,
+            owner_id=owner_id,
             allow_stale=allow_stale,
         )
         root_session_id = cast(uuid.UUID, root_session.id)
@@ -421,17 +412,15 @@ class SessionDBSource:
     async def get_target_session_ids(
         self,
         session_name_or_id: str | uuid.UUID,
-        access_key: AccessKey,
+        owner_id: uuid.UUID,
         recursive: bool = False,
-        owner_user_uuid: uuid.UUID | None = None,
     ) -> list[SessionId]:
         """
         Get list of session IDs including dependent sessions if recursive.
 
         :param session_name_or_id: Name or ID of the primary session
-        :param access_key: Access key of the session owner (legacy scope)
+        :param owner_id: User UUID of the session owner
         :param recursive: If True, include dependent sessions
-        :param owner_user_uuid: When set, scope by user UUID instead of access key.
         :return: List of session IDs
         """
         async with self._db.begin_readonly_session() as db_sess:
@@ -441,9 +430,8 @@ class SessionDBSource:
                     root_id, dependent_ids = await self._find_dependent_sessions(
                         db_sess,
                         session_name_or_id,
-                        access_key,
+                        owner_id,
                         allow_stale=True,
-                        owner_user_uuid=owner_user_uuid,
                     )
                     # Return dependent sessions first, then root session
                     session_ids = [cast(SessionId, sid) for sid in dependent_ids]
@@ -453,8 +441,7 @@ class SessionDBSource:
                     session = await SessionRow.get_session(
                         db_sess,
                         session_name_or_id,
-                        access_key,
-                        user_uuid=owner_user_uuid,
+                        owner_id=owner_id,
                         kernel_loading_strategy=KernelLoadingStrategy.NONE,
                         allow_stale=True,
                     )
@@ -467,19 +454,19 @@ class SessionDBSource:
     async def find_dependency_sessions(
         self,
         session_name_or_id: uuid.UUID | str,
-        access_key: AccessKey,
+        owner_id: uuid.UUID,
     ) -> dict[str, list[Any] | str]:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await find_dependency_sessions(
                 session_name_or_id,
                 db_sess,
-                access_key,
+                owner_id,
             )
 
     async def get_session_with_group(
         self,
         session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        owner_id: uuid.UUID,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
@@ -488,7 +475,7 @@ class SessionDBSource:
             return await SessionRow.get_session(
                 db_sess,
                 session_name_or_id,
-                owner_access_key,
+                owner_id=owner_id,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
                 eager_loading_op=[selectinload(SessionRow.group)],
@@ -497,14 +484,14 @@ class SessionDBSource:
     async def get_session_with_routing_minimal(
         self,
         session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        owner_id: uuid.UUID,
     ) -> SessionRow:
         """Get session with minimal routing information"""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await SessionRow.get_session(
                 db_sess,
                 session_name_or_id,
-                owner_access_key,
+                owner_id=owner_id,
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 eager_loading_op=[
                     selectinload(SessionRow.routing).options(noload("*")),

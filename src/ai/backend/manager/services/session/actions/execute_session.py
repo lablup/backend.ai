@@ -1,7 +1,7 @@
+import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
@@ -21,7 +21,7 @@ class ExecuteSessionActionParams:
 class ExecuteSessionAction(SessionAction):
     session_name: str
     api_version: tuple[Any, ...]
-    owner_access_key: AccessKey
+    owner_id: uuid.UUID
     params: ExecuteSessionActionParams
 
     @override

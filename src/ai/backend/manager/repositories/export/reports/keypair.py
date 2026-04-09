@@ -70,9 +70,11 @@ RESOURCE_GROUP_JOIN = JoinDef(
 RESOURCE_GROUP_JOINS = (SGROUP_FOR_KEYPAIR_JOIN, RESOURCE_GROUP_JOIN)
 
 # Session JOIN (1:N, causes duplication)
+# SessionRow.access_key was dropped; sessions belong to an owner (user) and
+# keypairs belong to a user, so join via KeyPairRow.user -> SessionRow.owner_id.
 SESSION_JOIN = JoinDef(
     table=SessionRow.__table__,
-    condition=KeyPairRow.access_key == SessionRow.access_key,
+    condition=KeyPairRow.user == SessionRow.owner_id,
 )
 
 # Field definitions for keypair export

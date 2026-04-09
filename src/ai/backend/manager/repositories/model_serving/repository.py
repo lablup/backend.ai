@@ -735,7 +735,7 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             try:
                 return await SessionRow.get_session(
-                    session, session_id, None, kernel_loading_strategy=kernel_loading_strategy
+                    session, session_id, kernel_loading_strategy=kernel_loading_strategy
                 )
             except NoResultFound:
                 return None

@@ -926,6 +926,19 @@ class SchedulerRepository:
         """
         await self._db_source.lower_session_priority(session_ids, amount, min_priority)
 
+    async def resolve_main_access_keys(
+        self,
+        session_ids: list[SessionId],
+    ) -> dict[SessionId, AccessKey]:
+        """Resolve session_id -> owner's main_access_key.
+
+        BA-5609: the legacy ``sessions.access_key`` column has been removed;
+        call sites that still need the resolved main access key (e.g., cache
+        invalidation for deprioritized sessions) use this to batch-fetch it
+        via ``users.main_access_key``.
+        """
+        return await self._db_source.resolve_main_access_keys(session_ids)
+
     async def update_kernels_last_observed_at(
         self,
         kernel_observation_times: Mapping[UUID, datetime],

@@ -68,7 +68,7 @@ def _create_scheduling_data_with_strategy(
         id=SessionId(uuid.uuid4()),
         access_key=AccessKey("test-key"),
         requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
-        user_uuid=uuid.uuid4(),
+        owner_id=uuid.uuid4(),
         group_id=uuid.uuid4(),
         domain_name="default",
         scaling_group_name="test-sg",

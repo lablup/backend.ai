@@ -132,12 +132,17 @@ class SessionLifecycleManager:
                 await self.event_producer.anycast_event(
                     SessionStartedAnycastEvent(session_row.id, creation_id)
                 )
+                # BA-5609: resolve main_access_key from owner_id; external
+                # hook plugins still receive the resolved access key.
+                session_main_access_key = await self.registry._resolve_main_access_key(
+                    session_row.owner_id
+                )
                 await self.hook_plugin_ctx.notify(
                     "POST_START_SESSION",
                     (
                         session_row.id,
                         session_row.name,
-                        session_row.access_key,
+                        session_main_access_key,
                     ),
                 )
                 match session_row.session_type:

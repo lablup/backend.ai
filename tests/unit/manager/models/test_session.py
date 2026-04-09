@@ -261,7 +261,7 @@ class TestSessionUniqueNamePerUser:
         async with database_with_tables.begin_session() as db_sess:
             duplicate_session = SessionRow(
                 name=prepared_first_session.name,
-                user_uuid=prepared_first_session.user_uuid,
+                owner_id=prepared_first_session.user_uuid,
                 group_id=prepared_first_session.group_id,
                 domain_name=prepared_first_session.domain_name,
                 status=test_config.second_session_status,
@@ -291,7 +291,7 @@ class TestSessionUniqueNamePerUser:
     ) -> None:
         duplicate_session = SessionRow(
             name=prepared_first_session.name,
-            user_uuid=prepared_first_session.user_uuid,
+            owner_id=prepared_first_session.user_uuid,
             group_id=prepared_first_session.group_id,
             domain_name=prepared_first_session.domain_name,
             status=test_config.second_session_status,
@@ -332,7 +332,7 @@ class TestSessionUniqueNamePerUser:
         async with database_with_tables.begin_session() as db_sess:
             duplicate_session = SessionRow(
                 name=prepared_first_session.name,
-                user_uuid=user_two.uuid,  # Different user
+                owner_id=user_two.uuid,  # Different user
                 group_id=prepared_first_session.group_id,
                 domain_name=prepared_first_session.domain_name,
                 status=test_config.second_session_status,

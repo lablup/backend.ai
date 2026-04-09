@@ -33,6 +33,7 @@ def setup_api(
     adapters = Adapters.create(
         r.processing.processors,
         r.bootstrap.config_provider.config.auth,
+        r.domain.repositories,
         config_provider=r.bootstrap.config_provider,
     )
     gql_context_deps = GQLContextDeps(

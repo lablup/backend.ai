@@ -484,7 +484,7 @@ class FairShareAggregator:
             spec = KernelUsageRecordCreatorSpec(
                 kernel_id=UUID(str(kernel.id)),
                 session_id=UUID(kernel.session.session_id),
-                user_uuid=kernel.user_permission.user_uuid,
+                user_uuid=kernel.user_permission.owner_id,
                 project_id=kernel.user_permission.group_id,
                 domain_name=kernel.user_permission.domain_name,
                 resource_group=scaling_group,

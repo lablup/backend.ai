@@ -69,7 +69,7 @@ class SessionAllocation:
     kernel_allocations: list[KernelAllocation]
     # List of agent allocations for this session
     agent_allocations: list[AgentAllocation]
-    # Keypair associated with the session
+    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
     access_key: AccessKey
     # Phases that passed during scheduling
     passed_phases: list[SchedulingPredicate] = field(default_factory=list)

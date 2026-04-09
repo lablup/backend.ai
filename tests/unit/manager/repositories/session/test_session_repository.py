@@ -218,8 +218,7 @@ class TestSessionRepository:
                 cluster_size=1,
                 domain_name=domain_name,
                 group_id=group_id,
-                user_uuid=user_id,
-                access_key=access_key,
+                owner_id=user_id,
                 tag=None,
                 status=SessionStatus.RUNNING,
                 status_info=None,
@@ -250,8 +249,7 @@ class TestSessionRepository:
                 session_type=SessionTypes.INTERACTIVE,
                 domain_name=domain_name,
                 group_id=group_id,
-                user_uuid=user_id,
-                access_key=access_key,
+                owner_id=user_id,
                 cluster_mode=ClusterMode.SINGLE_NODE.value,
                 cluster_size=1,
                 cluster_role="main",
@@ -372,8 +370,7 @@ class TestSessionRepository:
         assert session_data.name == "test-session"
         assert session_data.domain_name == session_with_kernel.domain_name
         assert session_data.group_id == session_with_kernel.group_id
-        assert session_data.user_uuid == session_with_kernel.user_id
-        assert session_data.access_key == session_with_kernel.access_key
+        assert session_data.owner_id == session_with_kernel.user_id
 
     async def test_search_sessions_empty_result(
         self,
@@ -544,8 +541,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 cluster_size=1,
                 domain_name=domain_name,
                 group_id=group_id,
-                user_uuid=user_id,
-                access_key=access_key,
+                owner_id=user_id,
                 tag=None,
                 status=SessionStatus.RUNNING,
                 status_info=None,
@@ -574,8 +570,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 session_type=SessionTypes.INTERACTIVE,
                 domain_name=domain_name,
                 group_id=group_id,
-                user_uuid=user_id,
-                access_key=access_key,
+                owner_id=user_id,
                 cluster_mode=ClusterMode.SINGLE_NODE.value,
                 cluster_size=1,
                 cluster_role="main",

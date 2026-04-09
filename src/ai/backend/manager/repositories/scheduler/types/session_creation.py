@@ -222,7 +222,8 @@ class KernelEnqueueData:
     scaling_group: str
     domain_name: str
     group_id: UUID
-    user_uuid: UUID
+    owner_id: UUID
+    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
     access_key: AccessKey
     image: str  # Canonical image name
     architecture: str
@@ -268,8 +269,9 @@ class SessionEnqueueData:
     id: SessionId
     creation_id: str
     name: str
+    # Resolved main_access_key of the owner; required for keypair-scoped concurrency tracking and resource policy lookups.
     access_key: AccessKey
-    user_uuid: UUID
+    owner_id: UUID
     group_id: UUID
     domain_name: str
     scaling_group_name: str

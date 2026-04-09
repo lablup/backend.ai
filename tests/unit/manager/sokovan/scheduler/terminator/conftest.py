@@ -213,8 +213,7 @@ def _create_kernel_info(
             session_type=SessionTypes.INTERACTIVE,
         ),
         user_permission=UserPermission(
-            user_uuid=uuid4(),
-            access_key="test-access-key",
+            owner_id=uuid4(),
             domain_name="default",
             group_id=uuid4(),
             uid=None,

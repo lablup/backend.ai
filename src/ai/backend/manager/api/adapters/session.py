@@ -6,9 +6,13 @@ import json
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
+
+if TYPE_CHECKING:
+    from ai.backend.manager.services.processors import Processors
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.deployment.types import (
@@ -116,6 +120,7 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.session.actions.enqueue_session import (
     EnqueueSessionAction,
     ResourceSlotEntry,
@@ -194,6 +199,38 @@ _KERNEL_PAGINATION_SPEC = PaginationSpec(
 
 class SessionAdapter(BaseAdapter):
     """Adapter for session and kernel domain operations."""
+
+    def __init__(
+        self,
+        processors: Processors,
+        user_repository: UserRepository,
+    ) -> None:
+        super().__init__(processors)
+        # NOTE(BA-5609): sessions/kernels no longer carry access_key. Owning
+        # user's main_access_key is resolved here for external wire schema
+        # stability (GraphQL ComputeSession.access_key, etc.).
+        self._user_repository = user_repository
+
+    async def _resolve_main_access_key_map(
+        self, owner_ids: Sequence[UUID]
+    ) -> dict[UUID, str | None]:
+        """Resolve a batch of owner UUIDs to their main_access_key.
+
+        Returns an empty-string fallback for missing/ill-configured users so
+        that the GraphQL schema (non-null access_key field) stays stable.
+        """
+        result: dict[UUID, str | None] = {}
+        seen: set[UUID] = set()
+        for oid in owner_ids:
+            if oid in seen:
+                continue
+            seen.add(oid)
+            try:
+                user = await self._user_repository.get_user_by_uuid(oid)
+                result[oid] = user.main_access_key
+            except Exception:
+                result[oid] = None
+        return result
 
     @staticmethod
     def _require_user_id() -> UUID:
@@ -307,8 +344,9 @@ class SessionAdapter(BaseAdapter):
         )
 
         result = await self._processors.session.enqueue_session.wait_for_complete(action)
+        ak_map = await self._resolve_main_access_key_map([result.session_data.owner_id])
         return EnqueueSessionPayload(
-            session=self._session_data_to_node(result.session_data),
+            session=self._session_data_to_node(result.session_data, ak_map),
         )
 
     # -------------------------------------------------------------------------
@@ -327,7 +365,8 @@ class SessionAdapter(BaseAdapter):
         )
         if not action_result.data:
             raise SessionNotFound(f"Session not found: {session_id}")
-        return self._session_data_to_node(action_result.data[0])
+        ak_map = await self._resolve_main_access_key_map([action_result.data[0].owner_id])
+        return self._session_data_to_node(action_result.data[0], ak_map)
 
     # -------------------------------------------------------------------------
     # Batch load (DataLoader)
@@ -347,8 +386,10 @@ class SessionAdapter(BaseAdapter):
         action_result = await self._processors.session.search_sessions.wait_for_complete(
             SearchSessionsAction(querier=querier, user_id=self._require_user_id())
         )
+        ak_map = await self._resolve_main_access_key_map([d.owner_id for d in action_result.data])
         session_map: dict[SessionId, SessionNode] = {
-            SessionId(data.id): self._session_data_to_node(data) for data in action_result.data
+            SessionId(data.id): self._session_data_to_node(data, ak_map)
+            for data in action_result.data
         }
         return [session_map.get(session_id) for session_id in session_ids]
 
@@ -368,8 +409,11 @@ class SessionAdapter(BaseAdapter):
         action_result = await self._processors.session.search_kernels.wait_for_complete(
             SearchKernelsAction(querier=querier, user_id=self._require_user_id())
         )
+        ak_map = await self._resolve_main_access_key_map([
+            info.user_permission.owner_id for info in action_result.data
+        ])
         kernel_map: dict[KernelId, KernelNode] = {
-            info.id: self._kernel_info_to_node(info) for info in action_result.data
+            info.id: self._kernel_info_to_node(info, ak_map) for info in action_result.data
         }
         return [kernel_map.get(kernel_id) for kernel_id in kernel_ids]
 
@@ -400,8 +444,9 @@ class SessionAdapter(BaseAdapter):
             SearchSessionsAction(querier=querier, user_id=self._require_user_id())
         )
 
+        ak_map = await self._resolve_main_access_key_map([d.owner_id for d in action_result.data])
         return AdminSearchSessionsPayload(
-            items=[self._session_data_to_node(item) for item in action_result.data],
+            items=[self._session_data_to_node(item, ak_map) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -433,8 +478,9 @@ class SessionAdapter(BaseAdapter):
             SearchSessionsAction(querier=querier, user_id=self._require_user_id())
         )
 
+        ak_map = await self._resolve_main_access_key_map([d.owner_id for d in action_result.data])
         return AdminSearchSessionsPayload(
-            items=[self._session_data_to_node(item) for item in action_result.data],
+            items=[self._session_data_to_node(item, ak_map) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -450,7 +496,7 @@ class SessionAdapter(BaseAdapter):
         orders = self._convert_session_orders(input.order) if input.order else []
 
         def _by_user_uuid() -> sa.sql.expression.ColumnElement[bool]:
-            return SessionRow.user_uuid == user.user_id
+            return SessionRow.owner_id == user.user_id
 
         querier = self._build_querier(
             conditions=conditions,
@@ -467,8 +513,9 @@ class SessionAdapter(BaseAdapter):
         action_result = await self._processors.session.search_sessions.wait_for_complete(
             SearchSessionsAction(querier=querier, user_id=user.user_id)
         )
+        ak_map = await self._resolve_main_access_key_map([d.owner_id for d in action_result.data])
         return AdminSearchSessionsPayload(
-            items=[self._session_data_to_node(item) for item in action_result.data],
+            items=[self._session_data_to_node(item, ak_map) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -496,8 +543,9 @@ class SessionAdapter(BaseAdapter):
         action_result = await self._processors.session.search_sessions_in_project.wait_for_complete(
             SearchSessionsInProjectAction(scope=scope, querier=querier)
         )
+        ak_map = await self._resolve_main_access_key_map([d.owner_id for d in action_result.data])
         return AdminSearchSessionsPayload(
-            items=[self._session_data_to_node(item) for item in action_result.data],
+            items=[self._session_data_to_node(item, ak_map) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -528,8 +576,9 @@ class SessionAdapter(BaseAdapter):
         action_result = await self._processors.session.search_sessions.wait_for_complete(
             SearchSessionsAction(querier=querier, user_id=self._require_user_id())
         )
+        ak_map = await self._resolve_main_access_key_map([d.owner_id for d in action_result.data])
         return AdminSearchSessionsPayload(
-            items=[self._session_data_to_node(item) for item in action_result.data],
+            items=[self._session_data_to_node(item, ak_map) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -576,8 +625,8 @@ class SessionAdapter(BaseAdapter):
         if f.user_uuid is not None:
             c = self.convert_uuid_filter(
                 f.user_uuid,
-                equals_factory=SessionConditions.by_user_uuid_filter_equals,
-                in_factory=SessionConditions.by_user_uuid_filter_in,
+                equals_factory=SessionConditions.by_owner_id_filter_equals,
+                in_factory=SessionConditions.by_owner_id_filter_in,
             )
             if c is not None:
                 conditions.append(c)
@@ -629,8 +678,11 @@ class SessionAdapter(BaseAdapter):
             SearchKernelsAction(querier=querier, user_id=self._require_user_id())
         )
 
+        ak_map = await self._resolve_main_access_key_map([
+            d.user_permission.owner_id for d in action_result.data
+        ])
         return AdminSearchKernelsPayload(
-            items=[self._kernel_info_to_node(item) for item in action_result.data],
+            items=[self._kernel_info_to_node(item, ak_map) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -662,8 +714,11 @@ class SessionAdapter(BaseAdapter):
             SearchKernelsAction(querier=querier, user_id=self._require_user_id())
         )
 
+        ak_map = await self._resolve_main_access_key_map([
+            d.user_permission.owner_id for d in action_result.data
+        ])
         return AdminSearchKernelsPayload(
-            items=[self._kernel_info_to_node(item) for item in action_result.data],
+            items=[self._kernel_info_to_node(item, ak_map) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -695,8 +750,11 @@ class SessionAdapter(BaseAdapter):
             SearchKernelsAction(querier=querier, user_id=self._require_user_id())
         )
 
+        ak_map = await self._resolve_main_access_key_map([
+            d.user_permission.owner_id for d in action_result.data
+        ])
         return AdminSearchKernelsPayload(
-            items=[self._kernel_info_to_node(item) for item in action_result.data],
+            items=[self._kernel_info_to_node(item, ak_map) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -832,7 +890,7 @@ class SessionAdapter(BaseAdapter):
         """Shut down a service in a session."""
         action = ShutdownServiceAction(
             session_name=str(session_id),
-            owner_access_key=AccessKey(access_key),
+            owner_id=self._require_user_id(),
             service_name=input.service,
         )
         await self._processors.session.shutdown_service.wait_for_complete(action)
@@ -846,18 +904,12 @@ class SessionAdapter(BaseAdapter):
         session_id: UUID,
         access_key: str,
         kernel_id: UUID | None = None,
-        owner_id: UUID | None = None,
     ) -> SessionLogsPayload:
-        """Get container logs for a session.
-
-        When ``owner_id`` is provided, the logs are fetched on behalf of the
-        delegated owner. Otherwise the caller's own access key is used.
-        """
+        """Get container logs for a session."""
         action = GetContainerLogsAction(
             session_name=str(session_id),
-            owner_access_key=AccessKey(access_key),
+            owner_id=self._require_user_id(),
             kernel_id=KernelId(kernel_id) if kernel_id else None,
-            owner_id=owner_id,
         )
         result = await self._processors.session.get_container_logs.wait_for_complete(action)
         logs_text = result.result.get("result", {}).get("logs", "")
@@ -878,10 +930,13 @@ class SessionAdapter(BaseAdapter):
             action = RenameSessionAction(
                 session_name=str(session_id),
                 new_name=input.name,
-                owner_access_key=AccessKey(access_key),
+                owner_id=self._require_user_id(),
             )
             result = await self._processors.session.rename_session.wait_for_complete(action)
-            return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))
+            ak_map = await self._resolve_main_access_key_map([result.session_data.owner_id])
+            return UpdateSessionPayload(
+                session=self._session_data_to_node(result.session_data, ak_map)
+            )
         # If no fields to update, just return the current session
         session_node = await self.get(session_id)
         return UpdateSessionPayload(session=session_node)
@@ -890,8 +945,11 @@ class SessionAdapter(BaseAdapter):
     # Data → DTO conversion
     # -------------------------------------------------------------------------
 
-    @staticmethod
-    def _session_data_to_node(data: SessionData) -> SessionNode:
+    def _session_data_to_node(
+        self,
+        data: SessionData,
+        access_key_map: dict[UUID, str | None] | None = None,
+    ) -> SessionNode:
         requested = ResourceSlotInfo(
             entries=[
                 ResourceSlotEntryInfo(resource_type=k, quantity=Decimal(str(v)))
@@ -917,13 +975,13 @@ class SessionAdapter(BaseAdapter):
         return SessionNode(
             id=data.id,
             domain_name=data.domain_name,
-            user_id=data.user_uuid,
+            user_id=data.owner_id,
             project_id=data.group_id,
             metadata=SessionMetadataInfoGQLDTO(
                 creation_id=data.creation_id or "",
                 name=data.name or "",
                 session_type=data.session_type.value,
-                access_key=str(data.access_key) if data.access_key else "",
+                access_key=(access_key_map or {}).get(data.owner_id),
                 cluster_mode=data.cluster_mode.name,
                 cluster_size=data.cluster_size,
                 priority=data.priority,
@@ -955,8 +1013,11 @@ class SessionAdapter(BaseAdapter):
             ),
         )
 
-    @staticmethod
-    def _kernel_info_to_node(info: KernelInfo) -> KernelNode:
+    def _kernel_info_to_node(
+        self,
+        info: KernelInfo,
+        access_key_map: dict[UUID, str | None] | None = None,
+    ) -> KernelNode:
         requested = ResourceSlotInfo(
             entries=[
                 ResourceSlotEntryInfo(resource_type=k, quantity=Decimal(v))
@@ -995,8 +1056,8 @@ class SessionAdapter(BaseAdapter):
                 session_type=info.session.session_type.value,
             ),
             user_info=KernelUserInfoGQLDTO(
-                user_id=info.user_permission.user_uuid,
-                access_key=info.user_permission.access_key,
+                user_id=info.user_permission.owner_id,
+                access_key=(access_key_map or {}).get(info.user_permission.owner_id) or "",
                 domain_name=info.user_permission.domain_name,
                 group_id=info.user_permission.group_id,
             ),

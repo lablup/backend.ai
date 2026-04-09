@@ -346,7 +346,7 @@ class ResourcePresetDBSource:
             )
             .select_from(j)
             .where(
-                (KernelRow.user_uuid == user_id)
+                (KernelRow.owner_id == user_id)
                 & (ResourceAllocationRow.free_at.is_(None))
                 & (
                     KernelRow.status.in_(

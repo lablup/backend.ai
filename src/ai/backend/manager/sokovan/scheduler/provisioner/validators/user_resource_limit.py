@@ -23,13 +23,13 @@ class UserResourceLimitValidator(ValidatorRule):
 
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the user's resource policy
-        policy = snapshot.resource_policy.user_policies.get(workload.user_uuid)
+        policy = snapshot.resource_policy.user_policies.get(workload.owner_id)
         if not policy:
             # If no user-specific policy, skip validation (no limits apply)
             return
 
         # Get current user occupancy (list[SlotQuantity]) and convert to ResourceSlot
-        user_occupied_quantities = snapshot.resource_occupancy.by_user.get(workload.user_uuid, [])
+        user_occupied_quantities = snapshot.resource_occupancy.by_user.get(workload.owner_id, [])
         user_occupied = ResourceSlot({sq.slot_name: sq.quantity for sq in user_occupied_quantities})
 
         # Check if adding this workload would exceed the limit

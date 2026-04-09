@@ -6,7 +6,6 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
@@ -128,7 +127,10 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
                         from_status=session.session_info.lifecycle.status,
                         reason="no-scheduling-data",
                         creation_id=session.session_info.identity.creation_id,
-                        access_key=AccessKey(session.session_info.metadata.access_key),
+                        # BA-5609: skipped sessions are only recorded to
+                        # scheduling history; access_key is not used by that
+                        # consumer, so leaving it None is safe.
+                        access_key=None,
                     )
                 )
             return result
@@ -171,7 +173,10 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
                         from_status=session.session_info.lifecycle.status,
                         reason="not-scheduled-this-cycle",
                         creation_id=session.session_info.identity.creation_id,
-                        access_key=AccessKey(session.session_info.metadata.access_key),
+                        # BA-5609: skipped sessions are only recorded to
+                        # scheduling history; access_key is not used by that
+                        # consumer, so leaving it None is safe.
+                        access_key=None,
                     )
                 )
 

@@ -16,7 +16,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, SlotName
+from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.common.types import SearchResult
@@ -186,12 +186,9 @@ class UserRepository:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_main_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
-        await self._db_source.delegate_endpoint_ownership(
-            user_uuid, target_user_uuid, target_main_access_key
-        )
+        await self._db_source.delegate_endpoint_ownership(user_uuid, target_user_uuid)
 
     @user_repository_resilience.apply()
     async def delete_endpoints(

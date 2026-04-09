@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+import sqlalchemy as sa
+
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
@@ -21,6 +23,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.resource_slot.types import (
     quantities_from_json,
     quantities_to_json,
@@ -137,7 +140,10 @@ class AccessKeyFilter(ResourceOccupancyFilter):
         self.access_key = access_key
 
     def get_condition(self) -> Any:
-        return KernelRow.access_key == self.access_key
+        # KernelRow.access_key column was dropped; match kernels whose owner's
+        # resolved main_access_key equals the requested access_key.
+        owner_subquery = sa.select(UserRow.uuid).where(UserRow.main_access_key == self.access_key)
+        return KernelRow.owner_id.in_(owner_subquery)
 
 
 class GroupIdFilter(ResourceOccupancyFilter):

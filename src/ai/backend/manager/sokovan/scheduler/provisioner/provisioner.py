@@ -392,8 +392,8 @@ class SessionProvisioner:
         snapshot.resource_occupancy.by_keypair[workload.access_key] = current_keypair
 
         # Update user occupancy
-        current_user = snapshot.resource_occupancy.by_user.get(workload.user_uuid, [])
-        snapshot.resource_occupancy.by_user[workload.user_uuid] = add_quantities(
+        current_user = snapshot.resource_occupancy.by_user.get(workload.owner_id, [])
+        snapshot.resource_occupancy.by_user[workload.owner_id] = add_quantities(
             current_user, total_quantities
         )
 
