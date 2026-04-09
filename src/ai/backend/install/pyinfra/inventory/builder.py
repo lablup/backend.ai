@@ -1,4 +1,3 @@
-# type: ignore
 """
 Backend.AI Unified Inventory Base Module
 
