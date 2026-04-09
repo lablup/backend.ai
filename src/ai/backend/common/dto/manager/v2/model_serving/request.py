@@ -47,6 +47,8 @@ class ServiceConfigInput(BaseRequestModel):
     scaling_group: str = Field(
         description="Name of the resource group to spawn inference sessions",
     )
+    # TODO: Consider aligning with the compute session pattern (ResourceSlotEntryInput)
+    #  which accepts quantity as str and defers numeric parsing to ResourceSlot.
     resources: dict[str, str | int | NonNegativeFloat] | None = Field(
         default=None,
         description="Resource requirements for the inference session",

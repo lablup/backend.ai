@@ -103,6 +103,8 @@ class ServiceConfigModel(BaseRequestModel):
         examples=["nvidia-H100"],
         alias="scalingGroup",
     )
+    # TODO: Consider aligning with the compute session pattern (ResourceSlotEntryInput)
+    #  which accepts quantity as str and defers numeric parsing to ResourceSlot.
     resources: dict[str, str | int | NonNegativeFloat] | None = Field(
         default=None, examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}]
     )
