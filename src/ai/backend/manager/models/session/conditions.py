@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
@@ -99,13 +99,39 @@ class SessionConditions:
 
         return inner
 
+    # NOTE(BA-5609): sessions no longer carry an access_key column. The
+    # by_main_access_key_* helpers below preserve the external wire field name
+    # (access_key) by resolving the owning user's main access key via a
+    # subquery against the users table.
+
     @staticmethod
-    def by_access_key_contains(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = SessionRow.access_key.ilike(f"%{spec.value}%")
+    def _user_uuid_subq_by_main_access_key(
+        value: str, case_insensitive: bool, like_mode: str | None
+    ) -> sa.sql.expression.ScalarSelect[Any]:
+        from ai.backend.manager.models.user import UserRow
+
+        col = UserRow.main_access_key
+        cond: sa.sql.expression.ColumnElement[bool]
+        if like_mode == "contains":
+            cond = col.ilike(f"%{value}%") if case_insensitive else col.like(f"%{value}%")
+        elif like_mode == "starts_with":
+            cond = col.ilike(f"{value}%") if case_insensitive else col.like(f"{value}%")
+        elif like_mode == "ends_with":
+            cond = col.ilike(f"%{value}") if case_insensitive else col.like(f"%{value}")
+        else:
+            if case_insensitive:
+                cond = sa.func.lower(col) == value.lower()
             else:
-                condition = SessionRow.access_key.like(f"%{spec.value}%")
+                cond = col == value
+        return sa.select(UserRow.uuid).where(cond).scalar_subquery()
+
+    @staticmethod
+    def by_main_access_key_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = SessionConditions._user_uuid_subq_by_main_access_key(
+                spec.value, spec.case_insensitive, None
+            )
+            condition = SessionRow.owner_id.in_(subq)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -113,16 +139,12 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_access_key_equals(spec: StringMatchSpec) -> QueryCondition:
+    def by_main_access_key_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            condition: sa.sql.expression.ColumnElement[bool]
-            if spec.case_insensitive:
-                condition = cast(
-                    sa.sql.expression.ColumnElement[bool],
-                    sa.func.lower(SessionRow.access_key) == spec.value.lower(),
-                )
-            else:
-                condition = SessionRow.access_key == spec.value
+            subq = SessionConditions._user_uuid_subq_by_main_access_key(
+                spec.value, spec.case_insensitive, "contains"
+            )
+            condition = SessionRow.owner_id.in_(subq)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -130,12 +152,12 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_access_key_starts_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_main_access_key_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = SessionRow.access_key.ilike(f"{spec.value}%")
-            else:
-                condition = SessionRow.access_key.like(f"{spec.value}%")
+            subq = SessionConditions._user_uuid_subq_by_main_access_key(
+                spec.value, spec.case_insensitive, "starts_with"
+            )
+            condition = SessionRow.owner_id.in_(subq)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -143,19 +165,12 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_access_key_ends_with(spec: StringMatchSpec) -> QueryCondition:
+    def by_main_access_key_ends_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            condition: sa.sql.expression.ColumnElement[bool]
-            if spec.case_insensitive:
-                condition = cast(
-                    sa.sql.expression.ColumnElement[bool],
-                    SessionRow.access_key.ilike(f"%{spec.value}"),
-                )
-            else:
-                condition = cast(
-                    sa.sql.expression.ColumnElement[bool],
-                    SessionRow.access_key.like(f"%{spec.value}"),
-                )
+            subq = SessionConditions._user_uuid_subq_by_main_access_key(
+                spec.value, spec.case_insensitive, "ends_with"
+            )
+            condition = SessionRow.owner_id.in_(subq)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -416,24 +431,24 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def by_user_uuid_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
-        """Factory for user UUID equality filter."""
+    def by_owner_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for owner_id equality filter."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.negated:
-                return SessionRow.user_uuid != spec.value
-            return SessionRow.user_uuid == spec.value
+                return SessionRow.owner_id != spec.value
+            return SessionRow.owner_id == spec.value
 
         return inner
 
     @staticmethod
-    def by_user_uuid_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
-        """Factory for user UUID IN filter."""
+    def by_owner_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for owner_id IN filter."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.negated:
-                return SessionRow.user_uuid.notin_(spec.values)
-            return SessionRow.user_uuid.in_(spec.values)
+                return SessionRow.owner_id.notin_(spec.values)
+            return SessionRow.owner_id.in_(spec.values)
 
         return inner
 
