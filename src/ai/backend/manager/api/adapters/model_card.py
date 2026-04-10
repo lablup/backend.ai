@@ -66,7 +66,12 @@ from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUp
 from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder, combine_conditions_or
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
@@ -549,6 +554,12 @@ class ModelCardAdapter(BaseAdapter):
                 or_conds.extend(self._convert_filter(sub))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
+        if filter_.NOT:
+            not_conds: list[QueryCondition] = []
+            for sub in filter_.NOT:
+                not_conds.extend(self._convert_filter(sub))
+            if not_conds:
+                conditions.append(negate_conditions(not_conds))
         return conditions
 
     def _convert_orders(self, orders: list[ModelCardOrder]) -> list[QueryOrder]:
