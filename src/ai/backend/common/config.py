@@ -4,7 +4,7 @@ import os
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import humps
 import tomli
@@ -340,11 +340,40 @@ class ModelDefinition(BaseConfigModel):
         description="List of models in the model definition.",
     )
 
+    # Fields in ModelServiceConfig that are atomic (should be replaced wholesale,
+    # not merged element-by-element when both base and override are lists).
+    _ATOMIC_SERVICE_FIELDS: ClassVar[frozenset[str]] = frozenset({
+        "start_command",
+        "start-command",
+        "pre_start_actions",
+        "pre-start-actions",
+    })
+
     def merge(self, override: ModelDefinition) -> ModelDefinition:
-        """Deep merge the given override into this definition, returning a new instance."""
+        """Deep merge the given override into this definition, returning a new instance.
+
+        Atomic list fields such as ``start_command`` are replaced wholesale by
+        the override value rather than being merged element-by-element, because
+        they represent a single logical value (e.g. a complete shell command).
+        """
         base_dict = self.model_dump(exclude_none=True, by_alias=True)
         override_dict = override.model_dump(exclude_none=True, by_alias=True)
         merged_dict = deep_merge(base_dict, override_dict)
+        # Restore atomic list fields from the override so they are not
+        # partially merged with base values by deep_merge's index-based
+        # list merging strategy.
+        for idx, override_model in enumerate(override_dict.get("models", [])):
+            if idx >= len(merged_dict.get("models", [])):
+                break
+            override_service = override_model.get("service")
+            if override_service is None:
+                continue
+            merged_service = merged_dict["models"][idx].get("service")
+            if merged_service is None:
+                continue
+            for field_name in self._ATOMIC_SERVICE_FIELDS:
+                if field_name in override_service:
+                    merged_service[field_name] = override_service[field_name]
         return ModelDefinition.model_validate(merged_dict)
 
     def health_check_config(self) -> ModelHealthCheck | None:
