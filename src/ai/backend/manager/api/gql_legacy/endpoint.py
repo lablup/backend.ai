@@ -915,7 +915,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             return [VirtualFolderNode.from_row(info, r) for r in (await sess.scalars(query))]
 
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
-        if not self.routings:
+        if self.routings is None:
             return []
         error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
         errors = []
