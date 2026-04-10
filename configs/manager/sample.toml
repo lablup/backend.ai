@@ -193,7 +193,7 @@
   # resolve client IPs from X-Forwarded-For headers. Only proxies in this list
   # are trusted to set forwarding headers. If empty (default), the manager falls
   # back to manual X-Forwarded-For parsing.
-  # Added in 26.4.0
+  # Added in 26.4.1
   trusted-proxies = ["10.0.0.0/8", "172.16.0.0/12"]
   # Event loop implementation to use for async operations. 'asyncio' is the
   # Python standard library implementation (default). 'uvloop' is a faster
@@ -573,7 +573,7 @@
   # Password for authenticating with Redis Sentinel nodes. If None, falls back
   # to the master password. Set explicitly when Sentinel nodes use a different
   # password than the master.
-  # Added in 26.4.0
+  # Added in 26.4.1
   ## sentinel-password = "REDIS_SENTINEL_PASSWORD"
   # Timeout in milliseconds for Redis requests. Controls how long operations
   # wait before timing out. If None, uses the default timeout configured in the
@@ -811,7 +811,7 @@
   password-hash-salt-size = 32
   # Maximum login session age in seconds. Default is 604800 (7 days). Sessions
   # older than this are considered expired.
-  # Added in 26.4.0
+  # Added in 26.4.1
   login-session-max-age = 604800
 
 # JWT (JSON Web Token) authentication configuration. Controls JWT token signing

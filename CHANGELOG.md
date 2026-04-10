@@ -16,6 +16,24 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.1 (2026-04-10)
+
+### Fixes
+* Fix Pydantic validation error when creating ModelCard with null framework, label, or accessLevel fields via GraphQL ([#10921](https://github.com/lablup/backend.ai/issues/10921))
+* Fix model service creation failing with Pydantic validation error when using fractional `cuda.shares` resource values (e.g., 2.5) ([#10929](https://github.com/lablup/backend.ai/issues/10929))
+* Fix backfill migration referencing dropped `permission_groups` table; use denormalized permissions schema instead. ([#10933](https://github.com/lablup/backend.ai/issues/10933))
+* Fix migration failure on BinarySize-suffixed resource_slots values (e.g. "32g", "4m"). ([#10934](https://github.com/lablup/backend.ai/issues/10934))
+* Fix superadmin unable to see other users' vfolders via vfolder_nodes GQL query due to empty ADMIN_PERMISSIONS ([#10939](https://github.com/lablup/backend.ai/issues/10939))
+* Skip event deserialization in event dispatcher when no consumer or subscriber is registered, preventing `ModuleNotFoundError` in appproxy coordinator ([#10941](https://github.com/lablup/backend.ai/issues/10941))
+* Fix legacy GQL endpoint resolvers crashing when routings is empty by using `is not None` check instead of truthiness check, and add missing `load_routes` in `load_all`. ([#10948](https://github.com/lablup/backend.ai/issues/10948))
+* Fix CLI v2 `RuntimeError: no running event loop` crash on aiohttp >= 3.13 by deferring `CookieJar` creation to an async context ([#10954](https://github.com/lablup/backend.ai/issues/10954))
+* Fix IndexError in health check handlers caused by incompatible `web.Request` annotation in `_wrap_api_handler`; now use `RequestCtx` parameter type. ([#10958](https://github.com/lablup/backend.ai/issues/10958))
+* Fix `ModelDefinition.merge()` corrupting `start_command` via index-based list merging by replacing `deep_merge()` with Pydantic-aware field-by-field merge functions ([#10959](https://github.com/lablup/backend.ai/issues/10959))
+* Normalize `None` routings to empty list in endpoint `to_data()` and `from_dto()` to fix NoneType iteration crashes ([#10965](https://github.com/lablup/backend.ai/issues/10965))
+* Fix GQL `my_client_ip` returning the hive-gateway proxy IP by forwarding the `X-Forwarded-For` header from hive-gateway to manager subgraph requests (note: `allowed_client_ip` configurations that whitelisted the hive-gateway IP as a workaround should be reviewed, as the manager will now see the real client IP via GQL) ([#10966](https://github.com/lablup/backend.ai/issues/10966))
+* Expose `AND`/`OR`/`NOT` composition on the `ModelCardV2Filter` GraphQL input so composed filter queries no longer fail with `Field "AND" is not defined` ([#10970](https://github.com/lablup/backend.ai/issues/10970))
+
+
 ## 26.4.0 (2026-04-09)
 
 ### Features
