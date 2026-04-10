@@ -28,6 +28,7 @@ import tomlkit
 from dateutil.tz import tzutc
 from etcd_client import GRPCStatusError
 from rich.text import Text
+from ruamel.yaml import YAML
 from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
@@ -1193,6 +1194,131 @@ class Context(metaclass=ABCMeta):
                 print(f"""echo 'Your email: {user["email"]}'""", file=fp)
                 print(f"""echo 'Your password: {user["password"]}'""", file=fp)
 
+    async def configure_harbor(self) -> None:
+        """
+        Configure and install a local Harbor container registry.
+
+        Downloads the Harbor offline installer archive, extracts it into
+        ``<base_path>/harbor``, writes ``harbor.yml`` from the bundled template
+        (replacing ``hostname``/``http port``/``admin password``/``data_volume``
+        placeholders), and runs Harbor's own ``install.sh`` which in turn
+        generates the working ``docker-compose.yml`` and config files for the
+        core, portal, registry, jobservice, and database containers.
+
+        The generated ``docker-compose.yml`` can then be managed with
+        ``docker compose -f harbor/docker-compose.yml up -d`` or via the
+        ``./dev harbor start/stop`` helpers.
+        """
+        service = self.install_info.service_config
+        if not service.harbor_enabled:
+            return
+
+        base_path = self.install_info.base_path
+        harbor_dir = base_path / "harbor"
+        harbor_data_dir = base_path / "var" / "harbor"
+        harbor_dir.mkdir(parents=True, exist_ok=True)
+        harbor_data_dir.mkdir(parents=True, exist_ok=True)
+
+        download_uri = self.install_variable.harbor_download_uri
+        archive_path = base_path / Path(download_uri).name
+
+        # 1) Download the Harbor offline installer archive if not already present.
+        if not archive_path.exists():
+            self.log_header(f"Downloading Harbor offline installer from {download_uri}")
+            await self.run_exec(
+                ["curl", "-fL", "--output", str(archive_path), download_uri],
+                cwd=base_path,
+            )
+        else:
+            self.log.write(
+                Text.from_markup(
+                    f"Using cached Harbor installer archive at [bold]{archive_path}[/]"
+                )
+            )
+
+        # 2) Extract the archive into a temporary directory and rsync into harbor_dir.
+        self.log_header("Extracting Harbor installer archive...")
+        with tempfile.TemporaryDirectory(prefix="bai-harbor-") as extract_root:
+            extract_path = Path(extract_root)
+            await self.run_exec(
+                ["tar", "-xzf", str(archive_path), "-C", str(extract_path)],
+                cwd=base_path,
+            )
+            # The tarball extracts into a top-level ``harbor/`` directory.
+            extracted_harbor_dir = extract_path / "harbor"
+            if not extracted_harbor_dir.is_dir():
+                raise RuntimeError(
+                    f"Harbor archive did not contain a top-level 'harbor/' directory: {archive_path}"
+                )
+            # Copy everything into our harbor_dir (overwriting previous contents,
+            # but preserving generated docker-compose.yml if idempotent re-run).
+            for child in extracted_harbor_dir.iterdir():
+                dest = harbor_dir / child.name
+                if child.is_dir():
+                    shutil.copytree(child, dest, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(child, dest)
+
+        # 3) Load Harbor's bundled ``harbor.yml.tmpl`` using ruamel.yaml
+        #    (round-trip mode) so we can modify only the fields we care about
+        #    while preserving comments and structure — mirroring the tomlkit
+        #    pattern used for other service configs.
+        self.log_header("Writing harbor.yml configuration...")
+        harbor_template = harbor_dir / "harbor.yml.tmpl"
+        if not harbor_template.exists():
+            raise RuntimeError(
+                f"Harbor template not found at {harbor_template}; archive may be corrupt."
+            )
+        yaml = YAML()
+        yaml.preserve_quotes = True
+        with harbor_template.open("r", encoding="utf-8") as fp:
+            harbor_config = yaml.load(fp)
+        harbor_config["hostname"] = service.harbor_hostname
+        harbor_config["http"]["port"] = service.harbor_http_port
+        harbor_config["harbor_admin_password"] = service.harbor_admin_password
+        harbor_config["database"]["password"] = service.harbor_admin_password
+        harbor_config["data_volume"] = str(harbor_data_dir)
+        # Drop the https section entirely so that ``prepare`` does not require
+        # certificate files. The template keeps it commented out by default,
+        # but be defensive in case a newer archive enables it.
+        if "https" in harbor_config:
+            del harbor_config["https"]
+        with (harbor_dir / "harbor.yml").open("w", encoding="utf-8") as fp:
+            yaml.dump(harbor_config, fp)
+
+        # 4) Run Harbor's install.sh to generate docker-compose.yml and config
+        #    files. The script is idempotent-ish: if docker-compose.yml already
+        #    exists we still re-run it so that config changes take effect, but
+        #    we do NOT start containers here. Lifecycle is managed via
+        #    ``./dev harbor start|stop``.
+        self.log_header("Running Harbor prepare script (install.sh)...")
+        install_script = harbor_dir / "install.sh"
+        if not install_script.exists():
+            raise RuntimeError(
+                f"Harbor install.sh not found at {install_script}; archive may be corrupt."
+            )
+        # ``install.sh`` internally invokes ``prepare`` which generates
+        # docker-compose.yml and all service config files. We want the prepare
+        # step but not the ``docker compose up``; instead of parsing install.sh
+        # we run it and then immediately ``docker compose down`` to leave the
+        # config on disk without leaving containers running.
+        await self.run_exec(
+            ["bash", "install.sh"],
+            cwd=harbor_dir,
+        )
+        await self.run_exec(
+            ["docker", "compose", "down", "--remove-orphans"],
+            cwd=harbor_dir,
+        )
+
+        self.log.write(
+            Text.from_markup(
+                f"[green]Harbor is configured.[/] "
+                f"Start it with [bold]./dev harbor start[/] and access it at "
+                f"[bold]http://{service.harbor_hostname}:{service.harbor_http_port}[/]"
+            )
+        )
+
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")
         base_path = self.install_info.base_path
@@ -1389,6 +1515,10 @@ class DevContext(Context):
             appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
             appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
             appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
+            harbor_enabled=self.install_variable.with_harbor,
+            harbor_hostname=public_facing_address,
+            harbor_http_port=self.install_variable.harbor_http_port,
+            harbor_admin_password=self.install_variable.harbor_admin_password,
         )
 
         return InstallInfo(
@@ -1472,6 +1602,10 @@ class DevContext(Context):
 
         self.log_header("Generating client environ configs...")
         await self.configure_client()
+
+        if self.install_variable.with_harbor:
+            self.log_header("Configuring local Harbor registry...")
+            await self.configure_harbor()
 
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()

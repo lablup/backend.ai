@@ -106,6 +106,36 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     default="0.0.0.0/0",
     help="CIDR for metric access allowed hosts (default: 0.0.0.0/0).",
 )
+@click.option(
+    "--with-harbor",
+    is_flag=True,
+    default=False,
+    help="Also install a local Harbor container registry (dev mode only).",
+)
+@click.option(
+    "--harbor-http-port",
+    type=int,
+    default=8084,
+    show_default=True,
+    help="HTTP port for the local Harbor instance.",
+)
+@click.option(
+    "--harbor-admin-password",
+    type=str,
+    default="Harbor12345",
+    show_default=True,
+    help="Initial admin password for the local Harbor instance.",
+)
+@click.option(
+    "--harbor-download-uri",
+    type=str,
+    default=(
+        "https://github.com/goharbor/harbor/releases/download/"
+        "v2.11.0/harbor-offline-installer-v2.11.0.tgz"
+    ),
+    show_default=False,
+    help="Harbor offline installer archive URL to download.",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
@@ -124,6 +154,10 @@ def main(
     use_wildcard_binding: bool,
     otel_endpoint: str | None,
     metric_access_cidr: str,
+    with_harbor: bool,
+    harbor_http_port: int,
+    harbor_admin_password: str,
+    harbor_download_uri: str,
     accelerator: str,
 ) -> None:
     """The installer"""
@@ -155,6 +189,10 @@ def main(
         use_wildcard_binding=use_wildcard_binding,
         otel_endpoint=otel_endpoint,
         metric_access_cidr=metric_access_cidr,
+        with_harbor=with_harbor,
+        harbor_http_port=harbor_http_port,
+        harbor_admin_password=harbor_admin_password,
+        harbor_download_uri=harbor_download_uri,
     )
     app = InstallerApp(args)
     app.run(headless=headless)

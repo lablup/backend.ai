@@ -436,6 +436,33 @@ class InstallReport(Static):
                 """
                     )
                 )
+            if service.harbor_enabled:
+                harbor_url = f"http://{service.harbor_hostname}:{service.harbor_http_port}"
+                with TabPane("Harbor", id="harbor"):
+                    yield Markdown(
+                        textwrap.dedent(
+                            f"""
+                A local Harbor container registry has been configured at
+                `{self.install_info.base_path.resolve() / "harbor"}`.
+
+                Start or stop it with:
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./dev harbor start
+                $ ./dev harbor stop
+                ```
+
+                Once started, open the Harbor UI at <{harbor_url}>.
+
+                Admin credentials:
+                - Username: `admin`
+                - Password: `{service.harbor_admin_password}`
+
+                Note: Harbor may take 30-60 seconds to become fully ready
+                after `./dev harbor start`.
+                """
+                        )
+                    )
 
 
 class ModeMenu(Static):
@@ -497,6 +524,10 @@ class ModeMenu(Static):
             use_wildcard_binding=args.use_wildcard_binding,
             otel_endpoint=args.otel_endpoint,
             metric_access_cidr=args.metric_access_cidr,
+            with_harbor=args.with_harbor,
+            harbor_http_port=args.harbor_http_port,
+            harbor_admin_password=args.harbor_admin_password,
+            harbor_download_uri=args.harbor_download_uri,
         )
 
     def compose(self) -> ComposeResult:
