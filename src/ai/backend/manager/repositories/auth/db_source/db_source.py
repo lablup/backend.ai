@@ -406,8 +406,14 @@ class AuthDBSource:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
+        *,
+        login_client_type_id: UUID | None = None,
     ) -> CredentialVerificationResult:
         """Verify credentials, migrate password hash, and fetch active sessions.
+
+        When ``login_client_type_id`` is provided, only active sessions of that
+        client type are returned so that per-client-type concurrent login
+        enforcement works correctly.
 
         Does NOT record login history — the caller (service layer) handles
         all history recording via try/except.
@@ -427,15 +433,19 @@ class AuthDBSource:
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
+            session_conditions = (LoginSessionRow.__table__.c.user_id == row.uuid) & (
+                LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE
+            )
+            if login_client_type_id is not None:
+                session_conditions = session_conditions & (
+                    LoginSessionRow.__table__.c.login_client_type_id == login_client_type_id
+                )
             session_result = await conn.execute(
                 sa.select(
                     LoginSessionRow.__table__.c.session_token,
                     LoginSessionRow.__table__.c.created_at,
                 )
-                .where(
-                    (LoginSessionRow.__table__.c.user_id == row.uuid)
-                    & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
-                )
+                .where(session_conditions)
                 .order_by(LoginSessionRow.__table__.c.created_at.asc())
             )
             active_sessions = [
@@ -480,6 +490,8 @@ class AuthDBSource:
         user_id: UUID,
         access_key: str,
         domain_name: str,
+        *,
+        login_client_type_id: UUID | None = None,
     ) -> LoginSessionCreationResult:
         """Create a new active login session and record a successful login history entry.
 
@@ -496,6 +508,7 @@ class AuthDBSource:
                     access_key=access_key,
                     session_token=session_token,
                     status=LoginSessionStatus.ACTIVE,
+                    login_client_type_id=login_client_type_id,
                 )
             )
 
@@ -551,18 +564,28 @@ class AuthDBSource:
     # --- Login Session ---
 
     @auth_db_source_resilience.apply()
-    async def fetch_active_session_tokens(self, user_id: UUID) -> list[ActiveSessionInfo]:
-        """Fetch active session tokens for a user, ordered by created_at ASC (oldest first)."""
+    async def fetch_active_session_tokens(
+        self, user_id: UUID, *, login_client_type_id: UUID | None = None
+    ) -> list[ActiveSessionInfo]:
+        """Fetch active session tokens for a user, ordered by created_at ASC (oldest first).
+
+        When ``login_client_type_id`` is provided, only sessions of that client type
+        are returned so that per-client-type concurrent login enforcement works correctly.
+        """
         async with self._db.begin_readonly_session() as db_session:
+            conditions = (LoginSessionRow.user_id == user_id) & (
+                LoginSessionRow.status == LoginSessionStatus.ACTIVE
+            )
+            if login_client_type_id is not None:
+                conditions = conditions & (
+                    LoginSessionRow.login_client_type_id == login_client_type_id
+                )
             query = (
                 sa.select(
                     LoginSessionRow.session_token,
                     LoginSessionRow.created_at,
                 )
-                .where(
-                    (LoginSessionRow.user_id == user_id)
-                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
-                )
+                .where(conditions)
                 .order_by(LoginSessionRow.created_at.asc())
             )
             result = await db_session.execute(query)
