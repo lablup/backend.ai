@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -83,7 +83,7 @@ class EndpointData:
     lifecycle_stage: EndpointLifecycle
     runtime_variant: RuntimeVariant
     extra_mounts: Sequence[VFolderMount]
-    routings: Sequence[RoutingData] | None = None
+    routings: Sequence[RoutingData] = field(default_factory=list)
 
 
 @dataclass
@@ -268,7 +268,7 @@ class ServiceSearchItem:
     open_to_public: bool
     resource_slots: ResourceSlot
     resource_group: str
-    routings: Sequence[RoutingData] | None
+    routings: Sequence[RoutingData]
 
 
 @dataclass

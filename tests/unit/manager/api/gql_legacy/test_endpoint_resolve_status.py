@@ -10,18 +10,25 @@ from ai.backend.manager.data.deployment.types import RouteStatus
 
 
 class TestEndpointResolveStatus:
-    """Regression test for BA-5664: empty routings must not resolve to HEALTHY."""
+    """Regression tests for endpoint status/error resolution with empty or None routings."""
 
     @pytest.fixture
     def info(self) -> MagicMock:
         return MagicMock()
 
-    async def test_empty_routings_returns_degraded(self, info: MagicMock) -> None:
+    async def test_none_routings_returns_unhealthy(self, info: MagicMock) -> None:
+        ep = Endpoint()
+        ep.lifecycle_stage = EndpointLifecycle.READY.name
+        ep.routings = None
+        result = await ep.resolve_status(info)
+        assert result == EndpointStatus.UNHEALTHY
+
+    async def test_empty_routings_returns_unhealthy(self, info: MagicMock) -> None:
         ep = Endpoint()
         ep.lifecycle_stage = EndpointLifecycle.READY.name
         ep.routings = []
         result = await ep.resolve_status(info)
-        assert result == EndpointStatus.DEGRADED
+        assert result == EndpointStatus.UNHEALTHY
 
     async def test_all_inactive_routings_returns_unhealthy(self, info: MagicMock) -> None:
         routing = MagicMock()
@@ -31,3 +38,9 @@ class TestEndpointResolveStatus:
         ep.routings = [routing]
         result = await ep.resolve_status(info)
         assert result == EndpointStatus.UNHEALTHY
+
+    async def test_none_routings_resolve_errors_returns_empty(self, info: MagicMock) -> None:
+        ep = Endpoint()
+        ep.routings = None
+        result = await ep.resolve_errors(info)
+        assert result == []

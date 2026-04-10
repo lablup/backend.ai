@@ -104,15 +104,15 @@ class TestEndpointType:
         result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
         assert result == EndpointStatus.HEALTHY
 
-    async def test_status_degraded_when_no_routes(self) -> None:
+    async def test_status_unhealthy_when_no_routes(self) -> None:
         """
-        When there are no routes at all, the endpoint status should be DEGRADED.
+        When there are no routes at all, the endpoint status should be UNHEALTHY.
 
-        An endpoint with no routes is likely still provisioning.
+        An endpoint with no routes cannot serve any requests.
         """
         mock_endpoint = Mock(spec=Endpoint)
         mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
         mock_endpoint.routings = []
 
         result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
-        assert result == EndpointStatus.DEGRADED
+        assert result == EndpointStatus.UNHEALTHY
