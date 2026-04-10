@@ -10,6 +10,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -112,6 +113,27 @@ def zero_if_none(val: int | None) -> int:
 class FixtureOpModes(enum.StrEnum):
     INSERT = "insert"
     UPDATE = "update"
+
+
+@dataclass(frozen=True)
+class FixtureReferenceSpec:
+    source_column: str
+    target_column: str
+    lookup_table: str
+    lookup_column: str
+    value_column: str = "id"
+
+
+FIXTURE_REFERENCE_SPECS: Final[Mapping[str, Sequence[FixtureReferenceSpec]]] = {
+    "runtime_variant_presets": (
+        FixtureReferenceSpec(
+            source_column="runtime_variant_name",
+            target_column="runtime_variant",
+            lookup_table="runtime_variants",
+            lookup_column="name",
+        ),
+    ),
+}
 
 
 T_Enum = TypeVar("T_Enum", bound=enum.Enum, covariant=True)
@@ -833,8 +855,7 @@ async def populate_fixture(
         from .hasher.types import PasswordColumn
 
         async with engine.begin() as conn:
-            if table_name == "runtime_variant_presets":
-                await _resolve_runtime_variant_preset_references(conn, rows)
+            await _resolve_fixture_references(conn, table, rows)
             # Apply typedecorator manually for required columns
             for col in table.columns:
                 if isinstance(col.type, sa.sql.sqltypes.DateTime):
@@ -951,38 +972,62 @@ async def populate_fixture(
                     await conn.execute(update_stmt, update_data)
 
 
-async def _resolve_runtime_variant_preset_references(
+async def _resolve_fixture_references(
     conn: AsyncConnection,
+    table: sa.Table,
     rows: Sequence[dict[str, Any]],
 ) -> None:
-    runtime_variant_names = {
-        cast(str, row["runtime_variant_name"])
-        for row in rows
-        if "runtime_variant" not in row and row.get("runtime_variant_name") is not None
-    }
-    if not runtime_variant_names:
+    reference_specs = FIXTURE_REFERENCE_SPECS.get(table.name, ())
+    for reference_spec in reference_specs:
+        await _resolve_fixture_reference(conn, table, rows, reference_spec)
+
+
+async def _resolve_fixture_reference(
+    conn: AsyncConnection,
+    table: sa.Table,
+    rows: Sequence[dict[str, Any]],
+    reference_spec: FixtureReferenceSpec,
+) -> None:
+    # Pop source_column from every row, collecting rows that need resolution.
+    rows_to_resolve: list[tuple[dict[str, Any], str]] = []
+    for row in rows:
+        source_value = row.pop(reference_spec.source_column, None)
+        if source_value is not None and reference_spec.target_column not in row:
+            rows_to_resolve.append((row, cast(str, source_value)))
+
+    if not rows_to_resolve:
         return
 
-    runtime_variants_table = metadata.tables.get("runtime_variants")
-    if not isinstance(runtime_variants_table, sa.Table):
-        raise DataTransformationFailed("Table runtime_variants not found in metadata")
+    source_values = {sv for _, sv in rows_to_resolve}
+
+    lookup_table = metadata.tables.get(reference_spec.lookup_table)
+    if lookup_table is None:
+        raise DataTransformationFailed(f"Table {reference_spec.lookup_table} not found in metadata")
+
+    lookup_column = lookup_table.columns.get(reference_spec.lookup_column)
+    if lookup_column is None:
+        raise DataTransformationFailed(
+            f"Column {reference_spec.lookup_table}.{reference_spec.lookup_column} not found in metadata"
+        )
+    value_column = lookup_table.columns.get(reference_spec.value_column)
+    if value_column is None:
+        raise DataTransformationFailed(
+            f"Column {reference_spec.lookup_table}.{reference_spec.value_column} not found in metadata"
+        )
 
     result = await conn.execute(
-        sa.select(runtime_variants_table.c.name, runtime_variants_table.c.id).where(
-            runtime_variants_table.c.name.in_(runtime_variant_names)
-        )
+        sa.select(lookup_column, value_column).where(lookup_column.in_(source_values))
     )
-    runtime_variant_ids = {name: row_id for name, row_id in result}
-    missing_variant_names = sorted(runtime_variant_names - runtime_variant_ids.keys())
-    if missing_variant_names:
+    resolved_values = {source_value: resolved_value for source_value, resolved_value in result}
+    missing_values = sorted(source_values - resolved_values.keys())
+    if missing_values:
         raise DataTransformationFailed(
-            "Unknown runtime_variant_name in fixture: " + ", ".join(missing_variant_names)
+            f"Unknown {reference_spec.source_column} in fixture for {table.name}: "
+            + ", ".join(missing_values)
         )
 
-    for row in rows:
-        runtime_variant_name = row.pop("runtime_variant_name", None)
-        if runtime_variant_name is not None and "runtime_variant" not in row:
-            row["runtime_variant"] = runtime_variant_ids[runtime_variant_name]
+    for row, source_value in rows_to_resolve:
+        row[reference_spec.target_column] = resolved_values[source_value]
 
 
 class DecimalType(TypeDecorator[Decimal], Decimal):

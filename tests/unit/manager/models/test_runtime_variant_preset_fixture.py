@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -89,6 +90,44 @@ class TestRuntimeVariantPresetFixture:
         assert preset.ui_option.ui_type.value == "select"
         assert preset.ui_option.choices is not None
         assert preset.ui_option.choices.items[0].value == "auto"
+
+    async def test_populate_preset_keeps_explicit_variant_id(
+        self,
+        db_engine: ExtendedAsyncSAEngine,
+    ) -> None:
+        variant_id = uuid.uuid4()
+        fixture_data: dict[str, list[dict[str, object]]] = {
+            "runtime_variants": [
+                {
+                    "id": variant_id,
+                    "name": "vllm",
+                    "description": "vLLM",
+                }
+            ],
+            "runtime_variant_presets": [
+                {
+                    "runtime_variant": variant_id,
+                    "runtime_variant_name": "nonexistent",
+                    "name": "dtype",
+                    "description": "Model weight dtype.",
+                    "rank": 100,
+                    "preset_target": "args",
+                    "value_type": "str",
+                    "default_value": "auto",
+                    "key": "--dtype",
+                }
+            ],
+        }
+
+        await populate_fixture(db_engine, fixture_data)
+
+        async with db_engine.begin_session() as db_sess:
+            preset = await db_sess.scalar(
+                sa.select(RuntimeVariantPresetRow).where(RuntimeVariantPresetRow.name == "dtype")
+            )
+
+        assert preset is not None
+        assert preset.runtime_variant == variant_id
 
     @pytest.fixture
     def preset_fixture_data_with_unknown_variant(
