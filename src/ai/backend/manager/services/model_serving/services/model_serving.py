@@ -271,6 +271,9 @@ class ModelServingService:
         creation_config = action.creator.config.to_dict()
         # Override resource_opts with merged values from deployment config + API request
         creation_config["resource_opts"] = dict(revision.resource_spec.resource_opts or {})
+        # Pass merged model_definition to Agent via creation_config
+        if revision.model_definition:
+            creation_config["model_definition"] = revision.model_definition.model_dump(mode="json")
         creation_config["mounts"] = [
             model_vfolder_id,
             *[m.vfid.folder_id for m in service_prepare_ctx.extra_mounts],
@@ -592,6 +595,11 @@ class ModelServingService:
                 "mount_map": mount_map,
                 "mount_options": mount_options,
                 "model_definition_path": service_prepare_ctx.model_definition_path,
+                "model_definition": (
+                    revision.model_definition.model_dump(mode="json")
+                    if revision.model_definition
+                    else None
+                ),
                 "runtime_variant": action.runtime_variant,
                 "environ": environ,
                 "scaling_group": service_prepare_ctx.scaling_group,

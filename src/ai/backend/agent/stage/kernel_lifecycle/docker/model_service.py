@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast, override
+from typing import Any, cast, override
 
 from aiodocker.docker import Docker
 from pydantic import ValidationError
@@ -32,6 +32,7 @@ class ModelServiceSpecCheckArgs:
     session_type: SessionTypes
     runtime_variant: RuntimeVariant
     model_definition_path: str | None = None
+    model_definition: dict[str, Any] | None = None
 
     def to_model_service_spec(self, image_command: str | None) -> "ModelServiceSpec":
         return ModelServiceSpec(
@@ -39,6 +40,7 @@ class ModelServiceSpecCheckArgs:
             model_vfolder_mount=self.model_vfolder_mount,
             runtime_variant=self.runtime_variant,
             model_definition_path=self.model_definition_path,
+            model_definition=self.model_definition,
             image_command=image_command,
         )
 
@@ -49,6 +51,7 @@ class ModelServiceSpec:
     model_vfolder_mount: VFolderMount
     runtime_variant: RuntimeVariant
     model_definition_path: str | None
+    model_definition: dict[str, Any] | None
     image_command: str | None
 
 
@@ -130,6 +133,15 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
         )
 
     async def _get_model_definition(self, spec: ModelServiceSpec) -> ModelDefinition:
+        # Use pre-merged model definition from Manager if available
+        if spec.model_definition is not None:
+            try:
+                return ModelDefinition.model_validate(spec.model_definition)
+            except ValidationError as e:
+                raise InvalidModelConfigurationError(
+                    f"Invalid pre-merged model definition from Manager: {e}"
+                ) from e
+
         image_command = spec.image_command
         model_folder = spec.model_vfolder_mount
         match spec.runtime_variant:

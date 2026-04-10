@@ -188,6 +188,11 @@ class SessionCreationSpec:
                 "mount_map": mount_spec.mount_map,
                 "mount_options": mount_spec.mount_options,
                 "model_definition_path": target_revision.mounts.model_definition_path,
+                "model_definition": (
+                    target_revision.model_definition.model_dump(mode="json")
+                    if target_revision.model_definition
+                    else None
+                ),
                 "runtime_variant": target_revision.execution.runtime_variant,
                 "environ": environ,
                 "scaling_group": deployment_info.metadata.resource_group,

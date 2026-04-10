@@ -3310,6 +3310,13 @@ class AbstractAgent[
 
         model_folder: VFolderMount = model_folders[0]
 
+        # Use pre-merged model definition from Manager if available
+        internal_data = kernel_config.get("internal_data") or {}
+        if manager_model_definition := internal_data.get("model_definition"):
+            return self._apply_model_definition(
+                manager_model_definition, model_folder, environ, service_ports
+            )
+
         raw_definition: dict[str, Any]
         match runtime_variant:
             case "vllm":
@@ -3439,6 +3446,15 @@ class AbstractAgent[
                     raw_definition = yaml.load(model_definition_yaml)
                 except YAMLError as e:
                     raise ModelDefinitionInvalidYAMLError(f"Invalid YAML syntax: {e}") from e
+        return self._apply_model_definition(raw_definition, model_folder, environ, service_ports)
+
+    def _apply_model_definition(
+        self,
+        raw_definition: dict[str, Any],
+        model_folder: VFolderMount,
+        environ: MutableMapping[str, Any],
+        service_ports: list[ServicePort],
+    ) -> Any:
         try:
             model_definition = model_definition_iv.check(raw_definition)
             if model_definition is None:

@@ -34,6 +34,9 @@ class InternalDataRule(SessionPreparerRule):
         if model_def_path := spec.creation_spec.get("model_definition_path"):
             internal_data["model_definition_path"] = model_def_path
 
+        if model_definition := spec.creation_spec.get("model_definition"):
+            internal_data["model_definition"] = model_definition
+
         if runtime_variant := spec.creation_spec.get("runtime_variant"):
             internal_data["runtime_variant"] = runtime_variant
 

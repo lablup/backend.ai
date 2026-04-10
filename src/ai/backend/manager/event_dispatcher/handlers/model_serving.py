@@ -206,6 +206,7 @@ class ModelServingEventHandler:
                             for m in current_rev.extra_mounts
                         },
                         "model_definition_path": current_rev.model_definition_path,
+                        "model_definition": current_rev.model_definition,
                         "runtime_variant": current_rev.runtime_variant,
                         "environ": environ,
                         "scaling_group": endpoint.resource_group,
