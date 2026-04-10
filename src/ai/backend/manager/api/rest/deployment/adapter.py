@@ -431,6 +431,7 @@ def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreato
         mounts=mounts,
         execution=execution,
         model_definition=revision_input.model_definition,
+        auto_activate=revision_input.auto_activate,
     )
 
 

@@ -276,6 +276,17 @@ class RevisionInput(BaseRequestModel):
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Extra vfolder mounts"
     )
+    auto_activate: bool = Field(
+        default=False,
+        description=(
+            "If true, activate the new revision immediately after creation in the same "
+            "request. When false (default), the caller must activate the revision via a "
+            "separate POST /deployments/{id}/revisions/{revision_id}/activate call. "
+            "Only honored by POST /deployments/{id}/revisions; this field is ignored "
+            "when RevisionInput is nested inside CreateDeploymentRequest.initial_revision, "
+            "where the initial revision is always activated."
+        ),
+    )
 
 
 # ========== Create Requests ==========
