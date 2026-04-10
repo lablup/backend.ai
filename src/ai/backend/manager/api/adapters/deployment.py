@@ -1022,7 +1022,7 @@ class DeploymentAdapter(BaseAdapter):
             ),
             model_definition=input.model_definition,
             revision_preset_id=input.revision_preset_id,
-            auto_activate=input.auto_activate,
+            auto_activate=options.auto_activate,
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(
