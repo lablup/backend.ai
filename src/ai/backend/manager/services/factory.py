@@ -321,6 +321,7 @@ def create_services(args: ServiceArgs) -> Services:
             config_provider=args.config_provider,
             valkey_session_client=args.valkey_session_client,
             user_resource_policy_repository=repositories.user_resource_policy.repository,
+            login_client_type_repository=repositories.auth.login_client_type,
         ),
         login_client_type=LoginClientTypeService(
             repository=repositories.auth.login_client_type,

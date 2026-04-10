@@ -19,6 +19,7 @@ class AuthorizeAction(AuthAction):
     password: str
     stoken: str | None
     otp: str | None
+    client_type_name: str
     force: bool = False
 
     @override

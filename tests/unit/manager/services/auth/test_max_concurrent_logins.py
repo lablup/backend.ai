@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -67,6 +67,7 @@ def _make_action(*, force: bool = False) -> AuthorizeAction:
         password="password",
         request=MagicMock(),
         stoken=None,
+        client_type_name="webui",
         otp=None,
         force=force,
     )
@@ -128,6 +129,7 @@ def auth_service(
         config_provider=mock_config_provider,
         valkey_session_client=mock_valkey_session_client,
         user_resource_policy_repository=mock_user_resource_policy_repository,
+        login_client_type_repository=AsyncMock(),
     )
 
 
@@ -238,6 +240,7 @@ class TestMaxConcurrentLoginsEnforcement:
                 keypair_row=_make_mock_keypair_row(),
                 live_sessions=_make_live_sessions(case.existing_active_sessions),
                 auth_config=_make_auth_config(),
+                login_client_type_id=uuid4(),
             )
 
     @pytest.mark.parametrize(
@@ -338,6 +341,7 @@ class TestMaxConcurrentLoginsEnforcement:
             keypair_row=_make_mock_keypair_row(),
             live_sessions=_make_live_sessions(case.existing_active_sessions),
             auth_config=_make_auth_config(),
+            login_client_type_id=uuid4(),
         )
 
         invalidate_mock = mock_auth_repository.invalidate_login_sessions_by_tokens
