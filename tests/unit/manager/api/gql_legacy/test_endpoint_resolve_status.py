@@ -6,6 +6,7 @@ import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, EndpointStatus
 from ai.backend.manager.api.gql_legacy.endpoint import Endpoint
+from ai.backend.manager.data.deployment.types import RouteStatus
 
 
 class TestEndpointResolveStatus:
@@ -21,3 +22,12 @@ class TestEndpointResolveStatus:
         ep.routings = []
         result = await ep.resolve_status(info)
         assert result == EndpointStatus.DEGRADED
+
+    async def test_all_inactive_routings_returns_unhealthy(self, info: MagicMock) -> None:
+        routing = MagicMock()
+        routing.status = RouteStatus.TERMINATED.name
+        ep = Endpoint()
+        ep.lifecycle_stage = EndpointLifecycle.READY.name
+        ep.routings = [routing]
+        result = await ep.resolve_status(info)
+        assert result == EndpointStatus.UNHEALTHY
