@@ -17,6 +17,10 @@ Changes
 <!-- towncrier release notes start -->
 
 ## 26.4.1 (2026-04-10)
+No significant changes.
+
+
+## 26.4.1 (2026-04-10)
 
 ### Fixes
 * Fix Pydantic validation error when creating ModelCard with null framework, label, or accessLevel fields via GraphQL ([#10921](https://github.com/lablup/backend.ai/issues/10921))
