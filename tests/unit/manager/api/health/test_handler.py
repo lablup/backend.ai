@@ -23,6 +23,7 @@ from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.manager import __version__
 from ai.backend.manager.api.rest.health.handler import HealthHandler
 from ai.backend.manager.api.rest.internal.health.handler import InternalHealthHandler
+from ai.backend.manager.dto.context import RequestCtx
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -35,6 +36,14 @@ def mock_request() -> MagicMock:
     req = MagicMock(spec=web.Request)
     req.__setitem__ = MagicMock()
     return req
+
+
+@pytest.fixture
+def mock_request_ctx(mock_request: MagicMock) -> MagicMock:
+    """RequestCtx mock wrapping the mock request."""
+    ctx = MagicMock(spec=RequestCtx)
+    ctx.request = mock_request
+    return ctx
 
 
 @pytest.fixture
@@ -98,10 +107,10 @@ class TestPublicHealthHandler:
     async def test_returns_200_with_status_ok(
         self,
         handler: HealthHandler,
-        mock_request: MagicMock,
+        mock_request_ctx: MagicMock,
     ) -> None:
         """Verify hello returns HTTP 200 with status=ok and version."""
-        response = await handler.hello(mock_request)
+        response = await handler.hello(mock_request_ctx)
 
         assert response.status == 200
         assert isinstance(response.body, bytes)
@@ -113,19 +122,20 @@ class TestPublicHealthHandler:
         self,
         handler: HealthHandler,
         mock_request: MagicMock,
+        mock_request_ctx: MagicMock,
     ) -> None:
         """Verify hello sets do_not_print_access_log flag on the request."""
-        await handler.hello(mock_request)
+        await handler.hello(mock_request_ctx)
 
         mock_request.__setitem__.assert_called_once_with("do_not_print_access_log", True)
 
     async def test_no_connectivity_field(
         self,
         handler: HealthHandler,
-        mock_request: MagicMock,
+        mock_request_ctx: MagicMock,
     ) -> None:
         """Verify hello does NOT include connectivity field (no HealthProbe call)."""
-        response = await handler.hello(mock_request)
+        response = await handler.hello(mock_request_ctx)
 
         assert isinstance(response.body, bytes)
         body = json.loads(response.body)
@@ -134,12 +144,12 @@ class TestPublicHealthHandler:
     async def test_no_external_io(
         self,
         handler: HealthHandler,
-        mock_request: MagicMock,
+        mock_request_ctx: MagicMock,
     ) -> None:
         """Verify hello completes without any external I/O (no AsyncMock calls)."""
         # If any async call occurred, it would fail here without an event loop issue
         # The handler should be synchronous in effect — just return a static response
-        response = await handler.hello(mock_request)
+        response = await handler.hello(mock_request_ctx)
 
         assert isinstance(response, web.Response)
 
@@ -159,10 +169,10 @@ class TestInternalHealthHandler:
     async def test_returns_200_with_connectivity_field(
         self,
         handler: InternalHealthHandler,
-        mock_request: MagicMock,
+        mock_request_ctx: MagicMock,
     ) -> None:
         """Verify hello returns JSON with connectivity field."""
-        response = await handler.hello(mock_request)
+        response = await handler.hello(mock_request_ctx)
 
         assert response.status == 200
         assert isinstance(response.body, bytes)
@@ -173,10 +183,10 @@ class TestInternalHealthHandler:
     async def test_healthy_probe_returns_status_ok(
         self,
         handler: InternalHealthHandler,
-        mock_request: MagicMock,
+        mock_request_ctx: MagicMock,
     ) -> None:
         """Verify status=ok when HealthProbe reports all components healthy."""
-        response = await handler.hello(mock_request)
+        response = await handler.hello(mock_request_ctx)
 
         assert isinstance(response.body, bytes)
         body = json.loads(response.body)
@@ -186,14 +196,14 @@ class TestInternalHealthHandler:
     async def test_degraded_probe_returns_status_degraded(
         self,
         mock_health_probe: MagicMock,
-        mock_request: MagicMock,
+        mock_request_ctx: MagicMock,
         degraded_connectivity: ConnectivityCheckResponse,
     ) -> None:
         """Verify status=degraded when HealthProbe reports an unhealthy component."""
         mock_health_probe.get_connectivity_status = AsyncMock(return_value=degraded_connectivity)
         handler = InternalHealthHandler(health_probe=mock_health_probe)
 
-        response = await handler.hello(mock_request)
+        response = await handler.hello(mock_request_ctx)
 
         assert isinstance(response.body, bytes)
         body = json.loads(response.body)
@@ -203,10 +213,10 @@ class TestInternalHealthHandler:
     async def test_includes_version_and_component(
         self,
         handler: InternalHealthHandler,
-        mock_request: MagicMock,
+        mock_request_ctx: MagicMock,
     ) -> None:
         """Verify hello includes version and component fields."""
-        response = await handler.hello(mock_request)
+        response = await handler.hello(mock_request_ctx)
 
         assert isinstance(response.body, bytes)
         body = json.loads(response.body)
@@ -217,31 +227,32 @@ class TestInternalHealthHandler:
         self,
         handler: InternalHealthHandler,
         mock_request: MagicMock,
+        mock_request_ctx: MagicMock,
     ) -> None:
         """Verify hello sets do_not_print_access_log flag on the request."""
-        await handler.hello(mock_request)
+        await handler.hello(mock_request_ctx)
 
         mock_request.__setitem__.assert_called_once_with("do_not_print_access_log", True)
 
     async def test_calls_health_probe_get_connectivity_status(
         self,
         handler: InternalHealthHandler,
-        mock_request: MagicMock,
+        mock_request_ctx: MagicMock,
         mock_health_probe: MagicMock,
     ) -> None:
         """Verify get_connectivity_status is called exactly once per request."""
-        await handler.hello(mock_request)
+        await handler.hello(mock_request_ctx)
 
         mock_health_probe.get_connectivity_status.assert_awaited_once()
 
     async def test_connectivity_checks_in_response(
         self,
         handler: InternalHealthHandler,
-        mock_request: MagicMock,
+        mock_request_ctx: MagicMock,
         healthy_connectivity: ConnectivityCheckResponse,
     ) -> None:
         """Verify connectivity_checks list is included in the response body."""
-        response = await handler.hello(mock_request)
+        response = await handler.hello(mock_request_ctx)
 
         assert isinstance(response.body, bytes)
         body = json.loads(response.body)
