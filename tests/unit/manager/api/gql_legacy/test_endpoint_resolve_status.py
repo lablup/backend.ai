@@ -15,9 +15,9 @@ class TestEndpointResolveStatus:
     def info(self) -> MagicMock:
         return MagicMock()
 
-    async def test_empty_routings_returns_unhealthy(self, info: MagicMock) -> None:
+    async def test_empty_routings_returns_degraded(self, info: MagicMock) -> None:
         ep = Endpoint()
         ep.lifecycle_stage = EndpointLifecycle.READY.name
         ep.routings = []
         result = await ep.resolve_status(info)
-        assert result == EndpointStatus.UNHEALTHY
+        assert result == EndpointStatus.DEGRADED
