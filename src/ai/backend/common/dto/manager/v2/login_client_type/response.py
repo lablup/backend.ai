@@ -12,7 +12,6 @@ from ai.backend.common.api_handlers import BaseResponseModel
 __all__ = (
     "CreateLoginClientTypePayload",
     "DeleteLoginClientTypePayload",
-    "ListLoginClientTypesPayload",
     "LoginClientTypeNode",
     "UpdateLoginClientTypePayload",
 )
@@ -44,9 +43,3 @@ class DeleteLoginClientTypePayload(BaseResponseModel):
     """Payload for login client type deletion."""
 
     id: UUID = Field(description="UUID of the deleted login client type.")
-
-
-class ListLoginClientTypesPayload(BaseResponseModel):
-    """Payload for listing all login client types."""
-
-    items: list[LoginClientTypeNode] = Field(description="All registered login client types.")
