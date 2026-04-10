@@ -26,10 +26,6 @@ __all__ = (
     "check",
     "etcd_config_iv",
     "merge",
-    "merge_config",
-    "merge_definition",
-    "merge_metadata",
-    "merge_service_config",
     "model_definition_iv",
     "override_key",
     "override_with_env",
@@ -348,7 +344,7 @@ def _pick(base_val: Any, override_val: Any, override_set: bool) -> Any:
     return override_val
 
 
-def merge_metadata(base: ModelMetadata, override: ModelMetadata) -> ModelMetadata:
+def _merge_metadata(base: ModelMetadata, override: ModelMetadata) -> ModelMetadata:
     """Merge two ModelMetadata instances. All fields are atomic."""
     s = override.model_fields_set
     return ModelMetadata.model_construct(
@@ -368,7 +364,7 @@ def merge_metadata(base: ModelMetadata, override: ModelMetadata) -> ModelMetadat
     )
 
 
-def merge_service_config(
+def _merge_service_config(
     base: ModelServiceConfig,
     override: ModelServiceConfig,
 ) -> ModelServiceConfig:
@@ -405,7 +401,7 @@ def merge_service_config(
     )
 
 
-def merge_config(base: ModelConfig, override: ModelConfig) -> ModelConfig:
+def _merge_config(base: ModelConfig, override: ModelConfig) -> ModelConfig:
     """Merge two ModelConfig instances.
 
     ``service`` and ``metadata`` sub-models are merged recursively;
@@ -414,12 +410,12 @@ def merge_config(base: ModelConfig, override: ModelConfig) -> ModelConfig:
     s = override.model_fields_set
     service: ModelServiceConfig | None
     if "service" in s and base.service is not None and override.service is not None:
-        service = merge_service_config(base.service, override.service)
+        service = _merge_service_config(base.service, override.service)
     else:
         service = _pick(base.service, override.service, "service" in s)
     metadata: ModelMetadata | None
     if "metadata" in s and base.metadata is not None and override.metadata is not None:
-        metadata = merge_metadata(base.metadata, override.metadata)
+        metadata = _merge_metadata(base.metadata, override.metadata)
     else:
         metadata = _pick(base.metadata, override.metadata, "metadata" in s)
     return ModelConfig.model_construct(
@@ -430,11 +426,11 @@ def merge_config(base: ModelConfig, override: ModelConfig) -> ModelConfig:
     )
 
 
-def merge_definition(base: ModelDefinition, override: ModelDefinition) -> ModelDefinition:
+def _merge_definition(base: ModelDefinition, override: ModelDefinition) -> ModelDefinition:
     """Merge two ModelDefinition instances.
 
     The ``models`` list is merged by index — each element pair is merged
-    via :func:`merge_config`.  All other fields are replaced atomically.
+    via :func:`_merge_config`.  All other fields are replaced atomically.
     """
     models: list[ModelConfig]
     if "models" not in override.model_fields_set:
@@ -449,7 +445,7 @@ def merge_definition(base: ModelDefinition, override: ModelDefinition) -> ModelD
             elif i >= len(override.models):
                 models.append(base.models[i])
             else:
-                models.append(merge_config(base.models[i], override.models[i]))
+                models.append(_merge_config(base.models[i], override.models[i]))
     return ModelDefinition.model_construct(models=models)
 
 
@@ -461,7 +457,7 @@ class ModelDefinition(BaseConfigModel):
 
     def merge(self, override: ModelDefinition) -> ModelDefinition:
         """Merge the given override into this definition, returning a new instance."""
-        return merge_definition(self, override)
+        return _merge_definition(self, override)
 
     def health_check_config(self) -> ModelHealthCheck | None:
         for model in self.models:

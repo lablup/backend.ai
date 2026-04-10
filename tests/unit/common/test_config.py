@@ -9,11 +9,11 @@ from ai.backend.common.config import (
     ModelHealthCheck,
     ModelMetadata,
     ModelServiceConfig,
+    _merge_config,
+    _merge_definition,
+    _merge_metadata,
+    _merge_service_config,
     merge,
-    merge_config,
-    merge_definition,
-    merge_metadata,
-    merge_service_config,
     override_key,
 )
 
@@ -93,9 +93,9 @@ class TestMergeFieldCoverage:
             min_resource={"base": 1},
         )
         override = ModelMetadata.model_construct(_fields_set=set())
-        result = merge_metadata(base, override)
+        result = _merge_metadata(base, override)
         missing = set(ModelMetadata.model_fields) - result.model_fields_set
-        assert not missing, f"merge_metadata() does not handle: {missing}"
+        assert not missing, f"_merge_metadata() does not handle: {missing}"
 
     def test_merge_service_config(self) -> None:
         base = ModelServiceConfig.model_construct(
@@ -114,9 +114,9 @@ class TestMergeFieldCoverage:
             port=2,
             health_check=None,
         )
-        result = merge_service_config(base, override)
+        result = _merge_service_config(base, override)
         missing = set(ModelServiceConfig.model_fields) - result.model_fields_set
-        assert not missing, f"merge_service_config() does not handle: {missing}"
+        assert not missing, f"_merge_service_config() does not handle: {missing}"
 
     def test_merge_service_config_health_check_subfields(self) -> None:
         base_hc = ModelHealthCheck.model_construct(
@@ -144,7 +144,7 @@ class TestMergeFieldCoverage:
             port=2,
             health_check=override_hc,
         )
-        result = merge_service_config(base, override)
+        result = _merge_service_config(base, override)
         assert result.health_check is not None
         missing = set(ModelHealthCheck.model_fields) - result.health_check.model_fields_set
         assert not missing, f"health_check merge does not handle: {missing}"
@@ -162,9 +162,9 @@ class TestMergeFieldCoverage:
             name="",
             model_path="",
         )
-        result = merge_config(base, override)
+        result = _merge_config(base, override)
         missing = set(ModelConfig.model_fields) - result.model_fields_set
-        assert not missing, f"merge_config() does not handle: {missing}"
+        assert not missing, f"_merge_config() does not handle: {missing}"
 
     def test_merge_definition(self) -> None:
         base = ModelDefinition.model_construct(
@@ -172,9 +172,9 @@ class TestMergeFieldCoverage:
             models=[],
         )
         override = ModelDefinition.model_construct(_fields_set=set())
-        result = merge_definition(base, override)
+        result = _merge_definition(base, override)
         missing = set(ModelDefinition.model_fields) - result.model_fields_set
-        assert not missing, f"merge_definition() does not handle: {missing}"
+        assert not missing, f"_merge_definition() does not handle: {missing}"
 
 
 def test_sanitize_inline_dicts() -> None:
