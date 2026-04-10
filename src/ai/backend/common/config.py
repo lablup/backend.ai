@@ -338,8 +338,12 @@ class ModelConfig(BaseConfigModel):
 
 
 def _pick(base_val: Any, override_val: Any, override_set: bool) -> Any:
-    """Return the override value if explicitly set and non-None, otherwise the base."""
-    if not override_set or override_val is None:
+    """Return the override value if explicitly set, otherwise the base.
+
+    Distinguishes between unset (not in model_fields_set → keep base)
+    and explicitly set to None (in model_fields_set → replace with None).
+    """
+    if not override_set:
         return base_val
     return override_val
 
@@ -433,9 +437,9 @@ def merge_definition(base: ModelDefinition, override: ModelDefinition) -> ModelD
     via :func:`merge_config`.  All other fields are replaced atomically.
     """
     models: list[ModelConfig]
-    if "models" not in override.model_fields_set or not override.models:
+    if "models" not in override.model_fields_set:
         models = base.models
-    elif not base.models:
+    elif not base.models or not override.models:
         models = override.models
     else:
         models = []
