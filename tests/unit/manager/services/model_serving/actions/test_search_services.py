@@ -234,7 +234,7 @@ class TestSearchServices:
                     open_to_public=False,
                     resource_slots=resource_slots,
                     resource_group="nvidia-H100",
-                    routings=None,
+                    routings=[],
                 ),
             ],
             total_count=1,
@@ -280,7 +280,7 @@ class TestSearchServices:
                     open_to_public=True,
                     resource_slots=ResourceSlot({"cpu": "2"}),
                     resource_group="default",
-                    routings=None,
+                    routings=[],
                 ),
             ],
             total_count=1,
@@ -319,7 +319,7 @@ class TestSearchServices:
                 open_to_public=False,
                 resource_slots=ResourceSlot({"cpu": "1"}),
                 resource_group="default",
-                routings=None,
+                routings=[],
             )
             for i in range(5)
         ]
@@ -363,7 +363,7 @@ class TestSearchServices:
                     open_to_public=False,
                     resource_slots=ResourceSlot({"cpu": "4", "cuda.shares": "2.5"}),
                     resource_group="gpu-cluster",
-                    routings=None,
+                    routings=[],
                 ),
             ],
             total_count=1,
