@@ -871,7 +871,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
                 return EndpointStatus.DESTROYING
             case _:
                 if not self.routings:
-                    return EndpointStatus.UNHEALTHY
+                    return EndpointStatus.DEGRADED
                 active_route_status_names = {s.name for s in RouteStatus.active_route_statuses()}
                 active_routings = [
                     r for r in self.routings if r.status in active_route_status_names
