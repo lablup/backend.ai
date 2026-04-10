@@ -5231,6 +5231,15 @@ input ModelCardV2Filter {
   Filter by the storage host backing the model card's VFolder. Matches via an EXISTS subquery against the VFolder host column.
   """
   storageHost: StringFilter = null
+
+  """Combine nested filters with logical AND."""
+  AND: [ModelCardV2Filter!] = null
+
+  """Combine nested filters with logical OR."""
+  OR: [ModelCardV2Filter!] = null
+
+  """Negate the combined result of nested filters."""
+  NOT: [ModelCardV2Filter!] = null
 }
 
 """
