@@ -8,6 +8,7 @@ from aiohttp import web
 
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.manager import __version__
+from ai.backend.manager.dto.context import RequestCtx
 
 if TYPE_CHECKING:
     from ai.backend.common.health_checker.probe import HealthProbe
@@ -19,9 +20,9 @@ class InternalHealthHandler:
     def __init__(self, *, health_probe: HealthProbe) -> None:
         self._health_probe = health_probe
 
-    async def hello(self, request: web.Request) -> web.Response:
+    async def hello(self, request_ctx: RequestCtx) -> web.Response:
         """Internal health check endpoint with full dependency connectivity status."""
-        request["do_not_print_access_log"] = True
+        request_ctx.request["do_not_print_access_log"] = True
         connectivity = await self._health_probe.get_connectivity_status()
         response = HealthResponse(
             status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
