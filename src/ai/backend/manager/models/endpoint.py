@@ -589,7 +589,9 @@ class EndpointRow(Base):
             lifecycle_stage=self.lifecycle_stage,
             runtime_variant=self.runtime_variant,
             extra_mounts=self.extra_mounts,
-            routings=[routing.to_data() for routing in self.routings] if self.routings else None,
+            routings=[routing.to_data() for routing in self.routings]
+            if self.routings is not None
+            else None,
         )
 
     @classmethod
