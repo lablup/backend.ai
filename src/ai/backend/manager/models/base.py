@@ -117,20 +117,28 @@ class FixtureOpModes(enum.StrEnum):
 
 @dataclass(frozen=True)
 class FixtureReferenceSpec:
-    source_column: str
-    target_column: str
+    """Declarative spec for resolving a human-friendly alias in a fixture row
+    into a value looked up from another table.
+
+    For each matching fixture row, the value in `fixture_alias_column` is
+    looked up against `lookup_table.lookup_match_column`, and the resulting
+    `lookup_table.lookup_value_column` is written into `fixture_fk_column`.
+    """
+
+    fixture_alias_column: str
+    fixture_fk_column: str
     lookup_table: str
-    lookup_column: str
-    value_column: str = "id"
+    lookup_match_column: str
+    lookup_value_column: str = "id"
 
 
 FIXTURE_REFERENCE_SPECS: Final[Mapping[str, Sequence[FixtureReferenceSpec]]] = {
     "runtime_variant_presets": (
         FixtureReferenceSpec(
-            source_column="runtime_variant_name",
-            target_column="runtime_variant",
+            fixture_alias_column="runtime_variant_name",
+            fixture_fk_column="runtime_variant",
             lookup_table="runtime_variants",
-            lookup_column="name",
+            lookup_match_column="name",
         ),
     ),
 }
@@ -988,46 +996,52 @@ async def _resolve_fixture_reference(
     rows: Sequence[dict[str, Any]],
     reference_spec: FixtureReferenceSpec,
 ) -> None:
-    # Pop source_column from every row, collecting rows that need resolution.
+    # Pop alias column from every row, collecting rows that still need a resolved FK.
     rows_to_resolve: list[tuple[dict[str, Any], str]] = []
     for row in rows:
-        source_value = row.pop(reference_spec.source_column, None)
-        if source_value is not None and reference_spec.target_column not in row:
-            rows_to_resolve.append((row, cast(str, source_value)))
+        alias_value = row.pop(reference_spec.fixture_alias_column, None)
+        if alias_value is not None and reference_spec.fixture_fk_column not in row:
+            rows_to_resolve.append((row, cast(str, alias_value)))
 
     if not rows_to_resolve:
         return
 
-    source_values = {sv for _, sv in rows_to_resolve}
+    alias_values = {alias for _, alias in rows_to_resolve}
 
     lookup_table = metadata.tables.get(reference_spec.lookup_table)
     if lookup_table is None:
         raise DataTransformationFailed(f"Table {reference_spec.lookup_table} not found in metadata")
 
-    lookup_column = lookup_table.columns.get(reference_spec.lookup_column)
-    if lookup_column is None:
+    match_column = lookup_table.columns.get(reference_spec.lookup_match_column)
+    if match_column is None:
         raise DataTransformationFailed(
-            f"Column {reference_spec.lookup_table}.{reference_spec.lookup_column} not found in metadata"
+            f"Column {reference_spec.lookup_table}.{reference_spec.lookup_match_column} "
+            "not found in metadata"
         )
-    value_column = lookup_table.columns.get(reference_spec.value_column)
+    value_column = lookup_table.columns.get(reference_spec.lookup_value_column)
     if value_column is None:
         raise DataTransformationFailed(
-            f"Column {reference_spec.lookup_table}.{reference_spec.value_column} not found in metadata"
+            f"Column {reference_spec.lookup_table}.{reference_spec.lookup_value_column} "
+            "not found in metadata"
         )
 
     result = await conn.execute(
-        sa.select(lookup_column, value_column).where(lookup_column.in_(source_values))
+        sa.select(match_column, value_column).where(match_column.in_(alias_values))
     )
-    resolved_values = {source_value: resolved_value for source_value, resolved_value in result}
-    missing_values = sorted(source_values - resolved_values.keys())
+    # Access via `_mapping` with column objects so that match/value being the same
+    # column still yields the expected identity mapping.
+    resolved_values: dict[str, Any] = {
+        row._mapping[match_column]: row._mapping[value_column] for row in result
+    }
+    missing_values = sorted(alias_values - resolved_values.keys())
     if missing_values:
         raise DataTransformationFailed(
-            f"Unknown {reference_spec.source_column} in fixture for {table.name}: "
+            f"Unknown {reference_spec.fixture_alias_column} in fixture for {table.name}: "
             + ", ".join(missing_values)
         )
 
-    for row, source_value in rows_to_resolve:
-        row[reference_spec.target_column] = resolved_values[source_value]
+    for row, alias_value in rows_to_resolve:
+        row[reference_spec.fixture_fk_column] = resolved_values[alias_value]
 
 
 class DecimalType(TypeDecorator[Decimal], Decimal):
