@@ -1,0 +1,375 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.backend.ai/schemas/model-definition.schema.json",
+  "title": "Backend.AI Model Definition",
+  "description": "Defines models, their service configurations, and metadata for Backend.AI model serving.",
+  "type": "object",
+  "required": [
+    "models"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "models": {
+      "type": "array",
+      "description": "List of models in the model definition.",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/ModelConfig"
+      }
+    }
+  },
+  "$defs": {
+    "ModelConfig": {
+      "type": "object",
+      "description": "Configuration for a single model.",
+      "required": [
+        "name",
+        "model_path"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the model.",
+          "examples": [
+            "my_model"
+          ]
+        },
+        "model_path": {
+          "type": "string",
+          "description": "Path to the model file or directory.",
+          "examples": [
+            "/models/my_model"
+          ]
+        },
+        "service": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ModelServiceConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Configuration for the model service. Required if this model should be served."
+        },
+        "metadata": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ModelMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Metadata about the model."
+        }
+      }
+    },
+    "ModelServiceConfig": {
+      "type": "object",
+      "description": "Service configuration that defines how to start and monitor the model service.",
+      "required": [
+        "start_command",
+        "port"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "pre_start_actions": {
+          "type": "array",
+          "description": "List of pre-start actions to execute before starting the model service.",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PreStartAction"
+          }
+        },
+        "start_command": {
+          "description": "Command to start the model service. Can be a string (executed via shell) or an array of arguments.",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ],
+          "examples": [
+            "python service.py",
+            [
+              "python",
+              "service.py"
+            ]
+          ]
+        },
+        "shell": {
+          "type": "string",
+          "description": "Shell to use when start_command is a string.",
+          "default": "/bin/bash",
+          "examples": [
+            "/bin/bash",
+            "/bin/sh"
+          ]
+        },
+        "port": {
+          "type": "integer",
+          "description": "Port number for the model service.",
+          "exclusiveMinimum": 1,
+          "examples": [
+            8080
+          ]
+        },
+        "health_check": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ModelHealthCheck"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Health check configuration for the model service."
+        }
+      }
+    },
+    "PreStartAction": {
+      "type": "object",
+      "description": "An action to execute before starting the model service.",
+      "required": [
+        "action"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "The name of the pre-start action to execute.",
+          "examples": [
+            "write_file",
+            "run_command"
+          ]
+        },
+        "args": {
+          "type": "object",
+          "description": "Arguments for the pre-start action.",
+          "default": {},
+          "additionalProperties": true,
+          "examples": [
+            {
+              "arg1": "value1",
+              "arg2": "value2"
+            }
+          ]
+        }
+      }
+    },
+    "ModelHealthCheck": {
+      "type": "object",
+      "description": "Configuration for periodic health checks of the model service.",
+      "required": [
+        "path"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "HTTP path to check for health status.",
+          "examples": [
+            "/health",
+            "/v1/health"
+          ]
+        },
+        "interval": {
+          "type": "number",
+          "description": "Interval in seconds between health checks.",
+          "default": 10.0,
+          "minimum": 0,
+          "examples": [
+            10.0
+          ]
+        },
+        "max_retries": {
+          "type": "integer",
+          "description": "Maximum number of retries for health check before marking unhealthy.",
+          "default": 10,
+          "minimum": 1,
+          "examples": [
+            10
+          ]
+        },
+        "max_wait_time": {
+          "type": "number",
+          "description": "Maximum time in seconds to wait for a single health check response.",
+          "default": 15.0,
+          "minimum": 0,
+          "examples": [
+            15.0
+          ]
+        },
+        "expected_status_code": {
+          "type": "integer",
+          "description": "Expected HTTP status code for a healthy response.",
+          "default": 200,
+          "minimum": 100,
+          "examples": [
+            200
+          ]
+        },
+        "initial_delay": {
+          "type": "number",
+          "description": "Initial delay in seconds before the first health check.",
+          "default": 60.0,
+          "minimum": 0,
+          "examples": [
+            60.0
+          ]
+        }
+      }
+    },
+    "ModelMetadata": {
+      "type": "object",
+      "description": "Metadata describing the model.",
+      "additionalProperties": true,
+      "properties": {
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Author of the model.",
+          "default": null,
+          "examples": [
+            "John Doe"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Display title of the model.",
+          "default": null
+        },
+        "version": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Version of the model.",
+          "default": null
+        },
+        "created": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Creation date of the model.",
+          "default": null
+        },
+        "last_modified": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Last modification date of the model.",
+          "default": null
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Description of the model.",
+          "default": null
+        },
+        "task": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Task type the model is designed for (e.g., text-generation, image-classification).",
+          "default": null
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Category of the model.",
+          "default": null
+        },
+        "architecture": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Model architecture (e.g., transformer, cnn).",
+          "default": null
+        },
+        "framework": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Frameworks used by the model (e.g., pytorch, tensorflow).",
+          "default": null
+        },
+        "label": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Labels/tags for the model.",
+          "default": null
+        },
+        "license": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "License of the model.",
+          "default": null
+        },
+        "min_resource": {
+          "oneOf": [
+            {
+              "type": "object",
+              "description": "Minimum resource requirements (e.g., {\"cpu\": 4, \"mem\": \"16g\", \"cuda.shares\": 1}).",
+              "additionalProperties": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Minimum resource requirements for the model.",
+          "default": null
+        }
+      }
+    }
+  }
+}

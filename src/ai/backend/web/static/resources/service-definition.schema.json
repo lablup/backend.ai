@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.backend.ai/schemas/service-definition.schema.json",
+  "title": "Backend.AI Service Definition",
+  "description": "Defines a service that can be launched inside a Backend.AI container. Stored as JSON files in /etc/backend.ai/service-defs/.",
+  "type": "object",
+  "required": [
+    "command"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "command": {
+      "description": "Command to start the service. Can be a string (executed via shell) or an array of arguments.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ],
+      "examples": [
+        "jupyter lab --no-browser",
+        [
+          "python",
+          "-m",
+          "http.server",
+          "8080"
+        ]
+      ]
+    },
+    "shell": {
+      "type": "string",
+      "description": "Shell to use when command is a string.",
+      "default": "bash",
+      "examples": [
+        "bash",
+        "sh"
+      ]
+    },
+    "noop": {
+      "type": "boolean",
+      "description": "If true, the service is a no-op and will not actually start any process.",
+      "default": false
+    },
+    "url_template": {
+      "type": "string",
+      "description": "URL template for accessing the service. Supports variable interpolation with {host}, {port}, etc.",
+      "default": "",
+      "examples": [
+        "http://{host}:{port}/",
+        "http://{host}:{port}/?token={token}"
+      ]
+    },
+    "prestart": {
+      "type": "array",
+      "description": "List of actions to execute before starting the service.",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Action"
+      }
+    },
+    "env": {
+      "type": "object",
+      "description": "Environment variables to set for the service.",
+      "default": {},
+      "additionalProperties": {
+        "type": "string"
+      },
+      "examples": [
+        {
+          "MY_VAR": "value"
+        }
+      ]
+    },
+    "allowed_envs": {
+      "type": "array",
+      "description": "List of environment variable names that users are allowed to override.",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "examples": [
+        [
+          "JUPYTER_TOKEN",
+          "LANG"
+        ]
+      ]
+    },
+    "allowed_arguments": {
+      "type": "array",
+      "description": "List of argument names that users are allowed to pass.",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "examples": [
+        [
+          "--port",
+          "--debug"
+        ]
+      ]
+    },
+    "default_arguments": {
+      "type": "object",
+      "description": "Default argument values. Each value can be null, a string, or a list of strings.",
+      "default": {},
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "string"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "examples": [
+        {
+          "--port": "8080",
+          "--debug": null
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "Action": {
+      "type": "object",
+      "description": "A pre-start action to execute before the service starts.",
+      "required": [
+        "action",
+        "args"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "The name of the action to execute (must be a function in service_actions module).",
+          "examples": [
+            "write_file",
+            "run_command"
+          ]
+        },
+        "args": {
+          "type": "object",
+          "description": "Keyword arguments passed to the action function.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Variable name to store the action's return value for later interpolation.",
+          "default": null
+        }
+      }
+    }
+  }
+}
