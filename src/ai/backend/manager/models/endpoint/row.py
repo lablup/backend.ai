@@ -709,7 +709,7 @@ class EndpointRow(Base):  # type: ignore[misc]
                 else RuntimeVariant("custom")
             ),
             extra_mounts=current_rev.extra_mounts if current_rev else [],
-            routings=[routing.to_data() for routing in self.routings] if self.routings else None,
+            routings=[routing.to_data() for routing in self.routings] if self.routings is not None else None,
         )
 
     @classmethod
