@@ -584,6 +584,37 @@ class InstallReport(Static):
                 """
                     )
                 )
+            if service.sftp_agent_enabled:
+                with TabPane("SFTP Agent", id="sftp-agent"):
+                    yield Markdown(
+                        textwrap.dedent(
+                            f"""
+                A dedicated SFTP agent has been configured alongside the
+                regular compute agent, assigned to the
+                `{service.sftp_agent_scaling_group}` scaling group.
+
+                Start it in a separate shell (or via the `./dev` helper):
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./dev start sftp-agent
+                ```
+
+                Or run the agent process directly against the SFTP config:
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backendai-agent ag start-server -f agent-sftp.toml
+                ```
+
+                The SFTP agent listens on:
+                - RPC:     `{service.sftp_agent_rpc_addr.bind.host}:{service.sftp_agent_rpc_addr.bind.port}`
+                - Watcher: `{service.sftp_agent_watcher_addr.bind.host}:{service.sftp_agent_watcher_addr.bind.port}`
+
+                SFTP upload sessions created via the web UI will be routed
+                to this agent; regular compute sessions continue to run on
+                the primary agent.
+                """
+                        )
+                    )
 
 
 class ModeMenu(Static):
@@ -645,6 +676,7 @@ class ModeMenu(Static):
             use_wildcard_binding=args.use_wildcard_binding,
             otel_endpoint=args.otel_endpoint,
             metric_access_cidr=args.metric_access_cidr,
+            with_sftp_agent=args.with_sftp_agent,
         )
 
     def compose(self) -> ComposeResult:

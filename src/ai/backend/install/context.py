@@ -567,6 +567,11 @@ class Context(metaclass=ABCMeta):
                 "exposed_volume_info": "percentage",
             },
         }
+        # When a dedicated SFTP agent is configured, point the storage proxy's
+        # sftp_scaling_groups at that agent's scaling group so that SFTP
+        # upload sessions get routed through it.
+        if service.sftp_agent_enabled:
+            data["volumes"]["sftp_scaling_groups"] = service.sftp_agent_scaling_group
         await self.etcd_put_json("", data)
         data = {}
         # TODO: in dev-mode, enable these.
@@ -684,6 +689,119 @@ class Context(metaclass=ABCMeta):
                 'endpoint = "http://127.0.0.1:4317"',
                 f'endpoint = "{self.install_variable.otel_endpoint}"',
             )
+
+    async def configure_sftp_agent(self) -> None:
+        """
+        Configure an optional dedicated SFTP agent alongside the regular
+        compute agent. This is gated by ``install_variable.with_sftp_agent``
+        and piggybacks on Backend.AI's multi-agent-per-node feature.
+
+        The SFTP agent uses the same ``agent.toml`` template but we copy it
+        to ``agent-sftp.toml`` and override the fields that would otherwise
+        collide with the primary agent: rpc/watcher ports, pid-file,
+        agent-sock-port, ipc/var base paths, pyroscope app-name, container
+        port-range, and (most importantly) the ``scaling-group`` which is
+        set to the dedicated ``upload`` group. The ``default`` scaling group
+        is expected to live on the primary agent, which serves compute
+        workloads, and the ``upload`` scaling group is used by Backend.AI
+        to route SFTP upload sessions.
+        """
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+        if not service.sftp_agent_enabled:
+            return
+
+        # Copy the bundled agent.toml to a distinct destination for the SFTP
+        # agent without clobbering the primary agent.toml that configure_agent
+        # has already written.
+        with self.resource_path("ai.backend.install.configs", "agent.toml") as src_path:
+            dst_path = Path.cwd() / "agent-sftp.toml"
+            shutil.copy(src_path, dst_path)
+
+        Path(service.sftp_agent_var_base_path).mkdir(parents=True, exist_ok=True)
+
+        # The primary configure_agent uses simple port literal substitution
+        # (e.g. "port = 6001") which would be ambiguous here because the
+        # template has multiple occurrences of the same literal we'd be
+        # overwriting in-place. Instead, scope each replacement by the
+        # preceding attribute name using regex with re.MULTILINE so we
+        # always target exactly one line per field.
+        pyroscope_app_name = "backendai-half-sftp-agent"
+        self.sed_in_place_multi(
+            dst_path,
+            [
+                # etcd addr stays the same as the primary agent
+                ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
+                # [agent] rpc-listen-addr
+                (
+                    re.compile(r"^rpc-listen-addr = .*", flags=re.MULTILINE),
+                    (
+                        f'rpc-listen-addr = {{ host = "{service.sftp_agent_rpc_addr.bind.host}",'
+                        f" port = {service.sftp_agent_rpc_addr.bind.port} }}"
+                    ),
+                ),
+                # [agent] agent-sock-port — must not collide with primary (default 6007)
+                (
+                    re.compile(r"^agent-sock-port = .*", flags=re.MULTILINE),
+                    "agent-sock-port = 6017",
+                ),
+                # [agent] pid-file — must not collide with primary agent's ./agent.pid
+                (
+                    re.compile(r"^pid-file = .*", flags=re.MULTILINE),
+                    'pid-file = "./agent-sftp.pid"',
+                ),
+                # [agent] scaling-group — the whole point of this function
+                (
+                    re.compile(r"^scaling-group = .*", flags=re.MULTILINE),
+                    f'scaling-group = "{service.sftp_agent_scaling_group}"',
+                ),
+                # [agent] id — give the SFTP agent a distinguishable id so
+                # the manager doesn't treat both agent processes as the same
+                # heartbeat source.
+                (
+                    re.compile(r"^(# )?id = .*", flags=re.MULTILINE),
+                    'id = "i-local-sftp"',
+                ),
+                # [agent] ipc-base-path
+                (
+                    re.compile(r"^(# )?ipc-base-path = .*", flags=re.MULTILINE),
+                    f'ipc-base-path = "{service.sftp_agent_ipc_base_path}"',
+                ),
+                # [agent] var-base-path
+                (
+                    re.compile(r"^(# )?var-base-path = .*", flags=re.MULTILINE),
+                    f'var-base-path = "{service.sftp_agent_var_base_path}"',
+                ),
+                # [agent] mount-path — share the same vfolder root as the
+                # primary agent so that uploaded files are visible.
+                (
+                    re.compile(r"^mount-path = .*", flags=re.MULTILINE),
+                    f'mount-path = "{self.install_info.base_path / service.vfolder_relpath}"',
+                ),
+                # [container] port-range — must not overlap with the primary
+                # agent's default 30000-31000.
+                (
+                    re.compile(r"^port-range = .*", flags=re.MULTILINE),
+                    "port-range = [31100, 31200]",
+                ),
+                # [watcher] service-addr
+                (
+                    re.compile(
+                        r'^service-addr = \{ host = "127.0.0.1", port = 6009 \}',
+                        flags=re.MULTILINE,
+                    ),
+                    (
+                        f'service-addr = {{ host = "{service.sftp_agent_watcher_addr.bind.host}",'
+                        f" port = {service.sftp_agent_watcher_addr.bind.port} }}"
+                    ),
+                ),
+                # [pyroscope] app-name — differentiate from primary agent.
+                (
+                    re.compile(r'^app-name = "backendai-half-agent"', flags=re.MULTILINE),
+                    f'app-name = "{pyroscope_app_name}"',
+                ),
+            ],
+        )
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -1137,6 +1255,51 @@ class Context(metaclass=ABCMeta):
                 )
             await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
 
+    async def configure_sftp_agent_fixture(self) -> None:
+        """
+        Register the dedicated SFTP scaling group and associate it with the
+        default domain. This is only populated when the user passed
+        ``--with-sftp-agent`` — it mirrors the ``sgroups_for_domains``
+        association in ``example-users.json`` for the default scaling group.
+        """
+        service = self.install_info.service_config
+        if not service.sftp_agent_enabled:
+            return
+
+        self.log_header(
+            f"Registering '{service.sftp_agent_scaling_group}' scaling group for SFTP agent..."
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fixture_path = Path(tmpdir) / "fixture.json"
+            with fixture_path.open("w") as fw:
+                fw.write(
+                    json.dumps({
+                        "scaling_groups": [
+                            {
+                                "name": service.sftp_agent_scaling_group,
+                                "description": "Scaling group dedicated to SFTP upload sessions",
+                                "is_active": True,
+                                "driver": "static",
+                                "driver_opts": {},
+                                "scheduler": "fifo",
+                                "scheduler_opts": {},
+                                "wsproxy_addr": (
+                                    f"http://{service.appproxy_coordinator_addr.face.host}"
+                                    f":{service.appproxy_coordinator_addr.face.port}"
+                                ),
+                                "wsproxy_api_token": service.appproxy_api_secret,
+                            }
+                        ],
+                        "sgroups_for_domains": [
+                            {
+                                "scaling_group": service.sftp_agent_scaling_group,
+                                "domain": "default",
+                            }
+                        ],
+                    })
+                )
+            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
+
     async def configure_client(self) -> None:
         # TODO: add an option to generate keypairs
         base_path = self.install_info.base_path
@@ -1389,6 +1552,12 @@ class DevContext(Context):
             appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
             appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
             appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
+            sftp_agent_enabled=self.install_variable.with_sftp_agent,
+            sftp_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6013)),
+            sftp_agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6015)),
+            sftp_agent_ipc_base_path="ipc/agent-sftp",
+            sftp_agent_var_base_path="var/agent-sftp",
+            sftp_agent_scaling_group="upload",
         )
 
         return InstallInfo(
@@ -1453,6 +1622,10 @@ class DevContext(Context):
         self.log_header("Configuring agent...")
         await self.configure_agent()
 
+        if self.install_variable.with_sftp_agent:
+            self.log_header("Configuring dedicated SFTP agent...")
+            await self.configure_sftp_agent()
+
         self.log_header("Initializing app-proxy database...")
         await self.install_appproxy_db()
 
@@ -1469,6 +1642,9 @@ class DevContext(Context):
         self.log_header("Configuring app-proxy...")
         await self.configure_appproxy()
         await self.configure_appproxy_fixture()
+
+        if self.install_variable.with_sftp_agent:
+            await self.configure_sftp_agent_fixture()
 
         self.log_header("Generating client environ configs...")
         await self.configure_client()

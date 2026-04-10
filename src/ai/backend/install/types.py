@@ -76,6 +76,7 @@ class CliArgs:
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
+    with_sftp_agent: bool = False
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -204,6 +205,17 @@ class ServiceConfig:
     appproxy_tcp_worker_addr: ServerAddr = dataclasses.field(
         default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10202))
     )
+    # Optional dedicated SFTP agent (multi-agent per node)
+    sftp_agent_enabled: bool = False
+    sftp_agent_rpc_addr: ServerAddr = dataclasses.field(
+        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 6013))
+    )
+    sftp_agent_watcher_addr: ServerAddr = dataclasses.field(
+        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 6015))
+    )
+    sftp_agent_ipc_base_path: str = "ipc/agent-sftp"
+    sftp_agent_var_base_path: str = "var/agent-sftp"
+    sftp_agent_scaling_group: str = "upload"
 
 
 @dataclasses.dataclass
@@ -218,6 +230,7 @@ class InstallVariable:
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
+    with_sftp_agent: bool = False
 
     @property
     def apphub_address(self) -> str:
