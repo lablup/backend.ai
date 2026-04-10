@@ -122,14 +122,16 @@ class FixtureReferenceSpec:
 
     For each matching fixture row, the value in `fixture_alias_column` is
     looked up against `lookup_table.lookup_match_column`, and the resulting
-    `lookup_table.lookup_value_column` is written into `fixture_fk_column`.
+    `lookup_table.lookup_referenced_column` is written into `fixture_fk_column`.
+    In SQL terms, the fixture's FK column ends up referencing
+    `lookup_table(lookup_referenced_column)`.
     """
 
     fixture_alias_column: str
     fixture_fk_column: str
     lookup_table: str
     lookup_match_column: str
-    lookup_value_column: str = "id"
+    lookup_referenced_column: str
 
 
 FIXTURE_REFERENCE_SPECS: Final[Mapping[str, Sequence[FixtureReferenceSpec]]] = {
@@ -139,6 +141,7 @@ FIXTURE_REFERENCE_SPECS: Final[Mapping[str, Sequence[FixtureReferenceSpec]]] = {
             fixture_fk_column="runtime_variant",
             lookup_table="runtime_variants",
             lookup_match_column="name",
+            lookup_referenced_column="id",
         ),
     ),
 }
@@ -1018,20 +1021,20 @@ async def _resolve_fixture_reference(
             f"Column {reference_spec.lookup_table}.{reference_spec.lookup_match_column} "
             "not found in metadata"
         )
-    value_column = lookup_table.columns.get(reference_spec.lookup_value_column)
-    if value_column is None:
+    referenced_column = lookup_table.columns.get(reference_spec.lookup_referenced_column)
+    if referenced_column is None:
         raise DataTransformationFailed(
-            f"Column {reference_spec.lookup_table}.{reference_spec.lookup_value_column} "
+            f"Column {reference_spec.lookup_table}.{reference_spec.lookup_referenced_column} "
             "not found in metadata"
         )
 
     result = await conn.execute(
-        sa.select(match_column, value_column).where(match_column.in_(alias_values))
+        sa.select(match_column, referenced_column).where(match_column.in_(alias_values))
     )
-    # Access via `_mapping` with column objects so that match/value being the same
+    # Access via `_mapping` with column objects so that match/referenced being the same
     # column still yields the expected identity mapping.
     resolved_values: dict[str, Any] = {
-        row._mapping[match_column]: row._mapping[value_column] for row in result
+        row._mapping[match_column]: row._mapping[referenced_column] for row in result
     }
     missing_values = sorted(alias_values - resolved_values.keys())
     if missing_values:
