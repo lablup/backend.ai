@@ -579,18 +579,19 @@ class EventDispatcher(EventDispatcherGroup):
         mq_msg: MQMessage,
     ) -> None:
         event_name = deserialize_event_name_for_anycast(mq_msg.payload)
+        consumer_handlers = self._consumers.get(event_name)
         post_callback = _ConsumerPostCallback(
             mq_msg.msg_id,
             self._msg_queue,
-            len(self._consumers[event_name]) if event_name in self._consumers else 0,
+            len(consumer_handlers) if consumer_handlers else 0,
         )
-        if event_name not in self._consumers or not self._consumers[event_name]:
+        if not consumer_handlers:
             await post_callback.done()
             return
         if self._log_events:
-            log.debug("DISPATCH_CONSUMERS(ev:{})}", event_name)
+            log.debug("DISPATCH_CONSUMERS(ev:{})", event_name)
         msg_payload = MessagePayload.from_anycast(mq_msg.payload)
-        for consumer in self._consumers[event_name].copy():
+        for consumer in consumer_handlers.copy():
             self._consumer_taskgroup.create_task(
                 self._handle(
                     consumer,
@@ -607,12 +608,13 @@ class EventDispatcher(EventDispatcherGroup):
         broadcast_msg: BroadcastMessage,
     ) -> None:
         event_name = deserialize_event_name_for_broadcast(broadcast_msg.payload)
-        if event_name not in self._subscribers or not self._subscribers[event_name]:
+        subscriber_handlers = self._subscribers.get(event_name)
+        if not subscriber_handlers:
             return
         if self._log_events:
             log.debug("DISPATCH_SUBSCRIBERS(ev:{})", event_name)
         msg_payload = MessagePayload.from_broadcast(broadcast_msg.payload)
-        for subscriber in self._subscribers[event_name].copy():
+        for subscriber in subscriber_handlers.copy():
             self._subscriber_taskgroup.create_task(
                 self._handle(
                     subscriber,
