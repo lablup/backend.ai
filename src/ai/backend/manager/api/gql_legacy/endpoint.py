@@ -720,7 +720,9 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             created_at=dto.created_at,
             destroyed_at=dto.destroyed_at,
             retries=dto.retries,
-            routings=[Routing.from_dto(r) for r in dto.routings] if dto.routings is not None else None,
+            routings=[Routing.from_dto(r) for r in dto.routings]
+            if dto.routings is not None
+            else None,
             lifecycle_stage=dto.lifecycle_stage,
             runtime_variant=RuntimeVariantInfo.from_enum(dto.runtime_variant),
         )
