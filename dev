@@ -54,38 +54,70 @@ _color() {
   esac
 }
 
+# Path to the pid-file managed by the agent process itself.
+# Since setproctitle overwrites the argv of agent workers to just
+# "backend.ai: agent", there is no way to distinguish the primary compute
+# agent from the optional SFTP agent using `pgrep -f` alone. Both agents
+# write their own pid-file (configured in agent.toml / agent-sftp.toml),
+# and we use those files as the source of truth for process tracking.
+_service_pidfile() {
+  case $1 in
+    agent)      echo "./agent.pid" ;;
+    sftp-agent) echo "./agent-sftp.pid" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Check whether the pid recorded in $1 is still a live process.
+_pid_alive() {
+  local pid=$1
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
 _is_running() {
   local svc=$1
-  local pattern
-  pattern=$(_service_process "$svc")
-  # The primary "agent" and the optional "sftp-agent" share the same
-  # proctitle ("backend.ai: agent"), so we must distinguish them by the
-  # presence (or absence) of "agent-sftp.toml" on the command line.
-  if [ "$svc" = "agent" ]; then
-    pgrep -f "$pattern" 2>/dev/null | while read -r pid; do
-      # Exclude SFTP-agent processes by checking their full cmdline.
-      if ! ps -p "$pid" -o command= 2>/dev/null | grep -q "agent-sftp.toml"; then
-        echo "$pid"
+  case "$svc" in
+    agent|sftp-agent)
+      local pidfile
+      pidfile=$(_service_pidfile "$svc")
+      if [ -f "$pidfile" ]; then
+        local pid
+        pid=$(cat "$pidfile" 2>/dev/null || true)
+        _pid_alive "$pid"
+        return $?
       fi
-    done | grep -q . && return 0
-    return 1
-  fi
-  pgrep -f "$pattern" > /dev/null 2>&1
+      return 1
+      ;;
+    *)
+      pgrep -f "$(_service_process "$svc")" > /dev/null 2>&1
+      ;;
+  esac
 }
 
 _stop_service() {
   local svc=$1
+  _kill_by_pidfile() {
+    local signal=$1
+    local pidfile
+    pidfile=$(_service_pidfile "$svc")
+    if [ -f "$pidfile" ]; then
+      local pid
+      pid=$(cat "$pidfile" 2>/dev/null || true)
+      if [ -n "$pid" ]; then
+        kill "-${signal}" "$pid" 2>/dev/null || true
+      fi
+    fi
+  }
   _kill_matching() {
     local signal=$1
-    if [ "$svc" = "agent" ]; then
-      pgrep -f "backend.ai: agent" 2>/dev/null | while read -r pid; do
-        if ! ps -p "$pid" -o command= 2>/dev/null | grep -q "agent-sftp.toml"; then
-          kill "-${signal}" "$pid" 2>/dev/null || true
-        fi
-      done
-    else
-      pkill "-${signal}" -f "$(_service_process "$svc")" 2>/dev/null || true
-    fi
+    case "$svc" in
+      agent|sftp-agent)
+        _kill_by_pidfile "$signal"
+        ;;
+      *)
+        pkill "-${signal}" -f "$(_service_process "$svc")" 2>/dev/null || true
+        ;;
+    esac
   }
   if _is_running "$svc"; then
     echo "  Stopping $svc..."
@@ -98,6 +130,12 @@ _stop_service() {
       _kill_matching KILL
       sleep 1
     fi
+    # Remove stale pid file on stop so the next status check is accurate.
+    case "$svc" in
+      agent|sftp-agent)
+        rm -f "$(_service_pidfile "$svc")"
+        ;;
+    esac
   fi
 }
 
@@ -126,16 +164,14 @@ _status_services() {
   for svc in $services; do
     if _is_running "$svc"; then
       local pid
-      if [ "$svc" = "agent" ]; then
-        pid=$(pgrep -f "backend.ai: agent" 2>/dev/null | while read -r p; do
-          if ! ps -p "$p" -o command= 2>/dev/null | grep -q "agent-sftp.toml"; then
-            echo "$p"
-            break
-          fi
-        done)
-      else
-        pid=$(pgrep -f "$(_service_process "$svc")" | head -1)
-      fi
+      case "$svc" in
+        agent|sftp-agent)
+          pid=$(cat "$(_service_pidfile "$svc")" 2>/dev/null || true)
+          ;;
+        *)
+          pid=$(pgrep -f "$(_service_process "$svc")" | head -1)
+          ;;
+      esac
       printf "  %-20s %s (pid: %s)\n" "$svc" "$(_color green running)" "$pid"
     else
       printf "  %-20s %s\n" "$svc" "$(_color red stopped)"
