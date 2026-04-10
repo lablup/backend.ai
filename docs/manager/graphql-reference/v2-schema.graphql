@@ -4959,6 +4959,62 @@ type LoginClientType implements Node {
   description: String
 }
 
+"""
+Added in 26.4.0rc1. Paginated connection for login client type records.
+"""
+type LoginClientTypeConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [LoginClientTypeEdge!]!
+
+  """Total number of login client type records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type LoginClientTypeEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: LoginClientType!
+}
+
+"""Added in 26.4.0rc1. Filter input for querying login client types."""
+input LoginClientTypeFilter {
+  """Filter by name."""
+  name: StringFilter = null
+
+  """Filter by description."""
+  description: StringFilter = null
+
+  """Filter by creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by last modification datetime."""
+  modifiedAt: DateTimeFilter = null
+}
+
+"""Added in 26.4.0rc1. Specifies ordering for login client type results."""
+input LoginClientTypeOrderBy {
+  """The field to order by."""
+  field: LoginClientTypeOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.4.0rc1. Fields available for ordering login client type results.
+"""
+enum LoginClientTypeOrderField {
+  NAME
+  CREATED_AT
+  MODIFIED_AT
+}
+
 """Added in 26.4.1. Filter criteria for querying login history."""
 input LoginHistoryFilter {
   domainName: StringFilter = null
@@ -8380,6 +8436,11 @@ type Query {
 
   """Added in 26.4.0rc1. Get a single login client type by id."""
   loginClientType(id: UUID!): LoginClientType
+
+  """
+  Added in 26.4.0rc1. Search login client types with filtering, ordering, and pagination (super admin only).
+  """
+  loginClientTypes(filter: LoginClientTypeFilter = null, orderBy: [LoginClientTypeOrderBy!] = null, limit: Int = null, offset: Int = null): LoginClientTypeConnection
 
   """Added in 26.4.1. Search runtime variants."""
   runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection

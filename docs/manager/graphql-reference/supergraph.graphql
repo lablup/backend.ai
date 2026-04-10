@@ -7910,6 +7910,72 @@ type LoginClientType implements Node
   description: String
 }
 
+"""
+Added in 26.4.0rc1. Paginated connection for login client type records.
+"""
+type LoginClientTypeConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [LoginClientTypeEdge!]!
+
+  """Total number of login client type records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type LoginClientTypeEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: LoginClientType!
+}
+
+"""Added in 26.4.0rc1. Filter input for querying login client types."""
+input LoginClientTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by name."""
+  name: StringFilter = null
+
+  """Filter by description."""
+  description: StringFilter = null
+
+  """Filter by creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by last modification datetime."""
+  modifiedAt: DateTimeFilter = null
+}
+
+"""Added in 26.4.0rc1. Specifies ordering for login client type results."""
+input LoginClientTypeOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: LoginClientTypeOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.4.0rc1. Fields available for ordering login client type results.
+"""
+enum LoginClientTypeOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  MODIFIED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in 26.4.1. Filter criteria for querying login history."""
 input LoginHistoryFilter
   @join__type(graph: STRAWBERRY)
@@ -13149,6 +13215,11 @@ type Query
 
   """Added in 26.4.0rc1. Get a single login client type by id."""
   loginClientType(id: UUID!): LoginClientType @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.4.0rc1. Search login client types with filtering, ordering, and pagination (super admin only).
+  """
+  loginClientTypes(filter: LoginClientTypeFilter = null, orderBy: [LoginClientTypeOrderBy!] = null, limit: Int = null, offset: Int = null): LoginClientTypeConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.1. Search runtime variants."""
   runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection @join__field(graph: STRAWBERRY)
