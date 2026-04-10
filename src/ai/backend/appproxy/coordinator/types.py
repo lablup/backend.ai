@@ -3,18 +3,15 @@ import itertools
 import logging
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Sequence
-from contextlib import AbstractAsyncContextManager
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from typing import (
     Annotated,
     Any,
     AsyncContextManager,
-    Callable,
     Optional,
     Protocol,
     Self,
-    Sequence,
     TypeAlias,
 )
 from uuid import UUID

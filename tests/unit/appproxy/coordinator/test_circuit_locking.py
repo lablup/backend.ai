@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.appproxy.common.errors import ObjectNotFound
+from ai.backend.appproxy.common.exceptions import ObjectNotFound
 from ai.backend.appproxy.coordinator.health_checker import HealthCheckEngine
 from ai.backend.appproxy.coordinator.models import Circuit
 from ai.backend.appproxy.coordinator.types import CircuitManager
