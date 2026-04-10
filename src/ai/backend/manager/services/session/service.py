@@ -1334,6 +1334,8 @@ class SessionService:
 
     async def start_service(self, action: StartServiceAction) -> StartServiceActionResult:
         session_name = action.session_name
+        if action.owner_id is None:
+            raise InvalidAPIParameters("owner_id is required for start_service")
         access_key = await self._resolve_owner_main_access_key(action.owner_id)
         service = action.service
         port = action.port
