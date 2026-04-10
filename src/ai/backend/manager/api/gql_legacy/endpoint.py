@@ -867,10 +867,14 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             case EndpointLifecycle.DESTROYING.name:
                 return EndpointStatus.DESTROYING
             case _:
+                if not self.routings:
+                    return EndpointStatus.UNHEALTHY
                 active_route_status_names = {s.name for s in RouteStatus.active_route_statuses()}
                 active_routings = [
                     r for r in self.routings if r.status in active_route_status_names
                 ]
+                if not active_routings:
+                    return EndpointStatus.UNHEALTHY
                 healthy_count = sum(
                     1 for r in active_routings if r.status == RouteStatus.RUNNING.name
                 )
@@ -910,7 +914,9 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             return [VirtualFolderNode.from_row(info, r) for r in (await sess.scalars(query))]
 
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
-        error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
+        error_routes = [
+            r for r in (self.routings or []) if r.status == RouteStatus.FAILED_TO_START.name
+        ]
         errors = []
         for route in error_routes:
             if not route.error_data:
