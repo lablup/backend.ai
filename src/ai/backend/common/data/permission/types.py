@@ -70,6 +70,14 @@ class OperationType(enum.StrEnum):
 
 
 class EntityType(enum.StrEnum):
+    """Deprecated for RBAC domain: use ``RBACElementType`` instead.
+
+    This enum is being sunset in the RBAC context. New RBAC code should use
+    ``RBACElementType`` which provides a unified element type for the
+    scope-entity relationship model. ``EntityType`` remains only for
+    existing ORM schema compatibility (e.g., ``permissions`` table columns).
+    """
+
     # === RBAC scope/resource types (original 12) ===
     USER = "user"
     PROJECT = "project"
@@ -312,6 +320,15 @@ class FieldType(enum.StrEnum):
 
 
 class ScopeType(enum.StrEnum):
+    """Deprecated for RBAC domain: use ``RBACElementType`` instead.
+
+    This enum is being sunset in the RBAC context. New RBAC code should use
+    ``RBACElementType`` which provides a unified element type for the
+    scope-entity relationship model. ``ScopeType`` remains only for
+    existing ORM schema compatibility (e.g., ``permissions`` and
+    ``association_scopes_entities`` table columns).
+    """
+
     # === Organization/permission scopes (original) ===
     DOMAIN = "domain"
     PROJECT = "project"
