@@ -11,7 +11,7 @@ ROLE_NAME_PREFIX = "role_"
 ADMIN_ROLE_NAME_SUFFIX = "_admin"
 
 
-GLOBAL_SCOPE_ID = ORIGINAL_GLOBAL_SCOPE_ID
+GLOBAL_SCOPE_ID = ORIGINAL_GLOBAL_SCOPE_ID  # Deprecated: no longer used in RBAC scope hierarchy
 
 
 @dataclass
