@@ -28,13 +28,13 @@ graph TD
     A[User] -->|user_roles| B[Role]
     B -->|association_scopes_entities| S[Scope Bindings]
     B -->|permissions| C[Scoped Permissions]
-    C -->|scope constrained to| S
+    C -->|applies within| Scope
     C --> E[Operations: create, read, update, soft-delete, hard-delete]
 ```
 
 Users can have one or more Roles, and each Role has multiple Permissions. Roles are introduced to group permissions, and users are granted permissions through Roles. This structure improves consistency in permission management and simplifies the relationship between users and permissions.
 
-Roles are bound to one or more scopes via `association_scopes_entities`. Each Role's permissions are constrained to its bound scopes — when adding permissions to a role, the scope must be selected from the role's pre-declared scope bindings.
+Roles are bound to one or more scopes via `association_scopes_entities`. Scope bindings determine role visibility, manageability, and user-scope membership. Permissions are independently scoped and can reference hierarchy scopes (domain/project/user) or entity-level scopes (vfolder/session/etc.).
 
 #### Scoped Permissions
 
@@ -42,7 +42,7 @@ Scoped Permissions define permissions for operations on a specific Entity Type w
 - **Regular operations**: 'create', 'read', 'update', 'soft-delete', 'hard-delete', etc.
 - **Grant operations**: 'grant:read', 'grant:update', 'grant:soft-delete', 'grant:hard-delete', etc.
 
-A Role with regular permissions can perform operations on all Entities of the Entity Type accessible within the permission's scope. The permission's scope must be one of the role's bound scopes.
+A Role with regular permissions can perform operations on all Entities of the Entity Type accessible within the permission's scope.
 
 For example:
 - A role bound to Project-A with 'read' permission for 'session' entity type can read all sessions within Project-A
@@ -190,7 +190,7 @@ CREATE TABLE permissions (
 );
 ```
 
-The permissions table defines Operations that a Role can perform on specific Entity Types within a scope. The `scope_type` and `scope_id` must reference one of the role's bound scopes in `association_scopes_entities`. This constraint ensures that permissions are only created for scopes the role is explicitly bound to.
+The permissions table defines Operations that a Role can perform on specific Entity Types within a scope. The scope can be a hierarchy scope (domain/project/user) or an entity-level scope (e.g., vfolder/session) for instance-level access control such as resource sharing.
 
 #### Migration from Existing Tables
 

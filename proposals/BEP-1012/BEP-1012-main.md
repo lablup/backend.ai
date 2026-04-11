@@ -138,7 +138,6 @@ Defines permissions for operations on an **entity type** within a specific scope
 
 - Specifies: scope + entity type (e.g., `vfolder`) + operation (e.g., `read`)
 - Applies to all entities of that type accessible within the scope
-- **Scope Constraint**: A permission's scope must be one of the role's bound scopes. When adding permissions to a role, the scope is selected from the role's pre-declared scope bindings, not freely specified.
 - Example: A role bound to Project-A with `vfolder:read` permission allows reading all VFolders within Project-A
 
 **Multi-Scope Permissions**:
@@ -154,12 +153,10 @@ Each Role in the RBAC system has the following structure:
 - **Scope Bindings**: A Role is bound to one or more scopes (Domain, Project, or User) via `association_scopes_entities`. Scope bindings determine:
   1. Where the role is visible and manageable (e.g., which scope admin can see and assign the role)
   2. Which scopes users assigned this role become members of
-  3. Which scopes are valid targets for the role's permissions
 - **Source**: Indicates whether the role is system-generated or custom-created
 
 **Permission Components**:
 - **Scoped Permissions**: A collection of scope-level permissions (scope + entity type + operation)
-  - Each permission's scope must be one of the role's bound scopes
   - Example: A role bound to Project-A can have `vfolder:read`, `compute_session:create` for Project-A
 
 ```mermaid
@@ -168,7 +165,7 @@ graph LR
     RoleAssignment -->|references| Role
     Role -->|bound to| Scopes[Scope Bindings]
     Role -->|contains| ScopedPermission[Scoped Permissions]
-    ScopedPermission -->|scope must be in| Scopes
+    ScopedPermission -->|applies within| Scope
 ```
 
 ### Role Source
