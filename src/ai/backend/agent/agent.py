@@ -86,7 +86,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.config import model_definition_iv
+from ai.backend.common.config import ModelDefinition, model_definition_iv
 from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
 from ai.backend.common.data.image.types import InstalledImageInfo, ScannedImage
 from ai.backend.common.defs import (
@@ -3404,41 +3404,28 @@ class AbstractAgent[
                 raw_definition = {"models": [_model]}
 
             case "custom":
-                if _fname := (kernel_config.get("internal_data") or {}).get(
-                    "model_definition_path"
-                ):
-                    model_definition_candidates = [_fname]
-                else:
-                    model_definition_candidates = [
-                        "model-definition.yaml",
-                        "model-definition.yml",
-                    ]
+                raw_definition = await self._read_model_definition_from_vfolder(
+                    model_folder, kernel_config
+                )
 
-                model_definition_path = None
-                for filename in model_definition_candidates:
-                    if (Path(model_folder.host_path) / filename).is_file():
-                        model_definition_path = Path(model_folder.host_path) / filename
-                        break
-
-                if not model_definition_path:
-                    raise ModelDefinitionNotFoundError(
-                        f"Model definition file ({' or '.join(model_definition_candidates)}) does not exist under vFolder"
-                        f" {model_folder.name} (ID {model_folder.vfid})",
-                    )
-                try:
-                    model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
-                        None, model_definition_path.read_text
-                    )
-                except FileNotFoundError as e:
-                    raise ModelDefinitionNotFoundError(
-                        "Model definition file (model-definition.yml) does not exist under"
-                        f" vFolder {model_folder.name} (ID {model_folder.vfid})",
-                    ) from e
-                try:
-                    yaml = YAML()
-                    raw_definition = yaml.load(model_definition_yaml)
-                except YAMLError as e:
-                    raise ModelDefinitionInvalidYAMLError(f"Invalid YAML syntax: {e}") from e
+        # For non-custom variants, apply VFolder model-definition.yaml override if present.
+        # This mirrors the Manager's _apply_vfolder_override() in
+        # definition_generator/registry.py so that health_check values
+        # (initial_delay, max_retries, max_wait_time) set by the user are respected.
+        if runtime_variant != "custom":
+            vfolder_override = await self._try_read_model_definition_from_vfolder(
+                model_folder, kernel_config
+            )
+            if vfolder_override is not None:
+                base = ModelDefinition.model_validate(raw_definition)
+                override = ModelDefinition.model_validate(vfolder_override)
+                merged = base.merge(override)
+                raw_definition = merged.model_dump(mode="json")
+                log.info(
+                    "load_model_definition(): applied VFolder model-definition.yaml override"
+                    " (runtime_variant={})",
+                    runtime_variant,
+                )
         try:
             model_definition = model_definition_iv.check(raw_definition)
             if model_definition is None:
@@ -3471,6 +3458,53 @@ class AbstractAgent[
                 "Failed to validate model definition from vFolder"
                 f" {model_folder.name} (ID {model_folder.vfid})",
             ) from e
+
+    async def _read_model_definition_from_vfolder(
+        self,
+        model_folder: VFolderMount,
+        kernel_config: KernelCreationConfig,
+    ) -> dict[str, Any]:
+        """Read model-definition.yaml from VFolder. Raises on missing/invalid file."""
+        if _fname := (kernel_config.get("internal_data") or {}).get("model_definition_path"):
+            candidates = [_fname]
+        else:
+            candidates = ["model-definition.yaml", "model-definition.yml"]
+
+        found_path = None
+        for filename in candidates:
+            if (Path(model_folder.host_path) / filename).is_file():
+                found_path = Path(model_folder.host_path) / filename
+                break
+
+        if not found_path:
+            raise ModelDefinitionNotFoundError(
+                f"Model definition file ({' or '.join(candidates)}) does not exist"
+                f" under vFolder {model_folder.name} (ID {model_folder.vfid})",
+            )
+        try:
+            content = await asyncio.get_running_loop().run_in_executor(None, found_path.read_text)
+        except FileNotFoundError as e:
+            raise ModelDefinitionNotFoundError(
+                f"Model definition file does not exist under"
+                f" vFolder {model_folder.name} (ID {model_folder.vfid})",
+            ) from e
+        try:
+            yaml = YAML()
+            result: dict[str, Any] = yaml.load(content)
+            return result
+        except YAMLError as e:
+            raise ModelDefinitionInvalidYAMLError(f"Invalid YAML syntax: {e}") from e
+
+    async def _try_read_model_definition_from_vfolder(
+        self,
+        model_folder: VFolderMount,
+        kernel_config: KernelCreationConfig,
+    ) -> dict[str, Any] | None:
+        """Try to read model-definition.yaml from VFolder. Returns None if not found."""
+        try:
+            return await self._read_model_definition_from_vfolder(model_folder, kernel_config)
+        except (ModelDefinitionNotFoundError, ModelDefinitionInvalidYAMLError):
+            return None
 
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
