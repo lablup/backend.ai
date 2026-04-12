@@ -1,22 +1,17 @@
-import asyncio
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, cast, override
 
 from aiodocker.docker import Docker
 from pydantic import ValidationError
-from ruamel.yaml import YAML
-from ruamel.yaml.error import YAMLError
 
 from ai.backend.agent.exception import InvalidModelConfigurationError
 from ai.backend.common.asyncio import closing_async
-from ai.backend.common.config import ModelConfig, ModelDefinition
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.stage.types import (
     Provisioner,
     SpecGenerator,
 )
 from ai.backend.common.types import (
-    MODEL_SERVICE_RUNTIME_PROFILES,
     RuntimeVariant,
     ServicePort,
     ServicePortProtocols,
@@ -31,7 +26,6 @@ class ModelServiceSpecCheckArgs:
     model_vfolder_mount: VFolderMount
     session_type: SessionTypes
     runtime_variant: RuntimeVariant
-    model_definition_path: str | None = None
     model_definition: dict[str, Any] | None = None
 
     def to_model_service_spec(self, image_command: str | None) -> "ModelServiceSpec":
@@ -39,7 +33,6 @@ class ModelServiceSpecCheckArgs:
             session_type=self.session_type,
             model_vfolder_mount=self.model_vfolder_mount,
             runtime_variant=self.runtime_variant,
-            model_definition_path=self.model_definition_path,
             model_definition=self.model_definition,
             image_command=image_command,
         )
@@ -50,7 +43,6 @@ class ModelServiceSpec:
     session_type: SessionTypes
     model_vfolder_mount: VFolderMount
     runtime_variant: RuntimeVariant
-    model_definition_path: str | None
     model_definition: dict[str, Any] | None
     image_command: str | None
 
@@ -78,7 +70,6 @@ class ModelServiceSpecCheckProvisioner(Provisioner[ModelServiceSpecCheckArgs, Mo
 
     @override
     async def teardown(self, resource: ModelServiceSpec) -> None:
-        # No teardown actions needed for this provisioner
         pass
 
 
@@ -107,7 +98,7 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
 
     @override
     async def setup(self, spec: ModelServiceSpec) -> ModelServiceResult:
-        model_definition = await self._get_model_definition(spec)
+        model_definition = self._get_model_definition(spec)
         if model_definition is None:
             raise InvalidModelConfigurationError(
                 "Model definition is empty. Please check your model definition file"
@@ -132,195 +123,18 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             service_ports=service_ports,
         )
 
-    async def _get_model_definition(self, spec: ModelServiceSpec) -> ModelDefinition:
-        # Use pre-merged model definition from Manager if available
-        if spec.model_definition is not None:
-            try:
-                return ModelDefinition.model_validate(spec.model_definition)
-            except ValidationError as e:
-                raise InvalidModelConfigurationError(
-                    f"Invalid pre-merged model definition from Manager: {e}"
-                ) from e
-
-        image_command = spec.image_command
-        model_folder = spec.model_vfolder_mount
-        match spec.runtime_variant:
-            case "vllm":
-                return await self._get_model_definition_from_vllm(model_folder, image_command)
-            case "huggingface-tgi":
-                return await self._get_model_definition_from_tgi(model_folder, image_command)
-            case "nim":
-                return await self._get_model_definition_from_nim(model_folder, image_command)
-            case "sglang":
-                return await self._get_model_definition_from_sglang(model_folder, image_command)
-            case "modular-max":
-                return await self._get_model_definition_from_modular_max(
-                    model_folder, image_command
-                )
-            case "cmd":
-                return await self._get_model_definition_from_cmd(model_folder, image_command)
-            case "custom":
-                return await self._get_model_definition_from_custom(
-                    model_folder, spec.model_definition_path
-                )
-            case _:
-                raise InvalidModelConfigurationError(
-                    f"Unsupported runtime variant: {spec.runtime_variant}"
-                )
-
-    async def _get_model_definition_from_vllm(
-        self, model_folder: VFolderMount, image_command: str | None
-    ) -> ModelDefinition:
-        _model = {
-            "name": "vllm-model",
-            "model_path": model_folder.kernel_path.as_posix(),
-            "service": {
-                "start_command": image_command,
-                "port": MODEL_SERVICE_RUNTIME_PROFILES["vllm"].port,
-                "health_check": {
-                    "path": MODEL_SERVICE_RUNTIME_PROFILES["vllm"].health_check_endpoint,
-                },
-            },
-        }
-        try:
-            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
-        except ValidationError as e:
-            raise InvalidModelConfigurationError(f"Invalid model definition for VLLM: {e}") from e
-
-    async def _get_model_definition_from_tgi(
-        self, model_folder: VFolderMount, image_command: str | None
-    ) -> ModelDefinition:
-        _model = {
-            "name": "tgi-model",
-            "model_path": model_folder.kernel_path.as_posix(),
-            "service": {
-                "start_command": image_command,
-                "port": MODEL_SERVICE_RUNTIME_PROFILES["huggingface-tgi"].port,
-                "health_check": {
-                    "path": MODEL_SERVICE_RUNTIME_PROFILES["huggingface-tgi"].health_check_endpoint,
-                },
-            },
-        }
-        try:
-            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
-        except ValidationError as e:
-            raise InvalidModelConfigurationError(f"Invalid model definition for TGI: {e}") from e
-
-    async def _get_model_definition_from_nim(
-        self, model_folder: VFolderMount, image_command: str | None
-    ) -> ModelDefinition:
-        _model = {
-            "name": "nim-model",
-            "model_path": model_folder.kernel_path.as_posix(),
-            "service": {
-                "start_command": image_command,
-                "port": MODEL_SERVICE_RUNTIME_PROFILES["nim"].port,
-                "health_check": {
-                    "path": MODEL_SERVICE_RUNTIME_PROFILES["nim"].health_check_endpoint,
-                },
-            },
-        }
-        try:
-            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
-        except ValidationError as e:
-            raise InvalidModelConfigurationError(f"Invalid model definition for NIM: {e}") from e
-
-    async def _get_model_definition_from_sglang(
-        self, model_folder: VFolderMount, image_command: str | None
-    ) -> ModelDefinition:
-        _model = {
-            "name": "sglang-model",
-            "model_path": model_folder.kernel_path.as_posix(),
-            "service": {
-                "start_command": image_command,
-                "port": MODEL_SERVICE_RUNTIME_PROFILES["sglang"].port,
-                "health_check": {
-                    "path": MODEL_SERVICE_RUNTIME_PROFILES["sglang"].health_check_endpoint,
-                },
-            },
-        }
-        try:
-            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
-        except ValidationError as e:
-            raise InvalidModelConfigurationError(f"Invalid model definition for SGLang: {e}") from e
-
-    async def _get_model_definition_from_modular_max(
-        self, model_folder: VFolderMount, image_command: str | None
-    ) -> ModelDefinition:
-        _model = {
-            "name": "max-model",
-            "model_path": model_folder.kernel_path.as_posix(),
-            "service": {
-                "start_command": image_command,
-                "port": MODEL_SERVICE_RUNTIME_PROFILES["modular-max"].port,
-                "health_check": {
-                    "path": MODEL_SERVICE_RUNTIME_PROFILES["modular-max"].health_check_endpoint,
-                },
-            },
-        }
-        try:
-            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
-        except ValidationError as e:
+    def _get_model_definition(self, spec: ModelServiceSpec) -> ModelDefinition:
+        if spec.model_definition is None:
             raise InvalidModelConfigurationError(
-                f"Invalid model definition for Modular MAX: {e}"
-            ) from e
-
-    async def _get_model_definition_from_cmd(
-        self, model_folder: VFolderMount, image_command: str | None
-    ) -> ModelDefinition:
-        _model = {
-            "name": "image-model",
-            "model_path": model_folder.kernel_path.as_posix(),
-            "service": {
-                "start_command": image_command,
-                "port": 8000,
-            },
-        }
-        try:
-            return ModelDefinition(models=[ModelConfig.model_validate(_model)])
-        except ValidationError as e:
-            raise InvalidModelConfigurationError(f"Invalid model definition for CMD: {e}") from e
-
-    async def _get_model_definition_from_custom(
-        self, model_folder: VFolderMount, model_definition_path: str | None
-    ) -> ModelDefinition:
-        if model_definition_path:
-            model_definition_candidates = [model_definition_path]
-        else:
-            model_definition_candidates = [
-                "model-definition.yaml",
-                "model-definition.yml",
-            ]
-
-        final_model_definition_path: Path | None = None
-        for filename in model_definition_candidates:
-            if (Path(model_folder.host_path) / filename).is_file():
-                final_model_definition_path = Path(model_folder.host_path) / filename
-                break
-
-        if not final_model_definition_path:
-            raise InvalidModelConfigurationError(
-                f"Model definition file ({' or '.join(model_definition_candidates)}) does not exist under VFolder"
-                f" {model_folder.name} (ID {model_folder.vfid})",
+                "model_definition was not provided by Manager via internal_data."
+                f" (runtime_variant={spec.runtime_variant})"
             )
         try:
-            model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
-                None, final_model_definition_path.read_text
-            )
-        except FileNotFoundError as e:
-            raise InvalidModelConfigurationError(
-                "Model definition file (model-definition.yml) does not exist under"
-                f" vFolder {model_folder.name} (ID {model_folder.vfid})",
-            ) from e
-        try:
-            yaml = YAML()
-            raw_definition = yaml.load(model_definition_yaml)
-        except YAMLError as e:
-            raise InvalidModelConfigurationError(f"Invalid YAML syntax: {e}") from e
-        try:
-            return ModelDefinition(**raw_definition)
+            return ModelDefinition.model_validate(spec.model_definition)
         except ValidationError as e:
-            raise InvalidModelConfigurationError(f"Invalid model definition: {e}") from e
+            raise InvalidModelConfigurationError(
+                f"Invalid model definition from Manager: {e}"
+            ) from e
 
     @override
     async def teardown(self, resource: ModelServiceResult) -> None:

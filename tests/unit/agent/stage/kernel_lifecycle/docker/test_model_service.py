@@ -1,10 +1,13 @@
-"""Tests for ModelServiceProvisioner with pre-merged model definitions."""
+"""Tests for ModelServiceProvisioner with model definitions from Manager."""
 
 from __future__ import annotations
 
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
+
+from ai.backend.agent.exception import InvalidModelConfigurationError
 from ai.backend.agent.stage.kernel_lifecycle.docker.model_service import (
     ModelServiceProvisioner,
     ModelServiceSpec,
@@ -51,11 +54,11 @@ def _make_model_definition_dict(
     }
 
 
-class TestModelServiceProvisionerWithPreMergedDefinition:
-    """Tests for ModelServiceProvisioner._get_model_definition() using pre-merged definitions."""
+class TestModelServiceProvisionerGetModelDefinition:
+    """Tests for ModelServiceProvisioner._get_model_definition()."""
 
-    async def test_uses_pre_merged_definition_when_available(self) -> None:
-        """When spec.model_definition is set, it should be used instead of hardcoded values."""
+    def test_uses_model_definition_from_spec(self) -> None:
+        """When spec.model_definition is set, it should be validated and returned."""
         model_definition_dict = _make_model_definition_dict(
             initial_delay=300, max_retries=30, max_wait_time=20
         )
@@ -63,13 +66,12 @@ class TestModelServiceProvisionerWithPreMergedDefinition:
             session_type=SessionTypes.INFERENCE,
             model_vfolder_mount=_make_vfolder_mount(),
             runtime_variant=RuntimeVariant("vllm"),
-            model_definition_path="model-definition.yaml",
             model_definition=model_definition_dict,
             image_command="vllm serve",
         )
 
         provisioner = ModelServiceProvisioner()
-        result = await provisioner._get_model_definition(spec)
+        result = provisioner._get_model_definition(spec)
 
         assert isinstance(result, ModelDefinition)
         assert len(result.models) == 1
@@ -81,31 +83,22 @@ class TestModelServiceProvisionerWithPreMergedDefinition:
         assert model.service.health_check.max_retries == 30
         assert model.service.health_check.max_wait_time == 20
 
-    async def test_falls_back_to_hardcoded_when_no_pre_merged_definition(self) -> None:
-        """When spec.model_definition is None, fall back to variant-specific hardcoded logic."""
+    def test_raises_error_when_model_definition_absent(self) -> None:
+        """When spec.model_definition is None, raise InvalidModelConfigurationError."""
         spec = ModelServiceSpec(
             session_type=SessionTypes.INFERENCE,
             model_vfolder_mount=_make_vfolder_mount(),
             runtime_variant=RuntimeVariant("vllm"),
-            model_definition_path=None,
             model_definition=None,
             image_command="vllm serve",
         )
 
         provisioner = ModelServiceProvisioner()
-        result = await provisioner._get_model_definition(spec)
+        with pytest.raises(InvalidModelConfigurationError):
+            provisioner._get_model_definition(spec)
 
-        assert isinstance(result, ModelDefinition)
-        assert len(result.models) == 1
-        model = result.models[0]
-        assert model.name == "vllm-model"
-        # Hardcoded defaults: health_check only has path, no custom overrides
-        assert model.service is not None
-        assert model.service.health_check is not None
-        assert model.service.health_check.path is not None
-
-    async def test_pre_merged_definition_preserves_all_health_check_fields(self) -> None:
-        """All health_check fields from pre-merged definition should be preserved."""
+    def test_preserves_all_health_check_fields(self) -> None:
+        """All health_check fields from model definition should be preserved."""
         model_definition_dict = {
             "models": [
                 {
@@ -130,13 +123,12 @@ class TestModelServiceProvisionerWithPreMergedDefinition:
             session_type=SessionTypes.INFERENCE,
             model_vfolder_mount=_make_vfolder_mount(),
             runtime_variant=RuntimeVariant("vllm"),
-            model_definition_path=None,
             model_definition=model_definition_dict,
             image_command="serve",
         )
 
         provisioner = ModelServiceProvisioner()
-        result = await provisioner._get_model_definition(spec)
+        result = provisioner._get_model_definition(spec)
 
         service = result.models[0].service
         assert service is not None

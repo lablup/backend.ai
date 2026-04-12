@@ -1,12 +1,15 @@
-"""Tests for model definition loading with Manager-merged definitions."""
+"""Tests for model definition loading from Manager-provided internal_data."""
 
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 from uuid import UUID
 
+import pytest
+
 from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.errors.agent import ModelDefinitionNotFoundError
 from ai.backend.common.types import (
     RuntimeVariant,
     ServicePort,
@@ -138,11 +141,11 @@ class TestApplyModelDefinition:
         assert health_check["max_wait_time"] == 15
 
 
-class TestLoadModelDefinitionWithManagerDefinition:
-    """Tests for AbstractAgent.load_model_definition() preferring Manager-merged definition."""
+class TestLoadModelDefinition:
+    """Tests for AbstractAgent.load_model_definition()."""
 
-    async def test_uses_manager_definition_when_present(self) -> None:
-        """When internal_data contains model_definition, it should be used directly."""
+    async def test_uses_model_definition_from_internal_data(self) -> None:
+        """When internal_data contains model_definition, it should be used."""
         model_definition = _make_model_definition(initial_delay=300, max_retries=30)
         model_folder = _make_vfolder_mount()
         environ: dict[str, Any] = {}
@@ -156,7 +159,6 @@ class TestLoadModelDefinitionWithManagerDefinition:
         }
 
         mock_agent = Mock(spec=AbstractAgent)
-        mock_agent.extract_image_command = AsyncMock(return_value="vllm serve")
         mock_agent._apply_model_definition = AbstractAgent._apply_model_definition.__get__(
             mock_agent
         )
@@ -174,8 +176,8 @@ class TestLoadModelDefinitionWithManagerDefinition:
         assert health_check["initial_delay"] == 300
         assert health_check["max_retries"] == 30
 
-    async def test_falls_back_to_hardcoded_when_no_manager_definition(self) -> None:
-        """When internal_data has no model_definition, fallback to hardcoded variant logic."""
+    async def test_raises_error_when_model_definition_absent(self) -> None:
+        """When internal_data has no model_definition, raise ModelDefinitionNotFoundError."""
         model_folder = _make_vfolder_mount()
         environ: dict[str, Any] = {}
         service_ports: list[ServicePort] = []
@@ -187,22 +189,13 @@ class TestLoadModelDefinitionWithManagerDefinition:
         }
 
         mock_agent = Mock(spec=AbstractAgent)
-        mock_agent.extract_image_command = AsyncMock(return_value="vllm serve")
         mock_agent._apply_model_definition = AbstractAgent._apply_model_definition.__get__(
             mock_agent
         )
         mock_agent.load_model_definition = AbstractAgent.load_model_definition.__get__(mock_agent)
 
-        with patch(
-            "ai.backend.agent.agent.MODEL_SERVICE_RUNTIME_PROFILES",
-            {
-                "vllm": MagicMock(
-                    port=8000,
-                    health_check_endpoint="/health",
-                ),
-            },
-        ):
-            result = await mock_agent.load_model_definition(
+        with pytest.raises(ModelDefinitionNotFoundError):
+            await mock_agent.load_model_definition(
                 RuntimeVariant("vllm"),
                 [model_folder],
                 environ,
@@ -210,7 +203,24 @@ class TestLoadModelDefinitionWithManagerDefinition:
                 kernel_config,
             )
 
-        # Fallback uses hardcoded defaults via trafaret
-        health_check = result["models"][0]["service"]["health_check"]
-        assert health_check["initial_delay"] == 60
-        assert health_check["max_retries"] == 10
+    async def test_raises_error_when_internal_data_missing(self) -> None:
+        """When internal_data is None, raise ModelDefinitionNotFoundError."""
+        model_folder = _make_vfolder_mount()
+        environ: dict[str, Any] = {}
+        service_ports: list[ServicePort] = []
+        kernel_config: dict[str, Any] = {
+            "image": {"canonical": "test-image:latest"},
+            "internal_data": None,
+        }
+
+        mock_agent = Mock(spec=AbstractAgent)
+        mock_agent.load_model_definition = AbstractAgent.load_model_definition.__get__(mock_agent)
+
+        with pytest.raises(ModelDefinitionNotFoundError):
+            await mock_agent.load_model_definition(
+                RuntimeVariant("custom"),
+                [model_folder],
+                environ,
+                service_ports,
+                kernel_config,
+            )

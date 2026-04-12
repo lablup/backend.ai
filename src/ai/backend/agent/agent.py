@@ -51,8 +51,6 @@ import zmq
 import zmq.asyncio
 from async_timeout import timeout
 from cachetools import LRUCache, cached
-from ruamel.yaml import YAML
-from ruamel.yaml.error import YAMLError
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -186,7 +184,6 @@ from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import (
-    MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
     AgentId,
     AutoPullBehavior,
@@ -240,10 +237,8 @@ from .errors import (
     ContainerStartupFailedError,
     ContainerStartupTimeoutError,
     ImageArchitectureMismatchError,
-    ImageCommandRequiredError,
     ImagePullTimeoutError,
     ModelDefinitionEmptyError,
-    ModelDefinitionInvalidYAMLError,
     ModelDefinitionNotFoundError,
     ModelDefinitionValidationError,
     ModelFolderNotSpecifiedError,
@@ -3297,12 +3292,6 @@ class AbstractAgent[
         service_ports: list[ServicePort],
         kernel_config: KernelCreationConfig,
     ) -> Any:
-        image_command = await self.extract_image_command(kernel_config["image"]["canonical"])
-        if runtime_variant != "custom" and not image_command:
-            raise ImageCommandRequiredError(
-                "Image should have its own command when runtime variant is set to values other than CUSTOM"
-            )
-
         if len(model_folders) == 0:
             raise ModelFolderNotSpecifiedError(
                 "At least one model virtual folder must be specified"
@@ -3310,155 +3299,21 @@ class AbstractAgent[
 
         model_folder: VFolderMount = model_folders[0]
 
-        # Use model definition from Manager (via internal_data) if available.
-        # Present when created through sokovan deployment path (POST /deployments/).
-        # Absent for legacy path (POST /services/) or pre-fix Manager versions.
         internal_data = kernel_config.get("internal_data") or {}
-        if manager_model_definition := internal_data.get("model_definition"):
-            log.info(
-                "load_model_definition(): using model_definition from internal_data"
-                " (runtime_variant={})",
-                runtime_variant,
-            )
-            return self._apply_model_definition(
-                manager_model_definition, model_folder, environ, service_ports
+        model_definition = internal_data.get("model_definition")
+        if not model_definition:
+            raise ModelDefinitionNotFoundError(
+                "model_definition was not provided by Manager via internal_data."
+                f" (runtime_variant={runtime_variant},"
+                f" vfolder={model_folder.name}, ID={model_folder.vfid})"
             )
 
         log.info(
-            "load_model_definition(): internal_data has no model_definition, "
-            "falling back to Agent-generated defaults (runtime_variant={})",
+            "load_model_definition(): using model_definition from internal_data"
+            " (runtime_variant={})",
             runtime_variant,
         )
-        raw_definition: dict[str, Any]
-        match runtime_variant:
-            case "vllm":
-                _model = {
-                    "name": "vllm-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "huggingface-tgi":
-                _model = {
-                    "name": "tgi-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "nim":
-                _model = {
-                    "name": "nim-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "sglang":
-                _model = {
-                    "name": "sglang-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "modular-max":
-                _model = {
-                    "name": "max-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "cmd":
-                _model = {
-                    "name": "image-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": 8000,
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "custom":
-                if _fname := (kernel_config.get("internal_data") or {}).get(
-                    "model_definition_path"
-                ):
-                    model_definition_candidates = [_fname]
-                else:
-                    model_definition_candidates = [
-                        "model-definition.yaml",
-                        "model-definition.yml",
-                    ]
-
-                model_definition_path = None
-                for filename in model_definition_candidates:
-                    if (Path(model_folder.host_path) / filename).is_file():
-                        model_definition_path = Path(model_folder.host_path) / filename
-                        break
-
-                if not model_definition_path:
-                    raise ModelDefinitionNotFoundError(
-                        f"Model definition file ({' or '.join(model_definition_candidates)}) does not exist under vFolder"
-                        f" {model_folder.name} (ID {model_folder.vfid})",
-                    )
-                try:
-                    model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
-                        None, model_definition_path.read_text
-                    )
-                except FileNotFoundError as e:
-                    raise ModelDefinitionNotFoundError(
-                        "Model definition file (model-definition.yml) does not exist under"
-                        f" vFolder {model_folder.name} (ID {model_folder.vfid})",
-                    ) from e
-                try:
-                    yaml = YAML()
-                    raw_definition = yaml.load(model_definition_yaml)
-                except YAMLError as e:
-                    raise ModelDefinitionInvalidYAMLError(f"Invalid YAML syntax: {e}") from e
-        return self._apply_model_definition(raw_definition, model_folder, environ, service_ports)
+        return self._apply_model_definition(model_definition, model_folder, environ, service_ports)
 
     def _apply_model_definition(
         self,
