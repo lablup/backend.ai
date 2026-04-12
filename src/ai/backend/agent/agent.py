@@ -3310,13 +3310,25 @@ class AbstractAgent[
 
         model_folder: VFolderMount = model_folders[0]
 
-        # Use pre-merged model definition from Manager if available
+        # Use model definition from Manager (via internal_data) if available.
+        # Present when created through sokovan deployment path (POST /deployments/).
+        # Absent for legacy path (POST /services/) or pre-fix Manager versions.
         internal_data = kernel_config.get("internal_data") or {}
         if manager_model_definition := internal_data.get("model_definition"):
+            log.info(
+                "load_model_definition(): using model_definition from internal_data"
+                " (runtime_variant={})",
+                runtime_variant,
+            )
             return self._apply_model_definition(
                 manager_model_definition, model_folder, environ, service_ports
             )
 
+        log.info(
+            "load_model_definition(): internal_data has no model_definition, "
+            "falling back to Agent-generated defaults (runtime_variant={})",
+            runtime_variant,
+        )
         raw_definition: dict[str, Any]
         match runtime_variant:
             case "vllm":

@@ -932,6 +932,15 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             timeout_seconds = (
                 health_check_info["max_retries"] * health_check_info["max_wait_time"] + 10
             )
+            log.info(
+                "feed_start_model_service({}): health_check config — "
+                "initial_delay={}, max_retries={}, max_wait_time={}, timeout={}s",
+                model_info.get("name", "?"),
+                health_check_info.get("initial_delay"),
+                health_check_info["max_retries"],
+                health_check_info["max_wait_time"],
+                timeout_seconds,
+            )
         else:
             timeout_seconds = 10
         try:
