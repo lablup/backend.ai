@@ -63,7 +63,7 @@ This document analyzes the requirements and trade-offs for supporting VM-based i
 **Key findings:**
 
 - **VM-based isolation must be supported as an option** for environments with strict security, multi-tenancy, or regulatory requirements where shared-kernel containers are inadequate.
-- **GPU workloads break most VM optimization techniques**: Firecracker cannot do GPU passthrough, VM pooling wastes GPUs, and Cold Start times are 30 seconds to several minutes due to GPU initialization overhead.
+- **GPU workloads break most VM optimization techniques**: Firecracker cannot do GPU passthrough, VM pooling wastes GPUs, and Cold Start times are 30 seconds to several minutes due to GPU initialization overhead. However, multi-GPU is supported via `pcie_root_port` configuration (when bypassing the NVIDIA GPU Operator).
 - **Per-GPU driver binding** allows hybrid nodes (some GPUs DooD, others VM) but requires per-GPU scheduler tracking.
 - **Fractional GPU does not work in VMs** — Backend.AI's CUDA hook library mechanism cannot cross the VM boundary. NVIDIA vGPU (Enterprise license) or MIG are the only alternatives.
 - **System-wide changes** span 12 architectural layers and require an estimated 12-18 months of engineering effort with 2-3 full-time engineers.
@@ -131,8 +131,8 @@ Kata Containers provides pod-level hardware isolation by running each Kubernetes
 
 **GPU support limitations** (see `kata-containers-feature-parity-analysis.md` for full analysis):
 
-- **Single GPU only** per container via VFIO passthrough
-- **No multi-GPU allocation** to a single container
+- **Single GPU supported** via VFIO passthrough
+- **Multi-GPU supported** — multiple VFIO devices can be passed to a single VM via `pcie_root_port` configuration. Note: the NVIDIA GPU Operator path only supports single GPU; multi-GPU requires direct VFIO management (as Backend.AI already does). QEMU is more stable than Cloud Hypervisor for this
 - **No fractional GPU** — VFIO passes the entire device; CUDA hook libraries do not work across the VM boundary
 - **No NVIDIA Container Toolkit integration** — host-side device mapping does not cross the VM boundary
 - Partial MIG support depending on hypervisor
@@ -171,7 +171,7 @@ KubeVirt extends Kubernetes with a `VirtualMachine` custom resource, running ful
 | Isolation boundary | cgroup/namespace (soft) | Hardware VM (hard, per-pod) | Hardware VM (hard, per-VM) |
 | GPU allocation mechanism | Docker device passthrough | VFIO passthrough | VFIO passthrough |
 | Single GPU | Full | Yes | Yes |
-| Multi-GPU per instance | Full | **Not supported** | Yes (multiple VFIO) |
+| Multi-GPU per instance | Full | Yes (multiple VFIO, requires `pcie_root_port` config, bypassing GPU Operator) | Yes (multiple VFIO) |
 | Fractional GPU (cuda.shares) | Full (CUDA hook library) | **Not supported** | NVIDIA vGPU (Enterprise license) |
 | MIG support | Full | Limited | Yes |
 | NVIDIA Container Toolkit | Full | Not applicable | Not applicable |
@@ -423,7 +423,7 @@ ACTION=="add", KERNEL=="0000:82:00.0", DRIVERS=="vfio-pci"
 | Security research / malware analysis | KubeVirt (strongest isolation) |
 | Legacy workloads requiring full VM | KubeVirt |
 | Cost-sensitive small clusters | DooD (avoid VM overhead) |
-| GPU-intensive distributed training | DooD (avoid Kata multi-GPU limitation) |
+| GPU-intensive distributed training | DooD preferred (performance), Kata also supports multi-GPU |
 | Single-GPU inference at scale | Kata acceptable, DooD preferred |
 
 ---
