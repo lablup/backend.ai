@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, cast
 from unittest.mock import MagicMock
 from uuid import UUID
@@ -27,7 +28,7 @@ def internal_data_rule() -> InternalDataRule:
 
 
 @pytest.fixture
-def test_user_scope() -> UserScope:
+def user_scope() -> UserScope:
     return UserScope(
         domain_name="test-domain",
         group_id=UUID("00000000-0000-0000-0000-000000000001"),
@@ -37,7 +38,7 @@ def test_user_scope() -> UserScope:
 
 
 @pytest.fixture
-def basic_context() -> SessionCreationContext:
+def context() -> SessionCreationContext:
     return SessionCreationContext(
         scaling_group_network=ScalingGroupNetworkInfo(
             use_host_network=False,
@@ -49,6 +50,33 @@ def basic_context() -> SessionCreationContext:
         dotfile_data={},
         container_user_info=ContainerUserInfo(),
     )
+
+
+@pytest.fixture
+def model_definition() -> dict[str, Any]:
+    return {
+        "models": [
+            {
+                "name": "vllm-model",
+                "model_path": "/models",
+                "service": {
+                    "start_command": "vllm serve",
+                    "port": 8000,
+                    "health_check": {
+                        "path": "/health",
+                        "initial_delay": 300,
+                        "max_retries": 30,
+                        "max_wait_time": 20,
+                    },
+                },
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def preparation_data() -> dict[str, Any]:
+    return {}
 
 
 def _make_spec(
@@ -74,90 +102,70 @@ def _make_spec(
     )
 
 
+@dataclass
+class NotForwardedCase:
+    creation_spec: dict[str, Any]
+    description: str
+
+
 class TestInternalDataRule:
     """Tests for InternalDataRule.prepare()."""
 
     def test_model_definition_forwarded_to_internal_data(
         self,
         internal_data_rule: InternalDataRule,
-        basic_context: SessionCreationContext,
-        test_user_scope: UserScope,
+        context: SessionCreationContext,
+        user_scope: UserScope,
+        model_definition: dict[str, Any],
+        preparation_data: dict[str, Any],
     ) -> None:
-        """Model definition from creation_spec should be forwarded to internal_data."""
-        model_definition = {
-            "models": [
-                {
-                    "name": "vllm-model",
-                    "model_path": "/models",
-                    "service": {
-                        "start_command": "vllm serve",
-                        "port": 8000,
-                        "health_check": {
-                            "path": "/health",
-                            "initial_delay": 300,
-                            "max_retries": 30,
-                            "max_wait_time": 20,
-                        },
-                    },
-                }
-            ]
-        }
         spec = _make_spec(
-            test_user_scope,
+            user_scope,
             creation_spec={
                 "model_definition_path": "model-definition.yaml",
                 "model_definition": model_definition,
                 "runtime_variant": "vllm",
             },
         )
-        preparation_data: dict[str, Any] = {}
 
-        internal_data_rule.prepare(spec, basic_context, preparation_data)
+        internal_data_rule.prepare(spec, context, preparation_data)
 
         result = preparation_data["internal_data"]
         assert result["model_definition"] == model_definition
         assert result["model_definition_path"] == "model-definition.yaml"
         assert result["runtime_variant"] == "vllm"
 
-    def test_model_definition_absent_when_not_in_creation_spec(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            NotForwardedCase(
+                creation_spec={
+                    "model_definition_path": "model-definition.yaml",
+                    "runtime_variant": "vllm",
+                },
+                description="model_definition key absent from creation_spec",
+            ),
+            NotForwardedCase(
+                creation_spec={
+                    "model_definition": None,
+                    "runtime_variant": "vllm",
+                },
+                description="model_definition explicitly set to None",
+            ),
+        ],
+        ids=["absent", "explicit-none"],
+    )
+    def test_model_definition_not_forwarded_when_missing_or_none(
         self,
         internal_data_rule: InternalDataRule,
-        basic_context: SessionCreationContext,
-        test_user_scope: UserScope,
+        context: SessionCreationContext,
+        user_scope: UserScope,
+        preparation_data: dict[str, Any],
+        case: NotForwardedCase,
     ) -> None:
-        """When creation_spec has no model_definition, internal_data should not contain it."""
-        spec = _make_spec(
-            test_user_scope,
-            creation_spec={
-                "model_definition_path": "model-definition.yaml",
-                "runtime_variant": "vllm",
-            },
-        )
-        preparation_data: dict[str, Any] = {}
+        spec = _make_spec(user_scope, creation_spec=case.creation_spec)
 
-        internal_data_rule.prepare(spec, basic_context, preparation_data)
-
-        result = preparation_data["internal_data"]
-        assert "model_definition" not in result
-        assert result["model_definition_path"] == "model-definition.yaml"
-
-    def test_model_definition_none_not_forwarded(
-        self,
-        internal_data_rule: InternalDataRule,
-        basic_context: SessionCreationContext,
-        test_user_scope: UserScope,
-    ) -> None:
-        """When model_definition is None, it should not be forwarded."""
-        spec = _make_spec(
-            test_user_scope,
-            creation_spec={
-                "model_definition": None,
-                "runtime_variant": "vllm",
-            },
-        )
-        preparation_data: dict[str, Any] = {}
-
-        internal_data_rule.prepare(spec, basic_context, preparation_data)
+        internal_data_rule.prepare(spec, context, preparation_data)
 
         result = preparation_data["internal_data"]
         assert "model_definition" not in result
@@ -165,22 +173,21 @@ class TestInternalDataRule:
     def test_existing_internal_data_preserved(
         self,
         internal_data_rule: InternalDataRule,
-        basic_context: SessionCreationContext,
-        test_user_scope: UserScope,
+        context: SessionCreationContext,
+        user_scope: UserScope,
+        model_definition: dict[str, Any],
+        preparation_data: dict[str, Any],
     ) -> None:
-        """Pre-existing internal_data fields should be preserved."""
-        model_definition = {"models": [{"name": "test", "model_path": "/models"}]}
         spec = _make_spec(
-            test_user_scope,
+            user_scope,
             creation_spec={
                 "model_definition": model_definition,
                 "runtime_variant": "vllm",
             },
             internal_data={"existing_key": "existing_value"},
         )
-        preparation_data: dict[str, Any] = {}
 
-        internal_data_rule.prepare(spec, basic_context, preparation_data)
+        internal_data_rule.prepare(spec, context, preparation_data)
 
         result = preparation_data["internal_data"]
         assert result["existing_key"] == "existing_value"
