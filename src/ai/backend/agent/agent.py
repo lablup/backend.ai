@@ -3417,15 +3417,23 @@ class AbstractAgent[
                 model_folder, kernel_config
             )
             if vfolder_override is not None:
-                base = ModelDefinition.model_validate(raw_definition)
-                override = ModelDefinition.model_validate(vfolder_override)
-                merged = base.merge(override)
-                raw_definition = merged.model_dump(mode="json")
-                log.info(
-                    "load_model_definition(): applied VFolder model-definition.yaml override"
-                    " (runtime_variant={})",
-                    runtime_variant,
-                )
+                try:
+                    base = ModelDefinition.model_validate(raw_definition)
+                    override = ModelDefinition.model_validate(vfolder_override)
+                    merged = base.merge(override)
+                    raw_definition = merged.model_dump(mode="json")
+                    log.info(
+                        "load_model_definition(): applied VFolder model-definition.yaml override"
+                        " (runtime_variant={})",
+                        runtime_variant,
+                    )
+                except Exception:
+                    log.warning(
+                        "load_model_definition(): failed to merge VFolder override,"
+                        " using variant defaults (runtime_variant={})",
+                        runtime_variant,
+                        exc_info=True,
+                    )
         try:
             model_definition = model_definition_iv.check(raw_definition)
             if model_definition is None:
@@ -3490,10 +3498,15 @@ class AbstractAgent[
             ) from e
         try:
             yaml = YAML()
-            result: dict[str, Any] = yaml.load(content)
-            return result
+            result = yaml.load(content)
         except YAMLError as e:
             raise ModelDefinitionInvalidYAMLError(f"Invalid YAML syntax: {e}") from e
+        if not isinstance(result, dict):
+            raise ModelDefinitionValidationError(
+                "Model definition YAML must have a mapping at the top level,"
+                f" got {type(result).__name__}"
+            )
+        return result
 
     async def _try_read_model_definition_from_vfolder(
         self,
@@ -3503,7 +3516,15 @@ class AbstractAgent[
         """Try to read model-definition.yaml from VFolder. Returns None if not found."""
         try:
             return await self._read_model_definition_from_vfolder(model_folder, kernel_config)
-        except (ModelDefinitionNotFoundError, ModelDefinitionInvalidYAMLError):
+        except ModelDefinitionNotFoundError:
+            return None
+        except (ModelDefinitionInvalidYAMLError, ModelDefinitionValidationError):
+            log.warning(
+                "Invalid model definition override in vFolder {} (ID {}), ignoring",
+                model_folder.name,
+                model_folder.vfid,
+                exc_info=True,
+            )
             return None
 
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
