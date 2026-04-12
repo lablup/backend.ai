@@ -216,7 +216,7 @@ Role Assignment is a separate entity that maps users to roles. This design provi
 - **Flexible Management**: Create and manage Role Assignments without modifying the Role itself
 - **Audit Trail**: Each assignment tracks who granted it and when
 - **Consistent Operations**: Uses standard create/read/update operations instead of special-purpose operations
-- **Membership Determination**: A user's scope membership is derived from their Role Assignments — assigning a role bound to a scope makes the user a member of that scope
+- **Membership Determination**: A user's scope membership is automatically synced to `association_scopes_entities` when roles are assigned or unassigned
 
 **Role Assignment Attributes**:
 - `user_id`: The user receiving the role
@@ -225,28 +225,29 @@ Role Assignment is a separate entity that maps users to roles. This design provi
 - `granted_at`: When the assignment was created
 
 **Scope Membership via Role Assignment**:
-When a user is assigned a role, they automatically become a member of all scopes the role is bound to. This replaces the previous `association_groups_users` table for project membership management and unifies scope membership queries across all scope types.
+When a user is assigned a role, the system automatically syncs user-scope membership entries in `association_scopes_entities` (with `entity_type='user'`). This replaces the previous `association_groups_users` table and unifies scope membership queries across all scope types.
+
+- **On role assign**: Insert user-scope entries for the role's bound scopes (`ON CONFLICT DO NOTHING` to handle overlap with other roles).
+- **On role unassign**: Delete user-scope entries only for scopes not covered by the user's remaining roles.
 
 **Querying Users in a Scope**:
 
-All scope types use the same query pattern:
+All scope types use a single-table lookup:
 
 ```sql
-SELECT DISTINCT ur.user_id
-FROM user_roles ur
-JOIN association_scopes_entities ase
-  ON ase.entity_type = 'role'
-  AND ase.entity_id = ur.role_id::text
-  AND ase.scope_type = :scope_type   -- 'domain', 'project', 'user'
-  AND ase.scope_id = :scope_id
+SELECT entity_id AS user_id
+FROM association_scopes_entities
+WHERE scope_type = :scope_type   -- 'domain', 'project', 'user'
+  AND scope_id = :scope_id
+  AND entity_type = 'user'
 ```
 
-Previously, each scope type required a different query path (e.g., `association_groups_users` for projects, `users.domain_name` for domains). The new approach unifies all scope membership queries into a single pattern.
+Previously, each scope type required a different query path (e.g., `association_groups_users` for projects, `users.domain_name` for domains). The new approach unifies all scope membership queries into a single-table pattern with no JOINs.
 
 **Example**:
 - Role: "Project-A-Member" (bound to Project-A scope, with basic read permissions)
 - Role Assignment: User Alice → "Project-A-Member" role
-- Result: Alice becomes a member of Project-A and has the permissions defined in the role
+- Result: System inserts `(scope_type='project', scope_id='proj-A', entity_type='user', entity_id=alice_id)` into `association_scopes_entities`. Alice becomes a member of Project-A and has the permissions defined in the role.
 
 **Management**: Scope administrators (Domain Admin, Project Admin) typically have all Role Assignment management permissions for their scope, allowing them to assign roles, revoke assignments, and view all assignments within their scope.
 

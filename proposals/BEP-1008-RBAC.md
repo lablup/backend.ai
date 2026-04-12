@@ -158,23 +158,28 @@ CREATE TABLE user_roles (
 );
 ```
 
-The user_roles table defines the relationship between each user and Role. Users can have multiple Roles. A user's scope membership is derived from their role assignments — the scopes bound to the assigned roles (via `association_scopes_entities`) determine which scopes the user belongs to. This replaces the previous `association_groups_users` table for project membership.
+The user_roles table defines the relationship between each user and Role. Users can have multiple Roles. When a role is assigned or unassigned, the system automatically syncs user-scope membership entries in `association_scopes_entities` (with `entity_type='user'`), enabling single-table membership lookups. This replaces the previous `association_groups_users` table for project membership.
 
-##### 3. association_scopes_entities table (Role-Scope Binding)
+##### 3. association_scopes_entities table (Scope-Entity Binding)
 ```sql
 CREATE TABLE association_scopes_entities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     scope_type VARCHAR(32) NOT NULL,  -- 'domain', 'project', 'user'
     scope_id VARCHAR(64) NOT NULL,    -- Specific scope identifier
-    entity_type VARCHAR(32) NOT NULL, -- 'role', 'vfolder', 'session', etc.
-    entity_id VARCHAR(64) NOT NULL,   -- Entity identifier (e.g., role_id)
+    entity_type VARCHAR(32) NOT NULL, -- 'role', 'user', 'vfolder', 'session', etc.
+    entity_id VARCHAR(64) NOT NULL,   -- Entity identifier (e.g., role_id, user_id)
     relation_type VARCHAR(32) NOT NULL DEFAULT 'auto', -- 'auto' or 'ref'
     registered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(scope_type, scope_id, entity_id)
 );
 ```
 
-The association_scopes_entities table manages scope bindings for all entity types, including roles. For roles, this table defines which scopes the role is bound to. A role's scope bindings determine: (1) where the role is visible and manageable, (2) which scopes users assigned the role become members of, and (3) which scopes are valid targets for the role's permissions. The `relation_type` distinguishes between `auto` (primary scope binding) and `ref` (visibility-only, e.g., for cross-scope sharing).
+The association_scopes_entities table manages scope bindings for all entity types. Key usages:
+- **Roles** (`entity_type='role'`): Defines which scopes the role is bound to, determining role visibility and manageability.
+- **Users** (`entity_type='user'`): Stores user-scope membership, auto-synced on role assign/unassign. Enables single-table membership queries (replaces `association_groups_users`).
+- **Other entities** (`entity_type='vfolder'`, `'session'`, etc.): Manages entity-scope associations for ownership and sharing.
+
+The `relation_type` distinguishes between `auto` (primary scope binding) and `ref` (visibility-only, e.g., for cross-scope sharing).
 
 ##### 4. permissions table (Scoped Permissions)
 ```sql
@@ -200,7 +205,7 @@ The permissions table defines Operations that a Role can perform on specific Ent
 - Use the unified RBAC permission check in the Service Layer
 
 **Project Membership Migration**:
-- Convert `association_groups_users` entries to Role Assignments (`user_roles`) with project-scoped system roles (Project Member, Project Admin)
+- Convert `association_groups_users` entries to Role Assignments (`user_roles`) with project-scoped system roles (Project Member, Project Admin), which auto-syncs user-scope entries in `association_scopes_entities`
 - Sunset `association_groups_users` table
 
 ## Predefined Roles
