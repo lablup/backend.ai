@@ -56,6 +56,11 @@ etcdSeed:
 schemaMigrate:
   enabled: true
 
+## Populate bootstrap data (default domain/group/scaling-group/keypairs) on
+## first install. Source is files/bootstrap-fixture.json in the chart.
+fixture:
+  enabled: true
+
 ## ---------------- Subchart: PostgreSQL HA (Patroni) ----------------
 postgresql-ha:
   enabled: true
