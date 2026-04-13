@@ -21,7 +21,7 @@ def register_v2_login_client_type_routes(
 
     Layout:
         POST   /            create (superadmin only)
-        POST   /search      admin search with filter/order/pagination (superadmin only)
+        POST   /search      search with filter/order/pagination (authenticated users)
         GET    /{id}        get by id (authenticated users)
         PATCH  /{id}        update (superadmin only)
         DELETE /{id}        delete (superadmin only)
@@ -31,7 +31,7 @@ def register_v2_login_client_type_routes(
     registry.add(
         "POST",
         "/",
-        handler.create,
+        handler.admin_create,
         middlewares=[superadmin_required],
     )
     registry.add(
@@ -49,13 +49,13 @@ def register_v2_login_client_type_routes(
     registry.add(
         "PATCH",
         "/{login_client_type_id}",
-        handler.update,
+        handler.admin_update,
         middlewares=[superadmin_required],
     )
     registry.add(
         "DELETE",
         "/{login_client_type_id}",
-        handler.delete,
+        handler.admin_delete,
         middlewares=[superadmin_required],
     )
 

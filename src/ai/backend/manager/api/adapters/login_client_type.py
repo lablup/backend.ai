@@ -48,7 +48,7 @@ from ai.backend.manager.services.login_client_type.actions.get import (
     GetLoginClientTypeAction,
 )
 from ai.backend.manager.services.login_client_type.actions.search import (
-    AdminSearchLoginClientTypesAction,
+    SearchLoginClientTypesAction,
 )
 from ai.backend.manager.services.login_client_type.actions.update import (
     UpdateLoginClientTypeAction,
@@ -91,14 +91,14 @@ class LoginClientTypeAdapter(BaseAdapter):
 
     # --- Instance methods ---
 
-    async def create(self, input: CreateLoginClientTypeInput) -> CreateLoginClientTypePayload:
+    async def admin_create(self, input: CreateLoginClientTypeInput) -> CreateLoginClientTypePayload:
         creator = Creator[LoginClientTypeRow](
             spec=LoginClientTypeCreatorSpec(
                 name=input.name,
                 description=input.description,
             ),
         )
-        action_result = await self._processors.login_client_type.create.wait_for_complete(
+        action_result = await self._processors.login_client_type_admin.create.wait_for_complete(
             CreateLoginClientTypeAction(creator=creator)
         )
         return CreateLoginClientTypePayload(
@@ -117,10 +117,8 @@ class LoginClientTypeAdapter(BaseAdapter):
         """Search login client types with admin scope (filter/order/pagination)."""
         querier = self._build_search_querier(input)
 
-        action_result = (
-            await self._processors.login_client_type_admin.admin_search.wait_for_complete(
-                AdminSearchLoginClientTypesAction(querier=querier)
-            )
+        action_result = await self._processors.login_client_type.search.wait_for_complete(
+            SearchLoginClientTypesAction(querier=querier)
         )
 
         return AdminSearchLoginClientTypesPayload(
@@ -130,7 +128,7 @@ class LoginClientTypeAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def update(
+    async def admin_update(
         self, type_id: UUID, input: UpdateLoginClientTypeInput
     ) -> UpdateLoginClientTypePayload:
         name = OptionalState.nop() if input.name is None else OptionalState.update(input.name)
@@ -148,15 +146,15 @@ class LoginClientTypeAdapter(BaseAdapter):
             ),
             pk_value=type_id,
         )
-        action_result = await self._processors.login_client_type.update.wait_for_complete(
+        action_result = await self._processors.login_client_type_admin.update.wait_for_complete(
             UpdateLoginClientTypeAction(updater=updater)
         )
         return UpdateLoginClientTypePayload(
             login_client_type=self._data_to_node(action_result.login_client_type),
         )
 
-    async def delete(self, type_id: UUID) -> DeleteLoginClientTypePayload:
-        action_result = await self._processors.login_client_type.delete.wait_for_complete(
+    async def admin_delete(self, type_id: UUID) -> DeleteLoginClientTypePayload:
+        action_result = await self._processors.login_client_type_admin.delete.wait_for_complete(
             DeleteLoginClientTypeAction(id=type_id)
         )
         return DeleteLoginClientTypePayload(id=action_result.login_client_type.id)
