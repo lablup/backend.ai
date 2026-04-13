@@ -266,7 +266,7 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
 
         assert result.success is True
         assert result.data == mock_endpoint_data
-        mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
+        mock_deployment_controller.mark_lifecycle_needed.assert_awaited_once_with(
             DeploymentLifecycleType.CHECK_REPLICA
         )
 
@@ -293,7 +293,7 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
 
         assert result.success is True
         assert result.data == mock_endpoint_data
-        mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
+        mock_deployment_controller.mark_lifecycle_needed.assert_awaited_once_with(
             DeploymentLifecycleType.CHECK_REPLICA
         )
 
