@@ -194,7 +194,7 @@ class LoginClientTypeConflict(BackendAIError, web.HTTPConflict):
         )
 
 
-class TooManyConcurrentLoginSessions(BackendAIError, web.HTTPTooManyRequests):
+class TooManyConcurrentLoginSessions(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/too-many-concurrent-logins"
     error_title = "Too many concurrent login sessions for this user."
 
