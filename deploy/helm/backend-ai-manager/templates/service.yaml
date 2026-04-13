@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bai-manager.fullname" . }}
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.manager.service.type }}
+  selector:
+    {{- include "bai-manager.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.manager.service.port }}
+      targetPort: {{ .Values.manager.bindPort }}
+      protocol: TCP

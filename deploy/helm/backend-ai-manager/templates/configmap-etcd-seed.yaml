@@ -1,0 +1,16 @@
+{{- if .Values.etcdSeed.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bai-manager.fullname" . }}-etcd-seed
+  labels:
+    {{- include "bai-manager.labels" . | nindent 4 }}
+data:
+  etcd-seed.json: |-
+{{- $seed := .Values.etcdSeed.config | deepCopy }}
+{{- $_ := set $seed "redis" (dict
+    "sentinel" (printf "%s:26379" (include "bai-manager.redisSentinelHost" .))
+    "service_name" .Values.redis.sentinel.masterSet
+    "password" .Values.redis.auth.password) }}
+    {{- toJson $seed | nindent 4 }}
+{{- end }}

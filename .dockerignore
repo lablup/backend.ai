@@ -1,5 +1,66 @@
+# VCS
+.git
+.github
+
+# Pants & build caches
+.pants.d
+.pants.rc
+dist
+.pids
+.cache
+
+# Python caches
+**/__pycache__
+**/*.pyc
+**/*.pyo
+.venv
+.mypy_cache
+.pytest_cache
+.ruff_cache
+
+# Halfstack / local state
 changes
 volumes
-tools
 tmp
 .tmp
+wheelhouse
+
+# Editor / OS
+.idea
+.vscode
+.DS_Store
+
+# Unrelated scratch files living at repo root (demo/test artifacts, not part of the build)
+Dockerfile
+Dockerfile-go
+K8S_OPERATOR_ARCHITECTURE.md
+K8S_POD_TO_BACKENDAI_SESSION.md
+KERNEL_K8S_VIEW.md
+StartupCpuDemo.class
+StartupCpuDemo.java
+backend-ai-test
+bridge.md
+cpu-boost-test-suite
+fix_datetime_microsecond.md
+gotest
+jvm-test
+k8s.pptx
+migration-agent-to-k8s-pod.md
+pytorch_test.sh
+test
+test.go
+test.sh
+test_api
+test_cpu_affinity_debug.sh
+test_cpu_frequency.sh
+test_cpu_intensive.sh
+test_hmac.sh
+test_np.sh
+test_numpy_cpu.sh
+test_prime.sh
+test_prime_multicore.sh
+test_pytorch_import.sh
+virtual.md
+
+# Keep docker/manager/Dockerfile itself reachable (only deny files, not the dir)
+!docker/
