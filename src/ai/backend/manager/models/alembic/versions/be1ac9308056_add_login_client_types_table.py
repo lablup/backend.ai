@@ -6,6 +6,8 @@ Create Date: 2026-04-09
 
 """
 
+import uuid
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
@@ -16,6 +18,10 @@ down_revision = "2c9000848b6e"
 # Part of: 26.3.0
 branch_labels = None
 depends_on = None
+
+# Fixed UUIDs for seed rows so references stay stable.
+_SEED_CORE_ID = uuid.UUID("00000000-0000-0000-0000-00000000c02e")
+_SEED_WEBUI_ID = uuid.UUID("00000000-0000-0000-0000-0000000000eb")
 
 
 def upgrade() -> None:
@@ -46,6 +52,28 @@ def upgrade() -> None:
                 onupdate=sa.func.now(),
                 nullable=False,
             ),
+        )
+
+        login_client_types_table = sa.table(
+            "login_client_types",
+            sa.column("id", postgresql.UUID(as_uuid=True)),
+            sa.column("name", sa.String),
+            sa.column("description", sa.Text),
+        )
+        op.bulk_insert(
+            login_client_types_table,
+            [
+                {
+                    "id": _SEED_CORE_ID,
+                    "name": "core",
+                    "description": "Backend.AI CLI / core SDK clients.",
+                },
+                {
+                    "id": _SEED_WEBUI_ID,
+                    "name": "webui",
+                    "description": "Backend.AI web console.",
+                },
+            ],
         )
 
 
