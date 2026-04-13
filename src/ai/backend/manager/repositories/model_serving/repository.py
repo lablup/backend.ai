@@ -21,9 +21,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AccessKey,
-    QuotaScopeID,
     ResourceSlot,
-    VFolderID,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.types import RouteHealthStatus
@@ -42,7 +40,7 @@ from ai.backend.manager.data.model_serving.types import (
     UserData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import VFolderLocation, VFolderOwnershipType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -83,6 +81,9 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.deployment.creators import DeploymentPolicyCreatorSpec
+from ai.backend.manager.repositories.deployment.storage_source.storage_source import (
+    DeploymentStorageSource,
+)
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import (
@@ -972,35 +973,32 @@ class ModelServingRepository:
                 VFolderRow.id,
                 VFolderRow.host,
                 VFolderRow.quota_scope_id,
+                VFolderRow.ownership_type,
+                VFolderRow.usage_mode,
             ).where(VFolderRow.id == vfolder_id)
             vf_result = await db_session.execute(vf_query)
             vf_row = vf_result.one_or_none()
             if vf_row is None:
                 return None
 
-            quota_scope_id: QuotaScopeID | None = vf_row.quota_scope_id
-            vfid = VFolderID(quota_scope_id, vf_row.id)
-            proxy_name, volume_name = storage_manager.get_proxy_and_volume(vf_row.host)
-            manager_client = storage_manager.get_manager_facing_client(proxy_name)
-
+            vfolder_location = VFolderLocation(
+                id=vf_row.id,
+                quota_scope_id=vf_row.quota_scope_id,
+                host=vf_row.host,
+                ownership_type=vf_row.ownership_type,
+                usage_mode=vf_row.usage_mode,
+            )
             candidates = (
                 [model_definition_path]
                 if model_definition_path
                 else ["model-definition.yaml", "model-definition.yml"]
             )
-            for candidate in candidates:
-                try:
-                    content = await manager_client.fetch_file_content(
-                        volume_name, str(vfid), candidate
-                    )
-                    if content:
-                        yaml = YAML()
-                        return cast(dict[str, Any], yaml.load(content))
-                except Exception:
-                    continue
+            storage_source = DeploymentStorageSource(storage_manager)
+            content = await storage_source.fetch_definition_file(vfolder_location, candidates)
+            yaml = YAML()
+            return cast(dict[str, Any], yaml.load(content))
         except Exception:
-            pass
-        return None
+            return None
 
     @model_serving_repository_resilience.apply()
     async def search_auto_scaling_rules(
