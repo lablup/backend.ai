@@ -5002,6 +5002,7 @@ type LoginHistoryV2Edge {
 
 """Added in 26.4.1. Filter criteria for querying login sessions."""
 input LoginSessionFilter {
+  userId: UUIDFilter = null
   status: LoginSessionStatusFilter = null
   accessKey: StringFilter = null
   createdAt: DateTimeFilter = null
@@ -6308,6 +6309,11 @@ type Mutation {
 
   """Added in 26.4.1. Revoke a login session owned by the current user."""
   myRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload!
+
+  """
+  Added in 26.4.1. Clear the failed-login rate limit block for a user. (admin only)
+  """
+  adminUnblockUser(username: String!): UnblockUserPayload!
 
   """
   Added in 26.4.0. Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention)
@@ -10833,6 +10839,14 @@ type UnassignUsersFromProjectPayload {
 
   """List of errors for users that could not be unassigned."""
   failed: [UnassignUserError!]!
+}
+
+"""
+Added in 26.4.1. Payload returned after clearing a user's failed-login block.
+"""
+type UnblockUserPayload {
+  """Whether the unblock was successful"""
+  success: Boolean!
 }
 
 """Added in 25.15.0. Input type for unregistering a storage namespace."""
