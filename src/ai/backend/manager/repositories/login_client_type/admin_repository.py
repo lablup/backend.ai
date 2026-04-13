@@ -26,5 +26,5 @@ class LoginClientTypeAdminRepository:
     async def update(self, updater: Updater[LoginClientTypeRow]) -> LoginClientTypeData:
         return await self._db_source.update(updater)
 
-    async def delete(self, type_id: UUID) -> LoginClientTypeData:
-        return await self._db_source.delete(type_id)
+    async def delete(self, login_client_type_id: UUID) -> LoginClientTypeData:
+        return await self._db_source.delete(login_client_type_id)

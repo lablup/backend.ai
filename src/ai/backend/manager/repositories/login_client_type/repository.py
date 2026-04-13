@@ -21,8 +21,8 @@ class LoginClientTypeRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = LoginClientTypeDBSource(db)
 
-    async def get_by_id(self, type_id: UUID) -> LoginClientTypeData:
-        return await self._db_source.get_by_id(type_id)
+    async def get_by_id(self, login_client_type_id: UUID) -> LoginClientTypeData:
+        return await self._db_source.get_by_id(login_client_type_id)
 
     async def search(self, querier: BatchQuerier) -> LoginClientTypeSearchResult:
         return await self._db_source.search(querier)

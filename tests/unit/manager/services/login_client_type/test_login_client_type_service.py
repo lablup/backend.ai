@@ -84,12 +84,12 @@ class TestLoginClientTypeService:
         service: LoginClientTypeService,
         mock_repository: MagicMock,
     ) -> None:
-        type_id = uuid4()
+        login_client_type_id = uuid4()
         mock_repository.get_by_id = AsyncMock(
-            side_effect=LoginClientTypeNotFound(extra_msg=f"id {type_id} not found")
+            side_effect=LoginClientTypeNotFound(extra_msg=f"id {login_client_type_id} not found")
         )
 
-        action = GetLoginClientTypeAction(id=type_id)
+        action = GetLoginClientTypeAction(id=login_client_type_id)
 
         with pytest.raises(LoginClientTypeNotFound):
             await service.get(action)
@@ -277,12 +277,12 @@ class TestLoginClientTypeAdminService:
         admin_service: LoginClientTypeAdminService,
         mock_admin_repository: MagicMock,
     ) -> None:
-        type_id = uuid4()
+        login_client_type_id = uuid4()
         mock_admin_repository.delete = AsyncMock(
-            side_effect=LoginClientTypeNotFound(extra_msg=f"id {type_id} not found")
+            side_effect=LoginClientTypeNotFound(extra_msg=f"id {login_client_type_id} not found")
         )
 
-        action = DeleteLoginClientTypeAction(id=type_id)
+        action = DeleteLoginClientTypeAction(id=login_client_type_id)
 
         with pytest.raises(LoginClientTypeNotFound):
             await admin_service.delete(action)

@@ -33,17 +33,17 @@ class LoginClientTypeDBSource:
             result = await execute_creator(session, creator)
             return result.row.to_dataclass()
 
-    async def get_by_id(self, type_id: UUID) -> LoginClientTypeData:
+    async def get_by_id(self, login_client_type_id: UUID) -> LoginClientTypeData:
         async with self._db.begin_readonly_session() as session:
             row = cast(
                 LoginClientTypeRow | None,
                 await session.scalar(
-                    sa.select(LoginClientTypeRow).where(LoginClientTypeRow.id == type_id)
+                    sa.select(LoginClientTypeRow).where(LoginClientTypeRow.id == login_client_type_id)
                 ),
             )
             if row is None:
                 raise LoginClientTypeNotFound(
-                    extra_msg=f"Login client type with id {type_id} not found."
+                    extra_msg=f"Login client type with id {login_client_type_id} not found."
                 )
             return row.to_dataclass()
 
@@ -71,17 +71,17 @@ class LoginClientTypeDBSource:
                 )
             return result.row.to_dataclass()
 
-    async def delete(self, type_id: UUID) -> LoginClientTypeData:
+    async def delete(self, login_client_type_id: UUID) -> LoginClientTypeData:
         async with self._db.begin_session() as session:
             row = cast(
                 LoginClientTypeRow | None,
                 await session.scalar(
-                    sa.select(LoginClientTypeRow).where(LoginClientTypeRow.id == type_id)
+                    sa.select(LoginClientTypeRow).where(LoginClientTypeRow.id == login_client_type_id)
                 ),
             )
             if row is None:
                 raise LoginClientTypeNotFound(
-                    extra_msg=f"Login client type with id {type_id} not found."
+                    extra_msg=f"Login client type with id {login_client_type_id} not found."
                 )
             data = row.to_dataclass()
             await session.delete(row)
