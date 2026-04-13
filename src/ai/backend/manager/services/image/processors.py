@@ -159,15 +159,20 @@ class ImageProcessors(AbstractProcessorPackage):
 
         # Single entity actions — also invoked from gql_legacy, so use the
         # non-enforcing legacy RBAC validator to avoid breaking legacy callers.
+        legacy_single_entity_validator = (
+            validators.legacy_rbac.single_entity
+            if validators.legacy_rbac is not None
+            else validators.rbac.single_entity
+        )
         self.forget_image_by_id = SingleEntityActionProcessor(
             service.forget_image_by_id,
             action_monitors,
-            validators=[validators.legacy_rbac.single_entity],
+            validators=[legacy_single_entity_validator],
         )
         self.purge_image_by_id = SingleEntityActionProcessor(
             service.purge_image_by_id,
             action_monitors,
-            validators=[validators.legacy_rbac.single_entity],
+            validators=[legacy_single_entity_validator],
         )
         # Superadmin-only mutations — access is enforced by check_admin_only at the API layer,
         # so per-entity RBAC validation is not required here.

@@ -152,10 +152,20 @@ class UserProcessors(AbstractProcessorPackage):
     ) -> None:
         # Scope actions with RBAC — create_user is also invoked from gql_legacy,
         # so use the non-enforcing legacy validator to avoid breaking callers.
+        legacy_scope_validator = (
+            validators.legacy_rbac.scope
+            if validators.legacy_rbac is not None
+            else validators.rbac.scope
+        )
+        legacy_single_entity_validator = (
+            validators.legacy_rbac.single_entity
+            if validators.legacy_rbac is not None
+            else validators.rbac.single_entity
+        )
         self.create_user = ScopeActionProcessor(
             user_service.create_user,
             action_monitors,
-            validators=[validators.legacy_rbac.scope],
+            validators=[legacy_scope_validator],
         )
         self.search_users_by_domain = ActionProcessor(
             user_service.search_users_by_domain, action_monitors
@@ -176,7 +186,7 @@ class UserProcessors(AbstractProcessorPackage):
         self.modify_user = SingleEntityActionProcessor(
             user_service.modify_user,
             action_monitors,
-            validators=[validators.legacy_rbac.single_entity],
+            validators=[legacy_single_entity_validator],
         )
         self.modify_user_by_id = SingleEntityActionProcessor(
             user_service.modify_user_by_id,
@@ -193,7 +203,7 @@ class UserProcessors(AbstractProcessorPackage):
         self.purge_user = SingleEntityActionProcessor(
             user_service.purge_user,
             action_monitors,
-            validators=[validators.legacy_rbac.single_entity],
+            validators=[legacy_single_entity_validator],
         )
         self.purge_user_by_id = SingleEntityActionProcessor(
             user_service.purge_user_by_id,
