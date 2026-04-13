@@ -754,15 +754,37 @@ class Context(metaclass=ABCMeta):
                     f'var-base-path = "{service.agent_var_base_path}"',
                     f'var-base-path = "{service.sftp_agent_var_base_path}"',
                 ),
+                # --- metric API service-addr (avoid port 6003 collision) ---
+                (
+                    'service-addr = { host = "0.0.0.0", port = 6003 }',
+                    'service-addr = { host = "0.0.0.0", port = 6014 }',
+                ),
                 # --- container port range (non-overlapping) ---
                 ("port-range = [30000, 31000]", "port-range = [31100, 31200]"),
                 # --- disable compute plugins (SFTP only) ---
                 (
                     re.compile(r"^allow-compute-plugins = \[.*\]", flags=re.MULTILINE),
-                    "# allow-compute-plugins = []",
+                    "allow-compute-plugins = []",
                 ),
                 # --- pyroscope differentiation ---
                 ('app-name = "backendai-half-agent"', 'app-name = "backendai-half-sftp-agent"'),
+            ],
+        )
+        # Insert additional ports into [agent] section to avoid collision
+        # with the primary agent (aiomonitor defaults: 38200/39200,
+        # metadata-server-port default: 40128).
+        self.sed_in_place_multi(
+            toml_path,
+            [
+                (
+                    'id = "i-local-sftp"',
+                    (
+                        'id = "i-local-sftp"\n'
+                        "aiomonitor-termui-port = 38201\n"
+                        "aiomonitor-webui-port = 39201\n"
+                        "metadata-server-port = 40129"
+                    ),
+                ),
             ],
         )
 
