@@ -178,8 +178,10 @@ class ServiceConfig:
     webui_menu_blocklist: list[str]
     webui_menu_inactivelist: list[str]
     local_proxy_addr: ServerAddr
+    scaling_group: str
     agent_rpc_addr: ServerAddr
     agent_watcher_addr: ServerAddr
+    agent_sock_port: int
     agent_ipc_base_path: str
     agent_var_base_path: str
     storage_proxy_manager_facing_addr: ServerAddr
@@ -217,6 +219,8 @@ class ServiceConfig:
     sftp_agent_watcher_addr: ServerAddr = dataclasses.field(
         default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 6015))
     )
+    sftp_agent_sock_port: int = 6017
+    sftp_agent_ipc_base_path: str = "ipc/agent-sftp"
     sftp_agent_var_base_path: str = "var/agent-sftp"
     sftp_agent_scaling_group: str = "upload"
 

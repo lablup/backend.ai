@@ -570,8 +570,11 @@ class Context(metaclass=ABCMeta):
         # When a dedicated SFTP agent is configured, point the storage proxy's
         # sftp_scaling_groups at that agent's scaling group so that SFTP
         # upload sessions get routed through it.
+        # Must be under volumes/proxies/<proxy>/ per manager config schema.
         if service.sftp_agent_enabled:
-            data["volumes"]["sftp_scaling_groups"] = service.sftp_agent_scaling_group
+            data["volumes"]["proxies"]["local"]["sftp_scaling_groups"] = (
+                service.sftp_agent_scaling_group
+            )
         await self.etcd_put_json("", data)
         data = {}
         # TODO: in dev-mode, enable these.
@@ -696,38 +699,70 @@ class Context(metaclass=ABCMeta):
         compute agent. This is gated by ``install_variable.with_sftp_agent``
         and piggybacks on Backend.AI's multi-agent-per-node feature.
 
-        Unlike ``configure_agent``, which rewrites large portions of the
-        primary agent template, this function copies a pre-authored
-        ``agent-sftp.toml`` sample (bundled as a symlink in the installer
-        package, same pattern as other halfstack TOMLs) and only touches
-        values that depend on the install environment: the etcd addr and
-        the mount-path (which needs to be rewritten to an absolute path
-        under the current install base_path). Every other field — ports,
-        pid-file, scaling-group, aiomonitor, compute-plugins — is baked
-        into the sample at edit time so we don't need to maintain ad-hoc
-        sed patterns here.
+        Clones the already-generated ``./agent.toml`` (produced by
+        ``configure_agent``) so that etcd, mount-path, plugin, and other
+        environment-specific settings are automatically shared.  Then
+        applies SFTP-specific overrides (distinct ports, pid-file,
+        scaling-group, ipc/var paths) so the two agents can coexist on
+        the same node without resource collisions.
         """
-        halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         if not service.sftp_agent_enabled:
             return
 
-        toml_path = self.copy_config("agent-sftp.toml")
+        # Clone the primary agent config instead of the bundled template
+        # so that every environment-dependent setting (etcd addr, mount-path,
+        # accelerator plugins, etc.) is inherited automatically.
+        primary_toml = Path.cwd() / "agent.toml"
+        toml_path = Path.cwd() / "agent-sftp.toml"
+        shutil.copy2(primary_toml, toml_path)
         Path(service.sftp_agent_var_base_path).mkdir(parents=True, exist_ok=True)
 
         self.sed_in_place_multi(
             toml_path,
             [
-                # etcd addr — rewrite the template port to whatever the
-                # local halfstack exposes.
-                ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
-                # mount-path — must be an absolute path pointing at the
-                # same vfolder root as the primary compute agent so that
-                # files uploaded via SFTP are visible to compute sessions.
+                # --- port collision avoidance ---
                 (
-                    re.compile(r"^mount-path = .*", flags=re.MULTILINE),
-                    f'mount-path = "{self.install_info.base_path / service.vfolder_relpath}"',
+                    f"port = {service.agent_rpc_addr.face.port}",
+                    f"port = {service.sftp_agent_rpc_addr.face.port}",
                 ),
+                (
+                    f"agent-sock-port = {service.agent_sock_port}",
+                    f"agent-sock-port = {service.sftp_agent_sock_port}",
+                ),
+                (
+                    f"port = {service.agent_watcher_addr.face.port}",
+                    f"port = {service.sftp_agent_watcher_addr.face.port}",
+                ),
+                # --- identity ---
+                (
+                    re.compile(r'^# id = "i-something-special"', flags=re.MULTILINE),
+                    'id = "i-local-sftp"',
+                ),
+                (re.compile(r'^id = "i-.*"', flags=re.MULTILINE), 'id = "i-local-sftp"'),
+                (
+                    f'scaling-group = "{service.scaling_group}"',
+                    f'scaling-group = "{service.sftp_agent_scaling_group}"',
+                ),
+                # --- path isolation ---
+                ('pid-file = "./agent.pid"', 'pid-file = "./agent-sftp.pid"'),
+                (
+                    f'ipc-base-path = "{service.agent_ipc_base_path}"',
+                    f'ipc-base-path = "{service.sftp_agent_ipc_base_path}"',
+                ),
+                (
+                    f'var-base-path = "{service.agent_var_base_path}"',
+                    f'var-base-path = "{service.sftp_agent_var_base_path}"',
+                ),
+                # --- container port range (non-overlapping) ---
+                ("port-range = [30000, 31000]", "port-range = [31100, 31200]"),
+                # --- disable compute plugins (SFTP only) ---
+                (
+                    re.compile(r"^allow-compute-plugins = \[.*\]", flags=re.MULTILINE),
+                    "# allow-compute-plugins = []",
+                ),
+                # --- pyroscope differentiation ---
+                ('app-name = "backendai-half-agent"', 'app-name = "backendai-half-sftp-agent"'),
             ],
         )
 
@@ -1457,8 +1492,10 @@ class DevContext(Context):
                 bind=HostPortPair(public_component_bind_address, 5050),
                 face=HostPortPair(public_facing_address, 5050),
             ),
+            scaling_group="default",
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
+            agent_sock_port=6007,
             agent_ipc_base_path="ipc/agent",
             agent_var_base_path="var/agent",
             storage_proxy_client_facing_addr=ServerAddr(
@@ -1618,8 +1655,10 @@ class PackageContext(Context):
                 bind=HostPortPair(public_component_bind_address, 15050),
                 face=HostPortPair(public_facing_address, 15050),
             ),
+            scaling_group="default",
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
+            agent_sock_port=6007,
             agent_ipc_base_path="ipc/agent",
             agent_var_base_path="var/agent",
             storage_proxy_client_facing_addr=ServerAddr(

@@ -301,6 +301,11 @@ _validate_service() {
     echo "Valid services: $ALL_SERVICES $OPTIONAL_SERVICES all"
     exit 1
   }
+  # Fail fast if sftp-agent config is missing
+  if [ "$svc" = "sftp-agent" ] && [ ! -f "./agent-sftp.toml" ]; then
+    echo "$(_color red "agent-sftp.toml not found. Run the installer with --with-sftp-agent first.")"
+    exit 1
+  fi
 }
 
 if [ $# -lt 1 ]; then
