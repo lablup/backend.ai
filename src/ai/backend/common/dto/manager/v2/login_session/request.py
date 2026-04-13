@@ -14,6 +14,7 @@ from .types import LoginSessionOrderField, LoginSessionStatus, OrderDirection
 __all__ = (
     "AdminRevokeLoginSessionInput",
     "AdminSearchLoginSessionsInput",
+    "AdminUnblockUserInput",
     "LoginSessionFilter",
     "LoginSessionOrder",
     "LoginSessionStatusFilter",
@@ -103,3 +104,9 @@ class AdminRevokeLoginSessionInput(BaseRequestModel):
     """Input for revoking a login session (admin)."""
 
     session_id: UUID = Field(description="ID of the login session to revoke")
+
+
+class AdminUnblockUserInput(BaseRequestModel):
+    """Input for clearing the failed-login rate limit block for a user (admin)."""
+
+    username: str = Field(description="Username of the user to unblock")

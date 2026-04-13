@@ -6,6 +6,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.login_session.request import (
     AdminRevokeLoginSessionInput,
     AdminSearchLoginSessionsInput,
+    AdminUnblockUserInput,
     LoginSessionFilter,
     LoginSessionOrder,
     LoginSessionStatusFilter,
@@ -17,6 +18,7 @@ from ai.backend.common.dto.manager.v2.login_session.response import (
     LoginSessionNode,
     MySearchLoginSessionsPayload,
     RevokeLoginSessionPayload,
+    UnblockUserPayload,
 )
 from ai.backend.common.dto.manager.v2.login_session.types import (
     LoginSessionOrderField,
@@ -42,6 +44,7 @@ from ai.backend.manager.services.auth.actions.search_login_sessions import (
     AdminSearchLoginSessionsAction,
     SearchLoginSessionsAction,
 )
+from ai.backend.manager.services.auth.actions.unblock_user import AdminUnblockUserAction
 
 from .base import BaseAdapter
 from .pagination import PaginationSpec
@@ -138,6 +141,13 @@ class LoginSessionAdapter(BaseAdapter):
             )
         )
         return RevokeLoginSessionPayload(success=action_result.success)
+
+    async def admin_unblock_user(self, input: AdminUnblockUserInput) -> UnblockUserPayload:
+        """Clear the failed-login rate limit block for a user (admin only)."""
+        action_result = await self._processors.auth.admin_unblock_user.wait_for_complete(
+            AdminUnblockUserAction(username=input.username)
+        )
+        return UnblockUserPayload(success=action_result.success)
 
     def _convert_filter(self, f: LoginSessionFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

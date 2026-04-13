@@ -95,6 +95,10 @@ from ai.backend.manager.services.auth.actions.search_login_sessions import (
 )
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
+from ai.backend.manager.services.auth.actions.unblock_user import (
+    AdminUnblockUserAction,
+    AdminUnblockUserActionResult,
+)
 from ai.backend.manager.services.auth.actions.update_full_name import (
     UpdateFullNameAction,
     UpdateFullNameActionResult,
@@ -531,6 +535,12 @@ class AuthService:
         session_token = await self._auth_repository.revoke_login_session(action.session_id)
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
+
+    async def admin_unblock_user(
+        self, action: AdminUnblockUserAction
+    ) -> AdminUnblockUserActionResult:
+        await self._valkey_session_client.clear_login_block(action.username)
+        return AdminUnblockUserActionResult(success=True)
 
     async def signout(self, action: SignoutAction) -> SignoutActionResult:
         if action.email != action.requester_email:

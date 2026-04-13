@@ -172,6 +172,7 @@ from .login_history import admin_login_history_v2, my_login_history_v2
 from .login_session import (
     admin_login_sessions_v2,
     admin_revoke_login_session,
+    admin_unblock_user,
     my_login_sessions_v2,
     my_revoke_login_session,
 )
@@ -763,6 +764,7 @@ class Mutation:
     # Login session mutations
     admin_revoke_login_session = admin_revoke_login_session
     my_revoke_login_session = my_revoke_login_session
+    admin_unblock_user = admin_unblock_user
     # IP allowlist self-service mutation
     update_my_allowed_client_ip = update_my_allowed_client_ip
     # Prometheus Query Preset - Admin APIs
