@@ -111,14 +111,6 @@ def huggingface_registry() -> None:
 
 @v2.group(
     cls=LazyGroup,
-    import_name="ai.backend.client.cli.v2.login_client_type:login_client_type",
-)
-def login_client_type() -> None:
-    """Login client type commands."""
-
-
-@v2.group(
-    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.reservoir_registry:reservoir_registry",
 )
 def reservoir_registry() -> None:
