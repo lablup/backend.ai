@@ -58,4 +58,4 @@ class TestMaxConcurrentLogins:
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.auth.authorize(authorize_req)
         assert exc_info.value.status == 409
-        assert exc_info.value.data["type"].split("/")[-1] == "too-many-concurrent-logins"
+        assert exc_info.value.data["type"].split("/")[-1] == "active-login-session-exists"
