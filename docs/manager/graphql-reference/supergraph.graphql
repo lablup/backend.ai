@@ -7864,6 +7864,11 @@ enum LoginAttemptResult
   FAILED_PASSWORD_EXPIRED @join__enumValue(graph: STRAWBERRY)
   FAILED_REJECTED_BY_HOOK @join__enumValue(graph: STRAWBERRY)
   FAILED_SESSION_ALREADY_EXISTS @join__enumValue(graph: STRAWBERRY)
+  LOGOUT @join__enumValue(graph: STRAWBERRY)
+  REVOKED_BY_ADMIN @join__enumValue(graph: STRAWBERRY)
+  REVOKED_BY_USER @join__enumValue(graph: STRAWBERRY)
+  EVICTED @join__enumValue(graph: STRAWBERRY)
+  EXPIRED @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.4.1. Filter criteria for querying login history."""

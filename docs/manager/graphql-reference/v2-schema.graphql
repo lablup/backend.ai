@@ -4922,6 +4922,11 @@ enum LoginAttemptResult {
   FAILED_PASSWORD_EXPIRED
   FAILED_REJECTED_BY_HOOK
   FAILED_SESSION_ALREADY_EXISTS
+  LOGOUT
+  REVOKED_BY_ADMIN
+  REVOKED_BY_USER
+  EVICTED
+  EXPIRED
 }
 
 """Added in 26.4.1. Filter criteria for querying login history."""
