@@ -85,11 +85,6 @@ async def _seed_login_client_types(db_engine: SAEngine) -> AsyncIterator[None]:
                         "name": "webui",
                         "description": "Backend.AI web console.",
                     },
-                    {
-                        "id": uuid.UUID("00000000-0000-0000-0000-00000000fa57"),
-                        "name": "fasttrack",
-                        "description": "Backend.AI FastTrack workflow client.",
-                    },
                 ])
             )
     yield
@@ -99,7 +94,6 @@ async def _seed_login_client_types(db_engine: SAEngine) -> AsyncIterator[None]:
                 LoginClientTypeRow.__table__.c.id.in_([
                     uuid.UUID("00000000-0000-0000-0000-00000000c02e"),
                     uuid.UUID("00000000-0000-0000-0000-0000000000eb"),
-                    uuid.UUID("00000000-0000-0000-0000-00000000fa57"),
                 ])
             )
         )
