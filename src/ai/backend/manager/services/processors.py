@@ -389,8 +389,6 @@ class Services:
     model_serving: ModelServingService
     model_serving_auto_scaling: AutoScalingService
     auth: AuthService
-    login_client_type: LoginClientTypeService
-    login_client_type_admin: LoginClientTypeAdminService
     notification: NotificationService
     object_storage: ObjectStorageService
     permission_controller: PermissionControllerService
@@ -407,6 +405,8 @@ class Services:
     resource_allocation: ResourceAllocationService
     stream: StreamService
     events: EventsService
+    login_client_type: LoginClientTypeService
+    login_client_type_admin: LoginClientTypeAdminService
 
 
 @dataclass
@@ -453,8 +453,6 @@ class Processors(AbstractProcessorPackage):
     model_serving: ModelServingProcessors
     model_serving_auto_scaling: ModelServingAutoScalingProcessors
     auth: AuthProcessors
-    login_client_type: LoginClientTypeProcessors
-    login_client_type_admin: LoginClientTypeAdminProcessors
     notification: NotificationProcessors
     object_storage: ObjectStorageProcessors
     permission_controller: PermissionControllerProcessors
@@ -471,6 +469,8 @@ class Processors(AbstractProcessorPackage):
     resource_allocation: ResourceAllocationProcessors
     stream: StreamProcessors
     events: EventsProcessors
+    login_client_type: LoginClientTypeProcessors
+    login_client_type_admin: LoginClientTypeAdminProcessors
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -510,8 +510,6 @@ class Processors(AbstractProcessorPackage):
             *self.model_serving.supported_actions(),
             *self.model_serving_auto_scaling.supported_actions(),
             *self.auth.supported_actions(),
-            *self.login_client_type.supported_actions(),
-            *self.login_client_type_admin.supported_actions(),
             *self.notification.supported_actions(),
             *self.object_storage.supported_actions(),
             *self.permission_controller.supported_actions(),
@@ -528,4 +526,6 @@ class Processors(AbstractProcessorPackage):
             *self.resource_allocation.supported_actions(),
             *self.stream.supported_actions(),
             *self.events.supported_actions(),
+            *self.login_client_type.supported_actions(),
+            *self.login_client_type_admin.supported_actions(),
         ]
