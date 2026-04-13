@@ -1,7 +1,7 @@
 """add prometheus_query_preset_id to endpoint_auto_scaling_rules
 
 Revision ID: ecc4b93d7907
-Revises: 4b0128c49210
+Revises: be1ac9308056
 Create Date: 2026-04-10
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "ecc4b93d7907"
-down_revision = "4b0128c49210"
+down_revision = "be1ac9308056"
 branch_labels = None
 depends_on = None
 
