@@ -160,9 +160,7 @@ class UserProcessors(AbstractProcessorPackage):
         legacy_rbac = validators.legacy_rbac
         if isinstance(legacy_rbac, LegacyRBACValidators):
             legacy_scope_validator: ScopeActionValidator = legacy_rbac.scope
-            legacy_single_entity_validator: SingleEntityActionValidator = (
-                legacy_rbac.single_entity
-            )
+            legacy_single_entity_validator: SingleEntityActionValidator = legacy_rbac.single_entity
         else:
             legacy_scope_validator = validators.rbac.scope
             legacy_single_entity_validator = validators.rbac.single_entity
