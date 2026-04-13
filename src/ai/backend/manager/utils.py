@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common.types import AccessKey
 
 from .data.user.types import SessionOwnerContext
-from .errors.common import InternalServerError
+from .errors.api import InvalidAPIParameters
+from .errors.common import InternalServerError, ObjectNotFound
 from .models.domain import domains
 from .models.group import association_groups_users as agus
 from .models.group import groups
@@ -135,7 +136,7 @@ async def query_userinfo(
         result = await conn.execute(query)
         row = result.first()
         if row is None:
-            raise ValueError("Unknown owner access key")
+            raise ObjectNotFound("Unknown owner access key", object_name="access key")
         if row.role is None:
             raise InternalServerError(f"Owner user has no role assigned (owner_uuid={row.user})")
         owner_domain = row.domain_name
@@ -172,7 +173,7 @@ async def query_userinfo(
     qresult = await conn.execute(query)
     domain_name = qresult.scalar()
     if domain_name is None:
-        raise ValueError("Invalid domain")
+        raise InvalidAPIParameters(f"Invalid or inactive domain: {owner_domain}")
 
     if isinstance(requesting_group, str):
         group_match_query = groups.c.name == requesting_group
@@ -194,7 +195,7 @@ async def query_userinfo(
     elif role_for_group_resolution == UserRole.ADMIN:
         # domain-admin can spawn container in any group in the same domain.
         if requesting_domain != owner_domain:
-            raise ValueError("You can only set the domain to the owner's domain.")
+            raise InvalidAPIParameters("You can only set the domain to the owner's domain.")
         query = (
             sa.select(groups.c.id)
             .select_from(groups)
@@ -207,7 +208,7 @@ async def query_userinfo(
     else:
         # normal users can spawn containers in their group and domain.
         if requesting_domain != owner_domain:
-            raise ValueError("You can only set the domain to your domain.")
+            raise InvalidAPIParameters("You can only set the domain to your domain.")
         query = (
             sa.select(agus.c.group_id)
             .select_from(agus.join(groups, agus.c.group_id == groups.c.id))
@@ -221,7 +222,10 @@ async def query_userinfo(
         qresult = await conn.execute(query)
         group_id = qresult.scalar()
     if group_id is None:
-        raise ValueError("Invalid group")
+        raise InvalidAPIParameters(
+            f"Invalid group ({requesting_group}): "
+            "the group does not exist, is inactive, or the user is not a member."
+        )
 
     return SessionOwnerContext(
         owner_uuid=owner_uuid,
@@ -254,7 +258,7 @@ async def query_userinfo_from_session(
         result = await db_sess.execute(query)
         row = result.first()
         if row is None:
-            raise ValueError("Unknown owner access key")
+            raise ObjectNotFound("Unknown owner access key", object_name="access key")
         owner_domain = row.domain_name
         owner_role = row.role
         check_if_requester_is_eligible_to_act_as_target_user(
@@ -287,7 +291,7 @@ async def query_userinfo_from_session(
         result = await db_sess.execute(query)
         row = result.first()
         if row is None:
-            raise ValueError("Unknown owner access key")
+            raise ObjectNotFound("Unknown owner access key", object_name="access key")
         if row.role is None:
             raise InternalServerError(f"Owner user has no role assigned (owner_uuid={row.user})")
         owner_domain = row.domain_name
@@ -324,7 +328,7 @@ async def query_userinfo_from_session(
     qresult = await db_sess.execute(query)
     domain_name = qresult.scalar()
     if domain_name is None:
-        raise ValueError("Invalid domain")
+        raise InvalidAPIParameters(f"Invalid or inactive domain: {owner_domain}")
 
     if isinstance(requesting_group, str):
         group_match_query = groups.c.name == requesting_group
@@ -346,7 +350,7 @@ async def query_userinfo_from_session(
     elif role_for_group_resolution == UserRole.ADMIN:
         # domain-admin can spawn container in any group in the same domain.
         if requesting_domain != owner_domain:
-            raise ValueError("You can only set the domain to the owner's domain.")
+            raise InvalidAPIParameters("You can only set the domain to the owner's domain.")
         query = (
             sa.select(groups.c.id)
             .select_from(groups)
@@ -359,7 +363,7 @@ async def query_userinfo_from_session(
     else:
         # normal users can spawn containers in their group and domain.
         if requesting_domain != owner_domain:
-            raise ValueError("You can only set the domain to your domain.")
+            raise InvalidAPIParameters("You can only set the domain to your domain.")
         query = (
             sa.select(agus.c.group_id)
             .select_from(agus.join(groups, agus.c.group_id == groups.c.id))
@@ -373,7 +377,10 @@ async def query_userinfo_from_session(
         qresult = await db_sess.execute(query)
         group_id = qresult.scalar()
     if group_id is None:
-        raise ValueError("Invalid group")
+        raise InvalidAPIParameters(
+            f"Invalid group ({requesting_group}): "
+            "the group does not exist, is inactive, or the user is not a member."
+        )
 
     return SessionOwnerContext(
         owner_uuid=owner_uuid,
