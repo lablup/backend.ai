@@ -46,21 +46,17 @@ from ai.backend.manager.services.login_client_type.admin_service import (
 from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 
 
-def _make_data(
-    *,
-    name: str = "webui",
-    description: str | None = "Backend.AI web console.",
-) -> LoginClientTypeData:
-    return LoginClientTypeData(
-        id=uuid4(),
-        name=name,
-        description=description,
-        created_at=datetime.now(UTC),
-        modified_at=datetime.now(UTC),
-    )
-
-
 class TestLoginClientTypeService:
+    @pytest.fixture
+    def login_client_type_data(self) -> LoginClientTypeData:
+        return LoginClientTypeData(
+            id=uuid4(),
+            name="webui",
+            description="Backend.AI web console.",
+            created_at=datetime.now(UTC),
+            modified_at=datetime.now(UTC),
+        )
+
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
         return MagicMock(spec=LoginClientTypeRepository)
@@ -73,15 +69,15 @@ class TestLoginClientTypeService:
         self,
         service: LoginClientTypeService,
         mock_repository: MagicMock,
+        login_client_type_data: LoginClientTypeData,
     ) -> None:
-        data = _make_data()
-        mock_repository.get_by_id = AsyncMock(return_value=data)
+        mock_repository.get_by_id = AsyncMock(return_value=login_client_type_data)
 
-        action = GetLoginClientTypeAction(id=data.id)
+        action = GetLoginClientTypeAction(id=login_client_type_data.id)
         result = await service.get(action)
 
-        assert result.login_client_type == data
-        mock_repository.get_by_id.assert_called_once_with(data.id)
+        assert result.login_client_type == login_client_type_data
+        mock_repository.get_by_id.assert_called_once_with(login_client_type_data.id)
 
     async def test_get_not_found(
         self,
@@ -102,12 +98,13 @@ class TestLoginClientTypeService:
         self,
         service: LoginClientTypeService,
         mock_repository: MagicMock,
+        login_client_type_data: LoginClientTypeData,
     ) -> None:
-        items = [_make_data(name="core"), _make_data(name="webui")]
+        items = [login_client_type_data]
         mock_repository.search = AsyncMock(
             return_value=LoginClientTypeSearchResult(
                 items=items,
-                total_count=2,
+                total_count=1,
                 has_next_page=False,
                 has_previous_page=False,
             )
@@ -122,7 +119,7 @@ class TestLoginClientTypeService:
         result = await service.search(action)
 
         assert result.items == items
-        assert result.total_count == 2
+        assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
         mock_repository.search.assert_called_once_with(querier=querier)
@@ -156,8 +153,9 @@ class TestLoginClientTypeService:
         self,
         service: LoginClientTypeService,
         mock_repository: MagicMock,
+        login_client_type_data: LoginClientTypeData,
     ) -> None:
-        items = [_make_data(name="core")]
+        items = [login_client_type_data]
         mock_repository.search = AsyncMock(
             return_value=LoginClientTypeSearchResult(
                 items=items,
@@ -183,6 +181,16 @@ class TestLoginClientTypeService:
 
 class TestLoginClientTypeAdminService:
     @pytest.fixture
+    def login_client_type_data(self) -> LoginClientTypeData:
+        return LoginClientTypeData(
+            id=uuid4(),
+            name="webui",
+            description="Backend.AI web console.",
+            created_at=datetime.now(UTC),
+            modified_at=datetime.now(UTC),
+        )
+
+    @pytest.fixture
     def mock_admin_repository(self) -> MagicMock:
         return MagicMock(spec=LoginClientTypeAdminRepository)
 
@@ -194,15 +202,15 @@ class TestLoginClientTypeAdminService:
         self,
         admin_service: LoginClientTypeAdminService,
         mock_admin_repository: MagicMock,
+        login_client_type_data: LoginClientTypeData,
     ) -> None:
-        data = _make_data(name="core")
-        mock_admin_repository.create = AsyncMock(return_value=data)
+        mock_admin_repository.create = AsyncMock(return_value=login_client_type_data)
 
         creator = MagicMock(spec=Creator)
         action = CreateLoginClientTypeAction(creator=creator)
         result = await admin_service.create(action)
 
-        assert result.login_client_type == data
+        assert result.login_client_type == login_client_type_data
         mock_admin_repository.create.assert_called_once_with(creator)
 
     async def test_create_duplicate_name_raises(
@@ -224,15 +232,15 @@ class TestLoginClientTypeAdminService:
         self,
         admin_service: LoginClientTypeAdminService,
         mock_admin_repository: MagicMock,
+        login_client_type_data: LoginClientTypeData,
     ) -> None:
-        data = _make_data(name="updated-name")
-        mock_admin_repository.update = AsyncMock(return_value=data)
+        mock_admin_repository.update = AsyncMock(return_value=login_client_type_data)
 
         updater = MagicMock(spec=Updater)
         action = UpdateLoginClientTypeAction(updater=updater)
         result = await admin_service.update(action)
 
-        assert result.login_client_type == data
+        assert result.login_client_type == login_client_type_data
         mock_admin_repository.update.assert_called_once_with(updater)
 
     async def test_update_not_found(
@@ -254,15 +262,15 @@ class TestLoginClientTypeAdminService:
         self,
         admin_service: LoginClientTypeAdminService,
         mock_admin_repository: MagicMock,
+        login_client_type_data: LoginClientTypeData,
     ) -> None:
-        data = _make_data()
-        mock_admin_repository.delete = AsyncMock(return_value=data)
+        mock_admin_repository.delete = AsyncMock(return_value=login_client_type_data)
 
-        action = DeleteLoginClientTypeAction(id=data.id)
+        action = DeleteLoginClientTypeAction(id=login_client_type_data.id)
         result = await admin_service.delete(action)
 
-        assert result.login_client_type == data
-        mock_admin_repository.delete.assert_called_once_with(data.id)
+        assert result.login_client_type == login_client_type_data
+        mock_admin_repository.delete.assert_called_once_with(login_client_type_data.id)
 
     async def test_delete_not_found(
         self,
