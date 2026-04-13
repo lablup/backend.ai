@@ -51,13 +51,9 @@ class AuthorizeRequest(BaseRequestModel):
         default=None,
         description="One-time password for TOTP-based two-factor authentication",
     )
-    client_type: str = Field(
-        default="webui",
-        min_length=1,
-        max_length=64,
+    client_type_id: UUID = Field(
         description=(
-            "Login client type name (resolved against the login_client_types table). "
-            "Defaults to 'webui'; CLI and SDK clients should pass 'core' explicitly. "
+            "Login client type UUID (must reference an existing login_client_types row). "
             "Concurrent session limits are enforced per client type."
         ),
     )

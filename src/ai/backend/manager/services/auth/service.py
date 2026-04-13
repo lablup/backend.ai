@@ -27,7 +27,6 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
-    LoginClientTypeNotFound,
     PasswordExpired,
     TooManyConcurrentLoginSessions,
     UserCreationError,
@@ -54,9 +53,6 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
-from ai.backend.manager.repositories.login_client_type.repository import (
-    LoginClientTypeRepository,
-)
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
@@ -145,29 +141,12 @@ class AuthService:
         config_provider: ManagerConfigProvider,
         valkey_session_client: ValkeySessionClient,
         user_resource_policy_repository: UserResourcePolicyRepository,
-        login_client_type_repository: LoginClientTypeRepository,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
         self._config_provider = config_provider
         self._valkey_session_client = valkey_session_client
         self._user_resource_policy_repository = user_resource_policy_repository
-        self._login_client_type_repository = login_client_type_repository
-
-    async def _resolve_login_client_type_id(self, name: str) -> uuid.UUID:
-        """Resolve a login client type name to its stored UUID.
-
-        Raises ``InvalidAPIParameters`` when the name does not match any
-        registered client type, so callers get a 400 instead of a 500.
-        """
-        try:
-            client_type = await self._login_client_type_repository.get_by_name(name)
-        except LoginClientTypeNotFound as exc:
-            raise InvalidAPIParameters(
-                f"Unknown login client type '{name}'. "
-                "Ask an administrator to register it via the login_client_types API."
-            ) from exc
-        return client_type.id
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
@@ -198,7 +177,7 @@ class AuthService:
         if action.type != AuthTokenType.KEYPAIR:
             raise InvalidAPIParameters("Unsupported authorization type")
         auth_config = self._config_provider.config.auth
-        login_client_type_id = await self._resolve_login_client_type_id(action.client_type_name)
+        login_client_type_id = action.client_type_id
         user, active_sessions = await self._verify_user(action, auth_config, login_client_type_id)
 
         try:
