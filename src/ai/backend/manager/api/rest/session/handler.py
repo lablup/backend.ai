@@ -1160,11 +1160,11 @@ class SessionHandler:
 
     async def convert_session_to_image(
         self,
-        query: QueryParam[ConvertSessionToImageRequest],
+        body: BodyParam[ConvertSessionToImageRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        params = query.parsed
+        params = body.parsed
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
