@@ -19,7 +19,10 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import (
     LoginClientTypeNode,
     UpdateLoginClientTypePayload,
 )
-from ai.backend.common.dto.manager.v2.login_client_type.types import OrderDirection
+from ai.backend.common.dto.manager.v2.login_client_type.types import (
+    LoginClientTypeOrderField,
+    OrderDirection,
+)
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.login_client_type.conditions import LoginClientTypeConditions
 from ai.backend.manager.models.login_client_type.orders import LoginClientTypeOrders
@@ -80,12 +83,12 @@ class LoginClientTypeAdapter(BaseAdapter):
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
-            match order.field.value:
-                case "name":
+            match order.field:
+                case LoginClientTypeOrderField.NAME:
                     result.append(LoginClientTypeOrders.name(ascending))
-                case "created_at":
+                case LoginClientTypeOrderField.CREATED_AT:
                     result.append(LoginClientTypeOrders.created_at(ascending))
-                case "modified_at":
+                case LoginClientTypeOrderField.MODIFIED_AT:
                     result.append(LoginClientTypeOrders.modified_at(ascending))
         return result
 
