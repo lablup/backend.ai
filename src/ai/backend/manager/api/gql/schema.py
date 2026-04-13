@@ -169,11 +169,11 @@ from .keypair import (
     update_my_keypair,
 )
 from .login_client_type import (
-    create_login_client_type,
-    delete_login_client_type,
+    admin_create_login_client_type,
+    admin_delete_login_client_type,
+    admin_update_login_client_type,
     login_client_type,
     login_client_types,
-    update_login_client_type,
 )
 from .login_history import admin_login_history_v2, my_login_history_v2
 from .login_session import (
@@ -804,9 +804,10 @@ class Mutation:
     admin_create_resource_preset_v2 = admin_create_resource_preset_v2
     admin_update_resource_preset_v2 = admin_update_resource_preset_v2
     admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
-    create_login_client_type = create_login_client_type
-    update_login_client_type = update_login_client_type
-    delete_login_client_type = delete_login_client_type
+    # Login Client Type mutations
+    admin_create_login_client_type = admin_create_login_client_type
+    admin_update_login_client_type = admin_update_login_client_type
+    admin_delete_login_client_type = admin_delete_login_client_type
     # Runtime Variant mutations
     admin_create_runtime_variant = admin_create_runtime_variant
     admin_update_runtime_variant = admin_update_runtime_variant

@@ -1,11 +1,11 @@
 """GraphQL login client type module."""
 
 from .resolver import (
-    create_login_client_type,
-    delete_login_client_type,
+    admin_create_login_client_type,
+    admin_delete_login_client_type,
+    admin_update_login_client_type,
     login_client_type,
     login_client_types,
-    update_login_client_type,
 )
 from .types import (
     CreateLoginClientTypeInputGQL,
@@ -38,7 +38,7 @@ __all__ = (
     "login_client_type",
     "login_client_types",
     # Mutation resolvers
-    "create_login_client_type",
-    "update_login_client_type",
-    "delete_login_client_type",
+    "admin_create_login_client_type",
+    "admin_update_login_client_type",
+    "admin_delete_login_client_type",
 )
