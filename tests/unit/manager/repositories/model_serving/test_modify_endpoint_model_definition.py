@@ -111,6 +111,7 @@ class TestModifyEndpointModelDefinitionRefresh:
         self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str
     ) -> uuid.UUID:
         user_id = uuid.uuid4()
+        email = f"test-{uuid.uuid4().hex[:8]}@test.com"
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 UserResourcePolicyRow(
@@ -122,10 +123,11 @@ class TestModifyEndpointModelDefinitionRefresh:
                 )
             )
             await sess.flush()
+            # Create user without main_access_key first (FK to keypairs)
             sess.add(
                 UserRow(
                     uuid=user_id,
-                    email=f"test-{uuid.uuid4().hex[:8]}@test.com",
+                    email=email,
                     username=f"testuser-{uuid.uuid4().hex[:8]}",
                     password=PasswordInfo(
                         password="pw",
@@ -137,7 +139,6 @@ class TestModifyEndpointModelDefinitionRefresh:
                     resource_policy="default",
                     role=UserRole.SUPERADMIN,
                     status=UserStatus.ACTIVE,
-                    main_access_key="TESTKEY",
                 )
             )
             await sess.flush()
@@ -145,7 +146,7 @@ class TestModifyEndpointModelDefinitionRefresh:
             await sess.flush()
             sess.add(
                 KeyPairRow(
-                    user_id=f"test-{uuid.uuid4().hex[:8]}@test.com",
+                    user_id=email,
                     access_key="TESTKEY",
                     secret_key="TESTSECRET",
                     is_active=True,
@@ -153,6 +154,11 @@ class TestModifyEndpointModelDefinitionRefresh:
                     user=user_id,
                     resource_policy="default",
                 )
+            )
+            await sess.flush()
+            # Now set main_access_key after keypair exists
+            await sess.execute(
+                sa.update(UserRow).where(UserRow.uuid == user_id).values(main_access_key="TESTKEY")
             )
             await sess.flush()
         return user_id
