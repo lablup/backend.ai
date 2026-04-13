@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Mapping, Optional, Sequence
 
@@ -72,7 +72,7 @@ class EndpointData:
     lifecycle_stage: EndpointLifecycle
     runtime_variant: RuntimeVariant
     extra_mounts: Sequence[VFolderMount]
-    routings: Optional[Sequence["RoutingData"]] = None
+    routings: Sequence["RoutingData"] = field(default_factory=list)
 
 
 @dataclass
