@@ -759,7 +759,9 @@ class Endpoint(graphene.ObjectType):
             created_at=dto.created_at,
             destroyed_at=dto.destroyed_at,
             retries=dto.retries,
-            routings=[Routing.from_dto(r) for r in dto.routings] if dto.routings else None,
+            routings=[Routing.from_dto(r) for r in dto.routings]
+            if dto.routings is not None
+            else None,
             lifecycle_stage=dto.lifecycle_stage,
             runtime_variant=RuntimeVariantInfo.from_enum(dto.runtime_variant),
         )
@@ -904,8 +906,8 @@ class Endpoint(graphene.ObjectType):
             case EndpointLifecycle.DESTROYING.name:
                 return EndpointStatus.DESTROYING
             case _:
-                if len(self.routings) == 0:
-                    return EndpointStatus.READY
+                if not self.routings:
+                    return EndpointStatus.DEGRADED
                 elif self.retries > SERVICE_MAX_RETRIES:
                     return EndpointStatus.UNHEALTHY
                 elif (spawned_service_count := len([r for r in self.routings])) > 0:
