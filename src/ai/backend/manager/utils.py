@@ -9,7 +9,8 @@ from ai.backend.common.types import AccessKey
 
 from .data.user.types import SessionOwnerContext
 from .errors.api import InvalidAPIParameters
-from .errors.common import InternalServerError, ObjectNotFound
+from .errors.auth import AccessKeyNotFound, UserNotFound
+from .errors.common import InternalServerError
 from .models.domain import domains
 from .models.group import association_groups_users as agus
 from .models.group import groups
@@ -58,7 +59,7 @@ async def check_if_requester_is_eligible_to_act_as_target_access_key(
     result = await conn.execute(query)
     row = result.first()
     if row is None:
-        raise ObjectNotFound("Unknown owner access key", object_name="access key")
+        raise AccessKeyNotFound("Unknown owner access key")
     owner_domain = row.domain_name
     owner_role = row.role
     return check_if_requester_is_eligible_to_act_as_target_user(
@@ -83,7 +84,7 @@ async def check_if_requester_is_eligible_to_act_as_target_user_uuid(
     result = await conn.execute(query)
     row = result.first()
     if row is None:
-        raise ObjectNotFound("Unknown target user", object_name="user")
+        raise UserNotFound("Unknown target user")
     owner_domain = row.domain_name
     owner_role = row.role
     return check_if_requester_is_eligible_to_act_as_target_user(
@@ -136,7 +137,7 @@ async def query_userinfo(
         result = await conn.execute(query)
         row = result.first()
         if row is None:
-            raise ObjectNotFound("Unknown owner access key", object_name="access key")
+            raise AccessKeyNotFound("Unknown owner access key")
         if row.role is None:
             raise InternalServerError(f"Owner user has no role assigned (owner_uuid={row.user})")
         owner_domain = row.domain_name
@@ -258,7 +259,7 @@ async def query_userinfo_from_session(
         result = await db_sess.execute(query)
         row = result.first()
         if row is None:
-            raise ObjectNotFound("Unknown owner access key", object_name="access key")
+            raise AccessKeyNotFound("Unknown owner access key")
         owner_domain = row.domain_name
         owner_role = row.role
         check_if_requester_is_eligible_to_act_as_target_user(
@@ -291,7 +292,7 @@ async def query_userinfo_from_session(
         result = await db_sess.execute(query)
         row = result.first()
         if row is None:
-            raise ObjectNotFound("Unknown owner access key", object_name="access key")
+            raise AccessKeyNotFound("Unknown owner access key")
         if row.role is None:
             raise InternalServerError(f"Owner user has no role assigned (owner_uuid={row.user})")
         owner_domain = row.domain_name

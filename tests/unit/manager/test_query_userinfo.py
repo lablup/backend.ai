@@ -17,7 +17,7 @@ import pytest
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.auth import AccessKeyNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -434,7 +434,7 @@ class TestQueryUserinfo:
         db: ExtendedAsyncSAEngine,
         seed: SeedData,
     ) -> None:
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(AccessKeyNotFound):
             async with db.begin() as conn:
                 await query_userinfo(
                     conn,
@@ -613,7 +613,7 @@ class TestQueryUserinfoFromSession:
         db: ExtendedAsyncSAEngine,
         seed: SeedData,
     ) -> None:
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(AccessKeyNotFound):
             async with db.begin_session() as sess:
                 await query_userinfo_from_session(
                     sess,

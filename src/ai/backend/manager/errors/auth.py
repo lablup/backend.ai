@@ -112,6 +112,17 @@ class UserNotFound(ObjectNotFound):
         )
 
 
+class AccessKeyNotFound(ObjectNotFound):
+    object_name = "access key"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class GroupMembershipNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/group-membership-not-found"
     error_title = "User is not a member of the specified group."
