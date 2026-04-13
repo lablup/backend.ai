@@ -16,7 +16,7 @@ from ai.backend.manager.services.login_client_type.actions.get import (
     GetLoginClientTypeActionResult,
 )
 from ai.backend.manager.services.login_client_type.actions.search import (
-    AdminSearchLoginClientTypesAction,
+    SearchLoginClientTypesAction,
     SearchLoginClientTypesActionResult,
 )
 from ai.backend.manager.services.login_client_type.actions.update import (
@@ -30,18 +30,36 @@ from ai.backend.manager.services.login_client_type.service import LoginClientTyp
 
 
 class LoginClientTypeProcessors(AbstractProcessorPackage):
-    create: ActionProcessor[CreateLoginClientTypeAction, CreateLoginClientTypeActionResult]
     get: ActionProcessor[GetLoginClientTypeAction, GetLoginClientTypeActionResult]
-    update: ActionProcessor[UpdateLoginClientTypeAction, UpdateLoginClientTypeActionResult]
-    delete: ActionProcessor[DeleteLoginClientTypeAction, DeleteLoginClientTypeActionResult]
+    search: ActionProcessor[SearchLoginClientTypesAction, SearchLoginClientTypesActionResult]
 
     def __init__(
         self,
         service: LoginClientTypeService,
         action_monitors: list[ActionMonitor],
     ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
         self.get = ActionProcessor(service.get, action_monitors)
+        self.search = ActionProcessor(service.search, action_monitors)
+
+    @override
+    def supported_actions(self) -> list[ActionSpec]:
+        return [
+            GetLoginClientTypeAction.spec(),
+            SearchLoginClientTypesAction.spec(),
+        ]
+
+
+class LoginClientTypeAdminProcessors(AbstractProcessorPackage):
+    create: ActionProcessor[CreateLoginClientTypeAction, CreateLoginClientTypeActionResult]
+    update: ActionProcessor[UpdateLoginClientTypeAction, UpdateLoginClientTypeActionResult]
+    delete: ActionProcessor[DeleteLoginClientTypeAction, DeleteLoginClientTypeActionResult]
+
+    def __init__(
+        self,
+        service: LoginClientTypeAdminService,
+        action_monitors: list[ActionMonitor],
+    ) -> None:
+        self.create = ActionProcessor(service.create, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
 
@@ -49,26 +67,6 @@ class LoginClientTypeProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             CreateLoginClientTypeAction.spec(),
-            GetLoginClientTypeAction.spec(),
             UpdateLoginClientTypeAction.spec(),
             DeleteLoginClientTypeAction.spec(),
-        ]
-
-
-class LoginClientTypeAdminProcessors(AbstractProcessorPackage):
-    admin_search: ActionProcessor[
-        AdminSearchLoginClientTypesAction, SearchLoginClientTypesActionResult
-    ]
-
-    def __init__(
-        self,
-        service: LoginClientTypeAdminService,
-        action_monitors: list[ActionMonitor],
-    ) -> None:
-        self.admin_search = ActionProcessor(service.search, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            AdminSearchLoginClientTypesAction.spec(),
         ]

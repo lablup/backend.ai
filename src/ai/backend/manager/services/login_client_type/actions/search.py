@@ -9,11 +9,8 @@ from ai.backend.manager.services.login_client_type.actions.base import LoginClie
 
 
 @dataclass
-class AdminSearchLoginClientTypesAction(LoginClientTypeAction):
-    """Search login client types with filtering, ordering, and pagination.
-
-    Admin-only action without scope restriction.
-    """
+class SearchLoginClientTypesAction(LoginClientTypeAction):
+    """Search login client types with filtering, ordering, and pagination."""
 
     querier: BatchQuerier
 
