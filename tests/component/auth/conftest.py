@@ -60,6 +60,15 @@ def server_module_registries(
     ]
 
 
+_SAMPLE_CLIENT_TYPE_ID = uuid.UUID("00000000-0000-0000-0000-0000000000eb")
+
+
+@pytest.fixture
+def sample_client_type_id() -> uuid.UUID:
+    """Well-known 'webui' login_client_type UUID from seed data."""
+    return _SAMPLE_CLIENT_TYPE_ID
+
+
 @pytest.fixture(autouse=True)
 async def seed_login_client_types(db_engine: SAEngine) -> AsyncIterator[None]:
     """Seed the login_client_types table for auth tests.
