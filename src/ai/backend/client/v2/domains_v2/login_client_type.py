@@ -7,15 +7,15 @@ from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
-    AdminSearchLoginClientTypesInput,
     CreateLoginClientTypeInput,
+    SearchLoginClientTypesInput,
     UpdateLoginClientTypeInput,
 )
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
-    AdminSearchLoginClientTypesPayload,
     CreateLoginClientTypePayload,
     DeleteLoginClientTypePayload,
     LoginClientTypeNode,
+    SearchLoginClientTypesPayload,
     UpdateLoginClientTypePayload,
 )
 
@@ -30,7 +30,7 @@ class V2LoginClientTypeClient(BaseDomainClient):
     authenticated user.
     """
 
-    async def create(
+    async def admin_create(
         self,
         request: CreateLoginClientTypeInput,
     ) -> CreateLoginClientTypePayload:
@@ -42,16 +42,16 @@ class V2LoginClientTypeClient(BaseDomainClient):
             response_model=CreateLoginClientTypePayload,
         )
 
-    async def admin_search(
+    async def search(
         self,
-        request: AdminSearchLoginClientTypesInput,
-    ) -> AdminSearchLoginClientTypesPayload:
+        request: SearchLoginClientTypesInput,
+    ) -> SearchLoginClientTypesPayload:
         """Search login client types with filter/order/pagination (superadmin only)."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/search",
             request=request,
-            response_model=AdminSearchLoginClientTypesPayload,
+            response_model=SearchLoginClientTypesPayload,
         )
 
     async def get(self, login_client_type_id: UUID) -> LoginClientTypeNode:
@@ -62,7 +62,7 @@ class V2LoginClientTypeClient(BaseDomainClient):
             response_model=LoginClientTypeNode,
         )
 
-    async def update(
+    async def admin_update(
         self,
         login_client_type_id: UUID,
         request: UpdateLoginClientTypeInput,
@@ -75,7 +75,7 @@ class V2LoginClientTypeClient(BaseDomainClient):
             response_model=UpdateLoginClientTypePayload,
         )
 
-    async def delete(
+    async def admin_delete(
         self,
         login_client_type_id: UUID,
     ) -> DeleteLoginClientTypePayload:
