@@ -299,7 +299,9 @@ class TestLoginSessionForce:
 
         # Step 2: evict existing tokens via the dedicated repository call, then create
         tokens_to_invalidate = [s.session_token for s in cred_result.active_sessions]
-        await auth_db_source.invalidate_sessions_by_tokens(tokens_to_invalidate)
+        await auth_db_source.delete_sessions_by_tokens(
+            tokens_to_invalidate, LoginAttemptResult.EVICTED
+        )
         session_result = await auth_db_source.create_login_session(
             user_id=user_id,
             access_key=access_key,
@@ -363,7 +365,9 @@ class TestLoginSessionForce:
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
 
         # Logout (invalidate session by token)
-        await auth_db_source.invalidate_session_by_token(result1.session_token)
+        await auth_db_source.delete_session_by_token(
+            result1.session_token, LoginAttemptResult.LOGOUT
+        )
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
 
         # Re-login without force should succeed

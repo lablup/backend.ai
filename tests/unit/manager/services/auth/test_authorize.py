@@ -14,6 +14,7 @@ from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -430,7 +431,9 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     result = await auth_service.authorize(action)
 
     # Stale session should have been invalidated in DB
-    mock_auth_repository.invalidate_login_session_by_token.assert_awaited_once_with("stale_token")
+    mock_auth_repository.delete_login_session_by_token.assert_awaited_once_with(
+        "stale_token", LoginAttemptResult.EXPIRED
+    )
     assert result.authorization_result is not None
     assert result.authorization_result.session_token == "new_session_token"
 
@@ -497,9 +500,9 @@ async def test_authorize_force_invalidates_existing_sessions(
     result = await auth_service.authorize(action)
 
     # Eviction happens via a dedicated repository call before create_login_session.
-    mock_auth_repository.invalidate_login_sessions_by_tokens.assert_awaited_once_with([
-        "existing_live_token"
-    ])
+    mock_auth_repository.delete_login_sessions_by_tokens.assert_awaited_once_with(
+        ["existing_live_token"], LoginAttemptResult.EVICTED
+    )
     mock_auth_repository.create_login_session.assert_awaited_once()
     create_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
     assert "tokens_to_invalidate" not in create_kwargs
@@ -550,4 +553,4 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
     call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
     assert "max_concurrent_sessions" not in call_kwargs
     assert "tokens_to_invalidate" not in call_kwargs
-    mock_auth_repository.invalidate_login_sessions_by_tokens.assert_not_called()
+    mock_auth_repository.delete_login_sessions_by_tokens.assert_not_called()

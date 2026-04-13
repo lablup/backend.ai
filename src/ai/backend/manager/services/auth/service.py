@@ -275,8 +275,8 @@ class AuthService:
             if await self._valkey_session_client.get_login_session(session_info.session_token):
                 live_sessions.append(session_info)
             else:
-                await self._auth_repository.invalidate_login_session_by_token(
-                    session_info.session_token
+                await self._auth_repository.delete_login_session_by_token(
+                    session_info.session_token, LoginAttemptResult.EXPIRED
                 )
 
         return main_keypair_row, live_sessions
@@ -360,7 +360,9 @@ class AuthService:
         if tokens_to_invalidate:
             for token in tokens_to_invalidate:
                 await self._valkey_session_client.delete_login_session(token)
-            await self._auth_repository.invalidate_login_sessions_by_tokens(tokens_to_invalidate)
+            await self._auth_repository.delete_login_sessions_by_tokens(
+                tokens_to_invalidate, LoginAttemptResult.EVICTED
+            )
 
         session_data = LoginSessionData(
             created=int(time.time()),
@@ -515,14 +517,18 @@ class AuthService:
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
-        await self._auth_repository.invalidate_login_session_by_token(action.session_token)
+        await self._auth_repository.delete_login_session_by_token(
+            action.session_token, LoginAttemptResult.LOGOUT
+        )
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
 
     async def admin_revoke_login_session(
         self, action: AdminRevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
-        session_token = await self._auth_repository.revoke_login_session(action.session_id)
+        session_token = await self._auth_repository.delete_login_session_by_id(
+            action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN
+        )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
 
@@ -532,7 +538,9 @@ class AuthService:
         session_data = await self._auth_repository.get_login_session_by_id(action.session_id)
         if session_data.user_id != action.user_id:
             raise GenericForbidden("You can only revoke your own login sessions.")
-        session_token = await self._auth_repository.revoke_login_session(action.session_id)
+        session_token = await self._auth_repository.delete_login_session_by_id(
+            action.session_id, LoginAttemptResult.REVOKED_BY_USER
+        )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
 
@@ -551,11 +559,11 @@ class AuthService:
             email,
             action.password,
         )
-        # Get active session tokens before invalidating, for Valkey cleanup
-        active_sessions = await self._auth_repository.get_active_session_tokens(action.user_id)
-        await self._auth_repository.invalidate_user_login_sessions(action.user_id)
-        for session_info in active_sessions:
-            await self._valkey_session_client.delete_login_session(session_info.session_token)
+        deleted_tokens = await self._auth_repository.delete_user_login_sessions(
+            action.user_id, action.domain_name, LoginAttemptResult.LOGOUT
+        )
+        for token in deleted_tokens:
+            await self._valkey_session_client.delete_login_session(token)
         await self._auth_repository.deactivate_user_and_keypairs(email)
 
         return SignoutActionResult(success=True)
