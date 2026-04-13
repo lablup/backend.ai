@@ -1936,7 +1936,7 @@ type CreateKeypairResourcePolicyPayloadGQL {
   keypairResourcePolicy: KeypairResourcePolicyV2!
 }
 
-"""Added in 26.4.0rc1. Input for creating a new login client type."""
+"""Added in 26.4.1. Input for creating a new login client type."""
 input CreateLoginClientTypeInput {
   """Unique login client type name."""
   name: String!
@@ -1945,7 +1945,7 @@ input CreateLoginClientTypeInput {
   description: String = null
 }
 
-"""Added in 26.4.0rc1. Payload for login client type creation."""
+"""Added in 26.4.1. Payload for login client type creation."""
 type CreateLoginClientTypePayload {
   """Created login client type."""
   loginClientType: LoginClientType!
@@ -2633,7 +2633,7 @@ type DeleteKeypairResourcePolicyPayloadGQL {
   name: String!
 }
 
-"""Added in 26.4.0rc1. Payload for login client type deletion."""
+"""Added in 26.4.1. Payload for login client type deletion."""
 type DeleteLoginClientTypePayload {
   """UUID of the deleted login client type."""
   id: String!
@@ -4946,7 +4946,7 @@ enum LoginAttemptResult {
 }
 
 """
-Added in 26.4.0rc1. A registered login client type that the auth flow can attribute sessions to.
+Added in 26.4.1. A registered login client type that the auth flow can attribute sessions to.
 """
 type LoginClientType implements Node {
   """The Globally Unique ID of this object"""
@@ -4959,9 +4959,7 @@ type LoginClientType implements Node {
   description: String
 }
 
-"""
-Added in 26.4.0rc1. Paginated connection for login client type records.
-"""
+"""Added in 26.4.1. Paginated connection for login client type records."""
 type LoginClientTypeConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -4982,7 +4980,7 @@ type LoginClientTypeEdge {
   node: LoginClientType!
 }
 
-"""Added in 26.4.0rc1. Filter input for querying login client types."""
+"""Added in 26.4.1. Filter input for querying login client types."""
 input LoginClientTypeFilter {
   """Filter by name."""
   name: StringFilter = null
@@ -4997,7 +4995,7 @@ input LoginClientTypeFilter {
   modifiedAt: DateTimeFilter = null
 }
 
-"""Added in 26.4.0rc1. Specifies ordering for login client type results."""
+"""Added in 26.4.1. Specifies ordering for login client type results."""
 input LoginClientTypeOrderBy {
   """The field to order by."""
   field: LoginClientTypeOrderField!
@@ -5007,7 +5005,7 @@ input LoginClientTypeOrderBy {
 }
 
 """
-Added in 26.4.0rc1. Fields available for ordering login client type results.
+Added in 26.4.1. Fields available for ordering login client type results.
 """
 enum LoginClientTypeOrderField {
   NAME
@@ -6489,13 +6487,13 @@ type Mutation {
   """Added in 26.4.1. Delete a resource preset (admin only)."""
   adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL!
 
-  """Added in 26.4.0rc1. Create a new login client type (super admin only)."""
+  """Added in 26.4.1. Create a new login client type (super admin only)."""
   createLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload!
 
-  """Added in 26.4.0rc1. Update a login client type (super admin only)."""
+  """Added in 26.4.1. Update a login client type (super admin only)."""
   updateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload!
 
-  """Added in 26.4.0rc1. Delete a login client type (super admin only)."""
+  """Added in 26.4.1. Delete a login client type (super admin only)."""
   deleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload!
 
   """Added in 26.4.1. Create a new runtime variant (superadmin only)."""
@@ -8434,11 +8432,11 @@ type Query {
   """Added in 26.4.1. Get a single resource preset by ID (admin only)."""
   adminResourcePresetV2(id: UUID!): ResourcePresetV2
 
-  """Added in 26.4.0rc1. Get a single login client type by id."""
+  """Added in 26.4.1. Get a single login client type by id."""
   loginClientType(id: UUID!): LoginClientType
 
   """
-  Added in 26.4.0rc1. Search login client types with filtering, ordering, and pagination (super admin only).
+  Added in 26.4.1. Search login client types with filtering, ordering, and pagination (super admin only).
   """
   loginClientTypes(filter: LoginClientTypeFilter = null, orderBy: [LoginClientTypeOrderBy!] = null, limit: Int = null, offset: Int = null): LoginClientTypeConnection
 
@@ -11251,7 +11249,7 @@ type UpdateKeypairResourcePolicyPayloadGQL {
 }
 
 """
-Added in 26.4.0rc1. Input for updating a login client type. Both fields are optional for partial update.
+Added in 26.4.1. Input for updating a login client type. Both fields are optional for partial update.
 """
 input UpdateLoginClientTypeInput {
   """Updated name."""
@@ -11261,7 +11259,7 @@ input UpdateLoginClientTypeInput {
   description: String = null
 }
 
-"""Added in 26.4.0rc1. Payload for login client type update."""
+"""Added in 26.4.1. Payload for login client type update."""
 type UpdateLoginClientTypePayload {
   """Updated login client type."""
   loginClientType: LoginClientType!

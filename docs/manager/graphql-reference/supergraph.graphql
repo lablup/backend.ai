@@ -3222,7 +3222,7 @@ type CreateKeypairResourcePolicyPayloadGQL
   keypairResourcePolicy: KeypairResourcePolicyV2!
 }
 
-"""Added in 26.4.0rc1. Input for creating a new login client type."""
+"""Added in 26.4.1. Input for creating a new login client type."""
 input CreateLoginClientTypeInput
   @join__type(graph: STRAWBERRY)
 {
@@ -3233,7 +3233,7 @@ input CreateLoginClientTypeInput
   description: String = null
 }
 
-"""Added in 26.4.0rc1. Payload for login client type creation."""
+"""Added in 26.4.1. Payload for login client type creation."""
 type CreateLoginClientTypePayload
   @join__type(graph: STRAWBERRY)
 {
@@ -4249,7 +4249,7 @@ type DeleteKeypairResourcePolicyPayloadGQL
   name: String!
 }
 
-"""Added in 26.4.0rc1. Payload for login client type deletion."""
+"""Added in 26.4.1. Payload for login client type deletion."""
 type DeleteLoginClientTypePayload
   @join__type(graph: STRAWBERRY)
 {
@@ -7894,7 +7894,7 @@ enum LoginAttemptResult
 }
 
 """
-Added in 26.4.0rc1. A registered login client type that the auth flow can attribute sessions to.
+Added in 26.4.1. A registered login client type that the auth flow can attribute sessions to.
 """
 type LoginClientType implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -7910,9 +7910,7 @@ type LoginClientType implements Node
   description: String
 }
 
-"""
-Added in 26.4.0rc1. Paginated connection for login client type records.
-"""
+"""Added in 26.4.1. Paginated connection for login client type records."""
 type LoginClientTypeConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -7937,7 +7935,7 @@ type LoginClientTypeEdge
   node: LoginClientType!
 }
 
-"""Added in 26.4.0rc1. Filter input for querying login client types."""
+"""Added in 26.4.1. Filter input for querying login client types."""
 input LoginClientTypeFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -7954,7 +7952,7 @@ input LoginClientTypeFilter
   modifiedAt: DateTimeFilter = null
 }
 
-"""Added in 26.4.0rc1. Specifies ordering for login client type results."""
+"""Added in 26.4.1. Specifies ordering for login client type results."""
 input LoginClientTypeOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -7966,7 +7964,7 @@ input LoginClientTypeOrderBy
 }
 
 """
-Added in 26.4.0rc1. Fields available for ordering login client type results.
+Added in 26.4.1. Fields available for ordering login client type results.
 """
 enum LoginClientTypeOrderField
   @join__type(graph: STRAWBERRY)
@@ -10485,13 +10483,13 @@ type Mutation
   """Added in 26.4.1. Delete a resource preset (admin only)."""
   adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.0rc1. Create a new login client type (super admin only)."""
+  """Added in 26.4.1. Create a new login client type (super admin only)."""
   createLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.0rc1. Update a login client type (super admin only)."""
+  """Added in 26.4.1. Update a login client type (super admin only)."""
   updateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.0rc1. Delete a login client type (super admin only)."""
+  """Added in 26.4.1. Delete a login client type (super admin only)."""
   deleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload! @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.1. Create a new runtime variant (superadmin only)."""
@@ -13213,11 +13211,11 @@ type Query
   """Added in 26.4.1. Get a single resource preset by ID (admin only)."""
   adminResourcePresetV2(id: UUID!): ResourcePresetV2 @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.0rc1. Get a single login client type by id."""
+  """Added in 26.4.1. Get a single login client type by id."""
   loginClientType(id: UUID!): LoginClientType @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.4.0rc1. Search login client types with filtering, ordering, and pagination (super admin only).
+  Added in 26.4.1. Search login client types with filtering, ordering, and pagination (super admin only).
   """
   loginClientTypes(filter: LoginClientTypeFilter = null, orderBy: [LoginClientTypeOrderBy!] = null, limit: Int = null, offset: Int = null): LoginClientTypeConnection @join__field(graph: STRAWBERRY)
 
@@ -16844,7 +16842,7 @@ type UpdateKeypairResourcePolicyPayloadGQL
 }
 
 """
-Added in 26.4.0rc1. Input for updating a login client type. Both fields are optional for partial update.
+Added in 26.4.1. Input for updating a login client type. Both fields are optional for partial update.
 """
 input UpdateLoginClientTypeInput
   @join__type(graph: STRAWBERRY)
@@ -16856,7 +16854,7 @@ input UpdateLoginClientTypeInput
   description: String = null
 }
 
-"""Added in 26.4.0rc1. Payload for login client type update."""
+"""Added in 26.4.1. Payload for login client type update."""
 type UpdateLoginClientTypePayload
   @join__type(graph: STRAWBERRY)
 {
