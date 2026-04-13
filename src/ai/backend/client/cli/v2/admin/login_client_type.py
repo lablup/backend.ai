@@ -42,9 +42,9 @@ def search(
 ) -> None:
     """Search login client types with admin scope."""
     from ai.backend.common.dto.manager.v2.login_client_type.request import (
-        AdminSearchLoginClientTypesInput,
         LoginClientTypeFilter,
         LoginClientTypeOrder,
+        SearchLoginClientTypesInput,
     )
     from ai.backend.common.dto.manager.v2.login_client_type.types import (
         LoginClientTypeOrderField,
@@ -67,8 +67,8 @@ def search(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.login_client_type.admin_search(
-                AdminSearchLoginClientTypesInput(
+            result = await registry.login_client_type.search(
+                SearchLoginClientTypesInput(
                     filter=filter_dto,
                     order=orders,
                     limit=limit,
@@ -94,7 +94,7 @@ def create(name: str, description: str | None) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.login_client_type.create(
+            result = await registry.login_client_type.admin_create(
                 CreateLoginClientTypeInput(name=name, description=description)
             )
             print_result(result)
@@ -121,7 +121,7 @@ def update(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.login_client_type.update(
+            result = await registry.login_client_type.admin_update(
                 login_client_type_id,
                 UpdateLoginClientTypeInput(name=name, description=description),
             )
@@ -140,7 +140,7 @@ def delete(login_client_type_id: uuid.UUID) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.login_client_type.delete(login_client_type_id)
+            result = await registry.login_client_type.admin_delete(login_client_type_id)
             print_result(result)
         finally:
             await registry.close()
