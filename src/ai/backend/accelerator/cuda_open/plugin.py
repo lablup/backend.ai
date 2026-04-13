@@ -285,7 +285,12 @@ class CUDAPlugin(AbstractComputePlugin):
                         try:
                             container = await docker.containers.get(cid)
                             container_info = await container.show()
-                        except DockerError:
+                        except DockerError as e:
+                            log.warning(
+                                "gather_container_measures(): container {} skipped: {!r}",
+                                cid,
+                                e,
+                            )
                             continue
                         nvidia_device_reqs = [
                             x
