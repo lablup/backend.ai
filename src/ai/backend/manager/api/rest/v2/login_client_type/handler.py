@@ -27,13 +27,7 @@ class V2LoginClientTypeHandler:
     def __init__(self, *, adapter: LoginClientTypeAdapter) -> None:
         self._adapter = adapter
 
-    async def admin_create(
-        self,
-        body: BodyParam[CreateLoginClientTypeInput],
-    ) -> APIResponse:
-        """Create a new login client type (superadmin only)."""
-        result = await self._adapter.admin_create(body.parsed)
-        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
+    # --- Non-admin methods ---
 
     async def get(
         self,
@@ -50,6 +44,16 @@ class V2LoginClientTypeHandler:
         """Search login client types with filter/order/pagination."""
         result = await self._adapter.search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    # --- Admin methods ---
+
+    async def admin_create(
+        self,
+        body: BodyParam[CreateLoginClientTypeInput],
+    ) -> APIResponse:
+        """Create a new login client type (superadmin only)."""
+        result = await self._adapter.admin_create(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def admin_update(
         self,
