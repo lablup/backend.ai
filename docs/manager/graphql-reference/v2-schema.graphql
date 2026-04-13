@@ -6488,13 +6488,13 @@ type Mutation {
   adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL!
 
   """Added in 26.4.1. Create a new login client type (super admin only)."""
-  createLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload!
+  adminCreateLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload!
 
   """Added in 26.4.1. Update a login client type (super admin only)."""
-  updateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload!
+  adminUpdateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload!
 
   """Added in 26.4.1. Delete a login client type (super admin only)."""
-  deleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload!
+  adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload!
 
   """Added in 26.4.1. Create a new runtime variant (superadmin only)."""
   adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayloadGQL!
@@ -8436,7 +8436,7 @@ type Query {
   loginClientType(id: UUID!): LoginClientType
 
   """
-  Added in 26.4.1. Search login client types with filtering, ordering, and pagination (super admin only).
+  Added in 26.4.1. Search login client types with filtering, ordering, and pagination.
   """
   loginClientTypes(filter: LoginClientTypeFilter = null, orderBy: [LoginClientTypeOrderBy!] = null, limit: Int = null, offset: Int = null): LoginClientTypeConnection
 
