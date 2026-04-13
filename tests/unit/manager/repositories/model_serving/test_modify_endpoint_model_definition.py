@@ -14,7 +14,8 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.contexts.user import UserData, with_user
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
