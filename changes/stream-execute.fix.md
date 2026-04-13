@@ -1,0 +1,1 @@
+Fix `GET /stream/session/{name}/execute` 500 error by sharing a single `PrivateContext` between the stream handler and its lifecycle hook, so `stream_execute_handlers` is initialized on the instance the handler reads at request time.
