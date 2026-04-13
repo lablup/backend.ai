@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -18,6 +19,33 @@ class FakeDeviceStat:
     mem_used: int
     mem_total: int
     gpu_util: int
+
+
+def _make_container_info(device_ids: list[str]) -> dict[str, Any]:
+    return {
+        "HostConfig": {
+            "DeviceRequests": [
+                {
+                    "Driver": "nvidia",
+                    "DeviceIDs": device_ids,
+                    "Capabilities": [["utility", "compute"]],
+                },
+            ],
+        },
+    }
+
+
+def _make_mock_docker() -> AsyncMock:
+    mock = AsyncMock()
+    mock.__aenter__ = AsyncMock(return_value=mock)
+    mock.__aexit__ = AsyncMock(return_value=False)
+    return mock
+
+
+def _make_mock_container(container_info: dict[str, Any]) -> AsyncMock:
+    mock = AsyncMock()
+    mock.show.return_value = container_info
+    return mock
 
 
 class TestGatherContainerMeasures:
@@ -49,44 +77,52 @@ class TestGatherContainerMeasures:
         )
         return nvml
 
-    def _make_container_info(self, device_ids: list[str]) -> dict[str, Any]:
-        return {
-            "HostConfig": {
-                "DeviceRequests": [
-                    {
-                        "Driver": "nvidia",
-                        "DeviceIDs": device_ids,
-                        "Capabilities": [["utility", "compute"]],
-                    },
-                ],
-            },
-        }
+    @pytest.fixture
+    def mock_docker(self) -> AsyncMock:
+        return _make_mock_docker()
+
+    @pytest.fixture
+    def single_gpu_container(self) -> AsyncMock:
+        return _make_mock_container(_make_container_info(["0"]))
+
+    @pytest.fixture
+    def multi_gpu_container(self) -> AsyncMock:
+        return _make_mock_container(_make_container_info(["0", "1"]))
+
+    @pytest.fixture
+    def no_gpu_container(self) -> AsyncMock:
+        return _make_mock_container({"HostConfig": {"DeviceRequests": []}})
+
+    @pytest.fixture
+    def patched_env(
+        self,
+        mock_libnvml: MagicMock,
+        mock_docker: AsyncMock,
+    ) -> Iterator[None]:
+        with (
+            patch("ai.backend.accelerator.cuda_open.plugin.libnvml", mock_libnvml),
+            patch(
+                "ai.backend.accelerator.cuda_open.plugin.aiodocker.Docker",
+                return_value=mock_docker,
+            ),
+        ):
+            yield
 
     async def test_container_show_is_called(
         self,
         cuda_plugin: CUDAPlugin,
         stat_context: MagicMock,
-        mock_libnvml: MagicMock,
+        mock_docker: AsyncMock,
+        single_gpu_container: AsyncMock,
+        patched_env: None,
     ) -> None:
         """container.show() must be called to get the inspect dict (BA-5693)."""
-        mock_container = AsyncMock()
-        mock_container.show.return_value = self._make_container_info(["0"])
+        mock_docker.containers.get.return_value = single_gpu_container
 
-        mock_docker = AsyncMock()
-        mock_docker.__aenter__ = AsyncMock(return_value=mock_docker)
-        mock_docker.__aexit__ = AsyncMock(return_value=False)
-        mock_docker.containers.get.return_value = mock_container
-
-        with (
-            patch("ai.backend.accelerator.cuda_open.plugin.libnvml", mock_libnvml),
-            patch(
-                "ai.backend.accelerator.cuda_open.plugin.aiodocker.Docker", return_value=mock_docker
-            ),
-        ):
-            results = await cuda_plugin.gather_container_measures(stat_context, ["container_001"])
+        results = await cuda_plugin.gather_container_measures(stat_context, ["container_001"])
 
         mock_docker.containers.get.assert_called_once_with("container_001")
-        mock_container.show.assert_called_once()
+        single_gpu_container.show.assert_called_once()
 
         cuda_mem, cuda_util = results
         assert cuda_mem.key == MetricKey("cuda_mem")
@@ -98,29 +134,19 @@ class TestGatherContainerMeasures:
         self,
         cuda_plugin: CUDAPlugin,
         stat_context: MagicMock,
-        mock_libnvml: MagicMock,
+        mock_docker: AsyncMock,
+        single_gpu_container: AsyncMock,
+        patched_env: None,
     ) -> None:
         """DockerError on a vanished container should be skipped, not crash the loop."""
-        mock_good_container = AsyncMock()
-        mock_good_container.show.return_value = self._make_container_info(["0"])
-
-        mock_docker = AsyncMock()
-        mock_docker.__aenter__ = AsyncMock(return_value=mock_docker)
-        mock_docker.__aexit__ = AsyncMock(return_value=False)
         mock_docker.containers.get.side_effect = [
             DockerError(status=404, data={"message": "No such container"}),
-            mock_good_container,
+            single_gpu_container,
         ]
 
-        with (
-            patch("ai.backend.accelerator.cuda_open.plugin.libnvml", mock_libnvml),
-            patch(
-                "ai.backend.accelerator.cuda_open.plugin.aiodocker.Docker", return_value=mock_docker
-            ),
-        ):
-            results = await cuda_plugin.gather_container_measures(
-                stat_context, ["vanished_cid", "good_cid"]
-            )
+        results = await cuda_plugin.gather_container_measures(
+            stat_context, ["vanished_cid", "good_cid"]
+        )
 
         cuda_mem, cuda_util = results
         assert "vanished_cid" not in cuda_mem.per_container
@@ -130,24 +156,14 @@ class TestGatherContainerMeasures:
         self,
         cuda_plugin: CUDAPlugin,
         stat_context: MagicMock,
-        mock_libnvml: MagicMock,
+        mock_docker: AsyncMock,
+        multi_gpu_container: AsyncMock,
+        patched_env: None,
     ) -> None:
         """Container with multiple GPUs should aggregate metrics from all devices."""
-        mock_container = AsyncMock()
-        mock_container.show.return_value = self._make_container_info(["0", "1"])
+        mock_docker.containers.get.return_value = multi_gpu_container
 
-        mock_docker = AsyncMock()
-        mock_docker.__aenter__ = AsyncMock(return_value=mock_docker)
-        mock_docker.__aexit__ = AsyncMock(return_value=False)
-        mock_docker.containers.get.return_value = mock_container
-
-        with (
-            patch("ai.backend.accelerator.cuda_open.plugin.libnvml", mock_libnvml),
-            patch(
-                "ai.backend.accelerator.cuda_open.plugin.aiodocker.Docker", return_value=mock_docker
-            ),
-        ):
-            results = await cuda_plugin.gather_container_measures(stat_context, ["multi_gpu_cid"])
+        results = await cuda_plugin.gather_container_measures(stat_context, ["multi_gpu_cid"])
 
         cuda_mem, cuda_util = results
         mem = cuda_mem.per_container["multi_gpu_cid"]
@@ -161,24 +177,14 @@ class TestGatherContainerMeasures:
         self,
         cuda_plugin: CUDAPlugin,
         stat_context: MagicMock,
-        mock_libnvml: MagicMock,
+        mock_docker: AsyncMock,
+        no_gpu_container: AsyncMock,
+        patched_env: None,
     ) -> None:
         """Container without nvidia DeviceRequests should be skipped."""
-        mock_container = AsyncMock()
-        mock_container.show.return_value = {"HostConfig": {"DeviceRequests": []}}
+        mock_docker.containers.get.return_value = no_gpu_container
 
-        mock_docker = AsyncMock()
-        mock_docker.__aenter__ = AsyncMock(return_value=mock_docker)
-        mock_docker.__aexit__ = AsyncMock(return_value=False)
-        mock_docker.containers.get.return_value = mock_container
-
-        with (
-            patch("ai.backend.accelerator.cuda_open.plugin.libnvml", mock_libnvml),
-            patch(
-                "ai.backend.accelerator.cuda_open.plugin.aiodocker.Docker", return_value=mock_docker
-            ),
-        ):
-            results = await cuda_plugin.gather_container_measures(stat_context, ["no_gpu_cid"])
+        results = await cuda_plugin.gather_container_measures(stat_context, ["no_gpu_cid"])
 
         cuda_mem, _ = results
         assert "no_gpu_cid" not in cuda_mem.per_container
@@ -190,6 +196,7 @@ class TestGatherContainerMeasures:
     ) -> None:
         """Disabled plugin should return empty measurements without querying Docker."""
         cuda_plugin.enabled = False
+
         results = await cuda_plugin.gather_container_measures(stat_context, ["any_cid"])
 
         cuda_mem, cuda_util = results
