@@ -6,17 +6,17 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
-    AdminSearchLoginClientTypesInput,
     CreateLoginClientTypeInput,
     LoginClientTypeFilter,
     LoginClientTypeOrder,
+    SearchLoginClientTypesInput,
     UpdateLoginClientTypeInput,
 )
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
-    AdminSearchLoginClientTypesPayload,
     CreateLoginClientTypePayload,
     DeleteLoginClientTypePayload,
     LoginClientTypeNode,
+    SearchLoginClientTypesPayload,
     UpdateLoginClientTypePayload,
 )
 from ai.backend.common.dto.manager.v2.login_client_type.types import (
@@ -114,17 +114,15 @@ class LoginClientTypeAdapter(BaseAdapter):
         )
         return self._data_to_node(action_result.login_client_type)
 
-    async def admin_search(
-        self, input: AdminSearchLoginClientTypesInput
-    ) -> AdminSearchLoginClientTypesPayload:
-        """Search login client types with admin scope (filter/order/pagination)."""
+    async def search(self, input: SearchLoginClientTypesInput) -> SearchLoginClientTypesPayload:
+        """Search login client types with filter/order/pagination."""
         querier = self._build_search_querier(input)
 
         action_result = await self._processors.login_client_type.search.wait_for_complete(
             SearchLoginClientTypesAction(querier=querier)
         )
 
-        return AdminSearchLoginClientTypesPayload(
+        return SearchLoginClientTypesPayload(
             items=[self._data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
@@ -164,7 +162,7 @@ class LoginClientTypeAdapter(BaseAdapter):
 
     # --- Private helpers ---
 
-    def _build_search_querier(self, input: AdminSearchLoginClientTypesInput) -> BatchQuerier:
+    def _build_search_querier(self, input: SearchLoginClientTypesInput) -> BatchQuerier:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         pagination = OffsetPagination(

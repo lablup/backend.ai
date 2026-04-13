@@ -12,7 +12,7 @@ from ai.backend.common.dto.manager.v2.login_client_type.types import (
 )
 
 __all__ = (
-    "AdminSearchLoginClientTypesInput",
+    "SearchLoginClientTypesInput",
     "CreateLoginClientTypeInput",
     "LoginClientTypeFilter",
     "LoginClientTypeOrder",
@@ -73,8 +73,8 @@ class LoginClientTypeOrder(BaseRequestModel):
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
 
 
-class AdminSearchLoginClientTypesInput(BaseRequestModel):
-    """Input for admin-scoped paginated login client type search."""
+class SearchLoginClientTypesInput(BaseRequestModel):
+    """Input for paginated login client type search."""
 
     filter: LoginClientTypeFilter | None = Field(default=None, description="Filter criteria.")
     order: list[LoginClientTypeOrder] | None = Field(default=None, description="Ordering criteria.")

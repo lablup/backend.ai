@@ -1,15 +1,15 @@
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
-    AdminSearchLoginClientTypesInput,
     CreateLoginClientTypeInput,
     LoginClientTypeFilter,
     LoginClientTypeOrder,
+    SearchLoginClientTypesInput,
     UpdateLoginClientTypeInput,
 )
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
-    AdminSearchLoginClientTypesPayload,
     CreateLoginClientTypePayload,
     DeleteLoginClientTypePayload,
     LoginClientTypeNode,
+    SearchLoginClientTypesPayload,
     UpdateLoginClientTypePayload,
 )
 from ai.backend.common.dto.manager.v2.login_client_type.types import (
@@ -18,8 +18,8 @@ from ai.backend.common.dto.manager.v2.login_client_type.types import (
 )
 
 __all__ = (
-    "AdminSearchLoginClientTypesInput",
-    "AdminSearchLoginClientTypesPayload",
+    "SearchLoginClientTypesInput",
+    "SearchLoginClientTypesPayload",
     "CreateLoginClientTypeInput",
     "CreateLoginClientTypePayload",
     "DeleteLoginClientTypePayload",
