@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 
+from ai.backend.manager.actions.validators.rbac.legacy import (
+    LegacyScopeActionRBACValidator,
+    LegacySingleEntityActionRBACValidator,
+)
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -10,3 +14,9 @@ from ai.backend.manager.actions.validators.rbac.single_entity import (
 class RBACValidators:
     scope: ScopeActionRBACValidator
     single_entity: SingleEntityActionRBACValidator
+
+
+@dataclass
+class LegacyRBACValidators:
+    scope: LegacyScopeActionRBACValidator
+    single_entity: LegacySingleEntityActionRBACValidator
