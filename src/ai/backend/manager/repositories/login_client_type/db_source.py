@@ -38,7 +38,9 @@ class LoginClientTypeDBSource:
             row = cast(
                 LoginClientTypeRow | None,
                 await session.scalar(
-                    sa.select(LoginClientTypeRow).where(LoginClientTypeRow.id == login_client_type_id)
+                    sa.select(LoginClientTypeRow).where(
+                        LoginClientTypeRow.id == login_client_type_id
+                    )
                 ),
             )
             if row is None:
@@ -76,7 +78,9 @@ class LoginClientTypeDBSource:
             row = cast(
                 LoginClientTypeRow | None,
                 await session.scalar(
-                    sa.select(LoginClientTypeRow).where(LoginClientTypeRow.id == login_client_type_id)
+                    sa.select(LoginClientTypeRow).where(
+                        LoginClientTypeRow.id == login_client_type_id
+                    )
                 ),
             )
             if row is None:
