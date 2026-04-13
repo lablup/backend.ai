@@ -860,6 +860,7 @@ class ModelServingRepository:
                             if spec.model_definition_path.optional_value() is not None
                             else current_rev.model_definition_path
                         ),
+                        model_definition=current_rev.model_definition,
                         resource_group=endpoint_row.resource_group,
                         resource_opts=(
                             spec.resource_opts.optional_value()
