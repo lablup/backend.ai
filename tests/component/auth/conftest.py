@@ -297,5 +297,3 @@ async def expired_password_user_fixture(
         extra_user_values={"password_changed_at": datetime(2020, 1, 1, tzinfo=UTC)},
     ) as data:
         yield data
-
-
