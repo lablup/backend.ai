@@ -27,12 +27,12 @@ class V2LoginClientTypeHandler:
     def __init__(self, *, adapter: LoginClientTypeAdapter) -> None:
         self._adapter = adapter
 
-    async def create(
+    async def admin_create(
         self,
         body: BodyParam[CreateLoginClientTypeInput],
     ) -> APIResponse:
         """Create a new login client type (superadmin only)."""
-        result = await self._adapter.create(body.parsed)
+        result = await self._adapter.admin_create(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def get(
@@ -51,19 +51,19 @@ class V2LoginClientTypeHandler:
         result = await self._adapter.admin_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def update(
+    async def admin_update(
         self,
         path: PathParam[LoginClientTypeIdPathParam],
         body: BodyParam[UpdateLoginClientTypeInput],
     ) -> APIResponse:
         """Update a login client type (superadmin only)."""
-        result = await self._adapter.update(path.parsed.login_client_type_id, body.parsed)
+        result = await self._adapter.admin_update(path.parsed.login_client_type_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def delete(
+    async def admin_delete(
         self,
         path: PathParam[LoginClientTypeIdPathParam],
     ) -> APIResponse:
         """Delete a login client type (superadmin only)."""
-        result = await self._adapter.delete(path.parsed.login_client_type_id)
+        result = await self._adapter.admin_delete(path.parsed.login_client_type_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
