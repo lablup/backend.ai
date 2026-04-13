@@ -1,0 +1,64 @@
+## Backend.AI Agent (DaemonSet) values.
+
+image:
+  repository: backend.ai-agent
+  tag: dev
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+agent:
+  # The agent joins a scaling group — must match what the manager announces
+  # via etcd. `default` works for the initial install.
+  scalingGroup: default
+
+  # Etcd cluster the manager also talks to. Usually the in-cluster etcd
+  # installed by the backend-ai-manager chart, reachable by Service DNS.
+  etcd:
+    host: bai-etcd.backend-ai.svc.cluster.local
+    port: 2379
+    namespace: local
+
+  # RPC / agent-sock ports the DaemonSet opens on the host (hostNetwork=true).
+  rpcPort: 6001
+  agentSockPort: 6007
+  containerPortRange: [30000, 32000]
+
+  # Host-side directories the agent expects to read/write. All are mounted via
+  # hostPath with DirectoryOrCreate where appropriate.
+  hostPaths:
+    varLib: /var/lib/backend.ai
+    scratchRoot: /var/lib/backend.ai/scratches
+    ipc: /var/run/backend.ai/ipc
+    dockerSocket: /var/run/docker.sock
+    # Host path used to stage the agent's krunner payload (runner/, kernel/,
+    # helpers/ site-packages). The agent pod AND the host docker daemon both
+    # need to see bind-mount sources at the same path, so we mount this host
+    # path at the same location inside the agent container and prepend it to
+    # PYTHONPATH — that way `files("ai.backend.runner")` resolves to a path
+    # the host dockerd can open.
+    krunner: /var/cache/backendai/krunner
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+
+  # Agent must see the node's real hardware and reach host ports for spawned
+  # containers. Setting these mirrors the DooD assumption.
+  hostNetwork: true
+  hostPID: true
+  privileged: true
+
+  # Reserved capacity taken away from the node's reported resources.
+  reserved:
+    cpu: 1
+    memory: 1G
+    disk: 8G
+
+  # Extra tolerations/nodeSelector to limit where the agent runs.
+  nodeSelector: {}
+  tolerations:
+    # Tolerate common agent-node taints; adjust in production.
+    - operator: Exists
+      effect: NoSchedule
