@@ -142,7 +142,17 @@ class TestModifyEndpointModelDefinitionRefresh:
                 )
             )
             await sess.flush()
-            sess.add(KeyPairResourcePolicyRow(name="default"))
+            sess.add(
+                KeyPairResourcePolicyRow(
+                    name="default",
+                    total_resource_slots=ResourceSlot(),
+                    max_session_lifetime=0,
+                    max_concurrent_sessions=10,
+                    max_concurrent_sftp_sessions=1,
+                    max_containers_per_session=1,
+                    idle_timeout=3600,
+                )
+            )
             await sess.flush()
             sess.add(
                 KeyPairRow(
