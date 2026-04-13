@@ -636,7 +636,7 @@ class AuthDBSource:
                         {
                             "user_id": user_id,
                             "domain_name": domain_name,
-                            "result": result.value,
+                            "result": result,
                         }
                         for _ in deleted_tokens
                     ],
@@ -729,7 +729,7 @@ class AuthDBSource:
                 sa.insert(lh).values(
                     user_id=row.user_id,
                     domain_name=domain_name,
-                    result=result.value,
+                    result=result,
                 )
             )
             await conn.commit()
