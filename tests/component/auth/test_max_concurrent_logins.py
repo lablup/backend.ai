@@ -54,7 +54,8 @@ class TestMaxConcurrentLogins:
         result = await admin_registry.auth.authorize(authorize_req)
         assert isinstance(result, AuthorizeResponse)
 
-        # Assert: second login raises BackendAPIError with HTTP 409
+        # Assert: second login raises BackendAPIError with HTTP 409 and correct error type
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.auth.authorize(authorize_req)
         assert exc_info.value.status == 409
+        assert exc_info.value.data["type"].split("/")[-1] == "too-many-concurrent-logins"
