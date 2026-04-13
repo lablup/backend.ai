@@ -31,7 +31,6 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.services.auth.processors import AuthProcessors
 
@@ -300,21 +299,3 @@ async def expired_password_user_fixture(
         yield data
 
 
-@pytest.fixture()
-async def max_concurrent_logins_limit(
-    db_engine: SAEngine,
-    auth_user_fixture: AuthUserFixtureData,
-) -> None:
-    """Set max_concurrent_logins=1 for the auth user's resource policy."""
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.update(UserResourcePolicyRow.__table__)
-            .where(
-                UserResourcePolicyRow.__table__.c.name
-                == sa.select(sa.text("resource_policy"))
-                .select_from(sa.text("users"))
-                .where(sa.text(f"uuid = '{auth_user_fixture.user_uuid}'"))
-                .scalar_subquery()
-            )
-            .values(max_concurrent_logins=1)
-        )
