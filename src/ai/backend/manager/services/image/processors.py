@@ -4,7 +4,9 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
@@ -159,9 +161,12 @@ class ImageProcessors(AbstractProcessorPackage):
 
         # Single entity actions — also invoked from gql_legacy, so use the
         # non-enforcing legacy RBAC validator to avoid breaking legacy callers.
-        legacy_single_entity_validator = (
-            validators.legacy_rbac.single_entity
-            if validators.legacy_rbac is not None
+        # Mocked test fixtures do not provide a legacy_rbac, so isinstance
+        # guards against MagicMock attribute access returning a truthy mock.
+        legacy_rbac = validators.legacy_rbac
+        legacy_single_entity_validator: SingleEntityActionValidator = (
+            legacy_rbac.single_entity
+            if isinstance(legacy_rbac, LegacyRBACValidators)
             else validators.rbac.single_entity
         )
         self.forget_image_by_id = SingleEntityActionProcessor(

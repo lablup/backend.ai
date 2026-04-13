@@ -6,7 +6,10 @@ from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
+from ai.backend.manager.actions.validator.scope import ScopeActionValidator
+from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
@@ -152,16 +155,17 @@ class UserProcessors(AbstractProcessorPackage):
     ) -> None:
         # Scope actions with RBAC — create_user is also invoked from gql_legacy,
         # so use the non-enforcing legacy validator to avoid breaking callers.
-        legacy_scope_validator = (
-            validators.legacy_rbac.scope
-            if validators.legacy_rbac is not None
-            else validators.rbac.scope
-        )
-        legacy_single_entity_validator = (
-            validators.legacy_rbac.single_entity
-            if validators.legacy_rbac is not None
-            else validators.rbac.single_entity
-        )
+        # Mocked test fixtures do not provide a legacy_rbac, so isinstance
+        # guards against MagicMock attribute access returning a truthy mock.
+        legacy_rbac = validators.legacy_rbac
+        if isinstance(legacy_rbac, LegacyRBACValidators):
+            legacy_scope_validator: ScopeActionValidator = legacy_rbac.scope
+            legacy_single_entity_validator: SingleEntityActionValidator = (
+                legacy_rbac.single_entity
+            )
+        else:
+            legacy_scope_validator = validators.rbac.scope
+            legacy_single_entity_validator = validators.rbac.single_entity
         self.create_user = ScopeActionProcessor(
             user_service.create_user,
             action_monitors,
