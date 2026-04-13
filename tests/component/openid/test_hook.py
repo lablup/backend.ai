@@ -132,6 +132,63 @@ class TestOIDCHookPreAuth:
         with pytest.raises(Reject, match="user is inactivated"):
             await hook_plugin.pre_auth_hook(request_with_inactive_user_stoken, {})
 
+    # -----------------------------------------------------------------------
+    # Tests — sToken via params (token-login flow)
+    # -----------------------------------------------------------------------
+
+    async def test_stoken_in_params_authenticates(
+        self,
+        hook_plugin: OIDCHookPlugin,
+        request_without_stoken: MagicMock,
+        active_user_uuid: uuid.UUID,
+        make_stoken: Callable[..., str],
+    ) -> None:
+        stoken = make_stoken(active_user_uuid, "alice@example.com")
+        params: dict[str, Any] = {"sToken": stoken}
+        raw_result: Any = await hook_plugin.pre_auth_hook(request_without_stoken, params)
+        assert raw_result is not None
+        assert raw_result["email"] == "alice@example.com"
+        assert raw_result["status"] == UserStatus.ACTIVE
+
+    async def test_stoken_lowercase_key_in_params_authenticates(
+        self,
+        hook_plugin: OIDCHookPlugin,
+        request_without_stoken: MagicMock,
+        active_user_uuid: uuid.UUID,
+        make_stoken: Callable[..., str],
+    ) -> None:
+        stoken = make_stoken(active_user_uuid, "alice@example.com")
+        params: dict[str, Any] = {"stoken": stoken}
+        raw_result: Any = await hook_plugin.pre_auth_hook(request_without_stoken, params)
+        assert raw_result is not None
+        assert raw_result["email"] == "alice@example.com"
+
+    async def test_expired_stoken_in_params_rejects(
+        self,
+        hook_plugin: OIDCHookPlugin,
+        request_without_stoken: MagicMock,
+        make_stoken: Callable[..., str],
+    ) -> None:
+        stoken = make_stoken(uuid.uuid4(), "alice@example.com", expired=True)
+        params: dict[str, Any] = {"sToken": stoken}
+        with pytest.raises(Reject, match="Expired authentication token"):
+            await hook_plugin.pre_auth_hook(request_without_stoken, params)
+
+    async def test_invalid_stoken_in_params_rejects(
+        self,
+        hook_plugin: OIDCHookPlugin,
+        request_without_stoken: MagicMock,
+    ) -> None:
+        now = int(time.time())
+        stoken = pyjwt.encode(
+            {"user": str(uuid.uuid4()), "email": "x@x.com", "exp": now + 3600},
+            "wrong-secret",
+            algorithm="HS256",
+        )
+        params: dict[str, Any] = {"sToken": stoken}
+        with pytest.raises(Reject, match="Invalid authentication token"):
+            await hook_plugin.pre_auth_hook(request_without_stoken, params)
+
 
 # ===========================================================================
 # TestOIDCHookLifecycle
