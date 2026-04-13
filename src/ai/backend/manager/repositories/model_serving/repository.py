@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from pydantic import HttpUrl
+from ruamel.yaml import YAML
 from sqlalchemy.exc import IntegrityError, NoResultFound, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
@@ -20,7 +21,9 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AccessKey,
+    QuotaScopeID,
     ResourceSlot,
+    VFolderID,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.types import RouteHealthStatus
@@ -828,6 +831,15 @@ class ModelServingRepository:
                     if current_rev is None:
                         raise InvalidAPIParameters("Endpoint has no current revision")
 
+                    # Re-read model definition from vfolder to pick up file changes
+                    refreshed_model_definition = await self._fetch_model_definition_from_vfolder(
+                        db_session,
+                        storage_manager,
+                        current_rev.model,
+                        spec.model_definition_path.optional_value()
+                        or current_rev.model_definition_path,
+                    )
+
                     # Resolve image if changed
                     image_id = current_rev.image
                     image_ref = spec.image.optional_value()
@@ -860,7 +872,7 @@ class ModelServingRepository:
                             if spec.model_definition_path.optional_value() is not None
                             else current_rev.model_definition_path
                         ),
-                        model_definition=current_rev.model_definition,
+                        model_definition=refreshed_model_definition or current_rev.model_definition,
                         resource_group=endpoint_row.resource_group,
                         resource_opts=(
                             spec.resource_opts.optional_value()
@@ -941,6 +953,54 @@ class ModelServingRepository:
             raise
         except Exception:
             raise
+
+    async def _fetch_model_definition_from_vfolder(
+        self,
+        db_session: SASession,
+        storage_manager: StorageSessionManager,
+        vfolder_id: uuid.UUID | None,
+        model_definition_path: str | None,
+    ) -> dict[str, Any] | None:
+        """Re-read model definition file from the vfolder storage.
+
+        Returns the parsed YAML content, or None if the file cannot be read.
+        """
+        if vfolder_id is None:
+            return None
+        try:
+            vf_query = sa.select(
+                VFolderRow.id,
+                VFolderRow.host,
+                VFolderRow.quota_scope_id,
+            ).where(VFolderRow.id == vfolder_id)
+            vf_result = await db_session.execute(vf_query)
+            vf_row = vf_result.one_or_none()
+            if vf_row is None:
+                return None
+
+            quota_scope_id: QuotaScopeID | None = vf_row.quota_scope_id
+            vfid = VFolderID(quota_scope_id, vf_row.id)
+            proxy_name, volume_name = storage_manager.get_proxy_and_volume(vf_row.host)
+            manager_client = storage_manager.get_manager_facing_client(proxy_name)
+
+            candidates = (
+                [model_definition_path]
+                if model_definition_path
+                else ["model-definition.yaml", "model-definition.yml"]
+            )
+            for candidate in candidates:
+                try:
+                    content = await manager_client.fetch_file_content(
+                        volume_name, str(vfid), candidate
+                    )
+                    if content:
+                        yaml = YAML()
+                        return cast(dict[str, Any], yaml.load(content))
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return None
 
     @model_serving_repository_resilience.apply()
     async def search_auto_scaling_rules(
