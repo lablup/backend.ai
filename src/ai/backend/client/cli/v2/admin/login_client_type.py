@@ -24,7 +24,7 @@ def login_client_type() -> None:
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
 @click.option(
-    "--name",
+    "--name-contains",
     default=None,
     type=str,
     help="Filter by name (substring match).",
@@ -37,7 +37,7 @@ def login_client_type() -> None:
 def search(
     limit: int,
     offset: int,
-    name: str | None,
+    name_contains: str | None,
     order_by: tuple[str, ...],
 ) -> None:
     """Search login client types with admin scope."""
@@ -51,11 +51,11 @@ def search(
     )
 
     filter_dto: LoginClientTypeFilter | None = None
-    if name is not None:
+    if name_contains is not None:
         from ai.backend.common.dto.manager.query import StringFilter
 
         filter_dto = LoginClientTypeFilter(
-            name=StringFilter(contains=name) if name is not None else None,
+            name=StringFilter(contains=name_contains),
         )
 
     orders = (
