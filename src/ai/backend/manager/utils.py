@@ -58,7 +58,7 @@ async def check_if_requester_is_eligible_to_act_as_target_access_key(
     result = await conn.execute(query)
     row = result.first()
     if row is None:
-        raise ValueError("Unknown owner access key")
+        raise ObjectNotFound("Unknown owner access key", object_name="access key")
     owner_domain = row.domain_name
     owner_role = row.role
     return check_if_requester_is_eligible_to_act_as_target_user(
@@ -83,7 +83,7 @@ async def check_if_requester_is_eligible_to_act_as_target_user_uuid(
     result = await conn.execute(query)
     row = result.first()
     if row is None:
-        raise ValueError("Unknown owner access key")
+        raise ObjectNotFound("Unknown target user", object_name="user")
     owner_domain = row.domain_name
     owner_role = row.role
     return check_if_requester_is_eligible_to_act_as_target_user(
