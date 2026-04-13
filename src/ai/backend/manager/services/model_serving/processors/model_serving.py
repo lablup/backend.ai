@@ -118,8 +118,11 @@ class ModelServingProcessors(AbstractProcessorPackage):
         self.delete_model_service = SingleEntityActionProcessor(
             service.delete, action_monitors, validators=[validators.rbac.single_entity]
         )
+        # modify_endpoint is invoked only from gql_legacy — non-enforcing validator.
         self.modify_endpoint = SingleEntityActionProcessor(
-            service.modify_endpoint, action_monitors, validators=[validators.rbac.single_entity]
+            service.modify_endpoint,
+            action_monitors,
+            validators=[validators.legacy_rbac.single_entity],
         )
         self.update_route = SingleEntityActionProcessor(
             service.update_route, action_monitors, validators=[validators.rbac.single_entity]

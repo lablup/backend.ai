@@ -150,9 +150,12 @@ class UserProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        # Scope actions with RBAC
+        # Scope actions with RBAC — create_user is also invoked from gql_legacy,
+        # so use the non-enforcing legacy validator to avoid breaking callers.
         self.create_user = ScopeActionProcessor(
-            user_service.create_user, action_monitors, validators=[validators.rbac.scope]
+            user_service.create_user,
+            action_monitors,
+            validators=[validators.legacy_rbac.scope],
         )
         self.search_users_by_domain = ActionProcessor(
             user_service.search_users_by_domain, action_monitors
@@ -169,8 +172,11 @@ class UserProcessors(AbstractProcessorPackage):
         self.get_user = SingleEntityActionProcessor(
             user_service.get_user, action_monitors, validators=[validators.rbac.single_entity]
         )
+        # modify_user is also invoked from gql_legacy — non-enforcing validator.
         self.modify_user = SingleEntityActionProcessor(
-            user_service.modify_user, action_monitors, validators=[validators.rbac.single_entity]
+            user_service.modify_user,
+            action_monitors,
+            validators=[validators.legacy_rbac.single_entity],
         )
         self.modify_user_by_id = SingleEntityActionProcessor(
             user_service.modify_user_by_id,
@@ -183,8 +189,11 @@ class UserProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=[validators.rbac.single_entity],
         )
+        # purge_user is invoked only from gql_legacy — non-enforcing validator.
         self.purge_user = SingleEntityActionProcessor(
-            user_service.purge_user, action_monitors, validators=[validators.rbac.single_entity]
+            user_service.purge_user,
+            action_monitors,
+            validators=[validators.legacy_rbac.single_entity],
         )
         self.purge_user_by_id = SingleEntityActionProcessor(
             user_service.purge_user_by_id,

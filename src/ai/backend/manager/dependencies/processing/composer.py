@@ -29,7 +29,11 @@ from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators, RBACValidators
+from ai.backend.manager.actions.validators.rbac.legacy import (
+    LegacyScopeActionRBACValidator,
+    LegacySingleEntityActionRBACValidator,
+)
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -254,6 +258,10 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             scope=ScopeActionRBACValidator(permission_controller_repository),
             single_entity=SingleEntityActionRBACValidator(permission_controller_repository),
         )
+        legacy_rbac_validators = LegacyRBACValidators(
+            scope=LegacyScopeActionRBACValidator(permission_controller_repository),
+            single_entity=LegacySingleEntityActionRBACValidator(permission_controller_repository),
+        )
 
         processors = await stack.enter_dependency(
             ProcessorsDependency(),
@@ -262,7 +270,10 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 action_monitors=[reporter_monitor, prometheus_monitor, audit_log_monitor],
                 event_hub=setup_input.event_hub,
                 event_fetcher=setup_input.event_fetcher,
-                validators=ActionValidators(rbac=rbac_validators),
+                validators=ActionValidators(
+                    rbac=rbac_validators,
+                    legacy_rbac=legacy_rbac_validators,
+                ),
             ),
         )
 
