@@ -112,7 +112,6 @@ def _make_creator(
             execution=ExecutionSpec(runtime_variant=RuntimeVariant("custom")),
             model_definition=None,
             revision_preset_id=preset_id,
-            auto_activate=True,
         ),
         policy=policy,
     )
