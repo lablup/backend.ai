@@ -66,14 +66,6 @@ def container_registry() -> None:
 
 @admin.group(
     cls=LazyGroup,
-    import_name="ai.backend.client.cli.v2.admin.login_client_type:login_client_type",
-)
-def login_client_type() -> None:
-    """Admin login client type commands."""
-
-
-@admin.group(
-    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.login_history:login_history",
 )
 def login_history() -> None:
