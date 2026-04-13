@@ -896,8 +896,7 @@ class ModelServingService:
             self._storage_manager,
         )
         spec = cast(EndpointUpdaterSpec, action.updater.spec)
-        if spec.replica_count_modified():
-            # Notify appproxy to update routing info
+        if spec.replica_count_modified() or spec.has_revision_changes():
             await self._deployment_controller.mark_lifecycle_needed(
                 DeploymentLifecycleType.CHECK_REPLICA,
             )
