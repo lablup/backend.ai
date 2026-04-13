@@ -61,7 +61,7 @@ def server_module_registries(
 
 
 @pytest.fixture(autouse=True)
-async def _seed_login_client_types(db_engine: SAEngine) -> AsyncIterator[None]:
+async def seed_login_client_types(db_engine: SAEngine) -> AsyncIterator[None]:
     """Seed the login_client_types table for auth tests.
 
     The oneshot schema setup uses metadata.create_all() + stamp (no alembic
