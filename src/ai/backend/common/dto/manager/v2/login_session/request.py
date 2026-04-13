@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 
 from .types import LoginSessionOrderField, LoginSessionStatus, OrderDirection
 
@@ -37,6 +37,7 @@ class LoginSessionStatusFilter(BaseRequestModel):
 class LoginSessionFilter(BaseRequestModel):
     """Filter for login sessions."""
 
+    user_id: UUIDFilter | None = Field(default=None, description="User ID filter")
     status: LoginSessionStatusFilter | None = Field(default=None, description="Status filter")
     access_key: StringFilter | None = Field(default=None, description="Access key filter")
     created_at: DateTimeFilter | None = Field(
