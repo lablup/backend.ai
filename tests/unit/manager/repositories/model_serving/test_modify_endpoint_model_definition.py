@@ -37,7 +37,9 @@ from ai.backend.manager.models.resource_slot.row import (
     DeploymentRevisionResourceSlotRow,
     ResourceSlotTypeRow,
 )
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -78,7 +80,9 @@ class TestModifyEndpointModelDefinitionRefresh:
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
+                SessionRow,
                 EndpointRow,
+                RoutingRow,
                 DeploymentRevisionRow,
                 ResourceSlotTypeRow,
                 DeploymentRevisionResourceSlotRow,
