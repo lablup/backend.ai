@@ -92,21 +92,7 @@ class LoginClientTypeAdapter(BaseAdapter):
                     result.append(LoginClientTypeOrders.modified_at(ascending))
         return result
 
-    # --- Instance methods ---
-
-    async def admin_create(self, input: CreateLoginClientTypeInput) -> CreateLoginClientTypePayload:
-        creator = Creator[LoginClientTypeRow](
-            spec=LoginClientTypeCreatorSpec(
-                name=input.name,
-                description=input.description,
-            ),
-        )
-        action_result = await self._processors.login_client_type_admin.create.wait_for_complete(
-            CreateLoginClientTypeAction(creator=creator)
-        )
-        return CreateLoginClientTypePayload(
-            login_client_type=self._data_to_node(action_result.login_client_type),
-        )
+    # --- Non-admin methods ---
 
     async def get(self, type_id: UUID) -> LoginClientTypeNode:
         action_result = await self._processors.login_client_type.get.wait_for_complete(
@@ -129,21 +115,39 @@ class LoginClientTypeAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
+    # --- Admin methods ---
+
+    async def admin_create(self, input: CreateLoginClientTypeInput) -> CreateLoginClientTypePayload:
+        creator = Creator[LoginClientTypeRow](
+            spec=LoginClientTypeCreatorSpec(
+                name=input.name,
+                description=input.description,
+            ),
+        )
+        action_result = await self._processors.login_client_type_admin.create.wait_for_complete(
+            CreateLoginClientTypeAction(creator=creator)
+        )
+        return CreateLoginClientTypePayload(
+            login_client_type=self._data_to_node(action_result.login_client_type),
+        )
+
     async def admin_update(
         self, type_id: UUID, input: UpdateLoginClientTypeInput
     ) -> UpdateLoginClientTypePayload:
-        name = OptionalState.nop() if input.name is None else OptionalState.update(input.name)
-        raw_description = input.description
-        if isinstance(raw_description, Sentinel):
-            description: TriState[str] = TriState.nop()
-        elif raw_description is None:
-            description = TriState.nullify()
-        else:
-            description = TriState.update(raw_description)
         updater = Updater[LoginClientTypeRow](
             spec=LoginClientTypeUpdaterSpec(
-                name=name,
-                description=description,
+                name=(
+                    OptionalState.update(input.name)
+                    if input.name is not None
+                    else OptionalState.nop()
+                ),
+                description=(
+                    TriState.nop()
+                    if isinstance(input.description, Sentinel)
+                    else TriState.nullify()
+                    if input.description is None
+                    else TriState.update(input.description)
+                ),
             ),
             pk_value=type_id,
         )
