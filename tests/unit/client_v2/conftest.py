@@ -1,11 +1,14 @@
 from collections.abc import Mapping
 from datetime import datetime
+from uuid import UUID
 
 import pytest
 from yarl import URL
 
 from ai.backend.client.v2.auth import AuthStrategy
 from ai.backend.client.v2.config import ClientConfig
+
+_SAMPLE_CLIENT_TYPE_ID = UUID("00000000-0000-0000-0000-0000000000eb")
 
 
 class MockAuth(AuthStrategy):
@@ -31,3 +34,8 @@ def mock_auth() -> AuthStrategy:
 @pytest.fixture
 def sample_config() -> ClientConfig:
     return ClientConfig(endpoint=URL("https://api.example.com"))
+
+
+@pytest.fixture
+def sample_client_type_id() -> UUID:
+    return _SAMPLE_CLIENT_TYPE_ID

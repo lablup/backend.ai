@@ -90,7 +90,6 @@ def auth_service(
         config_provider=mock_config_provider,
         valkey_session_client=mock_valkey_session_client,
         user_resource_policy_repository=mock_user_resource_policy_repository,
-        login_client_type_repository=AsyncMock(),
     )
 
 
@@ -181,7 +180,7 @@ async def test_authorize_success(
         password="correct_password",
         request=MagicMock(),
         stoken=None,
-        client_type_name="webui",
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -208,7 +207,7 @@ async def test_authorize_invalid_token_type(
         password="password",
         request=MagicMock(),
         stoken=None,
-        client_type_name="webui",
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -235,7 +234,7 @@ async def test_authorize_invalid_credentials(
         password="wrong_password",
         request=MagicMock(),
         stoken=None,
-        client_type_name="webui",
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -257,7 +256,7 @@ async def test_authorize_with_hook_authorization(
         password="any_password",
         request=MagicMock(),
         stoken=None,
-        client_type_name="webui",
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -314,7 +313,7 @@ async def test_authorize_with_password_expiry(
         password="old_password",
         request=MagicMock(),
         stoken=None,
-        client_type_name="webui",
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -357,7 +356,7 @@ async def test_authorize_with_post_hook_response(
         password="password",
         request=MagicMock(),
         stoken=None,
-        client_type_name="webui",
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -401,7 +400,7 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
         password="password",
         request=MagicMock(),
         stoken=None,
-        client_type_name="webui",
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -458,7 +457,7 @@ async def test_authorize_force_invalidates_existing_sessions(
         password="password",
         request=MagicMock(),
         stoken=None,
-        client_type_name="webui",
+        client_type_id=uuid4(),
         otp=None,
         force=True,
     )
@@ -543,7 +542,7 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
             password="password",
             request=MagicMock(),
             stoken=None,
-            client_type_name="webui",
+            client_type_id=uuid4(),
             otp=None,
         ),
         user=_make_mock_user(),
