@@ -1102,6 +1102,7 @@ type AuditLogV2Edge {
 enum AutoScalingMetricSource {
   KERNEL
   INFERENCE_FRAMEWORK
+  PROMETHEUS
 }
 
 """Added in 25.19.0. An auto-scaling rule for a model deployment."""
@@ -1132,6 +1133,11 @@ type AutoScalingRule implements Node {
 
   """The maximum number of replicas (e.g. 10)."""
   maxReplicas: Int
+
+  """
+  Added in 26.4.1. The Prometheus query preset ID for PROMETHEUS metric source.
+  """
+  prometheusQueryPresetId: ID
   createdAt: DateTime!
   lastTriggeredAt: DateTime!
 }
@@ -1746,6 +1752,7 @@ input CreateAutoScalingRuleInput {
   timeWindow: Int!
   minReplicas: Int
   maxReplicas: Int
+  prometheusQueryPresetId: ID = null
 }
 
 """Added in 25.19.0. Payload for creating an auto-scaling rule."""
@@ -10929,6 +10936,7 @@ input UpdateAutoScalingRuleInput {
   timeWindow: Int
   minReplicas: Int
   maxReplicas: Int
+  prometheusQueryPresetId: ID
 }
 
 """Added in 25.19.0. Payload for updating an auto-scaling rule."""

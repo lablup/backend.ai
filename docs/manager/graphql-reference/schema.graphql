@@ -2101,6 +2101,7 @@ type EndpointAutoScalingRuleNode implements Node @key(fields: "id") {
 enum AutoScalingMetricSource {
   KERNEL
   INFERENCE_FRAMEWORK
+  PROMETHEUS
 }
 
 """
