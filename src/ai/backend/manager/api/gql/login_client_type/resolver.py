@@ -8,7 +8,7 @@ from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
-    AdminSearchLoginClientTypesInput,
+    SearchLoginClientTypesInput,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -51,9 +51,7 @@ async def login_client_type(
 @gql_root_field(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Search login client types with filtering, ordering, and pagination (super admin only)."
-        ),
+        description=("Search login client types with filtering, ordering, and pagination."),
     )
 )  # type: ignore[misc]
 async def login_client_types(
@@ -63,12 +61,11 @@ async def login_client_types(
     limit: int | None = None,
     offset: int | None = None,
 ) -> LoginClientTypeConnection | None:
-    check_admin_only()
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
 
-    payload = await info.context.adapters.login_client_type.admin_search(
-        AdminSearchLoginClientTypesInput(
+    payload = await info.context.adapters.login_client_type.search(
+        SearchLoginClientTypesInput(
             filter=pydantic_filter,
             order=pydantic_order,
             limit=limit if limit is not None else 50,
@@ -97,12 +94,12 @@ async def login_client_types(
         description="Create a new login client type (super admin only).",
     )
 )  # type: ignore[misc]
-async def create_login_client_type(
+async def admin_create_login_client_type(
     info: Info[StrawberryGQLContext],
     input: CreateLoginClientTypeInputGQL,
 ) -> CreateLoginClientTypePayloadGQL:
     check_admin_only()
-    payload = await info.context.adapters.login_client_type.create(input.to_pydantic())
+    payload = await info.context.adapters.login_client_type.admin_create(input.to_pydantic())
     return CreateLoginClientTypePayloadGQL.from_pydantic(payload)
 
 
@@ -112,13 +109,13 @@ async def create_login_client_type(
         description="Update a login client type (super admin only).",
     )
 )  # type: ignore[misc]
-async def update_login_client_type(
+async def admin_update_login_client_type(
     info: Info[StrawberryGQLContext],
     id: UUID,
     input: UpdateLoginClientTypeInputGQL,
 ) -> UpdateLoginClientTypePayloadGQL:
     check_admin_only()
-    payload = await info.context.adapters.login_client_type.update(id, input.to_pydantic())
+    payload = await info.context.adapters.login_client_type.admin_update(id, input.to_pydantic())
     return UpdateLoginClientTypePayloadGQL.from_pydantic(payload)
 
 
@@ -128,10 +125,10 @@ async def update_login_client_type(
         description="Delete a login client type (super admin only).",
     )
 )  # type: ignore[misc]
-async def delete_login_client_type(
+async def admin_delete_login_client_type(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> DeleteLoginClientTypePayloadGQL:
     check_admin_only()
-    payload = await info.context.adapters.login_client_type.delete(id)
+    payload = await info.context.adapters.login_client_type.admin_delete(id)
     return DeleteLoginClientTypePayloadGQL.from_pydantic(payload)
