@@ -37,8 +37,8 @@ def register_v2_login_client_type_routes(
     registry.add(
         "POST",
         "/search",
-        handler.admin_search,
-        middlewares=[superadmin_required],
+        handler.search,
+        middlewares=[auth_required],
     )
     registry.add(
         "GET",

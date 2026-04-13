@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
-    AdminSearchLoginClientTypesInput,
     CreateLoginClientTypeInput,
+    SearchLoginClientTypesInput,
     UpdateLoginClientTypeInput,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -43,12 +43,12 @@ class V2LoginClientTypeHandler:
         result = await self._adapter.get(path.parsed.login_client_type_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_search(
+    async def search(
         self,
-        body: BodyParam[AdminSearchLoginClientTypesInput],
+        body: BodyParam[SearchLoginClientTypesInput],
     ) -> APIResponse:
-        """Search login client types with filter/order/pagination (superadmin only)."""
-        result = await self._adapter.admin_search(body.parsed)
+        """Search login client types with filter/order/pagination."""
+        result = await self._adapter.search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_update(

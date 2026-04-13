@@ -10,7 +10,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 __all__ = (
-    "AdminSearchLoginClientTypesPayload",
+    "SearchLoginClientTypesPayload",
     "CreateLoginClientTypePayload",
     "DeleteLoginClientTypePayload",
     "LoginClientTypeNode",
@@ -46,8 +46,8 @@ class DeleteLoginClientTypePayload(BaseResponseModel):
     id: UUID = Field(description="UUID of the deleted login client type.")
 
 
-class AdminSearchLoginClientTypesPayload(BaseResponseModel):
-    """Payload for admin-scoped paginated login client type search results."""
+class SearchLoginClientTypesPayload(BaseResponseModel):
+    """Payload for paginated login client type search results."""
 
     items: list[LoginClientTypeNode] = Field(description="Login client type nodes.")
     total_count: int = Field(description="Total count matching the filter.")
