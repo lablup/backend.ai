@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 from unittest.mock import MagicMock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -10,8 +10,6 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-
-_SAMPLE_CLIENT_TYPE_ID = UUID("00000000-0000-0000-0000-0000000000eb")
 
 
 @pytest.fixture
@@ -35,4 +33,4 @@ def mock_config_provider() -> MagicMock:
 
 @pytest.fixture
 def sample_client_type_id() -> UUID:
-    return _SAMPLE_CLIENT_TYPE_ID
+    return uuid4()

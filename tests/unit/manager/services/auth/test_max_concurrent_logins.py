@@ -59,9 +59,6 @@ def _make_mock_keypair_row() -> MagicMock:
     return mock_keypair
 
 
-_SAMPLE_CLIENT_TYPE_ID = UUID("00000000-0000-0000-0000-0000000000eb")
-
-
 def _make_action(*, force: bool = False) -> AuthorizeAction:
     return AuthorizeAction(
         type=AuthTokenType.KEYPAIR,
@@ -70,7 +67,7 @@ def _make_action(*, force: bool = False) -> AuthorizeAction:
         password="password",
         request=MagicMock(),
         stoken=None,
-        client_type_id=_SAMPLE_CLIENT_TYPE_ID,
+        client_type_id=uuid4(),
         otp=None,
         force=force,
     )

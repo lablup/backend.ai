@@ -60,23 +60,22 @@ def server_module_registries(
     ]
 
 
-_SAMPLE_CLIENT_TYPE_ID = uuid.UUID("00000000-0000-0000-0000-0000000000eb")
-
-
 @pytest.fixture
 def sample_client_type_id() -> uuid.UUID:
-    """Well-known 'webui' login_client_type UUID from seed data."""
-    return _SAMPLE_CLIENT_TYPE_ID
+    return uuid.uuid4()
 
 
 @pytest.fixture(autouse=True)
-async def seed_login_client_types(db_engine: SAEngine) -> AsyncIterator[None]:
+async def seed_login_client_types(
+    db_engine: SAEngine, sample_client_type_id: uuid.UUID
+) -> AsyncIterator[None]:
     """Seed the login_client_types table for auth tests.
 
     The oneshot schema setup uses metadata.create_all() + stamp (no alembic
     upgrade()), so migration seed data is not inserted. This fixture inserts
-    the well-known rows and cleans up afterwards.
+    the rows and cleans up afterwards.
     """
+    core_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         existing = await conn.scalar(
             sa.select(sa.func.count()).select_from(LoginClientTypeRow.__table__)
@@ -85,12 +84,12 @@ async def seed_login_client_types(db_engine: SAEngine) -> AsyncIterator[None]:
             await conn.execute(
                 sa.insert(LoginClientTypeRow.__table__).values([
                     {
-                        "id": uuid.UUID("00000000-0000-0000-0000-00000000c02e"),
+                        "id": core_id,
                         "name": "core",
                         "description": "Backend.AI CLI / core SDK clients.",
                     },
                     {
-                        "id": uuid.UUID("00000000-0000-0000-0000-0000000000eb"),
+                        "id": sample_client_type_id,
                         "name": "webui",
                         "description": "Backend.AI web console.",
                     },
@@ -100,10 +99,7 @@ async def seed_login_client_types(db_engine: SAEngine) -> AsyncIterator[None]:
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.delete(LoginClientTypeRow.__table__).where(
-                LoginClientTypeRow.__table__.c.id.in_([
-                    uuid.UUID("00000000-0000-0000-0000-00000000c02e"),
-                    uuid.UUID("00000000-0000-0000-0000-0000000000eb"),
-                ])
+                LoginClientTypeRow.__table__.c.id.in_([core_id, sample_client_type_id])
             )
         )
 
