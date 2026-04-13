@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from collections.abc import Mapping, Sequence
+from decimal import Decimal, DecimalException
 from typing import cast
 from uuid import UUID
 
@@ -10,11 +11,18 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
 )
+from ai.backend.common.clients.prometheus.client import PrometheusClient
+from ai.backend.common.clients.prometheus.preset import MetricPreset
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import (
+    BackendAIError,
+    FailedToGetMetric,
+    PrometheusConnectionError,
+)
 from ai.backend.common.types import (
+    AutoScalingMetricSource,
     RuntimeVariant,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -34,6 +42,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.errors.deployment import ReplicaCountMismatch
 from ai.backend.manager.models.routing import RoutingRow
@@ -47,6 +56,9 @@ from ai.backend.manager.repositories.deployment.creators import (
 from ai.backend.manager.repositories.deployment.repository import (
     AutoScalingMetricsData,
     DeploymentRepository,
+)
+from ai.backend.manager.repositories.prometheus_query_preset.repository import (
+    PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -84,6 +96,8 @@ class DeploymentExecutor:
     _config_provider: ManagerConfigProvider
     _client_pool: ClientPool
     _valkey_stat: ValkeyStatClient
+    _prometheus_client: PrometheusClient
+    _preset_repo: PrometheusQueryPresetRepository
 
     def __init__(
         self,
@@ -92,6 +106,8 @@ class DeploymentExecutor:
         config_provider: ManagerConfigProvider,
         client_pool: ClientPool,
         valkey_stat: ValkeyStatClient,
+        prometheus_client: PrometheusClient,
+        preset_repo: PrometheusQueryPresetRepository,
     ) -> None:
         """Initialize the deployment executor."""
         self._deployment_repo = deployment_repo
@@ -99,6 +115,8 @@ class DeploymentExecutor:
         self._config_provider = config_provider
         self._client_pool = client_pool
         self._valkey_stat = valkey_stat
+        self._prometheus_client = prometheus_client
+        self._preset_repo = preset_repo
 
     async def check_pending_deployments(
         self, deployments: Sequence[DeploymentWithHistory]
@@ -352,6 +370,11 @@ class DeploymentExecutor:
                 deployment_infos = [dep.deployment_info for dep in deployments]
                 metrics_data = await self._deployment_repo.fetch_metrics_for_autoscaling(
                     deployment_infos, auto_scaling_rules
+                )
+
+            with DeploymentRecorderContext.shared_step("load_prometheus_metrics"):
+                await self._fetch_prometheus_metrics(
+                    deployment_infos, auto_scaling_rules, metrics_data
                 )
 
         successes: list[DeploymentWithHistory] = []
@@ -676,6 +699,110 @@ class DeploymentExecutor:
                     scale_in_route_ids.extend(r.route_id for r in candidates)
 
         return scale_out_creators, scale_in_route_ids
+
+    async def _fetch_prometheus_metrics(
+        self,
+        deployments: Sequence[DeploymentInfo],
+        auto_scaling_rules: Mapping[UUID, Sequence[AutoScalingRule]],
+        metrics_data: AutoScalingMetricsData,
+    ) -> None:
+        """Fetch Prometheus metrics for rules with PROMETHEUS metric source.
+
+        Results are stored in metrics_data.prometheus_metrics keyed by rule ID.
+        """
+        prometheus_rules: list[tuple[DeploymentInfo, AutoScalingRule]] = []
+        for dep in deployments:
+            for rule in auto_scaling_rules.get(dep.id, []):
+                if rule.condition.metric_source == AutoScalingMetricSource.PROMETHEUS:
+                    prometheus_rules.append((dep, rule))
+
+        if not prometheus_rules:
+            return
+
+        # Batch-load unique presets via existing repository
+        preset_ids = {
+            rule.condition.prometheus_query_preset_id
+            for _, rule in prometheus_rules
+            if rule.condition.prometheus_query_preset_id is not None
+        }
+        presets: dict[UUID, PrometheusQueryPresetData] = {}
+        for pid in preset_ids:
+            try:
+                presets[pid] = await self._preset_repo.get_by_id(pid)
+            except Exception:
+                log.warning("AUTOSCALE: failed to load preset {}", pid)
+
+        # Execute queries concurrently
+        tasks = [
+            self._fetch_prometheus_metric(dep, rule, presets) for dep, rule in prometheus_rules
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for (_, rule), result in zip(prometheus_rules, results, strict=True):
+            if isinstance(result, BaseException):
+                log.warning("AUTOSCALE(rule:{}): prometheus query failed: {}", rule.id, result)
+            elif result is not None:
+                metrics_data.prometheus_metrics[rule.id] = result
+
+    async def _fetch_prometheus_metric(
+        self,
+        deployment: DeploymentInfo,
+        rule: AutoScalingRule,
+        presets: Mapping[UUID, PrometheusQueryPresetData],
+    ) -> Decimal | None:
+        """Execute a single Prometheus query for an auto-scaling rule.
+
+        Returns the scalar metric value, or None if unavailable.
+        """
+        preset_id = rule.condition.prometheus_query_preset_id
+        if preset_id is None or preset_id not in presets:
+            log.warning("AUTOSCALE(rule:{}): preset {} not found", rule.id, preset_id)
+            return None
+
+        preset_data: PrometheusQueryPresetData = presets[preset_id]
+
+        # Auto-inject deployment-specific label for scoping
+        labels: dict[str, str] = {"model_service_name": deployment.metadata.name}
+
+        # time_window: preset default → fallback to "5m"
+        time_window = preset_data.time_window or "5m"
+
+        metric_preset = MetricPreset(
+            template=preset_data.query_template,
+            labels=labels,
+            window=time_window,
+        )
+
+        try:
+            response = await self._prometheus_client.query_instant(preset=metric_preset)
+        except (PrometheusConnectionError, FailedToGetMetric) as e:
+            log.warning(
+                "AUTOSCALE(e:{}, rule:{}): prometheus query failed: {}",
+                deployment.id,
+                rule.id,
+                e,
+            )
+            return None
+
+        if not response.data.result:
+            log.debug(
+                "AUTOSCALE(e:{}, rule:{}): prometheus query returned empty result",
+                deployment.id,
+                rule.id,
+            )
+            return None
+
+        _, value_str = response.data.result[0].values[0]
+        try:
+            return Decimal(value_str)
+        except DecimalException:
+            log.warning(
+                "AUTOSCALE(e:{}, rule:{}): failed to parse prometheus value '{}'",
+                deployment.id,
+                rule.id,
+                value_str,
+            )
+            return None
 
     async def _calculate_deployment_replicas(
         self,

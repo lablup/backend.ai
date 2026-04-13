@@ -37,6 +37,10 @@ class CreateAutoScalingRuleInput(BaseRequestModel):
     time_window: int = Field(ge=1, description="Time window in seconds for scaling evaluation")
     min_replicas: int | None = Field(default=None, ge=0, description="Minimum number of replicas")
     max_replicas: int | None = Field(default=None, ge=1, description="Maximum number of replicas")
+    prometheus_query_preset_id: UUID | None = Field(
+        default=None,
+        description="ID of Prometheus query preset (required when metric_source is PROMETHEUS)",
+    )
 
 
 class UpdateAutoScalingRuleInput(BaseRequestModel):
@@ -74,6 +78,10 @@ class UpdateAutoScalingRuleInput(BaseRequestModel):
     max_replicas: int | Sentinel | None = Field(
         default=SENTINEL,
         description="Updated maximum replicas. SENTINEL = no change, None = clear.",
+    )
+    prometheus_query_preset_id: UUID | Sentinel | None = Field(
+        default=SENTINEL,
+        description="Updated Prometheus query preset ID. SENTINEL = no change, None = clear.",
     )
 
 

@@ -9,6 +9,7 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
+from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -20,6 +21,9 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.prometheus_query_preset.repository import (
+    PrometheusQueryPresetRepository,
+)
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
@@ -68,6 +72,9 @@ class SokovanOrchestratorInput:
     distributed_lock_factory: DistributedLockFactory
     # Service discovery
     service_discovery: ServiceDiscovery
+    # Prometheus
+    prometheus_client: PrometheusClient
+    prometheus_query_preset_repository: PrometheusQueryPresetRepository
 
 
 class SokovanOrchestratorDependency(
@@ -123,6 +130,8 @@ class SokovanOrchestratorDependency(
             client_pool=client_pool,
             valkey_stat=setup_input.valkey_stat,
             route_controller=setup_input.route_controller,
+            prometheus_client=setup_input.prometheus_client,
+            prometheus_query_preset_repository=setup_input.prometheus_query_preset_repository,
         )
 
         # Create route coordinator

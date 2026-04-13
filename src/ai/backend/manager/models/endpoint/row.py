@@ -939,6 +939,13 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     min_replicas: Mapped[int | None] = mapped_column("min_replicas", sa.Integer(), nullable=True)
     max_replicas: Mapped[int | None] = mapped_column("max_replicas", sa.Integer(), nullable=True)
 
+    prometheus_query_preset_id: Mapped[UUID | None] = mapped_column(
+        "prometheus_query_preset_id",
+        GUID,
+        sa.ForeignKey("prometheus_query_presets.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime | None] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -1026,45 +1033,29 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
 
     @classmethod
     def from_creator(cls, endpoint_id: UUID, creator: AutoScalingRuleCreator) -> Self:
-        min_threshold: Decimal | None = None
-        max_threshold: Decimal | None = None
-        if creator.condition.comparator in (
-            AutoScalingMetricComparator.GREATER_THAN,
-            AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL,
-        ):
-            max_threshold = Decimal(creator.condition.threshold)
-        else:
-            min_threshold = Decimal(creator.condition.threshold)
         return cls(
             id=uuid4(),
             endpoint=endpoint_id,
             metric_source=creator.condition.metric_source,
             metric_name=creator.condition.metric_name,
-            min_threshold=min_threshold,
-            max_threshold=max_threshold,
+            min_threshold=creator.condition.scale_down_threshold,
+            max_threshold=creator.condition.scale_up_threshold,
             step_size=creator.action.step_size,
             cooldown_seconds=creator.action.cooldown_seconds,
             min_replicas=creator.action.min_replicas,
             max_replicas=creator.action.max_replicas,
+            prometheus_query_preset_id=creator.condition.prometheus_query_preset_id,
         )
 
     def to_autoscaling_rule(self) -> AutoScalingRule:
-        if self.max_threshold is not None:
-            threshold_str = str(self.max_threshold)
-            comparator = AutoScalingMetricComparator.GREATER_THAN
-        elif self.min_threshold is not None:
-            threshold_str = str(self.min_threshold)
-            comparator = AutoScalingMetricComparator.LESS_THAN
-        else:
-            threshold_str = "0"
-            comparator = AutoScalingMetricComparator.GREATER_THAN
         return AutoScalingRule(
             id=self.id,
             condition=AutoScalingCondition(
                 metric_source=self.metric_source,
                 metric_name=self.metric_name,
-                threshold=threshold_str,
-                comparator=comparator,
+                scale_up_threshold=self.max_threshold,
+                scale_down_threshold=self.min_threshold,
+                prometheus_query_preset_id=self.prometheus_query_preset_id,
             ),
             action=AutoScalingAction(
                 step_size=self.step_size,
@@ -1092,6 +1083,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
             cooldown_seconds=creator.time_window,
             min_replicas=creator.min_replicas,
             max_replicas=creator.max_replicas,
+            prometheus_query_preset_id=creator.prometheus_query_preset_id,
         )
 
     def to_model_deployment_data(self) -> ModelDeploymentAutoScalingRuleData:
@@ -1109,6 +1101,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
             max_replicas=self.max_replicas,
             created_at=self.created_at or datetime.now(UTC),
             last_triggered_at=self.last_triggered_at or datetime.now(UTC),
+            prometheus_query_preset_id=self.prometheus_query_preset_id,
         )
 
     def apply_model_deployment_modifier(
@@ -1136,6 +1129,10 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
             self.max_threshold = max_threshold
         if (min_threshold := modifier.min_threshold.optional_value()) is not None:
             self.min_threshold = min_threshold
+        if (
+            prometheus_query_preset_id := modifier.prometheus_query_preset_id.optional_value()
+        ) is not None:
+            self.prometheus_query_preset_id = prometheus_query_preset_id
 
 
 class ModelServiceHelper:

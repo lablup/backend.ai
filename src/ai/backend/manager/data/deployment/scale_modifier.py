@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, override
+from uuid import UUID
 
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
@@ -71,6 +72,7 @@ class ModelDeploymentAutoScalingRuleModifier(PartialModifier):
     time_window: OptionalState[int] = field(default_factory=OptionalState[int].nop)
     min_replicas: OptionalState[int] = field(default_factory=OptionalState[int].nop)
     max_replicas: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    prometheus_query_preset_id: OptionalState[UUID] = field(default_factory=OptionalState[UUID].nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
@@ -83,4 +85,5 @@ class ModelDeploymentAutoScalingRuleModifier(PartialModifier):
         self.time_window.update_dict(to_update, "time_window")
         self.min_replicas.update_dict(to_update, "min_replicas")
         self.max_replicas.update_dict(to_update, "max_replicas")
+        self.prometheus_query_preset_id.update_dict(to_update, "prometheus_query_preset_id")
         return to_update
