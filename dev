@@ -149,14 +149,32 @@ cmd_restart() {
 
 cmd_log() {
   local svc=$1
+  local follow=${2:-}
   local winname
   winname=$(_tmux_window_name "$svc")
   local win
   win=$(tmux list-windows -t "$TMUX_SESSION" -F "#{window_name}" 2>/dev/null | grep "^${winname}$" | head -1) || true
-  if [ -n "$win" ]; then
-    tmux capture-pane -t "$TMUX_SESSION:$win" -p -S -50
-  else
+  if [ -z "$win" ]; then
     echo "$(_color red "No tmux window found for $svc")"
+    return 1
+  fi
+  if [ "$follow" = "-f" ]; then
+    local last_hash=""
+    trap 'exit 0' INT
+    while true; do
+      local output
+      output=$(tmux capture-pane -t "$TMUX_SESSION:$win" -p -S -50 2>/dev/null)
+      local cur_hash
+      cur_hash=$(echo "$output" | md5sum | cut -d' ' -f1)
+      if [ "$cur_hash" != "$last_hash" ]; then
+        clear
+        echo "$output"
+        last_hash=$cur_hash
+      fi
+      sleep 1
+    done
+  else
+    tmux capture-pane -t "$TMUX_SESSION:$win" -p -S -50
   fi
 }
 
@@ -170,7 +188,7 @@ Commands:
   start   <service|all>     Start a service
   stop    <service|all>     Stop a service
   restart <service|all>     Restart a service
-  log     <service>         Show recent log output
+  log     <service> [-f]    Show recent log output (-f to follow)
 
 Services:
   mgr, agent, storage, web, proxy-coordinator, proxy-worker, all
@@ -207,9 +225,9 @@ case "$1" in
     "cmd_$1" "$2"
     ;;
   log)
-    [ $# -lt 2 ] && { echo "$(_color red "Usage: ./dev log <service>")"; exit 1; }
+    [ $# -lt 2 ] && { echo "$(_color red "Usage: ./dev log <service> [-f]")"; exit 1; }
     _validate_service "$2"
-    cmd_log "$2"
+    cmd_log "$2" "${3:-}"
     ;;
   *) echo "$(_color red "Unknown command: $1")"; usage; exit 1 ;;
 esac
