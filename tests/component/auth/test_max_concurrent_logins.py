@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -42,12 +44,14 @@ class TestMaxConcurrentLogins:
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
         max_concurrent_logins_limit: None,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         authorize_req = AuthorizeRequest(
             type=AuthTokenType.KEYPAIR,
             domain=auth_user_fixture.domain_name,
             username=auth_user_fixture.email,
             password=auth_user_fixture.password,
+            client_type_id=sample_client_type_id,
         )
 
         # Act: first login succeeds
