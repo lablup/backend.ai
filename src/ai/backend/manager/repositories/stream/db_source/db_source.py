@@ -1,7 +1,7 @@
 import sqlalchemy as sa
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -23,7 +23,7 @@ class StreamDBSource:
                 sa.select(UserRow.uuid).where(UserRow.main_access_key == access_key)
             )
             if owner_id is None:
-                raise SessionNotFound(f"Unknown access_key: {access_key}")
+                raise UserNotFound(f"No user with main_access_key={access_key}")
             return await SessionRow.get_session(
                 db_sess,
                 session_name,
