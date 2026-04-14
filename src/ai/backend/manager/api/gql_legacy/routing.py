@@ -31,6 +31,7 @@ class Routing(graphene.ObjectType):  # type: ignore[misc]
     endpoint = graphene.String()
     session = graphene.UUID()
     status = graphene.String()
+    health_status = graphene.String()
     traffic_ratio = graphene.Float()
     created_at = GQLDateTime()
     error = InferenceSessionError()
@@ -49,6 +50,7 @@ class Routing(graphene.ObjectType):  # type: ignore[misc]
             endpoint=dto.endpoint,
             session=dto.session,
             status=dto.status.name,
+            health_status=dto.health_status.name,
             traffic_ratio=dto.traffic_ratio,
             created_at=dto.created_at,
             error_data=dto.error_data,
@@ -66,6 +68,7 @@ class Routing(graphene.ObjectType):  # type: ignore[misc]
             endpoint=(endpoint or row.endpoint_row).url,
             session=row.session,
             status=row.status.name,
+            health_status=row.health_status.name,
             traffic_ratio=row.traffic_ratio,
             created_at=row.created_at,
             error_data=row.error_data,

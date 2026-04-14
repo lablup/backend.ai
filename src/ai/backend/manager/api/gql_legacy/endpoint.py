@@ -32,7 +32,7 @@ from ai.backend.common.types import (
     RuleId,
     RuntimeVariant,
 )
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
 from ai.backend.manager.data.model_serving.modifier import (
     ExtraMount,
@@ -872,17 +872,11 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             case _:
                 if not self.routings:
                     return EndpointStatus.DEGRADED
-                active_route_status_names = {s.name for s in RouteStatus.active_route_statuses()}
-                active_routings = [
-                    r for r in self.routings if r.status in active_route_status_names
-                ]
-                healthy_count = sum(
-                    1 for r in active_routings if r.status == RouteStatus.RUNNING.name
-                )
-                if healthy_count == 0:
-                    return EndpointStatus.UNHEALTHY
-                if healthy_count == len(active_routings):
+                health_statuses = {r.health_status for r in self.routings}
+                if RouteHealthStatus.HEALTHY.name in health_statuses:
                     return EndpointStatus.HEALTHY
+                if RouteHealthStatus.UNHEALTHY.name in health_statuses:
+                    return EndpointStatus.UNHEALTHY
                 return EndpointStatus.DEGRADED
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
