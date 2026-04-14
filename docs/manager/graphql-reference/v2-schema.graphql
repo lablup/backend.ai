@@ -2120,6 +2120,15 @@ input CreateQueryDefinitionInput {
   """Human-readable identifier (must be unique)."""
   name: String!
 
+  """Human-readable description."""
+  description: String = null
+
+  """Sort rank."""
+  rank: Int! = 0
+
+  """Category UUID."""
+  categoryId: String = null
+
   """Prometheus metric name."""
   metricName: String!
 
@@ -5888,6 +5897,15 @@ input ModifyQueryDefinitionInput {
   """New name."""
   name: String
 
+  """New description."""
+  description: String
+
+  """New sort rank."""
+  rank: Int
+
+  """New category UUID."""
+  categoryId: String
+
   """New metric name."""
   metricName: String
 
@@ -8542,6 +8560,15 @@ type QueryDefinition implements Node {
 
   """Human-readable query definition identifier."""
   name: String!
+
+  """Human-readable description."""
+  description: String
+
+  """Sort rank (lower = higher priority)."""
+  rank: Int!
+
+  """Category UUID."""
+  categoryId: String
 
   """Prometheus metric name."""
   metricName: String!
