@@ -854,7 +854,6 @@ class SessionAdapter(BaseAdapter):
         """Shut down a service in a session."""
         action = ShutdownServiceAction(
             session_name=str(session_id),
-            owner_access_key=AccessKey(access_key),
             service_name=input.service,
         )
         await self._processors.session.shutdown_service.wait_for_complete(action)
@@ -872,7 +871,6 @@ class SessionAdapter(BaseAdapter):
         """Get container logs for a session."""
         action = GetContainerLogsAction(
             session_name=str(session_id),
-            owner_access_key=AccessKey(access_key),
             kernel_id=KernelId(kernel_id) if kernel_id else None,
         )
         result = await self._processors.session.get_container_logs.wait_for_complete(action)
@@ -894,7 +892,6 @@ class SessionAdapter(BaseAdapter):
             action = RenameSessionAction(
                 session_name=str(session_id),
                 new_name=input.name,
-                owner_access_key=AccessKey(access_key),
             )
             result = await self._processors.session.rename_session.wait_for_complete(action)
             return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))

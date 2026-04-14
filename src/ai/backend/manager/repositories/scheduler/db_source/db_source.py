@@ -1146,9 +1146,7 @@ class ScheduleDBSource:
                     for kernel in session_row.kernels
                 ]
 
-                owner_main_ak = (
-                    session_row.user.main_access_key if session_row.user else None
-                )
+                owner_main_ak = session_row.user.main_access_key if session_row.user else None
                 terminating_sessions.append(
                     TerminatingSessionData(
                         session_id=session_row.id,
@@ -1848,9 +1846,7 @@ class ScheduleDBSource:
             session_ids = {alloc.session_id for alloc in allocation_batch.allocations}
             if session_ids:
                 query = (
-                    sa.select(
-                        SessionRow.id, SessionRow.creation_id, UserRow.main_access_key
-                    )
+                    sa.select(SessionRow.id, SessionRow.creation_id, UserRow.main_access_key)
                     .select_from(SessionRow)
                     .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
                     .where(SessionRow.id.in_(session_ids))

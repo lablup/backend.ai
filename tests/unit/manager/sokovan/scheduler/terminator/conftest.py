@@ -137,7 +137,7 @@ def _create_terminating_session_data(
 
     return TerminatingSessionData(
         session_id=session_id or SessionId(uuid4()),
-        access_key=AccessKey("test-key"),
+        main_access_key=AccessKey("test-key"),
         creation_id=str(uuid4()),
         status=SessionStatus.TERMINATING,
         status_info=status_info,
