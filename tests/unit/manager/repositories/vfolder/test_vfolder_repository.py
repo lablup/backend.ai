@@ -91,6 +91,7 @@ class TestVfolderRepository:
             permission=permission,
             host="local",
             creator=f"test-{user_id.hex[:8]}@example.com",
+            creator_id=user_id,
             ownership_type=VFolderOwnershipType.GROUP,
             user=user_id,
             group=group_id,

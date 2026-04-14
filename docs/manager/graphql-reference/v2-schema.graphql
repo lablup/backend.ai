@@ -12827,6 +12827,7 @@ type VFolderOwnershipInfo {
   creator: UserV2
   userId: UUID
   projectId: UUID
+  creatorId: UUID
   creatorEmail: String
 }
 

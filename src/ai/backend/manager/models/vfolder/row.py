@@ -327,6 +327,7 @@ class VFolderRow(Base):  # type: ignore[misc]
     )
     # creator is always set to the user who created vfolder (regardless user/project types)
     creator: Mapped[str | None] = mapped_column("creator", sa.String(length=128), nullable=True)
+    creator_id: Mapped[uuid.UUID | None] = mapped_column("creator_id", GUID, nullable=True)
     # unmanaged vfolder represents the host-side absolute path instead of storage-based path.
     unmanaged_path: Mapped[str | None] = mapped_column(
         "unmanaged_path", sa.String(length=512), nullable=True
@@ -433,6 +434,7 @@ class VFolderRow(Base):  # type: ignore[misc]
             created_at=self.created_at or datetime.now(UTC),
             last_used=self.last_used,
             creator=self.creator,
+            creator_id=self.creator_id,
             unmanaged_path=self.unmanaged_path,
             ownership_type=self.ownership_type,
             user=self.user,
@@ -583,6 +585,7 @@ async def query_accessible_vfolders(
         vfolders.c.user,
         vfolders.c.group,
         vfolders.c.creator,
+        vfolders.c.creator_id,
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
         vfolders.c.status,
@@ -619,6 +622,7 @@ async def query_accessible_vfolders(
                 "user": str(row.vfolders_user) if row.vfolders_user else None,
                 "group": str(row.vfolders_group) if row.vfolders_group else None,
                 "creator": row.vfolders_creator,
+                "creator_id": row.vfolders_creator_id,
                 "user_email": row.users_email if "users_email" in row_keys else None,
                 "group_name": row.groups_name if "groups_name" in row_keys else None,
                 "is_owner": _is_owner,

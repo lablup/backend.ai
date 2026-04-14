@@ -111,6 +111,9 @@ class VFolderOwnershipInfoGQL:
     project_id: UUID | None = gql_field(
         description="UUID of the project that owns this virtual folder. Null for user-owned folders.",
     )
+    creator_id: UUID | None = gql_field(
+        description="UUID of the user who originally created this virtual folder.",
+    )
     creator_email: str | None = gql_field(
         description="Email of the user who originally created this virtual folder.",
     )
@@ -126,8 +129,9 @@ class VFolderOwnershipInfoGQL:
         ]
         | None
     ):
-        # Defer to data loader when wired; stub returns None for now.
-        return None
+        if self.user_id is None:
+            return None
+        return await info.context.data_loaders.user_loader.load(self.user_id)
 
     @gql_field(
         description="The project that owns this virtual folder. Null for user-owned folders."
@@ -142,8 +146,9 @@ class VFolderOwnershipInfoGQL:
         ]
         | None
     ):
-        # Defer to data loader when wired; stub returns None for now.
-        return None
+        if self.project_id is None:
+            return None
+        return await info.context.data_loaders.project_loader.load(self.project_id)
 
     @gql_field(description="The user who originally created this virtual folder.")  # type: ignore[misc]
     async def creator(
@@ -156,5 +161,6 @@ class VFolderOwnershipInfoGQL:
         ]
         | None
     ):
-        # Defer to data loader when wired; stub returns None for now.
-        return None
+        if self.creator_id is None:
+            return None
+        return await info.context.data_loaders.user_loader.load(self.creator_id)
