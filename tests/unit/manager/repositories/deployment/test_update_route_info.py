@@ -12,7 +12,7 @@ from ai.backend.manager.repositories.deployment.repository import DeploymentRepo
 
 def _make_repository(
     *,
-    connection_info: dict | None = None,
+    connection_info: dict[str, object] | None = None,
     health_check_config: ModelHealthCheck | None = None,
     health_check_side_effect: Exception | None = None,
 ) -> tuple[DeploymentRepository, AsyncMock, AsyncMock]:
