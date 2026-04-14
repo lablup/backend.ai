@@ -9,7 +9,12 @@ from strawberry import ID, Info
 from strawberry.relay import PageInfo
 from strawberry.scalars import JSON
 
-from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchRevisionsInput
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AddRevisionOptions as AdapterAddRevisionOptions,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AdminSearchRevisionsInput,
+)
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -22,6 +27,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ActivateRevisionInputGQL,
     ActivateRevisionPayloadGQL,
     AddRevisionInput,
+    AddRevisionOptionsGQL,
     AddRevisionPayload,
     ModelRevision,
     ModelRevisionConnection,
@@ -143,10 +149,15 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
 
 @gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Add model revision."))  # type: ignore[misc]
 async def add_model_revision(
-    input: AddRevisionInput, info: Info[StrawberryGQLContext]
+    input: AddRevisionInput,
+    info: Info[StrawberryGQLContext],
+    options: AddRevisionOptionsGQL | None = None,
 ) -> AddRevisionPayload:
     """Add a model revision to a deployment."""
-    payload = await info.context.adapters.deployment.add_revision(input.to_pydantic())
+    payload = await info.context.adapters.deployment.add_revision(
+        input.to_pydantic(),
+        options=options.to_pydantic() if options else AdapterAddRevisionOptions(),
+    )
     return AddRevisionPayload(revision=ModelRevision.from_pydantic(payload.revision))
 
 

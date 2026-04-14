@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import UUID
 
+from ai.backend.common.clients.prometheus.preset import LabelMatcher
 from ai.backend.common.clients.prometheus.types import ValueType
 
 
@@ -14,7 +15,7 @@ class MetricQuerier(ABC):
     """
 
     @abstractmethod
-    def labels(self) -> Mapping[str, str]:
+    def labels(self) -> Mapping[str, LabelMatcher]:
         """Return the labels to be used in the Prometheus query."""
         ...
 
@@ -34,22 +35,22 @@ class ContainerMetricQuerier(MetricQuerier):
     user_id: UUID | None = None
     project_id: UUID | None = None
 
-    def labels(self) -> Mapping[str, str]:
+    def labels(self) -> Mapping[str, LabelMatcher]:
         """Return the labels for the container metric query."""
-        result: dict[str, str] = {
-            "container_metric_name": self.metric_name,
-            "value_type": self.value_type,
+        result: dict[str, LabelMatcher] = {
+            "container_metric_name": LabelMatcher.exact(self.metric_name),
+            "value_type": LabelMatcher.exact(self.value_type),
         }
         if self.kernel_id is not None:
-            result["kernel_id"] = str(self.kernel_id)
+            result["kernel_id"] = LabelMatcher.exact(str(self.kernel_id))
         if self.session_id is not None:
-            result["session_id"] = str(self.session_id)
+            result["session_id"] = LabelMatcher.exact(str(self.session_id))
         if self.agent_id is not None:
-            result["agent_id"] = self.agent_id
+            result["agent_id"] = LabelMatcher.exact(self.agent_id)
         if self.user_id is not None:
-            result["user_id"] = str(self.user_id)
+            result["user_id"] = LabelMatcher.exact(str(self.user_id))
         if self.project_id is not None:
-            result["project_id"] = str(self.project_id)
+            result["project_id"] = LabelMatcher.exact(str(self.project_id))
         return result
 
     def group_by_labels(self) -> frozenset[str]:

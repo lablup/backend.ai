@@ -31,6 +31,9 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     DeleteAccessTokenPayload as DeleteAccessTokenPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    AccessTokenOrderField,
+)
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -43,9 +46,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.deployment.types import (
-    AccessTokenOrderField,
-)
 
 
 @gql_pydantic_input(

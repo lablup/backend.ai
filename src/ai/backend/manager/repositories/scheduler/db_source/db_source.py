@@ -2927,6 +2927,11 @@ class ScheduleDBSource:
                 session_id=session.id,
                 creation_id=session.creation_id or "",
                 main_access_key=AccessKey(owner_main_ak) if owner_main_ak else AccessKey(""),
+                else AccessKey(""),
+=======
+                main_access_key=AccessKey(owner_main_ak) if owner_main_ak else AccessKey(""),
+>>>>>>> 4ac120c73 (refactor(BA-5650-I): drop stray non-BA-5650 changes from slice)
+>>>>>>> e35caec08 (refactor(BA-5650-I): drop stray non-BA-5650 changes from slice)
                 reason="triggered-by-scheduler",
             )
             scheduled_sessions.append(scheduled_session)
@@ -2974,6 +2979,11 @@ class ScheduleDBSource:
                     session_id=session.id,
                     creation_id=session.creation_id or "",
                     main_access_key=AccessKey(owner_main_ak) if owner_main_ak else AccessKey(""),
+                    else AccessKey(""),
+=======
+                    main_access_key=AccessKey(owner_main_ak) if owner_main_ak else AccessKey(""),
+>>>>>>> 4ac120c73 (refactor(BA-5650-I): drop stray non-BA-5650 changes from slice)
+>>>>>>> e35caec08 (refactor(BA-5650-I): drop stray non-BA-5650 changes from slice)
                     reason="triggered-by-scheduler",
                 )
             )

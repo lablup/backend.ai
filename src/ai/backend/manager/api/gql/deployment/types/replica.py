@@ -31,6 +31,9 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     ReplicaStatusChangedPayload as ReplicaStatusChangedPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    ReplicaOrderField,
+)
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
@@ -50,7 +53,6 @@ from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
-    ReplicaOrderField,
     RouteStatus,
     RouteTrafficStatus,
 )

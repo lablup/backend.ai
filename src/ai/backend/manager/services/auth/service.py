@@ -210,7 +210,7 @@ class AuthService:
         self,
         action: AuthorizeAction,
         auth_config: AuthConfig,
-        login_client_type_id: uuid.UUID,
+        login_client_type_id: uuid.UUID | None,
     ) -> tuple[RowMapping, list[ActiveSessionInfo]]:
         """Step 1: Verify user identity via hook or password."""
         params = action.hook_params
@@ -329,7 +329,7 @@ class AuthService:
         keypair_row: Any,
         live_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
-        login_client_type_id: uuid.UUID,
+        login_client_type_id: uuid.UUID | None,
     ) -> AuthorizeActionResult:
         """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed.
 
