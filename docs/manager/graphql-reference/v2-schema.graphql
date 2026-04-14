@@ -3012,9 +3012,9 @@ input DeploymentOrderBy {
 }
 
 enum DeploymentOrderField {
+  NAME
   CREATED_AT
   UPDATED_AT
-  NAME
 }
 
 """Added in 25.19.0. Deployment policy configuration."""
