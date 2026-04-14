@@ -515,6 +515,9 @@ class UserResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
     max_customized_image_count = graphene.Int(
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
+    max_concurrent_logins = graphene.Int(
+        description="Added in 26.4.0. Maximum number of concurrent authenticated login sessions per user. Null means unlimited."
+    )
 
     @classmethod
     def from_row(
@@ -532,6 +535,7 @@ class UserResourcePolicy(graphene.ObjectType):  # type: ignore[misc]
             max_quota_scope_size=row.max_quota_scope_size,
             max_session_count_per_model_session=row.max_session_count_per_model_session,
             max_customized_image_count=row.max_customized_image_count,
+            max_concurrent_logins=row.max_concurrent_logins,
         )
 
     @classmethod
@@ -601,10 +605,16 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[m
     max_customized_image_count = graphene.Int(
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
+    max_concurrent_logins = graphene.Int(
+        description="Added in 26.4.0. Maximum number of concurrent authenticated login sessions per user. Null means unlimited."
+    )
 
     def to_creator(self, name: str) -> Creator[UserResourcePolicyRow]:
         def value_or_default(value: Any, default: int) -> int:
             return value if value is not Undefined and value is not None else default
+
+        def optional_int(value: Any) -> int | None:
+            return None if value is Undefined else value
 
         CreatorSpec = _get_user_resource_policy_creator_spec()
         return Creator(
@@ -616,6 +626,7 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[m
                     self.max_session_count_per_model_session, 0
                 ),
                 max_customized_image_count=value_or_default(self.max_customized_image_count, 3),
+                max_concurrent_logins=optional_int(self.max_concurrent_logins),
             )
         )
 
@@ -633,6 +644,9 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[m
     max_customized_image_count = graphene.Int(
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
+    max_concurrent_logins = graphene.Int(
+        description="Added in 26.4.0. Maximum number of concurrent authenticated login sessions per user. Null means unlimited."
+    )
 
     def to_updater(self, name: str) -> Updater[UserResourcePolicyRow]:
         UpdaterSpec = _get_user_resource_policy_updater_spec()
@@ -646,6 +660,7 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[m
                 max_customized_image_count=OptionalState[int].from_graphql(
                     self.max_customized_image_count
                 ),
+                max_concurrent_logins=TriState[int].from_graphql(self.max_concurrent_logins),
             ),
             pk_value=name,
         )
