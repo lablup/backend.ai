@@ -306,9 +306,6 @@ class SessionDBSource:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name:
-                # ``SessionRow.user_uuid`` is non-nullable, so we only need to
-                # gate on whether a new name was provided.
-                # Check the owner of the target session has any session with the same name
                 try:
                     sess = await SessionRow.get_session(
                         db_session,
