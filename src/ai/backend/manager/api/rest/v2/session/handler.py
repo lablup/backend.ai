@@ -153,38 +153,30 @@ class V2SessionHandler:
 
     async def shutdown_service(
         self,
-        user_ctx: UserContext,
         path: PathParam[SessionIdPathParamDTO],
         body: BodyParam[ShutdownSessionServiceInput],
     ) -> APIResponse:
         """Shut down a service in a session."""
-        await self._adapter.shutdown_service(
-            path.parsed.session_id, body.parsed, user_id=user_ctx.user_uuid
-        )
+        await self._adapter.shutdown_service(path.parsed.session_id, body.parsed)
         return APIResponse.no_content(status_code=HTTPStatus.NO_CONTENT)
 
     async def get_logs(
         self,
-        user_ctx: UserContext,
         path: PathParam[SessionIdPathParamDTO],
         query: QueryParam[GetSessionLogsQuery],
     ) -> APIResponse:
         """Get container logs for a session."""
         result = await self._adapter.get_logs(
             path.parsed.session_id,
-            user_id=user_ctx.user_uuid,
             kernel_id=query.parsed.kernel_id,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def update(
         self,
-        user_ctx: UserContext,
         path: PathParam[SessionIdPathParamDTO],
         body: BodyParam[UpdateSessionInput],
     ) -> APIResponse:
         """Update a session."""
-        result = await self._adapter.update(
-            path.parsed.session_id, body.parsed, user_id=user_ctx.user_uuid
-        )
+        result = await self._adapter.update(path.parsed.session_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
