@@ -1,7 +1,7 @@
 import logging
 
 from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.preset import MetricPreset
+from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -90,6 +90,12 @@ class PrometheusQueryPresetService:
                     f"Allowed: {sorted(preset_data.group_labels)}"
                 )
 
+    def _build_filter_label_matchers(
+        self,
+        filter_labels: dict[str, str],
+    ) -> dict[str, LabelMatcher]:
+        return {key: LabelMatcher.exact(value) for key, value in filter_labels.items()}
+
     async def execute_preset(self, action: ExecutePresetAction) -> ExecutePresetActionResult:
         preset_data = await self._repository.get_by_id(action.preset_id)
         self._validate_labels(action.options, preset_data)
@@ -98,7 +104,7 @@ class PrometheusQueryPresetService:
 
         metric_preset = MetricPreset(
             template=preset_data.query_template,
-            labels=action.options.filter_labels,
+            labels=self._build_filter_label_matchers(action.options.filter_labels),
             group_by=set(action.options.group_labels),
             window=time_window,
         )
