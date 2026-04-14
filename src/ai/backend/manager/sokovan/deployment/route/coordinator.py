@@ -6,7 +6,6 @@ import logging
 from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -287,8 +286,6 @@ class RouteCoordinator:
                 status=transitions.success.status,
                 health_status=transitions.success.health_status,
             )
-            if transitions.success.status == RouteStatus.RUNNING:
-                updater_spec.running_at = datetime.now(UTC)
             batch_updaters.append(
                 BatchUpdater(
                     spec=updater_spec,
