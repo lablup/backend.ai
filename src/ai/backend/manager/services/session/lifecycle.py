@@ -155,8 +155,7 @@ class SessionLifecycleManager:
                     )
                 else:
                     log.warning(
-                        "POST_START_SESSION skipped: owner {} has no main_access_key"
-                        " (session {})",
+                        "POST_START_SESSION skipped: owner {} has no main_access_key (session {})",
                         session_row.user_uuid,
                         session_row.id,
                     )
