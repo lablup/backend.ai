@@ -49,7 +49,6 @@ def _create_session_data(
         num_queries=0,
         creation_id="test-creation-id",
         name=name,
-        
         scaling_group_name="default",
         target_sgroup_names=None,
         agent_ids=None,
