@@ -3102,7 +3102,7 @@ class ScheduleDBSource:
                 sessions_map[session_id] = SessionDataForPull(
                     session_id=session_id,
                     creation_id=row.creation_id,
-                    access_key=row.access_key,
+                    main_access_key=row.access_key,
                     kernels=[],
                 )
 
@@ -3294,13 +3294,13 @@ class ScheduleDBSource:
                 SessionDataForStart(
                     session_id=session_info["id"],
                     creation_id=session_info["creation_id"],
-                    access_key=session_info["access_key"],
+                    main_access_key=session_info["access_key"],
                     session_type=session_info["session_type"],
                     name=session_info["name"],
                     cluster_mode=session_info["cluster_mode"],
                     kernels=kernel_bindings,
                     environ=session_info.get("environ", {}),
-                    user_uuid=session_info["user_uuid"],
+                    owner_id=session_info["user_uuid"],
                     user_email=user_info.email,
                     user_name=user_info.username,
                 )
@@ -4074,7 +4074,7 @@ class ScheduleDBSource:
                 sessions_map[session_id] = SessionDataForPull(
                     session_id=session_id,
                     creation_id=row.creation_id,
-                    access_key=row.access_key,
+                    main_access_key=row.access_key,
                     kernels=[],
                 )
 
@@ -4293,13 +4293,13 @@ class ScheduleDBSource:
                 SessionDataForStart(
                     session_id=session_info["id"],
                     creation_id=session_info["creation_id"],
-                    access_key=session_info["access_key"],
+                    main_access_key=session_info["access_key"],
                     session_type=session_info["session_type"],
                     name=session_info["name"],
                     cluster_mode=session_info["cluster_mode"],
                     kernels=kernel_bindings,
                     environ=session_info.get("environ", {}),
-                    user_uuid=session_info["user_uuid"],
+                    owner_id=session_info["user_uuid"],
                     user_email=user_info.email,
                     user_name=user_info.username,
                 )
@@ -4369,7 +4369,7 @@ class ScheduleDBSource:
                 sessions_map[row.id] = SessionDataForPull(
                     session_id=row.id,
                     creation_id=row.creation_id,
-                    access_key=row.access_key,
+                    main_access_key=row.access_key,
                     kernels=[],
                 )
 
@@ -4625,13 +4625,13 @@ class ScheduleDBSource:
                     SessionDataForStart(
                         session_id=session_info["id"],
                         creation_id=session_info["creation_id"],
-                        access_key=session_info["access_key"],
+                        main_access_key=session_info["access_key"],
                         session_type=session_info["session_type"],
                         name=session_info["name"],
                         cluster_mode=session_info["cluster_mode"],
                         kernels=session_info["kernels"],
                         environ=session_info.get("environ") or {},
-                        user_uuid=session_info["user_uuid"],
+                        owner_id=session_info["user_uuid"],
                         user_email=user_info.email,
                         user_name=user_info.username,
                     )
