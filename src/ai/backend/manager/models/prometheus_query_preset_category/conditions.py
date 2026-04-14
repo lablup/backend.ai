@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Collection
 
 import sqlalchemy as sa
@@ -79,3 +80,31 @@ class PrometheusQueryPresetCategoryConditions:
         return inner
 
     by_name_in = staticmethod(make_string_in_factory(PrometheusQueryPresetCategoryRow.name))
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.ColumnElement[bool]:
+            subquery = (
+                sa.select(PrometheusQueryPresetCategoryRow.created_at)
+                .where(PrometheusQueryPresetCategoryRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return PrometheusQueryPresetCategoryRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.ColumnElement[bool]:
+            subquery = (
+                sa.select(PrometheusQueryPresetCategoryRow.created_at)
+                .where(PrometheusQueryPresetCategoryRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return PrometheusQueryPresetCategoryRow.created_at > subquery
+
+        return inner

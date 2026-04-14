@@ -305,8 +305,12 @@ class TestSearchQueryDefinitionsInput:
         inp = SearchQueryDefinitionsInput()
         assert inp.filter is None
         assert inp.order is None
-        assert inp.limit == 50
-        assert inp.offset == 0
+        assert inp.first is None
+        assert inp.after is None
+        assert inp.last is None
+        assert inp.before is None
+        assert inp.limit is None
+        assert inp.offset is None
 
     def test_custom_pagination(self) -> None:
         inp = SearchQueryDefinitionsInput(limit=25, offset=50)

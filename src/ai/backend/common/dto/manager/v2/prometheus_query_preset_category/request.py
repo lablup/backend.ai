@@ -59,11 +59,20 @@ class CategoryOrder(BaseRequestModel):
 
 
 class SearchCategoriesInput(BaseRequestModel):
-    """Input for searching prometheus query preset categories with filters, orders, and pagination."""
+    """Input for searching prometheus query preset categories with filters, orders, and pagination.
+
+    Supports two pagination modes (mutually exclusive):
+    - Cursor-based: first/after (forward) or last/before (backward)
+    - Offset-based: limit/offset
+    """
 
     filter: CategoryFilter | None = Field(default=None, description="Filter conditions")
     order: list[CategoryOrder] | None = Field(default=None, description="Order specifications")
-    limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+    # Cursor-based pagination (Relay)
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
+    # Offset-based pagination
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Maximum items to return")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip")

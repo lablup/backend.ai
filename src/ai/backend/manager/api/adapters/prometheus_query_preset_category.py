@@ -36,7 +36,6 @@ from ai.backend.manager.models.prometheus_query_preset_category.orders import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    OffsetPagination,
     QueryCondition,
     QueryOrder,
 )
@@ -51,8 +50,7 @@ from ai.backend.manager.services.prometheus_query_preset_category.actions import
 )
 
 from .base import BaseAdapter
-
-DEFAULT_PAGINATION_LIMIT = 50
+from .pagination import PaginationSpec
 
 
 class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
@@ -110,13 +108,29 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
 
         return DeleteCategoryPayload(id=action_result.category_id)
 
+    _PAGINATION_SPEC = PaginationSpec(
+        forward_order=PrometheusQueryPresetCategoryOrders.created_at(ascending=False),
+        backward_order=PrometheusQueryPresetCategoryOrders.created_at(ascending=True),
+        forward_condition_factory=PrometheusQueryPresetCategoryConditions.by_cursor_forward,
+        backward_condition_factory=PrometheusQueryPresetCategoryConditions.by_cursor_backward,
+        tiebreaker_order=PrometheusQueryPresetCategoryRow.id.asc(),
+    )
+
     def build_querier(self, input: SearchCategoriesInput) -> BatchQuerier:
         """Build a BatchQuerier from the search input DTO."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        pagination = self._build_pagination(input)
-
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=self._PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
     def _convert_filter(self, filter: CategoryFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -146,13 +160,6 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
                 case "created_at":
                     result.append(PrometheusQueryPresetCategoryOrders.created_at(ascending))
         return result
-
-    @staticmethod
-    def _build_pagination(input: SearchCategoriesInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
 
     @staticmethod
     def _data_to_dto(data: PrometheusQueryPresetCategoryData) -> CategoryNode:
