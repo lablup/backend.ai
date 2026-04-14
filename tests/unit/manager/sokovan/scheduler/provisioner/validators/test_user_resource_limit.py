@@ -37,7 +37,7 @@ class TestUserResourceLimitValidator:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={
-                    workload.user_uuid: [
+                    workload.owner_id: [
                         SlotQuantity("cpu", Decimal("3")),
                         SlotQuantity("mem", Decimal("3")),
                     ]
@@ -49,7 +49,7 @@ class TestUserResourceLimitValidator:
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
                 user_policies={
-                    workload.user_uuid: UserResourcePolicy(
+                    workload.owner_id: UserResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
                     )
@@ -77,7 +77,7 @@ class TestUserResourceLimitValidator:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={
-                    workload.user_uuid: [
+                    workload.owner_id: [
                         SlotQuantity("cpu", Decimal("8")),
                         SlotQuantity("mem", Decimal("8")),
                     ]
@@ -89,7 +89,7 @@ class TestUserResourceLimitValidator:
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
                 user_policies={
-                    workload.user_uuid: UserResourcePolicy(
+                    workload.owner_id: UserResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
                     )
@@ -151,7 +151,7 @@ class TestUserResourceLimitValidator:
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
                 user_policies={
-                    workload.user_uuid: UserResourcePolicy(
+                    workload.owner_id: UserResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
                     )

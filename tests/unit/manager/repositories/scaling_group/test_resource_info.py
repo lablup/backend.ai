@@ -48,7 +48,7 @@ def _create_kernel(
     session_id: SessionId,
     domain_name: str,
     group_id: uuid.UUID,
-    user_uuid: uuid.UUID,
+    owner_id: uuid.UUID,
     scaling_group: str,
     agent_id: str,
     status: KernelStatus,
@@ -62,7 +62,7 @@ def _create_kernel(
         session_id=session_id,
         domain_name=domain_name,
         group_id=group_id,
-        user_uuid=user_uuid,
+        user_uuid=owner_id,
         scaling_group=scaling_group,
         agent=agent_id,
         status=status,
@@ -464,7 +464,7 @@ class TestResourceInfo:
         Returns:
             Tuple of (scaling_group_name, agent_capacity, list of kernel occupied_slots)
         """
-        user_uuid, domain_name, group_id = test_user_domain_group
+        owner_id, domain_name, group_id = test_user_domain_group
 
         agent_capacity = ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("34359738368")})
         kernel_slots = [
@@ -506,7 +506,7 @@ class TestResourceInfo:
                     id=session_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=user_uuid,
+                    user_uuid=owner_id,
                     scaling_group_name=base_scaling_group,
                     cluster_size=2,
                     vfolder_mounts={},
@@ -520,7 +520,7 @@ class TestResourceInfo:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=user_uuid,
+                    owner_id=owner_id,
                     scaling_group=base_scaling_group,
                     agent_id=agent_id,
                     status=KernelStatus.RUNNING,
@@ -536,7 +536,7 @@ class TestResourceInfo:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=user_uuid,
+                    owner_id=owner_id,
                     scaling_group=base_scaling_group,
                     agent_id=agent_id,
                     status=KernelStatus.TERMINATING,
@@ -562,7 +562,7 @@ class TestResourceInfo:
         Returns:
             Tuple of (scaling_group_name, agent_capacity, expected_used)
         """
-        user_uuid, domain_name, group_id = test_user_domain_group
+        owner_id, domain_name, group_id = test_user_domain_group
 
         agent_capacity = ResourceSlot({"cpu": Decimal("32"), "mem": Decimal("68719476736")})
         running_slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")})
@@ -606,7 +606,7 @@ class TestResourceInfo:
                     id=session_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=user_uuid,
+                    user_uuid=owner_id,
                     scaling_group_name=base_scaling_group,
                     cluster_size=4,
                     vfolder_mounts={},
@@ -620,7 +620,7 @@ class TestResourceInfo:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=user_uuid,
+                    owner_id=owner_id,
                     scaling_group=base_scaling_group,
                     agent_id=agent_id,
                     status=KernelStatus.RUNNING,
@@ -636,7 +636,7 @@ class TestResourceInfo:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=user_uuid,
+                    owner_id=owner_id,
                     scaling_group=base_scaling_group,
                     agent_id=agent_id,
                     status=KernelStatus.TERMINATING,
@@ -652,7 +652,7 @@ class TestResourceInfo:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=user_uuid,
+                    owner_id=owner_id,
                     scaling_group=base_scaling_group,
                     agent_id=agent_id,
                     status=KernelStatus.TERMINATED,
@@ -668,7 +668,7 @@ class TestResourceInfo:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=user_uuid,
+                    owner_id=owner_id,
                     scaling_group=base_scaling_group,
                     agent_id=agent_id,
                     status=KernelStatus.PENDING,

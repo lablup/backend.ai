@@ -168,7 +168,7 @@ async def session_service(
         session_repository=mock_session_repository,
         scheduling_controller=mock_scheduling_controller,
         appproxy_client_pool=mock_appproxy_client_pool,
-        user_repository=MagicMock(),
+        user_repository=AsyncMock(),
     )
     return SessionService(args)
 
@@ -220,8 +220,6 @@ def _make_session_data(
         agent_ids=["i-ubuntu"],
         domain_name="default",
         group_id=group_id,
-        user_uuid=user_id,
-        access_key=access_key,
         images=["cr.backend.ai/stable/python:latest"],
         tag=None,
         occupying_slots=ResourceSlot({"cpu": 1, "mem": 1024}),
@@ -312,7 +310,6 @@ class TestCommitSession:
 
         action = CommitSessionAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
             filename=None,
         )
 
@@ -327,6 +324,7 @@ class TestCommitSession:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         mock_session_repository.get_session_validated = AsyncMock(
             side_effect=SessionNotFound("Session not found")
@@ -334,7 +332,6 @@ class TestCommitSession:
 
         action = CommitSessionAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
             filename=None,
         )
 
@@ -363,7 +360,6 @@ class TestCommitSession:
 
         action = CommitSessionAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
             filename="my-snapshot.tar.gz",
         )
 
@@ -398,7 +394,6 @@ class TestGetCommitStatus:
 
         action = GetCommitStatusAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
         )
         result = await session_service.get_commit_status(action)
 
@@ -410,6 +405,7 @@ class TestGetCommitStatus:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         mock_session_repository.get_session_validated = AsyncMock(
             side_effect=SessionNotFound("Session not found")
@@ -417,7 +413,6 @@ class TestGetCommitStatus:
 
         action = GetCommitStatusAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
         )
 
         with pytest.raises(SessionNotFound):
@@ -460,7 +455,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(1,),
-            owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
                 mode=None,
                 options=None,
@@ -505,7 +499,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
                 mode="batch",
                 options=None,
@@ -544,7 +537,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
                 mode="complete",
                 options={},
@@ -575,7 +567,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
                 mode="continue",
                 options=None,
@@ -606,7 +597,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
                 mode="invalid_mode",
                 options=None,
@@ -637,7 +627,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
                 mode=None,
                 options=None,
@@ -678,7 +667,6 @@ class TestExecuteSession:
         action = ExecuteSessionAction(
             session_name="test-session",
             api_version=(2,),
-            owner_access_key=sample_access_key,
             params=ExecuteSessionActionParams(
                 mode="query",
                 options=None,
@@ -712,11 +700,11 @@ class TestCreateFromParams:
         self,
         sample_access_key: AccessKey,
         sample_user_id: UUID,
-        delegated_owner_access_key: AccessKey,
+        delegated_owner_id: UUID,
     ) -> CreateFromParamsAction:
         """
         CreateFromParamsAction representing an admin (sample_user_id) creating
-        a session on behalf of another user via owner_access_key.
+        a session on behalf of another user via owner_id.
         """
         return CreateFromParamsAction(
             params=CreateFromParamsActionParams(
@@ -732,7 +720,7 @@ class TestCreateFromParams:
                 tag="",
                 priority=0,
                 is_preemptible=True,
-                owner_access_key=delegated_owner_access_key,
+                owner_id=delegated_owner_id,
                 enqueue_only=False,
                 max_wait_seconds=0,
                 starts_at=None,
@@ -784,7 +772,7 @@ class TestCreateFromParams:
                 tag="",
                 priority=0,
                 is_preemptible=True,
-                owner_access_key=sample_access_key,
+                owner_id=sample_user_id,
                 enqueue_only=False,
                 max_wait_seconds=0,
                 starts_at=None,
@@ -830,7 +818,7 @@ class TestCreateFromParams:
                 tag="",
                 priority=0,
                 is_preemptible=True,
-                owner_access_key=sample_access_key,
+                owner_id=sample_user_id,
                 enqueue_only=False,
                 max_wait_seconds=0,
                 starts_at=None,
@@ -888,7 +876,7 @@ class TestCreateFromParams:
                 tag="",
                 priority=0,
                 is_preemptible=True,
-                owner_access_key=sample_access_key,
+                owner_id=sample_user_id,
                 enqueue_only=False,
                 max_wait_seconds=0,
                 starts_at=None,
@@ -951,7 +939,7 @@ class TestCreateFromParams:
                 tag="",
                 priority=0,
                 is_preemptible=True,
-                owner_access_key=sample_access_key,
+                owner_id=sample_user_id,
                 enqueue_only=False,
                 max_wait_seconds=0,
                 starts_at=None,
@@ -1011,7 +999,7 @@ class TestCreateFromParams:
                 tag="",
                 priority=0,
                 is_preemptible=True,
-                owner_access_key=sample_access_key,
+                owner_id=sample_user_id,
                 enqueue_only=False,
                 max_wait_seconds=0,
                 starts_at=None,
@@ -1053,6 +1041,11 @@ class TestCreateFromParams:
         identity leaked into the session row, causing scaling group access
         checks and container UID/GID lookups to use the wrong user.
         """
+        user_repo_mock = MagicMock()
+        user_repo_mock.get_user_by_uuid = AsyncMock(
+            return_value=MagicMock(main_access_key=str(delegated_owner_access_key))
+        )
+        session_service._user_repository = user_repo_mock
         new_session_id = str(uuid4())
         mock_session_repository.query_userinfo = AsyncMock(
             return_value=SessionOwnerContext(
@@ -1159,7 +1152,7 @@ class TestCreateFromTemplate:
                 tag=undefined,
                 priority=0,
                 is_preemptible=True,
-                owner_access_key=sample_access_key,
+                owner_id=sample_user_id,
                 enqueue_only=False,
                 max_wait_seconds=0,
                 starts_at=None,
@@ -1205,7 +1198,7 @@ class TestCreateFromTemplate:
                 tag="",
                 priority=0,
                 is_preemptible=True,
-                owner_access_key=sample_access_key,
+                owner_id=sample_user_id,
                 enqueue_only=False,
                 max_wait_seconds=0,
                 starts_at=None,
@@ -1266,7 +1259,7 @@ class TestCreateCluster:
             domain_name="default",
             scaling_group_name="default",
             requester_access_key=sample_access_key,
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             tag="",
             enqueue_only=False,
             keypair_resource_policy=None,
@@ -1297,7 +1290,7 @@ class TestCreateCluster:
             domain_name="default",
             scaling_group_name="default",
             requester_access_key=sample_access_key,
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             tag="",
             enqueue_only=False,
             keypair_resource_policy=None,
@@ -1343,7 +1336,7 @@ class TestCreateCluster:
             domain_name="default",
             scaling_group_name="default",
             requester_access_key=sample_access_key,
-            owner_access_key=sample_access_key,
+            owner_id=sample_user_id,
             tag="",
             enqueue_only=False,
             keypair_resource_policy=None,
@@ -1381,7 +1374,6 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="test",
-            owner_access_key=sample_access_key,
             user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
@@ -1401,7 +1393,6 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="nonexistent",
-            owner_access_key=sample_access_key,
             user_id=sample_user_id,
         )
         result = await session_service.match_sessions(action)
@@ -1419,12 +1410,11 @@ class TestMatchSessions:
 
         action = MatchSessionsAction(
             id_or_name_prefix="test",
-            owner_access_key=sample_access_key,
             user_id=sample_user_id,
         )
         await session_service.match_sessions(action)
 
-        mock_session_repository.match_sessions.assert_called_once_with("test", sample_access_key)
+        mock_session_repository.match_sessions.assert_called_once_with("test", sample_user_id)
 
 
 # ==================== GetAbusingReport Tests ====================
@@ -1451,7 +1441,6 @@ class TestGetAbusingReport:
 
         action = GetAbusingReportAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
         )
         result = await session_service.get_abusing_report(action)
 
@@ -1462,6 +1451,7 @@ class TestGetAbusingReport:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         mock_session_repository.get_session_validated = AsyncMock(
             side_effect=SessionNotFound("not found")
@@ -1469,7 +1459,6 @@ class TestGetAbusingReport:
 
         action = GetAbusingReportAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
         )
 
         with pytest.raises(SessionNotFound):
@@ -1503,7 +1492,6 @@ class TestGetDirectAccessInfo:
 
         action = GetDirectAccessInfoAction(
             session_name="system-session",
-            owner_access_key=sample_access_key,
         )
         result = await session_service.get_direct_access_info(action)
 
@@ -1533,7 +1521,6 @@ class TestGetDirectAccessInfo:
 
         action = GetDirectAccessInfoAction(
             session_name="interactive-session",
-            owner_access_key=sample_access_key,
         )
         result = await session_service.get_direct_access_info(action)
 
@@ -1562,7 +1549,6 @@ class TestGetDirectAccessInfo:
 
         action = GetDirectAccessInfoAction(
             session_name="system-session",
-            owner_access_key=sample_access_key,
         )
 
         with pytest.raises(KernelNotReady):
@@ -1597,7 +1583,6 @@ class TestGetDependencyGraph:
 
         action = GetDependencyGraphAction(
             root_session_name="root-session",
-            owner_access_key=sample_access_key,
         )
         result = await session_service.get_dependency_graph(action)
 
@@ -1626,7 +1611,6 @@ class TestGetDependencyGraph:
 
         action = GetDependencyGraphAction(
             root_session_name="root-session",
-            owner_access_key=sample_access_key,
         )
         result = await session_service.get_dependency_graph(action)
 
@@ -1637,6 +1621,7 @@ class TestGetDependencyGraph:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         dep_graph: dict[str, Any] = {"session_id": "", "children": []}
         mock_session_repository.find_dependency_sessions = AsyncMock(return_value=dep_graph)
@@ -1644,7 +1629,6 @@ class TestGetDependencyGraph:
 
         action = GetDependencyGraphAction(
             root_session_name="root-session",
-            owner_access_key=sample_access_key,
         )
 
         with pytest.raises(SessionNotFound):
@@ -1871,7 +1855,6 @@ class TestShutdownService:
 
         action = ShutdownServiceAction(
             session_name="test-session",
-            owner_access_key=sample_access_key,
             service_name="jupyter",
         )
         result = await session_service.shutdown_service(action)
@@ -1884,6 +1867,7 @@ class TestShutdownService:
         session_service: SessionService,
         mock_session_repository: MagicMock,
         sample_access_key: AccessKey,
+        sample_user_id: UUID,
     ) -> None:
         mock_session_repository.get_session_validated = AsyncMock(
             side_effect=SessionNotFound("not found")
@@ -1891,7 +1875,6 @@ class TestShutdownService:
 
         action = ShutdownServiceAction(
             session_name="nonexistent",
-            owner_access_key=sample_access_key,
             service_name="jupyter",
         )
 

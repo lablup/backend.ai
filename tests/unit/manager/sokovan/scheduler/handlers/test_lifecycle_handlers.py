@@ -123,7 +123,7 @@ class TestScheduleSessionsLifecycleHandler:
                 ScheduledSessionData(
                     session_id=first_session.session_info.identity.id,
                     creation_id=first_session.session_info.identity.creation_id,
-                    access_key=AccessKey(first_session.session_info.metadata.access_key),
+                    main_access_key=AccessKey("test-access-key"),
                     reason="scheduled-successfully",
                 )
             ]

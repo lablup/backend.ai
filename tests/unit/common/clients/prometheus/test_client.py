@@ -5,7 +5,6 @@ import aiohttp
 import pytest
 
 from ai.backend.common.clients.prometheus import (
-    LabelMatcher,
     MetricPreset,
     PrometheusClient,
 )
@@ -67,10 +66,7 @@ class TestQueryRange:
     def sample_preset(self) -> MetricPreset:
         return MetricPreset(
             template="sum(my_metric{{{labels}}}) by ({group_by})",
-            labels={
-                "container_metric_name": LabelMatcher.exact("mem"),
-                "value_type": LabelMatcher.exact("current"),
-            },
+            labels={"container_metric_name": "mem", "value_type": "current"},
             group_by=frozenset({"value_type"}),
             window="5m",
         )
@@ -179,10 +175,7 @@ class TestQueryInstant:
     def sample_preset(self) -> MetricPreset:
         return MetricPreset(
             template="sum(my_metric{{{labels}}}) by ({group_by})",
-            labels={
-                "container_metric_name": LabelMatcher.exact("mem"),
-                "value_type": LabelMatcher.exact("current"),
-            },
+            labels={"container_metric_name": "mem", "value_type": "current"},
             group_by=frozenset({"value_type"}),
             window="5m",
         )

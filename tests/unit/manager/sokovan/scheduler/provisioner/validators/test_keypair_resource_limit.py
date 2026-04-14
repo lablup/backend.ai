@@ -31,9 +31,9 @@ class TestKeypairResourceLimitValidator:
     def test_passes_when_under_limit(self, validator: KeypairResourceLimitValidator) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("2"), mem=Decimal("2")),
-            user_uuid=uuid.uuid4(),
+            owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
@@ -83,9 +83,9 @@ class TestKeypairResourceLimitValidator:
     def test_fails_when_exceeds_limit(self, validator: KeypairResourceLimitValidator) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
-            user_uuid=uuid.uuid4(),
+            owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
@@ -136,9 +136,9 @@ class TestKeypairResourceLimitValidator:
     def test_passes_when_no_policy(self, validator: KeypairResourceLimitValidator) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
-            user_uuid=uuid.uuid4(),
+            owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
@@ -181,9 +181,9 @@ class TestKeypairResourceLimitValidator:
     ) -> None:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
-            access_key=AccessKey("user1"),
+            main_access_key=AccessKey("user1"),
             requested_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
-            user_uuid=uuid.uuid4(),
+            owner_id=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",

@@ -64,7 +64,7 @@ def handler(
 def _make_terminating_session_data(session_id: SessionId) -> TerminatingSessionData:
     return TerminatingSessionData(
         session_id=session_id,
-        access_key=AccessKey("test-access-key"),
+        main_access_key=AccessKey("test-access-key"),
         creation_id="test-creation-id",
         status=SessionStatus.TERMINATED,
         status_info="FORCE_TERMINATED",

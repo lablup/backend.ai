@@ -126,9 +126,9 @@ class TestDRFSequencer:
         workloads = [
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
+                main_access_key=AccessKey("user1"),
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -136,9 +136,9 @@ class TestDRFSequencer:
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
+                main_access_key=AccessKey("user1"),
                 requested_slots=ResourceSlot(cpu=Decimal("20"), mem=Decimal("20")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -162,9 +162,9 @@ class TestDRFSequencer:
         workloads = [
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user2"),  # 30% dominant share
+                main_access_key=AccessKey("user2"),  # 30% dominant share
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -172,9 +172,9 @@ class TestDRFSequencer:
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user3"),  # 5% dominant share (lowest)
+                main_access_key=AccessKey("user3"),  # 5% dominant share (lowest)
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -182,9 +182,9 @@ class TestDRFSequencer:
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),  # 20% dominant share
+                main_access_key=AccessKey("user1"),  # 20% dominant share
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -198,9 +198,9 @@ class TestDRFSequencer:
 
         # Should be ordered by dominant share (ascending): user3 (5%), user1 (20%), user2 (30%)
         assert len(result) == 3
-        assert result[0].access_key == AccessKey("user3")
-        assert result[1].access_key == AccessKey("user1")
-        assert result[2].access_key == AccessKey("user2")
+        assert result[0].main_access_key == AccessKey("user3")
+        assert result[1].main_access_key == AccessKey("user1")
+        assert result[2].main_access_key == AccessKey("user2")
 
     async def test_multiple_users_same_dominant_share(
         self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
@@ -209,9 +209,9 @@ class TestDRFSequencer:
         workloads = [
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
+                main_access_key=AccessKey("user1"),
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -219,9 +219,9 @@ class TestDRFSequencer:
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user2"),
+                main_access_key=AccessKey("user2"),
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -229,9 +229,9 @@ class TestDRFSequencer:
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user3"),
+                main_access_key=AccessKey("user3"),
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -256,9 +256,9 @@ class TestDRFSequencer:
         workloads = [
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user2"),  # 30% dominant share
+                main_access_key=AccessKey("user2"),  # 30% dominant share
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -266,9 +266,9 @@ class TestDRFSequencer:
             ),
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("new_user"),  # 0% dominant share (new user)
+                main_access_key=AccessKey("new_user"),  # 0% dominant share (new user)
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
@@ -282,8 +282,8 @@ class TestDRFSequencer:
 
         # New user with 0% dominant share should get priority
         assert len(result) == 2
-        assert result[0].access_key == AccessKey("new_user")
-        assert result[1].access_key == AccessKey("user2")
+        assert result[0].main_access_key == AccessKey("new_user")
+        assert result[1].main_access_key == AccessKey("user2")
 
     async def test_dominant_share_calculation_with_zero_capacity(
         self, scaling_group: str, sequencer: DRFSequencer
@@ -331,9 +331,9 @@ class TestDRFSequencer:
         workloads = [
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
+                main_access_key=AccessKey("user1"),
                 requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
+                owner_id=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
