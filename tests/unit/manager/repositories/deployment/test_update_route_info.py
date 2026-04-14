@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -12,7 +13,7 @@ from ai.backend.manager.repositories.deployment.repository import DeploymentRepo
 
 def _make_repository(
     *,
-    connection_info: dict[str, object] | None = None,
+    connection_info: dict[str, Any] | None = None,
     health_check_config: ModelHealthCheck | None = None,
     health_check_side_effect: Exception | None = None,
 ) -> tuple[DeploymentRepository, AsyncMock, AsyncMock]:
