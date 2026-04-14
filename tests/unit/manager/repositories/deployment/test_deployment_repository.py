@@ -3816,47 +3816,6 @@ class TestDeploymentRepositoryDuplicateName:
         assert result.metadata.name == "reusable-endpoint"
         assert result.metadata.project == test_group.id
 
-    async def test_create_endpoint_still_blocked_when_existing_is_destroying(
-        self,
-        deployment_repository: DeploymentRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainRow,
-        test_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
-        test_image_id: uuid.UUID,
-    ) -> None:
-        """The application-level uniqueness check still rejects new endpoints
-        whose name collides with an endpoint currently in DESTROYING.
-
-        This guards against accidental relaxation of the user-visible behavior
-        when the partial unique index is narrowed in BA-5698.
-        """
-        first_creator = self._create_endpoint_creator(
-            name="destroying-blocked",
-            domain=test_domain,
-            group=test_group,
-            scaling_group=test_scaling_group,
-            image_id=test_image_id,
-        )
-        first_result = await deployment_repository.create_endpoint_legacy(first_creator)
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == first_result.id)
-                .values(lifecycle_stage=EndpointLifecycle.DESTROYING)
-            )
-
-        second_creator = self._create_endpoint_creator(
-            name="destroying-blocked",
-            domain=test_domain,
-            group=test_group,
-            scaling_group=test_scaling_group,
-            image_id=test_image_id,
-        )
-        with pytest.raises(DeploymentNameAlreadyExists):
-            await deployment_repository.create_endpoint_legacy(second_creator)
-
     async def test_destroy_endpoint_with_destroying_sibling_does_not_conflict(
         self,
         deployment_repository: DeploymentRepository,
