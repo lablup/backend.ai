@@ -345,8 +345,11 @@ class TestDestroySessionRequest:
 
 class TestRestartSessionRequest:
     def test_defaults(self) -> None:
+        # The request model carries no fields; ensure it still accepts an
+        # empty body and that the removed ``owner_access_key`` is gone.
         req = RestartSessionRequest()
-        assert req is not None
+        assert not hasattr(req, "owner_access_key")
+        assert req.model_dump() == {}
 
 
 class TestMatchSessionsRequest:
@@ -442,4 +445,5 @@ class TestGetTaskLogsRequest:
 class TestGetStatusHistoryRequest:
     def test_defaults(self) -> None:
         req = GetStatusHistoryRequest()
-        assert req is not None
+        assert not hasattr(req, "owner_access_key")
+        assert req.model_dump() == {}

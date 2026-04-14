@@ -275,7 +275,7 @@ class SessionHandler:
         owner_id = params.owner_id if params.owner_id is not None else request["user"]["uuid"]
 
         log.info(
-            "GET_OR_CREATE (ak:{0}, img:{1}, s:{2})",
+            "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
             requester_access_key,
             owner_id if owner_id != request["user"]["uuid"] else "*",
             params.image,
@@ -380,7 +380,7 @@ class SessionHandler:
         requester_access_key = AccessKey(request["keypair"]["access_key"])
         owner_id = params.owner_id if params.owner_id is not None else request["user"]["uuid"]
         log.info(
-            "GET_OR_CREATE (ak:{0}, img:{1}, s:{2})",
+            "GET_OR_CREATE (ak:{0}/{1}, img:{2}, s:{3})",
             requester_access_key,
             owner_id if owner_id != request["user"]["uuid"] else "*",
             params.image,
@@ -443,7 +443,7 @@ class SessionHandler:
         requester_access_key = AccessKey(request["keypair"]["access_key"])
         owner_id = params.owner_id if params.owner_id is not None else request["user"]["uuid"]
         log.info(
-            "CREAT_CLUSTER (ak:{0}, s:{1})",
+            "CREAT_CLUSTER (ak:{0}/{1}, s:{2})",
             requester_access_key,
             owner_id if owner_id != request["user"]["uuid"] else "*",
             params.session_name,
@@ -512,7 +512,7 @@ class SessionHandler:
         requester_access_key = AccessKey(request["keypair"]["access_key"])
         agent_id = AgentId(params.agent)
         log.info(
-            "SYNC_AGENT_REGISTRY (ak:{}/{}, a:{})",
+            "SYNC_AGENT_REGISTRY (ak:{}, a:{})",
             requester_access_key,
             agent_id,
         )
@@ -537,7 +537,7 @@ class SessionHandler:
         user_id = cast(UUID, request["user"]["uuid"])
         requester_access_key = AccessKey(request["keypair"]["access_key"])
         log.info(
-            "TRANSIT_STATUS (ak:{}/{}, s:{})",
+            "TRANSIT_STATUS (ak:{}, s:{})",
             requester_access_key,
             session_ids,
         )
@@ -949,7 +949,7 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         requester_access_key = AccessKey(request["keypair"]["access_key"])
         log.info(
-            "COMMIT_SESSION (ak:{}/{}, s:{})",
+            "COMMIT_SESSION (ak:{}, s:{})",
             requester_access_key,
             session_name,
         )
@@ -978,7 +978,7 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         requester_access_key = AccessKey(request["keypair"]["access_key"])
         log.info(
-            "CONVERT_SESSION_TO_IMAGE (ak:{}/{}, s:{})",
+            "CONVERT_SESSION_TO_IMAGE (ak:{}, s:{})",
             requester_access_key,
             session_name,
         )
@@ -1015,7 +1015,7 @@ class SessionHandler:
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
         log.info(
-            "GET_COMMIT_STATUS (ak:{}/{}, s:{})",
+            "GET_COMMIT_STATUS (ak:{}, s:{})",
             requester_access_key,
             session_name,
         )
@@ -1042,7 +1042,7 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         requester_access_key = AccessKey(request["keypair"]["access_key"])
         log.info(
-            "GET_ABUSING_REPORT (ak:{}/{}, s:{})",
+            "GET_ABUSING_REPORT (ak:{}, s:{})",
             requester_access_key,
             session_name,
         )
@@ -1072,7 +1072,7 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         requester_access_key = AccessKey(request["keypair"]["access_key"])
         log.info(
-            "GET_STATUS_HISTORY (ak:{}/{}, s:{})",
+            "GET_STATUS_HISTORY (ak:{}, s:{})",
             requester_access_key,
             session_name,
         )

@@ -1,4 +1,4 @@
-"""BA-5608: ``POST /session`` with ``owner_access_key`` must build ``UserScope``
+"""BA-5608: ``POST /session`` with ``owner_id`` must build ``UserScope``
 from the owner, not the requester admin."""
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 
 class TestDelegatedSessionCreation:
-    """Tests for legacy ``POST /session`` with ``owner_access_key`` (BA-5608)."""
+    """Tests for legacy ``POST /session`` with the new ``owner_id`` (BA-5608)."""
 
     @pytest.fixture()
     def stub_image_row(self) -> MagicMock:
@@ -84,7 +84,7 @@ class TestDelegatedSessionCreation:
         assert name is not None, "group_fixture row missing name"
         return str(name)
 
-    async def test_admin_create_with_owner_access_key_routes_owner_into_user_scope(
+    async def test_admin_create_with_owner_id_routes_owner_into_user_scope(
         self,
         admin_registry: BackendAIClientRegistry,
         domain_fixture: str,
@@ -96,7 +96,7 @@ class TestDelegatedSessionCreation:
     ) -> None:
         """
         POST /session signed by the admin keypair, with
-        ``owner_access_key=<regular user's access key>``, must reach
+        ``owner_id=<regular user's uuid>``, must reach
         ``AgentRegistry.create_session`` with a ``UserScope`` carrying the
         regular user's uuid — not the admin's.
         """
