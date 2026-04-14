@@ -1150,8 +1150,8 @@ class ScheduleDBSource:
                 terminating_sessions.append(
                     TerminatingSessionData(
                         session_id=session_row.id,
-                        main_access_key=AccessKey(session_row.access_key)
-                        if session_row.access_key
+                        main_access_key=AccessKey(owner_main_ak)
+                        if owner_main_ak
                         else AccessKey(""),
                         creation_id=session_row.creation_id or "",
                         status=session_row.status,
@@ -1864,7 +1864,7 @@ class ScheduleDBSource:
                             ScheduledSessionData(
                                 session_id=allocation.session_id,
                                 creation_id=creation_id,
-                                main_access_key=access_key,
+                                main_access_key=main_access_key,
                                 reason="triggered-by-scheduler",
                             )
                         )
@@ -2924,7 +2924,9 @@ class ScheduleDBSource:
             scheduled_session = ScheduledSessionData(
                 session_id=session.id,
                 creation_id=session.creation_id or "",
-                main_access_key=AccessKey(session.access_key) if session.access_key else AccessKey(""),
+                main_access_key=AccessKey(session.access_key)
+                if session.access_key
+                else AccessKey(""),
                 reason="triggered-by-scheduler",
             )
             scheduled_sessions.append(scheduled_session)
