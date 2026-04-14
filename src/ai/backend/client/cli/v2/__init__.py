@@ -263,3 +263,12 @@ def app_config() -> None:
 )
 def prometheus_query_preset() -> None:
     """Prometheus query definition commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.prometheus_query_preset_category:prometheus_query_preset_category",
+    name="prometheus-query-definition-category",
+)
+def prometheus_query_preset_category() -> None:
+    """Prometheus query definition category commands."""
