@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, EndpointStatus
 from ai.backend.manager.api.gql_legacy.endpoint import Endpoint
-from ai.backend.manager.data.deployment.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
 
 
 class TestEndpointType:
@@ -21,6 +21,7 @@ class TestEndpointType:
 
         unhealthy_route = Mock()
         unhealthy_route.status = RouteStatus.FAILED_TO_START.name
+        unhealthy_route.health_status = RouteHealthStatus.UNHEALTHY.name
         mock_endpoint.routings = [unhealthy_route, unhealthy_route]
 
         result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
@@ -36,8 +37,10 @@ class TestEndpointType:
 
         healthy_route = Mock()
         healthy_route.status = RouteStatus.RUNNING.name
+        healthy_route.health_status = RouteHealthStatus.HEALTHY.name
         provisioning_route = Mock()
         provisioning_route.status = RouteStatus.PROVISIONING.name
+        provisioning_route.health_status = RouteHealthStatus.NOT_CHECKED.name
 
         mock_endpoint.routings = [healthy_route, provisioning_route]
 
@@ -57,8 +60,10 @@ class TestEndpointType:
 
         healthy_route = Mock()
         healthy_route.status = RouteStatus.RUNNING.name
+        healthy_route.health_status = RouteHealthStatus.HEALTHY.name
         provisioning_route = Mock()
         provisioning_route.status = RouteStatus.PROVISIONING.name
+        provisioning_route.health_status = RouteHealthStatus.NOT_CHECKED.name
 
         mock_endpoint.routings = [healthy_route, provisioning_route]
 
@@ -76,6 +81,7 @@ class TestEndpointType:
 
         terminated_route = Mock()
         terminated_route.status = RouteStatus.TERMINATED.name
+        terminated_route.health_status = RouteHealthStatus.UNHEALTHY.name
 
         mock_endpoint.routings = [terminated_route, terminated_route]
 
@@ -96,8 +102,10 @@ class TestEndpointType:
 
         healthy_route = Mock()
         healthy_route.status = RouteStatus.RUNNING.name
+        healthy_route.health_status = RouteHealthStatus.HEALTHY.name
         terminated_route = Mock()
         terminated_route.status = RouteStatus.TERMINATED.name
+        terminated_route.health_status = RouteHealthStatus.UNHEALTHY.name
 
         mock_endpoint.routings = [healthy_route, healthy_route, terminated_route]
 

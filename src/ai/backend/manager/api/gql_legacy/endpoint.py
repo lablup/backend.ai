@@ -872,10 +872,14 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             case _:
                 if not self.routings:
                     return EndpointStatus.DEGRADED
-                health_statuses = {r.health_status for r in self.routings}
-                if RouteHealthStatus.HEALTHY.name in health_statuses:
+                active_status_names = {s.name for s in RouteStatus.active_route_statuses()}
+                active_routings = [r for r in self.routings if r.status in active_status_names]
+                if not active_routings:
+                    return EndpointStatus.UNHEALTHY
+                health_statuses = {r.health_status for r in active_routings}
+                if health_statuses == {RouteHealthStatus.HEALTHY.name}:
                     return EndpointStatus.HEALTHY
-                if RouteHealthStatus.UNHEALTHY.name in health_statuses:
+                if health_statuses == {RouteHealthStatus.UNHEALTHY.name}:
                     return EndpointStatus.UNHEALTHY
                 return EndpointStatus.DEGRADED
 
