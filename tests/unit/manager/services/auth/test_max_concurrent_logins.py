@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -14,6 +14,7 @@ from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.auth import TooManyConcurrentLoginSessions
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -67,6 +68,7 @@ def _make_action(*, force: bool = False) -> AuthorizeAction:
         password="password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
         force=force,
     )
@@ -238,6 +240,7 @@ class TestMaxConcurrentLoginsEnforcement:
                 keypair_row=_make_mock_keypair_row(),
                 live_sessions=_make_live_sessions(case.existing_active_sessions),
                 auth_config=_make_auth_config(),
+                login_client_type_id=uuid4(),
             )
 
     @pytest.mark.parametrize(
@@ -338,11 +341,14 @@ class TestMaxConcurrentLoginsEnforcement:
             keypair_row=_make_mock_keypair_row(),
             live_sessions=_make_live_sessions(case.existing_active_sessions),
             auth_config=_make_auth_config(),
+            login_client_type_id=uuid4(),
         )
 
-        invalidate_mock = mock_auth_repository.invalidate_login_sessions_by_tokens
+        delete_mock = mock_auth_repository.delete_login_sessions_by_tokens
         if case.expected_evicted_tokens is None:
-            invalidate_mock.assert_not_called()
+            delete_mock.assert_not_called()
         else:
-            invalidate_mock.assert_called_once_with(case.expected_evicted_tokens)
+            delete_mock.assert_called_once_with(
+                case.expected_evicted_tokens, LoginAttemptResult.EVICTED
+            )
         assert result.authorization_result is not None

@@ -1,0 +1,3 @@
+/*! For license information please see 1457.5f2c0b7c.chunk.js.LICENSE.txt */
+"use strict";(globalThis.webpackChunkbackend_ai_webui_react=globalThis.webpackChunkbackend_ai_webui_react||[]).push([[1457],{71457(e,a,n){n.r(a),n.d(a,{default:()=>l});var r=n(6347),c=n(63946),i=n(71719),t=n(72578);const u=c.lazy((()=>n.e(9364).then(n.bind(n,29364)))),l=()=>{const[e,a]=(0,i.useQueryParam)("invitation",i.StringParam);return(0,t.jsx)(r.XcZ,{children:(0,t.jsx)(u,{open:"true"===e,onCancel:()=>{a(null,"replaceIn")}})})}}}]);
+//# sourceMappingURL=1457.5f2c0b7c.chunk.js.map

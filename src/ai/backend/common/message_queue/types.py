@@ -100,6 +100,14 @@ class MessageMetadata:
             yield
 
 
+def deserialize_event_name_for_anycast(payload: Mapping[bytes, bytes]) -> str:
+    return payload[b"name"].decode("utf-8")
+
+
+def deserialize_event_name_for_broadcast(payload: Mapping[str, str]) -> str:
+    return payload["name"]
+
+
 @dataclass
 class MessagePayload:
     name: str
@@ -145,7 +153,7 @@ class MessagePayload:
         if b"metadata" in payload:
             metadata = MessageMetadata.deserialize(payload[b"metadata"])
         return cls(
-            name=payload[b"name"].decode("utf-8"),
+            name=deserialize_event_name_for_anycast(payload),
             source=payload[b"source"].decode("utf-8"),
             args=cast(tuple[bytes, ...], msgpack.unpackb(payload[b"args"])),
             metadata=metadata,
@@ -162,7 +170,7 @@ class MessagePayload:
         if "metadata" in payload:
             metadata = MessageMetadata.deserialize(payload["metadata"])
         return cls(
-            name=payload["name"],
+            name=deserialize_event_name_for_broadcast(payload),
             source=payload["source"],
             args=cast(tuple[bytes, ...], msgpack.unpackb(args_bytes)),
             metadata=metadata,

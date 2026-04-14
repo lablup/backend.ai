@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     CommitSessionInput,
     DestroySessionInput,
     DownloadFilesInput,
+    EnqueueSessionInput,
     ExecuteInput,
     GetContainerLogsInput,
     ListFilesInput,
@@ -25,6 +26,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     UploadFilesInput,
 )
 from ai.backend.common.dto.manager.v2.session.types import (
+    CreateSessionTypeEnum,
     OrderDirection,
     SessionOrderField,
     SessionStatusEnum,
@@ -105,19 +107,8 @@ class TestSearchSessionsInput:
 class TestRestartSessionInput:
     """Tests for RestartSessionInput model."""
 
-    def test_default_owner_access_key_is_none(self) -> None:
-        inp = RestartSessionInput()
-        assert inp.owner_access_key is None
-
-    def test_with_owner_access_key(self) -> None:
-        inp = RestartSessionInput(owner_access_key="AKIAIOSFODNN7EXAMPLE")
-        assert inp.owner_access_key == "AKIAIOSFODNN7EXAMPLE"
-
-    def test_round_trip(self) -> None:
-        inp = RestartSessionInput(owner_access_key="some-key")
-        json_str = inp.model_dump_json()
-        restored = RestartSessionInput.model_validate_json(json_str)
-        assert restored.owner_access_key == "some-key"
+    def test_instantiable(self) -> None:
+        RestartSessionInput()
 
 
 class TestDestroySessionInput:
@@ -127,7 +118,6 @@ class TestDestroySessionInput:
         inp = DestroySessionInput()
         assert inp.forced is False
         assert inp.recursive is False
-        assert inp.owner_access_key is None
 
     def test_forced_true(self) -> None:
         inp = DestroySessionInput(forced=True)
@@ -139,17 +129,12 @@ class TestDestroySessionInput:
         assert inp.forced is True
         assert inp.recursive is True
 
-    def test_with_owner_access_key(self) -> None:
-        inp = DestroySessionInput(owner_access_key="some-key")
-        assert inp.owner_access_key == "some-key"
-
     def test_round_trip(self) -> None:
-        inp = DestroySessionInput(forced=True, recursive=True, owner_access_key="key")
+        inp = DestroySessionInput(forced=True, recursive=True)
         json_str = inp.model_dump_json()
         restored = DestroySessionInput.model_validate_json(json_str)
         assert restored.forced is True
         assert restored.recursive is True
-        assert restored.owner_access_key == "key"
 
 
 class TestCommitSessionInput:
@@ -329,7 +314,6 @@ class TestGetContainerLogsInput:
 
     def test_all_none_defaults(self) -> None:
         inp = GetContainerLogsInput()
-        assert inp.owner_access_key is None
         assert inp.kernel_id is None
 
     def test_with_kernel_id(self) -> None:
@@ -337,8 +321,42 @@ class TestGetContainerLogsInput:
         inp = GetContainerLogsInput(kernel_id=kernel_id)
         assert inp.kernel_id == kernel_id
 
-    def test_with_all_fields(self) -> None:
-        kernel_id = uuid.uuid4()
-        inp = GetContainerLogsInput(owner_access_key="my-key", kernel_id=kernel_id)
-        assert inp.owner_access_key == "my-key"
-        assert inp.kernel_id == kernel_id
+
+class TestEnqueueSessionInputOwnerDelegation:
+    """Tests for owner_id delegation on EnqueueSessionInput."""
+
+    def test_owner_id_defaults_to_none(self) -> None:
+        """owner_id should be optional and default to None."""
+        inp = EnqueueSessionInput(
+            session_name="s",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
+            image_id=uuid.uuid4(),
+            resource_entries=[],
+            project_id=uuid.uuid4(),
+        )
+        assert inp.owner_id is None
+
+    def test_owner_id_accepts_uuid(self) -> None:
+        owner = uuid.uuid4()
+        inp = EnqueueSessionInput(
+            session_name="s",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
+            image_id=uuid.uuid4(),
+            resource_entries=[],
+            project_id=uuid.uuid4(),
+            owner_id=owner,
+        )
+        assert inp.owner_id == owner
+
+    def test_owner_id_round_trip(self) -> None:
+        owner = uuid.uuid4()
+        inp = EnqueueSessionInput(
+            session_name="s",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
+            image_id=uuid.uuid4(),
+            resource_entries=[],
+            project_id=uuid.uuid4(),
+            owner_id=owner,
+        )
+        restored = EnqueueSessionInput.model_validate_json(inp.model_dump_json())
+        assert restored.owner_id == owner

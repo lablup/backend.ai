@@ -132,15 +132,12 @@ class AdminSearchSessionsInput(BaseRequestModel):
 class RestartSessionInput(BaseRequestModel):
     """Input for restarting a session."""
 
-    owner_access_key: str | None = None
-
 
 class DestroySessionInput(BaseRequestModel):
     """Input for destroying a session."""
 
     forced: bool = False
     recursive: bool = False
-    owner_access_key: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +235,6 @@ class ListFilesInput(BaseRequestModel):
 class GetContainerLogsInput(BaseRequestModel):
     """Input for retrieving container logs from a session."""
 
-    owner_access_key: str | None = None
     kernel_id: UUID | None = None
 
 
@@ -351,6 +347,16 @@ class EnqueueSessionInput(BaseRequestModel):
 
     # Project scope
     project_id: UUID = Field(description="Project (group) UUID.")
+
+    # Delegation
+    owner_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Delegated owner user UUID. When set, the session is created on behalf of "
+            "the specified user instead of the caller. Caller must have permission to "
+            "act on behalf of the target user."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

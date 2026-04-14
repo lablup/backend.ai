@@ -7,13 +7,14 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 
 from .types import LoginSessionOrderField, LoginSessionStatus, OrderDirection
 
 __all__ = (
     "AdminRevokeLoginSessionInput",
     "AdminSearchLoginSessionsInput",
+    "AdminUnblockUserInput",
     "LoginSessionFilter",
     "LoginSessionOrder",
     "LoginSessionStatusFilter",
@@ -37,6 +38,7 @@ class LoginSessionStatusFilter(BaseRequestModel):
 class LoginSessionFilter(BaseRequestModel):
     """Filter for login sessions."""
 
+    user_id: UUIDFilter | None = Field(default=None, description="User ID filter")
     status: LoginSessionStatusFilter | None = Field(default=None, description="Status filter")
     access_key: StringFilter | None = Field(default=None, description="Access key filter")
     created_at: DateTimeFilter | None = Field(
@@ -102,3 +104,9 @@ class AdminRevokeLoginSessionInput(BaseRequestModel):
     """Input for revoking a login session (admin)."""
 
     session_id: UUID = Field(description="ID of the login session to revoke")
+
+
+class AdminUnblockUserInput(BaseRequestModel):
+    """Input for clearing the failed-login rate limit block for a user (admin)."""
+
+    username: str = Field(description="Username of the user to unblock")

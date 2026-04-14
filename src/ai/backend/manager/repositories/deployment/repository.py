@@ -25,7 +25,6 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
-    AutoScalingMetricComparator,
     AutoScalingMetricSource,
     KernelId,
     SessionId,
@@ -113,6 +112,7 @@ class AutoScalingMetricsData:
     endpoint_statistics: dict[uuid.UUID, Mapping[str, Any] | None] = field(default_factory=dict)
     routes_by_endpoint: Mapping[uuid.UUID, list[RouteInfo]] = field(default_factory=dict)
     kernels_by_session: dict[SessionId, list[KernelId]] = field(default_factory=dict)
+    prometheus_metrics: dict[uuid.UUID, Decimal] = field(default_factory=dict)
 
 
 deployment_repository_resilience = Resilience(
@@ -842,6 +842,9 @@ class DeploymentRepository:
                 elif rule.condition.metric_source == AutoScalingMetricSource.INFERENCE_FRAMEWORK:
                     # Need to fetch endpoint metrics
                     metric_requested_endpoints.append(deployment.id)
+                elif rule.condition.metric_source == AutoScalingMetricSource.PROMETHEUS:
+                    # Prometheus metrics are fetched in the executor, not from Valkey
+                    pass
 
         # Fetch kernel data if needed
         if metric_requested_sessions:
@@ -986,32 +989,62 @@ class DeploymentRepository:
                             )
                             continue
 
-            # Evaluate threshold comparison
+            elif rule.condition.metric_source == AutoScalingMetricSource.PROMETHEUS:
+                # Use pre-fetched Prometheus metrics (populated by executor)
+                pre_fetched = metrics_data.prometheus_metrics.get(rule.id)
+                if pre_fetched is None:
+                    log.warning(
+                        "AUTOSCALE(e:{}, rule:{}): skipping - no prometheus metric",
+                        deployment.id,
+                        rule.id,
+                    )
+                    continue
+                current_value = pre_fetched
+
+            # Evaluate threshold comparison (scale-up and scale-down)
+            scale_direction: int = 0  # +1 for scale-out, -1 for scale-in
             if current_value is not None:
-                threshold = Decimal(rule.condition.threshold)
-
-                if rule.condition.comparator == AutoScalingMetricComparator.LESS_THAN:
-                    should_trigger = current_value < threshold
-                elif rule.condition.comparator == AutoScalingMetricComparator.LESS_THAN_OR_EQUAL:
-                    should_trigger = current_value <= threshold
-                elif rule.condition.comparator == AutoScalingMetricComparator.GREATER_THAN:
-                    should_trigger = current_value > threshold
-                elif rule.condition.comparator == AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL:
-                    should_trigger = current_value >= threshold
-
-                log.debug(
-                    "AUTOSCALE(e:{}, rule:{}): {} {} {}: {}",
-                    deployment.id,
-                    rule.id,
-                    current_value,
-                    rule.condition.comparator.value,
-                    threshold,
-                    should_trigger,
-                )
+                if (
+                    rule.condition.scale_up_threshold is not None
+                    and current_value > rule.condition.scale_up_threshold
+                ):
+                    scale_direction = 1
+                    should_trigger = True
+                    log.debug(
+                        "AUTOSCALE(e:{}, rule:{}): {} > {} → scale out",
+                        deployment.id,
+                        rule.id,
+                        current_value,
+                        rule.condition.scale_up_threshold,
+                    )
+                elif (
+                    rule.condition.scale_down_threshold is not None
+                    and current_value < rule.condition.scale_down_threshold
+                ):
+                    scale_direction = -1
+                    should_trigger = True
+                    log.debug(
+                        "AUTOSCALE(e:{}, rule:{}): {} < {} → scale in",
+                        deployment.id,
+                        rule.id,
+                        current_value,
+                        rule.condition.scale_down_threshold,
+                    )
+                else:
+                    log.debug(
+                        "AUTOSCALE(e:{}, rule:{}): {} in range [{}, {}] → no action",
+                        deployment.id,
+                        rule.id,
+                        current_value,
+                        rule.condition.scale_down_threshold,
+                        rule.condition.scale_up_threshold,
+                    )
 
             if should_trigger:
                 # Calculate new replica count
-                new_replica_count = max(0, current_replica_count + rule.action.step_size)
+                new_replica_count = max(
+                    0, current_replica_count + scale_direction * rule.action.step_size
+                )
 
                 # Check min/max limits
                 if (

@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -46,6 +47,9 @@ from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     EndpointLifecycleBatchUpdaterSpec,
+)
+from ai.backend.manager.repositories.prometheus_query_preset.repository import (
+    PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
 from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
@@ -219,6 +223,8 @@ class DeploymentCoordinator:
         client_pool: ClientPool,
         valkey_stat: ValkeyStatClient,
         route_controller: RouteController,
+        prometheus_client: PrometheusClient,
+        prometheus_query_preset_repository: PrometheusQueryPresetRepository,
     ) -> None:
         """Initialize the deployment coordinator."""
         self._valkey_schedule = valkey_schedule
@@ -236,6 +242,8 @@ class DeploymentCoordinator:
             config_provider=self._config_provider,
             client_pool=client_pool,
             valkey_stat=valkey_stat,
+            prometheus_client=prometheus_client,
+            preset_repo=prometheus_query_preset_repository,
         )
 
         # Create strategy components for deploying handlers

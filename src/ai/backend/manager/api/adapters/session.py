@@ -219,7 +219,13 @@ class SessionAdapter(BaseAdapter):
         domain_name: str,
         group_id: UUID,
     ) -> EnqueueSessionPayload:
-        """Enqueue a new session for scheduling."""
+        """Enqueue a new session for scheduling.
+
+        When ``input.owner_id`` is set, the session is created on behalf of the
+        target user: their main access key, role, and domain are used in place
+        of the caller's. Resolution and authorization of the delegated user
+        are handled by the downstream session service, not by this adapter.
+        """
         batch_spec: SessionBatchSpec | None = None
         if input.batch is not None:
             starts_at = None
@@ -297,6 +303,7 @@ class SessionAdapter(BaseAdapter):
             access_key=AccessKey(access_key),
             domain_name=domain_name,
             group_id=group_id,
+            owner_id=input.owner_id,
         )
 
         result = await self._processors.session.enqueue_session.wait_for_complete(action)

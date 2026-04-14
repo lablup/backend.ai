@@ -2058,6 +2058,7 @@ class PromMetricGroup[MetricType: PromMetric](metaclass=ABCMeta):
 class AutoScalingMetricSource(CIStrEnum):
     KERNEL = enum.auto()
     INFERENCE_FRAMEWORK = enum.auto()
+    PROMETHEUS = enum.auto()
 
 
 class AutoScalingMetricComparator(CIStrEnum):

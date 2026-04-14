@@ -10,6 +10,7 @@ from strawberry import Info
 from ai.backend.common.dto.manager.v2.login_session.request import (
     AdminRevokeLoginSessionInput,
     AdminSearchLoginSessionsInput,
+    AdminUnblockUserInput,
     MyRevokeLoginSessionInput,
     MySearchLoginSessionsInput,
 )
@@ -27,6 +28,7 @@ from ai.backend.manager.api.gql.login_session.types import (
     LoginSessionV2EdgeGQL,
     LoginSessionV2GQL,
     RevokeLoginSessionPayloadGQL,
+    UnblockUserPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -150,3 +152,20 @@ async def my_revoke_login_session(
         MyRevokeLoginSessionInput(session_id=session_id)
     )
     return RevokeLoginSessionPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Clear the failed-login rate limit block for a user. (admin only)",
+    )
+)  # type: ignore[misc]
+async def admin_unblock_user(
+    info: Info[StrawberryGQLContext],
+    username: str,
+) -> UnblockUserPayloadGQL:
+    check_admin_only()
+    payload = await info.context.adapters.login_session.admin_unblock_user(
+        AdminUnblockUserInput(username=username)
+    )
+    return UnblockUserPayloadGQL.from_pydantic(payload)

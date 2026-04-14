@@ -10,6 +10,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -27,6 +28,7 @@ import yarl
 from dateutil.parser import isoparse
 from pydantic import BaseModel
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
+from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicode, UnicodeText
@@ -111,6 +113,38 @@ def zero_if_none(val: int | None) -> int:
 class FixtureOpModes(enum.StrEnum):
     INSERT = "insert"
     UPDATE = "update"
+
+
+@dataclass(frozen=True)
+class FixtureReferenceSpec:
+    """Declarative spec for resolving a human-friendly alias in a fixture row
+    into a value looked up from another table.
+
+    For each matching fixture row, the value in `fixture_alias_column` is
+    looked up against `lookup_table.lookup_match_column`, and the resulting
+    `lookup_table.lookup_referenced_column` is written into `fixture_fk_column`.
+    In SQL terms, the fixture's FK column ends up referencing
+    `lookup_table(lookup_referenced_column)`.
+    """
+
+    fixture_alias_column: str
+    fixture_fk_column: str
+    lookup_table: str
+    lookup_match_column: str
+    lookup_referenced_column: str
+
+
+FIXTURE_REFERENCE_SPECS: Final[Mapping[str, Sequence[FixtureReferenceSpec]]] = {
+    "runtime_variant_presets": (
+        FixtureReferenceSpec(
+            fixture_alias_column="runtime_variant_name",
+            fixture_fk_column="runtime_variant",
+            lookup_table="runtime_variants",
+            lookup_match_column="name",
+            lookup_referenced_column="id",
+        ),
+    ),
+}
 
 
 T_Enum = TypeVar("T_Enum", bound=enum.Enum, covariant=True)
@@ -832,6 +866,7 @@ async def populate_fixture(
         from .hasher.types import PasswordColumn
 
         async with engine.begin() as conn:
+            await _resolve_fixture_references(conn, table, rows)
             # Apply typedecorator manually for required columns
             for col in table.columns:
                 if isinstance(col.type, sa.sql.sqltypes.DateTime):
@@ -946,6 +981,70 @@ async def populate_fixture(
                                 ) from e
                         update_data.append(update_row)
                     await conn.execute(update_stmt, update_data)
+
+
+async def _resolve_fixture_references(
+    conn: AsyncConnection,
+    table: sa.Table,
+    rows: Sequence[dict[str, Any]],
+) -> None:
+    reference_specs = FIXTURE_REFERENCE_SPECS.get(table.name, ())
+    for reference_spec in reference_specs:
+        await _resolve_fixture_reference(conn, table, rows, reference_spec)
+
+
+async def _resolve_fixture_reference(
+    conn: AsyncConnection,
+    table: sa.Table,
+    rows: Sequence[dict[str, Any]],
+    reference_spec: FixtureReferenceSpec,
+) -> None:
+    # Pop alias column from every row, collecting rows that still need a resolved FK.
+    rows_to_resolve: list[tuple[dict[str, Any], str]] = []
+    for row in rows:
+        alias_value = row.pop(reference_spec.fixture_alias_column, None)
+        if alias_value is not None and reference_spec.fixture_fk_column not in row:
+            rows_to_resolve.append((row, cast(str, alias_value)))
+
+    if not rows_to_resolve:
+        return
+
+    alias_values = {alias for _, alias in rows_to_resolve}
+
+    lookup_table = metadata.tables.get(reference_spec.lookup_table)
+    if lookup_table is None:
+        raise DataTransformationFailed(f"Table {reference_spec.lookup_table} not found in metadata")
+
+    match_column = lookup_table.columns.get(reference_spec.lookup_match_column)
+    if match_column is None:
+        raise DataTransformationFailed(
+            f"Column {reference_spec.lookup_table}.{reference_spec.lookup_match_column} "
+            "not found in metadata"
+        )
+    referenced_column = lookup_table.columns.get(reference_spec.lookup_referenced_column)
+    if referenced_column is None:
+        raise DataTransformationFailed(
+            f"Column {reference_spec.lookup_table}.{reference_spec.lookup_referenced_column} "
+            "not found in metadata"
+        )
+
+    result = await conn.execute(
+        sa.select(match_column, referenced_column).where(match_column.in_(alias_values))
+    )
+    # Access via `_mapping` with column objects so that match/referenced being the same
+    # column still yields the expected identity mapping.
+    resolved_values: dict[str, Any] = {
+        row._mapping[match_column]: row._mapping[referenced_column] for row in result
+    }
+    missing_values = sorted(alias_values - resolved_values.keys())
+    if missing_values:
+        raise DataTransformationFailed(
+            f"Unknown {reference_spec.fixture_alias_column} in fixture for {table.name}: "
+            + ", ".join(missing_values)
+        )
+
+    for row, alias_value in rows_to_resolve:
+        row[reference_spec.fixture_fk_column] = resolved_values[alias_value]
 
 
 class DecimalType(TypeDecorator[Decimal], Decimal):

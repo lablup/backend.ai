@@ -18,6 +18,7 @@ from ai.backend.manager.api.adapters.domain import DomainAdapter
 from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
 from ai.backend.manager.api.adapters.huggingface_registry import HuggingFaceRegistryAdapter
 from ai.backend.manager.api.adapters.image import ImageAdapter
+from ai.backend.manager.api.adapters.login_client_type import LoginClientTypeAdapter
 from ai.backend.manager.api.adapters.login_history import LoginHistoryAdapter
 from ai.backend.manager.api.adapters.login_session import LoginSessionAdapter
 from ai.backend.manager.api.adapters.model_card import ModelCardAdapter
@@ -71,6 +72,7 @@ class Adapters:
         fair_share: FairShareAdapter,
         huggingface_registry: HuggingFaceRegistryAdapter,
         image: ImageAdapter,
+        login_client_type: LoginClientTypeAdapter,
         login_history: LoginHistoryAdapter,
         login_session: LoginSessionAdapter,
         notification: NotificationAdapter,
@@ -109,6 +111,7 @@ class Adapters:
         self.fair_share = fair_share
         self.huggingface_registry = huggingface_registry
         self.image = image
+        self.login_client_type = login_client_type
         self.login_history = login_history
         self.login_session = login_session
         self.notification = notification
@@ -156,6 +159,7 @@ class Adapters:
             fair_share=FairShareAdapter(processors),
             huggingface_registry=HuggingFaceRegistryAdapter(processors),
             image=ImageAdapter(processors),
+            login_client_type=LoginClientTypeAdapter(processors),
             login_history=LoginHistoryAdapter(processors),
             login_session=LoginSessionAdapter(processors),
             notification=NotificationAdapter(processors),

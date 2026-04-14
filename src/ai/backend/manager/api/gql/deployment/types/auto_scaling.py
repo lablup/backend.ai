@@ -39,10 +39,12 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateAutoScalingRulePayload as UpdateAutoScalingRulePayloadDTO,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -63,6 +65,7 @@ from ai.backend.manager.data.deployment.types import (
 class AutoScalingMetricSource(StrEnum):
     KERNEL = "KERNEL"
     INFERENCE_FRAMEWORK = "INFERENCE_FRAMEWORK"
+    PROMETHEUS = "PROMETHEUS"
 
 
 @gql_pydantic_input(
@@ -114,6 +117,13 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     min_replicas: int | None = gql_field(description="The minimum number of replicas (e.g. 1).")
     max_replicas: int | None = gql_field(description="The maximum number of replicas (e.g. 10).")
 
+    prometheus_query_preset_id: ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The Prometheus query preset ID for PROMETHEUS metric source.",
+        ),
+    )
+
     created_at: datetime
     last_triggered_at: datetime
 
@@ -161,6 +171,7 @@ class CreateAutoScalingRuleInput(PydanticInputMixin[CreateAutoScalingRuleInputDT
     time_window: int
     min_replicas: int | None
     max_replicas: int | None
+    prometheus_query_preset_id: ID | None = None
 
 
 @gql_pydantic_input(
@@ -180,6 +191,7 @@ class UpdateAutoScalingRuleInput(PydanticInputMixin[UpdateAutoScalingRuleInputDT
     time_window: int | None = UNSET
     min_replicas: int | None = UNSET
     max_replicas: int | None = UNSET
+    prometheus_query_preset_id: ID | None = UNSET
 
 
 @gql_pydantic_input(

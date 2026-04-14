@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 from unittest.mock import MagicMock
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -28,3 +29,8 @@ def mock_config_provider() -> MagicMock:
         login_session_max_age=604800,
     )
     return mock_provider
+
+
+@pytest.fixture
+def sample_client_type_id() -> UUID:
+    return uuid4()

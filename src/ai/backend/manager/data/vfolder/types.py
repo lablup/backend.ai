@@ -162,6 +162,7 @@ class VFolderData:
     created_at: datetime
     last_used: datetime | None
     creator: str | None
+    creator_id: uuid.UUID | None
     unmanaged_path: str | None
     ownership_type: VFolderOwnershipType
     user: uuid.UUID | None
@@ -211,6 +212,7 @@ class VFolderCreateParams:
     permission: VFolderMountPermission
     host: str
     creator: str
+    creator_id: uuid.UUID
     ownership_type: VFolderOwnershipType
     user: uuid.UUID | None
     group: uuid.UUID | None

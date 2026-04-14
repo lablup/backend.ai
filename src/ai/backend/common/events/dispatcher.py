@@ -32,6 +32,8 @@ from ai.backend.common.message_queue.types import (
     MessageMetadata,
     MessagePayload,
     MQMessage,
+    deserialize_event_name_for_anycast,
+    deserialize_event_name_for_broadcast,
 )
 from ai.backend.common.types import (
     AgentId,
@@ -572,40 +574,55 @@ class EventDispatcher(EventDispatcherGroup):
         for complete in evh.event_complete_reporters:
             await complete.complete_event_report(event, CompleteEventReportArgs(duration))
 
-    async def dispatch_consumers(
+    async def _dispatch_consumers(
         self,
-        event_name: str,
-        source: AgentId,
-        args: tuple[Any, ...],
-        post_callbacks: Sequence[PostCallback] = tuple(),
-        metadata: MessageMetadata | None = None,
+        mq_msg: MQMessage,
     ) -> None:
-        if self._log_events:
-            log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
-        consumers_handlers = self._consumers[event_name].copy()
-        if not consumers_handlers:
-            # If there are no consumer handlers, we can just call post callbacks and return.
-            for post_callback in post_callbacks:
-                await post_callback.done()
+        event_name = deserialize_event_name_for_anycast(mq_msg.payload)
+        consumer_handlers = self._consumers.get(event_name)
+        post_callback = _ConsumerPostCallback(
+            mq_msg.msg_id,
+            self._msg_queue,
+            len(consumer_handlers) if consumer_handlers else 0,
+        )
+        if not consumer_handlers:
+            await post_callback.done()
             return
-        for consumer in consumers_handlers:
+        if self._log_events:
+            log.debug("DISPATCH_CONSUMERS(ev:{})", event_name)
+        msg_payload = MessagePayload.from_anycast(mq_msg.payload)
+        for consumer in consumer_handlers.copy():
             self._consumer_taskgroup.create_task(
-                self._handle(consumer, source, args, post_callbacks, metadata),
+                self._handle(
+                    consumer,
+                    AgentId(msg_payload.source),
+                    msg_payload.args,
+                    [post_callback],
+                    msg_payload.metadata,
+                ),
             )
             await asyncio.sleep(0)
 
-    async def dispatch_subscribers(
+    async def _dispatch_subscribers(
         self,
-        event_name: str,
-        source: AgentId,
-        args: tuple[Any, ...],
-        metadata: MessageMetadata | None = None,
+        broadcast_msg: BroadcastMessage,
     ) -> None:
+        event_name = deserialize_event_name_for_broadcast(broadcast_msg.payload)
+        subscriber_handlers = self._subscribers.get(event_name)
+        if not subscriber_handlers:
+            return
         if self._log_events:
-            log.debug("DISPATCH_SUBSCRIBERS(ev:{}, ag:{})", event_name, source)
-        for subscriber in self._subscribers[event_name].copy():
+            log.debug("DISPATCH_SUBSCRIBERS(ev:{})", event_name)
+        msg_payload = MessagePayload.from_broadcast(broadcast_msg.payload)
+        for subscriber in subscriber_handlers.copy():
             self._subscriber_taskgroup.create_task(
-                self._handle(subscriber, source, args, tuple(), metadata),
+                self._handle(
+                    subscriber,
+                    AgentId(msg_payload.source),
+                    msg_payload.args,
+                    tuple(),
+                    msg_payload.metadata,
+                ),
             )
             await asyncio.sleep(0)
 
@@ -615,20 +632,7 @@ class EventDispatcher(EventDispatcherGroup):
             if self._closed:
                 return
             try:
-                mq_msg = cast(MQMessage, msg)
-                msg_payload = MessagePayload.from_anycast(mq_msg.payload)
-                post_callback = _ConsumerPostCallback(
-                    mq_msg.msg_id,
-                    self._msg_queue,
-                    len(self._consumers[msg_payload.name]),
-                )
-                await self.dispatch_consumers(
-                    msg_payload.name,
-                    AgentId(msg_payload.source),
-                    msg_payload.args,
-                    [post_callback],
-                    msg_payload.metadata,
-                )
+                await self._dispatch_consumers(cast(MQMessage, msg))
             except Exception as e:
                 log.exception(
                     "EventDispatcher._consume_loop: unexpected-error, {}",
@@ -643,14 +647,7 @@ class EventDispatcher(EventDispatcherGroup):
             if self._closed:
                 return
             try:
-                msg = cast(BroadcastMessage, msg)
-                msg_payload = MessagePayload.from_broadcast(msg.payload)
-                await self.dispatch_subscribers(
-                    msg_payload.name,
-                    AgentId(msg_payload.source),
-                    msg_payload.args,
-                    msg_payload.metadata,
-                )
+                await self._dispatch_subscribers(cast(BroadcastMessage, msg))
             except Exception as e:
                 log.exception(
                     "EventDispatcher._subscribe_loop: unexpected-error, {}",

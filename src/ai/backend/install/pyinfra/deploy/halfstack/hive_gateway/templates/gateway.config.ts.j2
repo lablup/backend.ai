@@ -7,11 +7,14 @@ const useConnectionParamsToHeadersPlugin = (): GatewayPlugin => {
       const originalExecutor = executor;
       const wrappedExecutor = async (execRequest: any) => {
         let reqHeaders = execRequest.context.headers || {};
-        let new_headers = {};
+        let new_headers: Record<string, string> = {};
         if (reqHeaders["x-backendai-token"]) {
-          new_headers = {
-            "x-backendai-token": reqHeaders["x-backendai-token"]
-          };
+          new_headers["x-backendai-token"] = reqHeaders["x-backendai-token"];
+        }
+        // Forward X-Forwarded-For so the manager can resolve the real client IP
+        // (e.g. for the my_client_ip GQL query).
+        if (reqHeaders["x-forwarded-for"]) {
+          new_headers["x-forwarded-for"] = reqHeaders["x-forwarded-for"];
         }
         const modifiedRequest = {
           ...execRequest,

@@ -607,6 +607,7 @@ class ModelDeploymentAutoScalingRuleData:
     max_replicas: int | None
     created_at: datetime
     last_triggered_at: datetime
+    prometheus_query_preset_id: UUID | None = None
 
 
 @dataclass

@@ -95,6 +95,10 @@ from ai.backend.manager.services.auth.actions.search_login_sessions import (
 )
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
+from ai.backend.manager.services.auth.actions.unblock_user import (
+    AdminUnblockUserAction,
+    AdminUnblockUserActionResult,
+)
 from ai.backend.manager.services.auth.actions.update_full_name import (
     UpdateFullNameAction,
     UpdateFullNameActionResult,
@@ -177,7 +181,8 @@ class AuthService:
         if action.type != AuthTokenType.KEYPAIR:
             raise InvalidAPIParameters("Unsupported authorization type")
         auth_config = self._config_provider.config.auth
-        user, active_sessions = await self._verify_user(action, auth_config)
+        login_client_type_id = action.client_type_id
+        user, active_sessions = await self._verify_user(action, auth_config, login_client_type_id)
 
         try:
             post_result = await self._post_check(action, user, active_sessions, auth_config)
@@ -186,7 +191,7 @@ class AuthService:
             keypair_row, live_sessions = post_result
 
             return await self._create_login_session(
-                action, user, keypair_row, live_sessions, auth_config
+                action, user, keypair_row, live_sessions, auth_config, login_client_type_id
             )
         except (
             AuthorizationFailed,
@@ -205,6 +210,7 @@ class AuthService:
         self,
         action: AuthorizeAction,
         auth_config: AuthConfig,
+        login_client_type_id: uuid.UUID,
     ) -> tuple[RowMapping, list[ActiveSessionInfo]]:
         """Step 1: Verify user identity via hook or password."""
         params = action.hook_params
@@ -217,7 +223,9 @@ class AuthService:
             raise RejectedByHook.from_hook_result(hook_result)
         if hook_result.result:
             user = hook_result.result
-            active_sessions = await self._auth_repository.get_active_session_tokens(user.uuid)
+            active_sessions = await self._auth_repository.get_active_session_tokens(
+                user.uuid, login_client_type_id=login_client_type_id
+            )
             return user, active_sessions
 
         target_password_info = PasswordInfo(
@@ -230,6 +238,7 @@ class AuthService:
             action.domain_name,
             action.email,
             target_password_info=target_password_info,
+            login_client_type_id=login_client_type_id,
         )
         return cred_result.user, cred_result.active_sessions
 
@@ -271,8 +280,8 @@ class AuthService:
             if await self._valkey_session_client.get_login_session(session_info.session_token):
                 live_sessions.append(session_info)
             else:
-                await self._auth_repository.invalidate_login_session_by_token(
-                    session_info.session_token
+                await self._auth_repository.delete_login_session_by_token(
+                    session_info.session_token, LoginAttemptResult.EXPIRED
                 )
 
         return main_keypair_row, live_sessions
@@ -320,6 +329,7 @@ class AuthService:
         keypair_row: Any,
         live_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
+        login_client_type_id: uuid.UUID,
     ) -> AuthorizeActionResult:
         """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed.
 
@@ -351,12 +361,15 @@ class AuthService:
             user_id=user.uuid,
             access_key=keypair_row.access_key,
             domain_name=action.domain_name,
+            login_client_type_id=login_client_type_id,
         )
 
         if tokens_to_invalidate:
             for token in tokens_to_invalidate:
                 await self._valkey_session_client.delete_login_session(token)
-            await self._auth_repository.invalidate_login_sessions_by_tokens(tokens_to_invalidate)
+            await self._auth_repository.delete_login_sessions_by_tokens(
+                tokens_to_invalidate, LoginAttemptResult.EVICTED
+            )
 
         session_data = LoginSessionData(
             created=int(time.time()),
@@ -511,14 +524,18 @@ class AuthService:
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
-        await self._auth_repository.invalidate_login_session_by_token(action.session_token)
+        await self._auth_repository.delete_login_session_by_token(
+            action.session_token, LoginAttemptResult.LOGOUT
+        )
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
 
     async def admin_revoke_login_session(
         self, action: AdminRevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
-        session_token = await self._auth_repository.revoke_login_session(action.session_id)
+        session_token = await self._auth_repository.delete_login_session_by_id(
+            action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN
+        )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
 
@@ -528,9 +545,17 @@ class AuthService:
         session_data = await self._auth_repository.get_login_session_by_id(action.session_id)
         if session_data.user_id != action.user_id:
             raise GenericForbidden("You can only revoke your own login sessions.")
-        session_token = await self._auth_repository.revoke_login_session(action.session_id)
+        session_token = await self._auth_repository.delete_login_session_by_id(
+            action.session_id, LoginAttemptResult.REVOKED_BY_USER
+        )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
+
+    async def admin_unblock_user(
+        self, action: AdminUnblockUserAction
+    ) -> AdminUnblockUserActionResult:
+        await self._valkey_session_client.clear_login_block(action.username)
+        return AdminUnblockUserActionResult(success=True)
 
     async def signout(self, action: SignoutAction) -> SignoutActionResult:
         if action.email != action.requester_email:
@@ -541,11 +566,11 @@ class AuthService:
             email,
             action.password,
         )
-        # Get active session tokens before invalidating, for Valkey cleanup
-        active_sessions = await self._auth_repository.get_active_session_tokens(action.user_id)
-        await self._auth_repository.invalidate_user_login_sessions(action.user_id)
-        for session_info in active_sessions:
-            await self._valkey_session_client.delete_login_session(session_info.session_token)
+        deleted_tokens = await self._auth_repository.delete_user_login_sessions(
+            action.user_id, action.domain_name, LoginAttemptResult.LOGOUT
+        )
+        for token in deleted_tokens:
+            await self._valkey_session_client.delete_login_session(token)
         await self._auth_repository.deactivate_user_and_keypairs(email)
 
         return SignoutActionResult(success=True)

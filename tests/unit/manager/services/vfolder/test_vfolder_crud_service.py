@@ -163,6 +163,7 @@ def _make_vfolder_data(
         created_at=datetime(2025, 1, 1, tzinfo=UTC),
         last_used=None,
         creator="test@example.com",
+        creator_id=user_id,
         unmanaged_path=unmanaged_path,
         ownership_type=ownership_type,
         user=user_id,

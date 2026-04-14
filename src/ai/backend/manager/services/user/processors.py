@@ -6,7 +6,10 @@ from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
+from ai.backend.manager.actions.validator.scope import ScopeActionValidator
+from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
@@ -150,9 +153,21 @@ class UserProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        # Scope actions with RBAC
+        # Scope actions with RBAC — create_user is also invoked from gql_legacy,
+        # so use the non-enforcing legacy validator to avoid breaking callers.
+        # Mocked test fixtures do not provide a legacy_rbac, so isinstance
+        # guards against MagicMock attribute access returning a truthy mock.
+        legacy_rbac = validators.legacy_rbac
+        if isinstance(legacy_rbac, LegacyRBACValidators):
+            legacy_scope_validator: ScopeActionValidator = legacy_rbac.scope
+            legacy_single_entity_validator: SingleEntityActionValidator = legacy_rbac.single_entity
+        else:
+            legacy_scope_validator = validators.rbac.scope
+            legacy_single_entity_validator = validators.rbac.single_entity
         self.create_user = ScopeActionProcessor(
-            user_service.create_user, action_monitors, validators=[validators.rbac.scope]
+            user_service.create_user,
+            action_monitors,
+            validators=[legacy_scope_validator],
         )
         self.search_users_by_domain = ActionProcessor(
             user_service.search_users_by_domain, action_monitors
@@ -169,8 +184,11 @@ class UserProcessors(AbstractProcessorPackage):
         self.get_user = SingleEntityActionProcessor(
             user_service.get_user, action_monitors, validators=[validators.rbac.single_entity]
         )
+        # modify_user is also invoked from gql_legacy — non-enforcing validator.
         self.modify_user = SingleEntityActionProcessor(
-            user_service.modify_user, action_monitors, validators=[validators.rbac.single_entity]
+            user_service.modify_user,
+            action_monitors,
+            validators=[legacy_single_entity_validator],
         )
         self.modify_user_by_id = SingleEntityActionProcessor(
             user_service.modify_user_by_id,
@@ -183,8 +201,11 @@ class UserProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=[validators.rbac.single_entity],
         )
+        # purge_user is invoked only from gql_legacy — non-enforcing validator.
         self.purge_user = SingleEntityActionProcessor(
-            user_service.purge_user, action_monitors, validators=[validators.rbac.single_entity]
+            user_service.purge_user,
+            action_monitors,
+            validators=[legacy_single_entity_validator],
         )
         self.purge_user_by_id = SingleEntityActionProcessor(
             user_service.purge_user_by_id,

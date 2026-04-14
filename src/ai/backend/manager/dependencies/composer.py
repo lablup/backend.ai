@@ -266,6 +266,8 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 deployment_controller=agents.deployment_controller,
                 route_controller=agents.route_controller,
                 service_discovery=system.service_discovery,
+                prometheus_client=system.prometheus_client,
+                prometheus_query_preset_repository=domain.repositories.prometheus_query_preset.repository,
             ),
         )
 

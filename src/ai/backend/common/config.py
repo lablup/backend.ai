@@ -20,7 +20,6 @@ from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import ConfigurationError
 from .types import RedisHelperConfig
-from .utils import deep_merge
 
 __all__ = (
     "ConfigurationError",
@@ -334,6 +333,122 @@ class ModelConfig(BaseConfigModel):
     )
 
 
+def _pick(base_val: Any, override_val: Any, override_set: bool) -> Any:
+    """Return the override value if explicitly set, otherwise the base.
+
+    Distinguishes between unset (not in model_fields_set → keep base)
+    and explicitly set to None (in model_fields_set → replace with None).
+    """
+    if not override_set:
+        return base_val
+    return override_val
+
+
+def _merge_metadata(base: ModelMetadata, override: ModelMetadata) -> ModelMetadata:
+    """Merge two ModelMetadata instances. All fields are atomic."""
+    s = override.model_fields_set
+    return ModelMetadata.model_construct(
+        author=_pick(base.author, override.author, "author" in s),
+        title=_pick(base.title, override.title, "title" in s),
+        version=_pick(base.version, override.version, "version" in s),
+        created=_pick(base.created, override.created, "created" in s),
+        last_modified=_pick(base.last_modified, override.last_modified, "last_modified" in s),
+        description=_pick(base.description, override.description, "description" in s),
+        task=_pick(base.task, override.task, "task" in s),
+        category=_pick(base.category, override.category, "category" in s),
+        architecture=_pick(base.architecture, override.architecture, "architecture" in s),
+        framework=_pick(base.framework, override.framework, "framework" in s),
+        label=_pick(base.label, override.label, "label" in s),
+        license=_pick(base.license, override.license, "license" in s),
+        min_resource=_pick(base.min_resource, override.min_resource, "min_resource" in s),
+    )
+
+
+def _merge_service_config(
+    base: ModelServiceConfig,
+    override: ModelServiceConfig,
+) -> ModelServiceConfig:
+    """Merge two ModelServiceConfig instances.
+
+    ``health_check`` is merged field-by-field; all other fields
+    (``start_command``, ``pre_start_actions``, etc.) are replaced atomically.
+    """
+    s = override.model_fields_set
+    health_check: ModelHealthCheck | None
+    if "health_check" in s and base.health_check is not None and override.health_check is not None:
+        hb, ho = base.health_check, override.health_check
+        hs = ho.model_fields_set
+        health_check = ModelHealthCheck.model_construct(
+            interval=_pick(hb.interval, ho.interval, "interval" in hs),
+            path=_pick(hb.path, ho.path, "path" in hs),
+            max_retries=_pick(hb.max_retries, ho.max_retries, "max_retries" in hs),
+            max_wait_time=_pick(hb.max_wait_time, ho.max_wait_time, "max_wait_time" in hs),
+            expected_status_code=_pick(
+                hb.expected_status_code, ho.expected_status_code, "expected_status_code" in hs
+            ),
+            initial_delay=_pick(hb.initial_delay, ho.initial_delay, "initial_delay" in hs),
+        )
+    else:
+        health_check = _pick(base.health_check, override.health_check, "health_check" in s)
+    return ModelServiceConfig.model_construct(
+        pre_start_actions=_pick(
+            base.pre_start_actions, override.pre_start_actions, "pre_start_actions" in s
+        ),
+        start_command=_pick(base.start_command, override.start_command, "start_command" in s),
+        shell=_pick(base.shell, override.shell, "shell" in s),
+        port=_pick(base.port, override.port, "port" in s),
+        health_check=health_check,
+    )
+
+
+def _merge_config(base: ModelConfig, override: ModelConfig) -> ModelConfig:
+    """Merge two ModelConfig instances.
+
+    ``service`` and ``metadata`` sub-models are merged recursively;
+    all other fields are replaced atomically.
+    """
+    s = override.model_fields_set
+    service: ModelServiceConfig | None
+    if "service" in s and base.service is not None and override.service is not None:
+        service = _merge_service_config(base.service, override.service)
+    else:
+        service = _pick(base.service, override.service, "service" in s)
+    metadata: ModelMetadata | None
+    if "metadata" in s and base.metadata is not None and override.metadata is not None:
+        metadata = _merge_metadata(base.metadata, override.metadata)
+    else:
+        metadata = _pick(base.metadata, override.metadata, "metadata" in s)
+    return ModelConfig.model_construct(
+        name=_pick(base.name, override.name, "name" in s),
+        model_path=_pick(base.model_path, override.model_path, "model_path" in s),
+        service=service,
+        metadata=metadata,
+    )
+
+
+def _merge_definition(base: ModelDefinition, override: ModelDefinition) -> ModelDefinition:
+    """Merge two ModelDefinition instances.
+
+    The ``models`` list is merged by index — each element pair is merged
+    via :func:`_merge_config`.  All other fields are replaced atomically.
+    """
+    models: list[ModelConfig]
+    if "models" not in override.model_fields_set:
+        models = base.models
+    elif not base.models or not override.models:
+        models = override.models
+    else:
+        models = []
+        for i in range(max(len(base.models), len(override.models))):
+            if i >= len(base.models):
+                models.append(override.models[i])
+            elif i >= len(override.models):
+                models.append(base.models[i])
+            else:
+                models.append(_merge_config(base.models[i], override.models[i]))
+    return ModelDefinition.model_construct(models=models)
+
+
 class ModelDefinition(BaseConfigModel):
     models: list[ModelConfig] = Field(
         default_factory=list,
@@ -341,11 +456,8 @@ class ModelDefinition(BaseConfigModel):
     )
 
     def merge(self, override: ModelDefinition) -> ModelDefinition:
-        """Deep merge the given override into this definition, returning a new instance."""
-        base_dict = self.model_dump(exclude_none=True, by_alias=True)
-        override_dict = override.model_dump(exclude_none=True, by_alias=True)
-        merged_dict = deep_merge(base_dict, override_dict)
-        return ModelDefinition.model_validate(merged_dict)
+        """Merge the given override into this definition, returning a new instance."""
+        return _merge_definition(self, override)
 
     def health_check_config(self) -> ModelHealthCheck | None:
         for model in self.models:

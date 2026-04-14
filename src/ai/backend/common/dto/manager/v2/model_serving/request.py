@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, NonNegativeFloat, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.types import RuntimeVariant
@@ -47,7 +47,9 @@ class ServiceConfigInput(BaseRequestModel):
     scaling_group: str = Field(
         description="Name of the resource group to spawn inference sessions",
     )
-    resources: dict[str, str | int] | None = Field(
+    # TODO: Consider aligning with the compute session pattern (ResourceSlotEntryInput)
+    #  which accepts quantity as str and defers numeric parsing to ResourceSlot.
+    resources: dict[str, str | int | NonNegativeFloat] | None = Field(
         default=None,
         description="Resource requirements for the inference session",
     )

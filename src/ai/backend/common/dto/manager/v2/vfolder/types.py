@@ -99,6 +99,7 @@ class VFolderOwnershipInfo(BaseResponseModel):
 
     user_id: UUID | None
     project_id: UUID | None
+    creator_id: UUID | None
     creator_email: str | None
 
 

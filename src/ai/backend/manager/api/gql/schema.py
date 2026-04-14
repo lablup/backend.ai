@@ -168,10 +168,18 @@ from .keypair import (
     switch_my_main_access_key,
     update_my_keypair,
 )
+from .login_client_type import (
+    admin_create_login_client_type,
+    admin_delete_login_client_type,
+    admin_update_login_client_type,
+    login_client_type,
+    login_client_types,
+)
 from .login_history import admin_login_history_v2, my_login_history_v2
 from .login_session import (
     admin_login_sessions_v2,
     admin_revoke_login_session,
+    admin_unblock_user,
     my_login_sessions_v2,
     my_revoke_login_session,
 )
@@ -594,6 +602,8 @@ class Query:
     # Resource Preset V2 APIs
     admin_resource_presets_v2 = admin_resource_presets_v2
     admin_resource_preset_v2 = admin_resource_preset_v2
+    login_client_type = login_client_type
+    login_client_types = login_client_types
     # Runtime Variant APIs
     runtime_variants = runtime_variants
     runtime_variant = runtime_variant
@@ -763,6 +773,7 @@ class Mutation:
     # Login session mutations
     admin_revoke_login_session = admin_revoke_login_session
     my_revoke_login_session = my_revoke_login_session
+    admin_unblock_user = admin_unblock_user
     # IP allowlist self-service mutation
     update_my_allowed_client_ip = update_my_allowed_client_ip
     # Prometheus Query Preset - Admin APIs
@@ -795,6 +806,10 @@ class Mutation:
     admin_create_resource_preset_v2 = admin_create_resource_preset_v2
     admin_update_resource_preset_v2 = admin_update_resource_preset_v2
     admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
+    # Login Client Type mutations
+    admin_create_login_client_type = admin_create_login_client_type
+    admin_update_login_client_type = admin_update_login_client_type
+    admin_delete_login_client_type = admin_delete_login_client_type
     # Runtime Variant mutations
     admin_create_runtime_variant = admin_create_runtime_variant
     admin_update_runtime_variant = admin_update_runtime_variant

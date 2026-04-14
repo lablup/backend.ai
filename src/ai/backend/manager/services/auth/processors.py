@@ -45,6 +45,10 @@ from ai.backend.manager.services.auth.actions.search_login_sessions import (
 )
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
+from ai.backend.manager.services.auth.actions.unblock_user import (
+    AdminUnblockUserAction,
+    AdminUnblockUserActionResult,
+)
 from ai.backend.manager.services.auth.actions.update_full_name import (
     UpdateFullNameAction,
     UpdateFullNameActionResult,
@@ -100,6 +104,7 @@ class AuthProcessors(AbstractProcessorPackage):
     my_revoke_login_session: ActionProcessor[
         MyRevokeLoginSessionAction, RevokeLoginSessionActionResult
     ]
+    admin_unblock_user: ActionProcessor[AdminUnblockUserAction, AdminUnblockUserActionResult]
 
     def __init__(
         self,
@@ -144,6 +149,7 @@ class AuthProcessors(AbstractProcessorPackage):
         self.my_revoke_login_session = ActionProcessor(
             service.my_revoke_login_session, action_monitors
         )
+        self.admin_unblock_user = ActionProcessor(service.admin_unblock_user, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -167,4 +173,5 @@ class AuthProcessors(AbstractProcessorPackage):
             SearchLoginHistoryAction.spec(),
             AdminRevokeLoginSessionAction.spec(),
             MyRevokeLoginSessionAction.spec(),
+            AdminUnblockUserAction.spec(),
         ]

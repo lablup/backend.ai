@@ -39,7 +39,7 @@ class V2ConnectionConfig:
     secret_key: str | None
     api_version: str
     skip_ssl_verification: bool = False
-    cookie_jar: aiohttp.CookieJar | None = field(default=None)
+    cookie_file: Path | None = field(default=None)
 
 
 def load_v2_config() -> V2ConnectionConfig:
@@ -79,14 +79,11 @@ def load_v2_config() -> V2ConnectionConfig:
     if env_sk := os.environ.get("BACKEND_SECRET_KEY"):
         secret_key = env_sk
 
-    # Load session cookie if endpoint_type is "session"
-    cookie_jar = None
+    # Defer cookie jar creation to async context (aiohttp >=3.13 requires event loop)
+    cookie_file = None
     endpoint_type = str(cfg["endpoint_type"])
     if endpoint_type == "session" and COOKIE_FILE.exists():
-        import aiohttp
-
-        cookie_jar = aiohttp.CookieJar(unsafe=True)
-        cookie_jar.load(COOKIE_FILE)
+        cookie_file = COOKIE_FILE
 
     return V2ConnectionConfig(
         endpoint=URL(str(cfg["endpoint"])),
@@ -95,7 +92,7 @@ def load_v2_config() -> V2ConnectionConfig:
         secret_key=secret_key,
         api_version=str(cfg["api_version"]),
         skip_ssl_verification=bool(cfg.get("skip_ssl_verification", False)),
-        cookie_jar=cookie_jar,
+        cookie_file=cookie_file,
     )
 
 
@@ -105,12 +102,17 @@ async def create_v2_registry(config: V2ConnectionConfig) -> V2ClientRegistry:
     from ai.backend.client.v2.config import ClientConfig
     from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
+    cookie_jar: aiohttp.CookieJar | None = None
+    if config.cookie_file is not None:
+        cookie_jar = aiohttp.CookieJar(unsafe=True)
+        cookie_jar.load(config.cookie_file)
+
     client_config = ClientConfig(
         endpoint=config.endpoint,
         endpoint_type=config.endpoint_type,
         api_version=config.api_version,
         skip_ssl_verification=config.skip_ssl_verification,
-        cookie_jar=config.cookie_jar,
+        cookie_jar=cookie_jar,
     )
 
     if config.endpoint_type == "session":

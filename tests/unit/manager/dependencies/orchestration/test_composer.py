@@ -53,6 +53,8 @@ class TestOrchestrationComposer:
             deployment_controller=MagicMock(),
             route_controller=MagicMock(),
             service_discovery=MagicMock(),
+            prometheus_client=MagicMock(),
+            prometheus_query_preset_repository=MagicMock(),
         )
 
         async with DependencyBuilderStack() as stack:
@@ -126,6 +128,8 @@ class TestOrchestrationComposer:
             deployment_controller=MagicMock(),
             route_controller=MagicMock(),
             service_discovery=MagicMock(),
+            prometheus_client=MagicMock(),
+            prometheus_query_preset_repository=MagicMock(),
         )
 
         async with DependencyBuilderStack() as stack:

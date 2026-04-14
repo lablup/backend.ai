@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from aiohttp import web
@@ -14,6 +14,7 @@ from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -180,6 +181,7 @@ async def test_authorize_success(
         password="correct_password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -206,6 +208,7 @@ async def test_authorize_invalid_token_type(
         password="password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -232,6 +235,7 @@ async def test_authorize_invalid_credentials(
         password="wrong_password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -253,6 +257,7 @@ async def test_authorize_with_hook_authorization(
         password="any_password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -309,6 +314,7 @@ async def test_authorize_with_password_expiry(
         password="old_password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -351,6 +357,7 @@ async def test_authorize_with_post_hook_response(
         password="password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -394,6 +401,7 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
         password="password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -430,7 +438,9 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     result = await auth_service.authorize(action)
 
     # Stale session should have been invalidated in DB
-    mock_auth_repository.invalidate_login_session_by_token.assert_awaited_once_with("stale_token")
+    mock_auth_repository.delete_login_session_by_token.assert_awaited_once_with(
+        "stale_token", LoginAttemptResult.EXPIRED
+    )
     assert result.authorization_result is not None
     assert result.authorization_result.session_token == "new_session_token"
 
@@ -450,6 +460,7 @@ async def test_authorize_force_invalidates_existing_sessions(
         password="password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
         force=True,
     )
@@ -497,9 +508,9 @@ async def test_authorize_force_invalidates_existing_sessions(
     result = await auth_service.authorize(action)
 
     # Eviction happens via a dedicated repository call before create_login_session.
-    mock_auth_repository.invalidate_login_sessions_by_tokens.assert_awaited_once_with([
-        "existing_live_token"
-    ])
+    mock_auth_repository.delete_login_sessions_by_tokens.assert_awaited_once_with(
+        ["existing_live_token"], LoginAttemptResult.EVICTED
+    )
     mock_auth_repository.create_login_session.assert_awaited_once()
     create_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
     assert "tokens_to_invalidate" not in create_kwargs
@@ -525,6 +536,7 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
         session_token="new_token",
     )
 
+    test_client_type_id = uuid4()
     await auth_service._create_login_session(
         action=AuthorizeAction(
             type=AuthTokenType.KEYPAIR,
@@ -533,6 +545,7 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
             password="password",
             request=MagicMock(),
             stoken=None,
+            client_type_id=uuid4(),
             otp=None,
         ),
         user=_make_mock_user(),
@@ -545,9 +558,10 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
             password_hash_salt_size=32,
             login_session_max_age=604800,
         ),
+        login_client_type_id=test_client_type_id,
     )
 
     call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
     assert "max_concurrent_sessions" not in call_kwargs
     assert "tokens_to_invalidate" not in call_kwargs
-    mock_auth_repository.invalidate_login_sessions_by_tokens.assert_not_called()
+    mock_auth_repository.delete_login_sessions_by_tokens.assert_not_called()

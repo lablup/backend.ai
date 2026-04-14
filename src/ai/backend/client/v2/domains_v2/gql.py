@@ -6,7 +6,7 @@ from typing import Any, Final
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 
-_GQL_PATH_SESSION: Final = "/func/admin/gql"
+_GQL_PATH_SESSION: Final = "/admin/gql"
 _GQL_PATH_API_LEGACY: Final = "/admin/gql"
 _GQL_PATH_API_V2: Final = "/admin/gql/strawberry"
 

@@ -9,7 +9,7 @@ from ai.backend.common.dto.manager.v2.login_session.request import (
     LoginSessionStatusFilter,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter
+from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -43,6 +43,7 @@ class LoginSessionStatusFilterGQL(PydanticInputMixin[LoginSessionStatusFilter]):
     name="LoginSessionFilter",
 )
 class LoginSessionFilterGQL(PydanticInputMixin[LoginSessionFilter]):
+    user_id: UUIDFilter | None = None
     status: LoginSessionStatusFilterGQL | None = None
     access_key: StringFilter | None = None
     created_at: DateTimeFilter | None = None

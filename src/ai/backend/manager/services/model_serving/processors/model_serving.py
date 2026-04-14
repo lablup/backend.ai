@@ -5,7 +5,9 @@ from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
@@ -118,8 +120,19 @@ class ModelServingProcessors(AbstractProcessorPackage):
         self.delete_model_service = SingleEntityActionProcessor(
             service.delete, action_monitors, validators=[validators.rbac.single_entity]
         )
+        # modify_endpoint is invoked only from gql_legacy — non-enforcing validator.
+        # Mocked test fixtures do not provide a legacy_rbac, so isinstance
+        # guards against MagicMock attribute access returning a truthy mock.
+        legacy_rbac = validators.legacy_rbac
+        legacy_single_entity_validator: SingleEntityActionValidator = (
+            legacy_rbac.single_entity
+            if isinstance(legacy_rbac, LegacyRBACValidators)
+            else validators.rbac.single_entity
+        )
         self.modify_endpoint = SingleEntityActionProcessor(
-            service.modify_endpoint, action_monitors, validators=[validators.rbac.single_entity]
+            service.modify_endpoint,
+            action_monitors,
+            validators=[legacy_single_entity_validator],
         )
         self.update_route = SingleEntityActionProcessor(
             service.update_route, action_monitors, validators=[validators.rbac.single_entity]

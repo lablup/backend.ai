@@ -79,7 +79,7 @@ class AutoScalingService:
             raise ModelServiceNotFound
 
         return ScaleServiceReplicasActionResult(
-            current_route_count=len(endpoint_data.routings) if endpoint_data.routings else 0,
+            current_route_count=len(endpoint_data.routings),
             target_count=action.to,
         )
 

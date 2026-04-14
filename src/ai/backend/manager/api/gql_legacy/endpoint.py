@@ -720,7 +720,9 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             created_at=dto.created_at,
             destroyed_at=dto.destroyed_at,
             retries=dto.retries,
-            routings=[Routing.from_dto(r) for r in dto.routings] if dto.routings else None,
+            routings=[Routing.from_dto(r) for r in dto.routings]
+            if dto.routings is not None
+            else [],
             lifecycle_stage=dto.lifecycle_stage,
             runtime_variant=RuntimeVariantInfo.from_enum(dto.runtime_variant),
         )
@@ -824,6 +826,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
                 project=project,
                 domain=domain_name,
                 user_uuid=user_uuid,
+                load_routes=True,
                 load_revisions=True,
                 load_created_user=True,
                 load_session_owner=True,
@@ -867,6 +870,8 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             case EndpointLifecycle.DESTROYING.name:
                 return EndpointStatus.DESTROYING
             case _:
+                if not self.routings:
+                    return EndpointStatus.DEGRADED
                 active_route_status_names = {s.name for s in RouteStatus.active_route_statuses()}
                 active_routings = [
                     r for r in self.routings if r.status in active_route_status_names
@@ -910,7 +915,9 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             return [VirtualFolderNode.from_row(info, r) for r in (await sess.scalars(query))]
 
     async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
-        error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name]
+        error_routes = [
+            r for r in (self.routings or []) if r.status == RouteStatus.FAILED_TO_START.name
+        ]
         errors = []
         for route in error_routes:
             if not route.error_data:

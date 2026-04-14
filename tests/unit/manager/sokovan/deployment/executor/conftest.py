@@ -79,12 +79,26 @@ def mock_valkey_stat() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_prometheus_client() -> AsyncMock:
+    """Mock PrometheusClient for Prometheus-based auto-scaling."""
+    return AsyncMock()
+
+
+@pytest.fixture
+def mock_preset_repo() -> AsyncMock:
+    """Mock PrometheusQueryPresetRepository for Prometheus-based auto-scaling."""
+    return AsyncMock()
+
+
+@pytest.fixture
 def deployment_executor(
     mock_deployment_repo: AsyncMock,
     mock_scheduling_controller: AsyncMock,
     mock_config_provider: MagicMock,
     mock_client_pool: MagicMock,
     mock_valkey_stat: AsyncMock,
+    mock_prometheus_client: AsyncMock,
+    mock_preset_repo: AsyncMock,
 ) -> DeploymentExecutor:
     """Create DeploymentExecutor with mocked dependencies."""
     return DeploymentExecutor(
@@ -93,6 +107,8 @@ def deployment_executor(
         config_provider=mock_config_provider,
         client_pool=mock_client_pool,
         valkey_stat=mock_valkey_stat,
+        prometheus_client=mock_prometheus_client,
+        preset_repo=mock_preset_repo,
     )
 
 

@@ -801,6 +801,7 @@ class DeploymentAdapter(BaseAdapter):
             time_window=input.time_window,
             min_replicas=input.min_replicas,
             max_replicas=input.max_replicas,
+            prometheus_query_preset_id=input.prometheus_query_preset_id,
         )
         action_result = (
             await self._processors.deployment.create_auto_scaling_rule.wait_for_complete(
@@ -883,6 +884,12 @@ class DeploymentAdapter(BaseAdapter):
             max_replicas=(
                 OptionalState.update(input.max_replicas)
                 if not isinstance(input.max_replicas, Sentinel) and input.max_replicas is not None
+                else OptionalState.nop()
+            ),
+            prometheus_query_preset_id=(
+                OptionalState.update(input.prometheus_query_preset_id)
+                if not isinstance(input.prometheus_query_preset_id, Sentinel)
+                and input.prometheus_query_preset_id is not None
                 else OptionalState.nop()
             ),
         )
@@ -1846,6 +1853,7 @@ class DeploymentAdapter(BaseAdapter):
             time_window=data.time_window,
             min_replicas=data.min_replicas,
             max_replicas=data.max_replicas,
+            prometheus_query_preset_id=data.prometheus_query_preset_id,
             created_at=data.created_at,
             last_triggered_at=data.last_triggered_at,
         )

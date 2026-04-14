@@ -31,6 +31,7 @@ from ai.backend.common.exception import (
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
+    AccessKey,
     ContainerId,
     ImageAlias,
     KernelEnqueueingConfig,
@@ -75,6 +76,7 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -232,6 +234,7 @@ class SessionServiceArgs:
     session_repository: SessionRepository
     scheduling_controller: SchedulingController
     appproxy_client_pool: AppProxyClientPool
+    user_repository: UserRepository
 
 
 class SessionService:
@@ -242,6 +245,7 @@ class SessionService:
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
+    _user_repository: UserRepository
     _scheduling_controller: SchedulingController
     _appproxy_client_pool: AppProxyClientPool
     _database_ptask_group: aiotools.PersistentTaskGroup
@@ -258,6 +262,7 @@ class SessionService:
         self._error_monitor = args.error_monitor
         self._idle_checker_host = args.idle_checker_host
         self._session_repository = args.session_repository
+        self._user_repository = args.user_repository
         self._scheduling_controller = args.scheduling_controller
         self._appproxy_client_pool = args.appproxy_client_pool
         self._database_ptask_group = aiotools.PersistentTaskGroup()
@@ -1591,17 +1596,44 @@ class SessionService:
 
         Resolves the image, builds a SessionCreationSpec, and delegates
         to the scheduling controller. Returns immediately with PENDING status.
+
+        When ``action.owner_id`` is set, the target user's main access key,
+        role, and domain are loaded from the user repository and used in place
+        of the caller's identity for delegation.
         """
+        user_id = action.user_id
+        user_role = action.user_role
+        access_key = action.access_key
+        domain_name = action.domain_name
+        if action.owner_id is not None:
+            owner = await self._user_repository.get_user_by_uuid(action.owner_id)
+            if owner.main_access_key is None:
+                raise InternalServerError(
+                    f"Delegated owner {action.owner_id} has no main access key configured"
+                )
+            if owner.role is None:
+                raise InternalServerError(
+                    f"Delegated owner {action.owner_id} has no role configured"
+                )
+            if owner.domain_name is None:
+                raise InternalServerError(
+                    f"Delegated owner {action.owner_id} has no domain configured"
+                )
+            user_id = owner.id
+            access_key = AccessKey(owner.main_access_key)
+            user_role = owner.role
+            domain_name = owner.domain_name
+
         image_row = await self._session_repository.resolve_image_by_id(action.image_id)
         resource_policy = await self._session_repository.get_keypair_resource_policy(
-            action.access_key,
+            access_key,
         )
 
         user_scope = UserScope(
-            domain_name=action.domain_name,
+            domain_name=domain_name,
             group_id=action.group_id,
-            user_uuid=action.user_id,
-            user_role=action.user_role,
+            user_uuid=user_id,
+            user_role=user_role,
         )
 
         # Build creation_spec dict from typed action fields
@@ -1668,7 +1700,7 @@ class SessionService:
         spec = SessionCreationSpec(
             session_creation_id=session_creation_id,
             session_name=action.session_name,
-            access_key=action.access_key,
+            access_key=access_key,
             user_scope=user_scope,
             session_type=action.session_type,
             cluster_mode=action.resource.cluster_mode,

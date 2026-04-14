@@ -207,6 +207,9 @@ class AutoScalingRuleNode(BaseResponseModel):
     time_window: int = Field(description="Time window in seconds")
     min_replicas: int | None = Field(default=None, description="Minimum replicas")
     max_replicas: int | None = Field(default=None, description="Maximum replicas")
+    prometheus_query_preset_id: UUID | None = Field(
+        default=None, description="Prometheus query preset ID"
+    )
     created_at: datetime = Field(description="Creation timestamp")
     last_triggered_at: datetime = Field(description="Last triggered timestamp")
 

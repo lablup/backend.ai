@@ -58,10 +58,10 @@ class OIDCHookPlugin(HookPlugin):
         db = root_app["_db"]
         secret = self._config.secret
 
-        stoken = request.cookies.get("sToken")
+        stoken = params.get("stoken") or params.get("sToken") or request.cookies.get("sToken")
         if not stoken:
             log.debug(
-                "AUTHORIZE_HOOK(openid): no auth cookie found. proceeded with normal auth steps"
+                "AUTHORIZE_HOOK(openid): no sToken found in params or cookies. proceeded with normal auth steps"
             )
             return None
         try:

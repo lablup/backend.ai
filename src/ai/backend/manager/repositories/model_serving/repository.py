@@ -992,7 +992,7 @@ class ModelServingRepository:
             for row in result.rows:
                 ep = row.EndpointRow
                 current_rev = ep._find_current_revision()
-                routings_data = [r.to_data() for r in ep.routings] if ep.routings else None
+                routings_data = [r.to_data() for r in ep.routings] if ep.routings else []
                 active_route_count = (
                     len([
                         r

@@ -38,6 +38,9 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.prometheus_query_preset.row import (
+    PrometheusQueryPresetRow,
+)
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -95,6 +98,7 @@ class TestSearchAutoScalingRulesValidated:
                 KernelRow,
                 RoutingRow,
                 ResourcePresetRow,
+                PrometheusQueryPresetRow,
                 EndpointAutoScalingRuleRow,
             ],
         ):

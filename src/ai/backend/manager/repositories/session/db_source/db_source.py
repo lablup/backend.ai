@@ -68,6 +68,7 @@ class SessionDBSource:
         allow_stale: bool = False,
         eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
+        """Look up a session by name or ID."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await SessionRow.get_session(
                 db_sess,

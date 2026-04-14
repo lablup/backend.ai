@@ -33,6 +33,11 @@ class LoginAttemptResultGQL(StrEnum):
     FAILED_PASSWORD_EXPIRED = "failed_password_expired"
     FAILED_REJECTED_BY_HOOK = "failed_rejected_by_hook"
     FAILED_SESSION_ALREADY_EXISTS = "failed_session_already_exists"
+    LOGOUT = "logout"
+    REVOKED_BY_ADMIN = "revoked_by_admin"
+    REVOKED_BY_USER = "revoked_by_user"
+    EVICTED = "evicted"
+    EXPIRED = "expired"
 
 
 @gql_node_type(

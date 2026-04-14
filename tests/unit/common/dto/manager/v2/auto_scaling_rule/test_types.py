@@ -57,7 +57,7 @@ class TestAutoScalingMetricSourceReExport:
         assert ExportedAutoScalingMetricSource.INFERENCE_FRAMEWORK.value == "inference_framework"
 
     def test_enum_members_count(self) -> None:
-        assert len(list(ExportedAutoScalingMetricSource)) == 2
+        assert len(list(ExportedAutoScalingMetricSource)) == 3
 
     def test_case_insensitive_lookup_kernel(self) -> None:
         # CIStrEnum is case-insensitive

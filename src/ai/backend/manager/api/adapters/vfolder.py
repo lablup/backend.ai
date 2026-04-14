@@ -206,6 +206,7 @@ class VFolderAdapter(BaseAdapter):
             ownership=VFolderOwnershipInfo(
                 user_id=data.user,
                 project_id=data.group,
+                creator_id=data.creator_id,
                 creator_email=data.creator,
             ),
             usage=VFolderUsageInfoDTO(

@@ -275,6 +275,8 @@ def coordinator_with_pending_deployments(
         client_pool=mock_client_pool,
         valkey_stat=mock_valkey_stat,
         route_controller=mock_route_controller,
+        prometheus_client=MagicMock(),
+        prometheus_query_preset_repository=MagicMock(),
     )
     yield coordinator
 
@@ -306,6 +308,8 @@ def coordinator_without_deployments(
         client_pool=mock_client_pool,
         valkey_stat=mock_valkey_stat,
         route_controller=mock_route_controller,
+        prometheus_client=MagicMock(),
+        prometheus_query_preset_repository=MagicMock(),
     )
     yield coordinator
 

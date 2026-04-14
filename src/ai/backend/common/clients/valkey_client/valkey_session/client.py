@@ -203,6 +203,17 @@ class ValkeySessionClient:
             )
 
     @valkey_session_resilience.apply()
+    async def clear_login_block(self, username: str) -> None:
+        """
+        Clear the login failure/block history for a user.
+
+        :param username: The username whose block to clear.
+        """
+        key = f"{LOGIN_HISTORY_KEY_PREFIX}{username}"
+        async with self._client.client() as conn:
+            await conn.delete([key])
+
+    @valkey_session_resilience.apply()
     async def flush_all_sessions(self) -> None:
         """
         Flush all data in the current database (typically used for session cleanup).

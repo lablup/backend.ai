@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import secrets
+import uuid
 from datetime import timedelta
 
 import pytest
@@ -30,6 +31,7 @@ class TestAuthorize:
         self,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         result = await admin_registry.auth.authorize(
             AuthorizeRequest(
@@ -37,6 +39,7 @@ class TestAuthorize:
                 domain=auth_user_fixture.domain_name,
                 username=auth_user_fixture.email,
                 password=auth_user_fixture.password,
+                client_type_id=sample_client_type_id,
             ),
         )
         assert isinstance(result, AuthorizeResponse)
@@ -49,6 +52,7 @@ class TestAuthorize:
         self,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         with pytest.raises(AuthenticationError):
             await admin_registry.auth.authorize(
@@ -57,6 +61,7 @@ class TestAuthorize:
                     domain=auth_user_fixture.domain_name,
                     username=auth_user_fixture.email,
                     password="completely-wrong-password",
+                    client_type_id=sample_client_type_id,
                 ),
             )
 
@@ -64,6 +69,7 @@ class TestAuthorize:
         self,
         admin_registry: BackendAIClientRegistry,
         inactive_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         with pytest.raises(AuthenticationError):
             await admin_registry.auth.authorize(
@@ -72,6 +78,7 @@ class TestAuthorize:
                     domain=inactive_user_fixture.domain_name,
                     username=inactive_user_fixture.email,
                     password=inactive_user_fixture.password,
+                    client_type_id=sample_client_type_id,
                 ),
             )
 
@@ -79,6 +86,7 @@ class TestAuthorize:
         self,
         admin_registry: BackendAIClientRegistry,
         before_verification_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         with pytest.raises(AuthenticationError):
             await admin_registry.auth.authorize(
@@ -87,6 +95,7 @@ class TestAuthorize:
                     domain=before_verification_user_fixture.domain_name,
                     username=before_verification_user_fixture.email,
                     password=before_verification_user_fixture.password,
+                    client_type_id=sample_client_type_id,
                 ),
             )
 
@@ -95,6 +104,7 @@ class TestAuthorize:
         admin_registry: BackendAIClientRegistry,
         config_provider: ManagerConfigProvider,
         expired_password_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         original_config = config_provider._config
@@ -110,6 +120,7 @@ class TestAuthorize:
                     domain=expired_password_user_fixture.domain_name,
                     username=expired_password_user_fixture.email,
                     password=expired_password_user_fixture.password,
+                    client_type_id=sample_client_type_id,
                 ),
             )
 
@@ -117,6 +128,7 @@ class TestAuthorize:
         self,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         with pytest.raises(InvalidRequestError):
             await admin_registry.auth.authorize(
@@ -125,6 +137,7 @@ class TestAuthorize:
                     domain=auth_user_fixture.domain_name,
                     username=auth_user_fixture.email,
                     password=auth_user_fixture.password,
+                    client_type_id=sample_client_type_id,
                 ),
             )
 

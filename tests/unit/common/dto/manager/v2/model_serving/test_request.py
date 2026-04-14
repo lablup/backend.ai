@@ -80,6 +80,15 @@ class TestServiceConfigInput:
         assert config.resources is not None
         assert config.resources["cpu"] == "2"
 
+    def test_with_fractional_resource_values(self) -> None:
+        config = _make_service_config(resources={"cpu": 4, "mem": "32g", "cuda.shares": 2.5})
+        assert config.resources is not None
+        assert config.resources["cuda.shares"] == 2.5
+
+    def test_negative_float_resource_rejected(self) -> None:
+        with pytest.raises(ValidationError, match=r"greater than or equal to 0"):
+            _make_service_config(resources={"cuda.shares": -0.5})
+
     def test_missing_model_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
             ServiceConfigInput.model_validate({"scaling_group": "default"})

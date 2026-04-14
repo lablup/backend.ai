@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Self
 from uuid import UUID
 
 import strawberry
@@ -324,6 +324,15 @@ class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
             "Filter by the storage host backing the model card's VFolder. "
             "Matches via an EXISTS subquery against the VFolder host column."
         ),
+    )
+    AND: list[Self] | None = gql_field(
+        default=None, description="Combine nested filters with logical AND."
+    )
+    OR: list[Self] | None = gql_field(
+        default=None, description="Combine nested filters with logical OR."
+    )
+    NOT: list[Self] | None = gql_field(
+        default=None, description="Negate the combined result of nested filters."
     )
 
 

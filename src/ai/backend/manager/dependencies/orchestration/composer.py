@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
+from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
@@ -18,6 +19,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.prometheus_query_preset.repository import (
+    PrometheusQueryPresetRepository,
+)
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
@@ -61,6 +65,9 @@ class OrchestrationInput:
     deployment_controller: DeploymentController
     route_controller: RouteController
     service_discovery: ServiceDiscovery
+    # Prometheus
+    prometheus_client: PrometheusClient
+    prometheus_query_preset_repository: PrometheusQueryPresetRepository
 
 
 @dataclass
@@ -134,6 +141,8 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             route_controller=setup_input.route_controller,
             distributed_lock_factory=setup_input.distributed_lock_factory,
             service_discovery=setup_input.service_discovery,
+            prometheus_client=setup_input.prometheus_client,
+            prometheus_query_preset_repository=setup_input.prometheus_query_preset_repository,
         )
         sokovan_orchestrator = await stack.enter_dependency(
             sokovan_dep,

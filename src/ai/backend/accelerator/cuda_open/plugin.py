@@ -282,7 +282,16 @@ class CUDAPlugin(AbstractComputePlugin):
 
                 async with aiodocker.Docker() as docker:
                     for cid in container_ids:
-                        container_info = await docker.containers.get(cid)
+                        try:
+                            container = await docker.containers.get(cid)
+                            container_info = await container.show()
+                        except DockerError as e:
+                            log.warning(
+                                "gather_container_measures(): container {} skipped: {!r}",
+                                cid,
+                                e,
+                            )
+                            continue
                         nvidia_device_reqs = [
                             x
                             for x in container_info.get("HostConfig", {}).get("DeviceRequests", [])

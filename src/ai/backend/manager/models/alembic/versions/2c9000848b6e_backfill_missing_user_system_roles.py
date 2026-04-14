@@ -2,7 +2,7 @@
 
 Users created via the signup or OpenID flows after migration a4d56e86d9ee
 were not assigned RBAC system roles. This idempotent migration creates
-system roles, permission groups, permissions, and user_roles mappings
+system roles, permissions, and user_roles mappings
 for any user that lacks a user_roles entry.
 
 Revision ID: 2c9000848b6e
@@ -19,21 +19,17 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.engine import Connection, Row
 
-from ai.backend.manager.models.base import EnumValueType, IDColumn
+from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn
 from ai.backend.manager.models.rbac_models.migration.enums import (
     RoleSource,
     ScopeType,
 )
 from ai.backend.manager.models.rbac_models.migration.models import (
-    get_permission_groups_table,
-    get_permissions_table,
     get_roles_table,
     get_user_roles_table,
     mapper_registry,
 )
 from ai.backend.manager.models.rbac_models.migration.types import (
-    PermissionCreateInput,
-    PermissionGroupCreateInput,
     UserRoleCreateInput,
 )
 from ai.backend.manager.models.rbac_models.migration.user import (
@@ -43,7 +39,6 @@ from ai.backend.manager.models.rbac_models.migration.user import (
 )
 from ai.backend.manager.models.rbac_models.migration.utils import (
     insert_skip_on_conflict,
-    query_permission_groups_by_scope_ids,
     query_role_rows_by_name,
 )
 
@@ -52,6 +47,22 @@ revision = "2c9000848b6e"
 down_revision = "4f08ccd6cb8e"
 branch_labels = None
 depends_on = None
+
+
+def _get_permissions_table() -> sa.Table:
+    """Local definition matching the current schema (post-f41bbe0c0f12)
+    where permission_group_id has been replaced by direct role_id/scope columns."""
+    return sa.Table(
+        "permissions",
+        mapper_registry.metadata,
+        IDColumn(),
+        sa.Column("role_id", GUID, nullable=False),
+        sa.Column("scope_type", sa.VARCHAR(length=32), nullable=False),
+        sa.Column("scope_id", sa.String(length=64), nullable=False),
+        sa.Column("entity_type", sa.String(32), nullable=False),
+        sa.Column("operation", sa.String(32), nullable=False),
+        extend_existing=True,
+    )
 
 
 def _get_users_table() -> sa.Table:
@@ -118,33 +129,20 @@ def _backfill_roles_and_permissions(db_conn: Connection, rows: Sequence[Row[Any]
         r.id: uuid_by_role_name[r.name] for r in role_rows
     }
 
-    # Create permission groups
-    pg_inputs: list[dict[str, Any]] = []
-    for role_id, user_id in role_id_user_id_map.items():
-        pg_inputs.append(
-            PermissionGroupCreateInput(
-                role_id=role_id,
-                scope_type=ScopeType.USER,
-                scope_id=str(user_id),
-            ).to_dict()
-        )
-    insert_skip_on_conflict(db_conn, get_permission_groups_table(), pg_inputs)
-
-    # Create permissions
-    str_user_ids = [str(uid) for uid in role_id_user_id_map.values()]
-    pg_ids = query_permission_groups_by_scope_ids(db_conn, str_user_ids)
+    # Create permissions directly (post-f41bbe0c0f12 denormalized schema)
+    permissions_table = _get_permissions_table()
     perm_inputs: list[dict[str, Any]] = []
-    for pg_id in pg_ids:
+    for role_id, user_id in role_id_user_id_map.items():
         for entity_type in ENTITY_TYPES_IN_ROLE:
             for operation in OPERATIONS_IN_ROLE:
-                perm_inputs.append(
-                    PermissionCreateInput(
-                        permission_group_id=pg_id,
-                        entity_type=entity_type,
-                        operation=operation,
-                    ).to_dict()
-                )
-    insert_skip_on_conflict(db_conn, get_permissions_table(), perm_inputs)
+                perm_inputs.append({
+                    "role_id": role_id,
+                    "scope_type": ScopeType.USER,
+                    "scope_id": str(user_id),
+                    "entity_type": entity_type,
+                    "operation": operation,
+                })
+    insert_skip_on_conflict(db_conn, permissions_table, perm_inputs)
 
     # Create user-role mappings
     ur_inputs: list[dict[str, Any]] = []

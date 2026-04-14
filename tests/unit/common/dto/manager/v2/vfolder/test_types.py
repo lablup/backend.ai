@@ -166,14 +166,18 @@ class TestVFolderOwnershipInfo:
     """Tests for VFolderOwnershipInfo sub-model."""
 
     def test_creation_with_all_none(self) -> None:
-        info = VFolderOwnershipInfo(user_id=None, project_id=None, creator_email=None)
+        info = VFolderOwnershipInfo(
+            user_id=None, project_id=None, creator_id=None, creator_email=None
+        )
         assert info.user_id is None
         assert info.project_id is None
         assert info.creator_email is None
 
     def test_creation_with_values(self) -> None:
         uid = uuid4()
-        info = VFolderOwnershipInfo(user_id=uid, project_id=None, creator_email="user@example.com")
+        info = VFolderOwnershipInfo(
+            user_id=uid, project_id=None, creator_id=uid, creator_email="user@example.com"
+        )
         assert info.user_id == uid
         assert info.creator_email == "user@example.com"
 

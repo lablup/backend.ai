@@ -102,6 +102,22 @@ class TestServiceConfigModel:
         assert model.resources == {"cpu": 4, "mem": "32g"}
         assert model.resource_opts == {"shmem": "2g"}
 
+    def test_with_fractional_resource_values(self) -> None:
+        model = ServiceConfigModel(
+            model="test-model",
+            scaling_group="default",
+            resources={"cpu": 4, "mem": "32g", "cuda.shares": 2.5},
+        )
+        assert model.resources == {"cpu": 4, "mem": "32g", "cuda.shares": 2.5}
+
+    def test_negative_float_resource_rejected(self) -> None:
+        with pytest.raises(ValidationError, match=r"greater than or equal to 0"):
+            ServiceConfigModel(
+                model="test-model",
+                scaling_group="default",
+                resources={"cuda.shares": -0.5},
+            )
+
 
 class TestNewServiceRequestModel:
     def test_minimal_creation(self) -> None:

@@ -102,7 +102,7 @@ Verify options with `--help`: `./bai {entity} {command} --help`
 For non-interactive environments (CI, Claude Code):
 
 ```bash
-BACKEND_USER=admin@lablup.com BACKEND_PASSWORD=changeme ./bai login
+BACKEND_USER=admin@lablup.com BACKEND_PASSWORD=wJalrXUt ./bai login
 ```
 
 Session cookie stored in `~/.backend.ai/session/cookie.dat`.

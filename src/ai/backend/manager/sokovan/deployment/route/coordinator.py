@@ -282,12 +282,13 @@ class RouteCoordinator:
                 )
                 for r in result.successes
             ]
+            updater_spec = RouteBatchUpdaterSpec(
+                status=transitions.success.status,
+                health_status=transitions.success.health_status,
+            )
             batch_updaters.append(
                 BatchUpdater(
-                    spec=RouteBatchUpdaterSpec(
-                        status=transitions.success.status,
-                        health_status=transitions.success.health_status,
-                    ),
+                    spec=updater_spec,
                     conditions=[
                         RouteConditions.by_ids(route_ids),
                         RouteConditions.by_lifecycle_statuses(target.lifecycle),

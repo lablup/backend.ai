@@ -132,6 +132,16 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.keypair_resource_policy.service import (
         KeypairResourcePolicyService,  # pants: no-infer-dep
     )
+    from ai.backend.manager.services.login_client_type.admin_service import (
+        LoginClientTypeAdminService,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.login_client_type.processors import (
+        LoginClientTypeAdminProcessors,  # pants: no-infer-dep
+        LoginClientTypeProcessors,  # pants: no-infer-dep
+    )
+    from ai.backend.manager.services.login_client_type.service import (
+        LoginClientTypeService,  # pants: no-infer-dep
+    )
     from ai.backend.manager.services.manager_admin.processors import (
         ManagerAdminProcessors,  # pants: no-infer-dep
     )
@@ -395,6 +405,8 @@ class Services:
     resource_allocation: ResourceAllocationService
     stream: StreamService
     events: EventsService
+    login_client_type: LoginClientTypeService
+    login_client_type_admin: LoginClientTypeAdminService
 
 
 @dataclass
@@ -457,6 +469,8 @@ class Processors(AbstractProcessorPackage):
     resource_allocation: ResourceAllocationProcessors
     stream: StreamProcessors
     events: EventsProcessors
+    login_client_type: LoginClientTypeProcessors
+    login_client_type_admin: LoginClientTypeAdminProcessors
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -512,4 +526,6 @@ class Processors(AbstractProcessorPackage):
             *self.resource_allocation.supported_actions(),
             *self.stream.supported_actions(),
             *self.events.supported_actions(),
+            *self.login_client_type.supported_actions(),
+            *self.login_client_type_admin.supported_actions(),
         ]

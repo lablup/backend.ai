@@ -7,6 +7,7 @@ Also provides data-to-DTO conversion functions.
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
 from ai.backend.common.dto.manager.auto_scaling_rule import (
     AutoScalingRuleDTO,
@@ -50,6 +51,7 @@ class AutoScalingRuleAdapter(BaseFilterAdapter):
             time_window=data.time_window,
             min_replicas=data.min_replicas,
             max_replicas=data.max_replicas,
+            prometheus_query_preset_id=data.prometheus_query_preset_id,
             created_at=data.created_at,
             last_triggered_at=data.last_triggered_at,
         )
@@ -66,6 +68,7 @@ class AutoScalingRuleAdapter(BaseFilterAdapter):
         time_window = OptionalState[int].nop()
         min_replicas = OptionalState[int].nop()
         max_replicas = OptionalState[int].nop()
+        prometheus_query_preset_id = OptionalState[UUID].nop()
 
         if request.metric_source is not None:
             metric_source = OptionalState.update(request.metric_source)
@@ -83,6 +86,8 @@ class AutoScalingRuleAdapter(BaseFilterAdapter):
             min_replicas = OptionalState.update(request.min_replicas)
         if request.max_replicas is not None:
             max_replicas = OptionalState.update(request.max_replicas)
+        if request.prometheus_query_preset_id is not None:
+            prometheus_query_preset_id = OptionalState.update(request.prometheus_query_preset_id)
 
         return ModelDeploymentAutoScalingRuleModifier(
             metric_source=metric_source,
@@ -93,6 +98,7 @@ class AutoScalingRuleAdapter(BaseFilterAdapter):
             time_window=time_window,
             min_replicas=min_replicas,
             max_replicas=max_replicas,
+            prometheus_query_preset_id=prometheus_query_preset_id,
         )
 
     def build_querier(self, request: SearchAutoScalingRulesRequest) -> BatchQuerier:
