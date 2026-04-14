@@ -24,6 +24,8 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
         user = current_user()
         if user is None:
             raise UserNotFound("User not found in context")
+        if user.is_superadmin:
+            return
 
         allowed = await self._repository.check_permission_with_scope_chain(
             ScopeChainPermissionCheckInput(

@@ -54,6 +54,8 @@ class LegacySingleEntityActionRBACValidator(SingleEntityActionValidator):
         user = current_user()
         if user is None:
             raise UserNotFound("User not found in context")
+        if user.is_superadmin:
+            return
 
         operation = action.operation_type().to_permission_operation()
         target = action.target_element()
@@ -93,6 +95,8 @@ class LegacyScopeActionRBACValidator(ScopeActionValidator):
         user = current_user()
         if user is None:
             raise UserNotFound("User not found in context")
+        if user.is_superadmin:
+            return
 
         operation = action.operation_type().to_permission_operation()
         entity_type = action.entity_type()
