@@ -1,6 +1,14 @@
 from collections.abc import Mapping, Set
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Self
+
+
+class LabelOperator(StrEnum):
+    EQUAL = "="
+    NOT_EQUAL = "!="
+    REGEX = "=~"
+    NOT_REGEX = "!~"
 
 
 @dataclass(frozen=True)
@@ -8,15 +16,15 @@ class LabelMatcher:
     """PromQL label matcher with an explicit operator."""
 
     value: str
-    operator: str = "="
+    operator: LabelOperator = LabelOperator.EQUAL
 
     @classmethod
     def exact(cls, value: str) -> Self:
-        return cls(value=value, operator="=")
+        return cls(value=value, operator=LabelOperator.EQUAL)
 
     @classmethod
     def regex(cls, value: str) -> Self:
-        return cls(value=value, operator="=~")
+        return cls(value=value, operator=LabelOperator.REGEX)
 
 
 def _escape_label_value(value: str) -> str:
