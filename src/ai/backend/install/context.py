@@ -590,6 +590,21 @@ class Context(metaclass=ABCMeta):
                 data["redis"]["password"] = halfstack.redis_password
         (base_path / "etcd.config.json").write_text(json.dumps(data))
         await self.etcd_put_json("config", data)
+        public_addr = self.install_variable.public_facing_address
+        manager_port = self.install_info.service_config.manager_addr.bind.port
+        self.sed_in_place(
+            toml_path,
+            re.compile(r"^internal-addr = .*$", flags=re.MULTILINE),
+            f'internal-addr = {{ host = "0.0.0.0", port = 18080 }}\n'
+            f'announce-addr = {{ host = "{public_addr}", port = {manager_port} }}\n'
+            f'announce-internal-addr = {{ host = "{public_addr}", port = 18080 }}',
+        )
+        if self.install_variable.otel_endpoint:
+            self.sed_in_place(
+                toml_path,
+                'endpoint = "http://127.0.0.1:4317"',
+                f'endpoint = "{self.install_variable.otel_endpoint}"',
+            )
 
     async def configure_agent(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -640,6 +655,21 @@ class Context(metaclass=ABCMeta):
             re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.MULTILINE),
             f"allow-compute-plugins = [{', '.join(plugin_list)}]",
         )
+        public_addr = self.install_variable.public_facing_address
+        self.sed_in_place(
+            toml_path,
+            re.compile(
+                r'^service-addr = \{ host = "0\.0\.0\.0", port = 6003 \}', flags=re.MULTILINE
+            ),
+            f'service-addr = {{ host = "0.0.0.0", port = 6003 }}\n'
+            f'announce-addr = {{ host = "{public_addr}", port = 6003 }}',
+        )
+        if self.install_variable.otel_endpoint:
+            self.sed_in_place(
+                toml_path,
+                'endpoint = "http://127.0.0.1:4317"',
+                f'endpoint = "{self.install_variable.otel_endpoint}"',
+            )
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -701,9 +731,23 @@ class Context(metaclass=ABCMeta):
             manager_facing_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
             data["api"]["manager"]["service-addr"] = manager_facing_addr_table  # type: ignore
             data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key  # type: ignore
+            announce_addr_table = tomlkit.inline_table()
+            announce_addr_table["host"] = self.install_variable.public_facing_address
+            announce_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
+            data["api"]["manager"]["announce-addr"] = announce_addr_table  # type: ignore
+            announce_internal_table = tomlkit.inline_table()
+            announce_internal_table["host"] = self.install_variable.public_facing_address
+            announce_internal_table["port"] = 16023
+            data["api"]["manager"]["announce-internal-addr"] = announce_internal_table  # type: ignore
             data["volume"]["volume1"]["path"] = service.vfolder_relpath  # type: ignore
         with toml_path.open("w") as fp:
             tomlkit.dump(data, fp)
+        if self.install_variable.otel_endpoint:
+            self.sed_in_place(
+                toml_path,
+                'endpoint = "http://127.0.0.1:4317"',
+                f'endpoint = "{self.install_variable.otel_endpoint}"',
+            )
 
     async def configure_webserver(self) -> None:
         conf_path = self.copy_config("webserver.conf")
@@ -767,6 +811,12 @@ class Context(metaclass=ABCMeta):
             data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
+        if self.install_variable.otel_endpoint:
+            self.sed_in_place(
+                conf_path,
+                'endpoint = "http://127.0.0.1:4317"',
+                f'endpoint = "{self.install_variable.otel_endpoint}"',
+            )
 
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
@@ -900,6 +950,9 @@ class Context(metaclass=ABCMeta):
             if tls_advertised:
                 data["proxy_coordinator"]["tls_advertised"] = True  # type: ignore[index]
                 data["proxy_coordinator"]["advertised_addr"]["port"] = advertised_port  # type: ignore[index]
+            data["proxy_coordinator"]["metric_access_allowed_hosts"] = (  # type: ignore[index]
+                self.install_variable.metric_access_cidr
+            )
         with coord_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -966,6 +1019,9 @@ class Context(metaclass=ABCMeta):
             else:
                 # update port_proxy.advertised_host
                 data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
+            data["proxy_worker"]["metric_access_allowed_hosts"] = (  # type: ignore[index]
+                self.install_variable.metric_access_cidr
+            )
         with worker_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -984,6 +1040,13 @@ class Context(metaclass=ABCMeta):
                 ),
             ],
         )
+        if self.install_variable.otel_endpoint:
+            for conf in (coord_conf, worker_conf):
+                self.sed_in_place(
+                    conf,
+                    'endpoint = "http://127.0.0.1:4317"',
+                    f'endpoint = "{self.install_variable.otel_endpoint}"',
+                )
 
     async def configure_appproxy_fixture(self) -> None:
         self.log_header("Updating manager scaling_groups to point to appproxy coordinator...")
