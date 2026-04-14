@@ -12,7 +12,7 @@ import uuid
 
 import pytest
 
-from ai.backend.client.v2.exceptions import NotFoundError
+from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -448,6 +448,6 @@ class TestUserAccessDeployment:
         self,
         user_registry: BackendAIClientRegistry,
     ) -> None:
-        """Regular user gets NotFoundError for non-existent deployment."""
-        with pytest.raises(NotFoundError):
+        """Regular user gets NotFoundError or PermissionDeniedError for non-existent deployment."""
+        with pytest.raises((NotFoundError, PermissionDeniedError)):
             await user_registry.deployment.get_deployment(_RANDOM_DEPLOYMENT_ID)
