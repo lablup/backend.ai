@@ -390,30 +390,28 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         return result
 
     @classmethod
-    async def from_dataclass(
+    def from_dataclass(
         cls,
         ctx: GraphQueryContext,
         session_data: SessionData,
+        main_access_key: str | None,
         *,
         permissions: Iterable[ComputeSessionPermission] | None = None,
     ) -> Self:
+        """Build a ``ComputeSessionNode`` from session data.
+
+        ``main_access_key`` must be pre-resolved by the caller (typically
+        via ``UserRepository.get_main_access_key_by_id(session_data.owner_id)``
+        or by eagerly loading ``session_data.owner``). Keeping the helper
+        synchronous avoids a hidden per-session DB query and lets the
+        caller batch the lookup across nodes.
+        """
         status_history = session_data.status_history or {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
         if not session_data.vfolder_mounts:
             vfolder_mounts = []
         else:
             vfolder_mounts = [vf.vfid.folder_id for vf in session_data.vfolder_mounts]
-
-        # access_key on this node is the owner's main_access_key. When the
-        # caller hasn't eagerly loaded session_data.owner, fall back to the
-        # user repository so the required field is always populated from the
-        # always-present owner_id.
-        if session_data.owner is not None:
-            main_access_key = session_data.owner.main_access_key
-        else:
-            main_access_key = await ctx.user_repository.get_main_access_key_by_id(
-                session_data.owner_id
-            )
 
         result = cls(
             # identity
@@ -925,8 +923,14 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):  # type: ignore[mis
             )
         )
 
+        session_data = result.session_data
+        main_access_key = (
+            session_data.owner.main_access_key
+            if session_data.owner
+            else await graph_ctx.user_repository.get_main_access_key_by_id(session_data.owner_id)
+        )
         return ModifyComputeSession(
-            await ComputeSessionNode.from_dataclass(graph_ctx, result.session_data),
+            ComputeSessionNode.from_dataclass(graph_ctx, session_data, main_access_key),
             input.get("client_mutation_id"),
         )
 
@@ -976,8 +980,16 @@ class CheckAndTransitStatus(graphene.Mutation):  # type: ignore[misc]
                     )
                 )
             )
+            session_data = action_result.session_data
+            main_access_key = (
+                session_data.owner.main_access_key
+                if session_data.owner
+                else await graph_ctx.user_repository.get_main_access_key_by_id(
+                    session_data.owner_id
+                )
+            )
             session_nodes.append(
-                await ComputeSessionNode.from_dataclass(graph_ctx, action_result.session_data)
+                ComputeSessionNode.from_dataclass(graph_ctx, session_data, main_access_key)
             )
 
         return CheckAndTransitStatus(session_nodes, input.get("client_mutation_id"))

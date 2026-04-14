@@ -524,8 +524,9 @@ async def parse_resource_usage_groups(
             last_stat=stat_map.get(kern.id),
             user_id=kern.session.user_uuid,
             user_email=kern.session.user.email if kern.session.user is not None else None,
-            # TODO(BA-5609 phase D): resolve access_key from owner via
-            # users.main_access_key. SessionRow.access_key has been removed.
+            # The old ``SessionRow.access_key`` column is being dropped in a
+            # later slice; source the keypair access_key from the owner's
+            # ``main_access_key`` instead.
             access_key=(
                 kern.session.user.main_access_key if kern.session.user is not None else None
             ),
@@ -557,8 +558,9 @@ SESSION_RESOURCE_SELECT_COLS = (
     SessionRow.domain_name,
     SessionRow.id,
     SessionRow.group_id,
-    # TODO(BA-5609 phase D): SessionRow.access_key removed. Callers should
-    # join UserRow and read users.main_access_key when an access_key is needed.
+    # SessionRow.access_key is deprecated (removed in a later slice); callers
+    # that need the keypair access_key should join UserRow and read
+    # users.main_access_key instead.
     SessionRow.images,
     SessionRow.cluster_mode,
     SessionRow.status_history,
@@ -611,7 +613,12 @@ def _parse_query(
         session_load.options(
             load_only(*SESSION_RESOURCE_SELECT_COLS),
             joinedload(SessionRow.user).options(
-                load_only(UserRow.email, UserRow.username, UserRow.full_name)
+                load_only(
+                    UserRow.email,
+                    UserRow.username,
+                    UserRow.full_name,
+                    UserRow.main_access_key,
+                )
             ),
             project_load.options(load_only(*PROJECT_RESOURCE_SELECT_COLS)),
         ),

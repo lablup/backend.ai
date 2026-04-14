@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives.hashes import SHA256
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
@@ -31,7 +31,6 @@ from ai.backend.manager.models.base import (
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
     from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow
-    from ai.backend.manager.models.session import SessionRow
     from ai.backend.manager.models.user import UserRow
 
 __all__: Sequence[str] = (
@@ -46,13 +45,6 @@ __all__: Sequence[str] = (
 
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
-
-
-# Defined for avoiding circular import
-def _get_session_row_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.session import SessionRow
-
-    return KeyPairRow.access_key == foreign(SessionRow.access_key)
 
 
 class KeyPairRow(Base):  # type: ignore[misc]
@@ -100,12 +92,6 @@ class KeyPairRow(Base):  # type: ignore[misc]
     )
 
     # Relationships
-    sessions: Mapped[list[SessionRow]] = relationship(
-        "SessionRow",
-        primaryjoin=_get_session_row_join_condition,
-        foreign_keys="SessionRow.access_key",
-        back_populates="access_key_row",
-    )
     resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship(
         "KeyPairResourcePolicyRow", back_populates="keypairs"
     )

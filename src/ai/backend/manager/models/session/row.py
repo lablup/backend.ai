@@ -1333,7 +1333,8 @@ class SessionRow(Base):  # type: ignore[misc]
     ) -> list[SessionRow]:
         """
         Match the prefix of session ID or session name among the sessions
-        that belongs to the given access key, and return the list of SessionRow.
+        that belong to the given owner (``owner_id``), and return the list
+        of ``SessionRow``.
         """
 
         if isinstance(session_reference, list):
@@ -1403,12 +1404,12 @@ class SessionRow(Base):  # type: ignore[misc]
     ) -> SessionRow:
         """
         Retrieve the session information by session's UUID,
-        or session's name paired with access_key.
+        or session's name paired with ``owner_id``.
         This will return the information of the session and the sibling kernel(s).
 
         :param db_session: Database connection to use when fetching row.
         :param session_name_or_id: Name or ID (UUID) of session to look up.
-        :param access_key: Access key used to create session.
+        :param owner_id: UUID of the session owner; required when ``session_name_or_id`` is a name.
         :param allow_stale: If set to True, filter "inactive" sessions as well as "active" ones.
                             Otherwise filter "active" sessions only.
         :param for_update: Apply for_update during executing select query.
