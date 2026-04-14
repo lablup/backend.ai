@@ -12,7 +12,7 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
 )
 from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.preset import MetricPreset
+from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.permission.types import RBACElementType
@@ -762,7 +762,7 @@ class DeploymentExecutor:
         preset_data: PrometheusQueryPresetData = presets[preset_id]
 
         # Auto-inject deployment-specific label for scoping
-        labels: dict[str, str] = {"model_service_name": deployment.metadata.name}
+        labels = {"model_service_name": LabelMatcher.exact(deployment.metadata.name)}
 
         # time_window: preset default → fallback to "5m"
         time_window = preset_data.time_window or "5m"

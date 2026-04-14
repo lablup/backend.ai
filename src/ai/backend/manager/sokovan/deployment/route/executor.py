@@ -193,6 +193,11 @@ class RouteExecutor:
                 with RouteRecorderContext.shared_step("fetch_kernel_connection_info"):
                     await self._populate_replica_info(routes_missing_replica)
 
+        # Phase 4: Ensure RouteHealthRecords exist in Valkey for routes with replica info
+        routes_with_replica = [r for r in successes if r.replica_host and r.replica_port]
+        if routes_with_replica:
+            await self._ensure_health_records(routes_with_replica)
+
         return RouteExecutionResult(
             successes=successes,
             errors=errors,
@@ -220,6 +225,29 @@ class RouteExecutor:
         if populated_routes:
             await self._initialize_health_records(populated_routes, updates)
 
+    async def _ensure_health_records(self, routes: Sequence[RouteData]) -> None:
+        """Ensure RouteHealthRecords exist in Valkey for routes that already have replica info.
+
+        Routes may already have replica_host/port in DB (set by a previous cycle or legacy code)
+        but lack a RouteHealthRecord in Valkey. This method checks and initializes missing records.
+        """
+        route_id_strs = [str(r.route_id) for r in routes]
+        existing = await self._valkey_schedule.get_route_health_records_batch(route_id_strs)
+        missing = [r for r in routes if existing.get(str(r.route_id)) is None]
+        if not missing:
+            return
+        log.warning(
+            "RouteHealthRecord missing in Valkey for {} routes, re-initializing: {}",
+            len(missing),
+            [str(r.route_id)[:8] for r in missing],
+        )
+        replica_info = {
+            r.route_id: (r.replica_host, r.replica_port)
+            for r in missing
+            if r.replica_host and r.replica_port
+        }
+        await self._initialize_health_records(missing, replica_info)
+
     async def _initialize_health_records(
         self,
         routes: Sequence[RouteData],
@@ -230,6 +258,14 @@ class RouteExecutor:
         health_configs = await self._deployment_repo.fetch_health_check_configs_by_revision_ids(
             revision_ids
         )
+        redis_time = await self._valkey_schedule.get_redis_time()
+
+        # Read existing running_at values that were set when routes transitioned to RUNNING
+        # These may be in partial hashes (only running_at field), so read raw field directly
+        running_at_map = await self._valkey_schedule.get_route_running_at_batch([
+            str(r.route_id) for r in routes
+        ])
+
         records: list[RouteHealthRecord] = []
         for route in routes:
             host, port = replica_info[route.route_id]
@@ -238,16 +274,21 @@ class RouteExecutor:
             health_path = health_config.path if health_config else "/"
             initial_delay = health_config.initial_delay if health_config else 60.0
             created_at = int(route.created_at.timestamp())
-            initial_delay_until = created_at + int(initial_delay)
+
+            # Use running_at from Valkey (set at RUNNING transition), fallback to redis_time
+            route_id_str = str(route.route_id)
+            running_at = running_at_map.get(route_id_str) or redis_time
+            initial_delay_until = running_at + int(initial_delay)
 
             records.append(
                 RouteHealthRecord(
-                    route_id=str(route.route_id),
+                    route_id=route_id_str,
                     created_at=created_at,
                     initial_delay_until=initial_delay_until,
                     health_path=health_path,
                     inference_port=port,
                     replica_host=host,
+                    running_at=running_at,
                 )
             )
 

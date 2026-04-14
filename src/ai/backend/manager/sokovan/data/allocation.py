@@ -80,6 +80,7 @@ class SessionAllocation:
     kernel_allocations: list[KernelAllocation]
     # List of agent allocations for this session
     agent_allocations: list[AgentAllocation]
+    # Owner's resolved main_access_key; required for keypair-scoped concurrency tracking and resource policy lookups.
     main_access_key: AccessKey
     # Phases that passed during scheduling
     passed_phases: list[SchedulingPredicate] = field(default_factory=list)
@@ -140,7 +141,7 @@ class SessionAllocation:
             scaling_group=scaling_group,
             kernel_allocations=kernel_allocations,
             agent_allocations=agent_allocations,
-            access_key=session_workload.main_access_key,
+            main_access_key=session_workload.main_access_key,
         )
 
     def unique_agent_ids(self) -> list[AgentId]:

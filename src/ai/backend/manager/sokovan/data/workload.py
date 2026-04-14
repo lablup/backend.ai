@@ -77,6 +77,7 @@ class SessionWorkload:
 
     # Session identifier
     session_id: SessionId
+    # Owner's resolved main_access_key; required for keypair-scoped concurrency tracking and resource policy lookups.
     main_access_key: AccessKey
     # Resource requirements
     requested_slots: ResourceSlot

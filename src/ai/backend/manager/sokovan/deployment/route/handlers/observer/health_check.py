@@ -73,6 +73,11 @@ class RouteHealthObserver(RouteObserver):
                 targets.append((route_id_str, record))
 
         if not targets:
+            if checkable:
+                log.warning(
+                    "Health observer: {} checkable routes but 0 have records in Valkey",
+                    len(checkable),
+                )
             return RouteObservationResult(observed_count=0)
 
         # Perform HTTP health checks in parallel
