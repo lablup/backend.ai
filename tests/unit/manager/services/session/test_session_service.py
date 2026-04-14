@@ -1712,8 +1712,8 @@ class TestSearchKernels:
                 session_type=SessionTypes.INTERACTIVE,
             ),
             user_permission=UserPermission(
-                user_uuid=user_id,
-                access_key="TESTKEY",
+                owner_id=user_id,
+                main_access_key="TESTKEY",
                 domain_name="default",
                 group_id=group_id,
                 uid=1000,

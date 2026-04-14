@@ -820,9 +820,8 @@ class KernelRow(Base):  # type: ignore[misc]
             else:
                 self.status_data = dict(status_data)
 
-    def delegate_ownership(self, user_uuid: uuid.UUID, access_key: AccessKey) -> None:
-        self.user_uuid = user_uuid
-        self.access_key = access_key
+    def delegate_ownership(self, owner_id: uuid.UUID) -> None:
+        self.user_uuid = owner_id
 
     @classmethod
     async def set_kernel_status(
@@ -945,8 +944,7 @@ class KernelRow(Base):  # type: ignore[misc]
             agent_addr=info.resource.agent_addr,
             domain_name=info.user_permission.domain_name,
             group_id=info.user_permission.group_id,
-            user_uuid=info.user_permission.user_uuid,
-            access_key=info.user_permission.access_key,
+            user_uuid=info.user_permission.owner_id,
             image=info.image.identifier.canonical if info.image.identifier else None,
             architecture=info.image.identifier.architecture if info.image.identifier else None,
             registry=info.image.registry,
@@ -1002,8 +1000,8 @@ class KernelRow(Base):  # type: ignore[misc]
                 session_type=self.session_type,
             ),
             user_permission=UserPermission(
-                user_uuid=self.user_uuid,
-                access_key=self.access_key or "",
+                owner_id=self.user_uuid,
+                main_access_key=self.user_row.main_access_key if self.user_row else None,
                 domain_name=self.domain_name,
                 group_id=self.group_id,
                 uid=self.uid,
@@ -1113,12 +1111,19 @@ async def recalc_concurrency_used(
 ) -> None:
     from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
 
+    # TODO(BA-5609 phase D): kernels.access_key is removed. Resolve the
+    # owner_id for this access_key (via users.main_access_key) and filter by
+    # KernelRow.user_uuid instead. The join below is a temporary shim that
+    # selects kernels whose owning user has main_access_key == access_key.
+    owner_id_subq = (
+        sa.select(users.c.uuid).where(users.c.main_access_key == access_key).scalar_subquery()
+    )
     async with db_sess.begin_nested():
         result = await db_sess.execute(
             sa.select(sa.func.count())
             .select_from(KernelRow)
             .where(
-                (KernelRow.access_key == access_key)
+                (KernelRow.user_uuid == owner_id_subq)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                 & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
             ),
@@ -1128,7 +1133,7 @@ async def recalc_concurrency_used(
             sa.select(sa.func.count())
             .select_from(KernelRow)
             .where(
-                (KernelRow.access_key == access_key)
+                (KernelRow.user_uuid == owner_id_subq)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                 & (KernelRow.session_type.in_(PRIVATE_SESSION_TYPES))
             ),
